@@ -4,6 +4,7 @@ import { AddBodyMeasurementsModal } from '../../diary-modals';
 import { getWeightLog, saveWeightLog, type WeightEntry } from '../../../../../engines/profile-store';
 import { strengthDiary } from '../../../../../engines/strength-diary.engine';
 import { generateInsights, type DiarySession, type DiarySet } from '../../../../../engines/diary-insights.engine';
+import { projectWeight, calcFFMI } from '../../../../../engines/body-composition.engine';
 import {
   buildWeeklyHistogram,
   compareWithLastWeek,
@@ -23,6 +24,31 @@ import {
   type SortState,
 } from '../../diary-helpers';
 import type { DiaryWindowProps } from '../../DiaryWindow';
+import { WeightDiaryVisuals } from './WeightDiary.visuals';
+import { OverlayChart, ChartLegend, FIELD_COLORS, FIELD_LABELS, PERCENT_FIELDS, type OverlayChartProps } from './WeightChart';
+import { AnimatedCounter } from '@/ui/components/AnimatedCounter';
+
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  @keyframes countUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .wd-card { animation: fadeIn 0.35s ease; transition: transform 0.2s, box-shadow 0.2s; }
+  .wd-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .wd-row { animation: fadeIn 0.3s ease; transition: background 0.15s; }
+  .wd-row:hover { background: '#27272a' !important; }
+  .wd-badge { animation: slideIn 0.25s ease; }
+  .wd-stat-value { animation: countUp 0.4s ease; }
+  .wd-btn { transition: background 0.2s, transform 0.15s; }
+  .wd-btn:hover { transform: scale(1.02); }
+  .wd-btn:active { transform: scale(0.98); }
+  @media (max-width: 480px) {
+    .wd-chart-wrap svg { min-height: 180px; }
+    .wd-table-wrap { overflow-x: auto; }
+  }
+`;
+if (typeof document !== 'undefined') document.head.appendChild(style);
 
 const button: React.CSSProperties = {
   minHeight: 38,
@@ -40,7 +66,14 @@ const FIELDS = [
   'chestCm',
   'hipCm',
   'bicepCm',
+  'bicepLeftCm',
+  'bicepRightCm',
   'thighCm',
+  'thighLeftCm',
+  'thighRightCm',
+  'calfCm',
+  'calfLeftCm',
+  'calfRightCm',
   'neckCm',
   'forearmCm',
   'bodyFat',
@@ -54,7 +87,14 @@ const LABELS: Record<Field, string> = {
   chestCm: 'Грудь',
   hipCm: 'Бёдра',
   bicepCm: 'Бицепс',
+  bicepLeftCm: 'Бицепс L',
+  bicepRightCm: 'Бицепс R',
   thighCm: 'Бедро',
+  thighLeftCm: 'Бедро L',
+  thighRightCm: 'Бедро R',
+  calfCm: 'Икры',
+  calfLeftCm: 'Икра L',
+  calfRightCm: 'Икра R',
   neckCm: 'Шея',
   forearmCm: 'Предплечье',
   bodyFat: '% жира',
@@ -67,7 +107,14 @@ const UNIT: Record<Field, string> = {
   chestCm: 'см',
   hipCm: 'см',
   bicepCm: 'см',
+  bicepLeftCm: 'см',
+  bicepRightCm: 'см',
   thighCm: 'см',
+  thighLeftCm: 'см',
+  thighRightCm: 'см',
+  calfCm: 'см',
+  calfLeftCm: 'см',
+  calfRightCm: 'см',
   neckCm: 'см',
   forearmCm: 'см',
   bodyFat: '%',
@@ -141,65 +188,6 @@ const loadTraining = async (): Promise<TrainingState> => {
 const pointsFor = (rows: WeightEntry[], field: Field): { date: string; value: number }[] =>
   rows.map((r) => ({ date: r.date, value: Number(r[field]) })).filter((x) => Number.isFinite(x.value));
 
-const Chart: React.FC<{
-  points: { date: string; value: number }[];
-  color: string;
-  target?: number;
-  onSvg: (x: SVGSVGElement) => void;
-  onPng: (x: SVGSVGElement) => void;
-}> = ({ points, color, target, onSvg, onPng }) => {
-  const ref = useRef<SVGSVGElement>(null);
-  if (!points.length)
-    return <div style={{ padding: 20, color: colors.textMuted }}>Недостаточно данных для графика.</div>;
-  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const values = sorted.map((x) => x.value);
-  const min = Math.min(...values, target ?? Infinity);
-  const max = Math.max(...values, target ?? -Infinity);
-  const pad = Math.max((max - min) * 0.12, 1);
-  const lo = min - pad;
-  const hi = max + pad;
-  const x = (i: number) => 42 + (i * 540) / Math.max(1, sorted.length - 1);
-  const y = (v: number) => 170 - ((v - lo) / (hi - lo)) * 140;
-  const path = sorted.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-        <button style={button} onClick={() => ref.current && onSvg(ref.current)}>
-          SVG
-        </button>
-        <button style={button} onClick={() => ref.current && onPng(ref.current)}>
-          PNG
-        </button>
-      </div>
-      <svg ref={ref} viewBox="0 0 600 200" width="100%" role="img" aria-label="График веса и замеров">
-        <line x1="42" y1="170" x2="582" y2="170" stroke="#555" />
-        <line x1="42" y1="30" x2="42" y2="170" stroke="#555" />
-        {[0, 1, 2, 3, 4].map((i) => (
-          <line key={i} x1="42" y1={30 + i * 35} x2="582" y2={30 + i * 35} stroke="#ffffff12" />
-        ))}
-        <path d={path} fill="none" stroke={color} strokeWidth="3" />
-        {sorted.map((p, i) => (
-          <circle key={`${p.date}-${i}`} cx={x(i)} cy={y(p.value)} r="3" fill={color} />
-        ))}
-        {target !== undefined && (
-          <>
-            <line x1="42" y1={y(target)} x2="582" y2={y(target)} stroke="#22c55e" strokeDasharray="5 4" />
-            <text x="578" y={y(target) - 4} textAnchor="end" fill="#22c55e" fontSize="10">
-              цель {target}
-            </text>
-          </>
-        )}
-        <text x="42" y="194" fill="#aaa" fontSize="10">
-          {sorted[0].date}
-        </text>
-        <text x="582" y="194" textAnchor="end" fill="#aaa" fontSize="10">
-          {sorted.at(-1)?.date}
-        </text>
-      </svg>
-    </div>
-  );
-};
-
 export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDataChange }) => {
   const [rows, setRows] = useState<WeightEntry[]>([]);
   const [modal, setModal] = useState(false);
@@ -210,10 +198,17 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<WeightEntry>>({});
   const [undo, setUndo] = useState<WeightEntry[] | null>(null);
+  const [viewPhoto, setViewPhoto] = useState<{ src: string; date: string } | null>(null);
   const [training, setTraining] = useState<TrainingState | null>(null);
   const [goal, setGoal] = useState(goals?.weightKg || 0);
-  const [chartField, setChartField] = useState<Field>('weight');
+  const [activeChartFields, setActiveChartFields] = useState<Field[]>(['weight', 'bodyFat', 'muscleMass']);
+  const [profileHeight, setProfileHeight] = useState<number | undefined>();
+  const [profileSex, setProfileSex] = useState<'male' | 'female' | undefined>();
   const svgName = `weight-${todayIso()}`;
+  const toggleChartField = (f: Field) =>
+    setActiveChartFields(prev =>
+      prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]
+    );
   useEffect(() => {
     if (!open) return;
     setRows(getWeightLog());
@@ -222,6 +217,16 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       setGoal(Number.isFinite(stored) && stored > 0 ? stored : goals?.weightKg || 0);
     } catch {
       setGoal(goals?.weightKg || 0);
+    }
+    try {
+      const raw = localStorage.getItem('he_training_profile');
+      if (raw) {
+        const profile = JSON.parse(raw);
+        if (profile.bodyHeightCm) setProfileHeight(Number(profile.bodyHeightCm));
+        if (profile.sex) setProfileSex(profile.sex);
+      }
+    } catch {
+      /* ignore */
     }
   }, [open, goals?.weightKg]);
   useEffect(() => {
@@ -271,7 +276,64 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     return sortEntries(v, sort);
   }, [entries, range, query, sort]);
   const pageData = paginate(filtered, page, 8);
-  const chartPoints = pointsFor(rows, chartField);
+  const chartSeries = useMemo<OverlayChartProps['series']>(() => {
+    if (activeChartFields.length === 0) return [];
+    const series: OverlayChartProps['series'] = activeChartFields.map(f => ({
+      field: f,
+      points: pointsFor(rows, f),
+      color: FIELD_COLORS[f] || '#888',
+      useRightAxis: PERCENT_FIELDS.has(f),
+    }));
+    if (profileHeight && rows.some(r => r.bodyFat !== undefined)) {
+      const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+      const ffmiPoints = sorted
+        .filter(r => r.bodyFat !== undefined && Number.isFinite(r.bodyFat))
+        .map(r => {
+          const bf = r.bodyFat as number;
+          const ffmi = calcFFMI(r.weight, profileHeight, bf);
+          return { date: r.date, value: ffmi };
+        });
+      if (ffmiPoints.length > 0) {
+        series.push({
+          field: 'ffmi',
+          points: ffmiPoints,
+          color: '#a78bfa',
+          useRightAxis: true,
+        });
+      }
+    }
+    return series;
+  }, [rows, activeChartFields, profileHeight]);
+  const chartProjection = useMemo(() => {
+    if (goal <= 0 || rows.length < 3) return [] as OverlayChartProps['projections'];
+    const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+    const last = sorted[sorted.length - 1];
+    const first = sorted[0];
+    const daysDiff = (Date.parse(last.date) - Date.parse(first.date)) / 86400000;
+    if (daysDiff <= 0) return [];
+    const weeklyRate = ((last.weight - first.weight) / daysDiff) * 7;
+    const proj = projectWeight(last.weight, weeklyRate, goal, 12);
+    return proj.map(p => ({ date: p.date, value: p.weight }));
+  }, [rows, goal]);
+  const chartNotes = useMemo(() => rows.filter(r => r.notes).map(r => ({ date: r.date, text: r.notes! })), [rows]);
+  const rightAxis = useMemo(() => {
+    const rightFields = activeChartFields.filter(f => PERCENT_FIELDS.has(f));
+    const rightValues: number[] = [];
+    rightFields.forEach(f => {
+      const pts = pointsFor(rows, f);
+      rightValues.push(...pts.map(p => p.value));
+    });
+    if (profileHeight && rows.some(r => r.bodyFat !== undefined)) {
+      const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+      sorted.filter(r => r.bodyFat !== undefined && Number.isFinite(r.bodyFat)).forEach(r => {
+        rightValues.push(calcFFMI(r.weight, profileHeight, r.bodyFat as number));
+      });
+    }
+    if (rightValues.length === 0) return undefined;
+    const min = Math.min(...rightValues);
+    const max = Math.max(...rightValues);
+    return { min, max, label: '% / FFMI', ticks: 5 };
+  }, [rows, activeChartFields, profileHeight]);
   const weightPoints = pointsFor(rows, 'weight');
   const distribution = computeDistribution(weightPoints.map((x) => x.value));
   const extremes = computeExtremes('weight', entries);
@@ -294,6 +356,42 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       waistDelta: latest.waistCm !== undefined && first?.waistCm !== undefined ? latest.waistCm - first.waistCm : null,
     };
   }, [rows]);
+
+  const interpretWeight = (delta: number, goal: number): string => {
+    if (goal > 0 && Math.abs(delta) <= 1) return 'На цели';
+    if (delta > 1.5) return 'Рост веса';
+    if (delta > 0.5) return 'Небольшой рост';
+    if (delta < -1.5) return 'Снижение веса';
+    if (delta < -0.5) return 'Небольшое снижение';
+    return 'Стабильно';
+  };
+
+  const interpretFat = (delta: number | null): string => {
+    if (delta === null) return '';
+    if (delta < -1) return 'Жир снижается — отлично';
+    if (delta < -0.3) return 'Жир немного снизился';
+    if (delta > 1) return 'Жир растёт';
+    if (delta > 0.3) return 'Жир немного вырос';
+    return 'Жир стабилен';
+  };
+
+  const interpretMuscle = (delta: number | null): string => {
+    if (delta === null) return '';
+    if (delta > 0.8) return 'Мышечный рост';
+    if (delta > 0.2) return 'Небольшой рост мышц';
+    if (delta < -0.8) return 'Потеря мышц — внимательно';
+    if (delta < -0.2) return 'Небольшая потеря мышц';
+    return 'Мышцы стабильны';
+  };
+
+  const interpretWaist = (delta: number | null): string => {
+    if (delta === null) return '';
+    if (delta < -1) return 'Талия уменьшилась — хорошая рекомпозиция';
+    if (delta < -0.3) return 'Талия немного уменьшилась';
+    if (delta > 1) return 'Талия увеличилась';
+    if (delta > 0.3) return 'Талия немного выросла';
+    return 'Талия стабильна';
+  };
   const bodyCorrelations = useMemo(
     () =>
       FIELDS.filter((field): field is Exclude<Field, 'weight'> => field !== 'weight')
@@ -343,6 +441,81 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     );
     setEditing(null);
   };
+  const badgeFor = (field: Field, value: number | undefined, row: WeightEntry): React.ReactNode => {
+    if (value === undefined || value === null || !Number.isFinite(value)) return null;
+    const sex = profileSex;
+    const isMale = sex === 'male';
+    switch (field) {
+      case 'bodyFat': {
+        if (isMale) {
+          if (value < 10) return <span style={badge('blue')}>Low</span>;
+          if (value <= 20) return <span style={badge('green')}>Norm</span>;
+          if (value <= 25) return <span style={badge('orange')}>High</span>;
+          return <span style={badge('red')}>V.High</span>;
+        }
+        if (value < 18) return <span style={badge('blue')}>Low</span>;
+        if (value <= 28) return <span style={badge('green')}>Norm</span>;
+        if (value <= 32) return <span style={badge('orange')}>High</span>;
+        return <span style={badge('red')}>V.High</span>;
+      }
+      case 'muscleMass': {
+        const median = isMale ? 34 : 24;
+        const diff = value - median;
+        if (Math.abs(diff) < 3) return <span style={badge('green')}>≈med</span>;
+        if (diff > 0) return <span style={badge('green')}>▲ +{diff.toFixed(1)}</span>;
+        return <span style={badge('red')}>▼ {diff.toFixed(1)}</span>;
+      }
+      case 'waistCm': {
+        if (isMale) {
+          if (value < 80) return <span style={badge('blue')}>Low</span>;
+          if (value <= 94) return <span style={badge('green')}>Norm</span>;
+          if (value <= 102) return <span style={badge('orange')}>High</span>;
+          return <span style={badge('red')}>V.High</span>;
+        }
+        if (value < 70) return <span style={badge('blue')}>Low</span>;
+        if (value <= 80) return <span style={badge('green')}>Norm</span>;
+        if (value <= 88) return <span style={badge('orange')}>High</span>;
+        return <span style={badge('red')}>V.High</span>;
+      }
+      case 'weight': {
+        const g = goal;
+        if (!g || g <= 0) return null;
+        const d = value - g;
+        if (Math.abs(d) <= 1) return <span style={badge('green')}>✓ Goal</span>;
+        if (d > 0) return <span style={badge('orange')}>▲ +{d.toFixed(1)}</span>;
+        return <span style={badge('blue')}>▼ {d.toFixed(1)}</span>;
+      }
+      case 'bicepCm':
+      case 'thighCm':
+      case 'calfCm': {
+        const leftKey = `${field.slice(0, -2)}LeftCm` as keyof WeightEntry;
+        const rightKey = `${field.slice(0, -2)}RightCm` as keyof WeightEntry;
+        const left = row[leftKey];
+        const right = row[rightKey];
+        if (left !== undefined && right !== undefined && Number.isFinite(left as number) && Number.isFinite(right as number)) {
+          const diff = Math.abs((left as number) - (right as number));
+          if (diff > 1) return <span style={badge('red')}>Δ {diff.toFixed(1)}</span>;
+          if (diff > 0.5) return <span style={badge('orange')}>Δ {diff.toFixed(1)}</span>;
+        }
+        return null;
+      }
+      default:
+        return null;
+    }
+  };
+  const badge = (color: string): React.CSSProperties => ({
+    display: 'inline-block',
+    marginLeft: 6,
+    padding: '1px 6px',
+    borderRadius: 4,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.3px',
+    background: color === 'green' ? '#22c55e33' : color === 'red' ? '#ef444433' : color === 'orange' ? '#f9731633' : '#3b82f633',
+    color: color === 'green' ? '#4ade80' : color === 'red' ? '#f87171' : color === 'orange' ? '#fb923c' : '#60a5fa',
+    lineHeight: '16px',
+    whiteSpace: 'nowrap',
+  });
   const fieldCell = (row: WeightEntry, field: Field) =>
     editing === row.date ? (
       <input
@@ -353,7 +526,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         onChange={(e) => setDraft({ ...draft, [field]: e.target.value === '' ? undefined : Number(e.target.value) })}
       />
     ) : (
-      (row[field] ?? '—')
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span>{row[field] ?? '—'}</span>
+        {badgeFor(field, row[field] as number | undefined, row)}
+      </span>
     );
   const correlation =
     trainingCorrelation ||
@@ -457,87 +633,110 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             }}
           >
             {[
-              ['Текущий вес', `${body.latest.weight} кг`],
-              ['Δ веса', `${body.weightDelta > 0 ? '+' : ''}${body.weightDelta.toFixed(1)} кг`],
-              ['% жира', body.latest.bodyFat === undefined ? '—' : `${body.latest.bodyFat}%`],
-              ['Δ жира', body.fatDelta === null ? '—' : `${body.fatDelta > 0 ? '+' : ''}${body.fatDelta.toFixed(1)}%`],
-              ['Мышцы', body.latest.muscleMass === undefined ? '—' : `${body.latest.muscleMass} кг`],
+              ['Текущий вес', body.latest.weight, 'кг', interpretWeight(body.weightDelta, goal)],
+              ['Δ веса', body.weightDelta, 'кг', interpretWeight(body.weightDelta, goal), body.weightDelta > 0 ? '+' : ''],
+              ['% жира', body.latest.bodyFat, '%', interpretFat(body.fatDelta)],
+              ['Δ жира', body.fatDelta, '%', interpretFat(body.fatDelta), body.fatDelta && body.fatDelta > 0 ? '+' : ''],
+              ['Мышцы', body.latest.muscleMass, 'кг', interpretMuscle(body.leanDelta)],
               [
                 'Δ талии',
-                body.waistDelta === null ? '—' : `${body.waistDelta > 0 ? '+' : ''}${body.waistDelta.toFixed(1)} см`,
+                body.waistDelta,
+                'см',
+                interpretWaist(body.waistDelta),
+                body.waistDelta && body.waistDelta > 0 ? '+' : '',
               ],
-            ].map(([k, v]) => (
-              <div
-                key={String(k)}
-                style={{ padding: 12, borderRadius: 9, background: '#22c55e18', border: '1px solid #22c55e44' }}
-              >
-                <small>{k}</small>
-                <strong style={{ display: 'block', marginTop: 4 }}>{v}</strong>
-              </div>
-            ))}
+            ].map(([k, val, unit, insight, prefix]) => {
+              const numVal = typeof val === 'number' ? val : null;
+              return (
+                <div
+                  key={String(k)}
+                  style={{ padding: 12, borderRadius: 9, background: '#22c55e18', border: '1px solid #22c55e44' }}
+                >
+                  <small>{k}</small>
+                  <strong style={{ display: 'block', marginTop: 4, fontSize: 16 }}>
+                    {numVal === null ? '—' : (
+                      <AnimatedCounter
+                        value={Math.abs(numVal)}
+                        decimals={unit === 'кг' || unit === 'см' ? 1 : 0}
+                        duration={500}
+                        prefix={typeof prefix === 'string' ? prefix : ''}
+                        suffix={` ${unit}`}
+                        style={{ fontSize: 16, fontWeight: 700 }}
+                      />
+                    )}
+                  </strong>
+                  {insight && (
+                    <small style={{ display: 'block', marginTop: 4, color: '#aaa', fontSize: 10 }}>
+                      {insight}
+                    </small>
+                  )}
+                </div>
+              );
+            })}
           </section>
         )}
         <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {[
-            ['Среднее', distribution?.mean.toFixed(1) || '—'],
-            ['Медиана', distribution?.median.toFixed(1) || '—'],
-            ['Мин/макс', extremes.min && extremes.max ? `${extremes.min.value}/${extremes.max.value}` : '—'],
+            ['Среднее', distribution?.mean],
+            ['Медиана', distribution?.median],
+            ['Мин/макс', extremes.min && extremes.max ? [extremes.min.value, extremes.max.value] : null],
             ['Дней', streak.totalDays],
             ['Серия', streak.current],
-            ['Δ нед.', comparison.delta?.toFixed(1) || '—'],
+            ['Δ нед.', comparison.delta],
             ['Аномалии', anomalies.length],
-          ].map(([k, v]) => (
-            <div key={String(k)} style={{ padding: 10, background: '#27272a', borderRadius: 8 }}>
-              <small>{k}</small>
-              <b style={{ display: 'block' }}>{v}</b>
-            </div>
-          ))}
+          ].map(([k, v]) => {
+            let content: React.ReactNode = '—';
+            if (Array.isArray(v)) {
+              content = `${v[0].toFixed(1)}/${v[1].toFixed(1)}`;
+            } else if (typeof v === 'number' && Number.isFinite(v)) {
+              const decimals = k === 'Дней' || k === 'Серия' || k === 'Аномалии' ? 0 : 1;
+              content = <AnimatedCounter value={Math.abs(v)} decimals={decimals} duration={500} prefix={v < 0 ? '-' : ''} style={{ fontSize: 14, fontWeight: 700 }} />;
+            }
+            return (
+              <div key={String(k)} style={{ padding: 10, background: '#27272a', borderRadius: 8 }}>
+                <small>{k}</small>
+                <b style={{ display: 'block' }}>{content}</b>
+              </div>
+            );
+          })}
         </section>
         <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <b>📈 График</b>
-            <select
-              style={{ ...input, width: 180 }}
-              value={chartField}
-              onChange={(e) => setChartField(e.target.value as Field)}
-            >
-              {FIELDS.map((f) => (
-                <option key={f} value={f}>
-                  {LABELS[f]}
-                </option>
-              ))}
-            </select>
+            {FIELDS.map(f => (
+              <button
+                key={f}
+                style={{
+                  ...button,
+                  background: activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') + '33' : '#27272a',
+                  border: `1px solid ${activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') + '66' : '#3f3f46'}`,
+                  color: activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') : '#aaa',
+                }}
+                onClick={() => toggleChartField(f)}
+              >
+                {LABELS[f]}
+              </button>
+            ))}
           </div>
-          <Chart
-            points={chartPoints}
-            color="#22c55e"
-            target={chartField === 'weight' && goal > 0 ? goal : undefined}
+          <OverlayChart
+            series={chartSeries}
+            target={activeChartFields.includes('weight') && goal > 0 ? goal : undefined}
+            projections={chartProjection}
+            rightAxis={rightAxis}
+            notes={chartNotes}
             onSvg={(x) => exportSvgAsFile(x, `${svgName}.svg`)}
             onPng={(x) => exportSvgAsPng(x, `${svgName}.png`)}
+            onSwipeField={(field) => {
+              const f = field as Field;
+              if (activeChartFields.includes(f)) {
+                setActiveChartFields(prev => prev.filter(x => x !== f));
+              } else {
+                setActiveChartFields(prev => [...prev, f]);
+              }
+            }}
           />
         </section>
-        {weekly.length > 0 && (
-          <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
-            <b>📊 Среднее по неделям</b>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 120, marginTop: 8 }}>
-              {weekly.map((w) => {
-                const max = Math.max(...weekly.map((x) => x.mean));
-                const h = Math.max(12, (w.mean / Math.max(max, 1)) * 85);
-                return (
-                  <div
-                    key={w.weekStart}
-                    title={`${w.weekStart}: ${w.mean.toFixed(1)} кг, ${w.count} записей`}
-                    style={{ flex: 1, textAlign: 'center', minWidth: 25 }}
-                  >
-                    <small>{w.mean.toFixed(1)}</small>
-                    <div style={{ height: h, background: '#22c55e99', borderRadius: '4px 4px 0 0' }} />
-                    <small>{w.weekStart.slice(5)}</small>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+        <WeightDiaryVisuals rows={rows} goal={goal} heightCm={profileHeight} sex={profileSex} />
         {comparison.thisWeek && comparison.lastWeek && (
           <section style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
             📆 Эта неделя: <b>{comparison.thisWeek.mean.toFixed(1)} кг</b> · прошлая:{' '}
@@ -595,7 +794,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             ))}
           </section>
         )}
-        <section style={{ overflowX: 'auto' }}>
+        <section style={{ overflowX: 'auto' }} className="wd-table-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
             <thead>
               <tr>
@@ -613,6 +812,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   </th>
                 ))}
                 <th>Заметка</th>
+                <th>Фото</th>
                 <th>Действия</th>
               </tr>
             </thead>
@@ -621,7 +821,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 const row = rows.find((r) => r.date === e.date);
                 if (!row) return null;
                 return (
-                  <tr key={row.date}>
+                  <tr key={row.date} style={{ animation: 'fadeIn 0.3s ease' }}>
                     <td>
                       {editing === row.date ? (
                         <input
@@ -646,6 +846,23 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         />
                       ) : (
                         row.notes || '—'
+                      )}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {row.photos && row.photos.length > 0 ? (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {row.photos.map((src, i) => (
+                            <img
+                              key={i}
+                              src={src}
+                              alt=""
+                              style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', cursor: 'pointer', border: '1px solid #3f3f46' }}
+                              onClick={() => setViewPhoto({ src, date: row.date })}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        '—'
                       )}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
@@ -700,6 +917,26 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         onClose={() => setModal(false)}
         onSave={(x) => commit([x as WeightEntry, ...rows.filter((r) => r.date !== x.date)])}
       />
+      {viewPhoto && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 3000, background: 'rgba(0,0,0,0.92)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}
+          onClick={() => setViewPhoto(null)}
+        >
+          <button
+            style={{ position: 'absolute', top: 16, right: 16, background: '#27272a', border: '1px solid #3f3f46', color: '#fff', width: 36, height: 36, borderRadius: 8, cursor: 'pointer', fontSize: 18, zIndex: 1 }}
+            onClick={() => setViewPhoto(null)}
+          >
+            ×
+          </button>
+          <img src={viewPhoto.src} alt="" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
+          <div style={{ position: 'absolute', bottom: 16, background: '#0008', padding: '6px 12px', borderRadius: 8, color: '#ccc', fontSize: 12 }}>
+            {viewPhoto.date}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

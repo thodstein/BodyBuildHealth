@@ -34,10 +34,20 @@ import {
   parseDose,
   migrateLegacyEntry,
   migrateAllLegacyEntries,
+  getInjectionTrend,
+  getZoneTechniqueMatrix,
+  getLastInjection,
+  localDateDaysAgo,
+  getRotationRecommendations,
+  suggestBetterTechnique,
+  getInjectionRecommendations,
+  getZoneTechniqueAdvice,
+  getSubstanceInjectionAdvice,
   INJECTION_ZONES,
   NEEDLE_GAUGES,
   TECHNIQUES,
   type InjectionEntry,
+  type InjectionRecommendation,
 } from '../injection-diary.engine';
 
 const STORAGE_KEY = 'he_injection_diary';
@@ -406,6 +416,323 @@ describe('injection-diary.engine', () => {
     it('TECHNIQUES has IM and subq', () => {
       expect(TECHNIQUES.map(t => t.id)).toContain('im');
       expect(TECHNIQUES.map(t => t.id)).toContain('subq');
+    });
+  });
+
+  describe('Trend analysis', () => {
+    it('returns null for <2 entries', () => {
+      expect(getInjectionTrend([mockEntry()])).toBeNull();
+      expect(getInjectionTrend([])).toBeNull();
+    });
+
+    it('computes trend direction up/down/stable', () => {
+      const now = todayLocalStr();
+      const old = new Date();
+      old.setDate(old.getDate() - 10);
+      const oldDate = `${old.getFullYear()}-${String(old.getMonth() + 1).padStart(2, '0')}-${String(old.getDate()).padStart(2, '0')}`;
+      addInjection(mockEntry({ date: oldDate, pipLevel: 1, painLevel: 1 }));
+      addInjection(mockEntry({ date: now, pipLevel: 8, painLevel: 7 }));
+      const trend = getInjectionTrend(getInjectionDiary(), 7);
+      expect(trend).not.toBeNull();
+      expect(trend!.direction).toBe('up');
+      expect(trend!.avgPip).toBeGreaterThan(0);
+    });
+
+    it('returns stable when delta <0.5', () => {
+      const now = todayLocalStr();
+      const old = new Date();
+      old.setDate(old.getDate() - 14);
+      const mid = new Date();
+      mid.setDate(mid.getDate() - 7);
+      const oldDate = `${old.getFullYear()}-${String(old.getMonth() + 1).padStart(2, '0')}-${String(old.getDate()).padStart(2, '0')}`;
+      const midDate = `${mid.getFullYear()}-${String(mid.getMonth() + 1).padStart(2, '0')}-${String(mid.getDate()).padStart(2, '0')}`;
+      addInjection(mockEntry({ date: oldDate, pipLevel: 3, painLevel: 2 }));
+      addInjection(mockEntry({ date: midDate, pipLevel: 3, painLevel: 2 }));
+      const trend = getInjectionTrend(getInjectionDiary(), 7);
+      expect(trend!.direction).toBe('stable');
+    });
+  });
+
+  describe('Zone technique matrix', () => {
+    it('returns empty for no entries', () => {
+      expect(getZoneTechniqueMatrix([])).toEqual([]);
+    });
+
+    it('groups by zone and technique', () => {
+      addInjection(mockEntry({ zone: 'glute_dorsal', technique: 'im', pipLevel: 2 }));
+      addInjection(mockEntry({ zone: 'glute_dorsal', technique: 'im', pipLevel: 4 }));
+      addInjection(mockEntry({ zone: 'glute_dorsal', technique: 'subq', pipLevel: 1 }));
+      const matrix = getZoneTechniqueMatrix(getInjectionDiary());
+      expect(matrix).toHaveLength(2);
+      const imRow = matrix.find(r => r.technique === 'im');
+      expect(imRow!.avgPip).toBe(3);
+      expect(imRow!.count).toBe(2);
+    });
+
+    it('sorts by avgPip descending', () => {
+      addInjection(mockEntry({ zone: 'deltoid_l', technique: 'im', pipLevel: 8 }));
+      addInjection(mockEntry({ zone: 'glute_dorsal', technique: 'im', pipLevel: 1 }));
+      const matrix = getZoneTechniqueMatrix(getInjectionDiary());
+      expect(matrix[0].avgPip).toBeGreaterThan(matrix[1].avgPip!);
+    });
+  });
+
+  describe('Repeat last suggestion', () => {
+    it('returns null for empty diary', () => {
+      expect(getLastInjection([])).toBeNull();
+    });
+
+    it('returns last entry fields', () => {
+      addInjection(mockEntry({ substance: 'Нандролон', dose: '200 мг', zone: 'deltoid_l' }));
+      const last = getLastInjection(getInjectionDiary());
+      expect(last!.substance).toBe('Нандролон');
+      expect(last!.zone).toBe('deltoid_l');
+      expect(last!.volumeMl).toBe(1);
+    });
+  });
+
+  describe('Storage quota handling', () => {
+    it('writeStorage handles quota exceeded by trimming old entries', () => {
+      for (let i = 0; i < 400; i++) {
+        addInjection(mockEntry({ date: localDateDaysAgo(i % 365), substance: `Sub${i}`, dose: `${i}мг` }));
+      }
+      expect(getInjectionDiary().length).toBeLessThanOrEqual(365);
+    });
+  });
+
+  describe('Local date helpers', () => {
+    it('localDateDaysAgo returns correct date string', () => {
+      const d = localDateDaysAgo(0);
+      expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+
+  describe('Injection recommendations', () => {
+    it('returns general recommendation for empty diary', () => {
+      const recs = getInjectionRecommendations([]);
+      expect(recs.length).toBeGreaterThanOrEqual(1);
+      expect(recs[0].category).toBe('general');
+      expect(recs[0].priority).toBe('low');
+    });
+
+    it('flags high infection signs', () => {
+      const recs = getInjectionRecommendations([
+        mockEntry({ redness: true, lump: true }),
+        mockEntry({ redness: true, lump: true }),
+      ]);
+      expect(recs.some(r => r.category === 'safety' && r.priority === 'high')).toBe(true);
+    });
+
+    it('flags high complication rate', () => {
+      const entries = Array.from({ length: 10 }, () => mockEntry({ redness: true, lump: false }));
+      const recs = getInjectionRecommendations(entries);
+      expect(recs.some(r => r.category === 'safety' && r.message.includes('осложнений'))).toBe(true);
+    });
+
+    it('flags high PIP zones', () => {
+      const recs = getInjectionRecommendations([
+        mockEntry({ zone: 'glute_dorsal', pipLevel: 8 }),
+        mockEntry({ zone: 'glute_dorsal', pipLevel: 9 }),
+      ]);
+      expect(recs.some(r => r.category === 'technique' && r.priority === 'high')).toBe(true);
+    });
+
+    it('flags long rest zones', () => {
+      const fifteenDaysAgo = new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10);
+      const recs = getInjectionRecommendations([mockEntry({ zone: 'glute_dorsal', date: fifteenDaysAgo })]);
+      expect(recs.some(r => r.category === 'rotation' && r.message.includes('≥14 дней'))).toBe(true);
+    });
+
+    it('flags overused zones', () => {
+      const today = todayLocalStr();
+      const recs = getInjectionRecommendations([
+        mockEntry({ zone: 'glute_dorsal', date: today }),
+        mockEntry({ zone: 'glute_dorsal', date: today }),
+        mockEntry({ zone: 'glute_dorsal', date: today }),
+      ]);
+      expect(recs.some(r => r.category === 'rotation' && r.message.includes('переиспользуются'))).toBe(true);
+    });
+
+    it('flags rising PIP trend', () => {
+      const now = todayLocalStr();
+      const old = new Date();
+      old.setDate(old.getDate() - 10);
+      const oldDate = `${old.getFullYear()}-${String(old.getMonth() + 1).padStart(2, '0')}-${String(old.getDate()).padStart(2, '0')}`;
+      const recs = getInjectionRecommendations([
+        mockEntry({ date: oldDate, pipLevel: 1 }),
+        mockEntry({ date: now, pipLevel: 8 }),
+      ]);
+      expect(recs.some(r => r.category === 'technique' && r.message.toLowerCase().includes('тренд pip растёт'))).toBe(true);
+    });
+
+    it('suggests technique improvement when available', () => {
+      const recs = getInjectionRecommendations([
+        mockEntry({ zone: 'glute_dorsal', technique: 'im', pipLevel: 8 }),
+        mockEntry({ zone: 'glute_dorsal', technique: 'im', pipLevel: 9 }),
+        mockEntry({ zone: 'glute_dorsal', technique: 'subq', pipLevel: 2 }),
+        mockEntry({ zone: 'glute_dorsal', technique: 'subq', pipLevel: 1 }),
+      ]);
+      expect(recs.some(r => r.category === 'technique' && r.message.includes('техника'))).toBe(true);
+    });
+
+    it('flags too many injections today', () => {
+      const today = todayLocalStr();
+      const entries = Array.from({ length: 3 }, (_, i) => mockEntry({ date: today, zone: `zone_${i}` }));
+      const recs = getInjectionRecommendations(entries);
+      expect(recs.some(r => r.category === 'schedule' && r.message.includes('сегодня'))).toBe(true);
+    });
+
+    it('flags narrow zone usage over time', () => {
+      const entries = Array.from({ length: 30 }, () => mockEntry({ zone: 'glute_dorsal' }));
+      const recs = getInjectionRecommendations(entries);
+      expect(recs.some(r => r.category === 'rotation' && r.message.toLowerCase().includes('используются только'))).toBe(true);
+    });
+
+    it('returns positive message when no issues', () => {
+      const recs = getInjectionRecommendations([mockEntry({ painLevel: 1, pipLevel: 1 })]);
+      expect(recs.some(r => r.message.includes('адекватная'))).toBe(true);
+    });
+
+    it('sorts high priority first', () => {
+      const fifteenDaysAgo = new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10);
+      const recs = getInjectionRecommendations([
+        mockEntry({ zone: 'glute_dorsal', date: fifteenDaysAgo }),
+        mockEntry({ redness: true, lump: true }),
+      ]);
+      expect(recs[0].priority).toBe('high');
+    });
+  });
+
+  describe('Zone technique advice', () => {
+    it('returns null for unknown zone', () => {
+      expect(getZoneTechniqueAdvice('unknown_zone')).toBeNull();
+    });
+
+    it('returns advice for glute_dorsal', () => {
+      const advice = getZoneTechniqueAdvice('glute_dorsal');
+      expect(advice).not.toBeNull();
+      expect(advice!.needleGauge).toBe('21-23G');
+      expect(advice!.needleLength).toBe('1.5" (38 мм)');
+      expect(advice!.maxVolumeMl).toBe(5);
+      expect(advice!.risk).toBe('Низкий');
+    });
+
+    it('returns advice for deltoid_l', () => {
+      const advice = getZoneTechniqueAdvice('deltoid_l');
+      expect(advice).not.toBeNull();
+      expect(advice!.needleGauge).toBe('25-27G');
+      expect(advice!.maxVolumeMl).toBe(2);
+    });
+
+    it('returns advice for biceps with high risk warning', () => {
+      const advice = getZoneTechniqueAdvice('biceps_l');
+      expect(advice).not.toBeNull();
+      expect(advice!.risk).toBe('Очень высокий');
+      expect(advice!.warnings.some(w => w.includes('ОЧЕНЬ ОПАСНО'))).toBe(true);
+    });
+
+    it('returns advice for calves with oil warning', () => {
+      const advice = getZoneTechniqueAdvice('calves_l');
+      expect(advice).not.toBeNull();
+      expect(advice!.tips.some(t => t.includes('масляные'))).toBe(true);
+    });
+  });
+
+  describe('Substance injection advice', () => {
+    it('returns null for unknown substance', () => {
+      expect(getSubstanceInjectionAdvice('Неизвестный препарат')).toBeNull();
+    });
+
+    it('returns advice for BPC-157', () => {
+      const advice = getSubstanceInjectionAdvice('BPC-157');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+      expect(advice!.needle).toContain('29-31G');
+    });
+
+    it('returns advice for TB-500', () => {
+      const advice = getSubstanceInjectionAdvice('TB-500');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+    });
+
+    it('returns advice for GHRP-6', () => {
+      const advice = getSubstanceInjectionAdvice('GHRP-6');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+    });
+
+    it('returns advice for CJC-1295', () => {
+      const advice = getSubstanceInjectionAdvice('CJC-1295');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+    });
+
+    it('returns advice for Ipamorelin', () => {
+      const advice = getSubstanceInjectionAdvice('Ipamorelin');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+    });
+
+    it('returns advice for Semax (intranasal)', () => {
+      const advice = getSubstanceInjectionAdvice('Semax');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('интраназально');
+    });
+
+    it('returns advice for Cerebrolysin (IV)', () => {
+      const advice = getSubstanceInjectionAdvice('Cerebrolysin');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('в/в капельно');
+    });
+
+    it('returns advice for Thymalin', () => {
+      const advice = getSubstanceInjectionAdvice('Thymalin');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('в/м');
+    });
+
+    it('returns advice for Epitalon', () => {
+      const advice = getSubstanceInjectionAdvice('Epitalon');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('в/м');
+    });
+
+    it('returns advice for GLP-1 agonist', () => {
+      const advice = getSubstanceInjectionAdvice('Семаглутид');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+    });
+
+    it('returns advice for Insulin', () => {
+      const advice = getSubstanceInjectionAdvice('Инсулин');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
+    });
+
+    it('returns advice for HCG', () => {
+      const advice = getSubstanceInjectionAdvice('HCG');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к или в/м');
+    });
+
+    it('returns advice for emergency adrenaline', () => {
+      const advice = getSubstanceInjectionAdvice('Адреналин');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('в/м');
+      expect(advice!.notes).toContain('анафилаксии');
+    });
+
+    it('returns advice for IV magnesium', () => {
+      const advice = getSubstanceInjectionAdvice('Магний в/в');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('в/в');
+    });
+
+    it('handles case-insensitive matching', () => {
+      const advice = getSubstanceInjectionAdvice('bpc-157');
+      expect(advice).not.toBeNull();
+      expect(advice!.technique).toBe('п/к');
     });
   });
 });

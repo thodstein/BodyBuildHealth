@@ -8,7 +8,7 @@
  * - Reports (сводка по инъекциям за период)
  */
 
-import { getInjectionDiary, computeInjectionStats, detectInjectionAnomalies, getRotationWarnings, getWeeklyFrequency, parseDose } from './injection-diary.engine';
+import { getInjectionDiary, computeInjectionStats, detectInjectionAnomalies, getRotationWarnings, getWeeklyFrequency, parseDose, getInjectionTrend, getZoneTechniqueMatrix, getLastInjection, localDateDaysAgo, getInjectionRecommendations } from './injection-diary.engine';
 
 export interface InjectionDiarySummary {
   totalInjections: number;
@@ -17,11 +17,12 @@ export interface InjectionDiarySummary {
   anomalies: ReturnType<typeof detectInjectionAnomalies>;
   rotationWarnings: ReturnType<typeof getRotationWarnings>;
   weeklyFrequency: ReturnType<typeof getWeeklyFrequency>;
+  recommendations: ReturnType<typeof getInjectionRecommendations>;
 }
 
 export function getInjectionDiarySummary(days: number = 30): InjectionDiarySummary {
   const entries = getInjectionDiary();
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = localDateDaysAgo(days);
   const recent = entries.filter(e => e.date >= cutoff);
   
   return {
@@ -36,6 +37,7 @@ export function getInjectionDiarySummary(days: number = 30): InjectionDiarySumma
     anomalies: detectInjectionAnomalies(entries),
     rotationWarnings: getRotationWarnings(entries),
     weeklyFrequency: getWeeklyFrequency(entries, 4),
+    recommendations: getInjectionRecommendations(entries),
   };
 }
 
@@ -69,10 +71,10 @@ export function getInjectionDiaryForSupportCalc() {
 
 export function getInjectionDiaryForPharma() {
   const entries = getInjectionDiary();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateDaysAgo(0);
   const last30 = entries.filter(e => {
-    const d = new Date(e.date);
-    return d >= new Date(Date.now() - 30 * 86400000);
+    const d = new Date(e.date + 'T00:00:00');
+    return d >= new Date(localDateDaysAgo(30) + 'T00:00:00');
   });
   
   const substanceDoses = new Map<string, { totalDose: number; count: number; unit: string }>();

@@ -1,23 +1,17 @@
 /** DiaryAnalyticsZone.tsx — зона «Дневник и аналитика» тренировочного блока.
- * Объединяет: дневник (TrainingDiaryHub), календарь, MMC-трекинг, импорт CSV.
- * Содержимое зоны — ровно эти 4 вкладки; нигде больше они не рендерятся. */
+ * Все вкладки рендерятся через TrainingDiaryHub с разными модами.
+ * Calendar, MMC, Checkin, Import — интегрированы в hub (body/tools modes). */
 import React from 'react';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog, TrainingOutput } from '../../../core/types';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 import { TrainingDiaryHub } from './TrainingDiaryHub';
-import { TrainingCalendarTab } from './TrainingCalendarTab';
-import { CsvImportTab } from './CsvImportTab';
-import MMCTrackingCard from './MMCTrackingCard';
-import { CheckinMetricsCard } from './CheckinMetricsCard';
-import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
-import { InsightsCard } from './InsightsCard';
 import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'diary' | 'reports';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -36,62 +30,39 @@ interface Props {
   linked: any;
 }
 
+/** Map old external tabs and legacy mode names to hub modes */
+function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' {
+  // Legacy initialDiaryMode values
+  if (initialDiaryMode === 'reports') return 'tools';
+  if (initialDiaryMode === 'diary') return 'record';
+  switch (tab) {
+    case 'import_data': return 'tools';
+    default: return 'record';
+  }
+}
+
 export const DiaryAnalyticsZone: React.FC<Props> = (p) => {
   return (
-    <>
-      {p.tab === 'diary' && (
-        <InfoErrorBoundary label="Дневник">
-          <TrainingDiaryHub
-            initialMode={p.initialDiaryMode}
-            diary={p.diary}
-            diaryStats={p.diaryStats}
-            diaryProgress={p.diaryProgress}
-            historyWorkouts={p.historyWorkouts}
-            macrocycle={p.macrocycle}
-            selectedWeek={p.selectedWeek}
-            level={p.level}
-            onRefresh={p.onRefresh}
-            trainingOutput={p.trainingOutput}
-            goal={p.goal}
-            daysPerWeek={p.daysPerWeek}
-            splitType={p.splitType}
-            periodizationType={p.periodizationType}
-            mesoLength={p.mesoLength}
-            tprofile={p.tprofile}
-            linked={p.linked}
-          />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'calendar' && (
-        <InfoErrorBoundary label="Календарь тренировок">
-          <TrainingCalendarTab />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'mmc_tracking' && (
-        <InfoErrorBoundary label="MMC-трекинг">
-          <MMCTrackingCard />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'checkin' && (
-        <InfoErrorBoundary label="Чек-ин метрик">
-          <CheckinMetricsCard />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'insights' && (
-        <InfoErrorBoundary label="Авто-инсайты">
-          <InsightsCard />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'strength' && (
-        <InfoErrorBoundary label="Аналитика силы">
-          <StrengthAnalyticsCard />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'import_data' && (
-        <InfoErrorBoundary label="Импорт CSV">
-          <CsvImportTab onDone={p.onRefresh} />
-        </InfoErrorBoundary>
-      )}
-    </>
+    <InfoErrorBoundary label="Дневник">
+      <TrainingDiaryHub
+        initialMode={p.initialDiaryMode || tabToHubMode(p.tab)}
+        diary={p.diary}
+        diaryStats={p.diaryStats}
+        diaryProgress={p.diaryProgress}
+        historyWorkouts={p.historyWorkouts}
+        macrocycle={p.macrocycle}
+        selectedWeek={p.selectedWeek}
+        level={p.level}
+        onRefresh={p.onRefresh}
+        trainingOutput={p.trainingOutput}
+        goal={p.goal}
+        daysPerWeek={p.daysPerWeek}
+        splitType={p.splitType}
+        periodizationType={p.periodizationType}
+        mesoLength={p.mesoLength}
+        tprofile={p.tprofile}
+        linked={p.linked}
+      />
+    </InfoErrorBoundary>
   );
 };

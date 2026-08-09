@@ -1,7 +1,7 @@
 /**
  * injection-diary.engine.ts — Дневник инъекций
  *
- * Полноценный движок: CRUD, статистика, аномалии, ротация зон.
+ * Полноценный движок: CRUD, статистика, аномалии, ротация зон, рекомендации.
  * Хранилище: localStorage key `he_injection_diary`.
  */
 
@@ -83,7 +83,7 @@ export interface InjectionAnomaly {
 
 /* ── localStorage helpers ── */
 
-function readStorage(): InjectionEntry[] {
+function readRawStorage(): any[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -92,10 +92,30 @@ function readStorage(): InjectionEntry[] {
   } catch { return []; }
 }
 
+function readStorage(): InjectionEntry[] {
+  return readRawStorage().filter((e: any): e is InjectionEntry => {
+    if (!e?.date || !e?.substance || !e?.zone) return false;
+    if (typeof e.painLevel !== 'number' || typeof e.pipLevel !== 'number') return false;
+    return true;
+  });
+}
+
 function writeStorage(data: InjectionEntry[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data.slice(-365)));
-  } catch { /* quota exceeded — silent */ }
+  } catch (error) {
+    if ((error as Error)?.name === 'QuotaExceededError' || (error as any)?.code === 22) {
+      try {
+        const existing = readRawStorage();
+        const cutoff = localDateDaysAgo(180);
+        const trimmed = existing.filter((e: any) => e.date && e.date >= cutoff);
+        const valid = trimmed.filter((e: any): e is InjectionEntry => !!e?.date && !!e?.substance && !!e?.zone);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(valid.length > 0 ? valid : []));
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }
 }
 
 /* ── CRUD ── */
@@ -247,7 +267,7 @@ export function computeInjectionStats(entries: InjectionEntry[]): InjectionStats
     }))
     .sort((a, b) => b.count - a.count);
 
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const weekAgo = localDateDaysAgo(7);
   const last7Entries = entries.filter(e => e.date >= weekAgo);
   const last7 = last7Entries.length > 0
     ? {
@@ -319,7 +339,7 @@ export function detectInjectionAnomalies(entries: InjectionEntry[]): InjectionAn
   }
 
   const zoneFreq = new Map<string, number>();
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const weekAgo = localDateDaysAgo(7);
   for (const e of entries.filter(e => e.date >= weekAgo)) {
     zoneFreq.set(e.zone, (zoneFreq.get(e.zone) || 0) + 1);
   }
@@ -363,6 +383,12 @@ function localDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+export function localDateDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return localDateKey(d);
+}
+
 /* ── Dose parsing ── */
 
 export function parseDose(doseStr: string): { value: number; unit: string } | null {
@@ -379,6 +405,289 @@ export function parseDose(doseStr: string): { value: number; unit: string } | nu
         ? 'IU'
         : '';
   return { value: Math.round(value * 100) / 100, unit };
+}
+
+export interface InjectionTrend {
+  period: string;
+  avgPain: number | null;
+  avgPip: number | null;
+  count: number;
+  direction: 'up' | 'down' | 'stable';
+}
+
+export interface ZoneTechniqueMatrix {
+  zone: string;
+  technique: string;
+  count: number;
+  avgPip: number | null;
+  avgPain: number | null;
+}
+
+export interface RepeatLastSuggestion {
+  substance: string;
+  dose: string;
+  zone: string;
+  side: 'left' | 'right';
+  volumeMl: number;
+  needleGauge: string;
+  technique: string;
+  date: string;
+}
+
+/* ── Trend analysis ── */
+
+export function getInjectionTrend(entries: InjectionEntry[], days: number = 7): InjectionTrend | null {
+  if (entries.length < 2) return null;
+  const recent = entries.filter(e => e.date >= localDateDaysAgo(days));
+  const previous = entries.filter(e => {
+    const end = localDateDaysAgo(days);
+    const start = localDateDaysAgo(days * 2);
+    return e.date >= start && e.date < end;
+  });
+  const recentAvgPip = recent.length ? recent.reduce((s, e) => s + e.pipLevel, 0) / recent.length : 0;
+  const prevAvgPip = previous.length ? previous.reduce((s, e) => s + e.pipLevel, 0) / previous.length : 0;
+  const delta = recentAvgPip - prevAvgPip;
+  return {
+    period: `${days}дн`,
+    avgPain: recent.length ? +((recent.reduce((s, e) => s + e.painLevel, 0) / recent.length).toFixed(1)) : null,
+    avgPip: recent.length ? +recentAvgPip.toFixed(1) : null,
+    count: recent.length,
+    direction: delta > 0.5 ? 'up' : delta < -0.5 ? 'down' : 'stable',
+  };
+}
+
+export function getZoneTechniqueMatrix(entries: InjectionEntry[]): ZoneTechniqueMatrix[] {
+  const map = new Map<string, { pipSum: number; painSum: number; count: number }>();
+  for (const e of entries) {
+    const key = `${e.zone}::${e.technique}`;
+    const existing = map.get(key) || { pipSum: 0, painSum: 0, count: 0 };
+    existing.pipSum += e.pipLevel;
+    existing.painSum += e.painLevel;
+    existing.count++;
+    map.set(key, existing);
+  }
+  return [...map.entries()]
+    .map(([key, data]) => {
+      const [zone, technique] = key.split('::');
+      return {
+        zone,
+        technique,
+        count: data.count,
+        avgPip: data.count > 0 ? +(data.pipSum / data.count).toFixed(1) : null,
+        avgPain: data.count > 0 ? +(data.painSum / data.count).toFixed(1) : null,
+      };
+    })
+    .sort((a, b) => (b.avgPip ?? 0) - (a.avgPip ?? 0));
+}
+
+export function getLastInjection(entries: InjectionEntry[]): RepeatLastSuggestion | null {
+  if (entries.length === 0) return null;
+  const last = entries[entries.length - 1];
+  return {
+    substance: last.substance,
+    dose: last.dose,
+    zone: last.zone,
+    side: last.side,
+    volumeMl: last.volumeMl,
+    needleGauge: last.needleGauge,
+    technique: last.technique,
+    date: last.date,
+  };
+}
+
+export interface RotationRecommendation {
+  zone: string;
+  reason: 'rest' | 'overuse' | 'infection_risk' | 'pip_risk';
+  message: string;
+  suggestedZones: string[];
+}
+
+export function getRotationRecommendations(entries: InjectionEntry[], restDays: number = 7): RotationRecommendation[] {
+  const recommendations: RotationRecommendation[] = [];
+  const today = todayLocalStr();
+  const usedToday = new Set(entries.filter(e => e.date === today).map(e => e.zone));
+  const zoneEntriesMap = new Map<string, InjectionEntry[]>();
+  for (const e of entries) {
+    const list = zoneEntriesMap.get(e.zone) || [];
+    list.push(e);
+    zoneEntriesMap.set(e.zone, list);
+  }
+
+  for (const zone of INJECTION_ZONES) {
+    const zoneEntries = zoneEntriesMap.get(zone.id) || [];
+    if (zoneEntries.length === 0) continue;
+    const daysSince = getDaysSinceLastInjection(zone.id, entries, today);
+    if (daysSince === null) continue;
+
+    if (daysSince >= 14) {
+      const available = INJECTION_ZONES.filter(z => z.id !== zone.id && !usedToday.has(z.id));
+      recommendations.push({
+        zone: zone.id,
+        reason: 'rest',
+        message: `Зона ${zoneLabel(zone.id)} отдыхала ${daysSince} дней — риск фиброза/липома`,
+        suggestedZones: available.slice(0, 3).map(z => z.id),
+      });
+    } else if (daysSince < restDays) {
+      const recentPip = zoneEntries.filter(e => e.date >= localDateDaysAgo(7));
+      const avgPip = recentPip.length ? recentPip.reduce((s, e) => s + e.pipLevel, 0) / recentPip.length : 0;
+      if (avgPip >= 5) {
+        const available = INJECTION_ZONES.filter(z => z.id !== zone.id && !usedToday.has(z.id));
+        recommendations.push({
+          zone: zone.id,
+          reason: 'pip_risk',
+          message: `Высокий PIP в ${zoneLabel(zone.id)} (${avgPip.toFixed(1)}/10) — рекомендую смену зоны`,
+          suggestedZones: available.slice(0, 3).map(z => z.id),
+        });
+      }
+    }
+
+    const recentInfections = zoneEntries.filter(e => e.date >= localDateDaysAgo(14) && e.redness && e.lump);
+    if (recentInfections.length >= 1) {
+      recommendations.push({
+        zone: zone.id,
+        reason: 'infection_risk',
+        message: `Признаки инфицирования в ${zoneLabel(zone.id)} — временно избегать`,
+        suggestedZones: INJECTION_ZONES.filter(z => z.id !== zone.id && !usedToday.has(z.id)).slice(0, 3).map(z => z.id),
+      });
+    }
+  }
+
+  const weekAgo = localDateDaysAgo(7);
+  const zoneFreq = new Map<string, number>();
+  for (const e of entries.filter(e => e.date >= weekAgo)) {
+    zoneFreq.set(e.zone, (zoneFreq.get(e.zone) || 0) + 1);
+  }
+  for (const [zone, count] of zoneFreq) {
+    if (count >= 3) {
+      const available = INJECTION_ZONES.filter(z => z.id !== zone && !usedToday.has(z.id));
+      recommendations.push({
+        zone,
+        reason: 'overuse',
+        message: `${count} инъекций в ${zoneLabel(zone)} за 7 дней — требуется ротация`,
+        suggestedZones: available.slice(0, 3).map(z => z.id),
+      });
+    }
+  }
+
+  return recommendations.sort((a, b) => {
+    const order = { infection_risk: 0, pip_risk: 1, rest: 2, overuse: 3 };
+    return (order[a.reason] ?? 99) - (order[b.reason] ?? 99);
+  });
+}
+
+export function suggestBetterTechnique(zone: string, technique: string, entries: InjectionEntry[]): string | null {
+  const matrix = getZoneTechniqueMatrix(entries).filter(m => m.zone === zone);
+  if (matrix.length <= 1) return null;
+  const current = matrix.find(m => m.technique === technique);
+  if (!current || current.count < 2) return null;
+  const alternatives = matrix.filter(m => m.technique !== technique && m.count >= 2 && (m.avgPip ?? 10) < (current.avgPip ?? 0));
+  if (alternatives.length === 0) return null;
+  alternatives.sort((a, b) => (a.avgPip ?? 10) - (b.avgPip ?? 10));
+  return alternatives[0].technique;
+}
+
+export interface InjectionRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  category: 'rotation' | 'technique' | 'schedule' | 'safety' | 'general';
+  message: string;
+  action?: string;
+}
+
+export function getInjectionRecommendations(entries: InjectionEntry[]): InjectionRecommendation[] {
+  const recs: InjectionRecommendation[] = [];
+  if (!entries.length) {
+    recs.push({ priority: 'low', category: 'general', message: 'Начните вести дневник инъекций для персональных рекомендаций', action: 'Добавьте первую запись' });
+    return recs;
+  }
+
+  const today = todayLocalStr();
+  const stats = computeInjectionStats(entries);
+  const anomalies = detectInjectionAnomalies(entries);
+  const rotationRecs = getRotationRecommendations(entries);
+  const trend = getInjectionTrend(entries, 14);
+
+  const highPipZones = new Set<string>();
+  const longRestZones = new Set<string>();
+  const overusedZones = new Set<string>();
+  const infectionZones = new Set<string>();
+
+  for (const r of rotationRecs) {
+    if (r.reason === 'pip_risk') highPipZones.add(r.zone);
+    if (r.reason === 'rest') longRestZones.add(r.zone);
+    if (r.reason === 'overuse') overusedZones.add(r.zone);
+    if (r.reason === 'infection_risk') infectionZones.add(r.zone);
+  }
+
+  for (const a of anomalies) {
+    if (a.category === 'infection') infectionZones.add(a.date);
+    if (a.category === 'pip' && a.severity === 'danger') highPipZones.add('general');
+  }
+
+  if (infectionZones.size > 0) {
+    recs.push({ priority: 'high', category: 'safety', message: `Признаки инфицирования в ${[...infectionZones].map(z => zoneLabel(z)).join(', ')}`, action: 'Обратитесь к врачу, временно избегайте этих зон' });
+  }
+
+  if (stats.complicationRate >= 20) {
+    recs.push({ priority: 'high', category: 'safety', message: `Высокий процент осложнений: ${stats.complicationRate}%`, action: 'Проверьте асептику, длину иглы и технику введения' });
+  }
+
+  if (highPipZones.size > 0) {
+    const zones = [...highPipZones].filter(z => z !== 'general').map(z => zoneLabel(z)).join(', ');
+    recs.push({ priority: 'high', category: 'technique', message: `Высокий PIP в зонах: ${zones || 'несколько зон'}`, action: 'Смените зону, используйте более тонкую иглу, рассмотрите subq' });
+  }
+
+  if (longRestZones.size > 0) {
+    recs.push({ priority: 'medium', category: 'rotation', message: `${longRestZones.size} зон не использовались ≥14 дней`, action: 'Верните эти зоны в ротацию для предотвращения фиброза' });
+  }
+
+  if (overusedZones.size > 0) {
+    recs.push({ priority: 'medium', category: 'rotation', message: `${overusedZones.size} зон переиспользуются (>3 инъекций/нед)`, action: 'Распределите нагрузку на реже используемые зоны' });
+  }
+
+  if (trend && trend.direction === 'up' && (trend.avgPip ?? 0) > 3) {
+    recs.push({ priority: 'medium', category: 'technique', message: 'Тренд PIP растёт', action: 'Пересмотрите длину/калибр иглы, скорость введения, расположение' });
+  }
+
+  const zoneEntriesMap = new Map<string, InjectionEntry[]>();
+  for (const e of entries) {
+    const list = zoneEntriesMap.get(e.zone) || [];
+    list.push(e);
+    zoneEntriesMap.set(e.zone, list);
+  }
+
+  for (const zone of INJECTION_ZONES) {
+    const zoneEntries = zoneEntriesMap.get(zone.id) || [];
+    if (zoneEntries.length < 2) continue;
+    const better = suggestBetterTechnique(zone.id, zoneEntries[0].technique, entries);
+    if (better) {
+      recs.push({ priority: 'low', category: 'technique', message: `В ${zoneLabel(zone.id)} техника ${techniqueLabel(zoneEntries[0].technique)} даёт высокий PIP`, action: `Попробуйте ${techniqueLabel(better)}` });
+    }
+  }
+
+  const todayEntries = entries.filter(e => e.date === today);
+  if (todayEntries.length >= 3) {
+    recs.push({ priority: 'medium', category: 'schedule', message: `${todayEntries.length} инъекций сегодня — высокая нагрузка`, action: 'Рассмотрите распределение по нескольким дням' });
+  }
+
+  if (entries.length >= 30) {
+    const uniqueZones = new Set(entries.map(e => e.zone)).size;
+    if (uniqueZones < 4) {
+      recs.push({ priority: 'low', category: 'rotation', message: `Используются только ${uniqueZones} зон из ${INJECTION_ZONES.length}`, action: 'Расширьте ротацию для равномерной нагрузки' });
+    }
+  }
+
+  if (stats.avgPain && stats.avgPain >= 4) {
+    recs.push({ priority: 'medium', category: 'technique', message: `Средняя боль при введении: ${stats.avgPain}/10`, action: 'Используйте более тонкую иглу, вводите медленнее, рассмотрите подкожный способ' });
+  }
+
+  if (recs.length === 0) {
+    recs.push({ priority: 'low', category: 'general', message: 'Осложнений не выявлено, техника инъекций адекватная', action: 'Продолжайте следить за ротацией зон' });
+  }
+
+  return recs.sort((a, b) => {
+    const order = { high: 0, medium: 1, low: 2 };
+    return (order[a.priority] ?? 99) - (order[b.priority] ?? 99);
+  });
 }
 
 /* ── Migration: old 5-field → new full entry ── */
@@ -407,17 +716,296 @@ export function migrateLegacyEntry(legacy: { date: string; substance: string; do
 }
 
 export function migrateAllLegacyEntries(): InjectionEntry[] {
-  const diary = readStorage();
+  let raw: any[];
+  try {
+    const rawJson = localStorage.getItem(STORAGE_KEY);
+    raw = rawJson ? JSON.parse(rawJson) : [];
+    if (!Array.isArray(raw)) raw = [];
+  } catch { raw = []; }
   const migrated: InjectionEntry[] = [];
-  for (const entry of diary) {
+  for (const entry of raw) {
     if ((entry as any).zone && (entry as any).painLevel !== undefined) {
       migrated.push(entry as InjectionEntry);
     } else {
       migrated.push(migrateLegacyEntry(entry as any));
     }
   }
-  if (migrated.some((e, i) => e !== diary[i])) {
+  if (migrated.some((e, i) => e !== raw[i])) {
     writeStorage(migrated);
   }
   return migrated;
+}
+
+export interface InjectionTechniqueAdvice {
+  zoneId: string;
+  needleGauge: string;
+  needleLength: string;
+  angle: string;
+  maxVolumeMl: number;
+  solutionType: string;
+  difficulty: string;
+  risk: string;
+  warnings: string[];
+  tips: string[];
+}
+
+const ZONE_TECHNIQUE: Record<string, InjectionTechniqueAdvice> = {
+  glute_dorsal: {
+    zoneId: 'glute_dorsal',
+    needleGauge: '21-23G',
+    needleLength: '1.5" (38 мм)',
+    angle: '90°',
+    maxVolumeMl: 5,
+    solutionType: 'любой',
+    difficulty: '⭐',
+    risk: 'Низкий',
+    warnings: ['Только верхне-наружный квадрант', 'Нижние квадранты опасны (седалищный нерв)'],
+    tips: ['Лягте на бок, верхнюю ногу согните', 'Если объём >3 мл — разделите на 2 инъекции'],
+  },
+  glute_ventral: {
+    zoneId: 'glute_ventral',
+    needleGauge: '21-23G',
+    needleLength: '1.5" (38 мм)',
+    angle: '90°',
+    maxVolumeMl: 4,
+    solutionType: 'любой',
+    difficulty: '⭐⭐',
+    risk: 'Низкий',
+    warnings: ['V-метод: сместите кожу в сторону перед вколом'],
+    tips: ['Меньше жировой прослойки чем дорсальная', 'При боли >2 дней — проверьте технику'],
+  },
+  quadriceps_l: {
+    zoneId: 'quadriceps_l',
+    needleGauge: '23-25G',
+    needleLength: '1" (25 мм)',
+    angle: '90°',
+    maxVolumeMl: 3,
+    solutionType: 'любой',
+    difficulty: '⭐',
+    risk: 'Средний',
+    warnings: ['Только латеральная поверхность', 'Передняя — бедренный нерв', 'Внутренняя — бедренная артерия'],
+    tips: ['Сядьте, вытяните ногу, средняя треть латеральной поверхности', 'Не колоть в день тренировки ног'],
+  },
+  quadriceps_r: {
+    zoneId: 'quadriceps_r',
+    needleGauge: '23-25G',
+    needleLength: '1" (25 мм)',
+    angle: '90°',
+    maxVolumeMl: 3,
+    solutionType: 'любой',
+    difficulty: '⭐',
+    risk: 'Средний',
+    warnings: ['Только латеральная поверхность', 'Передняя — бедренный нерв', 'Внутренняя — бедренная артерия'],
+    tips: ['Сядьте, вытяните ногу, средняя треть латеральной поверхности', 'Не колоть в день тренировки ног'],
+  },
+  deltoid_l: {
+    zoneId: 'deltoid_l',
+    needleGauge: '25-27G',
+    needleLength: '5/8"-1" (16-25 мм)',
+    angle: '90°',
+    maxVolumeMl: 2,
+    solutionType: 'любой',
+    difficulty: '⭐',
+    risk: 'Средний',
+    warnings: ['2-3 пальца ниже акромиона', 'Тонкая игла обязательна'],
+    tips: ['Не колоть в день тренировки плеч', 'При перекачанных дельтах可能需要 игла 1"'],
+  },
+  deltoid_r: {
+    zoneId: 'deltoid_r',
+    needleGauge: '25-27G',
+    needleLength: '5/8"-1" (16-25 мм)',
+    angle: '90°',
+    maxVolumeMl: 2,
+    solutionType: 'любой',
+    difficulty: '⭐',
+    risk: 'Средний',
+    warnings: ['2-3 пальца ниже акромиона', 'Тонкая игла обязательна'],
+    tips: ['Не колоть в день тренировки плеч', 'При перекачанных дельтах可能需要 игла 1"'],
+  },
+  pectoral_l: {
+    zoneId: 'pectoral_l',
+    needleGauge: '25-27G',
+    needleLength: '5/8" (16 мм)',
+    angle: '90°',
+    maxVolumeMl: 1.5,
+    solutionType: 'водный',
+    difficulty: '⭐⭐',
+    risk: 'Высокий',
+    warnings: ['Только верхне-наружная часть', 'Не нижняя треть (гинекомастия)', 'Не средняя линия (сердце)', 'Не глубже 1.5 см'],
+    tips: ['Только водные растворы', 'Локальная инъекция, не для системных курсов', 'Высокий риск гематом'],
+  },
+  pectoral_r: {
+    zoneId: 'pectoral_r',
+    needleGauge: '25-27G',
+    needleLength: '5/8" (16 мм)',
+    angle: '90°',
+    maxVolumeMl: 1.5,
+    solutionType: 'водный',
+    difficulty: '⭐⭐',
+    risk: 'Высокий',
+    warnings: ['Только верхне-наружная часть', 'Не нижняя треть (гинекомастия)', 'Не средняя линия (сердце)', 'Не глубже 1.5 см'],
+    tips: ['Только водные растворы', 'Локальная инъекция, не для системных курсов', 'Высокий риск гематом'],
+  },
+  triceps_l: {
+    zoneId: 'triceps_l',
+    needleGauge: '25-27G',
+    needleLength: '5/8" (16 мм)',
+    angle: '90°',
+    maxVolumeMl: 1.5,
+    solutionType: 'водный',
+    difficulty: '⭐⭐',
+    risk: 'Средний',
+    warnings: ['Строго наружная поверхность', 'Лучевой нерв проходит внутри'],
+    tips: ['Согните руку в локте 90°, упритесь локтем в колено', 'Масляные растворы — осторожно, склонность к PIP'],
+  },
+  triceps_r: {
+    zoneId: 'triceps_r',
+    needleGauge: '25-27G',
+    needleLength: '5/8" (16 мм)',
+    angle: '90°',
+    maxVolumeMl: 1.5,
+    solutionType: 'водный',
+    difficulty: '⭐⭐',
+    risk: 'Средний',
+    warnings: ['Строго наружная поверхность', 'Лучевой нерв проходит внутри'],
+    tips: ['Согните руку в локте 90°, упритесь локтем в колено', 'Масляные растворы — осторожно, склонность к PIP'],
+  },
+  biceps_l: {
+    zoneId: 'biceps_l',
+    needleGauge: '27-29G',
+    needleLength: '1/2" (13 мм)',
+    angle: '90°',
+    maxVolumeMl: 1,
+    solutionType: 'водный',
+    difficulty: '⭐⭐⭐',
+    risk: 'Очень высокий',
+    warnings: ['ОЧЕНЬ ОПАСНО', 'Маленький объём мышцы, много нервов и сосудов', 'Попадание в срединный нерв = паралич'],
+    tips: ['ТОЛЬКО водные препараты', 'НЕ ДЛЯ НАЧИНАЮЩИХ', 'При онемении — немедленно извлечь'],
+  },
+  biceps_r: {
+    zoneId: 'biceps_r',
+    needleGauge: '27-29G',
+    needleLength: '1/2" (13 мм)',
+    angle: '90°',
+    maxVolumeMl: 1,
+    solutionType: 'водный',
+    difficulty: '⭐⭐⭐',
+    risk: 'Очень высокий',
+    warnings: ['ОЧЕНЬ ОПАСНО', 'Маленький объём мышцы, много нервов и сосудов', 'Попадание в срединный нерв = паралич'],
+    tips: ['ТОЛЬКО водные препараты', 'НЕ ДЛЯ НАЧИНАЮЩИХ', 'При онемении — немедленно извлечь'],
+  },
+  calves_l: {
+    zoneId: 'calves_l',
+    needleGauge: '25-27G',
+    needleLength: '5/8" (16 мм)',
+    angle: '90°',
+    maxVolumeMl: 1,
+    solutionType: 'водный',
+    difficulty: '⭐⭐⭐',
+    risk: 'Очень высокий',
+    warnings: ['Самая болезненная зона', 'Масляные растворы ВЫЗЫВАЮТ СИЛЬНУЮ БОЛЬ', 'Риск компартмент-синдрома'],
+    tips: ['ТОЛЬКО водные препараты', 'При нарастающей боли — немедленно к врачу', 'Никогда не используйте масляные в икры'],
+  },
+  calves_r: {
+    zoneId: 'calves_r',
+    needleGauge: '25-27G',
+    needleLength: '5/8" (16 мм)',
+    angle: '90°',
+    maxVolumeMl: 1,
+    solutionType: 'водный',
+    difficulty: '⭐⭐⭐',
+    risk: 'Очень высокий',
+    warnings: ['Самая болезненная зона', 'Масляные растворы ВЫЗЫВАЮТ СИЛЬНУЮ БОЛЬ', 'Риск компартмент-синдрома'],
+    tips: ['ТОЛЬКО водные препараты', 'При нарастающей боли — немедленно к врачу', 'Никогда не используйте масляные в икры'],
+  },
+  abdominal: {
+    zoneId: 'abdominal',
+    needleGauge: '29-31G',
+    needleLength: '5/16"-1/2" (8-13 мм)',
+    angle: '45° (кожная складка) или 90° (короткая игла)',
+    maxVolumeMl: 1.5,
+    solutionType: 'водный',
+    difficulty: '⭐',
+    risk: 'Низкий',
+    warnings: ['5 см от пупка', 'Не в области пупка', 'Ротация: минимум 4 зоны, расстояние >2 см'],
+    tips: ['Соберите кожу в складку', 'Идеально для самостоятельных инъекций', 'Идеально для пептидов/HCG/инсулина'],
+  },
+};
+
+export function getZoneTechniqueAdvice(zoneId: string): InjectionTechniqueAdvice | null {
+  return ZONE_TECHNIQUE[zoneId] || null;
+}
+
+export function getSubstanceInjectionAdvice(substance: string): { technique: string; needle: string; notes: string } | null {
+  const s = substance.toLowerCase();
+  if (s.includes('bpc') || s.includes('tb-500') || s.includes('tb500') || s.includes('ghrp') || s.includes('ipamorelin') || s.includes('cjc') || s.includes('tesamorelin') || s.includes('sermorelin') || s.includes('грип') || s.includes('грипа')) {
+    return { technique: 'п/к', needle: '29-31G × 5/16"-1/2" (8-13 мм)', notes: 'Пептиды/GHRP — подкожно. Живот или бедро. 45° угол или 90° с короткой иглой.' };
+  }
+  if (s.includes('somatropin') || s.includes('гормон роста') || s.includes('gh ') || s.includes('hgh')) {
+    return { technique: 'п/к или в/м', needle: '29-31G × 5/16"-1/2"', notes: 'GH — подкожно или внутримышечно. Утро натощак или перед сном. Разделить на 2 инъекции при >3 МЕ.' };
+  }
+  if (s.includes('hcgon') || s.includes('hcg')) {
+    return { technique: 'п/к или в/м', needle: '25-27G × 5/8"', notes: 'HCG — подкожно или внутримышечно. 2×/нед во время ПКТ или на курсе.' };
+  }
+  if (s.includes('igf') || s.includes('лр3') || s.includes('lr3')) {
+    return { technique: 'п/к или в/м', needle: '29-31G × 5/16"-1/2"', notes: 'IGF-1 LR3 — подкожно или внутримышечно. 2-3 инъекции в день. Контроль глюкозы!' };
+  }
+  if (s.includes('peg-mgf') || s.includes('мгф')) {
+    return { technique: 'в/м', needle: '25-27G × 5/8"', notes: 'PEG-MGF — внутримышечно. 1-2×/нед. После тренировки в целевую мышцу.' };
+  }
+  if (s.includes('cerebrolysin') || s.includes('церебролизин')) {
+    return { technique: 'в/в капельно', needle: 'по назначению врача', notes: 'Только в стационаре. 10-30 мл в/в капельно 10-20 дней.' };
+  }
+  if (s.includes('pinealon') || s.includes('пинеалон')) {
+    return { technique: 'в/м', needle: '27-29G × 1/2"', notes: '1-2 мл в/м ×10 дней. Курс 10-20 дней.' };
+  }
+  if (s.includes('epitalon') || s.includes('эпиталон')) {
+    return { technique: 'в/м', needle: '27-29G × 1/2"', notes: '5-10 мг в/м 10-20 дней. Курс 10-20 дней.' };
+  }
+  if (s.includes('thymalin') || s.includes('тимлин') || s.includes('thymogen')) {
+    return { technique: 'в/м', needle: '27-29G × 1/2"', notes: '5-10 мг в/м 5-10 дней. 1-2×/год.' };
+  }
+  if (s.includes('ta-1') || s.includes('та-1') || s.includes('thymosin')) {
+    return { technique: 'п/к', needle: '29-31G × 5/16"-1/2"', notes: '1.6 мг п/к 2-4 нед. Противовирусный + противоопухолевый.' };
+  }
+  if (s.includes('semax') || s.includes('семакс')) {
+    return { technique: 'интраназально', needle: 'капли', notes: '200-600 мкг интраназально 1-2/сут. Курс 10-14 дней.' };
+  }
+  if (s.includes('адреналин') || s.includes('epinephrine')) {
+    return { technique: 'в/м', needle: 'по назначению', notes: '0.3-0.5 мг в/м (1:1000) в передне-боковую поверхность бедра. Через одежду. При анафилаксии.' };
+  }
+  if (s.includes('глюкагон')) {
+    return { technique: 'в/м', needle: 'по назначению', notes: '1 мг в/м. При гипогликемии без сознания.' };
+  }
+  if (s.includes('эссенциале') || s.includes('фосфатидилхолин')) {
+    return { technique: 'в/в', needle: 'по назначению', notes: '5-10 мл/день в/в. Курс 10-14 дней. При АЛТ >5x ВГН.' };
+  }
+  if (s.includes('гептрал') || s.includes('ademetionine') || s.includes('s-аденозилметионин')) {
+    return { technique: 'в/в', needle: 'по назначению', notes: '400-800 мг/день в/в. Курс 14-21 день. При холестазе.' };
+  }
+  if (s.includes('витамин c') || s.includes('аскорбат')) {
+    return { technique: 'в/в капельно', needle: 'по назначению', notes: '10-15 г в/в капельно. При пневмонии/тяжёлой инфекции.' };
+  }
+  if (s.includes('магний') && (s.includes('в/в') || s.includes('infusion') || s.includes('капельно'))) {
+    return { technique: 'в/в', needle: 'по назначению', notes: 'MgSO₄ в/в. При гипомагниемии <0.65 ммоль/л.' };
+  }
+  if (s.includes('омепразол') || s.includes('ипп')) {
+    return { technique: 'в/в болюс', needle: 'по назначению', notes: '40-80 мг в/в болюс. При кровотечении из ЖКТ.' };
+  }
+  if (s.includes('фуросемид') || s.includes('лазикс')) {
+    return { technique: 'в/в', needle: 'по назначению', notes: '40-80 мг в/в. При отёке лёгких.' };
+  }
+  if (s.includes('эноксапарин') || s.includes('нмг') || s.includes('клексан')) {
+    return { technique: 'п/к', needle: 'по назначению', notes: '1 мг/кг 2×/день п/к. При ТЭЛА.' };
+  }
+  if (s.includes('триамцинолон') || s.includes('кеналог')) {
+    return { technique: 'внутриочагово', needle: 'по назначению', notes: 'Только дерматолог. В кисты/узлы акне.' };
+  }
+  if (s.includes('семаглутид') || s.includes('семagl') || s.includes('лираглутид') || s.includes('оземпик') || s.includes('виктоза') || s.includes('саксенда')) {
+    return { technique: 'п/к', needle: '29-31G × 5/16"-1/2"', notes: 'GLP-1 агонисты — подкожно. Живот или бедро. 1×/нед или ежедневно.' };
+  }
+  if (s.includes('инсулин')) {
+    return { technique: 'п/к', needle: '29-31G × 5/16"-1/2"', notes: 'Подкожно. Живот, бедро, плечо. Ротация критична. 45° или 90° с короткой иглой.' };
+  }
+  return null;
 }

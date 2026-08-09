@@ -80,7 +80,7 @@ export function compareMedsVsNoMeds(entries: BPEntry[]) {
 }
 
 export function getCircadianPattern(entries: BPEntry[]) {
-  const groups = ['morning', 'afternoon', 'evening', 'night'].reduce((out, key) => { out[key] = average(entries.filter(e => e.timeOfDay === key)); return out; }, {} as Record<string, ReturnType<typeof average>>);
+  const groups = (['morning', 'afternoon', 'evening', 'night'] as const).reduce((out, key) => { out[key] = average(entries.filter(e => e.timeOfDay === key)); return out; }, {} as Record<'morning' | 'afternoon' | 'evening' | 'night', ReturnType<typeof average>>);
   const morning = groups.morning.avgS;
   const night = groups.night.avgS;
   return { ...groups, isNonDipper: morning > 0 && night > 0 && (morning - night) / morning < 0.1 };

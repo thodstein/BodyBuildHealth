@@ -9,17 +9,26 @@ import {
   computeInjectionStats,
   deleteInjection,
   detectInjectionAnomalies,
+  getDaysSinceLastInjection,
   getInjectionDiary,
+  getInjectionTrend,
+  getLastInjection,
+  getRotationRecommendations,
   getRotationWarnings,
+  getSubstanceInjectionAdvice,
   getSuggestedZone,
   getWeeklyFrequency,
+  getZoneTechniqueMatrix,
+  getZoneTechniqueAdvice,
   migrateAllLegacyEntries,
   parseDose,
+  suggestBetterTechnique,
   techniqueLabel,
   todayLocalStr,
   updateInjection,
   zoneLabel,
   type InjectionEntry,
+  type InjectionTechniqueAdvice,
 } from '../../../../../engines/injection-diary.engine';
 import {
   getInjectionDiaryForPharma,
@@ -100,6 +109,69 @@ const Metric: React.FC<{ label: string; value: React.ReactNode; tone?: string }>
 );
 
 const scoreTone = (value: number) => (value >= 7 ? colors.danger : value >= 4 ? colors.warning : colors.green);
+
+const ZoneMap: React.FC<{
+  entries: InjectionEntry[];
+  selectedZone: string;
+  onSelectZone: (zoneId: string) => void;
+}> = ({ entries, selectedZone, onSelectZone }) => {
+  const zoneDays = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const zone of INJECTION_ZONES) {
+      const days = getDaysSinceLastInjection(zone.id, entries);
+      map.set(zone.id, days ?? 999);
+    }
+    return map;
+  }, [entries]);
+
+  const zoneColor = (days: number) => {
+    if (days >= 14) return { bg: 'rgba(239,68,68,.15)', border: 'rgba(239,68,68,.3)', text: '#fca5a5' };
+    if (days >= 7) return { bg: 'rgba(245,158,11,.12)', border: 'rgba(245,158,11,.25)', text: '#fcd34d' };
+    if (days >= 3) return { bg: 'rgba(59,130,246,.10)', border: 'rgba(59,130,246,.2)', text: '#93c5fd' };
+    return { bg: 'rgba(0,230,138,.10)', border: 'rgba(0,230,138,.2)', text: '#6ee7b7' };
+  };
+
+  return (
+    <div style={{ ...card, marginBottom: 12 }}>
+      <h3 style={{ margin: '0 0 10px', fontSize: 13 }}>🗺 Карта зон</h3>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {INJECTION_ZONES.map((zone) => {
+          const days = zoneDays.get(zone.id) ?? 999;
+          const c = zoneColor(days);
+          const isSelected = selectedZone === zone.id;
+          return (
+            <button
+              key={zone.id}
+              onClick={() => onSelectZone(zone.id)}
+              style={{
+                padding: '6px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 600,
+                background: isSelected ? c.bg.replace('.15', '.25').replace('.12', '.2').replace('.10', '.18').replace('.10', '.18') : c.bg,
+                border: `1px solid ${isSelected ? c.text : c.border}`,
+                color: c.text,
+                transition: 'all 0.15s',
+                minHeight: 32,
+              }}
+              title={days >= 999 ? 'Не использовалась' : `Последняя: ${days} дн. назад`}
+            >
+              {zone.label}
+              <span style={{ marginLeft: 5, opacity: 0.7 }}>{days >= 999 ? '—' : `${days}д`}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 10, color: colors.textMuted, flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(0,230,138,.2)', border: '1px solid rgba(0,230,138,.3)' }} /> Свежая (&lt;3д)</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }} /> 3-7д</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)' }} /> 7-14д</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)' }} /> ≥14д</span>
+      </div>
+    </div>
+  );
+};
 
 const InjectionEditor: React.FC<{
   open: boolean;
@@ -305,6 +377,8 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const [entries, setEntries] = useState<InjectionEntry[]>([]);
   const [mode, setMode] = useState<ViewMode>('journal');
   const [editor, setEditor] = useState<{ open: boolean; entry?: InjectionEntry }>({ open: false });
+  const [repeatDraft, setRepeatDraft] = useState<Draft | null>(null);
+  const [selectedZone, setSelectedZone] = useState<string>('glute_dorsal');
   const [undo, setUndo] = useState<InjectionEntry[] | null>(null);
   const [range, setRange] = useState<Range>('all');
   const [query, setQuery] = useState('');
@@ -313,7 +387,10 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [chartMetric, setChartMetric] = useState<'pain' | 'pip'>('pain');
+  const [trendDays, setTrendDays] = useState(7);
   const chartRef = useRef<SVGSVGElement>(null);
+
+  const today = todayLocalStr();
 
   useEffect(() => {
     if (!open) return;
@@ -332,9 +409,23 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const pharma = useMemo(() => getInjectionDiaryForPharma(), [entries]);
   const suggestedZone = useMemo(() => getSuggestedZone(entries), [entries]);
   const chartData = useMemo(() => [...entries].sort((a, b) => a.date.localeCompare(b.date)), [entries]);
+  const trend = useMemo(() => getInjectionTrend(entries, trendDays), [entries, trendDays]);
+  const zoneTechniqueMatrix = useMemo(() => getZoneTechniqueMatrix(entries), [entries]);
+  const repeatLast = useMemo(() => getLastInjection(entries), [entries]);
+  const zoneAdvice = useMemo(() => getZoneTechniqueAdvice(selectedZone), [selectedZone]);
+  const substanceAdvice = useMemo(() => {
+    if (!repeatLast) return null;
+    return getSubstanceInjectionAdvice(repeatLast.substance);
+  }, [repeatLast]);
+
+  const localDateDaysAgo = (days: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   const visible = useMemo(() => {
-    const cutoff = range === 'all' ? '' : new Date(Date.now() - Number(range) * 86400000).toISOString().slice(0, 10);
+    const cutoff = range === 'all' ? '' : localDateDaysAgo(Number(range));
     const search = query.trim().toLowerCase();
     return entries
       .filter(
@@ -519,6 +610,35 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
         >
           ＋ Добавить
         </button>
+        {repeatLast && (
+          <button
+            style={{ ...button, background: colors.blueDim, color: colors.blue, fontWeight: 700 }}
+            onClick={() => {
+              const last = entries[entries.length - 1];
+              setRepeatDraft({
+                date: todayLocalStr(),
+                substance: last.substance,
+                dose: last.dose,
+                zone: last.zone,
+                side: last.side,
+                volumeMl: last.volumeMl,
+                needleGauge: last.needleGauge,
+                technique: last.technique,
+                painLevel: 0,
+                pipLevel: 0,
+                swelling: 0,
+                redness: false,
+                lump: false,
+                bruise: false,
+                notes: '',
+              });
+              setEditor({ open: true });
+            }}
+            title={`Повторить: ${repeatLast.substance} ${repeatLast.dose} → ${zoneLabel(repeatLast.zone)}`}
+          >
+            ↻ Повторить
+          </button>
+        )}
         <button style={button} onClick={exportCsv}>
           CSV
         </button>
@@ -556,6 +676,41 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
             </button>
           ))}
         </div>
+        {anomalies.length > 0 && (
+          <div
+            style={{
+              ...card,
+              marginBottom: 12,
+              background: anomalies.some(a => a.severity === 'danger') ? 'rgba(239,68,68,.08)' : 'rgba(245,158,11,.08)',
+              border: `1px solid ${anomalies.some(a => a.severity === 'danger') ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)'}`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 18 }}>⚠️</span>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                <strong style={{ color: anomalies.some(a => a.severity === 'danger') ? '#fca5a5' : '#fcd34d' }}>
+                  {anomalies.filter(a => a.severity === 'danger').length > 0
+                    ? `Критических аномалий: ${anomalies.filter(a => a.severity === 'danger').length}`
+                    : `Предупреждений: ${anomalies.length}`}
+                </strong>
+                <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                  {anomalies.slice(0, 3).map(a => a.message).join(' · ')}
+                  {anomalies.length > 3 && ` · ещё ${anomalies.length - 3}`}
+                </div>
+              </div>
+              <button
+                style={{ ...button, fontSize: 11, padding: '6px 10px' }}
+                onClick={() => setMode('stats')}
+              >
+                📊 Детали
+              </button>
+            </div>
+          </div>
+        )}
+        <ZoneMap entries={entries} selectedZone={selectedZone} onSelectZone={(zoneId) => {
+          setSelectedZone(zoneId);
+          setEditor({ open: true });
+        }} />
         <section style={{ display: 'flex', gap: 9, flexWrap: 'wrap', marginBottom: 12 }}>
           <Metric label="Всего" value={stats.totalInjections} />
           <Metric
@@ -634,7 +789,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               </select>
             </div>
             <div style={{ overflowX: 'auto', marginTop: 12 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table className="inj-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr>
                     {[
@@ -664,8 +819,8 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 <tbody>
                   {current.map((entry) => (
                     <tr key={entry.id}>
-                      <td style={{ padding: 8, whiteSpace: 'nowrap' }}>{entry.date}</td>
-                      <td style={{ padding: 8 }}>
+                      <td data-label="Дата" style={{ padding: 8, whiteSpace: 'nowrap' }}>{entry.date}</td>
+                      <td data-label="Препарат" style={{ padding: 8 }}>
                         <strong>{entry.substance}</strong>
                         <br />
                         <span style={{ color: colors.textMuted }}>
@@ -675,21 +830,22 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                             : ''}
                         </span>
                       </td>
-                      <td style={{ padding: 8 }}>
+                      <td data-label="Зона" style={{ padding: 8 }}>
                         {zoneLabel(entry.zone)}
                         <br />
                         <span style={{ color: colors.textMuted }}>{entry.side === 'left' ? 'левая' : 'правая'}</span>
                       </td>
-                      <td style={{ padding: 8 }}>
+                      <td data-label="Техника" style={{ padding: 8 }}>
                         {techniqueLabel(entry.technique)}
                         <br />
                         {entry.needleGauge}
                       </td>
-                      <td style={{ padding: 8 }}>{entry.volumeMl} мл</td>
-                      <td style={{ padding: 8 }}>
+                      <td data-label="Объём" style={{ padding: 8 }}>{entry.volumeMl} мл</td>
+                      <td data-label="PIP / Боль / Отёк" style={{ padding: 8 }}>
                         {entry.painLevel} / {entry.pipLevel} / {entry.swelling}
                       </td>
                       <td
+                        data-label="Флаги"
                         style={{
                           padding: 8,
                           color: entry.redness || entry.lump || entry.bruise ? colors.warning : colors.textMuted,
@@ -699,7 +855,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                           .filter(Boolean)
                           .join(', ') || '—'}
                       </td>
-                      <td style={{ padding: 8, whiteSpace: 'nowrap' }}>
+                      <td data-label="Действия" style={{ padding: 8, whiteSpace: 'nowrap' }}>
                         <button
                           style={{ ...button, minHeight: 34, padding: '5px 8px' }}
                           onClick={() => setEditor({ open: true, entry })}
@@ -798,6 +954,71 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 <b style={{ color: colors.blue }}>📊 Последние 7 дней</b>
                 <div style={{ marginTop: 5, color: colors.textMuted }}>
                   {stats.last7.count} инъекций · средняя боль {stats.last7.avgPain} · средний PIP {stats.last7.avgPip}
+                </div>
+              </div>
+            )}
+            {trend && (
+              <div style={{ ...card, marginTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0 }}>📈 Тренд PIP</h3>
+                  <select
+                    value={trendDays}
+                    onChange={(e) => setTrendDays(Number(e.target.value))}
+                    style={{ ...selectStyle, width: 100, fontSize: 12 }}
+                  >
+                    <option value="7">7 дней</option>
+                    <option value="14">14 дней</option>
+                    <option value="30">30 дней</option>
+                  </select>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: trend.direction === 'up' ? colors.danger : trend.direction === 'down' ? colors.green : colors.textMuted,
+                    }}
+                  >
+                    {trend.direction === 'up' ? '↑ Ухудшение' : trend.direction === 'down' ? '↓ Улучшение' : '→ Стабильно'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: colors.textMuted, fontSize: 12 }}>
+                    Средний PIP: <b style={{ color: colors.text }}>{trend.avgPip ?? '—'}/10</b>
+                  </span>
+                  <span style={{ color: colors.textMuted, fontSize: 12 }}>
+                    Средняя боль: <b style={{ color: colors.text }}>{trend.avgPain ?? '—'}/10</b>
+                  </span>
+                  <span style={{ color: colors.textMuted, fontSize: 12 }}>
+                    Инъекций: <b style={{ color: colors.text }}>{trend.count}</b>
+                  </span>
+                </div>
+              </div>
+            )}
+            {zoneTechniqueMatrix.length > 0 && (
+              <div style={{ ...card, marginTop: 12 }}>
+                <h3 style={{ margin: '0 0 8px' }}>🔬 PIP по зонам и техникам</h3>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: 6, color: colors.textMuted, borderBottom: `1px solid ${colors.border}` }}>Зона</th>
+                        <th style={{ textAlign: 'left', padding: 6, color: colors.textMuted, borderBottom: `1px solid ${colors.border}` }}>Техника</th>
+                        <th style={{ textAlign: 'right', padding: 6, color: colors.textMuted, borderBottom: `1px solid ${colors.border}` }}>N</th>
+                        <th style={{ textAlign: 'right', padding: 6, color: colors.textMuted, borderBottom: `1px solid ${colors.border}` }}>PIP</th>
+                        <th style={{ textAlign: 'right', padding: 6, color: colors.textMuted, borderBottom: `1px solid ${colors.border}` }}>Боль</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {zoneTechniqueMatrix.slice(0, 20).map((item, idx) => (
+                        <tr key={`${item.zone}-${item.technique}-${idx}`}>
+                          <td style={{ padding: 6 }}>{zoneLabel(item.zone)}</td>
+                          <td style={{ padding: 6, color: colors.textMuted }}>{techniqueLabel(item.technique)}</td>
+                          <td style={{ textAlign: 'right', padding: 6 }}>{item.count}</td>
+                          <td style={{ textAlign: 'right', padding: 6, color: scoreTone(item.avgPip ?? 0) }}>{item.avgPip ?? '—'}/10</td>
+                          <td style={{ textAlign: 'right', padding: 6 }}>{item.avgPain ?? '—'}/10</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -904,11 +1125,30 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  {chartData.map((entry, index) => (
-                    <text key={entry.id} x={30 + index * 44} y="215" fill="#aaa" fontSize="8" textAnchor="middle">
-                      {entry.date.slice(5)}
-                    </text>
-                  ))}
+                  <polyline
+                    points={chartData
+                      .map(
+                        (entry, index) =>
+                          `${30 + index * 44},190 ${30 + index * 44},${190 - ((chartMetric === 'pain' ? entry.painLevel : entry.pipLevel) / chartMax) * 155}`,
+                      )
+                      .join(' ')}
+                    fill="none"
+                    stroke={chartMetric === 'pain' ? 'rgba(249,115,22,0.08)' : 'rgba(239,68,68,0.08)'}
+                    strokeWidth="44"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {chartData.map((entry, index) => {
+                    const y = 190 - ((chartMetric === 'pain' ? entry.painLevel : entry.pipLevel) / chartMax) * 155;
+                    return (
+                      <g key={entry.id}>
+                        <circle cx={30 + index * 44} cy={y} r="4" fill={chartMetric === 'pain' ? '#f97316' : '#ef4444'} stroke="#09090b" strokeWidth="1.5" />
+                        <text x={30 + index * 44} y="215" fill="#aaa" fontSize="8" textAnchor="middle">
+                          {entry.date.slice(5)}
+                        </text>
+                      </g>
+                    );
+                  })}
                 </svg>
               </div>
             ) : (
@@ -969,19 +1209,113 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
               </div>
             ))}
           </div>
+          <div style={card}>
+            <h3 style={{ margin: '0 0 8px' }}>💉 Техника инъекций</h3>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: colors.textMuted }}>Зона:</span>
+              <select
+                value={selectedZone}
+                onChange={(e) => setSelectedZone(e.target.value)}
+                style={{ ...selectStyle, width: 220, fontSize: 12 }}
+              >
+                {INJECTION_ZONES.map(z => (
+                  <option key={z.id} value={z.id}>{zoneLabel(z.id)}</option>
+                ))}
+              </select>
+            </div>
+            {zoneAdvice && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8, marginBottom: 8 }}>
+                <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 11, color: colors.textMuted }}>Игла</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{zoneAdvice.needleGauge} × {zoneAdvice.needleLength}</div>
+                </div>
+                <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 11, color: colors.textMuted }}>Угол / Макс. объём</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{zoneAdvice.angle} / {zoneAdvice.maxVolumeMl} мл</div>
+                </div>
+                <div style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 11, color: colors.textMuted }}>Раствор / Риск</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{zoneAdvice.solutionType} · {zoneAdvice.risk}</div>
+                </div>
+              </div>
+            )}
+            {zoneAdvice && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                {zoneAdvice.warnings.map((w, i) => (
+                  <div key={i} style={{ fontSize: 12, color: '#fca5a5' }}>⚠ {w}</div>
+                ))}
+                {zoneAdvice.tips.map((t, i) => (
+                  <div key={i} style={{ fontSize: 12, color: colors.textMuted }}>→ {t}</div>
+                ))}
+              </div>
+            )}
+            {substanceAdvice && (
+              <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: colors.blue, marginBottom: 2 }}>Рекомендации для: {repeatLast?.substance}</div>
+                <div style={{ fontSize: 12, color: colors.text }}><b>Техника:</b> {substanceAdvice.technique}</div>
+                <div style={{ fontSize: 12, color: colors.text }}><b>Игла:</b> {substanceAdvice.needle}</div>
+                <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{substanceAdvice.notes}</div>
+              </div>
+            )}
+            {!zoneAdvice && (
+              <div style={{ color: colors.textMuted, fontSize: 12 }}>Выберите зону для просмотра параметров инъекции</div>
+            )}
+          </div>
+          <div style={card}>
+            <h3 style={{ margin: '0 0 8px' }}>💡 Рекомендации</h3>
+            {summary.recommendations.length === 0 ? (
+              <div style={{ color: colors.textMuted }}>Нет рекомендаций</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {summary.recommendations.map((rec: import('../../../../../engines/injection-diary.engine').InjectionRecommendation, idx: number) => (
+                  <div key={idx} style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: rec.priority === 'high' ? 'rgba(239,68,68,0.12)' : rec.priority === 'medium' ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${rec.priority === 'high' ? 'rgba(239,68,68,0.35)' : rec.priority === 'medium' ? 'rgba(249,115,22,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: rec.action ? 4 : 0, color: rec.priority === 'high' ? '#fca5a5' : rec.priority === 'medium' ? '#fdba74' : colors.text }}>
+                      {rec.message}
+                    </div>
+                    {rec.action && (
+                      <div style={{ fontSize: 12, color: colors.textMuted }}>
+                        → {rec.action}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </main>
       <InjectionEditor
         open={editor.open}
         editing={Boolean(editor.entry)}
-        initial={editor.entry ? { ...editor.entry, notes: editor.entry.notes || '' } : emptyDraft(suggestedZone)}
+        initial={repeatDraft || (editor.entry ? { ...editor.entry, notes: editor.entry.notes || '' } : emptyDraft(selectedZone))}
         suggestedZone={suggestedZone}
-        onClose={() => setEditor({ open: false })}
+        onClose={() => {
+          setEditor({ open: false });
+          setRepeatDraft(null);
+        }}
         onSave={(draft) => {
           save(draft, editor.entry?.id);
           setEditor({ open: false });
+          setRepeatDraft(null);
         }}
       />
+      <style>{`
+        @media (max-width: 640px) {
+          .inj-table thead { display: none; }
+          .inj-table tbody tr { display: block; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; background: rgba(255,255,255,0.02); }
+          .inj-table tbody td { display: flex; justify-content: space-between; padding: 5px 0; border: none; }
+          .inj-table tbody td::before { content: attr(data-label); font-weight: 600; color: rgba(255,255,255,0.5); margin-right: 10px; }
+          .inj-table tbody td:last-child { justify-content: flex-start; }
+        }
+        @media (hover: none) and (pointer: coarse) {
+          .inj-table tbody td, .inj-table thead th { padding: 10px 6px; }
+        }
+      `}</style>
     </div>
   );
 };

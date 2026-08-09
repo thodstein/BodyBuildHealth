@@ -12,11 +12,31 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
   const [mThigh, setMThigh] = React.useState(60);
   const [mDate, setMDate] = React.useState(new Date().toISOString().split('T')[0]);
 
-  React.useEffect(() => { setMeasurements(loadMeasurements()); }, []);
+  React.useEffect(() => {
+    const m = loadMeasurements();
+    setMeasurements(m);
+    if (m.length > 0) {
+      const last = m[m.length - 1];
+      setMWeight(last.weightKg || 80);
+      setMWaist(last.waistCm || 85);
+      setMChest(last.chestCm || 100);
+      setMArm(last.armLeftCm || last.armRightCm || 38);
+      setMThigh(last.thighLeftCm || last.thighRightCm || 60);
+    }
+  }, []);
   const analytics = React.useMemo(() => analyzeMeasurements(175), [measurements]);
 
   const save = () => {
-    const updated = saveMeasurement({ date: mDate, weightKg: mWeight, waistCm: mWaist, chestCm: mChest, armCm: mArm, thighCm: mThigh, calfCm: 38, neckCm: 38, hipCm: 95, shoulderCm: 120, forearmCm: 32, wristCm: 18, ankleCm: 22, bodyFatPercent: 15 } as any);
+    const last = measurements.length > 0 ? measurements[measurements.length - 1] : null;
+    const updated = saveMeasurement({
+      date: mDate, weightKg: mWeight, waistCm: mWaist, chestCm: mChest,
+      armLeftCm: mArm || last?.armLeftCm || 0, armRightCm: mArm || last?.armRightCm || 0,
+      thighLeftCm: mThigh || last?.thighLeftCm || 0, thighRightCm: mThigh || last?.thighRightCm || 0,
+      calfLeftCm: last?.calfLeftCm || 0, calfRightCm: last?.calfRightCm || 0,
+      neckCm: last?.neckCm || 0, hipCm: last?.hipCm || 0, shoulderCm: last?.shoulderCm || 0,
+      forearmLeftCm: last?.forearmLeftCm || 0, forearmRightCm: last?.forearmRightCm || 0,
+      bodyFatPercent: last?.bodyFatPercent || 0, notes: '',
+    });
     setMeasurements(updated);
   };
 
@@ -47,7 +67,7 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
     {measurements.length > 0 && <div className="card" style={{ marginBottom:8, padding:10 }}>
       <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 История ({measurements.length})</h4>
         {measurements.slice(-5).reverse().map((m:any,i)=><div key={i} style={{ fontSize:10,padding:'2px 0',borderBottom:'1px solid rgba(255,255,255,0.03)' }}>
-        {m.date}: Вес {m.weightKg}кг | Талия {m.waistCm}см | Грудь {m.chestCm}см | Бицепс {m.armCm}см | Бедро {m.thighCm}см
+        {m.date}: Вес {m.weightKg}кг | Талия {m.waistCm}см | Грудь {m.chestCm}см | Бицепс {m.armLeftCm || m.armRightCm}см | Бедро {m.thighLeftCm || m.thighRightCm}см
       </div>)}
     </div>}
 

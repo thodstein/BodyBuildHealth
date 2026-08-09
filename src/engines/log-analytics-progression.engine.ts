@@ -257,18 +257,110 @@ export function analyzeTrainingLog(logs: WorkoutSetLog[], sessionDurations: { da
 // ═══════════════════════════════════════════════════════════════════════════
 
 const MEASUREMENT_KEY = 'he_measurements';
+const WEIGHT_LOG_KEY = 'he_weight_log';
 
-export function loadMeasurements(): BodyMeasurement[] {
-  try { return JSON.parse(localStorage.getItem(MEASUREMENT_KEY) || '[]'); } catch { return []; }
+/**
+ * Convert WeightEntry (canonical store) → BodyMeasurement.
+ * Fields without a direct mapping default to 0.
+ */
+function weightEntryToBodyMeasurement(e: any): BodyMeasurement {
+  return {
+    date: e.date,
+    weightKg: Number(e.weight) || 0,
+    bodyFatPercent: Number(e.bodyFat) || 0,
+    neckCm: Number(e.neckCm) || 0,
+    chestCm: Number(e.chestCm) || 0,
+    shoulderCm: 0,
+    armLeftCm: Number(e.bicepLeftCm) || Number(e.bicepCm) || 0,
+    armRightCm: Number(e.bicepRightCm) || Number(e.bicepCm) || 0,
+    forearmLeftCm: Number(e.forearmCm) || 0,
+    forearmRightCm: Number(e.forearmCm) || 0,
+    waistCm: Number(e.waistCm) || 0,
+    hipCm: Number(e.hipCm) || 0,
+    thighLeftCm: Number(e.thighLeftCm) || Number(e.thighCm) || 0,
+    thighRightCm: Number(e.thighRightCm) || Number(e.thighCm) || 0,
+    calfLeftCm: Number(e.calfLeftCm) || Number(e.calfCm) || 0,
+    calfRightCm: Number(e.calfRightCm) || Number(e.calfCm) || 0,
+    notes: e.notes || '',
+  };
 }
 
+/**
+ * Load body measurements from the CANONICAL weight log (he_weight_log).
+ * Falls back to legacy he_measurements and migrates if weight log is empty.
+ */
+export function loadMeasurements(): BodyMeasurement[] {
+  try {
+    const rawWeight = JSON.parse(localStorage.getItem(WEIGHT_LOG_KEY) || '[]');
+    if (Array.isArray(rawWeight) && rawWeight.length > 0) {
+      return rawWeight
+        .filter((e: any) => e && e.date)
+        .map(weightEntryToBodyMeasurement)
+        .sort((a: BodyMeasurement, b: BodyMeasurement) => a.date.localeCompare(b.date));
+    }
+    // Legacy fallback
+    const legacy = JSON.parse(localStorage.getItem(MEASUREMENT_KEY) || '[]');
+    if (Array.isArray(legacy) && legacy.length > 0) {
+      // Migrate legacy data into weight log
+      const migrated = legacy.map((m: any) => ({
+        date: m.date,
+        weight: Number(m.weightKg) || 0,
+        bodyFat: Number(m.bodyFatPercent) || undefined,
+        neckCm: Number(m.neckCm) || undefined,
+        chestCm: Number(m.chestCm) || undefined,
+        hipCm: Number(m.hipCm) || undefined,
+        bicepLeftCm: Number(m.armLeftCm) || undefined,
+        bicepRightCm: Number(m.armRightCm) || undefined,
+        forearmCm: Number(m.forearmLeftCm) || Number(m.forearmRightCm) || undefined,
+        waistCm: Number(m.waistCm) || undefined,
+        thighLeftCm: Number(m.thighLeftCm) || undefined,
+        thighRightCm: Number(m.thighRightCm) || undefined,
+        calfLeftCm: Number(m.calfLeftCm) || undefined,
+        calfRightCm: Number(m.calfRightCm) || undefined,
+        notes: m.notes || undefined,
+      }));
+      try { localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(migrated)); } catch { /* quota */ }
+      try { localStorage.removeItem(MEASUREMENT_KEY); } catch { /* ignore */ }
+      return legacy.sort((a: BodyMeasurement, b: BodyMeasurement) => a.date.localeCompare(b.date));
+    }
+    return [];
+  } catch { return []; }
+}
+
+/**
+ * Save a body measurement — writes to the CANONICAL weight log (he_weight_log),
+ * merging with any existing entry for the same date.
+ */
 export function saveMeasurement(m: BodyMeasurement): BodyMeasurement[] {
-  const measurements = loadMeasurements();
-  const idx = measurements.findIndex(e => e.date === m.date);
-  if (idx >= 0) measurements[idx] = m; else measurements.push(m);
-  measurements.sort((a, b) => a.date.localeCompare(b.date));
-  localStorage.setItem(MEASUREMENT_KEY, JSON.stringify(measurements.slice(-100)));
-  return measurements;
+  try {
+    const raw = JSON.parse(localStorage.getItem(WEIGHT_LOG_KEY) || '[]');
+    const log: any[] = Array.isArray(raw) ? raw : [];
+    const idx = log.findIndex((e: any) => e.date === m.date);
+    const patch = {
+      weight: Number(m.weightKg) || 0,
+      bodyFat: Number(m.bodyFatPercent) || undefined,
+      neckCm: Number(m.neckCm) || undefined,
+      chestCm: Number(m.chestCm) || undefined,
+      hipCm: Number(m.hipCm) || undefined,
+      bicepLeftCm: Number(m.armLeftCm) || undefined,
+      bicepRightCm: Number(m.armRightCm) || undefined,
+      forearmCm: Number(m.forearmLeftCm) || Number(m.forearmRightCm) || undefined,
+      waistCm: Number(m.waistCm) || undefined,
+      thighLeftCm: Number(m.thighLeftCm) || undefined,
+      thighRightCm: Number(m.thighRightCm) || undefined,
+      calfLeftCm: Number(m.calfLeftCm) || undefined,
+      calfRightCm: Number(m.calfRightCm) || undefined,
+      notes: m.notes || undefined,
+    };
+    if (idx >= 0) {
+      log[idx] = { ...log[idx], ...patch };
+    } else {
+      log.push({ date: m.date, ...patch });
+    }
+    log.sort((a: any, b: any) => (a.date || '').localeCompare(b.date || ''));
+    localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(log.slice(-365)));
+  } catch { /* quota — silent */ }
+  return loadMeasurements();
 }
 
 export function analyzeMeasurements(heightCm: number): MeasurementAnalytics | null {

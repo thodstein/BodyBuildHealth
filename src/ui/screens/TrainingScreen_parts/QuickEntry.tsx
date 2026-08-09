@@ -13,6 +13,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
+import { DiarySetRow } from './DiarySetRow';
 import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { useIsMobile } from './useIsMobile';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
@@ -104,10 +105,45 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   const [restTarget, setRestTarget] = useState(90);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedSummary, setSavedSummary] = useState<{ exercises: number; sets: number; volume: number } | null>(null);
   const [showPR, setShowPR] = useState<{ exercise: string; weight: number; reps: number; e1rm: number } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const prTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+
+  // Undo/Redo
+  const undoRef = useRef<ExerciseRecord[][]>([]);
+  const redoRef = useRef<ExerciseRecord[][]>([]);
+  const pushUndo = useCallback((snapshot: ExerciseRecord[]) => {
+    undoRef.current = [...undoRef.current.slice(-19), JSON.parse(JSON.stringify(snapshot))];
+    redoRef.current = [];
+  }, []);
+  const undo = useCallback(() => {
+    if (undoRef.current.length === 0) return;
+    redoRef.current.push(JSON.parse(JSON.stringify(exercises)));
+    const prev = undoRef.current.pop()!;
+    setExercises(prev);
+    setCurrentExIdx(Math.min(currentExIdx, prev.length - 1));
+  }, [exercises, currentExIdx]);
+  const redo = useCallback(() => {
+    if (redoRef.current.length === 0) return;
+    undoRef.current.push(JSON.parse(JSON.stringify(exercises)));
+    const next = redoRef.current.pop()!;
+    setExercises(next);
+    setCurrentExIdx(Math.min(currentExIdx, next.length - 1));
+  }, [exercises, currentExIdx]);
+
+  // Keyboard undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo(); else undo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
 
   useEffect(() => {
     return () => {
@@ -154,6 +190,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   }, [currentEx, historyWorkouts]);
 
   const addExercise = useCallback((ex: typeof EXERCISE_CATALOG[0]) => {
+    pushUndo(exercises);
     const isBW = isBWExercise(ex);
     const newEx: ExerciseRecord = {
       exerciseId: ex.id,
@@ -165,10 +202,11 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     setCurrentSetIdx(0);
     setSearchQuery('');
     setSearchResults([]);
-  }, [prevData, exercises.length]);
+  }, [prevData, exercises.length, exercises, pushUndo]);
 
   const addSet = useCallback(() => {
     if (!currentEx) return;
+    pushUndo(exercises);
     const lastSet = currentEx.sets[currentEx.sets.length - 1];
     const newSet: SetRecord = {
       weight: lastSet?.weight || 0,
@@ -183,7 +221,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
       return updated;
     });
     setCurrentSetIdx(currentEx.sets.length);
-  }, [currentEx, currentExIdx]);
+  }, [currentEx, currentExIdx, exercises, pushUndo]);
 
   const completeSet = useCallback((weight: number, reps: number, rpe: number, rir: number) => {
     if (!currentEx) return;
@@ -218,11 +256,12 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   }, [currentEx, currentExIdx, currentSetIdx, exercises.length, currentPR, restTarget]);
 
   const removeExercise = useCallback((idx: number) => {
+    pushUndo(exercises);
     setExercises(prev => prev.filter((_, i) => i !== idx));
     if (currentExIdx >= exercises.length - 1) {
       setCurrentExIdx(Math.max(0, exercises.length - 2));
     }
-  }, [currentExIdx, exercises.length]);
+  }, [currentExIdx, exercises.length, exercises, pushUndo]);
 
   const handleSave = useCallback(async () => {
     const wid = `workout_${Date.now()}`;
@@ -262,8 +301,9 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           await diary.saveStrengthLog(se);
         }
         if (mountedRef.current) {
+          setSavedSummary({ exercises: strengthEntries.length, sets: totalSets, volume: totalVolume });
           setSaved(true);
-          setTimeout(() => { if (mountedRef.current) { setSaved(false); onSave(); } }, 1500);
+          setTimeout(() => { if (mountedRef.current) { setSaved(false); setSavedSummary(null); onSave(); } }, 3000);
         }
       } catch {
         if (mountedRef.current) {
@@ -324,10 +364,42 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>⚡ Быстрый ввод</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-          {totalSets} сетов · {totalVolume.toLocaleString()} кг
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {undoRef.current.length > 0 && (
+            <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10 }}>↩</button>
+          )}
+          {redoRef.current.length > 0 && (
+            <button onClick={redo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10 }}>↷</button>
+          )}
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+            {totalSets} сетов · {totalVolume.toLocaleString()} кг
+          </div>
         </div>
       </div>
+
+      {/* Repeat last workout + Search */}
+      {exercises.length === 0 && historyWorkouts.length > 0 && (
+        <button onClick={() => {
+          const last = historyWorkouts[0];
+          if (!last?.exercises?.length) return;
+          const repeated: ExerciseRecord[] = last.exercises.map((ex: any) => ({
+            exerciseId: ex.exerciseId,
+            exerciseName: ex.exerciseName.replace(/\s*\[superset:\d+\]/, ''),
+            sets: (ex.sets || []).map((s: any) => ({
+              weight: s.weight || 0, reps: s.reps || 10, rpe: 0, rir: s.rir || 2, completed: false,
+            })),
+          }));
+          setExercises(repeated);
+          setCurrentExIdx(0);
+          setCurrentSetIdx(0);
+        }}
+          style={{
+            width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px dashed rgba(0,230,138,0.3)',
+            background: 'rgba(0,230,138,0.04)', color: ACCENT, cursor: 'pointer', fontSize: 13, minHeight: 44,
+          }}>
+          🔄 Повторить от {new Date(historyWorkouts[0].date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+        </button>
+      )}
 
       {/* Search */}
       <div style={{ position: 'relative' }}>
@@ -367,6 +439,32 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           </div>
         )}
       </div>
+
+      {/* Recent exercises quick list */}
+      {!searchQuery && exercises.length === 0 && (() => {
+        const recentMap = new Map<string, { name: string; lastDate: string }>();
+        historyWorkouts.slice(-10).forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+          const name = e.exerciseName || '';
+          if (!name) return;
+          const prev = recentMap.get(name);
+          if (!prev || w.date > prev.lastDate) recentMap.set(name, { name, lastDate: w.date });
+        }));
+        const recent = Array.from(recentMap.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).slice(0, 6);
+        if (recent.length === 0) return null;
+        return (
+          <div style={{ marginTop: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Недавние:</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {recent.map(r => (
+                <button key={r.name} onClick={() => { const ex = EXERCISE_CATALOG.find((c: any) => c.name === r.name); if (ex) addExercise(ex); }}
+                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 10 }}>
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Exercise list */}
       {exercises.length === 0 && (
@@ -432,7 +530,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                 {ex.sets.map((set, setIdx) => {
                   const isCurrentSet = setIdx === currentSetIdx && !set.completed;
                   return (
-                    <SetRow
+                    <DiarySetRow
                       key={setIdx}
                       set={set}
                       setNumber={setIdx + 1}
@@ -457,15 +555,38 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                     />
                   );
                 })}
-                {/* Add set button */}
-                <button
-                  onClick={addSet}
-                  style={{
-                    width: '100%', padding: '8px', borderRadius: 8,
-                    border: '1px dashed rgba(0,230,138,0.3)', background: 'transparent',
-                    color: ACCENT, cursor: 'pointer', fontSize: 11, marginTop: 4, minHeight: 36,
-                  }}
-                >+ Добавить подход</button>
+                {/* Add set + repeat last set buttons */}
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  <button
+                    onClick={addSet}
+                    style={{
+                      flex: 1, padding: '8px', borderRadius: 8,
+                      border: '1px dashed rgba(0,230,138,0.3)', background: 'transparent',
+                      color: ACCENT, cursor: 'pointer', fontSize: 11, minHeight: 36,
+                    }}
+                  >+ Добавить</button>
+                  {ex.sets.length >= 2 && (
+                    <button
+                      onClick={() => {
+                        pushUndo(exercises);
+                        const last = ex.sets[ex.sets.length - 1];
+                        setExercises(prev => {
+                          const updated = [...prev];
+                          const exercise = { ...updated[exIdx] };
+                          exercise.sets = [...exercise.sets, { ...last, completed: false }];
+                          updated[exIdx] = exercise;
+                          return updated;
+                        });
+                        setCurrentSetIdx(ex.sets.length);
+                      }}
+                      style={{
+                        padding: '8px 10px', borderRadius: 8,
+                        border: '1px dashed rgba(245,158,11,0.3)', background: 'transparent',
+                        color: '#f59e0b', cursor: 'pointer', fontSize: 11, minHeight: 36,
+                      }}
+                    >⧉ Копировать</button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -493,8 +614,38 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
       )}
 
       {/* Save button */}
-      {exercises.length > 0 && (
+      {savedSummary ? (
+        <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>✅ Тренировка сохранена!</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
+            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.4)' }}>Упр.</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.exercises}</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.4)' }}>Сетов</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.sets}</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.4)' }}>Тоннаж</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.volume.toLocaleString()} кг</div></div>
+          </div>
+        </div>
+      ) : exercises.length > 0 && (
         <>
+        {exercises.some(ex => ex.sets.some(s => !s.completed)) && (
+          <button
+            onClick={() => {
+              setExercises(prev => prev.map(ex => ({
+                ...ex,
+                sets: ex.sets.map(s => {
+                  if (s.completed) return s;
+                  const lastCompleted = [...ex.sets].reverse().find(sc => sc.completed);
+                  return { ...s, weight: lastCompleted?.weight || s.weight, reps: lastCompleted?.reps || s.reps, rpe: lastCompleted?.rpe || s.rpe, rir: lastCompleted?.rir || s.rir, completed: true };
+                }),
+              })));
+            }}
+            style={{
+              width: '100%', padding: 10, borderRadius: 10, border: '1px solid rgba(245,158,11,0.3)',
+              background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer',
+              fontWeight: 600, fontSize: 12, marginBottom: 6, minHeight: 40,
+            }}
+          >
+            ⚡ Добросить всё (авто-заполнить остатки)
+          </button>
+        )}
         <button
           onClick={handleSave}
           disabled={totalSets === 0}
@@ -514,118 +665,6 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   );
 };
 
-/* ─── SetRow — строка подхода с быстрым вводом ─── */
-const SetRow: React.FC<{
-  set: SetRecord;
-  setNumber: number;
-  isCurrent: boolean;
-  isBodyweight: boolean;
-  prevData: { weight: number; reps: number; rir: number } | null;
-  onComplete: (weight: number, reps: number, rpe: number, rir: number) => void;
-  onSkip: () => void;
-}> = ({ set, setNumber, isCurrent, isBodyweight, prevData, onComplete, onSkip }) => {
-  const [weight, setWeight] = useState(set.weight || prevData?.weight || 0);
-  const [reps, setReps] = useState(set.reps || prevData?.reps || 10);
-  const [rpe, setRpe] = useState(set.rpe || 7);
-  const [rir, setRir] = useState(set.rir ?? prevData?.rir ?? 2);
 
-  useEffect(() => {
-    if (prevData && set.weight === 0) {
-      setWeight(prevData.weight);
-      setReps(prevData.reps);
-    }
-  }, [prevData]);
-
-  if (set.completed) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 11,
-      }}>
-        <span style={{ fontWeight: 700, color: ACCENT, minWidth: 20 }}>#{setNumber}</span>
-        <span style={{ color: '#fff', fontWeight: 600 }}>{set.weight}кг × {set.reps}</span>
-        <span style={{ color: 'rgba(255,255,255,0.4)' }}>RPE {set.rpe}</span>
-        <span style={{ color: 'rgba(255,255,255,0.4)' }}>RIR {set.rir}</span>
-        <span style={{ color: ACCENT, marginLeft: 'auto', fontSize: 10 }}>
-          {Math.round(epley1RM(set.weight, set.reps))}кг 1RM
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.03)',
-      background: isCurrent ? 'rgba(0,230,138,0.03)' : 'transparent',
-      borderRadius: isCurrent ? 8 : 0,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-        <span style={{ fontWeight: 700, color: ACCENT, minWidth: 20, fontSize: 11 }}>#{setNumber}</span>
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4 }}>
-          <input
-            type="number" value={weight} disabled={isBodyweight}
-            onChange={e => setWeight(parseFloat(e.target.value) || 0)}
-            placeholder={isBodyweight ? 'свой вес' : 'кг'}
-            style={{
-              padding: '8px 6px', borderRadius: 6, background: isBodyweight ? 'rgba(255,255,255,0.03)' : '#18181b',
-              border: '1px solid rgba(255,255,255,0.08)', color: isBodyweight ? 'rgba(255,255,255,0.3)' : '#fff',
-              fontSize: 12, textAlign: 'center', minHeight: 36, opacity: isBodyweight ? 0.6 : 1,
-            }}
-          />
-          <input
-            type="number" value={reps}
-            onChange={e => setReps(parseInt(e.target.value) || 0)}
-            placeholder="повт"
-            style={{
-              padding: '8px 6px', borderRadius: 6, background: '#18181b',
-              border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
-              fontSize: 12, textAlign: 'center', minHeight: 36,
-            }}
-          />
-          <input
-            type="number" min={1} max={10} value={rpe}
-            onChange={e => setRpe(parseInt(e.target.value) || 5)}
-            placeholder="RPE"
-            style={{
-              padding: '8px 6px', borderRadius: 6, background: '#18181b',
-              border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
-              fontSize: 12, textAlign: 'center', minHeight: 36,
-            }}
-          />
-          <input
-            type="number" min={0} max={5} value={rir}
-            onChange={e => setRir(parseInt(e.target.value) || 0)}
-            placeholder="RIR"
-            style={{
-              padding: '8px 6px', borderRadius: 6, background: '#18181b',
-              border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
-              fontSize: 12, textAlign: 'center', minHeight: 36,
-            }}
-          />
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button
-          onClick={() => onComplete(weight, reps, rpe, rir)}
-          disabled={weight <= 0 || reps <= 0}
-          style={{
-            flex: 2, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: weight > 0 && reps > 0 ? 'linear-gradient(135deg, #00e68a, #00c853)' : 'rgba(255,255,255,0.05)',
-            color: weight > 0 && reps > 0 ? '#000' : 'rgba(255,255,255,0.3)',
-            fontWeight: 700, fontSize: 12, minHeight: 40,
-          }}
-        >✓ Записать</button>
-        <button
-          onClick={onSkip}
-          style={{
-            flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
-            background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer',
-            fontSize: 11, minHeight: 40,
-          }}
-        >Пропустить</button>
-      </div>
-    </div>
-  );
-};
 
 export default QuickEntry;

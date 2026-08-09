@@ -304,7 +304,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
     const s = Number(systolic),
       d = Number(diastolic),
       p = Number(pulse);
-    if (!date || s < 50 || s > 250 || d < 30 || d > 180 || p < 20 || p > 250) return;
+    if (!date || ![s, d, p].every(Number.isFinite) || s < 50 || s > 250 || d < 30 || d > 180 || p < 20 || p > 250 || d >= s) return;
     onSave({ date, systolic: s, diastolic: d, pulse: p, notes: notes.trim() || undefined });
     onClose();
   };
@@ -351,7 +351,14 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
     'chestCm',
     'hipCm',
     'bicepCm',
+    'bicepLeftCm',
+    'bicepRightCm',
     'thighCm',
+    'thighLeftCm',
+    'thighRightCm',
+    'calfCm',
+    'calfLeftCm',
+    'calfRightCm',
     'neckCm',
     'forearmCm',
     'bodyFat',
@@ -360,9 +367,33 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
   ] as const;
   const [values, setValues] = useState<Record<string, string>>({ weight: '80' });
   const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const MAX_PHOTOS = 5;
+  const MAX_SIZE_MB = 2;
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remaining = MAX_PHOTOS - photos.length;
+    if (remaining <= 0) {
+      alert(`Максимум ${MAX_PHOTOS} фото на запись`);
+      return;
+    }
+    const toProcess = files.slice(0, remaining);
+    const compressed = await Promise.all(
+      toProcess.map(file => compressImage(file, 800, 0.7))
+    );
+    setPhotos(prev => [...prev, ...compressed].slice(0, MAX_PHOTOS));
+    e.target.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
   const save = () => {
     if (!date) return;
-    const entry: Record<string, unknown> = { date, notes: notes.trim() || undefined };
+    const entry: Record<string, unknown> = { date, notes: notes.trim() || undefined, photos: photos.length ? photos : undefined };
     fields.forEach((key) => {
       const value = Number(values[key]);
       if (values[key] !== undefined && values[key] !== '' && Number.isFinite(value)) entry[key] = value;
@@ -395,9 +426,66 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         style={{ ...fieldInput, marginTop: 8 }}
         placeholder="Заметка"
       />
+      <div style={{ marginTop: 10 }}>
+        <label style={fieldLabel}>📷 Фото ({photos.length}/{MAX_PHOTOS}, до {MAX_SIZE_MB}Мб каждое)</label>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handlePhotoUpload}
+          style={{ ...fieldInput, padding: '8px' }}
+        />
+        {photos.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            {photos.map((src, i) => (
+              <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 8, overflow: 'hidden', border: '1px solid #3f3f46' }}>
+                <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button
+                  onClick={() => removePhoto(i)}
+                  style={{
+                    position: 'absolute', top: 2, right: 2, background: '#ef4444cc', color: '#fff',
+                    border: 'none', borderRadius: 4, width: 20, height: 20, cursor: 'pointer', fontSize: 12,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <ActionRow onClose={onClose} onSave={save} color={colors.green} />
     </Modal>
   );
+};
+
+const compressImage = (file: File, maxDim = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (file.size > 2 * 1024 * 1024) {
+      reject(new Error(`Файл ${file.name} > 2Мб`));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No canvas')); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 };
 
 export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({

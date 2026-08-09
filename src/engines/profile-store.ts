@@ -22,13 +22,21 @@ export interface WeightEntry {
   waistCm?: number;       // талия, см
   chestCm?: number;       // грудь, см
   hipCm?: number;         // бедра, см
-  bicepCm?: number;       // бицепс, см
-  thighCm?: number;       // бедро, см
+  bicepCm?: number;       // бицепс, см (среднее/общее)
+  bicepLeftCm?: number;   // бицепс левый, см
+  bicepRightCm?: number;  // бицепс правый, см
+  thighCm?: number;       // бедро, см (среднее/общее)
+  thighLeftCm?: number;   // бедро левое, см
+  thighRightCm?: number;  // бедро правое, см
+  calfCm?: number;        // икры, см (среднее/общее)
+  calfLeftCm?: number;    // икра левая, см
+  calfRightCm?: number;   // икра правая, см
   neckCm?: number;        // шея, см
   forearmCm?: number;     // предплечье, см
   muscleMass?: number;    // мышечная масса, кг
   waterMass?: number;     // вода, %
   notes?: string;         // заметка
+  photos?: string[];      // base64/dataURL фото (макс 5, до 2Мб каждое)
 }
 export function getWeightLog(): WeightEntry[] {
   try {
@@ -41,17 +49,31 @@ export function getWeightLog(): WeightEntry[] {
       chestCm: e.chestCm !== undefined ? Number(e.chestCm) : undefined,
       hipCm: e.hipCm !== undefined ? Number(e.hipCm) : undefined,
       bicepCm: e.bicepCm !== undefined ? Number(e.bicepCm) : undefined,
+      bicepLeftCm: e.bicepLeftCm !== undefined ? Number(e.bicepLeftCm) : undefined,
+      bicepRightCm: e.bicepRightCm !== undefined ? Number(e.bicepRightCm) : undefined,
       thighCm: e.thighCm !== undefined ? Number(e.thighCm) : undefined,
+      thighLeftCm: e.thighLeftCm !== undefined ? Number(e.thighLeftCm) : undefined,
+      thighRightCm: e.thighRightCm !== undefined ? Number(e.thighRightCm) : undefined,
+      calfCm: e.calfCm !== undefined ? Number(e.calfCm) : undefined,
+      calfLeftCm: e.calfLeftCm !== undefined ? Number(e.calfLeftCm) : undefined,
+      calfRightCm: e.calfRightCm !== undefined ? Number(e.calfRightCm) : undefined,
       neckCm: e.neckCm !== undefined ? Number(e.neckCm) : undefined,
       forearmCm: e.forearmCm !== undefined ? Number(e.forearmCm) : undefined,
       muscleMass: e.muscleMass !== undefined ? Number(e.muscleMass) : undefined,
       waterMass: e.waterMass !== undefined ? Number(e.waterMass) : undefined,
       notes: e.notes ? String(e.notes) : undefined,
+      photos: Array.isArray(e.photos) ? e.photos.filter((p: any) => typeof p === 'string') : undefined,
     })) : [];
   } catch { return []; }
 }
 export function saveWeightLog(log: WeightEntry[]) {
-  localStorage.setItem(KEYS.weight, JSON.stringify(log.slice(-365)));
+  const trimmed = log.slice(-365);
+  const totalPhotos = trimmed.reduce((sum, e) => sum + (e.photos?.length || 0), 0);
+  const estimatedSize = new Blob([JSON.stringify(trimmed)]).size;
+  if (estimatedSize > 4 * 1024 * 1024) {
+    console.warn(`[profile-store] weight log size ${(estimatedSize / 1024 / 1024).toFixed(1)}MB — consider removing old photos`);
+  }
+  localStorage.setItem(KEYS.weight, JSON.stringify(trimmed));
 }
 
 /* ── DEPRECATED: measurements log merged into weight log ── */
@@ -121,22 +143,3 @@ export function syncAllProfiles(settings: UserProfile['settings'] | UnifiedSetti
   } catch { /* silent */ }
 }
 
-/* ── READYNESS CALC (из UnifiedSettings) ── */
-export function calcReadinessFromSettings(settings: UnifiedSettings) {
-  const { calcReadiness } = require('../engines/readiness.engine');
-  const ls = settings.lifestyle;
-  const tr = settings.training;
-  return calcReadiness({
-    sleepHours: ls?.sleepHours ?? 7,
-    sleepQuality: ls?.sleepQuality === 'good' ? 8 : ls?.sleepQuality === 'fair' ? 5 : 3,
-    nightAwakenings: ls?.nightAwakenings ?? 1,
-    hrvRatio: ls?.baselineHrvRatio ?? 1.0,
-    doms: tr?.doms ?? 2,
-    stress: ls?.stressLevel ?? 3,
-    calRatio: settings.system?.nutritionFactor ?? 0.8, proteinRatio: 0.8,
-    waterRatio: 0.7, fiberRatio: 0.6, omega3Flag: false,
-    trainingLoadRatio: settings.system?.trainingFactor ?? 0.6,
-    subjFatigue: ls?.fatigueLevel ?? 3, hrIncrease: 0.1,
-    chronotype: ls?.chronotype, bedtime: ls?.bedtime, wakeTime: ls?.wakeTime,
-  });
-}

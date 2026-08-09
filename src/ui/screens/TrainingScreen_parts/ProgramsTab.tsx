@@ -19,7 +19,6 @@ import { generatePeriodization, getPhaseParams } from '../../../engines/cycle-pe
 import { getTrainingMethods, getMethodsByCategory, getVolumeReferences, getVolumeByMuscle, getSplitVisuals, type TrainingMethod } from '../../../engines/training-methodology.engine';
 import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../../engines/training-visualization.engine';
 import { getProgramById, getProgramsByGoal, FULL_PROGRAM_LIBRARY, type FullProgram } from '../../../engines/complete-program-library.engine';
-import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../../engines/log-analytics-progression.engine';
 import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
