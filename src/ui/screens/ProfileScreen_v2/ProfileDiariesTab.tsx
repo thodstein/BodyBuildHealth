@@ -15,33 +15,21 @@ import {
   groupEntriesByPeriod,
   buildSparkline,
   compareWithLastWeek,
-  sortEntries,
-  paginate,
   crossCorrelation,
   laggedCorrelation,
   dailyCompletion,
   computePace,
   currentStreak,
-  type SortState,
-  type SortDir,
-  computeSummary,
-  targetHit,
-  detectAnomalies,
   filterByRange,
   todayIso,
-  computeDistribution,
-  getNormalRange,
   classifyValue,
-  buildWeeklyHistogram,
-  buildHourDistribution,
-  exportSvgAsPng,
-  exportSvgAsFile,
   type DiaryKey,
-  type DiaryEntryLike,
-  type DiaryGoals,
-  defaultGoals,
 } from './diary-helpers';
-import { DiaryWindow } from './DiaryWindow';
+import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
+import { BPDiary } from './diaries/BPDiary/BPDiary';
+import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
+import { InjectionDiary } from './diaries/InjectionDiary/InjectionDiary';
+import { HealthDiary } from './diaries/HealthDiary/HealthDiary';
 import {
   AddSleepModal,
   AddBPModal,
@@ -859,14 +847,8 @@ export const ProfileDiariesTab: React.FC<{
   const [addInjectionOpen, setAddInjectionOpen] = useState(false);
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
-  const [diaryRange, setDiaryRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
-  const [tableSort, setTableSort] = useState<SortState>({ key: 'date', dir: 'desc' });
-  const [tablePage, setTablePage] = useState(1);
-  const [tableFilter, setTableFilter] = useState('');
-  const [editingDate, setEditingDate] = useState<string | null>(null);
-  const [editingValues, setEditingValues] = useState<Record<string, string>>({});
 
   const pushUndo = (label: string, undo: () => void) => {
     setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
@@ -1054,292 +1036,6 @@ export const ProfileDiariesTab: React.FC<{
     { key: 'health', count: healthEntries.length, last: healthEntries.length ? healthEntries[0].date : '' },
   ];
 
-  const getEntries = (key: DiaryKey): { date: string; fields: { label: string; value: string; unit: string }[] }[] => {
-    if (key === 'sleep')
-      return [...sleepEntries].reverse().map((e) => ({
-        date: e.date,
-        fields: [
-          { label: 'Часы', value: String(e.hours), unit: 'ч' },
-          { label: 'Качество', value: String(e.quality), unit: '1–5' },
-          { label: 'Пробуждений', value: String(e.awakenings ?? 0), unit: 'раз' },
-          { label: 'Легли', value: e.bedtime || '—', unit: '' },
-          { label: 'Подъём', value: e.wakeTime || '—', unit: '' },
-          ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
-        ],
-      }));
-    if (key === 'bp')
-      return [...bpEntries].reverse().map((e) => ({
-        date: e.date,
-        fields: [
-          { label: 'Систола', value: String(e.systolic), unit: 'мм рт.ст.' },
-          { label: 'Диастола', value: String(e.diastolic), unit: 'мм рт.ст.' },
-          { label: 'Пульс', value: String(e.pulse), unit: 'уд/мин' },
-          ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
-        ],
-      }));
-    if (key === 'weight')
-      return [...weights].reverse().map((w, idx, arr) => {
-        const prev = arr[idx + 1];
-        const delta = prev ? w.weight - prev.weight : 0;
-        const measurementFields = [
-          { label: '% жира', value: w.bodyFat ? String(w.bodyFat) : '—', unit: '%' },
-          { label: 'Талия', value: w.waistCm ? String(w.waistCm) : '—', unit: 'см' },
-          { label: 'Грудь', value: w.chestCm ? String(w.chestCm) : '—', unit: 'см' },
-          { label: 'Бёдра', value: w.hipCm ? String(w.hipCm) : '—', unit: 'см' },
-          { label: 'Бицепс', value: w.bicepCm ? String(w.bicepCm) : '—', unit: 'см' },
-          { label: 'Бедро', value: w.thighCm ? String(w.thighCm) : '—', unit: 'см' },
-          { label: 'Шея', value: w.neckCm ? String(w.neckCm) : '—', unit: 'см' },
-          { label: 'Предплечье', value: w.forearmCm ? String(w.forearmCm) : '—', unit: 'см' },
-        ].filter((f) => f.value !== '—');
-        return {
-          date: w.date,
-          fields: [
-            { label: 'Вес', value: String(w.weight), unit: 'кг' },
-            { label: 'Изменение', value: (delta > 0 ? '+' : '') + delta.toFixed(1), unit: 'кг' },
-            ...measurementFields,
-          ],
-        };
-      });
-    if (key === 'injection')
-      return [...injectionEntries].reverse().map((e) => ({
-        date: e.date,
-        fields: [
-          { label: 'Препарат', value: e.substance || '—', unit: '' },
-          { label: 'Доза', value: e.dose || '—', unit: '' },
-          { label: 'Место', value: e.site || '—', unit: '' },
-          ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
-        ],
-      }));
-    if (key === 'symptoms')
-      return [...symptomEntries].reverse().map((e) => ({
-        date: e.date,
-        fields: [
-          { label: 'Симптом', value: e.name, unit: '' },
-          { label: 'Сила', value: '★'.repeat(e.severity) + '☆'.repeat(5 - e.severity), unit: `${e.severity}/5` },
-          ...(e.duration ? [{ label: 'Длительность', value: e.duration, unit: '' }] : []),
-          ...(e.notes ? [{ label: 'Заметка', value: e.notes, unit: '' }] : []),
-        ],
-      }));
-    if (key === 'pain')
-      return [...painEntries].reverse().map((e) => {
-        const fields: { label: string; value: string; unit: string }[] = [];
-        Object.entries(e.zones).forEach(([zoneId, val]) => {
-          const z = PAIN_ZONES.find((p) => p.id === zoneId);
-          if (z && val > 0) fields.push({ label: z.label.replace(/^[^\s]+\s/, ''), value: String(val), unit: '/10' });
-        });
-        fields.push({ label: 'Суммарно', value: String(e.totalScore), unit: '/70' });
-        if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
-        return { date: e.date, fields };
-      });
-    if (key === 'neuro')
-      return [...neuroEntries].reverse().map((e) => {
-        const fields: { label: string; value: string; unit: string }[] = [];
-        Object.entries(e.symptoms)
-          .filter(([, v]) => v)
-          .forEach(([symId]) => {
-            const s = NEURO_SYMPTOMS.find((n) => n.id === symId);
-            if (s) fields.push({ label: s.label, value: 'есть', unit: '' });
-          });
-        fields.push({ label: 'Симптомов', value: String(e.totalScore), unit: '/10' });
-        if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
-        return { date: e.date, fields };
-      });
-    if (key === 'acne')
-      return [...acneEntries].reverse().map((e) => {
-        const fields: { label: string; value: string; unit: string }[] = [];
-        Object.entries(e.areas).forEach(([areaId, val]) => {
-          const a = ACNE_AREAS.find((x) => x.id === areaId);
-          if (a && val > 0) fields.push({ label: a.label.replace(/^[^\s]+\s/, ''), value: String(val), unit: '/3' });
-        });
-        fields.push({ label: 'Суммарно', value: String(e.totalScore), unit: '/12' });
-        if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
-        return { date: e.date, fields };
-      });
-    if (key === 'hemato')
-      return [...hematoEntries].reverse().map((e) => {
-        const fields: { label: string; value: string; unit: string }[] = [];
-        Object.entries(e.symptoms)
-          .filter(([, v]) => v)
-          .forEach(([symId]) => {
-            const s = HEMATO_SYMPTOMS.find((h) => h.id === symId);
-            if (s) fields.push({ label: s.label, value: 'есть', unit: '' });
-          });
-        fields.push({ label: 'Симптомов', value: String(e.totalScore), unit: '/8' });
-        if (e.notes) fields.push({ label: 'Заметка', value: e.notes, unit: '' });
-        return { date: e.date, fields };
-      });
-    return [];
-  };
-
-  const activeEntriesRaw = activeDiary ? getEntries(activeDiary) : [];
-  const activeEntries =
-    diaryRange === 'all'
-      ? activeEntriesRaw
-      : activeEntriesRaw.filter((e) => {
-          const d = Date.parse(e.date);
-          if (Number.isNaN(d)) return true;
-          return d >= Date.now() - Number(diaryRange) * 86400000;
-        });
-
-  const deleteDiaryEntry = (key: DiaryKey, date: string) => {
-    if (
-      key === 'health' ||
-      key === 'symptoms' ||
-      key === 'pain' ||
-      key === 'neuro' ||
-      key === 'acne' ||
-      key === 'hemato'
-    ) {
-      const removed = healthEntries.find((x) => x.date === date);
-      if (!removed) return;
-      const updated = healthEntries.filter((x) => x.date !== date);
-      setHealthEntries(updated);
-      saveUnifiedHealthEntries(updated);
-      const dateLabel = new Date(date).toLocaleDateString('ru-RU');
-      pushUndo(`Запись от ${dateLabel} удалена`, () => {
-        const restored = [...updated, removed].sort((a, b) => a.date.localeCompare(b.date));
-        setHealthEntries(restored);
-        saveUnifiedHealthEntries(restored);
-      });
-      return;
-    }
-    const findList = (): {
-      list: any[];
-      setter: (v: any[]) => void;
-      save: (v: any[]) => void;
-      keyName: string;
-    } | null => {
-      if (key === 'sleep')
-        return {
-          list: sleepEntries,
-          setter: setSleepEntries,
-          save: (v) => saveDiary(SLEEP_DIARY_KEY, v),
-          keyName: SLEEP_DIARY_KEY,
-        };
-      if (key === 'bp')
-        return {
-          list: bpEntries,
-          setter: setBpEntries,
-          save: (v) => saveDiary(BP_DIARY_KEY, v),
-          keyName: BP_DIARY_KEY,
-        };
-      if (key === 'injection')
-        return {
-          list: injectionEntries,
-          setter: setInjectionEntries,
-          save: (v) => saveDiary(INJECTION_DIARY_KEY, v),
-          keyName: INJECTION_DIARY_KEY,
-        };
-      return null;
-    };
-    const ctx = findList();
-    if (!ctx) return;
-    const removed = ctx.list.find((x) => x.date === date);
-    if (!removed) return;
-    const updated = ctx.list.filter((x) => x.date !== date);
-    ctx.setter(updated);
-    ctx.save(updated);
-    const dateLabel = new Date(date).toLocaleDateString('ru-RU');
-    pushUndo(`Запись от ${dateLabel} удалена`, () => {
-      const restored = [...updated, removed].sort((a, b) => a.date.localeCompare(b.date));
-      ctx.setter(restored);
-      ctx.save(restored);
-    });
-  };
-
-  const exportDiaryCSV = (key: DiaryKey, entries: typeof activeEntries) => {
-    if (entries.length === 0) return;
-    const meta = DIARY_META[key];
-    const rows: string[] = [];
-    const allLabels = new Set<string>();
-    entries.forEach((e) => e.fields.forEach((f) => allLabels.add(f.label)));
-    const labels = Array.from(allLabels);
-    rows.push(['Дата', ...labels].join(','));
-    entries.forEach((e) => {
-      const cells: string[] = [e.date];
-      labels.forEach((l) => {
-        const f = e.fields.find((x) => x.label === l);
-        const v = f ? `${f.value}${f.unit ? ' ' + f.unit : ''}`.replace(/"/g, '""') : '';
-        cells.push(`"${v}"`);
-      });
-      rows.push(cells.join(','));
-    });
-    const csv = '\uFEFF' + rows.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${key}-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 500);
-    if (typeof window !== 'undefined' && (window as any).showToast) {
-      (window as any).showToast(`📤 Экспортировано ${entries.length} записей: ${meta.title}`);
-    }
-  };
-
-  const clearActiveDiary = () => {
-    if (!activeDiary) return;
-    if (!confirm(`Удалить ВСЕ записи дневника «${DIARY_META[activeDiary].title}»?`)) return;
-    const doClear = () => {
-      if (activeDiary === 'sleep') {
-        saveDiary(SLEEP_DIARY_KEY, []);
-        setSleepEntries([]);
-      } else if (activeDiary === 'bp') {
-        saveDiary(BP_DIARY_KEY, []);
-        setBpEntries([]);
-      } else if (activeDiary === 'injection') {
-        saveDiary(INJECTION_DIARY_KEY, []);
-        setInjectionEntries([]);
-      } else if (
-        activeDiary === 'health' ||
-        activeDiary === 'symptoms' ||
-        activeDiary === 'pain' ||
-        activeDiary === 'neuro' ||
-        activeDiary === 'acne' ||
-        activeDiary === 'hemato'
-      ) {
-        setHealthEntries([]);
-        saveUnifiedHealthEntries([]);
-      }
-    };
-    doClear();
-    const snapshot = [
-      ...healthEntries,
-      ...(activeDiary === 'sleep' ? sleepEntries : []),
-      ...(activeDiary === 'bp' ? bpEntries : []),
-      ...(activeDiary === 'injection' ? injectionEntries : []),
-    ];
-    const keyName = DIARY_META[activeDiary].storageKey;
-    pushUndo(`🧹 Дневник «${DIARY_META[activeDiary].title}» очищен`, () => {
-      if (
-        keyName &&
-        activeDiary !== 'health' &&
-        activeDiary !== 'symptoms' &&
-        activeDiary !== 'pain' &&
-        activeDiary !== 'neuro' &&
-        activeDiary !== 'acne' &&
-        activeDiary !== 'hemato'
-      )
-        saveDiary(keyName, snapshot);
-      if (activeDiary === 'sleep') setSleepEntries(snapshot as SleepEntry[]);
-      else if (activeDiary === 'bp') setBpEntries(snapshot as BPEntry[]);
-      else if (activeDiary === 'injection') setInjectionEntries(snapshot as InjectionEntry[]);
-      else if (
-        activeDiary === 'health' ||
-        activeDiary === 'symptoms' ||
-        activeDiary === 'pain' ||
-        activeDiary === 'neuro' ||
-        activeDiary === 'acne' ||
-        activeDiary === 'hemato'
-      ) {
-        setHealthEntries(snapshot as HealthEntry[]);
-        saveUnifiedHealthEntries(snapshot as HealthEntry[]);
-      }
-    });
-  };
-
   const exportAllDiaries = () => {
     const payload: Record<string, any> = {
       version: 1,
@@ -1423,195 +1119,6 @@ export const ProfileDiariesTab: React.FC<{
       }
     };
     reader.readAsText(file);
-  };
-
-  const printActiveDiary = () => {
-    if (!activeDiary) return;
-    const meta = DIARY_META[activeDiary];
-    const allLabels = Array.from(new Set(activeEntriesRaw.flatMap((e) => e.fields.map((f) => f.label))));
-    const summary = computeSummary(activeDiary, activeEntriesRaw);
-    const summaryHtml = summary
-      ? summary
-          .map(
-            (s) =>
-              `<div class="sum"><div class="muted">${s.label}</div><div class="v" style="color:${s.color}">${s.value}</div></div>`,
-          )
-          .join('')
-      : '';
-    const anomalies = detectAnomalies(activeDiary, activeEntriesRaw);
-    const anomalyRows =
-      anomalies.length === 0
-        ? '<tr><td colspan="3" style="color:#22c55e">Аномалий не выявлено</td></tr>'
-        : anomalies
-            .map(
-              (a) =>
-                `<tr><td>${new Date(a.date).toLocaleDateString('ru-RU')}</td><td style="color:${a.severity === 'danger' ? '#ef4444' : '#f59e0b'};font-weight:700">${a.severity === 'danger' ? '⚠️ ВЫСОКИЙ' : '⚠ ВНИМАНИЕ'}</td><td>${a.message}</td></tr>`,
-            )
-            .join('');
-    const stats = computeDistribution(buildSparkline(activeDiary, activeEntriesRaw).map((p) => p.value));
-    const statsHtml = stats
-      ? `
-      <div class="stats-grid">
-        <div class="sum"><div class="muted">Среднее</div><div class="v">${stats.mean.toFixed(1)}</div></div>
-        <div class="sum"><div class="muted">Медиана</div><div class="v">${stats.median.toFixed(1)}</div></div>
-        <div class="sum"><div class="muted">σ (SD)</div><div class="v">${stats.stdDev.toFixed(1)}</div></div>
-        <div class="sum"><div class="muted">P25</div><div class="v">${stats.p25.toFixed(1)}</div></div>
-        <div class="sum"><div class="muted">P75</div><div class="v">${stats.p75.toFixed(1)}</div></div>
-        <div class="sum"><div class="muted">Мин / Макс</div><div class="v">${stats.min.toFixed(1)} / ${stats.max.toFixed(1)}</div></div>
-      </div>`
-      : '';
-    const norm = getNormalRange(activeDiary);
-    const normHtml = norm
-      ? `<div class="norm">📏 Норма: ${norm.low}–${norm.high}${norm.unit ? ' ' + norm.unit : ''}. ${norm.description}</div>`
-      : '';
-    const target = targetHit(activeDiary, activeEntriesRaw, goals);
-    const targetHtml = target
-      ? `<div class="target ${target.onTarget ? 'on' : 'off'}">🎯 Цель: ${target.details}${target.onTarget ? ' ✅' : ' ⚠️'}</div>`
-      : '';
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title} — отчёт</title>
-<style>
-@page { size: A4; margin: 14mm; }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#111;padding:18px;max-width:780px;margin:0 auto;}
-h1{color:${meta.color};border-bottom:3px solid ${meta.color};padding-bottom:6px;margin:0 0 8px;font-size:22px;}
-h2{color:#333;font-size:14px;margin:16px 0 6px;border-bottom:1px solid #eee;padding-bottom:4px;}
-.meta{color:#666;font-size:11px;margin-bottom:14px;}
-.summary,.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:12px;}
-.sum{padding:8px;border:1px solid #ddd;border-radius:6px;background:#fafafa;}
-.sum .muted{color:#777;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;}
-.sum .v{font-size:18px;font-weight:800;margin-top:2px;}
-.norm{background:#f0fdf4;border:1px solid #22c55e55;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#166534;}
-.target{padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:12px;font-weight:700;}
-.target.on{background:#f0fdf4;color:#166534;border:1px solid #22c55e55;}
-.target.off{background:#fef3c7;color:#92400e;border:1px solid #f59e0b55;}
-table{width:100%;border-collapse:collapse;margin-top:6px;font-size:10px;}
-th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #e5e5e5;}
-th{background:#f3f3f3;color:#444;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;}
-tr:nth-child(even){background:#fafafa;}
-.muted{color:#999;font-size:9px;margin-top:12px;text-align:right;}
-@media print{body{padding:0;}}
-</style></head><body>
-<h1>${meta.icon} ${meta.title}</h1>
-<div class="meta">📅 Отчёт сформирован: ${new Date().toLocaleString('ru-RU')} · Записей: ${activeEntriesRaw.length}${diaryRange !== 'all' ? ` (показано ${activeEntries.length} за период ${diaryRange} дней)` : ''}</div>
-${targetHtml}
-${normHtml}
-${summaryHtml ? `<h2>Сводка</h2><div class="summary">${summaryHtml}</div>` : ''}
-${statsHtml ? `<h2>Статистика</h2>${statsHtml}` : ''}
-<h2>Записи</h2>
-<table><thead><tr><th>Дата</th>${allLabels.map((l) => `<th>${l}</th>`).join('')}</tr></thead><tbody>
-${activeEntriesRaw
-  .map(
-    (e) =>
-      `<tr><td>${new Date(e.date).toLocaleDateString('ru-RU')}</td>${allLabels
-        .map((l) => {
-          const f = e.fields.find((x) => x.label === l);
-          return `<td>${f ? f.value + (f.unit ? ' ' + f.unit : '') : '—'}</td>`;
-        })
-        .join('')}</tr>`,
-  )
-  .join('')}
-</tbody></table>
-<h2>Аномалии и предупреждения</h2>
-<table><thead><tr><th>Дата</th><th>Уровень</th><th>Описание</th></tr></thead><tbody>${anomalyRows}</tbody></table>
-<div class="muted">BodyBuildHealth · профильные дневники · ${new Date().toLocaleString('ru-RU')}</div>
-</body></html>`;
-    const w = window.open('', '_blank');
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      setTimeout(() => w.print(), 300);
-    } else {
-      if ((window as any).showToast)
-        (window as any).showToast('⚠ Не удалось открыть окно печати — разрешите всплывающие окна');
-    }
-  };
-
-  const quickAddToday = () => {
-    if (!activeDiary) return;
-    const today = todayIso();
-    const last = getEntryArray(activeDiary);
-    if (last.length > 0 && last[last.length - 1].date === today) {
-      if ((window as any).showToast) (window as any).showToast('ℹ️ Запись за сегодня уже есть');
-      return;
-    }
-    if (activeDiary === 'sleep') {
-      const e: SleepEntry = { date: today, hours: 7.5, quality: 4, awakenings: 1, bedtime: '23:00', wakeTime: '07:00' };
-      const updated = [...sleepEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(SLEEP_DIARY_KEY, updated);
-      setSleepEntries(updated);
-    } else if (activeDiary === 'bp') {
-      const e: BPEntry = { date: today, systolic: 120, diastolic: 80, pulse: 70 };
-      const updated = [...bpEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(BP_DIARY_KEY, updated);
-      setBpEntries(updated);
-    } else if (activeDiary === 'symptoms') {
-      const e: SymptomEntry = { date: today, name: 'Нет симптомов', severity: 1 };
-      const updated = [...symptomEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(SYMPTOMS_DIARY_KEY, updated);
-      setSymptomEntries(updated);
-    } else if (activeDiary === 'pain') {
-      const e: PainEntry = { date: today, zones: {}, totalScore: 0 };
-      const updated = [...painEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(PAIN_DIARY_KEY, updated);
-      setPainEntries(updated);
-    } else if (activeDiary === 'neuro') {
-      const e: NeuroEntry = { date: today, symptoms: {}, totalScore: 0 };
-      const updated = [...neuroEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(NEURO_DIARY_KEY, updated);
-      setNeuroEntries(updated);
-    } else if (activeDiary === 'acne') {
-      const e: AcneEntry = { date: today, areas: {}, totalScore: 0 };
-      const updated = [...acneEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(ACNE_DIARY_KEY, updated);
-      setAcneEntries(updated);
-    } else if (activeDiary === 'hemato') {
-      const e: HematoEntry = { date: today, symptoms: {}, totalScore: 0 };
-      const updated = [...hematoEntries, e].sort((a, b) => a.date.localeCompare(b.date));
-      saveDiary(HEMATO_DIARY_KEY, updated);
-      setHematoEntries(updated);
-    } else if (activeDiary === 'injection') {
-      const e: InjectionEntry = { date: today, substance: 'Курс', dose: '—', site: 'Дельта' };
-      const updated = [...injectionEntries.filter((x) => x.date !== today), e].sort((a, b) =>
-        a.date.localeCompare(b.date),
-      );
-      saveDiary(INJECTION_DIARY_KEY, updated);
-      setInjectionEntries(updated);
-    } else {
-      setAddBodyMeasurementsOpen(activeDiary === 'weight' || activeDiary === 'measurements');
-      return;
-    }
-    if ((window as any).showToast) (window as any).showToast('⚡ Запись за сегодня добавлена (откройте для деталей)');
-  };
-
-  const targetHit = (
-    key: DiaryKey,
-    entries: { date: string; fields: { label: string; value: string; unit: string }[] }[],
-    goals: DiaryGoals,
-  ): { onTarget: boolean; details: string } | null => {
-    const last = entries[0];
-    if (!last) return null;
-    if (key === 'sleep' && goals.sleepHours > 0) {
-      const hours = parseFloat(last.fields.find((x) => x.label === 'Часы')?.value || 'NaN');
-      if (!Number.isFinite(hours)) return null;
-      const onTarget = hours >= goals.sleepHours;
-      return { onTarget, details: `${hours.toFixed(1)} ч / цель ${goals.sleepHours} ч` };
-    }
-    if (key === 'weight' && goals.weightKg > 0) {
-      const w = parseFloat(last.fields.find((x) => x.label === 'Вес')?.value || 'NaN');
-      if (!Number.isFinite(w)) return null;
-      const diff = w - goals.weightKg;
-      const onTarget = Math.abs(diff) <= 0.5;
-      return {
-        onTarget,
-        details: `${w.toFixed(1)} кг / цель ${goals.weightKg} кг (Δ ${diff > 0 ? '+' : ''}${diff.toFixed(1)})`,
-      };
-    }
-    if (key === 'bp' && goals.systolicTarget > 0) {
-      const sys = parseFloat(last.fields.find((x) => x.label === 'Систола')?.value || 'NaN');
-      if (!Number.isFinite(sys)) return null;
-      return { onTarget: sys <= goals.systolicTarget, details: `${sys.toFixed(0)} / цель ≤ ${goals.systolicTarget}` };
-    }
-    return null;
   };
 
   const reportSources = [
@@ -2324,16 +1831,20 @@ ${activeEntriesRaw
             <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" />
           </AccordionSection>
 
-          {activeDiary && (
-            <DiaryWindow
-              open={true}
-              onClose={() => setActiveDiary(null)}
-              diaryKey={activeDiary}
-              goals={goals}
-              onDataChange={() => {
-                refresh();
-              }}
-            />
+          {activeDiary === 'sleep' && (
+            <SleepDiary open onClose={() => setActiveDiary(null)} diaryKey="sleep" goals={goals} onDataChange={refresh} />
+          )}
+          {activeDiary === 'bp' && (
+            <BPDiary open onClose={() => setActiveDiary(null)} diaryKey="bp" goals={goals} onDataChange={refresh} />
+          )}
+          {(activeDiary === 'weight' || activeDiary === 'measurements') && (
+            <WeightDiary open onClose={() => setActiveDiary(null)} goals={goals} onDataChange={refresh} diaryKey="weight" />
+          )}
+          {activeDiary === 'injection' && (
+            <InjectionDiary open onClose={() => setActiveDiary(null)} diaryKey="injection" goals={goals} onDataChange={refresh} />
+          )}
+          {(activeDiary === 'health' || activeDiary === 'symptoms' || activeDiary === 'pain' || activeDiary === 'neuro' || activeDiary === 'acne' || activeDiary === 'hemato') && (
+            <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} onDataChange={refresh} diaryKey="health" />
           )}
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
