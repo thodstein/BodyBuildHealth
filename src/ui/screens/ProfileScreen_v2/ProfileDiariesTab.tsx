@@ -4,25 +4,14 @@
  * к дневникам в других блоках (открывает конкретный дневник/отчёт).
  */
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../core/db';
 import { getWeightLog, saveWeightLog } from '../../../engines/profile-store';
 import { useProfileRefresh } from '../../../core/profile-manager';
 import { AccordionSection, colors } from './ui';
 import {
-  computeStreak,
-  computePeriodDelta,
-  computeExtremes,
-  groupEntriesByPeriod,
-  buildSparkline,
-  compareWithLastWeek,
-  crossCorrelation,
-  laggedCorrelation,
   dailyCompletion,
   computePace,
   currentStreak,
-  filterByRange,
   todayIso,
-  classifyValue,
   type DiaryKey,
 } from './diary-helpers';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
@@ -472,239 +461,6 @@ const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> =
   );
 };
 
-/** Полноценный SVG-график с осями, сеткой, зонами нормы, target-линией, аннотациями и экспортом. */
-const FullChart: React.FC<{
-  points: { date: string; value: number }[];
-  color: string;
-  target?: number | null;
-  normalRange?: { low: number; high: number; warnLow?: number; warnHigh?: number } | null;
-  yMin?: number | null;
-  yMax?: number | null;
-  height?: number;
-  unit?: string;
-  onExportPng?: (svg: SVGSVGElement) => void;
-  onExportSvg?: (svg: SVGSVGElement) => void;
-}> = ({ points, color, target, normalRange, yMin, yMax, height = 200, unit = '', onExportPng, onExportSvg }) => {
-  const svgRef = React.useRef<SVGSVGElement | null>(null);
-  if (points.length < 1)
-    return (
-      <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'center', padding: 20 }}>
-        Нет данных для графика
-      </div>
-    );
-  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const values = sorted.map((p) => p.value);
-  const PAD = { l: 40, r: 16, t: 20, b: 28 };
-  const W = 600,
-    H = height;
-  const innerW = W - PAD.l - PAD.r;
-  const innerH = H - PAD.t - PAD.b;
-  let vMin = yMin !== null && yMin !== undefined ? yMin : Math.min(...values);
-  let vMax = yMax !== null && yMax !== undefined ? yMax : Math.max(...values);
-  if (normalRange) {
-    if (normalRange.warnLow !== undefined && normalRange.warnLow < vMin) vMin = normalRange.warnLow;
-    if (normalRange.warnHigh !== undefined && normalRange.warnHigh > vMax) vMax = normalRange.warnHigh;
-    if (normalRange.low < vMin) vMin = normalRange.low;
-    if (normalRange.high > vMax) vMax = normalRange.high;
-  }
-  if (target !== null && target !== undefined) {
-    if (target < vMin) vMin = target;
-    if (target > vMax) vMax = target;
-  }
-  let range = vMax - vMin;
-  if (range === 0) range = Math.max(Math.abs(vMax) * 0.2, 1);
-  const padding = range * 0.08;
-  vMin -= padding;
-  vMax += padding;
-  range = vMax - vMin;
-  const stepX = sorted.length === 1 ? 0 : innerW / (sorted.length - 1);
-  const toX = (i: number) => PAD.l + i * stepX;
-  const toY = (v: number) => PAD.t + innerH - ((v - vMin) / range) * innerH;
-  const yTicks = 4;
-  const yLabels: { y: number; v: number }[] = [];
-  for (let i = 0; i <= yTicks; i++) {
-    const v = vMin + (range * i) / yTicks;
-    yLabels.push({ y: toY(v), v });
-  }
-  const xLabelStep = Math.max(1, Math.ceil(sorted.length / 6));
-  const xLabels: { x: number; label: string }[] = [];
-  for (let i = 0; i < sorted.length; i += xLabelStep) {
-    const d = new Date(sorted[i].date);
-    xLabels.push({ x: toX(i), label: d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) });
-  }
-  if (xLabels.length && (sorted.length - 1) % xLabelStep !== 0) {
-    const lastD = new Date(sorted[sorted.length - 1].date);
-    xLabels.push({
-      x: toX(sorted.length - 1),
-      label: lastD.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
-    });
-  }
-  const pathD = sorted
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${toX(i).toFixed(1)} ${toY(p.value).toFixed(1)}`)
-    .join(' ');
-  const yNormalLow = normalRange ? toY(normalRange.low) : null;
-  const yNormalHigh = normalRange ? toY(normalRange.high) : null;
-  const yWarnLow = normalRange?.warnLow !== undefined ? toY(normalRange.warnLow) : null;
-  const yWarnHigh = normalRange?.warnHigh !== undefined ? toY(normalRange.warnHigh) : null;
-  return (
-    <div style={{ width: '100%' }}>
-      {(onExportPng || onExportSvg) && (
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: 4 }}>
-          {onExportSvg && (
-            <button
-              onClick={() => svgRef.current && onExportSvg(svgRef.current)}
-              style={{
-                padding: '3px 8px',
-                fontSize: 10,
-                borderRadius: 5,
-                background: 'rgba(96,165,250,0.12)',
-                border: '1px solid rgba(96,165,250,0.3)',
-                color: '#60a5fa',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              📄 SVG
-            </button>
-          )}
-          {onExportPng && (
-            <button
-              onClick={() => svgRef.current && onExportPng(svgRef.current)}
-              style={{
-                padding: '3px 8px',
-                fontSize: 10,
-                borderRadius: 5,
-                background: 'rgba(0,230,138,0.12)',
-                border: '1px solid rgba(0,230,138,0.3)',
-                color: '#00e68a',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              🖼 PNG
-            </button>
-          )}
-        </div>
-      )}
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        width="100%"
-        height={H}
-        role="img"
-        aria-label="График значений по датам"
-        style={{ display: 'block' }}
-      >
-        {normalRange && yNormalLow !== null && yNormalHigh !== null && (
-          <rect
-            x={PAD.l}
-            y={Math.min(yNormalLow, yNormalHigh)}
-            width={innerW}
-            height={Math.abs(yNormalLow - yNormalHigh)}
-            fill="rgba(34,197,94,0.12)"
-          />
-        )}
-        {normalRange && yWarnLow !== null && yWarnHigh !== null && yNormalHigh !== null && (
-          <rect
-            x={PAD.l}
-            y={yWarnHigh}
-            width={innerW}
-            height={Math.abs(yWarnHigh - yNormalHigh)}
-            fill="rgba(245,158,11,0.1)"
-          />
-        )}
-        {normalRange && yWarnLow !== null && yNormalLow !== null && (
-          <rect
-            x={PAD.l}
-            y={yNormalLow}
-            width={innerW}
-            height={Math.abs(yWarnLow - yNormalLow)}
-            fill="rgba(245,158,11,0.1)"
-          />
-        )}
-        {yLabels.map((t, i) => (
-          <g key={`y-${i}`}>
-            <line x1={PAD.l} y1={t.y} x2={W - PAD.r} y2={t.y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-            <text x={PAD.l - 6} y={t.y + 3} fontSize="10" fill="rgba(255,255,255,0.6)" textAnchor="end">
-              {t.v.toFixed(Math.abs(t.v) >= 100 ? 0 : 1)}
-            </text>
-          </g>
-        ))}
-        <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={H - PAD.b} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-        <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b} stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-        {xLabels.map((l, i) => (
-          <text key={`x-${i}`} x={l.x} y={H - 8} fontSize="9" fill="rgba(255,255,255,0.55)" textAnchor="middle">
-            {l.label}
-          </text>
-        ))}
-        {target !== null && target !== undefined && target >= vMin && target <= vMax && (
-          <g>
-            <line
-              x1={PAD.l}
-              y1={toY(target)}
-              x2={W - PAD.r}
-              y2={toY(target)}
-              stroke="#22c55e"
-              strokeWidth="1.5"
-              strokeDasharray="4 3"
-              opacity="0.8"
-            />
-            <text x={W - PAD.r - 4} y={toY(target) - 4} fontSize="9" fill="#22c55e" textAnchor="end" fontWeight="700">
-              🎯 цель {target.toFixed(1)}
-            </text>
-          </g>
-        )}
-        {(() => {
-          const minV = Math.min(...values);
-          const maxV = Math.max(...values);
-          const minIdx = values.findIndex((v) => v === minV);
-          const maxIdx = values.findIndex((v) => v === maxV);
-          return (
-            <>
-              {minIdx >= 0 && (
-                <g>
-                  <circle cx={toX(minIdx)} cy={toY(minV)} r="4" fill="#22c55e" stroke="#fff" strokeWidth="1.5" />
-                  <text
-                    x={toX(minIdx)}
-                    y={toY(minV) - 8}
-                    fontSize="9"
-                    fill="#22c55e"
-                    textAnchor="middle"
-                    fontWeight="700"
-                  >
-                    ▼{minV.toFixed(1)}
-                  </text>
-                </g>
-              )}
-              {maxIdx >= 0 && maxIdx !== minIdx && (
-                <g>
-                  <circle cx={toX(maxIdx)} cy={toY(maxV)} r="4" fill="#ef4444" stroke="#fff" strokeWidth="1.5" />
-                  <text
-                    x={toX(maxIdx)}
-                    y={toY(maxV) - 8}
-                    fontSize="9"
-                    fill="#ef4444"
-                    textAnchor="middle"
-                    fontWeight="700"
-                  >
-                    ▲{maxV.toFixed(1)}
-                  </text>
-                </g>
-              )}
-            </>
-          );
-        })()}
-        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {sorted.map((p, i) => (
-          <circle key={`pt-${i}`} cx={toX(i)} cy={toY(p.value)} r="2.5" fill={color}>
-            <title>{`${new Date(p.date).toLocaleDateString('ru-RU')}: ${p.value.toFixed(1)}${unit}`}</title>
-          </circle>
-        ))}
-      </svg>
-    </div>
-  );
-};
-
 const QUICK_DIARY_LINKS: QuickLink[] = [
   {
     icon: '🍽',
@@ -794,8 +550,7 @@ const QUICK_REPORT_LINKS: QuickLink[] = [
 export const ProfileDiariesTab: React.FC<{
   onNavigate?: (screen: string) => void;
   initialView?: 'diary' | 'reports' | 'archive';
-  initialActiveDiary?: DiaryKey;
-}> = ({ onNavigate, initialView, initialActiveDiary }) => {
+}> = ({ onNavigate, initialView }) => {
   const profile = useProfileRefresh();
   const pharmaPhase = (profile.settings as any)?.pharma?.phase as
     'baseline' | 'course' | 'bridge' | 'pct' | 'post_pct' | 'fertility' | undefined;
@@ -818,19 +573,22 @@ export const ProfileDiariesTab: React.FC<{
     return Math.max(1, Math.floor(diffMs / (7 * 86400000)) + 1);
   })();
   const [view, setView] = useState<'diary' | 'reports' | 'archive'>(initialView || 'diary');
-  const [activeDiary, setActiveDiary] = useState<DiaryKey | null>(initialActiveDiary || null);
+  const [activeDiary, setActiveDiary] = useState<DiaryKey | null>(null);
   useEffect(() => {
     if (initialView) setView(initialView);
   }, [initialView]);
   useEffect(() => {
-    if (initialActiveDiary) {
-      setActiveDiary(initialActiveDiary);
-      setView('diary');
-    }
-  }, [initialActiveDiary]);
-  useEffect(() => {
     if (view !== 'diary') setActiveDiary(null);
   }, [view]);
+
+  useEffect(() => {
+    if (!activeDiary) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActiveDiary(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeDiary]);
   const [sleepEntries, setSleepEntries] = useState<SleepEntry[]>([]);
   const [bpEntries, setBpEntries] = useState<BPEntry[]>([]);
   const [injectionEntries, setInjectionEntries] = useState<InjectionEntry[]>([]);
@@ -1507,10 +1265,7 @@ export const ProfileDiariesTab: React.FC<{
                     return (
                       <div
                         key={k.key}
-                        onClick={() => {
-                          setActiveDiary(k.key);
-                          setAddXxxOpenForKey(k.key);
-                        }}
+                        onClick={() => setAddXxxOpenForKey(k.key)}
                         title={`${DIARY_META[k.key].title}${filled ? ' ✓' : ' — нажмите, чтобы заполнить'}`}
                         role="button"
                         tabIndex={0}
@@ -1843,7 +1598,7 @@ export const ProfileDiariesTab: React.FC<{
           {activeDiary === 'injection' && (
             <InjectionDiary open onClose={() => setActiveDiary(null)} diaryKey="injection" goals={goals} onDataChange={refresh} />
           )}
-          {(activeDiary === 'health' || activeDiary === 'symptoms' || activeDiary === 'pain' || activeDiary === 'neuro' || activeDiary === 'acne' || activeDiary === 'hemato') && (
+          {activeDiary === 'health' && (
             <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} onDataChange={refresh} diaryKey="health" />
           )}
 
