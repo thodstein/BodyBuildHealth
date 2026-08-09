@@ -266,7 +266,7 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
           onLeave();
         }}
         onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'pan-y' }}
       >
         <defs>
           {activeSeries.map(s => (

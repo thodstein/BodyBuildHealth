@@ -250,34 +250,28 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       <label style={fieldLabel}>Дата</label>
       <DateInput value={date} onChange={setDate} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-        <input
-          type="number"
-          step="0.5"
-          value={hours}
-          onChange={(e) => setHours(e.target.value)}
-          style={fieldInput}
-          placeholder="Часы сна"
-        />
-        <input
-          type="number"
-          min="1"
-          max="5"
-          value={quality}
-          onChange={(e) => setQuality(e.target.value)}
-          style={fieldInput}
-          placeholder="Качество 1-5"
-        />
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Часы сна</span>
+          <input type="number" step="0.5" value={hours} onChange={(e) => setHours(e.target.value)} style={fieldInput} placeholder="7.5" />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Качество (1-5)</span>
+          <input type="number" min="1" max="5" value={quality} onChange={(e) => setQuality(e.target.value)} style={fieldInput} placeholder="4" />
+        </label>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
-        <input
-          type="number"
-          value={awakenings}
-          onChange={(e) => setAwakenings(e.target.value)}
-          style={fieldInput}
-          placeholder="Пробуждений"
-        />
-        <input type="time" value={bedtime} onChange={(e) => setBedtime(e.target.value)} style={fieldInput} />
-        <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} style={fieldInput} />
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Пробуждений</span>
+          <input type="number" value={awakenings} onChange={(e) => setAwakenings(e.target.value)} style={fieldInput} placeholder="1" />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Лёг спать</span>
+          <input type="time" value={bedtime} onChange={(e) => setBedtime(e.target.value)} style={fieldInput} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Встал</span>
+          <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} style={fieldInput} />
+        </label>
       </div>
       <textarea
         value={notes}
@@ -299,33 +293,40 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
     [systolic, setSystolic] = useState('120'),
     [diastolic, setDiastolic] = useState('80'),
     [pulse, setPulse] = useState('70'),
+    [timeOfDay, setTimeOfDay] = useState<'morning' | 'evening'>('morning'),
     [notes, setNotes] = useState('');
   const save = () => {
     const s = Number(systolic),
       d = Number(diastolic),
       p = Number(pulse);
     if (!date || ![s, d, p].every(Number.isFinite) || s < 50 || s > 250 || d < 30 || d > 180 || p < 20 || p > 250 || d >= s) return;
-    onSave({ date, systolic: s, diastolic: d, pulse: p, notes: notes.trim() || undefined });
+    onSave({ date, systolic: s, diastolic: d, hr: p, pulse: p, timeOfDay, notes: notes.trim() || undefined });
     onClose();
   };
   return (
     <Modal open={open} onClose={onClose} title="❤️ Добавить запись АД">
       <label style={fieldLabel}>Дата</label>
       <DateInput value={date} onChange={setDate} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginTop: 8 }}>
-        {[
-          ['Систола', systolic, setSystolic],
-          ['Диастола', diastolic, setDiastolic],
-          ['Пульс', pulse, setPulse],
-        ].map(([label, value, setter]) => (
-          <input
-            key={String(label)}
-            type="number"
-            value={value as string}
-            onChange={(e) => (setter as React.Dispatch<React.SetStateAction<string>>)(e.target.value)}
-            style={fieldInput}
-            placeholder={String(label)}
-          />
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, marginBottom: 8 }}>
+        {([['morning', '🌅 Утро'], ['evening', '🌙 Вечер']] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setTimeOfDay(k)} style={{
+            flex: 1, padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+            border: timeOfDay === k ? '1px solid #ef444488' : '1px solid #3f3f46',
+            background: timeOfDay === k ? '#ef444422' : '#18181b',
+            color: timeOfDay === k ? '#f87171' : '#71717a',
+          }}>{l}</button>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+        {([
+          ['Систола (мм рт.ст.)', systolic, setSystolic],
+          ['Диастола (мм рт.ст.)', diastolic, setDiastolic],
+          ['ЧСС (уд/мин)', pulse, setPulse],
+        ] as [string, string, React.Dispatch<React.SetStateAction<string>>][]).map(([label, value, setter]) => (
+          <label key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 10, color: '#a1a1aa' }}>{label}</span>
+            <input type="number" value={value} onChange={(e) => setter(e.target.value)} style={fieldInput} />
+          </label>
         ))}
       </div>
       <textarea
@@ -345,26 +346,27 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
   onSave,
 }) => {
   const [date, setDate] = useState(todayIso());
-  const fields = [
-    'weight',
-    'waistCm',
-    'chestCm',
-    'hipCm',
-    'bicepCm',
-    'bicepLeftCm',
-    'bicepRightCm',
-    'thighCm',
-    'thighLeftCm',
-    'thighRightCm',
-    'calfCm',
-    'calfLeftCm',
-    'calfRightCm',
-    'neckCm',
-    'forearmCm',
-    'bodyFat',
-    'muscleMass',
-    'waterMass',
-  ] as const;
+  const FIELD_RU: Record<string, string> = {
+    weight: 'Вес (кг)',
+    waistCm: 'Талия (см)',
+    chestCm: 'Грудь (см)',
+    hipCm: 'Бёдра (см)',
+    bicepCm: 'Бицепс (см)',
+    bicepLeftCm: 'Бицепс L (см)',
+    bicepRightCm: 'Бицепс R (см)',
+    thighCm: 'Бедро (см)',
+    thighLeftCm: 'Бедро L (см)',
+    thighRightCm: 'Бедро R (см)',
+    calfCm: 'Икры (см)',
+    calfLeftCm: 'Икра L (см)',
+    calfRightCm: 'Икра R (см)',
+    neckCm: 'Шея (см)',
+    forearmCm: 'Предплечье (см)',
+    bodyFat: '% жира',
+    muscleMass: 'Мышцы (кг)',
+    waterMass: 'Вода (%)',
+  };
+  const fields = Object.keys(FIELD_RU);
   const [values, setValues] = useState<Record<string, string>>({ weight: '80' });
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
@@ -408,16 +410,17 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       <DateInput value={date} onChange={setDate} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
         {fields.map((key) => (
-          <input
-            key={key}
-            type="number"
-            step="0.1"
-            value={values[key] || ''}
-            onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
-            style={fieldInput}
-            placeholder={key}
-            aria-label={key}
-          />
+          <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 10, color: '#a1a1aa' }}>{FIELD_RU[key]}</span>
+            <input
+              type="number"
+              step="0.1"
+              value={values[key] || ''}
+              onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+              style={fieldInput}
+              placeholder={FIELD_RU[key]}
+            />
+          </label>
         ))}
       </div>
       <textarea
@@ -533,92 +536,65 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
     <Modal open={open} onClose={onClose} title="💉 Добавить запись инъекции">
       <label style={fieldLabel}>Дата</label>
       <DateInput value={date} onChange={setDate} />
-      <input
-        value={substance}
-        onChange={(e) => setSubstance(e.target.value)}
-        style={{ ...fieldInput, marginTop: 8 }}
-        placeholder="Препарат"
-      />
-      <input
-        value={dose}
-        onChange={(e) => setDose(e.target.value)}
-        style={{ ...fieldInput, marginTop: 8 }}
-        placeholder="Доза"
-      />
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 8 }}>
+        <span style={{ fontSize: 10, color: '#a1a1aa' }}>Препарат</span>
+        <input value={substance} onChange={(e) => setSubstance(e.target.value)} style={fieldInput} placeholder="Тестостерон энантат" />
+      </label>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 8 }}>
+        <span style={{ fontSize: 10, color: '#a1a1aa' }}>Доза</span>
+        <input value={dose} onChange={(e) => setDose(e.target.value)} style={fieldInput} placeholder="250 мг / 1 мл / 100 IU" />
+      </label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-        <select value={zone} onChange={(e) => setZone(e.target.value)} style={fieldInput}>
-          {INJECTION_ZONES.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <select value={side} onChange={(e) => setSide(e.target.value as 'left' | 'right')} style={fieldInput}>
-          <option value="left">Левая сторона</option>
-          <option value="right">Правая сторона</option>
-        </select>
-        <input
-          type="number"
-          step="0.1"
-          min="0"
-          value={volumeMl}
-          onChange={(e) => setVolumeMl(e.target.value)}
-          style={fieldInput}
-          placeholder="Объём, мл"
-        />
-        <select value={needleGauge} onChange={(e) => setNeedleGauge(e.target.value)} style={fieldInput}>
-          {NEEDLE_GAUGES.map((g) => (
-            <option key={g}>{g}</option>
-          ))}
-        </select>
-        <select value={technique} onChange={(e) => setTechnique(e.target.value)} style={fieldInput}>
-          {TECHNIQUES.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-        <input
-          type="number"
-          min="0"
-          max="10"
-          value={painLevel}
-          onChange={(e) => setPainLevel(e.target.value)}
-          style={fieldInput}
-          placeholder="Боль 0–10"
-        />
-        <input
-          type="number"
-          min="0"
-          max="10"
-          value={pipLevel}
-          onChange={(e) => setPipLevel(e.target.value)}
-          style={fieldInput}
-          placeholder="PIP 0–10"
-        />
-        <input
-          type="number"
-          min="0"
-          max="10"
-          value={swelling}
-          onChange={(e) => setSwelling(e.target.value)}
-          style={fieldInput}
-          placeholder="Отёк 0–10"
-        />
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Зона</span>
+          <select value={zone} onChange={(e) => setZone(e.target.value)} style={fieldInput}>
+            {INJECTION_ZONES.map((item) => (<option key={item.id} value={item.id}>{item.label}</option>))}
+          </select>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Сторона</span>
+          <select value={side} onChange={(e) => setSide(e.target.value as 'left' | 'right')} style={fieldInput}>
+            <option value="left">Левая сторона</option>
+            <option value="right">Правая сторона</option>
+          </select>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Объём (мл)</span>
+          <input type="number" step="0.1" min="0" value={volumeMl} onChange={(e) => setVolumeMl(e.target.value)} style={fieldInput} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Игла</span>
+          <select value={needleGauge} onChange={(e) => setNeedleGauge(e.target.value)} style={fieldInput}>
+            {NEEDLE_GAUGES.map((g) => (<option key={g}>{g}</option>))}
+          </select>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Техника</span>
+          <select value={technique} onChange={(e) => setTechnique(e.target.value)} style={fieldInput}>
+            {TECHNIQUES.map((t) => (<option key={t.id} value={t.id}>{t.label}</option>))}
+          </select>
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Боль (0–10)</span>
+          <input type="number" min="0" max="10" value={painLevel} onChange={(e) => setPainLevel(e.target.value)} style={fieldInput} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>PIP (0–10)</span>
+          <input type="number" min="0" max="10" value={pipLevel} onChange={(e) => setPipLevel(e.target.value)} style={fieldInput} />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontSize: 10, color: '#a1a1aa' }}>Отёк (0–10)</span>
+          <input type="number" min="0" max="10" value={swelling} onChange={(e) => setSwelling(e.target.value)} style={fieldInput} />
+        </label>
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
-        {[
+        {([
           [redness, setRedness, 'Покраснение'],
           [lump, setLump, 'Уплотнение'],
           [bruise, setBruise, 'Синяк'],
-        ].map(([value, setter, label]) => (
-          <label key={String(label)} style={{ fontSize: 12 }}>
-            <input
-              type="checkbox"
-              checked={Boolean(value)}
-              onChange={(e) => (setter as React.Dispatch<React.SetStateAction<boolean>>)(e.target.checked)}
-            />{' '}
-            {String(label)}
+        ] as [boolean, React.Dispatch<React.SetStateAction<boolean>>, string][]).map(([value, setter, label]) => (
+          <label key={label} style={{ fontSize: 12 }}>
+            <input type="checkbox" checked={value} onChange={(e) => setter(e.target.checked)} /> {label}
           </label>
         ))}
       </div>

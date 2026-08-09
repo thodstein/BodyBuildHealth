@@ -33,7 +33,7 @@ export const TrainingWeakPointsSection: React.FC = () => {
   const [training, updateTraining] = useSectionState('training');
 
   const toggle = (key: 'weakPoints' | 'equipment', id: string) => {
-    const arr = (training[key] || []) as string[];
+    const arr = (Array.isArray(training[key]) ? training[key] : []) as string[];
     const next = arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
     updateTraining({ [key]: next } as any);
   };
@@ -53,7 +53,7 @@ export const TrainingWeakPointsSection: React.FC = () => {
           <BoolChip
             key={g.id}
             label={g.label}
-            checked={(training.weakPoints || []).includes(g.id)}
+            checked={(Array.isArray(training.weakPoints) ? training.weakPoints : []).includes(g.id)}
             onChange={() => toggle('weakPoints', g.id)}
             color={colors.pink}
           />
@@ -68,7 +68,7 @@ export const TrainingWeakPointsSection: React.FC = () => {
           <BoolChip
             key={e.id}
             label={e.label}
-            checked={(training.equipment || []).includes(e.id)}
+            checked={(Array.isArray(training.equipment) ? training.equipment : []).includes(e.id)}
             onChange={() => toggle('equipment', e.id)}
             color={colors.primary}
           />

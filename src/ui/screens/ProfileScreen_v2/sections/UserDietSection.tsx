@@ -27,7 +27,7 @@ export const UserDietSection: React.FC = () => {
   const [nutrition, updateNutrition] = useSectionState('nutrition');
 
   const toggle = (key: 'foodAllergies' | 'foodIntolerances' | 'excludedFoods' | 'preferredFoods' | 'tasteProfile' | 'excludedCategories', id: string) => {
-    const arr = (nutrition as any)[key] || [];
+    const arr = Array.isArray((nutrition as any)[key]) ? (nutrition as any)[key] : [];
     const next = arr.includes(id) ? arr.filter((x: string) => x !== id) : [...arr, id];
     updateNutrition({ [key]: next } as any);
   };
@@ -74,7 +74,7 @@ export const UserDietSection: React.FC = () => {
             <BoolChip
               key={a.id}
               label={a.label}
-              checked={(nutrition.foodAllergies || []).includes(a.id)}
+              checked={(Array.isArray(nutrition.foodAllergies) ? nutrition.foodAllergies : []).includes(a.id)}
               onChange={() => toggle('foodAllergies', a.id)}
               color={colors.danger}
             />
@@ -89,7 +89,7 @@ export const UserDietSection: React.FC = () => {
             <BoolChip
               key={a.id}
               label={a.label}
-              checked={(nutrition.foodIntolerances || []).includes(a.id)}
+              checked={(Array.isArray(nutrition.foodIntolerances) ? nutrition.foodIntolerances : []).includes(a.id)}
               onChange={() => toggle('foodIntolerances', a.id)}
               color={colors.warning}
             />

@@ -138,6 +138,28 @@ function makeSettingsProxy(s: UnifiedSettings): UnifiedSettings {
   }) as UnifiedSettings;
 }
 
+/** Поля, которые должны быть массивами — нормализуем при чтении. */
+const ARRAY_FIELDS: Record<string, string[]> = {
+  health: ['injuries', 'chronicConditions', 'excludedSupplements', 'excludedMeds', 'genetics'],
+  nutrition: ['foodAllergies', 'foodIntolerances', 'excludedFoods', 'preferredFoods', 'excludedCategories', 'lockedFoods', 'tasteProfile', 'preferredByMeal'],
+  training: ['weakPoints', 'equipment', 'daysOfWeek'],
+  symptoms: ['recent'],
+  personal: ['bloodType'],
+};
+
+function normalizeArrayFields(settings: any): void {
+  if (!settings || typeof settings !== 'object') return;
+  for (const [section, fields] of Object.entries(ARRAY_FIELDS)) {
+    const sec = settings[section];
+    if (!sec || typeof sec !== 'object') continue;
+    for (const field of fields) {
+      if (sec[field] !== undefined && !Array.isArray(sec[field])) {
+        sec[field] = [];
+      }
+    }
+  }
+}
+
 /* Читает профиль из localStorage с backward-compat proxy для settings. */
 export function getProfile(): UserProfile {
   try {
@@ -145,6 +167,7 @@ export function getProfile(): UserProfile {
     const saved = localStorage.getItem(STORAGE_KEY);
     const p: UserProfile = saved ? JSON.parse(saved) : getDefaultProfile();
     p.settings = makeSettingsProxy(p.settings);
+    normalizeArrayFields(p.settings);
     return p;
   } catch { return getDefaultProfile(); }
 }

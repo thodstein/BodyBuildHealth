@@ -77,12 +77,15 @@ export const UserHealthSection: React.FC = () => {
             <BoolChip
               key={c.id}
               label={c.label}
-              checked={(health.chronicConditions || []).includes(c.id)}
-              onChange={() => updateHealth({
-                chronicConditions: (health.chronicConditions || []).includes(c.id)
-                  ? health.chronicConditions.filter(x => x !== c.id)
-                  : [...(health.chronicConditions || []), c.id],
-              })}
+              checked={(Array.isArray(health.chronicConditions) ? health.chronicConditions : []).includes(c.id)}
+              onChange={() => {
+                const arr = Array.isArray(health.chronicConditions) ? health.chronicConditions : [];
+                updateHealth({
+                  chronicConditions: arr.includes(c.id)
+                    ? arr.filter(x => x !== c.id)
+                    : [...arr, c.id],
+                });
+              }}
               color={colors.danger}
             />
           ))}
@@ -277,24 +280,24 @@ export const UserHealthSection: React.FC = () => {
         </div>
         <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>Травмы:</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-          {(health.injuries || []).map((inj, i) => (
+          {(Array.isArray(health.injuries) ? health.injuries : []).filter(Boolean).map((inj, i) => (
             <span key={i} style={{
               padding: '4px 10px', borderRadius: 12, fontSize: 11,
               background: `${colors.warning}22`, color: colors.warning,
               border: `1px solid ${colors.warning}44`, display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              {inj.location}
+              {inj?.location || '—'}
               <span
-                onClick={() => updateHealth({ injuries: (health.injuries || []).filter((_, j) => j !== i) })}
+                onClick={() => updateHealth({ injuries: (Array.isArray(health.injuries) ? health.injuries : []).filter((_, j) => j !== i) })}
                 style={{ cursor: 'pointer', opacity: 0.7 }}>✕</span>
             </span>
           ))}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {COMMON_INJURIES.filter(loc => !(health.injuries || []).some(i => i.location === loc)).map(loc => (
+          {COMMON_INJURIES.filter(loc => !(Array.isArray(health.injuries) ? health.injuries : []).some(i => i?.location === loc)).map(loc => (
             <button
               key={loc}
-              onClick={() => updateHealth({ injuries: [...(health.injuries || []), { id: 'inj_' + Date.now(), location: loc, type: 'muscle', painLevel: 3, movementLimit: 'mild', side: 'both', chronic: false, date: new Date().toISOString().slice(0, 10) }] })}
+              onClick={() => updateHealth({ injuries: [...(Array.isArray(health.injuries) ? health.injuries : []), { id: 'inj_' + Date.now(), location: loc, type: 'muscle', painLevel: 3, movementLimit: 'mild', side: 'both', chronic: false, date: new Date().toISOString().slice(0, 10) }] })}
               style={{
                 padding: '4px 10px', borderRadius: 12, fontSize: 10,
                 background: 'transparent', color: colors.textMuted,

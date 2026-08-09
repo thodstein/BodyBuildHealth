@@ -196,6 +196,268 @@ interface TrainingDiaryHubProps {
 
 type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'body' | 'tools';
 
+/* ─── Extracted sub-components (fix: useState inside IIFE violates rules of hooks) ─── */
+
+const WeeklyTargetsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
+  const [targets, setTargets] = useState<{ sessions: number; sets: number; tonnage: number }>(() => {
+    try { return JSON.parse(localStorage.getItem('he_weekly_targets') || 'null') || { sessions: 4, sets: 80, tonnage: 5000 }; } catch { return { sessions: 4, sets: 80, tonnage: 5000 }; }
+  });
+  const today = new Date();
+  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - today.getDay() + 1); weekStart.setHours(0, 0, 0, 0);
+  const thisWeek = historyWorkouts.filter(w => new Date(w.date) >= weekStart);
+  const actualSessions = thisWeek.length;
+  const actualSets = thisWeek.reduce((s: number, w: any) => s + w.exercises.reduce((sum: number, e: any) => sum + (e.sets?.length || 0), 0), 0);
+  const actualTonnage = thisWeek.reduce((s: number, w: any) => s + w.exercises.reduce((sum: number, e: any) => sum + e.totalVolume, 0), 0);
+  const pct = (cur: number, goal: number) => Math.min(100, Math.round((cur / Math.max(1, goal)) * 100));
+  const saveTarget = (patch: Partial<typeof targets>) => {
+    const next = { ...targets, ...patch };
+    setTargets(next);
+    try { localStorage.setItem('he_weekly_targets', JSON.stringify(next)); } catch {}
+  };
+  const items = [
+    { label: 'Тренировки', actual: actualSessions, target: targets.sessions, unit: 'раз', color: '#00e68a', key: 'sessions' as const },
+    { label: 'Сеты', actual: actualSets, target: targets.sets, unit: '', color: '#60a5fa', key: 'sets' as const },
+    { label: 'Тоннаж', actual: actualTonnage, target: targets.tonnage, unit: 'кг', color: '#a855f7', key: 'tonnage' as const },
+  ];
+  return (
+    <div style={style.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={style.label}>🎯 Цели недели</div>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Эта неделя</span>
+      </div>
+      {items.map(item => {
+        const p = pct(item.actual, item.target);
+        return (
+          <div key={item.key} style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: p >= 100 ? '#22c55e' : '#fff' }}>
+                  {item.key === 'tonnage' ? (item.actual / 1000).toFixed(1) + 'т' : item.actual}
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}> / {item.key === 'tonnage' ? (item.target / 1000).toFixed(1) + 'т' : item.target}</span>
+                </span>
+                <input type="number" value={item.target} onChange={e => saveTarget({ [item.key]: Math.max(1, +e.target.value || 1) })}
+                  style={{ width: 40, padding: '1px 3px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', fontSize: 9, textAlign: 'right' }} />
+              </div>
+            </div>
+            <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${p}%`, background: p >= 100 ? '#22c55e' : item.color, borderRadius: 3, transition: 'width 0.3s' }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ProgressChartsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
+  const [chartTooltip, setChartTooltip] = useState<{ name: string; value: number; x: number; y: number } | null>(null);
+  const byEx: Record<string, { date: string; e1rm: number }[]> = {};
+  historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+    const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
+    if (best <= 0) return;
+    const name = e.exerciseName || e.exerciseId || '—';
+    (byEx[name] = byEx[name] || []).push({ date: w.date, e1rm: Math.round(best) });
+  }));
+  const top = Object.entries(byEx).map(([n, arr]) => ({ n, arr: arr.sort((a, b) => a.date.localeCompare(b.date)) }))
+    .sort((a, b) => b.arr.length - a.arr.length).slice(0, 3).filter(x => x.arr.length >= 2);
+  const wkMap: Record<string, number> = {};
+  historyWorkouts.forEach((w: any) => { const wn = w.date.slice(0, 10).slice(0, 7) + '-' + Math.floor(new Date(w.date).getDate() / 7); const vol = (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || (e.sets || []).reduce((ss: number, st: any) => ss + (st.weight || 0) * (st.reps || 0), 0)), 0); wkMap[wn] = (wkMap[wn] || 0) + vol; });
+  const wkArr = Object.entries(wkMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-8);
+  const colors = ['#00e68a', '#60a5fa', '#a855f7'];
+  const W = 320, H = 80;
+  const allVals = top.flatMap(t => t.arr.map(a => a.e1rm));
+  const minV = Math.min(...allVals, 0), maxV = Math.max(...allVals, 1);
+  const maxWk = Math.max(1, ...wkArr.map(([, v]) => v));
+  const gridLines = [0.25, 0.5, 0.75];
+  return (
+    <div className="card" style={{ padding: 10, marginTop: 8 }}>
+      <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📈 Прогресс из дневника</h4>
+      {top.length === 0 ? (
+        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недостаточно данных (нужно ≥2 тренировок на упражнение с весами).</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>ПМ (e1RM) по топ-упражнениям:</div>
+          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
+            {gridLines.map(pct => (
+              <line key={pct} x1={6} x2={W - 6} y1={H - 8 - pct * (H - 16)} y2={H - 8 - pct * (H - 16)}
+                stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
+            ))}
+            <text x={2} y={H - 8} fontSize={7} fill="rgba(255,255,255,0.3)">{minV}</text>
+            <text x={2} y={12} fontSize={7} fill="rgba(255,255,255,0.3)">{maxV}</text>
+            {top.map((t, i) => {
+              if (t.arr.length < 2) return null;
+              const px = (j: number) => 6 + (j / Math.max(1, t.arr.length - 1)) * (W - 12);
+              const py = (v: number) => H - 8 - ((v - minV) / Math.max(1, maxV - minV)) * (H - 16);
+              const d = t.arr.map((p, j) => `${j === 0 ? 'M' : 'L'}${px(j)},${py(p.e1rm)}`).join(' ');
+              return (
+                <g key={i}>
+                  <path d={d} fill="none" stroke={colors[i % colors.length]} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+                  {t.arr.map((p, j) => (
+                    <circle key={j} cx={px(j)} cy={py(p.e1rm)}
+                      r={j === t.arr.length - 1 ? 3 : 1.8}
+                      fill={j === t.arr.length - 1 ? colors[i % colors.length] : 'rgba(255,255,255,0.3)'}
+                      stroke={j === t.arr.length - 1 ? '#000' : 'none'} strokeWidth={0.5}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={e => setChartTooltip({ name: t.n, value: p.e1rm, x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setChartTooltip(null)}
+                    />
+                  ))}
+                </g>
+              );
+            })}
+          </svg>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
+            {top.map((t, i) => <span key={t.n} style={{ fontSize: 10, color: colors[i % colors.length] }}>● {t.n}</span>)}
+          </div>
+          {chartTooltip && (
+            <div style={{ position: 'fixed', left: chartTooltip.x + 8, top: chartTooltip.y - 28, background: '#18181b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+              {chartTooltip.name}: <strong>{chartTooltip.value} кг</strong>
+            </div>
+          )}
+        </>
+      )}
+      {wkArr.length >= 2 && (
+        <>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
+            {wkArr.map(([wk, v], i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)', position: 'relative' }}
+                  onMouseEnter={e => setChartTooltip({ name: wk, value: v, x: e.clientX, y: e.clientY })}
+                  onMouseLeave={() => setChartTooltip(null)}
+                />
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const WorkoutComparisonCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
+  const [cmpA, setCmpA] = useState(0);
+  const [cmpB, setCmpB] = useState(1);
+  const wA = historyWorkouts[cmpA];
+  const wB = historyWorkouts[cmpB];
+  if (!wA || !wB) return null;
+  const volA = wA.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0);
+  const volB = wB.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0);
+  const setsA = wA.exercises.reduce((s: number, e: any) => s + (e.sets?.length || 0), 0);
+  const setsB = wB.exercises.reduce((s: number, e: any) => s + (e.sets?.length || 0), 0);
+  const exA = new Set(wA.exercises.map((e: any) => e.exerciseName));
+  const exB = new Set(wB.exercises.map((e: any) => e.exerciseName));
+  const shared = [...exA].filter(n => exB.has(n));
+  const onlyA = [...exA].filter(n => !exB.has(n));
+  const onlyB = [...exB].filter(n => !exA.has(n));
+  return (
+    <div style={style.card}>
+      <div style={style.label}>⚖️ Сравнение тренировок</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <select value={cmpA} onChange={e => setCmpA(+e.target.value)} style={{ ...style.input, flex: 1, fontSize: 10, padding: '4px' }}>
+          {historyWorkouts.slice(0, 20).map((w: any, i: number) => <option key={i} value={i}>{(w.date || '').slice(0, 10)} ({w.split || '—'})</option>)}
+        </select>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>vs</span>
+        <select value={cmpB} onChange={e => setCmpB(+e.target.value)} style={{ ...style.input, flex: 1, fontSize: 10, padding: '4px' }}>
+          {historyWorkouts.slice(0, 20).map((w: any, i: number) => <option key={i} value={i}>{(w.date || '').slice(0, 10)} ({w.split || '—'})</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 4, fontSize: 10, marginBottom: 4 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, color: '#00e68a' }}>{(volA / 1000).toFixed(1)}т</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>объём</div>
+        </div>
+        <div style={{ color: volA > volB ? '#22c55e' : volA < volB ? '#ef4444' : 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+          {volA > volB ? '◀' : volA < volB ? '▶' : '='}
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, color: '#60a5fa' }}>{(volB / 1000).toFixed(1)}т</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>объём</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, color: '#00e68a' }}>{setsA}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>сетов</div>
+        </div>
+        <div style={{ color: setsA > setsB ? '#22c55e' : setsA < setsB ? '#ef4444' : 'rgba(255,255,255,0.3)' }}>
+          {setsA > setsB ? '◀' : setsA < setsB ? '▶' : '='}
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 700, color: '#60a5fa' }}>{setsB}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>сетов</div>
+        </div>
+      </div>
+      {shared.length > 0 && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>🔄 Совпадение: {shared.join(', ')}</div>}
+      {onlyA.length > 0 && <div style={{ fontSize: 9, color: '#00e68a' }}>🟢 Только A: {onlyA.join(', ')}</div>}
+      {onlyB.length > 0 && <div style={{ fontSize: 9, color: '#60a5fa' }}>🔵 Только B: {onlyB.join(', ')}</div>}
+    </div>
+  );
+};
+
+const ExerciseSubstitutionCard: React.FC = () => {
+  const muscleGroups: Record<string, string[]> = {
+    'Грудь': ['Жим штанги лёжа', 'Жим гантелей', 'Разводка кабель', 'Жим в тренажёре', 'Сведение в бабочке', 'Жим на наклонной', 'Отжимания на брусьях'],
+    'Спина': ['Тяга штанги в наклоне', 'Тяга верхнего блока', 'Тяга гантели', 'Подтягивания', 'Тяга нижнего блока', 'Гиперэкстензия', 'Тяга в ХМ-тренажёре'],
+    'Ноги': ['Приседания со штангой', 'Жим ногами', 'Болгарские сплит-присед', 'Румынская тяга', 'Разгибание ног', 'Сгибание ног', 'Гакк-присед'],
+    'Плечи': ['Жим стоя', 'Жим сидя гантелей', 'Разводка в стороны', 'Тяга к подбородку', 'Разведение кабеля', 'Армейский жим', 'Тяга штанги к груди'],
+    'Руки': ['Подъём на бицепс', 'Молотки', 'Разгибание на трицепс', 'Французский жим', 'Концентрированный подъём', 'Отжимания на трицепс', 'Экстензия кабель'],
+    'Ягодицы': ['Ягодичный мост', 'Гиперэкстензия', 'Отведение ноги', 'Болгарские сплит', 'Румынская тяга', 'Глубокий присед', 'Бедренная экстензия'],
+    'Пресс': ['Скручивания', 'Планка', 'Велосипед', 'Подъём ног', 'Кранчи в тренажёре', 'Махи ногами', 'Дровосек'],
+  };
+  const [selGroup, setSelGroup] = useState('Грудь');
+  const [selEx, setSelEx] = useState('');
+  const alts = muscleGroups[selGroup] || [];
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+        {Object.keys(muscleGroups).map(g => (
+          <button key={g} onClick={() => { setSelGroup(g); setSelEx(''); }} style={{ padding: '2px 8px', borderRadius: 10, background: selGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selGroup === g ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.08)'}`, color: selGroup === g ? ACCENT : DIM, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>{g}</button>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+        {alts.map(ex => (
+          <div key={ex} onClick={() => setSelEx(selEx === ex ? '' : ex)} style={{ padding: '5px 8px', borderRadius: 6, background: selEx === ex ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selEx === ex ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', fontSize: 10, color: selEx === ex ? ACCENT : 'rgba(255,255,255,0.7)' }}>{ex}</div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const WarmupRampCard: React.FC = () => {
+  const [wuWeight, setWuWeight] = useState(100);
+  const ramp = wuWeight <= 40
+    ? [{ pct: 0, w: 0, reps: 15, label: 'Разминка' }]
+    : wuWeight <= 80
+      ? [{ pct: 50, w: Math.round(wuWeight * 0.5 / 2.5) * 2.5, reps: 10 }, { pct: 70, w: Math.round(wuWeight * 0.7 / 2.5) * 2.5, reps: 6 }, { pct: 85, w: Math.round(wuWeight * 0.85 / 2.5) * 2.5, reps: 3 }]
+      : wuWeight <= 140
+        ? [{ pct: 40, w: Math.round(wuWeight * 0.4 / 5) * 5, reps: 12 }, { pct: 60, w: Math.round(wuWeight * 0.6 / 5) * 5, reps: 8 }, { pct: 75, w: Math.round(wuWeight * 0.75 / 5) * 5, reps: 5 }, { pct: 85, w: Math.round(wuWeight * 0.85 / 5) * 5, reps: 3 }]
+        : [{ pct: 40, w: Math.round(wuWeight * 0.4 / 5) * 5, reps: 12 }, { pct: 55, w: Math.round(wuWeight * 0.55 / 5) * 5, reps: 8 }, { pct: 70, w: Math.round(wuWeight * 0.7 / 5) * 5, reps: 5 }, { pct: 80, w: Math.round(wuWeight * 0.8 / 5) * 5, reps: 3 }, { pct: 90, w: Math.round(wuWeight * 0.9 / 5) * 5, reps: 1 }];
+  return (
+    <div style={style.card}>
+      <div style={style.label}>🔥 Разминочная рампа</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Автоподбор разминки по рабочему весу</div>
+      <div style={{ marginBottom: 6 }}>
+        <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Рабочий вес (кг)</label>
+        <input type="number" value={wuWeight} onChange={e => setWuWeight(Math.max(0, +e.target.value || 0))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} />
+      </div>
+      <div style={{ display: 'grid', gap: 2 }}>
+        {ramp.map((r, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '2px 0' }}>
+            <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.4)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.pct}%</span>
+            <span style={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>{r.w > 0 ? `${r.w}кг` : 'Пустой гриф'}</span>
+            <span style={{ color: 'rgba(255,255,255,0.35)' }}>{r.reps} повт</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '3px 0', fontWeight: 700 }}>
+          <span style={{ minWidth: 30, color: ACCENT }}>100%</span>
+          <span style={{ flex: 1, color: ACCENT }}>{wuWeight}кг × работа</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh,
   trainingOutput, goal, daysPerWeek, splitType, periodizationType, mesoLength, tprofile, linked,
@@ -1490,57 +1752,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 );
               })()}
               {/* Weekly targets */}
-              {historyWorkouts.length >= 1 && (() => {
-                const [targets, setTargets] = useState<{ sessions: number; sets: number; tonnage: number }>(() => {
-                  try { return JSON.parse(localStorage.getItem('he_weekly_targets') || 'null') || { sessions: 4, sets: 80, tonnage: 5000 }; } catch { return { sessions: 4, sets: 80, tonnage: 5000 }; }
-                });
-                const today = new Date();
-                const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - today.getDay() + 1); weekStart.setHours(0, 0, 0, 0);
-                const thisWeek = historyWorkouts.filter(w => new Date(w.date) >= weekStart);
-                const actualSessions = thisWeek.length;
-                const actualSets = thisWeek.reduce((s: number, w: any) => s + w.exercises.reduce((sum: number, e: any) => sum + (e.sets?.length || 0), 0), 0);
-                const actualTonnage = thisWeek.reduce((s: number, w: any) => s + w.exercises.reduce((sum: number, e: any) => sum + e.totalVolume, 0), 0);
-                const pct = (cur: number, goal: number) => Math.min(100, Math.round((cur / Math.max(1, goal)) * 100));
-                const saveTarget = (patch: Partial<typeof targets>) => {
-                  const next = { ...targets, ...patch };
-                  setTargets(next);
-                  try { localStorage.setItem('he_weekly_targets', JSON.stringify(next)); } catch {}
-                };
-                const items = [
-                  { label: 'Тренировки', actual: actualSessions, target: targets.sessions, unit: 'раз', color: '#00e68a', key: 'sessions' as const },
-                  { label: 'Сеты', actual: actualSets, target: targets.sets, unit: '', color: '#60a5fa', key: 'sets' as const },
-                  { label: 'Тоннаж', actual: actualTonnage, target: targets.tonnage, unit: 'кг', color: '#a855f7', key: 'tonnage' as const },
-                ];
-                return (
-                  <div style={style.card}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={style.label}>🎯 Цели недели</div>
-                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Эта неделя</span>
-                    </div>
-                    {items.map(item => {
-                      const p = pct(item.actual, item.target);
-                      return (
-                        <div key={item.key} style={{ marginBottom: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.label}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <span style={{ fontSize: 10, fontWeight: 700, color: p >= 100 ? '#22c55e' : '#fff' }}>
-                                {item.key === 'tonnage' ? (item.actual / 1000).toFixed(1) + 'т' : item.actual}
-                                <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}> / {item.key === 'tonnage' ? (item.target / 1000).toFixed(1) + 'т' : item.target}</span>
-                              </span>
-                              <input type="number" value={item.target} onChange={e => saveTarget({ [item.key]: Math.max(1, +e.target.value || 1) })}
-                                style={{ width: 40, padding: '1px 3px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', fontSize: 9, textAlign: 'right' }} />
-                            </div>
-                          </div>
-                          <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${p}%`, background: p >= 100 ? '#22c55e' : item.color, borderRadius: 3, transition: 'width 0.3s' }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+              {historyWorkouts.length >= 1 && <WeeklyTargetsCard historyWorkouts={historyWorkouts} />}
               {/* Workout streaks */}
               {historyWorkouts.length >= 3 && (() => {
                 const sorted = [...historyWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -2553,95 +2765,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             );
           })()}
           {/* e1RM and tonnage charts from diary data */}
-          {historyWorkouts.length > 0 && (() => {
-            const byEx: Record<string, { date: string; e1rm: number }[]> = {};
-            historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
-              const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
-              if (best <= 0) return;
-              const name = e.exerciseName || e.exerciseId || '—';
-              (byEx[name] = byEx[name] || []).push({ date: w.date, e1rm: Math.round(best) });
-            }));
-            const top = Object.entries(byEx).map(([n, arr]) => ({ n, arr: arr.sort((a, b) => a.date.localeCompare(b.date)) }))
-              .sort((a, b) => b.arr.length - a.arr.length).slice(0, 3).filter(x => x.arr.length >= 2);
-            const wkMap: Record<string, number> = {};
-            historyWorkouts.forEach((w: any) => { const wn = w.date.slice(0, 10).slice(0, 7) + '-' + Math.floor(new Date(w.date).getDate() / 7); const vol = (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || (e.sets || []).reduce((ss: number, st: any) => ss + (st.weight || 0) * (st.reps || 0), 0)), 0); wkMap[wn] = (wkMap[wn] || 0) + vol; });
-            const wkArr = Object.entries(wkMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-8);
-            const [chartTooltip, setChartTooltip] = useState<{ name: string; value: number; x: number; y: number } | null>(null);
-            const colors = ['#00e68a', '#60a5fa', '#a855f7'];
-            const W = 320, H = 80;
-            const allVals = top.flatMap(t => t.arr.map(a => a.e1rm));
-            const minV = Math.min(...allVals, 0), maxV = Math.max(...allVals, 1);
-            const maxWk = Math.max(1, ...wkArr.map(([, v]) => v));
-            const gridLines = [0.25, 0.5, 0.75];
-            return (
-              <div className="card" style={{ padding: 10, marginTop: 8 }}>
-                <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📈 Прогресс из дневника</h4>
-                {top.length === 0 ? (
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недостаточно данных (нужно ≥2 тренировок на упражнение с весами).</div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>ПМ (e1RM) по топ-упражнениям:</div>
-                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
-                      {/* Grid lines */}
-                      {gridLines.map(pct => (
-                        <line key={pct} x1={6} x2={W - 6} y1={H - 8 - pct * (H - 16)} y2={H - 8 - pct * (H - 16)}
-                          stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
-                      ))}
-                      {/* Y-axis labels */}
-                      <text x={2} y={H - 8} fontSize={7} fill="rgba(255,255,255,0.3)">{minV}</text>
-                      <text x={2} y={12} fontSize={7} fill="rgba(255,255,255,0.3)">{maxV}</text>
-                      {/* Lines */}
-                      {top.map((t, i) => {
-                        if (t.arr.length < 2) return null;
-                        const px = (j: number) => 6 + (j / Math.max(1, t.arr.length - 1)) * (W - 12);
-                        const py = (v: number) => H - 8 - ((v - minV) / Math.max(1, maxV - minV)) * (H - 16);
-                        const d = t.arr.map((p, j) => `${j === 0 ? 'M' : 'L'}${px(j)},${py(p.e1rm)}`).join(' ');
-                        return (
-                          <g key={i}>
-                            <path d={d} fill="none" stroke={colors[i % colors.length]} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                            {t.arr.map((p, j) => (
-                              <circle key={j} cx={px(j)} cy={py(p.e1rm)}
-                                r={j === t.arr.length - 1 ? 3 : 1.8}
-                                fill={j === t.arr.length - 1 ? colors[i % colors.length] : 'rgba(255,255,255,0.3)'}
-                                stroke={j === t.arr.length - 1 ? '#000' : 'none'} strokeWidth={0.5}
-                                style={{ cursor: 'pointer' }}
-                                onMouseEnter={e => setChartTooltip({ name: t.n, value: p.e1rm, x: e.clientX, y: e.clientY })}
-                                onMouseLeave={() => setChartTooltip(null)}
-                              />
-                            ))}
-                          </g>
-                        );
-                      })}
-                    </svg>
-                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
-                      {top.map((t, i) => <span key={t.n} style={{ fontSize: 10, color: colors[i % colors.length] }}>● {t.n}</span>)}
-                    </div>
-                    {chartTooltip && (
-                      <div style={{ position: 'fixed', left: chartTooltip.x + 8, top: chartTooltip.y - 28, background: '#18181b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
-                        {chartTooltip.name}: <strong>{chartTooltip.value} кг</strong>
-                      </div>
-                    )}
-                  </>
-                )}
-                {wkArr.length >= 2 && (
-                  <>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
-                      {wkArr.map(([wk, v], i) => (
-                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)', position: 'relative' }}
-                            onMouseEnter={e => setChartTooltip({ name: wk, value: v, x: e.clientX, y: e.clientY })}
-                            onMouseLeave={() => setChartTooltip(null)}
-                          />
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })()}
+          {historyWorkouts.length > 0 && <ProgressChartsCard historyWorkouts={historyWorkouts} />}
         </div>
       )}
 
@@ -2821,134 +2945,19 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             )}
           </div>
           {/* Workout Comparison */}
-          {historyWorkouts.length >= 2 && (() => {
-            const [cmpA, setCmpA] = useState(0);
-            const [cmpB, setCmpB] = useState(1);
-            const wA = historyWorkouts[cmpA];
-            const wB = historyWorkouts[cmpB];
-            if (!wA || !wB) return null;
-            const volA = wA.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0);
-            const volB = wB.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0);
-            const setsA = wA.exercises.reduce((s: number, e: any) => s + (e.sets?.length || 0), 0);
-            const setsB = wB.exercises.reduce((s: number, e: any) => s + (e.sets?.length || 0), 0);
-            const exA = new Set(wA.exercises.map((e: any) => e.exerciseName));
-            const exB = new Set(wB.exercises.map((e: any) => e.exerciseName));
-            const shared = [...exA].filter(n => exB.has(n));
-            const onlyA = [...exA].filter(n => !exB.has(n));
-            const onlyB = [...exB].filter(n => !exA.has(n));
-            return (
-              <div style={style.card}>
-                <div style={style.label}>⚖️ Сравнение тренировок</div>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                  <select value={cmpA} onChange={e => setCmpA(+e.target.value)} style={{ ...style.input, flex: 1, fontSize: 10, padding: '4px' }}>
-                    {historyWorkouts.slice(0, 20).map((w: any, i: number) => <option key={i} value={i}>{(w.date || '').slice(0, 10)} ({w.split || '—'})</option>)}
-                  </select>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>vs</span>
-                  <select value={cmpB} onChange={e => setCmpB(+e.target.value)} style={{ ...style.input, flex: 1, fontSize: 10, padding: '4px' }}>
-                    {historyWorkouts.slice(0, 20).map((w: any, i: number) => <option key={i} value={i}>{(w.date || '').slice(0, 10)} ({w.split || '—'})</option>)}
-                  </select>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 4, fontSize: 10, marginBottom: 4 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: '#00e68a' }}>{(volA / 1000).toFixed(1)}т</div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>объём</div>
-                  </div>
-                  <div style={{ color: volA > volB ? '#22c55e' : volA < volB ? '#ef4444' : 'rgba(255,255,255,0.3)', fontSize: 10 }}>
-                    {volA > volB ? '◀' : volA < volB ? '▶' : '='}
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: '#60a5fa' }}>{(volB / 1000).toFixed(1)}т</div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>объём</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: '#00e68a' }}>{setsA}</div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>сетов</div>
-                  </div>
-                  <div style={{ color: setsA > setsB ? '#22c55e' : setsA < setsB ? '#ef4444' : 'rgba(255,255,255,0.3)' }}>
-                    {setsA > setsB ? '◀' : setsA < setsB ? '▶' : '='}
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: '#60a5fa' }}>{setsB}</div>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>сетов</div>
-                  </div>
-                </div>
-                {shared.length > 0 && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>🔄 Совпадение: {shared.join(', ')}</div>}
-                {onlyA.length > 0 && <div style={{ fontSize: 9, color: '#00e68a' }}>🟢 Только A: {onlyA.join(', ')}</div>}
-                {onlyB.length > 0 && <div style={{ fontSize: 9, color: '#60a5fa' }}>🔵 Только B: {onlyB.join(', ')}</div>}
-              </div>
-            );
-          })()}
+          {historyWorkouts.length >= 2 && <WorkoutComparisonCard historyWorkouts={historyWorkouts} />}
           {/* Exercise Substitution */}
           <div style={style.card}>
             <div style={style.label}>🔄 Подбор замены</div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Альтернативы по мышечной группе</div>
-            {(() => {
-              const muscleGroups: Record<string, string[]> = {
-                'Грудь': ['Жим штанги лёжа', 'Жим гантелей', 'Разводка кабель', 'Жим в тренажёре', 'Сведение в бабочке', 'Жим на наклонной', 'Отжимания на брусьях'],
-                'Спина': ['Тяга штанги в наклоне', 'Тяга верхнего блока', 'Тяга гантели', 'Подтягивания', 'Тяга нижнего блока', 'Гиперэкстензия', 'Тяга в ХМ-тренажёре'],
-                'Ноги': ['Приседания со штангой', 'Жим ногами', 'Болгарские сплит-присед', 'Румынская тяга', 'Разгибание ног', 'Сгибание ног', 'Гакк-присед'],
-                'Плечи': ['Жим стоя', 'Жим сидя гантелей', 'Разводка в стороны', 'Тяга к подбородку', 'Разведение кабеля', 'Армейский жим', 'Тяга штанги к груди'],
-                'Руки': ['Подъём на бицепс', 'Молотки', 'Разгибание на трицепс', 'Французский жим', 'Концентрированный подъём', 'Отжимания на трицепс', 'Экстензия кабель'],
-                'Ягодицы': ['Ягодичный мост', 'Гиперэкстензия', 'Отведение ноги', 'Болгарские сплит', 'Румынская тяга', 'Глубокий присед', 'Бедренная экстензия'],
-                'Пресс': ['Скручивания', 'Планка', 'Велосипед', 'Подъём ног', 'Кранчи в тренажёре', 'Махи ногами', 'Дровосек'],
-              };
-              const [selGroup, setSelGroup] = useState('Грудь');
-              const [selEx, setSelEx] = useState('');
-              const alts = muscleGroups[selGroup] || [];
-              return (
-                <div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {Object.keys(muscleGroups).map(g => (
-                      <button key={g} onClick={() => { setSelGroup(g); setSelEx(''); }} style={{ padding: '2px 8px', borderRadius: 10, background: selGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selGroup === g ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.08)'}`, color: selGroup === g ? ACCENT : DIM, cursor: 'pointer', fontSize: 10, fontWeight: 600 }}>{g}</button>
-                    ))}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                    {alts.map(ex => (
-                      <div key={ex} onClick={() => setSelEx(selEx === ex ? '' : ex)} style={{ padding: '5px 8px', borderRadius: 6, background: selEx === ex ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${selEx === ex ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer', fontSize: 10, color: selEx === ex ? ACCENT : 'rgba(255,255,255,0.7)' }}>{ex}</div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
+            <ExerciseSubstitutionCard />
           </div>
           {/* 1RM Calculator — existing component */}
           <div style={style.card}>
             <OneRmCalcTab />
           </div>
           {/* Warm-up Ramp Calculator */}
-          {(() => {
-            const [wuWeight, setWuWeight] = useState(100);
-            const ramp = wuWeight <= 40
-              ? [{ pct: 0, w: 0, reps: 15, label: 'Разминка' }]
-              : wuWeight <= 80
-                ? [{ pct: 50, w: Math.round(wuWeight * 0.5 / 2.5) * 2.5, reps: 10 }, { pct: 70, w: Math.round(wuWeight * 0.7 / 2.5) * 2.5, reps: 6 }, { pct: 85, w: Math.round(wuWeight * 0.85 / 2.5) * 2.5, reps: 3 }]
-                : wuWeight <= 140
-                  ? [{ pct: 40, w: Math.round(wuWeight * 0.4 / 5) * 5, reps: 12 }, { pct: 60, w: Math.round(wuWeight * 0.6 / 5) * 5, reps: 8 }, { pct: 75, w: Math.round(wuWeight * 0.75 / 5) * 5, reps: 5 }, { pct: 85, w: Math.round(wuWeight * 0.85 / 5) * 5, reps: 3 }]
-                  : [{ pct: 40, w: Math.round(wuWeight * 0.4 / 5) * 5, reps: 12 }, { pct: 55, w: Math.round(wuWeight * 0.55 / 5) * 5, reps: 8 }, { pct: 70, w: Math.round(wuWeight * 0.7 / 5) * 5, reps: 5 }, { pct: 80, w: Math.round(wuWeight * 0.8 / 5) * 5, reps: 3 }, { pct: 90, w: Math.round(wuWeight * 0.9 / 5) * 5, reps: 1 }];
-            return (
-              <div style={style.card}>
-                <div style={style.label}>🔥 Разминочная рампа</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Автоподбор разминки по рабочему весу</div>
-                <div style={{ marginBottom: 6 }}>
-                  <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Рабочий вес (кг)</label>
-                  <input type="number" value={wuWeight} onChange={e => setWuWeight(Math.max(0, +e.target.value || 0))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} />
-                </div>
-                <div style={{ display: 'grid', gap: 2 }}>
-                  {ramp.map((r, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '2px 0' }}>
-                      <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.4)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.pct}%</span>
-                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>{r.w > 0 ? `${r.w}кг` : 'Пустой гриф'}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.35)' }}>{r.reps} повт</span>
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '3px 0', fontWeight: 700 }}>
-                    <span style={{ minWidth: 30, color: ACCENT }}>100%</span>
-                    <span style={{ flex: 1, color: ACCENT }}>{wuWeight}кг × работа</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          <WarmupRampCard />
           {/* Plate Calculator — existing component */}
           <div style={style.card}>
             <PlateCalcTab />

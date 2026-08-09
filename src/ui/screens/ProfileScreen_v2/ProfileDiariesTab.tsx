@@ -545,6 +545,73 @@ const QUICK_REPORT_LINKS: QuickLink[] = [
   },
 ];
 
+/* ── QuickLinkRow (вынесен из тела компонента для предотвращения ре-маунта) ── */
+
+const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate?: (s: string) => void }> = ({ links, ariaLabel, onNavigate }) => (
+  <div
+    role="navigation"
+    aria-label={ariaLabel}
+    style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}
+  >
+    {links.map((link) => (
+      <button
+        key={link.target}
+        onClick={() => onNavigate?.(link.target)}
+        aria-label={`Открыть ${link.label}: ${link.desc || ''}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '12px 14px',
+          borderRadius: 12,
+          cursor: 'pointer',
+          textAlign: 'left',
+          minHeight: 56,
+          background: `${link.color}14`,
+          border: `1px solid ${link.color}55`,
+          color: colors.text,
+          transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
+          position: 'relative',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-1px)';
+          e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+          e.currentTarget.style.background = `${link.color}22`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'none';
+          e.currentTarget.style.background = `${link.color}14`;
+        }}
+      >
+        <div
+          aria-hidden="true"
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: `${link.color}33`,
+            fontSize: 18,
+            flexShrink: 0,
+          }}
+        >
+          {link.icon}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: link.color }}>{link.label}</div>
+          {link.desc && (
+            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2, lineHeight: 1.3 }}>{link.desc}</div>
+          )}
+        </div>
+        <span style={{ color: link.color, fontSize: 16, opacity: 0.7 }}>→</span>
+      </button>
+    ))}
+  </div>
+);
+
 /* ── Главный компонент ── */
 
 export const ProfileDiariesTab: React.FC<{
@@ -955,71 +1022,6 @@ export const ProfileDiariesTab: React.FC<{
     }
     return list;
   };
-
-  const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string }> = ({ links, ariaLabel }) => (
-    <div
-      role="navigation"
-      aria-label={ariaLabel}
-      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}
-    >
-      {links.map((link) => (
-        <button
-          key={link.target}
-          onClick={() => onNavigate?.(link.target)}
-          aria-label={`Открыть ${link.label}: ${link.desc || ''}`}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '12px 14px',
-            borderRadius: 12,
-            cursor: 'pointer',
-            textAlign: 'left',
-            minHeight: 56,
-            background: `${link.color}14`,
-            border: `1px solid ${link.color}55`,
-            color: colors.text,
-            transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
-            position: 'relative',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
-            e.currentTarget.style.background = `${link.color}22`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
-            e.currentTarget.style.background = `${link.color}14`;
-          }}
-        >
-          <div
-            aria-hidden="true"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: `${link.color}33`,
-              fontSize: 18,
-              flexShrink: 0,
-            }}
-          >
-            {link.icon}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: link.color }}>{link.label}</div>
-            {link.desc && (
-              <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2, lineHeight: 1.3 }}>{link.desc}</div>
-            )}
-          </div>
-          <span style={{ color: link.color, fontSize: 16, opacity: 0.7 }}>→</span>
-        </button>
-      ))}
-    </div>
-  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1583,7 +1585,7 @@ export const ProfileDiariesTab: React.FC<{
             icon="🔗"
             color={colors.blue}
           >
-            <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" />
+            <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" onNavigate={onNavigate} />
           </AccordionSection>
 
           {activeDiary === 'sleep' && (
@@ -1633,6 +1635,7 @@ export const ProfileDiariesTab: React.FC<{
                 a.date.localeCompare(b.date),
               );
               saveWeightLog(updated);
+              setWeights(updated);
             }}
           />
           <AddInjectionModal

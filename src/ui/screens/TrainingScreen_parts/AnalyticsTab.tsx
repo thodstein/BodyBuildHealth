@@ -32,7 +32,6 @@ import {
 export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => void }> = ({ sessions, onRefresh }) => {
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const analytics = useMemo(() => {
-    setAnalyticsError(null);
     if (sessions.length === 0) return null;
     try {
     const mapped = sessions.map(w => ({
@@ -55,8 +54,16 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
     }));
     if (mapped.length === 0 || !mapped.some(m => m.sets.length > 0)) return null;
     return computeAnalytics({ sessions: mapped, weeks: 4 });
-    } catch (e) { setAnalyticsError(String(e)); return null; }
+    } catch (e) { return null; }
   }, [sessions]);
+
+  useEffect(() => {
+    if (analytics === null && sessions.length > 0) {
+      setAnalyticsError('Не удалось рассчитать аналитику');
+    } else {
+      setAnalyticsError(null);
+    }
+  }, [analytics, sessions.length]);
 
   if (!analytics || sessions.length === 0) {
     return (
