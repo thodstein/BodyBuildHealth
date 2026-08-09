@@ -3034,3 +3034,51 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   min-height: 36px !important;
   padding: 8px 10px !important;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   ПЛ-авто мобильная фикска — контент не вылезает за правый край
+   ════════════════════════════════════════════════════════════════ */
+.pl-auto-screen {
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.pl-auto-screen > * {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+/* Восстанавливаем overflow:hidden — глобальное правило ломает его */
+.pl-auto-screen [style*="overflow"],
+.pl-auto-screen [style*="hidden"] {
+  overflow-x: hidden !important;
+}
+/* Все grid-контейнеры — minmax(0,...) чтобы не расширялись */
+.pl-auto-screen [style*="gridTemplateColumns"] {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+/* Все flex-контейнеры — не вылезают */
+.pl-auto-screen [style*="display:flex"],
+.pl-auto-screen [style*="display: flex"] {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+/* Карточки и панели — не шире экрана */
+.pl-auto-screen > div,
+.pl-auto-screen div[style*="borderRadius"] {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
+@media (max-width: 480px) {
+  .pl-auto-screen {
+    padding: 8px 4px !important;
+  }
+  .pl-auto-screen > div {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
