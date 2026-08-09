@@ -63,7 +63,6 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
   useEffect(() => {
     if (initialSubTab && (
       ['diaries', 'reports', 'archive', 'custom-report', 'sleep', 'bp', 'weight', 'injection'].includes(initialSubTab)
-      || initialSubTab.endsWith('-diary')
       || initialSubTab.endsWith('-reports')
     )) {
       setTab('diaries');
