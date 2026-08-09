@@ -153,6 +153,7 @@ export const AddHealthModal: React.FC<{
     setSymptoms(p => p.filter(s => s.id !== id));
   };
 
+  if (!open) return null;
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000,
