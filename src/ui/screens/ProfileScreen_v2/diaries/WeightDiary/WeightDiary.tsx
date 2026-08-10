@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
-import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, type WeightEntry } from '../../../../../engines/profile-store';
+import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, type WeightEntry } from '../../../../../engines/profile-store';
+import { updateSection } from '../../../../../core/profile-manager';
 import { strengthDiary } from '../../../../../engines/strength-diary.engine';
 import { generateInsights, type DiarySession, type DiarySet } from '../../../../../engines/diary-insights.engine';
 import { projectWeight, calcFFMI } from '../../../../../engines/body-composition.engine';
@@ -20,10 +21,14 @@ import {
   fitLinearTrend,
   laggedCorrelation,
   movingAverage,
+  monthlySummaries,
+  paceToTarget,
   paginate,
   projectToDate,
   sortEntries,
   todayIso,
+  weeklySummaries,
+  weightHeatmap,
   type DiaryEntryLike,
   type SortState,
 } from '../../diary-helpers';
@@ -47,13 +52,37 @@ style.textContent = `
   .wd-btn { transition: background 0.2s, transform 0.15s; }
   .wd-btn:hover { transform: scale(1.02); }
   .wd-btn:active { transform: scale(0.98); }
-  @media (max-width: 480px) {
+  @media (max-width: 520px) {
     .wd-chart-wrap svg { min-height: 180px; }
-    .wd-table-wrap { overflow-x: auto; }
+    .wd-table-wrap { overflow-x: visible !important; }
+    .wd-table-wrap table { min-width: 0 !important; }
+    .wd-table-wrap thead { display: none; }
+    .wd-table-wrap tbody tr { display: block; border: 1px solid #27272a; border-radius: 10px; margin-bottom: 10px; padding: 8px; background: #18181b; }
+    .wd-table-wrap td { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 4px !important; border-bottom: 1px dashed #27272a; }
+    .wd-table-wrap td:last-child { border-bottom: none; }
+    .wd-table-wrap td::before { content: attr(data-label); color: #71717a; font-size: 11px; flex-shrink: 0; }
   }
 `;
 if (typeof document !== 'undefined') document.head.appendChild(style);
 
+const TrendSpark: React.FC<{ row: WeightEntry; rows: WeightEntry[] }> = ({ row, rows }) => {
+  const win = rows.filter((r) => r.date <= row.date).slice(0, 7).reverse();
+  if (win.length < 2) return <span style={{ color: '#52525b' }}>—</span>;
+  const min = Math.min(...win.map((w) => w.weight));
+  const max = Math.max(...win.map((w) => w.weight));
+  const span = max - min || 1;
+  const pts = win.map((w, i) => [i * 11, 16 - ((w.weight - min) / span) * 14] as const);
+  const path = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const trend = win[win.length - 1].weight - win[0].weight;
+  return (
+    <svg width="66" height="18" aria-label="тренд веса">
+      <path d={path} fill="none" stroke={trend >= 0 ? '#f87171' : '#22c55e'} strokeWidth="1.5" />
+      <circle cx={`${pts[pts.length - 1][0]}`} cy={`${pts[pts.length - 1][1]}`} r="2" fill={trend >= 0 ? '#f87171' : '#22c55e'} />
+    </svg>
+  );
+};
+
+const card: React.CSSProperties = { padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 };
 const thStyle: React.CSSProperties = {
   position: 'sticky',
   top: 0,
@@ -219,6 +248,9 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const [comparePos, setComparePos] = useState(50);
   const [quickW, setQuickW] = useState('');
   const [quickTod, setQuickTod] = useState<'morning' | 'evening'>('morning');
+  const [showArchive, setShowArchive] = useState(false);
+  const [goalDate, setGoalDate] = useState('');
+  const [archiveRows, setArchiveRows] = useState<WeightEntry[]>(() => getWeightLogArchived());
   const [profileHeight, setProfileHeight] = useState<number | undefined>();
   const [profileSex, setProfileSex] = useState<'male' | 'female' | undefined>();
   const svgName = `weight-${todayIso()}`;
@@ -229,6 +261,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   useEffect(() => {
     if (!open) return;
     setRows(getWeightLog());
+    setArchiveRows(getWeightLogArchived());
     try {
       const stored = Number(JSON.parse(localStorage.getItem('he_diary_goals') || '{}').weightKg);
       setGoal(Number.isFinite(stored) && stored > 0 ? stored : goals?.weightKg || 0);
@@ -423,6 +456,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     };
     return {
       latest,
+      bmi: profileHeight && profileHeight > 0 && latest.weight > 0 ? latest.weight / ((profileHeight / 100) ** 2) : null,
       weightDelta: first ? latest.weight - first.weight : 0,
       delta30: daysAgo(30),
       delta90: daysAgo(90),
@@ -433,7 +467,30 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           : null,
       waistDelta: latest.waistCm !== undefined && first?.waistCm !== undefined ? latest.waistCm - first.waistCm : null,
     };
-  }, [rows]);
+  }, [rows, profileHeight]);
+
+  const weekSummaries = useMemo(() => weeklySummaries(rows.map((r) => ({ date: r.date, weight: r.weight })), 12), [rows]);
+  const monthSummaries = useMemo(() => monthlySummaries(rows.map((r) => ({ date: r.date, weight: r.weight })), 6), [rows]);
+  const heatmap = useMemo(() => weightHeatmap(rows.map((r) => ({ date: r.date, weight: r.weight })), 12), [rows]);
+  const pace = useMemo(
+    () => (goalDate && goal > 0 && body ? paceToTarget(body.latest.weight, goal, goalDate) : null),
+    [goalDate, goal, body]
+  );
+  const syncFromProfile = () => {
+    setGoal(goals?.weightKg || 0);
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      if (raw) {
+        const unified = JSON.parse(raw);
+        if (Number(unified?.personal?.height) > 0) setProfileHeight(Number(unified.personal.height));
+        if (unified?.personal?.sex) setProfileSex(unified.personal.sex === 'female' ? 'female' : 'male');
+      }
+    } catch { /* ignore */ }
+  };
+  const syncToProfile = () => {
+    if (!body) return;
+    try { updateSection('personal', { weight: body.latest.weight }); } catch { /* ignore */ }
+  };
 
   const interpretWeight = (delta: number, goal: number): string => {
     if (goal > 0 && Math.abs(delta) <= 1) return 'На цели';
@@ -487,7 +544,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     [training, weightPoints],
   );
   const doExportCsv = () => {
-    const cols = ['date', ...FIELDS, 'notes'];
+    const cols = ['date', ...FIELDS, 'timeOfDay', 'notes'];
     const csv =
       '\ufeff' +
       [cols.join(','), ...rows.map((r) => cols.map((c) => JSON.stringify((r as any)[c] ?? '')).join(','))].join('\n');
@@ -495,6 +552,16 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const a = document.createElement('a');
     a.href = url;
     a.download = `${svgName}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  };
+  const exportArchiveCsv = () => {
+    const cols = ['date', 'weight', 'bodyFat', 'notes'];
+    const csv = '\ufeff' + [cols.join(','), ...archiveRows.map((r) => cols.map((c) => JSON.stringify((r as any)[c] ?? '')).join(','))].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${svgName}-archive.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 500);
   };
@@ -708,6 +775,19 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               onChange={(e) => setGoal(Number(e.target.value) || 0)}
             />
           </label>
+          <button
+            style={{ ...button, background: showArchive ? '#166534' : button.background }}
+            onClick={() => setShowArchive((v) => !v)}
+            aria-pressed={showArchive}
+          >
+            🗄 Архив ({archiveRows.length})
+          </button>
+          <button style={button} onClick={syncFromProfile}>
+            📋 Из профиля
+          </button>
+          <button style={button} onClick={syncToProfile}>
+            💾 В профиль
+          </button>
         </section>
         <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: 12, background: 'linear-gradient(135deg,#18181b,#0d2817)', borderRadius: 10, marginBottom: 12, border: '1px solid #22c55e33' }}>
           <b style={{ fontSize: 14 }}>⚡ Быстрый ввод</b>
@@ -759,6 +839,36 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </button>
           </section>
         )}
+        {showArchive && archiveRows.length > 0 && (
+          <details style={card} open>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>
+              🗄 Архив ({archiveRows.length} записей старше 365 дней)
+            </summary>
+            <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
+              <button style={button} onClick={exportArchiveCsv}>CSV архива</button>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Дата</th>
+                  <th style={thStyle}>Вес</th>
+                  <th style={thStyle}>Жир %</th>
+                  <th style={thStyle}>Заметка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {archiveRows.slice(0, 100).map((r) => (
+                  <tr key={r.date} style={{ borderBottom: '1px solid #27272a' }}>
+                    <td style={{ padding: 5 }}>{r.date}</td>
+                    <td style={{ padding: 5 }}>{r.weight ? r.weight.toFixed(1) : '—'}</td>
+                    <td style={{ padding: 5 }}>{r.bodyFat !== undefined ? r.bodyFat + '%' : '—'}</td>
+                    <td style={{ padding: 5 }}>{r.notes || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
         {body && (
           <section
             style={{
@@ -781,6 +891,12 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 interpretWaist(body.waistDelta),
                 body.waistDelta && body.waistDelta > 0 ? '+' : '',
               ],
+              [
+                'BMI',
+                body.bmi,
+                '',
+                body.bmi === null ? '' : body.bmi >= 30 ? 'Ожирение' : body.bmi >= 25 ? 'Избыточный вес' : body.bmi < 18.5 ? 'Дефицит' : 'Норма',
+              ],
             ].map(([k, val, unit, insight, prefix]) => {
               const numVal = typeof val === 'number' ? val : null;
               return (
@@ -793,7 +909,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                     {numVal === null ? '—' : (
                       <AnimatedCounter
                         value={Math.abs(numVal)}
-                        decimals={unit === 'кг' || unit === 'см' ? 1 : 0}
+                        decimals={unit === 'кг' || unit === 'см' || String(k) === 'BMI' ? 1 : 0}
                         duration={500}
                         prefix={typeof prefix === 'string' ? prefix : ''}
                         suffix={` ${unit}`}
@@ -813,22 +929,24 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         )}
         <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {[
-            ['Среднее', distribution?.mean],
-            ['Медиана', distribution?.median],
-            ['Мин/макс', extremes.min && extremes.max ? [extremes.min.value, extremes.max.value] : null],
-            ['Дней', streak.totalDays],
-            ['Серия', streak.current],
+            ['📊 Среднее', distribution?.mean],
+            ['🎯 Медиана', distribution?.median],
+            ['↕ Мин/макс', extremes.min && extremes.max ? [extremes.min.value, extremes.max.value] : null],
+            ['📅 Дней', streak.totalDays],
+            ['🔥 Серия', streak.current],
             ['Δ нед.', comparison.delta],
             ['Δ 30д', body?.delta30 ?? null],
             ['Δ 90д', body?.delta90 ?? null],
-            ['Аномалии', anomalies.length],
+            ['⚠ Аномалии', anomalies.length],
           ].map(([k, v]) => {
             let content: React.ReactNode = '—';
             if (Array.isArray(v)) {
               content = `${v[0].toFixed(1)}/${v[1].toFixed(1)}`;
             } else if (typeof v === 'number' && Number.isFinite(v)) {
               const decimals = k === 'Дней' || k === 'Серия' || k === 'Аномалии' ? 0 : 1;
-              content = <AnimatedCounter value={Math.abs(v)} decimals={decimals} duration={500} prefix={v < 0 ? '-' : ''} style={{ fontSize: 14, fontWeight: 700 }} />;
+              const isDelta = String(k).startsWith('Δ');
+              const color = isDelta ? (v < 0 ? '#22c55e' : v > 0 ? '#f87171' : '#aaa') : undefined;
+              content = <AnimatedCounter value={Math.abs(v)} decimals={decimals} duration={500} prefix={v < 0 ? '-' : ''} style={{ fontSize: 14, fontWeight: 700, color }} />;
             }
             return (
               <div key={String(k)} style={{ padding: 10, background: '#27272a', borderRadius: 8 }}>
@@ -838,7 +956,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             );
           })}
         </section>
-        <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+        <section style={card}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <b>📈 График</b>
             <button
@@ -889,7 +1007,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           />
         </section>
         {goalProgress && (
-          <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+          <section style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <b>Цель {goal} кг</b>
               {eta ? (
@@ -900,11 +1018,29 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 <small style={{ color: '#aaa' }}>Тренд не направлен к цели</small>
               )}
             </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+              <label style={{ fontSize: 11, color: '#aaa' }}>
+                К дате:{' '}
+                <input
+                  type="date"
+                  style={{ ...input, width: 150, display: 'inline-block' }}
+                  value={goalDate}
+                  onChange={(e) => setGoalDate(e.target.value)}
+                />
+              </label>
+              {pace && (
+                <small style={{ color: pace.kgPerWeek <= -0.25 || pace.kgPerWeek >= 0.25 ? '#fbbf24' : '#4ade80' }}>
+                  Нужно {pace.kgPerWeek > 0 ? '+' : ''}
+                  {pace.kgPerWeek.toFixed(2)} кг/нед · осталось {pace.days} дн. ({Math.abs(pace.kgTotal).toFixed(1)} кг)
+                </small>
+              )}
+            </div>
             <div style={{ height: 8, borderRadius: 4, background: '#27272a', marginTop: 8, overflow: 'hidden' }}>
               <div
                 style={{
                   height: '100%', width: (goalProgress.pct === null ? 0 : Math.max(0, Math.min(100, goalProgress.pct))) + '%',
                   borderRadius: 4,
+                  transition: 'width 0.5s ease',
                   background: goalProgress.done ? '#22c55e' : goalProgress.pct === null ? '#a78bfa' : goalProgress.pct < 0 ? '#ef4444' : 'linear-gradient(90deg,#22c55e,#a3e635)',
                 }}
               />
@@ -912,11 +1048,12 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             <small style={{ display: 'block', marginTop: 6, color: '#aaa' }}>
               {goalProgress.start.toFixed(1)} кг → {goalProgress.cur.toFixed(1)} кг (текущий) · прогресс{' '}
               {goalProgress.pct === null ? '—' : goalProgress.pct + '%'}
+              {!goalProgress.done && ` · осталось ${Math.abs(goal - goalProgress.cur).toFixed(1)} кг`}
             </small>
           </section>
         )}
         {photoPairs && (
-          <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+          <section style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
               <b>До / После</b>
               <small style={{ color: '#888' }}>
@@ -940,6 +1077,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 style={{
                   position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
                   clipPath: 'inset(0 ' + (100 - comparePos) + '% 0 0)',
+                  transition: 'clip-path 0.1s linear',
                 }}
               />
               <div
@@ -947,7 +1085,17 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   position: 'absolute', top: 0, bottom: 0, left: comparePos + '%',
                   width: 2, background: '#fff', opacity: 0.85, pointerEvents: 'none',
                 }}
-              />
+              >
+                <div
+                  style={{
+                    position: 'absolute', top: '50%', left: -10, width: 20, height: 20, borderRadius: '50%',
+                    background: '#fff', transform: 'translateY(-50%)', boxShadow: '0 0 0 3px rgba(0,0,0,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+                  }}
+                >
+                  <span style={{ color: '#111', fontSize: 10 }}>⇔</span>
+                </div>
+              </div>
               <span style={{ position: 'absolute', left: 8, top: 8, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', fontSize: 11, color: '#fff' }}>
                 До ({photoPairs.before.date.slice(5)})
               </span>
@@ -969,6 +1117,93 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </small>
           </section>
         )}
+        {heatmap && (
+          <details style={card}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>
+              🗓 Календарь веса ({heatmap.cells.flat().filter(Boolean).length} записей)
+            </summary>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginTop: 8 }}>
+              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
+                <small key={d} style={{ textAlign: 'center', color: '#71717a', fontSize: 9 }}>{d}</small>
+              ))}
+              {heatmap.cells.flat().map((c, i) =>
+                c ? (
+                  <div
+                    key={i}
+                    title={`${c.date}: ${c.value.toFixed(1)} кг`}
+                    style={{ aspectRatio: '1', borderRadius: 4, background: `rgba(34,197,94,${(0.12 + c.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <small style={{ fontSize: 8, color: '#e5e5e5' }}>{c.value.toFixed(0)}</small>
+                  </div>
+                ) : (
+                  <div key={i} style={{ aspectRatio: '1', borderRadius: 4, background: '#111113', border: '1px dashed #27272a' }} />
+                )
+              )}
+            </div>
+            <small style={{ display: 'block', marginTop: 6, color: '#71717a', fontSize: 10 }}>
+              Мин {heatmap.min.toFixed(1)} кг · Макс {heatmap.max.toFixed(1)} кг
+            </small>
+          </details>
+        )}
+        {(weekSummaries.length > 0 || monthSummaries.length > 0) && (
+          <details style={card}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>📊 Сводки по периодам</summary>
+            {weekSummaries.length > 0 && (
+              <>
+                <b style={{ fontSize: 12 }}>Недели</b>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6, fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Неделя</th>
+                      <th style={thStyle}>Записей</th>
+                      <th style={thStyle}>Средняя</th>
+                      <th style={thStyle}>Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weekSummaries.map((w) => (
+                      <tr key={w.weekStart} style={{ borderBottom: '1px solid #27272a' }}>
+                        <td style={{ padding: 5 }}>{w.weekStart}</td>
+                        <td style={{ padding: 5 }}>{w.count}</td>
+                        <td style={{ padding: 5 }}>{w.mean.toFixed(1)}</td>
+                        <td style={{ padding: 5, color: w.delta === null ? '#71717a' : w.delta < 0 ? '#22c55e' : '#f87171' }}>
+                          {w.delta === null ? '—' : (w.delta > 0 ? '+' : '') + w.delta.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+            {monthSummaries.length > 0 && (
+              <>
+                <b style={{ fontSize: 12, display: 'block', marginTop: 10 }}>Месяцы</b>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6, fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Месяц</th>
+                      <th style={thStyle}>Записей</th>
+                      <th style={thStyle}>Средняя</th>
+                      <th style={thStyle}>Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthSummaries.map((m) => (
+                      <tr key={m.month} style={{ borderBottom: '1px solid #27272a' }}>
+                        <td style={{ padding: 5 }}>{m.month}</td>
+                        <td style={{ padding: 5 }}>{m.count}</td>
+                        <td style={{ padding: 5 }}>{m.mean.toFixed(1)}</td>
+                        <td style={{ padding: 5, color: m.delta === null ? '#71717a' : m.delta < 0 ? '#22c55e' : '#f87171' }}>
+                          {m.delta === null ? '—' : (m.delta > 0 ? '+' : '') + m.delta.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </details>
+        )}
         <WeightDiaryVisuals rows={rows} goal={goal} heightCm={profileHeight} sex={profileSex} />
         {comparison.thisWeek && comparison.lastWeek && (
           <section style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
@@ -977,7 +1212,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           </section>
         )}
         {bodyCorrelations.length > 0 && (
-          <details style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+          <details style={card}>
             <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>🔗 Связь веса с замерами ({bodyCorrelations.length})</summary>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {bodyCorrelations.map((item) => (
@@ -1047,6 +1282,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 <th style={thStyle}>Время</th>
                 <th style={thStyle}>Заметка</th>
                 <th style={thStyle}>Фото</th>
+                <th style={thStyle}>Тренд</th>
                 <th style={thStyle}>Действия</th>
               </tr>
             </thead>
@@ -1056,7 +1292,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 if (!row) return null;
                 return (
                   <tr key={row.date} style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <td>
+                    <td data-label="Дата">
                       {editing === row.date ? (
                         <input
                           style={input}
@@ -1069,10 +1305,22 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                       )}
                     </td>
                     {FIELDS.map((f) => (
-                      <td key={f}>{fieldCell(row, f)}</td>
+                      <td data-label={LABELS[f]} key={f}>{fieldCell(row, f)}</td>
                     ))}
-                    <td>{row.timeOfDay === 'morning' ? '🌅 Утро' : row.timeOfDay === 'evening' ? '🌙 Вечер' : '—'}</td>
-                    <td>
+                    <td data-label="Время">
+                      {editing === row.date ? (
+                        <select
+                          style={input}
+                          value={draft.timeOfDay || 'morning'}
+                          onChange={(e) => setDraft({ ...draft, timeOfDay: e.target.value as 'morning' | 'evening' })}
+                          aria-label="Время суток"
+                        >
+                          <option value="morning">🌅 Утро</option>
+                          <option value="evening">🌙 Вечер</option>
+                        </select>
+                      ) : row.timeOfDay === 'morning' ? '🌅 Утро' : row.timeOfDay === 'evening' ? '🌙 Вечер' : '—'}
+                    </td>
+                    <td data-label="Заметка">
                       {editing === row.date ? (
                         <input
                           style={input}
@@ -1083,7 +1331,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         row.notes || '—'
                       )}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
+                    <td data-label="Фото" style={{ whiteSpace: 'nowrap' }}>
                       {row.photos && row.photos.length > 0 ? (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           {row.photos.map((src, i) => (
@@ -1100,7 +1348,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         '—'
                       )}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
+                    <td data-label="Тренд" style={{ whiteSpace: 'nowrap' }}>
+                      <TrendSpark row={row} rows={rows} />
+                    </td>
+                    <td data-label="Действия" style={{ whiteSpace: 'nowrap' }}>
                       {editing === row.date ? (
                         <>
                           <button style={button} onClick={saveEdit}>

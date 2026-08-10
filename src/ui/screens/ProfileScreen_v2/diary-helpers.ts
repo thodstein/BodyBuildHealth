@@ -1063,3 +1063,133 @@ export function daysToTarget(fit: { slopePerDay: number; intercept: number; star
   if (days < 0) return null;
   return Math.ceil(days);
 }
+
+/* ── Сводки по неделям/месяцам, темп к дате, heatmap веса ── */
+
+/** Локальный ISO (без сдвига UTC). */
+const localIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Понедельник недели для даты (ISO). */
+export function weekStartOf(dateISO: string): string {
+  const d = new Date(dateISO + 'T00:00:00');
+  if (Number.isNaN(+d)) return dateISO;
+  const day = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - day);
+  return localIso(d);
+}
+
+export interface WeekSummary {
+  weekStart: string;
+  count: number;
+  mean: number;
+  delta: number | null; // Δ к предыдущей (более ранней) неделе
+}
+
+/** Средний вес по неделям (понедельник → воскресенье), последние недели первыми. */
+export function weeklySummaries(entries: { date: string; weight: number }[], weeks = 12): WeekSummary[] {
+  const byWeek = new Map<string, { sum: number; count: number }>();
+  for (const e of entries) {
+    if (!e || !e.date || !Number.isFinite(e.weight) || e.weight <= 0) continue;
+    const ws = weekStartOf(e.date);
+    const cur = byWeek.get(ws) || { sum: 0, count: 0 };
+    cur.sum += e.weight;
+    cur.count += 1;
+    byWeek.set(ws, cur);
+  }
+  const keys = [...byWeek.keys()].sort().reverse().slice(0, weeks);
+  const out: WeekSummary[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const ws = keys[i];
+    const { sum, count } = byWeek.get(ws)!;
+    const mean = sum / count;
+    const older = keys[i + 1];
+    const delta = older !== undefined ? mean - byWeek.get(older)!.sum / byWeek.get(older)!.count : null;
+    out.push({ weekStart: ws, count, mean, delta });
+  }
+  return out;
+}
+
+export interface MonthSummary {
+  month: string; // 'YYYY-MM'
+  count: number;
+  mean: number;
+  delta: number | null;
+}
+
+/** Средний вес по месяцам, последние месяцы первыми. */
+export function monthlySummaries(entries: { date: string; weight: number }[], months = 6): MonthSummary[] {
+  const byMonth = new Map<string, { sum: number; count: number }>();
+  for (const e of entries) {
+    if (!e || !e.date || !Number.isFinite(e.weight) || e.weight <= 0) continue;
+    const m = e.date.slice(0, 7);
+    const cur = byMonth.get(m) || { sum: 0, count: 0 };
+    cur.sum += e.weight;
+    cur.count += 1;
+    byMonth.set(m, cur);
+  }
+  const keys = [...byMonth.keys()].sort().reverse().slice(0, months);
+  const out: MonthSummary[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const m = keys[i];
+    const { sum, count } = byMonth.get(m)!;
+    const mean = sum / count;
+    const older = keys[i + 1];
+    const delta = older !== undefined ? mean - byMonth.get(older)!.sum / byMonth.get(older)!.count : null;
+    out.push({ month: m, count, mean, delta });
+  }
+  return out;
+}
+
+/** Нужный темп (кг/нед) для достижения цели к дате. null если дата в прошлом или невалидна. */
+export function paceToTarget(
+  currentKg: number,
+  targetKg: number,
+  targetDate: string
+): { kgPerWeek: number; kgTotal: number; days: number } | null {
+  const days = Math.ceil((+new Date(targetDate + 'T00:00:00') - Date.now()) / 86400000);
+  if (!Number.isFinite(days) || days <= 0) return null;
+  const kgTotal = targetKg - currentKg;
+  return { kgPerWeek: kgTotal / (days / 7), kgTotal, days };
+}
+
+export interface HeatmapCell {
+  date: string;
+  value: number;
+  pct: number; // 0..1 относительно min/max всех значений
+}
+
+/** Календарная сетка веса: weeks × 7 дней (Пн..Вс), null = нет записи. */
+export function weightHeatmap(
+  entries: { date: string; weight: number }[],
+  weeks = 12
+): { cells: (HeatmapCell | null)[][]; min: number; max: number } | null {
+  const byDate = new Map<string, number>();
+  for (const e of entries) {
+    if (e && e.date && Number.isFinite(e.weight) && e.weight > 0) byDate.set(e.date, e.weight);
+  }
+  const values = [...byDate.values()];
+  if (!values.length) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min;
+  const today = new Date();
+  const todayIsoLoc = localIso(today);
+  const todayDow = (today.getDay() + 6) % 7; // Пн=0
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - todayDow);
+  const cells: (HeatmapCell | null)[][] = [];
+  for (let w = 0; w < weeks; w++) {
+    const row: (HeatmapCell | null)[] = [];
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(thisMonday);
+      day.setDate(thisMonday.getDate() - (weeks - 1 - w) * 7 + d);
+      const iso = localIso(day);
+      if (iso > todayIsoLoc) { row.push(null); continue; }
+      const value = byDate.get(iso);
+      row.push(value !== undefined ? { date: iso, value, pct: span === 0 ? 0.5 : (value - min) / span } : null);
+    }
+    cells.push(row);
+  }
+  return { cells, min, max };
+}

@@ -19,6 +19,11 @@ import {
   fitLinearTrend,
   projectToDate,
   daysToTarget,
+  weekStartOf,
+  weeklySummaries,
+  monthlySummaries,
+  paceToTarget,
+  weightHeatmap,
 } from '../diary-helpers';
 
 const makeEntry = (date: string, fields: { label: string; value: string; unit?: string }[]): DiaryEntryLike => ({
@@ -412,5 +417,152 @@ describe('daysToTarget', () => {
   it('цель уже достигнута → null (дней <= 0)', () => {
     const fit = { slopePerDay: 0.1, intercept: 80, startX: +new Date('2026-08-01') / 86400000, startY: 80 };
     expect(daysToTarget(fit, '2027-01-01', 85)).toBeNull();
+  });
+});
+
+describe('weeklySummaries', () => {
+  it('группирует по неделям (Пн..Вс), последние первыми', () => {
+    const out = weeklySummaries([
+      { date: '2026-07-01', weight: 80 }, // среда
+      { date: '2026-07-02', weight: 82 },
+      { date: '2026-07-06', weight: 81 }, // пн следующей недели
+      { date: '2026-07-12', weight: 83 }, // вс той же недели
+    ]);
+    expect(out.length).toBe(2);
+    expect(out[0].weekStart).toBe('2026-07-06');
+    expect(out[0].count).toBe(2);
+    expect(out[0].mean).toBe(82);
+    expect(out[1].weekStart).toBe('2026-06-29');
+    expect(out[1].mean).toBe(81);
+  });
+
+  it('delta = средняя неделя − предыдущая (более ранняя)', () => {
+    const out = weeklySummaries([
+      { date: '2026-07-01', weight: 80 },
+      { date: '2026-07-06', weight: 82 },
+    ]);
+    expect(out[0].delta).toBe(2);
+    expect(out[1].delta).toBeNull();
+  });
+
+  it('невалидные записи пропускаются', () => {
+    const out = weeklySummaries([
+      { date: '', weight: 90 },
+      { date: '2026-07-01', weight: 0 },
+      { date: '2026-07-01', weight: NaN },
+      { date: '2026-07-03', weight: 79 },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].count).toBe(1);
+  });
+
+  it('пусто → []', () => {
+    expect(weeklySummaries([])).toEqual([]);
+  });
+
+  it('cap по количеству недель', () => {
+    const entries: { date: string; weight: number }[] = [];
+    for (let i = 0; i < 60; i++) {
+      const d = new Date('2026-07-01');
+      d.setDate(d.getDate() - i * 7);
+      entries.push({ date: d.toISOString().slice(0, 10), weight: 80 });
+    }
+    expect(weeklySummaries(entries, 4)).toHaveLength(4);
+  });
+});
+
+describe('monthlySummaries', () => {
+  it('группирует по месяцам, delta к предыдущему', () => {
+    const out = monthlySummaries([
+      { date: '2026-06-10', weight: 80 },
+      { date: '2026-06-20', weight: 84 },
+      { date: '2026-07-05', weight: 86 },
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out[0].month).toBe('2026-07');
+    expect(out[0].mean).toBe(86);
+    expect(out[0].delta).toBe(4); // 86 − 82
+    expect(out[1].month).toBe('2026-06');
+    expect(out[1].count).toBe(2);
+    expect(out[1].delta).toBeNull();
+  });
+
+  it('пусто → []', () => {
+    expect(monthlySummaries([])).toEqual([]);
+  });
+});
+
+describe('paceToTarget', () => {
+  it('будущая дата → нужный темп кг/нед', () => {
+    const now = new Date();
+    const target = new Date(now);
+    target.setDate(target.getDate() + 14);
+    const iso = target.toISOString().slice(0, 10);
+    const out = paceToTarget(90, 85, iso);
+    expect(out).not.toBeNull();
+    if (out) {
+      expect(out.days).toBeGreaterThan(13);
+      expect(out.days).toBeLessThanOrEqual(14);
+      expect(out.kgTotal).toBe(-5);
+      expect(Math.abs(out.kgPerWeek + 2.5)).toBeLessThan(0.3);
+    }
+  });
+
+  it('прошедшая дата → null', () => {
+    expect(paceToTarget(90, 85, '2020-01-01')).toBeNull();
+  });
+
+  it('невалидная дата → null', () => {
+    expect(paceToTarget(90, 85, 'abc')).toBeNull();
+  });
+
+  it('набор веса → положительный темп', () => {
+    const target = new Date(Date.now() + 7 * 86400000);
+    const out = paceToTarget(80, 84, target.toISOString().slice(0, 10));
+    expect(out).not.toBeNull();
+    if (out) expect(out.kgPerWeek).toBeGreaterThan(0);
+  });
+});
+
+describe('weightHeatmap', () => {
+  it('сетка weeks×7, записи на своих днях, null на пропуски', () => {
+    const today = new Date();
+    const out = weightHeatmap([{ date: today.toISOString().slice(0, 10), weight: 80 }], 2);
+    expect(out).not.toBeNull();
+    if (out) {
+      expect(out.cells).toHaveLength(2);
+      expect(out.cells[0]).toHaveLength(7);
+      expect(out.cells[1]).toHaveLength(7);
+      expect(out.min).toBe(80);
+      expect(out.max).toBe(80);
+      const found = out.cells.flat().filter(Boolean) as { date: string; value: number; pct: number }[];
+      expect(found).toHaveLength(1);
+      expect(found[0].value).toBe(80);
+      expect(found[0].pct).toBe(0.5); // min === max
+    }
+  });
+
+  it('pct нормируется по диапазону', () => {
+    const today = new Date();
+    const y = (n: number) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - n);
+      return d.toISOString().slice(0, 10);
+    };
+    const out = weightHeatmap([
+      { date: y(0), weight: 90 },
+      { date: y(1), weight: 80 },
+    ], 2);
+    expect(out).not.toBeNull();
+    if (out) {
+      const vals = out.cells.flat().filter(Boolean) as { value: number; pct: number }[];
+      expect(vals.map(v => v.pct).sort()).toEqual([0, 1]);
+      expect(out.min).toBe(80);
+      expect(out.max).toBe(90);
+    }
+  });
+
+  it('пусто → null', () => {
+    expect(weightHeatmap([], 4)).toBeNull();
   });
 });
