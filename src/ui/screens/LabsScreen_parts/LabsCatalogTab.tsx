@@ -19,6 +19,7 @@ const INVEST_TYPE_CONFIG: Record<string, { label: string }> = {
   lipids: { label: 'Липидный профиль' },
   metabolic: { label: 'Метаболизм / Витамины' },
   minerals: { label: 'Минералы / Электролиты' },
+  urinalysis: { label: 'Моча' },
   instrumental: { label: 'Инструментальные исследования' },
 };
 const INVESTIGATIONS: InvestigationItem[] = [
@@ -39,6 +40,7 @@ const INVESTIGATIONS: InvestigationItem[] = [
   { id:'bone_metabolism', name:'Костный обмен', type:'metabolic', description:'Маркёры костного метаболизма и риска остеопороза.', frequency:'1 раз/год', markers:['CA','P','MG','VITD'], isInstrumental:false },
   { id:'electrolytes', name:'Электролиты плазмы', type:'minerals', description:'Контроль водно-электролитного баланса.', frequency:'Каждые 3-6 мес', markers:['NA','K','CA','P','MG'], isInstrumental:false },
   { id:'iron_panel', name:'Обмен железа', type:'minerals', description:'Маркёры дефицита или перегрузки железом.', frequency:'1 раз/3-6 мес', markers:['FERRITIN','TIBC'], isInstrumental:false },
+  { id:'urinalysis', name:'Общий анализ мочи (ОАМ)', type:'urinalysis', description:'Скрининг мочевыводящих путей и функции почек: плотность, pH, белок, глюкоза, кетоны, кровь, лейкоциты, эритроциты, эпителий, цилиндры и нитриты.', frequency:'Каждые 3-6 мес на курсе', markers:['URINE_SG','URINE_PH','URINE_PROTEIN_QR','URINE_GLUCOSE_QR','URINE_KETONES_QR','URINE_BILIRUBIN_QR','UROBILINOGEN_QR','URINE_NITRITE_QR','URINE_LEU_QR','URINE_BLOOD_QR','URINE_LEU','URINE_ERY','URINE_EPITHELIAL','URINE_CYLINDERS'], isInstrumental:false },
   { id:'echo_kg', name:'Эхокардиограмма (Эхо-КГ)', type:'instrumental', description:'Структура сердца, фракция выброса, клапаны, размеры камер.', frequency:'1 раз/год на курсе', markers:['ECHO_EF','ECHO_LV_MASS','ECHO_LA'], isInstrumental:true },
   { id:'ekg', name:'Электрокардиограмма (ЭКГ)', type:'instrumental', description:'Скрининг аритмий, гипертрофии ЛЖ, ишемии.', frequency:'Каждые 3-6 мес', markers:['HR','QTc'], isInstrumental:true },
   { id:'holter', name:'Холтер (суточное мониторирование ЭКГ)', type:'instrumental', description:'Аритмии, ишемия, вариабельность ритма.', frequency:'По показаниям', markers:['HR'], isInstrumental:true },
