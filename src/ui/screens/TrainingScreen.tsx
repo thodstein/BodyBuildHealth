@@ -197,11 +197,11 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     } catch {}
   }, []);
   useEffect(() => {
-    const diaryTabs = new Set<TrainingTab>(['diary', 'insights', 'strength', 'calendar', 'checkin', 'mmc_tracking', 'import_data']);
+    const diaryTabs = new Set<TrainingTab>(['diary', 'history', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'reports']);
     if (initialSubTab === 'reports') {
-      setZone('diary'); setPage('tabs'); setTab('diary');
+      setZone('diary'); setPage('tabs'); setTab('reports');
     } else if (initialSubTab === 'analytics') {
-      setZone('diary'); setPage('tabs'); setTab('insights');
+      setZone('diary'); setPage('tabs'); setTab('analytics');
     } else if (initialSubTab && diaryTabs.has(initialSubTab as TrainingTab)) {
       setZone('diary'); setPage('tabs'); setTab(initialSubTab as TrainingTab);
     }
@@ -497,11 +497,11 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {page !== 'hero' && (
       <div style={{ padding: '0 4px' }}>
-      {zone && (
+      {zone && zone !== 'diary' && (
         <h2 style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
       )}
 
-      {zone && zone !== 'planner' && zone !== 'calculators' && (() => {
+      {zone && zone !== 'planner' && zone !== 'calculators' && zone !== 'diary' && (() => {
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
@@ -632,10 +632,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
             {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {/* ═══════════ Дневник и аналитика (зона) ═══════════ */}
-      {(tab === 'diary' || tab === 'insights' || tab === 'strength' || tab === 'goals' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'import_data') && (
+      {(tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'reports') && (
         <DiaryAnalyticsZone
           tab={tab}
-          initialDiaryMode={initialSubTab === 'reports' ? 'reports' : initialSubTab === 'diary' ? 'diary' : undefined}
+          initialDiaryMode={initialSubTab === 'diary' ? 'diary' : undefined}
           diary={diary} diaryStats={diaryStats} diaryProgress={diaryProgress}
           historyWorkouts={historyWorkouts} macrocycle={macrocycle} selectedWeek={selectedWeek}
           level={level} onRefresh={loadDiaryStats} trainingOutput={trainingOutput}

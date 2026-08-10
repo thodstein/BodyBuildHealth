@@ -40,7 +40,9 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '📊',
     color: '#a855f7',
     subtitle: 'Дневник, история, аналитика, прогресс, календарь, отчёты',
-    tabs: ['diary', 'insights', 'strength', 'calendar', 'checkin', 'mmc_tracking', 'import_data'],
+    // Дневник — единственная навигация для hub. Не смешиваем её с
+    // внутренним переключателем TrainingDiaryHub.
+    tabs: ['diary', 'history', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'reports'],
   },
   calculators: {
     title: '⚡ Интеллект тренировки',

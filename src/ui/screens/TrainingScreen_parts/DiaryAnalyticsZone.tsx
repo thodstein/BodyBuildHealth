@@ -38,11 +38,13 @@ export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'reco
   if (initialDiaryMode === 'reports') return 'tools';
   if (initialDiaryMode === 'diary') return 'record';
   switch (tab) {
-    case 'insights':
-    case 'strength': return 'analytics';
+    case 'analytics': return 'analytics';
+    case 'history': return 'history';
+    case 'progress': return 'progress';
     case 'calendar': return 'calendar';
     case 'checkin': return 'checkin';
     case 'mmc_tracking': return 'mmc';
+    case 'reports':
     case 'import_data': return 'tools';
     case 'diary': return 'record';
     default: return 'record';

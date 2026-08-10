@@ -661,25 +661,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertRecentVol = useMemo(() => historyWorkouts.slice(-14).reduce((s: number, w: any) => s + ((w.exercises || []).length), 0), [historyWorkouts]);
   const expertRirStats = useMemo(() => { try { return loadRirCalibrationStats(); } catch { return { bias: 0, stdDev: 1, sessions: 0 }; } }, []);
 
-  const MODES: [HubMode, string][] = [
-    ['record', '📝 Запись'], ['history', '📜 История'], ['analytics', '📊 Аналитика'],
-    ['progress', '📏 Прогресс'], ['calendar', '📅 Календарь'], ['checkin', '✅ Чек-ин'],
-    ['mmc', '💪 MMC'], ['body', '🫀 Тело'], ['tools', '⚙️ Инструменты'],
-  ];
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Mode selector — compact pills */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {MODES.map(([k, l]) => (
-          <button key={k} onClick={() => setMode(k)} style={{
-            padding: '6px 10px', borderRadius: 8, border: mode === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-            background: mode === k ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-            color: mode === k ? 'var(--accent)' : 'var(--text-dim)', fontWeight: mode === k ? 700 : 400, fontSize: 10, cursor: 'pointer',
-          }}>{l}</button>
-        ))}
-      </div>
-
       {/* Program context header */}
       {macrocycle && curPhase && (
         <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
