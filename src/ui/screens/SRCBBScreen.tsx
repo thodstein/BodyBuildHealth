@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, originalCycleWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -40,7 +40,7 @@ import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastC
 import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
-import { MesocycleProgressionCard } from './TrainingScreen_parts/MesocycleProgressionCard';
+import { MesocycleProgressionCard, summarizeSourceCycleWeeks } from './TrainingScreen_parts/MesocycleProgressionCard';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
@@ -211,6 +211,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
   useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs]);
+  useEffect(() => {
+    const cycle = getCycleById(selectedCycleId);
+    if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
+  }, [selectedCycleId]);
   useEffect(() => { initExercisePMs(selectedCycleId); }, [selectedCycleId]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
@@ -279,15 +283,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const buildSrc = (cycleId = selectedCycleId, weeks = cycleWeeks) => {
     const tpl = getCycleById(cycleId);
     if (!tpl) return;
-    // P2-10: cap weeks at 52 to prevent unreasonable plan sizes (e.g., user typing 200)
-    const safeWeeks = Math.min(52, Math.max(1, weeks));
+    // The source cycle, not a generic UI mesocycle length, defines the calendar.
+    const safeWeeks = originalCycleWeeks(tpl);
     const pmMap: Record<string, number> = { ...exercisePMs };
     if (!pmMap['Присед']) pmMap['Присед'] = pmSquat;
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const rec = getRecoveryMetrics(linked);
     const plan = buildLMSPlan({
-       template: tpl, pmMap, fallbackPm: 80, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks, progressionEnabled: pedAuto,
+       template: tpl, pmMap, fallbackPm: 80, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
       focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
@@ -305,6 +309,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       pedDoses,
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
       autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+      // Original SRC cycles are self-calculating: preserve their source layout
+      // and apply the cycle's own PM correction between weeks.
+      progressionEnabled: true,
       faithful: true,
       ...rec,
     });
@@ -330,7 +337,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
            mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
            courseIntensity,
            weeksOverride: block.weeks,
-           progressionEnabled: pedAuto,
+           progressionEnabled: true,
           volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
           focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
           currentReadiness: linked.readiness?.recovery,
@@ -1020,9 +1027,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </>
             );
           })()}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 8, minWidth: 0 }}>
-            <PopupSelect label="Длина мезоцикла" value={String(cycleWeeks)} onChange={v => setCycleWeeks(+v)} options={[['12','12 недель'],['16','16 недель'],['20','20 недель'],['24','24 недели']].map(([id,label]) => ({ id, label }))} />
-          </div>
+          {(() => {
+            const sourceCycle = getCycleById(selectedCycleId);
+            const sourceWeeks = sourceCycle ? originalCycleWeeks(sourceCycle) : cycleWeeks;
+            return <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)', fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
+              📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся из исходной раскладки СРЦ.
+            </div>;
+          })()}
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ПЛ + ББ-акцент, сохраняются в профиль)</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
             💪 Добавляются accessory-упражнения в 1-2 дня (малые → 2 дня: тяжёлый + памп).
@@ -1634,7 +1645,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   )}
                 </MetricCard>
               )}
-              <MesocycleProgressionCard weeks={totalW} startVolumeSets={Math.round(W.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0), 0) / totalW / (days || 3))} startIntensityPct={0.72} startRIR={3} goal="strength" title="Прогрессия мезоцикла (ПЛ)" />
+              <MesocycleProgressionCard
+                weeks={totalW}
+                sourceWeeks={(() => {
+                  const sourceCycle = getCycleById(selectedCycleId);
+                  if (!sourceCycle || W.some(week => week.macroPhase)) return undefined;
+                  const layouts = sourceCycle.weeks && sourceCycle.weeks.length > 0
+                    ? sourceCycle.weeks
+                    : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1);
+                  return summarizeSourceCycleWeeks(layouts);
+                })()}
+                startVolumeSets={Math.round(W.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0), 0) / totalW / (days || 3))}
+                startIntensityPct={0.72}
+                startRIR={3}
+                goal="strength"
+                title="Календарь оригинального цикла (ПЛ)"
+              />
               {/* ── ПРОФЕССИОНАЛЬНЫЕ ПЛ-РЕКОМЕНДАЦИИ для слабых групп ── */}
               {weakPoints.length > 0 && (() => {
                 const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };

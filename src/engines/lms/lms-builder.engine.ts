@@ -114,6 +114,19 @@ export interface LMSBuildOutput {
   plVolumeLandmarks?: PLVolumeLandmark[];
 }
 
+/**
+ * Реальная длина исходного СРЦ-цикла.
+ *
+ * Для циклов с явной раскладкой weeks[] именно её длина является источником
+ * истины. Нельзя подменять её произвольным UI-длительностью мезоцикла: тогда
+ * календарь и карточка программы показывают не оригинальный цикл.
+ */
+export function originalCycleWeeks(template: SRCycleTemplate): number {
+  return template.weeks && template.weeks.length > 0
+    ? template.weeks.length
+    : Math.max(1, Math.round(template.meta.weeks));
+}
+
 export interface PLVolumeLandmark {
   group: string;       // английская группа (chest/back/legs/...)
   muscle: string;      // русское имя мышцы (из VOLUME_REFERENCES)
