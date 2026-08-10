@@ -1,4 +1,8 @@
 {
+  "framework": "vite",
+  "buildCommand": "NODE_OPTIONS=--max-old-space-size=2048 npm run build",
+  "installCommand": "npm ci",
+  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
