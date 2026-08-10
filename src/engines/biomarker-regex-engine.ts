@@ -46,7 +46,7 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   'Total_Protein': ['общий белок', 'total protein', 'белок общий', 'общ. белок'],
 
   // ── Cardiac / Cardiovascular ──
-  'NT-proBNP': ['nt-probnp', 'nt probnp', 'ntprobnp', 'nt-pro bnp', 'мозговой натрийуретический пептид', 'bnp', 'probnp'],
+  'NT-proBNP': ['nt-probnp', 'nt probnp', 'ntprobnp', 'nt-pro bnp', 'мозговой натрийуретический пептид', 'probnp'],
   'Galectin-3': ['galectin-3', 'galectin 3', 'галектин-3', 'галектин 3', 'gal3'],
   'Troponin_I': ['тропонин i', 'troponin i', 'тропонин-i', 'тропонин', 'troponin'],
   'Troponin_T': ['тропонин t', 'troponin t', 'тропонин-t'],
@@ -148,15 +148,102 @@ export const BIOMARKER_DICTIONARY: Record<string, string[]> = {
   // ── Electrolytes trace ──
   'Copper': ['медь', 'copper', 'cu'],
   'Manganese': ['марганец', 'manganese', 'mn'],
-  'Iodine': ['йод', 'iodine', 'i'],
-  'Chromium': ['хром', 'chromium', 'cr'],
+  'Iodine': ['йод', 'iodine', 'i2'],
+  'Chromium': ['хром', 'chromium', 'cr trace'],
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ДОБАВЛЕНО: 24 маркёра из UCUM_MAP, не распознававшиеся BIOMARKER_DICTIONARY
+  // ═══════════════════════════════════════════════════════════════════════
+  'AMH': ['антимюллеров гормон', 'амг', 'amh', 'anti-müllerian hormone', 'антимюллерова'],
+  'BNP': ['bnp', 'b-type natriuretic peptide', 'brain natriuretic peptide', 'натрийуретический пептид b'],
+  'PROTEIN_URINE': ['протеинурия', 'белок в моче', 'protein urine', 'общий белок мочи', 'белок мочи'],
+  'ENDOTHELIN1': ['эндотелин-1', 'эндотелин 1', 'endothelin-1', 'et-1', 'эндотелин'],
+  'NO_MARKER': ['оксид азота', 'нитраты и нитриты', 'nitric oxide', 'no marker', 'нитрит'],
+  'ESTRADIOL_SENS': ['эстрадиол чувствительный', 'чувствительный эстрадиол', 'estradiol sensitive', 'e2 чувств'],
+  'PREALBUMIN': ['преальбумин', 'транстиретин', 'prealbumin', 'transthyretin', 'tbpa'],
+  'RETICULOCYTES': ['ретикулоциты', 'reticulocytes', 'ретик', 'retics'],
+  'HAPTOGLOBIN': ['гаптоглобин', 'haptoglobin', 'гаптогл'],
+  'NGAL': ['ngal', 'липокалин-2', 'lipocalin-2', 'нейтрофильный липокалин'],
+  'TNF_ALPHA': ['фно-альфа', 'фно-a', 'фно-α', 'tnf-alpha', 'tnf-α', 'фактор некроза опухоли', 'tnf alpha'],
+  'IL6': ['ил-6', 'il-6', 'il6', 'интерлейкин 6', 'interleukin-6', 'ил6'],
+  'IL1B': ['ил-1бета', 'ил-1β', 'il-1beta', 'il-1β', 'интерлейкин 1', 'interleukin-1', 'il1b'],
+  'LACTATE': ['лактат', 'молочная кислота', 'lactate', 'lactic acid'],
+  'AMMONIA': ['аммиак', 'ammonia', 'nh3', 'азот аммонийный'],
+  'IGFBP3': ['ифр-сб3', 'igfbp-3', 'igfbp3', 'инсулиноподобный фактор связывающий 3', 'igf binding protein 3'],
+  'CHOLINESTERASE': ['холинэстераза', 'cholinesterase', 'хэ', 'псевдохолинэстераза'],
+  'OSMOLALITY': ['осмоляльность', 'osmolality', 'осмолярность'],
+  'ANION_GAP': ['анионный провал', 'анионная разница', 'anion gap', 'aniongap', 'ag'],
+  'URINE_PH': ['ph мочи', 'урин ph', 'моча ph', 'urine ph', 'ph urine'],
+  'URINE_OSM': ['осмоляльность мочи', 'моча осмоляльность', 'urine osmolality', 'моча osm'],
+  'MAR_TEST': ['mar-тест', 'mar тест', 'mar test', 'антиспермальные антитела', 'mar test iga'],
+  'DFI': ['фрагментация днк', 'dfi', 'dna fragmentation index', 'фрагмент. днк'],
+  'HDS': ['hds', 'незрелый хроматин', 'high dna stainability'],
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ДОБАВЛЕНО: 23 маркёра из LAB_PATTERNS, не распознававшиеся BIOMARKER_DICTIONARY
+  // ═══════════════════════════════════════════════════════════════════════
+  'MCV': ['mcv', 'средний объем эритроцита', 'mean corpuscular volume', 'ср. объём эритроцита'],
+  'MCH': ['mch', 'среднее содержание hb', 'mean corpuscular hemoglobin', 'ср. содержание hb'],
+  'MCHC': ['mchc', 'средняя конц hb', 'mean corpuscular hemoglobin concentration', 'ср. конц. hb'],
+  'NEUT': ['нейтрофилы', 'neut', 'neutrophils', 'нейтрофил'],
+  'LYMPH': ['лимфоциты', 'lymph', 'lymphocytes', 'лимфоцит'],
+  'MONO': ['моноциты', 'mono', 'monocytes', 'моноцит'],
+  'EO': ['эозинофилы', 'eo', 'eosinophils', 'эозинофил'],
+  'BASO': ['базофилы', 'baso', 'basophils', 'базофил'],
+  'T4': ['т4 общий', 'тироксин общий', 'total t4', 'т4 общ'],
+  'T3': ['т3 общий', 'трийодтиронин общий', 'total t3', 'т3 общ'],
+  'CA125': ['ca-125', 'са-125', 'ca125', 'cancer antigen 125'],
+  'AFP': ['афп', 'альфа-фетопротеин', 'afp', 'alpha-fetoprotein'],
+  'CEA': ['рэа', 'раково-эмбриональный антиген', 'cea', 'carcinoembryonic antigen'],
+  'MYOG': ['миоглобин', 'myoglobin', 'myo', 'миогл'],
+  'IGA': ['iga', 'иммуноглобулин a', 'ig a'],
+  'IGG': ['igg', 'иммуноглобулин g', 'ig g'],
+  'IGM': ['igm', 'иммуноглобулин m', 'ig m'],
+  'IGE': ['ige', 'иммуноглобулин e', 'ig e', 'общий ige'],
+  'SOD': ['сод', 'супероксиддисмутаза', 'sod', 'superoxide dismutase'],
+  'GLUT': ['глутатион', 'glutathione', 'gsh'],
+  'GPX': ['глутатионпероксидаза', 'gpx', 'glutathione peroxidase'],
+  'METAN': ['метанефрин', 'metanephrine', 'mn'],
+  'NMETAN': ['норметанефрин', 'normetanephrine', 'nmn'],
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ОБЩИЙ АНАЛИЗ МОЧИ (ОАМ) — количественные маркёры
+  // ═══════════════════════════════════════════════════════════════════════
+  'URINE_SG': ['относительная плотность мочи', 'удельная плотность мочи', 'отн. плотность мочи', 'уд. вес мочи', 'specific gravity', 'urine sg', 'sg мочи', 'отн плотность'],
+  'URINE_LEU': ['лейкоциты мочи', 'лейкоциты в моче', 'urine leukocytes', 'лейк мочи', 'leu urine'],
+  'URINE_ERY': ['эритроциты мочи', 'эритроциты в моче', 'urine erythrocytes', 'эритр мочи', 'ery urine'],
+  'URINE_EPITHELIAL': ['эпителий мочи', 'эпителиальные клетки мочи', 'эпителий в моче', 'urine epithelial', 'epithelial cells urine'],
+  'URINE_CYLINDERS': ['цилиндры мочи', 'цилиндры в моче', 'гиалиновые цилиндры', 'urine casts', 'cylinders urine'],
+  'URINE_GLUCOSE_Q': ['глюкоза мочи колич', 'глюкоза в моче колич', 'urine glucose quant', 'сахар мочи колич'],
+  'URINE_KETONES_Q': ['кетоны мочи колич', 'кетоновые тела в моче колич', 'urine ketones quant', 'ketone bodies urine'],
+  'PROTEIN_24H': ['суточная протеинурия', 'белок суточный', 'protein 24h', 'белок за сутки', 'суточный белок мочи'],
+  'CREATININE_URINE': ['креатинин мочи', 'креатинин в моче', 'urine creatinine', 'креатинин суточный', 'креатинин суточная моча'],
+  'URINE_VOLUME_24H': ['суточный диурез', 'объём мочи за сутки', 'объем мочи суточный', 'urine volume 24h', 'диурез суточный'],
+  'UROBILINOGEN': ['уробилиноген', 'urobilinogen', 'уробилин', 'уробилиноген мочи'],
+  'URINE_NITRITE_Q': ['нитриты мочи колич', 'нитриты в моче колич', 'urine nitrite quant', 'nitrite urine'],
+  'URINE_BILIRUBIN_Q': ['билирубин мочи колич', 'билирубин в моче колич', 'urine bilirubin quant'],
+  'NECHIP_LEU': ['лейкоциты нечипоренко', 'нечипоренко лейкоциты', 'nechiporenko leukocytes', 'лейк по нечипоренко', 'нечипоренко leu'],
+  'NECHIP_ERY': ['эритроциты нечипоренко', 'нечипоренко эритроциты', 'nechiporenko erythrocytes', 'эритр по нечипоренко', 'нечипоренко ery'],
+  'NECHIP_CYL': ['цилиндры нечипоренко', 'нечипоренко цилиндры', 'nechiporenko casts', 'цил по нечипоренко', 'нечипоренко cyl'],
+  'URINE_CALCIUM': ['кальций мочи', 'кальций в моче суточный', 'urine calcium', 'суточный кальций мочи', 'ca мочи'],
+  'URINE_OXALATE': ['оксалаты мочи', 'оксалаты в моче', 'urine oxalate', 'щавелевая кислота мочи', 'оксалат-ионы'],
+  'URINE_URATE': ['ураты мочи', 'ураты в моче суточные', 'urine urate', 'мочевая кислота мочи', 'урат-ионы мочи'],
+  // ── Полуколичественные (качественные знаки: neg/следы/+/++/+++/++++) ──
+  'URINE_PROTEIN_QR': ['белок мочи (кач)', 'белок в моче (кач)', 'белок мочи кач', 'protein urine qual', 'белок мочи тест-полоска'],
+  'URINE_GLUCOSE_QR': ['глюкоза мочи (кач)', 'сахар мочи (кач)', 'глюкоза мочи кач', 'glucose urine qual', 'тест-полоска глюкоза'],
+  'URINE_KETONES_QR': ['кетоны мочи (кач)', 'кетоновые тела мочи (кач)', 'кетоны мочи кач', 'ketones urine qual'],
+  'URINE_BILIRUBIN_QR': ['билирубин мочи (кач)', 'bilirubin urine qual', 'билирубин мочи кач'],
+  'UROBILINOGEN_QR': ['уробилиноген (кач)', 'urobilinogen qual', 'уробилиноген кач'],
+  'URINE_NITRITE_QR': ['нитриты мочи (кач)', 'nitrite urine qual', 'нитриты мочи кач'],
+  'URINE_LEU_QR': ['лейкоциты мочи (кач)', 'leu urine qual', 'лейкоциты мочи кач', 'тест-полоска лейкоциты'],
+  'URINE_BLOOD_QR': ['кровь мочи (кач)', 'blood urine qual', 'кровь в моче (кач)', 'эритроциты кач мочи', 'скрытая кровь мочи'],
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // UNIT MAP — canonical units for each biomarker
 // ═══════════════════════════════════════════════════════════════════════════
 
-const UNIT_MAP: Record<string, string> = {
+export const UNIT_MAP: Record<string, string> = {
   'ALT': 'U/L', 'AST': 'U/L', 'GGT': 'U/L', 'ALP': 'U/L', 'CK': 'U/L',
   'CK_MB': 'U/L', 'LDH': 'U/L',
   'Creatinine': 'mcmol/L', 'Urea': 'mmol/L', 'Uric_Acid': 'mcmol/L',
@@ -191,6 +278,36 @@ const UNIT_MAP: Record<string, string> = {
   'ACTH': 'pg/mL', 'OH17_Progesterone': 'nmol/L', 'Aldosterone': 'pg/mL',
   'TPO_AB': 'IU/mL', 'TG_AB': 'IU/mL', 'MPV': 'fL',
   'Amylase': 'U/L', 'Lipase': 'U/L', 'Proinsulin': 'pmol/L', 'Fructosamine': 'mcmol/L',
+  // ── Новые маркёры: UCUM_MAP canonical units ──
+  'AMH': 'ng/mL', 'BNP': 'pg/mL', 'PROTEIN_URINE': 'mg/L', 'ENDOTHELIN1': 'pg/mL',
+  'NO_MARKER': 'umol/L', 'ESTRADIOL_SENS': 'pmol/L', 'PREALBUMIN': 'mg/L',
+  'RETICULOCYTES': '%', 'HAPTOGLOBIN': 'g/L', 'NGAL': 'ng/mL',
+  'TNF_ALPHA': 'pg/mL', 'IL6': 'pg/mL', 'IL1B': 'pg/mL',
+  'LACTATE': 'mmol/L', 'AMMONIA': 'umol/L', 'IGFBP3': 'mg/L',
+  'CHOLINESTERASE': 'U/L', 'OSMOLALITY': 'mOsm/kg', 'ANION_GAP': 'mmol/L',
+  'URINE_PH': '', 'URINE_OSM': 'mOsm/kg',
+  'MAR_TEST': '%', 'DFI': '%', 'HDS': '%',
+  'MCV': 'fL', 'MCH': 'pg', 'MCHC': 'g/L',
+  'NEUT': '%', 'LYMPH': '%', 'MONO': '%', 'EO': '%', 'BASO': '%',
+  'T4': 'nmol/L', 'T3': 'nmol/L',
+  'CA125': 'U/mL', 'AFP': 'IU/mL', 'CEA': 'ng/mL', 'MYOG': 'ng/mL',
+  'IGA': 'g/L', 'IGG': 'g/L', 'IGM': 'g/L', 'IGE': 'IU/mL',
+  'SOD': 'U/mL', 'GLUT': 'umol/L', 'GPX': 'U/g Hb',
+  'METAN': 'mcg/24h', 'NMETAN': 'mcg/24h',
+  // ── ОАМ количественные ──
+  'URINE_SG': '', 'URINE_LEU': 'cells/uL', 'URINE_ERY': 'cells/uL',
+  'URINE_EPITHELIAL': 'cells/uL', 'URINE_CYLINDERS': 'cells/uL',
+  'URINE_GLUCOSE_Q': 'mmol/L', 'URINE_KETONES_Q': 'mmol/L',
+  'PROTEIN_24H': 'mg/24h', 'CREATININE_URINE': 'mmol/L',
+  'URINE_VOLUME_24H': 'mL/24h', 'UROBILINOGEN': 'mg/L',
+  'URINE_NITRITE_Q': 'mg/L', 'URINE_BILIRUBIN_Q': 'umol/L',
+  'NECHIP_LEU': 'cells/mL', 'NECHIP_ERY': 'cells/mL', 'NECHIP_CYL': 'cells/mL',
+  'URINE_CALCIUM': 'mmol/24h', 'URINE_OXALATE': 'mmol/24h', 'URINE_URATE': 'mmol/24h',
+  // ── Полуколичественные ──
+  'URINE_PROTEIN_QR': 'score', 'URINE_GLUCOSE_QR': 'score',
+  'URINE_KETONES_QR': 'score', 'URINE_BILIRUBIN_QR': 'score',
+  'UROBILINOGEN_QR': 'score', 'URINE_NITRITE_QR': 'score',
+  'URINE_LEU_QR': 'score', 'URINE_BLOOD_QR': 'score',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -225,7 +342,12 @@ export interface ExtractionResult {
  *  - Strip extra whitespace
  */
 function preprocessLine(line: string): string {
-  return line.trim().toLowerCase()
+  // Если строка содержит качественные знаки ОАМ (+, ++, +++, neg, следы, отрицательно),
+  // мы НЕ удаляем watermark-токены — иначе имена маркеров ("белок мочи", "следы")
+  // исчезнут, и matchBiomarker не найдёт полуколичественные маркеры.
+  // ВНИМАНИЕ: \b в JS regex не работает для Cyrillic — используем Cyrillic-aware boundary.
+  const hasQualSigns = /\+{1,4}|(?<![а-яё])(neg|negative|следы|след|trace|отрицательно|отр|нет|ne обн)(?![а-яё])/i.test(line);
+  let result = line.trim().toLowerCase()
     .replace(/(?<=\d)[оo](?=\d|[.,])/g, '0')
     .replace(/(?<=\d)[оo](?=\s|$)/g, '0')
     .replace(/мк\s*моль\s*\/\s*л/g, 'мкмоль/л')
@@ -234,10 +356,13 @@ function preprocessLine(line: string): string {
     .replace(/ммоль\s*\/\s*л/g, 'ммоль/л')
     .replace(/,/g, '.')
     // Remove strikethrough artifacts from OCR (only trailing ~ or - before whitespace/punctuation/end)
-    .replace(/\b\w+[~-]+(?=\s|[.,;!?]|$)/g, '')
-    // Remove watermark-like short all-alpha tokens (3-12 chars, no digits)
-    .replace(/\b[a-zа-яё]{3,12}\b(?!.*\d)/gi, '')
-    .replace(/\s+/g, ' ');
+    .replace(/\b\w+[~-]+(?=\s|[.,;!?]|$)/g, '');
+  // Remove watermark-like short all-alpha tokens (3-12 chars, no digits)
+  // SKIP for lines with qualitative signs (ОАМ) — preserves marker names like "белок мочи"
+  if (!hasQualSigns) {
+    result = result.replace(/\b[a-zа-яё]{3,12}\b(?!.*\d)/gi, '');
+  }
+  return result.replace(/\s+/g, ' ');
 }
 
 /**
@@ -248,6 +373,27 @@ function extractNumbers(text: string): number[] {
   const matches = text.match(/\d+(?:\.\d+)?/g);
   if (!matches) return [];
   return matches.map(Number).filter(n => !isNaN(n));
+}
+
+/**
+ * Полуколичественный парсинг для качественных тестов ОАМ (шкала 0-4):
+ *   neg / отрицательно / нет / "не обн."  → 0
+ *   следы / trace                         → 0.5
+ *   + → 1, ++ → 2, +++ → 3, ++++ → 4
+ * Возвращает null, если качественных знаков нет.
+ */
+function extractQualitativeScore(text: string): number | null {
+  const lower = text.toLowerCase();
+  // ВНИМАНИЕ: \b в JS regex не работает для Cyrillic (только ASCII \w).
+  // Используем lookbehind/lookahead для Cyrillic-aware word boundary.
+  if (/(?<![а-яё])(neg|negative|отрицательно|отр\.?|не обн|необн|не обнаружено|нет|n\/a)(?![а-яё])/i.test(lower)) return 0;
+  if (/(?<![а-яё])(следы|след|trace|traces|сл\.?)(?![а-яё])/i.test(lower)) return 0.5;
+  const plusMatch = lower.match(/\+{1,4}/g);
+  if (plusMatch) {
+    const max = Math.max(...plusMatch.map(p => p.length));
+    return Math.min(4, max);
+  }
+  return null;
 }
 
 /**
@@ -380,6 +526,28 @@ export function parseLabResults(
 
     // Extract numbers
     const numbers = extractNumbers(line);
+
+    // Полуколичественный fallback для качественных тестов ОАМ.
+    // Если BIOMARKER_DICTIONARY маркер оканчивается на _QR и число не найдено,
+    // пробуем распознать качественные знаки (neg/следы/+/++/+++/++++).
+    if (numbers.length === 0 && match.code.endsWith('_QR')) {
+      const q = extractQualitativeScore(rawLine);
+      if (q !== null) {
+        seenCodes.add(match.code);
+        markers.push({
+          code: match.code,
+          name: match.code.replace(/_/g, ' '),
+          value: q,
+          ec50: 0.5,
+          unit: UNIT_MAP[match.code] || 'score',
+          sourceLine: rawLine,
+          confidence: 0.75,
+          refRangeText: '',
+        });
+      }
+      continue;
+    }
+
     if (numbers.length === 0) continue;
 
     // Heuristics

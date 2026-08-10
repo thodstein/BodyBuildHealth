@@ -226,9 +226,10 @@ MPV 10,5 фл 7-12`);
 
   it('parses non-numeric reference markers like < and > bounds', () => {
     const result = parseLabText('D-димер < 0,5 мкг/л\nБилирубин прямой < 5 мкмоль/л');
-    expect(result.values.map(v => v.code)).toEqual(expect.arrayContaining(['DIMER', 'BIL']));
+    // Longest-match: "Билирубин прямой" → BILD (билирубин прямой), не BIL (общий)
+    expect(result.values.map(v => v.code)).toEqual(expect.arrayContaining(['DIMER', 'BILD']));
     expect(result.values.find(v => v.code === 'DIMER')?.value).toBe(0.5);
-    expect(result.values.find(v => v.code === 'BIL')?.value).toBe(5);
+    expect(result.values.find(v => v.code === 'BILD')?.value).toBe(5);
   });
 
   it('ignores repeated provider headers across multi-page OCR', () => {

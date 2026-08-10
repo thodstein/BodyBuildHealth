@@ -171,6 +171,51 @@ export const REQUIRED_LABS_PER_PHASE: Record<string, string[]> = {
 
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ОБЩИЙ АНАЛИЗ МОЧИ (ОАМ) + анализ по Нечипоренко + суточная протеинурия + Реберг
+// Количественные и полуколичественные маркёры. Используется UI-панелями,
+// планировщиком анализов и парсерами PDF/OCR.
+// ═══════════════════════════════════════════════════════════════════════════
+export const URINE_PANEL: Record<string, string[]> = {
+  // Общий анализ мочи (ОАМ) — стандартная панель
+  oam: [
+    'URINE_SG', 'URINE_PH', 'URINE_PROTEIN_QR', 'URINE_GLUCOSE_QR',
+    'URINE_KETONES_QR', 'URINE_BILIRUBIN_QR', 'UROBILINOGEN_QR',
+    'URINE_NITRITE_QR', 'URINE_LEU_QR', 'URINE_BLOOD_QR',
+    'URINE_LEU', 'URINE_ERY', 'URINE_EPITHELIAL', 'URINE_CYLINDERS',
+  ],
+  // ОАМ количественный (microscopy + chemistry)
+  oam_quant: [
+    'URINE_SG', 'URINE_PH', 'URINE_LEU', 'URINE_ERY', 'URINE_EPITHELIAL',
+    'URINE_CYLINDERS', 'URINE_GLUCOSE_Q', 'URINE_KETONES_Q',
+    'UROBILINOGEN', 'URINE_NITRITE_Q', 'URINE_BILIRUBIN_Q',
+  ],
+  // Анализ мочи по Нечипоренко
+  nechiporenko: ['NECHIP_LEU', 'NECHIP_ERY', 'NECHIP_CYL'],
+  // Суточная протеинурия
+  protein_24h: ['PROTEIN_24H', 'CREATININE_URINE', 'URINE_VOLUME_24H'],
+  // Проба Реберга (клиренс креатинина = СКФ)
+  reberg: ['CREATININE_URINE', 'CREATININE', 'EGFR', 'URINE_VOLUME_24H'],
+  // Мочевые камни / метаболизм (литогенные вещества)
+  lithogenesis: ['URINE_CALCIUM', 'URINE_OXALATE', 'URINE_URATE', 'UA', 'URINE_PH'],
+  // Полная панель (всё выше)
+  full: [
+    'URINE_SG', 'URINE_PH',
+    'URINE_PROTEIN_QR', 'URINE_GLUCOSE_QR', 'URINE_KETONES_QR',
+    'URINE_BILIRUBIN_QR', 'UROBILINOGEN_QR', 'URINE_NITRITE_QR',
+    'URINE_LEU_QR', 'URINE_BLOOD_QR',
+    'URINE_LEU', 'URINE_ERY', 'URINE_EPITHELIAL', 'URINE_CYLINDERS',
+    'URINE_GLUCOSE_Q', 'URINE_KETONES_Q', 'UROBILINOGEN',
+    'URINE_NITRITE_Q', 'URINE_BILIRUBIN_Q',
+    'NECHIP_LEU', 'NECHIP_ERY', 'NECHIP_CYL',
+    'PROTEIN_24H', 'CREATININE_URINE', 'URINE_VOLUME_24H',
+    'URINE_CALCIUM', 'URINE_OXALATE', 'URINE_URATE',
+    'URINE_OSM', 'UACR', 'MICROALB', 'PROTEIN_URINE',
+  ],
+} as const;
+
+
+
 export const REQUIRED_DIAGNOSTICS_PER_PHASE: Record<string, string[]> = {
   baseline:              ['echocg','usg_obp','dexa','ecg','bp_monitor'],
   on_cycle:              ['joint_usg','echocg','bp_monitor'],
@@ -436,6 +481,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'HOMA':{ prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0, name: 'HOMA-IR' },
   'LDL': { prefUnit: 'mmol/L', coeff: 1, uln: 3.0, lln: 1.0, name: 'ЛПНП' },
   'HDL': { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.9, name: 'ЛПВП' },
+  'CHOL': { prefUnit: 'mmol/L', coeff: 1, uln: 5.2, lln: 0, name: 'Холестерин общий' },
   'TG':  { prefUnit: 'mmol/L', coeff: 1, uln: 1.7, lln: 0.4, name: 'Триглицериды' },
   'CRP': { prefUnit: 'mg/L', coeff: 1, uln: 5, lln: 0.1, name: 'СРБ' },
   'CREATININE': { prefUnit: 'umol/L', coeff: 1, uln: 110, lln: 60, name: 'Креатинин' },
@@ -565,6 +611,90 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'DFI': { prefUnit: '%', coeff: 1, uln: 15, lln: 0, name: 'Фрагментация ДНК (DFI)' },
   'HDS': { prefUnit: '%', coeff: 1, uln: 15, lln: 0, name: 'HDS (незрелый хроматин)' },
   'VLDL': { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 0.3, name: 'ЛПОНП' },
+  'PT': { prefUnit: 'sec', coeff: 1, uln: 15, lln: 11, name: 'Протромбиновое время' },
+  // ── Hematology indices (распознаются LAB_PATTERNS, но не были в UCUM_MAP) ──
+  'MCV': { prefUnit: 'fL', coeff: 1, uln: 100, lln: 80, name: 'Средний объём эритроцита' },
+  'MCH': { prefUnit: 'pg', coeff: 1, uln: 34, lln: 27, name: 'Среднее содержание Hb' },
+  'MCHC': { prefUnit: 'g/L', coeff: 1, uln: 360, lln: 320, name: 'Средняя конц. Hb в эр' },
+  'NEUT': { prefUnit: '%', coeff: 1, uln: 75, lln: 45, name: 'Нейтрофилы' },
+  'LYMPH': { prefUnit: '%', coeff: 1, uln: 50, lln: 20, name: 'Лимфоциты' },
+  'MONO': { prefUnit: '%', coeff: 1, uln: 12, lln: 3, name: 'Моноциты' },
+  'EO': { prefUnit: '%', coeff: 1, uln: 5, lln: 0, name: 'Эозинофилы' },
+  'BASO': { prefUnit: '%', coeff: 1, uln: 1, lln: 0, name: 'Базофилы' },
+  // ── Thyroid total (T4/T3 общие — отдельные от FT4/FT3 свободных) ──
+  'T4': { prefUnit: 'nmol/L', coeff: 1, uln: 140, lln: 60, name: 'Т4 общий' },
+  'T3': { prefUnit: 'nmol/L', coeff: 1, uln: 2.8, lln: 1.0, name: 'Т3 общий' },
+  // ── Tumor markers ──
+  'CA125': { prefUnit: 'U/mL', coeff: 1, uln: 35, lln: 0, name: 'CA-125' },
+  'AFP': { prefUnit: 'IU/mL', coeff: 1, uln: 10, lln: 0, name: 'Альфа-фетопротеин' },
+  'CEA': { prefUnit: 'ng/mL', coeff: 1, uln: 5, lln: 0, name: 'РЭА' },
+  // ── Cardiac / Muscle ──
+  'MYOG': { prefUnit: 'ng/mL', coeff: 1, uln: 90, lln: 20, name: 'Миоглобин' },
+  // ── Immunoglobulins ──
+  'IGA': { prefUnit: 'g/L', coeff: 1, uln: 4.0, lln: 0.7, name: 'IgA' },
+  'IGG': { prefUnit: 'g/L', coeff: 1, uln: 16, lln: 7, name: 'IgG' },
+  'IGM': { prefUnit: 'g/L', coeff: 1, uln: 2.3, lln: 0.4, name: 'IgM' },
+  'IGE': { prefUnit: 'IU/mL', coeff: 1, uln: 100, lln: 0, name: 'IgE общий' },
+  // ── Antioxidant system ──
+  'SOD': { prefUnit: 'U/mL', coeff: 1, uln: 300, lln: 100, name: 'СОД' },
+  'GLUT': { prefUnit: 'umol/L', coeff: 1, uln: 1000, lln: 300, name: 'Глутатион' },
+  'GPX': { prefUnit: 'U/g Hb', coeff: 1, uln: 30, lln: 10, name: 'Глутатионпероксидаза' },
+  // ── Catecholamines ──
+  'METAN': { prefUnit: 'mcg/24h', coeff: 1, uln: 320, lln: 0, name: 'Метанефрин' },
+  'NMETAN': { prefUnit: 'mcg/24h', coeff: 1, uln: 390, lln: 0, name: 'Норметанефрин' },
+  // ── Liver injury (из BIOMARKER_DICTIONARY, но не было в UCUM_MAP) ──
+  'CK_18': { prefUnit: 'U/L', coeff: 1, uln: 200, lln: 0, name: 'Цитокератин-18' },
+  'GLDH': { prefUnit: 'U/L', coeff: 1, uln: 7, lln: 0, name: 'Глутаматдегидрогеназа' },
+  // ── Vascular ──
+  'ADMA': { prefUnit: 'umol/L', coeff: 1, uln: 0.7, lln: 0.1, name: 'АДМА' },
+  'OXLDL': { prefUnit: 'U/L', coeff: 1, uln: 60, lln: 0, name: 'Окисленные ЛПНП' },
+  // ── Cortisol night ──
+  'CORTISOL_NIGHT': { prefUnit: 'nmol/L', coeff: 1, uln: 150, lln: 50, name: 'Кортизол ночной' },
+  // ── Neurotransmitter metabolite ──
+  'HVA': { prefUnit: 'mg/24h', coeff: 1, uln: 7, lln: 0, name: 'Гомованилиновая кислота' },
+  // ── Trace minerals (из BIOMARKER_DICTIONARY, но не было в UCUM_MAP) ──
+  'MANGANESE': { prefUnit: 'umol/L', coeff: 1, uln: 0.3, lln: 0.05, name: 'Марганец' },
+  'IODINE': { prefUnit: 'ug/L', coeff: 1, uln: 100, lln: 50, name: 'Йод' },
+  'CHROMIUM': { prefUnit: 'nmol/L', coeff: 1, uln: 10, lln: 2, name: 'Хром' },
+  // ── Bone turnover (из BIOMARKER_DICTIONARY, но не было в UCUM_MAP) ──
+  'CTX': { prefUnit: 'ng/mL', coeff: 1, uln: 0.5, lln: 0.1, name: 'C-телопептид' },
+  'COMP': { prefUnit: 'U/L', coeff: 1, uln: 15, lln: 0, name: 'COMP' },
+  'P1NP': { prefUnit: 'ng/mL', coeff: 1, uln: 80, lln: 20, name: 'P1NP' },
+  // ── Renal (из BIOMARKER_DICTIONARY, но не было в UCUM_MAP) ──
+  'NEPHRIN': { prefUnit: 'ng/mL', coeff: 1, uln: 150, lln: 0, name: 'Нефрин' },
+  // ── Cardiac (из BIOMARKER_DICTIONARY, но не было в UCUM_MAP) ──
+  'GALECTIN3': { prefUnit: 'ng/mL', coeff: 1, uln: 17, lln: 0, name: 'Галектин-3' },
+  // ═══════════════════════════════════════════════════════════════════════
+  // ОБЩИЙ АНАЛИЗ МОЧИ (ОАМ) — количественные показатели
+  // ═══════════════════════════════════════════════════════════════════════
+  'URINE_SG': { prefUnit: '', coeff: 1, uln: 1.025, lln: 1.010, name: 'Отн. плотность мочи' },
+  'URINE_LEU': { prefUnit: 'cells/uL', coeff: 1, uln: 5, lln: 0, name: 'Лейкоциты мочи' },
+  'URINE_ERY': { prefUnit: 'cells/uL', coeff: 1, uln: 3, lln: 0, name: 'Эритроциты мочи' },
+  'URINE_EPITHELIAL': { prefUnit: 'cells/uL', coeff: 1, uln: 5, lln: 0, name: 'Эпителий мочи' },
+  'URINE_CYLINDERS': { prefUnit: 'cells/uL', coeff: 1, uln: 2, lln: 0, name: 'Цилиндры мочи (гиал.)' },
+  'URINE_GLUCOSE_Q': { prefUnit: 'mmol/L', coeff: 1, uln: 0.8, lln: 0, name: 'Глюкоза мочи (колич.)' },
+  'URINE_KETONES_Q': { prefUnit: 'mmol/L', coeff: 1, uln: 0.05, lln: 0, name: 'Кетоны мочи (колич.)' },
+  'PROTEIN_24H': { prefUnit: 'mg/24h', coeff: 1, uln: 150, lln: 0, name: 'Суточная протеинурия' },
+  'CREATININE_URINE': { prefUnit: 'mmol/L', coeff: 1, uln: 17.7, lln: 8.8, name: 'Креатинин мочи' },
+  'URINE_VOLUME_24H': { prefUnit: 'mL/24h', coeff: 1, uln: 2000, lln: 800, name: 'Суточный диурез' },
+  'UROBILINOGEN': { prefUnit: 'mg/L', coeff: 1, uln: 5, lln: 0, name: 'Уробилиноген' },
+  'URINE_NITRITE_Q': { prefUnit: 'mg/L', coeff: 1, uln: 0, lln: 0, name: 'Нитриты мочи (колич.)' },
+  'URINE_BILIRUBIN_Q': { prefUnit: 'umol/L', coeff: 1, uln: 0, lln: 0, name: 'Билирубин мочи (колич.)' },
+  'NECHIP_LEU': { prefUnit: 'cells/mL', coeff: 1, uln: 4000, lln: 0, name: 'Нечипоренко лейкоциты' },
+  'NECHIP_ERY': { prefUnit: 'cells/mL', coeff: 1, uln: 1000, lln: 0, name: 'Нечипоренко эритроциты' },
+  'NECHIP_CYL': { prefUnit: 'cells/mL', coeff: 1, uln: 200, lln: 0, name: 'Нечипоренко цилиндры' },
+  'URINE_CALCIUM': { prefUnit: 'mmol/24h', coeff: 1, uln: 7.5, lln: 2.5, name: 'Кальций мочи (суточн.)' },
+  'URINE_OXALATE': { prefUnit: 'mmol/24h', coeff: 1, uln: 0.4, lln: 0, name: 'Оксалаты мочи' },
+  'URINE_URATE': { prefUnit: 'mmol/24h', coeff: 1, uln: 7, lln: 2, name: 'Ураты мочи (суточн.)' },
+  // ── Полуколичественные (шкала 0-4: 0=neg, 0.5=следы, 1=+, 2=++, 3=+++, 4=++++) ──
+  'URINE_PROTEIN_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Белок мочи (кач.)' },
+  'URINE_GLUCOSE_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Глюкоза мочи (кач.)' },
+  'URINE_KETONES_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Кетоны мочи (кач.)' },
+  'URINE_BILIRUBIN_QR': { prefUnit: 'score', coeff: 1, uln: 0, lln: 0, name: 'Билирубин мочи (кач.)' },
+  'UROBILINOGEN_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Уробилиноген (кач.)' },
+  'URINE_NITRITE_QR': { prefUnit: 'score', coeff: 1, uln: 0, lln: 0, name: 'Нитриты мочи (кач.)' },
+  'URINE_LEU_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Лейкоциты мочи (тест-полос.)' },
+  'URINE_BLOOD_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Кровь мочи (тест-полос.)' },
 } as const;
 
 // ── Нормализация лабораторных значений к единицам РФ (Гемотест, Инвитро, Хеликс, КДЛ) ──

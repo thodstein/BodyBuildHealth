@@ -136,6 +136,77 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'C_PEPTIDE', names: ['с-пептид', 'c-peptide', 'c peptide', 'с пептид'], unitPatterns: ['пмоль/л', 'pmol/L', 'нг/мл'] },
   { code: 'AG_RATIO', names: ['а/г', 'a/g', 'альбумин/глобулин', 'альбумино-глобулиновый'], unitPatterns: ['', ''] },
   { code: 'BILIR', names: ['билирубин непрямой', 'непрямой билирубин', 'indirect bilirubin', 'BIL-IR'], unitPatterns: ['мкмоль/л', 'umol/L'] },
+  // ── 24 маркёра из UCUM_MAP, не распознававшиеся парсером ──
+  { code: 'AMH', names: ['антимюллеров гормон', 'АМГ', 'AMH', 'Anti-Müllerian hormone'], unitPatterns: ['нг/мл', 'ng/mL'] },
+  { code: 'BNP', names: ['BNP', 'натрийуретический пептид', 'B-type natriuretic', 'brain natriuretic'], unitPatterns: ['пг/мл', 'pg/mL'] },
+  { code: 'PROTEIN_URINE', names: ['протеинурия', 'белок в моче', 'protein urine', 'общий белок мочи'], unitPatterns: ['мг/л', 'mg/L', 'г/л'] },
+  { code: 'ENDOTHELIN1', names: ['эндотелин-1', 'эндотелин 1', 'Endothelin-1', 'ET-1'], unitPatterns: ['пг/мл', 'pg/mL', 'фмоль/л'] },
+  { code: 'NO_MARKER', names: ['оксид азота', 'нитраты и нитриты', 'NO', 'nitric oxide', 'нитрит'], unitPatterns: ['мкмоль/л', 'umol/L', 'моль/л'] },
+  { code: 'ESTRADIOL_SENS', names: ['эстрадиол чувствительный', 'чувствительный эстрадиол', 'E2 чувств', 'estradiol sensitive'], unitPatterns: ['пмоль/л', 'pmol/L', 'пг/мл', 'pg/mL'] },
+  { code: 'PREALBUMIN', names: ['преальбумин', 'транстиретин', 'Prealbumin', 'Transthyretin', 'TBPA'], unitPatterns: ['мг/л', 'mg/L', 'г/л'] },
+  { code: 'RETICULOCYTES', names: ['ретикулоциты', 'Retikulocytes', 'ретик', 'Retics'], unitPatterns: ['%', '10^9/л', 'промилле'] },
+  { code: 'HAPTOGLOBIN', names: ['гаптоглобин', 'Haptoglobin', 'гаптогл'], unitPatterns: ['г/л', 'g/L', 'мг/дл'] },
+  { code: 'NGAL', names: ['NGAL', 'липокалин', 'Lipocalin-2', 'нейтрофильный липокалин'], unitPatterns: ['нг/мл', 'ng/mL', 'мкг/л'] },
+  { code: 'TNF_ALPHA', names: ['ФНО-альфа', 'ФНО-a', 'TNF-alpha', 'TNF-α', 'фактор некроза опухоли'], unitPatterns: ['пг/мл', 'pg/mL', 'нг/л'] },
+  { code: 'IL6', names: ['ИЛ-6', 'IL-6', 'интерлейкин 6', 'Interleukin-6', 'ИЛ6'], unitPatterns: ['пг/мл', 'pg/mL', 'нг/л'] },
+  { code: 'IL1B', names: ['ИЛ-1бета', 'ИЛ-1β', 'IL-1beta', 'IL-1β', 'интерлейкин 1', 'Interleukin-1'], unitPatterns: ['пг/мл', 'pg/mL', 'нг/л'] },
+  { code: 'LACTATE', names: ['лактат', 'молочная кислота', 'Lactate', 'Lactic acid'], unitPatterns: ['ммоль/л', 'mmol/L', 'мг/дл'] },
+  { code: 'AMMONIA', names: ['аммиак', 'Ammonia', 'NH3', 'азот аммонийный'], unitPatterns: ['мкмоль/л', 'umol/L', 'мг/дл'] },
+  { code: 'IGFBP3', names: ['ИФР-СБ3', 'IGFBP-3', 'IGFBP3', 'инсулиноподобный фактор связывающий 3'], unitPatterns: ['мг/л', 'mg/L', 'нг/мл'] },
+  { code: 'CHOLINESTERASE', names: ['холинэстераза', 'Cholinesterase', 'ХЭ', 'псевдохолинэстераза'], unitPatterns: ['Е/л', 'U/L', 'МЕ/л'] },
+  { code: 'OSMOLALITY', names: ['осмоляльность', 'Osmolality', 'осмолярность'], unitPatterns: ['мОсм/кг', 'mOsm/kg', 'мОсм/л'] },
+  { code: 'ANION_GAP', names: ['анионный провал', 'анионная разница', 'Anion gap', 'AnionGap'], unitPatterns: ['ммоль/л', 'mmol/L'] },
+  { code: 'URINE_PH', names: ['pH мочи', 'урин pH', 'моча pH', 'urine pH'], unitPatterns: [''] },
+  { code: 'URINE_OSM', names: ['осмоляльность мочи', 'моча осмоляльность', 'urine osmolality', 'моча osm'], unitPatterns: ['мОсм/кг', 'mOsm/kg'] },
+  { code: 'MAR_TEST', names: ['MAR-тест', 'MAR тест', 'MAR test', 'антиспермальные антитела'], unitPatterns: ['%'] },
+  { code: 'DFI', names: ['фрагментация ДНК', 'DFI', 'DNA fragmentation index', 'фрагмент. ДНК'], unitPatterns: ['%'] },
+  { code: 'HDS', names: ['HDS', 'незрелый хроматин', 'high DNA stainability'], unitPatterns: ['%'] },
+  // ── 12 маркёров из BIOMARKER_DICTIONARY, не распознававшихся PDF-парсером ──
+  { code: 'CK_18', names: ['цитокератин-18', 'ЦК-18', 'CK-18', 'CK18', 'Cytokeratin 18', 'KRT18'], unitPatterns: ['Е/л', 'U/L', 'нг/мл'] },
+  { code: 'GLDH', names: ['глутаматдегидрогеназа', 'ГЛДГ', 'GLDH', 'Glutamate dehydrogenase'], unitPatterns: ['Е/л', 'U/L'] },
+  { code: 'ADMA', names: ['АДМА', 'асимметричный диметиларгинин', 'ADMA', 'Asymmetric dimethylarginine'], unitPatterns: ['мкмоль/л', 'umol/L', 'нмоль/л'] },
+  { code: 'OXLDL', names: ['окисленные ЛПНП', 'окс. ЛПНП', 'oxLDL', 'oxidized LDL', 'ОЛПНП'], unitPatterns: ['Е/л', 'U/L', 'мг/дл'] },
+  { code: 'CORTISOL_NIGHT', names: ['кортизол ночной', 'кортизол вечер', 'ночной кортизол', 'cortisol night', 'cortisol evening'], unitPatterns: ['нмоль/л', 'nmol/L', 'мкг/дл'] },
+  { code: 'HVA', names: ['гомованилиновая кислота', 'ГВК', 'HVA', 'Homovanillic acid'], unitPatterns: ['мг/сут', 'mg/24h', 'ммоль/сут'] },
+  { code: 'MANGANESE', names: ['марганец', 'Mn', 'Manganese'], unitPatterns: ['мкмоль/л', 'umol/L', 'мкг/л', 'нмоль/л'] },
+  { code: 'IODINE', names: ['йод', 'Iodine', 'I2'], unitPatterns: ['мкг/л', 'ug/L', 'мкг/дл', 'нмоль/л'] },
+  { code: 'CHROMIUM', names: ['хром', 'Cr', 'Chromium'], unitPatterns: ['нмоль/л', 'nmol/L', 'мкг/л', 'ug/L'] },
+  { code: 'CTX', names: ['C-телопептид', 'CTX', 'CrossLaps', 'b-CrossLaps', 'с-телопептид'], unitPatterns: ['нг/мл', 'ng/mL', 'нмоль/л'] },
+  { code: 'COMP', names: ['COMP', 'олигомерный матриксный белок', 'Cartilage oligomeric matrix protein', 'хрящевой матриксный белок'], unitPatterns: ['Е/л', 'U/L', 'нг/мл'] },
+  { code: 'P1NP', names: ['P1NP', 'пропептид проколлагена', 'N-терминальный пропептид', 'Procollagen type 1 N-peptide'], unitPatterns: ['нг/мл', 'ng/mL', 'мкг/л'] },
+  // ══════════════════════════════════════════════════════════════════════
+  //  ОБЩИЙ АНАЛИЗ МОЧИ (ОАМ) — количественные маркёры
+  // ══════════════════════════════════════════════════════════════════════
+  { code: 'URINE_SG', names: ['относительная плотность мочи', 'удельная плотность мочи', 'SG мочи', 'отн. плотность мочи', 'уд. вес мочи', 'specific gravity', 'отн плотность'], unitPatterns: ['г/см3', 'г/мл', 'кг/л', ''] },
+  { code: 'URINE_LEU', names: ['лейкоциты мочи', 'лейкоциты в моче', 'Leu urine', 'urine leukocytes', 'лейк мочи'], unitPatterns: ['кл/мкл', 'cells/uL', 'в п/з', 'клеток/мкл', '10^6/л'] },
+  { code: 'URINE_ERY', names: ['эритроциты мочи', 'эритроциты в моче', 'Ery urine', 'urine erythrocytes', 'эритр мочи'], unitPatterns: ['кл/мкл', 'cells/uL', 'в п/з', 'клеток/мкл', '10^6/л'] },
+  { code: 'URINE_EPITHELIAL', names: ['эпителий мочи', 'эпителиальные клетки мочи', 'эпителий в моче', 'urine epithelial', 'epithelial cells urine'], unitPatterns: ['кл/мкл', 'cells/uL', 'в п/з', 'клеток/мкл'] },
+  { code: 'URINE_CYLINDERS', names: ['цилиндры мочи', 'цилиндры в моче', 'гиалиновые цилиндры', 'urine casts', 'cylinders urine'], unitPatterns: ['кл/мкл', 'cells/uL', 'в п/з'] },
+  { code: 'URINE_GLUCOSE_Q', names: ['глюкоза мочи колич', 'глюкоза в моче колич', 'urine glucose quant', 'сахар мочи колич'], unitPatterns: ['ммоль/л', 'mmol/L', 'г/л', 'мг/дл'] },
+  { code: 'URINE_KETONES_Q', names: ['кетоны мочи колич', 'кетоновые тела в моче колич', 'urine ketones quant', 'ketone bodies urine'], unitPatterns: ['ммоль/л', 'mmol/L', 'мг/л', 'мг/дл'] },
+  { code: 'PROTEIN_24H', names: ['суточная протеинурия', 'белок суточный', 'protein 24h', 'белок за сутки', 'суточный белок мочи'], unitPatterns: ['мг/сут', 'mg/24h', 'г/сут', 'мг/24ч'] },
+  { code: 'CREATININE_URINE', names: ['креатинин мочи', 'креатинин в моче', 'urine creatinine', 'креатинин суточный', 'креатинин суточная моча'], unitPatterns: ['ммоль/л', 'mmol/L', 'ммоль/сут', 'мг/дл'] },
+  { code: 'URINE_VOLUME_24H', names: ['суточный диурез', 'объём мочи за сутки', 'объем мочи суточный', 'urine volume 24h', 'диурез суточный'], unitPatterns: ['мл/сут', 'mL/24h', 'мл', 'л/сут'] },
+  { code: 'UROBILINOGEN', names: ['уробилиноген', 'urobilinogen', 'уробилин', 'уробилиноген мочи'], unitPatterns: ['мг/л', 'mg/L', 'мкмоль/л', 'umol/L', 'Ед/л'] },
+  { code: 'URINE_NITRITE_Q', names: ['нитриты мочи колич', 'нитриты в моче колич', 'urine nitrite quant', 'nitrite urine'], unitPatterns: ['мг/л', 'mg/L', 'ммоль/л', 'мкмоль/л'] },
+  { code: 'URINE_BILIRUBIN_Q', names: ['билирубин мочи колич', 'билирубин в моче колич', 'urine bilirubin quant'], unitPatterns: ['мкмоль/л', 'umol/L', 'мг/л'] },
+  { code: 'NECHIP_LEU', names: ['лейкоциты нечипоренко', 'нечипоренко лейкоциты', 'nechiporenko leukocytes', 'лейк по Нечипоренко', 'Нечипоренко Leu'], unitPatterns: ['кл/мл', 'cells/mL', 'клеток/мл', '10^6/л'] },
+  { code: 'NECHIP_ERY', names: ['эритроциты нечипоренко', 'нечипоренко эритроциты', 'nechiporenko erythrocytes', 'эритр по Нечипоренко', 'Нечипоренко Ery'], unitPatterns: ['кл/мл', 'cells/mL', 'клеток/мл', '10^6/л'] },
+  { code: 'NECHIP_CYL', names: ['цилиндры нечипоренко', 'нечипоренко цилиндры', 'nechiporenko casts', 'цил по Нечипоренко', 'Нечипоренко Cyl'], unitPatterns: ['кл/мл', 'cells/mL', 'клеток/мл'] },
+  { code: 'URINE_CALCIUM', names: ['кальций мочи', 'кальций в моче суточный', 'urine calcium', 'суточный кальций мочи', 'Ca мочи'], unitPatterns: ['ммоль/сут', 'mmol/24h', 'мг/сут', 'ммоль/л'] },
+  { code: 'URINE_OXALATE', names: ['оксалаты мочи', 'оксалаты в моче', 'urine oxalate', 'щавелевая кислота мочи', 'оксалат-ионы'], unitPatterns: ['ммоль/сут', 'mmol/24h', 'мг/сут', 'мкмоль/сут'] },
+  { code: 'URINE_URATE', names: ['ураты мочи', 'ураты в моче суточные', 'urine urate', 'мочевая кислота мочи', 'урат-ионы мочи'], unitPatterns: ['ммоль/сут', 'mmol/24h', 'мг/сут', 'ммоль/л'] },
+  // ══════════════════════════════════════════════════════════════════════
+  //  ПОЛУКОЛИЧЕСТВЕННЫЕ МАРКЁРЫ ОАМ (распознаются через качественные знаки)
+  // ══════════════════════════════════════════════════════════════════════
+  { code: 'URINE_PROTEIN_QR', names: ['белок мочи (кач)', 'белок в моче (кач)', 'белок мочи кач', 'protein urine qual', 'белок мочи тест-полоска'], unitPatterns: ['', 'score'] },
+  { code: 'URINE_GLUCOSE_QR', names: ['глюкоза мочи (кач)', 'сахар мочи (кач)', 'глюкоза мочи кач', 'glucose urine qual', 'тест-полоска глюкоза'], unitPatterns: ['', 'score'] },
+  { code: 'URINE_KETONES_QR', names: ['кетоны мочи (кач)', 'кетоновые тела мочи (кач)', 'кетоны мочи кач', 'ketones urine qual'], unitPatterns: ['', 'score'] },
+  { code: 'URINE_BILIRUBIN_QR', names: ['билирубин мочи (кач)', 'bilirubin urine qual', 'билирубин мочи кач'], unitPatterns: ['', 'score'] },
+  { code: 'UROBILINOGEN_QR', names: ['уробилиноген (кач)', 'urobilinogen qual', 'уробилиноген кач'], unitPatterns: ['', 'score'] },
+  { code: 'URINE_NITRITE_QR', names: ['нитриты мочи (кач)', 'nitrite urine qual', 'нитриты мочи кач'], unitPatterns: ['', 'score'] },
+  { code: 'URINE_LEU_QR', names: ['лейкоциты мочи (кач)', 'leu urine qual', 'лейкоциты мочи кач', 'тест-полоска лейкоциты'], unitPatterns: ['', 'score'] },
+  { code: 'URINE_BLOOD_QR', names: ['кровь мочи (кач)', 'blood urine qual', 'кровь в моче (кач)', 'эритроциты кач мочи', 'скрытая кровь мочи'], unitPatterns: ['', 'score'] },
 ];
 
 function containsLabName(text: string, name: string): boolean {
@@ -164,12 +235,17 @@ function normalizeOcrText(text: string): string {
 
 function extractNumber(text: string): number | null {
   // Try to find the first standalone number that looks like a lab value (not part of a range)
-  const rangeMatch = text.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/);
   const allNums = text.match(/[\d]+[.,]?[\d]*/g);
   if (!allNums) return null;
-  // Filter: skip numbers that appear in a reference range (2.5-5.5 or 2.5 – 5.5)
+  // Filter: skip numbers that appear in ANY reference range (not just the first).
+  // OCR often duplicates ranges, and treating range bounds as values is the
+  // main source of misidentified markers.
   const rangeNums = new Set<string>();
-  if (rangeMatch) { rangeNums.add(rangeMatch[1]); rangeNums.add(rangeMatch[2]); }
+  const rangeMatches = text.matchAll(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/g);
+  for (const m of rangeMatches) {
+    rangeNums.add(m[1]);
+    rangeNums.add(m[2]);
+  }
   for (const n of allNums) {
     if (rangeNums.has(n)) continue;
     // Skip if it looks like a year, phone number, etc.
@@ -182,11 +258,64 @@ function extractNumber(text: string): number | null {
   return null;
 }
 
+/**
+ * Вариант extractNumber, разрешающий 0 как валидное значение.
+ * Используется для urine-маркёров, где 0 = норма (отсутствие клеток/вещества):
+ * URINE_LEU, URINE_ERY, URINE_EPITHELIAL, URINE_CYLINDERS, URINE_NITRITE_Q, и т.д.
+ *
+ * В отличие от extractNumber, distinguifies "0" как значение от "0" как part of range:
+ * "0   0-2" → первый "0" это значение, второй "0" — начало диапазона.
+ */
+function extractNumberAllowZero(text: string): number | null {
+  // Standalone number: не preceded by "-" и не followed by "-" (не part of range).
+  // JS поддерживает variable-length lookbehind в современных движках (Node 16+).
+  const standalone = text.match(/(?<![-–]\s?)\b\d+(?:[.,]\d+)?\b(?!\s*[-–])/g);
+  if (!standalone) return null;
+  for (const n of standalone) {
+    const clean = n.replace(',', '.');
+    const val = parseFloat(clean);
+    if (isNaN(val) || val < 0) continue;
+    return val;
+  }
+  return null;
+}
+
+/**
+ * Полуколичественный парсинг для качественных тестов мочи (ОАМ).
+ * Возвращает числовое значение по шкале 0-4, если распознаёт
+ * качественные знаки/слова в строке:
+ *   neg / отрицательно / нет / "не обн."  → 0
+ *   следы / след / trace / traces        → 0.5
+ *   +                                     → 1
+ *   ++                                    → 2
+ *   +++                                   → 3
+ *   ++++ / 4+                              → 4
+ * Возвращает null, если качественных знаков нет.
+ */
+function extractQualitativeScore(text: string): number | null {
+  const lower = text.toLowerCase();
+  // ВНИМАНИЕ: \b в JS regex не работает для Cyrillic (только ASCII \w).
+  // Используем lookbehind/lookahead для Cyrillic-aware word boundary.
+  if (/(?<![а-яё])(neg|negative|отрицательно|отр\.?|не обн|необн|не обнаружено|нет|n\/a)(?![а-яё])/i.test(lower)) return 0;
+  if (/(?<![а-яё])(следы|след|trace|traces|сл\.?)(?![а-яё])/i.test(lower)) return 0.5;
+  const plusMatch = lower.match(/\+{1,4}/g);
+  if (plusMatch) {
+    const max = Math.max(...plusMatch.map(p => p.length));
+    return Math.min(4, max);
+  }
+  return null;
+}
+
 function extractResultNumber(text: string): number | null {
   const cleaned = text.replace(/\b(?:от|до|референс|норма|ref)\b/gi, ' ');
-  const range = cleaned.match(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/);
   const numbers = cleaned.match(/\d+[.,]?\d*/g) || [];
-  const rangeNumbers = range ? new Set([range[1], range[2]]) : new Set<string>();
+  // Exclude ALL numbers that appear in ANY reference range, not just the first.
+  const rangeNumbers = new Set<string>();
+  const rangeMatches = cleaned.matchAll(/(\d+[.,]?\d*)\s*[-–]\s*(\d+[.,]?\d*)/g);
+  for (const m of rangeMatches) {
+    rangeNumbers.add(m[1]);
+    rangeNumbers.add(m[2]);
+  }
   for (const token of numbers) {
     if (rangeNumbers.has(token)) continue;
     const value = Number(token.replace(',', '.'));
@@ -226,7 +355,10 @@ function extractRefRange(text: string): { low?: number; high?: number } {
 }
 
 function extractUnit(text: string): string {
-  const match = text.match(/(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|м\s*[ЕEеe]д|мМЕ|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b/i);
+  // Match lab units in both Russian and English forms. Include common OCR
+  // variants: spaces inside units (мк моль/л), missing slash (ммоль л),
+  // and abbreviated prefixes (мЕд, мМЕ).
+  const match = text.match(/(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\s*\/\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\s*\/\s*(?:dL|mL|L)|%|сек|s\b|\/сут|\/24\s*ч|meq\/l|ммоль\/моль/i);
   return match?.[0].replace(/\s+/g, '') || '';
 }
 
@@ -308,13 +440,38 @@ function detectWatermarkText(text: string): string[] {
 
 async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Promise<string> {
   const enhanced = enhanceOcrCanvas(canvas);
+  const { resolveTesseractOptions } = await import('./ocr-assets');
+  const opts = await resolveTesseractOptions();
   try {
-    const result = await Tesseract.recognize(enhanced, 'rus+eng');
-    return result.data.text || '';
-  } catch (languageError) {
-    console.warn('Russian OCR language data failed, retrying in English:', languageError);
-    const result = await Tesseract.recognize(enhanced, 'eng');
-    return result.data.text || '';
+    const worker = await Tesseract.createWorker('rus+eng', 1, {
+      workerPath: opts.workerPath,
+      corePath: opts.corePath,
+      langPath: opts.langPath,
+    });
+    try {
+      const { data } = await worker.recognize(enhanced);
+      return data.text || '';
+    } finally {
+      await worker.terminate();
+    }
+  } catch (firstError: any) {
+    console.warn('Russian OCR failed (local assets), retrying in English:', firstError);
+    try {
+      const worker = await Tesseract.createWorker('eng', 1, {
+        workerPath: opts.workerPath,
+        corePath: opts.corePath,
+        langPath: opts.langPath,
+      });
+      try {
+        const { data } = await worker.recognize(enhanced);
+        return data.text || '';
+      } finally {
+        await worker.terminate();
+      }
+    } catch (secondError: any) {
+      console.warn('English OCR also failed, returning empty text:', secondError);
+      return '';
+    }
   }
 }
 
@@ -387,10 +544,22 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
 
     const combined = cols.join(' | ').toLowerCase();
 
+    // Longest-name match: выбираем наиболее специфичный паттерн (длиннейший
+    // matching name), чтобы "креатинин мочи" попадал в CREATININE_URINE, а не CREAT.
+    let bestLabDef: typeof LAB_PATTERNS[number] | null = null;
+    let bestNameLen = 0;
     for (const labDef of LAB_PATTERNS) {
-      const nameMatch = labDef.names.some(n => containsLabName(combined, n));
-      if (!nameMatch) continue;
+      for (const n of labDef.names) {
+        if (containsLabName(combined, n) && n.length > bestNameLen) {
+          bestNameLen = n.length;
+          bestLabDef = labDef;
+        }
+      }
+    }
+    if (!bestLabDef) continue;
+    const labDef = bestLabDef;
 
+    {
       let val: number | null = null;
       let unit = '';
       let refLow: number | undefined;
@@ -408,13 +577,29 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
         // Names such as 25(OH)D, T3, T4 and HbA1c contain digits which are
         // not the measured result. Never use the marker/name cell as value.
         const num = isNameCell ? null : extractResultNumber(cell);
-        if (num !== null && num > 0 && cell.length < 30) {
+        if (num !== null && num > 0 && cell.length < 80) {
           if (val === null) {
             val = num;
           }
         }
+        // Полуколичественный fallback для качественных тестов ОАМ
+        if (val === null && !isNameCell && labDef.code.endsWith('_QR')) {
+          const q = extractQualitativeScore(cell);
+          if (q !== null) val = q;
+        }
         const cellUnit = extractUnit(cell) || (isUnitCell(cell) ? cell : '');
         if (cellUnit && !unit) unit = cellUnit;
+      }
+
+      // Полуколичественный fallback из всей строки, если ячейки не дали значение
+      if (val === null && labDef.code.endsWith('_QR')) {
+        const q = extractQualitativeScore(line);
+        if (q !== null) val = q;
+      }
+      // Для urine-маркёров где 0 — норма, разрешаем 0
+      if (val === null && /^URINE_(LEU|ERY|EPITHELIAL|CYLINDERS|NITRITE_Q|BILIRUBIN_Q|KETONES_Q|GLUCOSE_Q|OSM)/.test(labDef.code)) {
+        const q = extractNumberAllowZero(line);
+        if (q !== null) val = q;
       }
 
       if (val === null) continue;
@@ -431,7 +616,6 @@ function tryParseTableRows(lines: string[], provider: string | null): ParsedLabV
         raw: line,
         confidence: candidateScore({ code: labDef.code, name: labDef.names[0], value: val, unit: unit || labDef.unitPatterns[0], refLow, refHigh, raw: line }),
       });
-      break;
     }
   }
 
@@ -480,31 +664,59 @@ function parseLabLineGeneric(line: string, val: number): { unit: string; refLow?
 
 function tryParseLabFromLine(line: string): { code: string; name: string; value: number; unit: string; refLow?: number; refHigh?: number; raw?: string; confidence?: number } | null {
   const lowerLine = line.toLowerCase();
-  
+
+  // Выбираем наиболее специфичный паттерн (с самым длинным matching name),
+  // чтобы "креатинин мочи" попадал в CREATININE_URINE, а не в общий CREAT.
+  let best: { labDef: typeof LAB_PATTERNS[number]; nameMatchText: string; nameLen: number } | null = null;
   for (const labDef of LAB_PATTERNS) {
-    const nameMatch = labDef.names.some(n => containsLabName(lowerLine, n));
-    if (!nameMatch) continue;
-
-    const nameMatchText = labDef.names.find(n => containsLabName(lowerLine, n)) || '';
-    const valueText = nameMatchText
-      ? line.replace(new RegExp(nameMatchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' ')
-      : line;
-    const val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
-    if (val === null || val > 100000) continue;
-
-    const parsed = parseLabLineGeneric(line, val);
-    return {
-      code: labDef.code,
-      name: labDef.names[0],
-      value: val,
-      unit: parsed.unit || labDef.unitPatterns[0],
-      refLow: parsed.refLow,
-      refHigh: parsed.refHigh,
-      raw: line,
-      confidence: candidateScore({ code: labDef.code, name: labDef.names[0], value: val, unit: parsed.unit || labDef.unitPatterns[0], refLow: parsed.refLow, refHigh: parsed.refHigh, raw: line }),
-    };
+    for (const n of labDef.names) {
+      if (containsLabName(lowerLine, n)) {
+        if (!best || n.length > best.nameLen) {
+          best = { labDef, nameMatchText: n, nameLen: n.length };
+        }
+      }
+    }
   }
-  return null;
+  if (!best) return null;
+  const labDef = best.labDef;
+  const nameMatchText = best.nameMatchText;
+
+  const valueText = nameMatchText
+    ? line.replace(new RegExp(nameMatchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' ')
+    : line;
+    // Try extractNumber first (filters out ALL range numbers). If it fails
+    // (all numbers were in ranges), try extractResultNumber as fallback —
+    // it has the same logic but can catch edge cases where the value is
+    // adjacent to a range without a clear separator.
+    let val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
+    if (val === null) {
+      val = extractResultNumber(valueText);
+    }
+    // Для urine-маркёров где 0 — норма (отсутствие клеток/вещества),
+    // разрешаем 0 как валидное значение.
+    if (val === null && /^URINE_(LEU|ERY|EPITHELIAL|CYLINDERS|NITRITE_Q|BILIRUBIN_Q|KETONES_Q|GLUCOSE_Q|OSM)/.test(labDef.code)) {
+      val = extractNumberAllowZero(valueText.replace(/[^\d.,\s\-–]/g, ' '));
+    }
+    // Полуколичественный fallback для качественных тестов мочи (ОАМ).
+    // Если число не найдено, но маркер в списке QR-кодов и строка содержит
+    // качественные знаки (neg/отрицательно/следы/+/++/+++/++++), парсим их.
+    if (val === null && labDef.code.endsWith('_QR')) {
+      const q = extractQualitativeScore(line);
+      if (q !== null) val = q;
+    }
+    if (val === null || val > 100000) return null;
+
+  const parsed = parseLabLineGeneric(line, val);
+  return {
+    code: labDef.code,
+    name: labDef.names[0],
+    value: val,
+    unit: parsed.unit || labDef.unitPatterns[0],
+    refLow: parsed.refLow,
+    refHigh: parsed.refHigh,
+    raw: line,
+    confidence: candidateScore({ code: labDef.code, name: labDef.names[0], value: val, unit: parsed.unit || labDef.unitPatterns[0], refLow: parsed.refLow, refHigh: parsed.refHigh, raw: line }),
+  };
 }
 
 export function parseLabText(rawText: string): ParsedLabResult {
@@ -536,17 +748,22 @@ export function parseLabText(rawText: string): ParsedLabResult {
   }
 
   if (values.length > 0 || lines.length > 1) {
-    // Try combined adjacent lines for codes not yet matched
-    for (let i = 0; i < lines.length - 1; i++) {
-      const combined = lines[i] + ' ' + lines[i + 1];
-      const result = tryParseLabFromLine(combined);
-      if (!result) continue;
-      if (values.some(v => v.code === result.code)) continue;
-      values.push({
-        ...result,
-        isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
-        confidence: candidateScore(result),
-      });
+    // Try combined adjacent lines for codes not yet matched.
+    // Use a sliding window of 2, then 3 lines to catch markers whose name,
+    // value, and unit were split across multiple lines by OCR or PDF column
+    // extraction.
+    for (let windowSize = 2; windowSize <= 3; windowSize++) {
+      for (let i = 0; i <= lines.length - windowSize; i++) {
+        const combined = lines.slice(i, i + windowSize).join(' ');
+        const result = tryParseLabFromLine(combined);
+        if (!result) continue;
+        if (values.some(v => v.code === result.code)) continue;
+        values.push({
+          ...result,
+          isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
+          confidence: candidateScore(result),
+        });
+      }
     }
   }
 
@@ -570,7 +787,8 @@ export function parseLabText(rawText: string): ParsedLabResult {
 export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<ParsedLabResult> {
   try {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
@@ -623,7 +841,9 @@ export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<Parsed
 /** OCR pages of a scanned PDF that has no usable text layer. */
 export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<string> {
   const pdfjsLib = await import('pdfjs-dist');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
+  const workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
   const Tesseract = await import('tesseract.js') as any;
   const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
   const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
@@ -657,6 +877,13 @@ export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promi
 
 async function extractTextFromImage(file: File): Promise<string> {
   const Tesseract = await import('tesseract.js') as any;
+  const { resolveTesseractOptions } = await import('./ocr-assets');
+  const opts = await resolveTesseractOptions();
+  const workerOptions = {
+    workerPath: opts.workerPath,
+    corePath: opts.corePath,
+    langPath: opts.langPath,
+  };
   try {
     if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable');
     const bitmap = await createImageBitmap(file);
@@ -669,23 +896,44 @@ async function extractTextFromImage(file: File): Promise<string> {
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const enhanced = enhanceOcrCanvas(canvas);
-    const result = await Tesseract.recognize(enhanced, 'rus+eng');
-    let text = result.data.text || '';
-    if (!text.trim()) {
-      const fallback = await Tesseract.recognize(canvas, 'rus+eng');
-      text = fallback.data.text || '';
+    try {
+      const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+      try {
+        const { data } = await worker.recognize(enhanced);
+        return data.text || '';
+      } finally {
+        await worker.terminate();
+      }
+    } catch (ocrError: any) {
+      console.warn('Image OCR (rus+eng) failed, retrying in English only:', ocrError);
+      const worker = await Tesseract.createWorker('eng', 1, workerOptions);
+      try {
+        const { data } = await worker.recognize(enhanced);
+        return data.text || '';
+      } finally {
+        await worker.terminate();
+      }
     }
-    return text;
   } catch (imageProcessingError) {
     console.warn('Enhanced image preprocessing failed, using direct OCR:', imageProcessingError);
     try {
-      const result = await Tesseract.recognize(file, 'rus+eng');
-      return result.data.text || '';
-    } catch (languageError) {
-      console.warn('Russian image OCR failed, retrying in English:', languageError);
+      const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
       try {
-        const result = await Tesseract.recognize(file, 'eng');
-        return result.data.text || '';
+        const { data } = await worker.recognize(file);
+        return data.text || '';
+      } finally {
+        await worker.terminate();
+      }
+    } catch (directOcrError: any) {
+      console.warn('Direct rus+eng OCR failed, retrying in English:', directOcrError);
+      try {
+        const worker = await Tesseract.createWorker('eng', 1, workerOptions);
+        try {
+          const { data } = await worker.recognize(file);
+          return data.text || '';
+        } finally {
+          await worker.terminate();
+        }
       } catch {
         return '';
       }

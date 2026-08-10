@@ -5,6 +5,7 @@ const SYNONYM_MAP = synonyms as Record<string, string>;
 
 /** Maps LAB_PATTERNS codes to UCUM_MAP keys where they differ */
 const CODE_ALIAS: Record<string, string> = {
+  // ── pdf-parser engine codes ──
   'CREATININE': 'CREATININE',
   'HEMATOCRIT': 'HCT',
   'HEMOGLOBIN': 'HGB',
@@ -32,11 +33,82 @@ const CODE_ALIAS: Record<string, string> = {
   'BILD': 'DBIL',
   'HBA1C': 'HbA1c',
   'FOLATE': 'FOL',
+  'B9': 'FOL',
   'INSULIN': 'INS',
   'DIMER': 'D_DIMER',
   'FIB': 'FIBRINOGEN',
   'TROP': 'TROPONIN',
   'PHOS': 'P',
+  'BILIR': 'BIL',
+  // ── biomarker-regex engine codes (snake_case English names) ──
+  // These must map to the same UCUM_MAP keys so markers found by both
+  // engines are deduplicated instead of appearing twice.
+  'BILIRUBIN_TOTAL': 'BIL',
+  'BILIRUBIN_DIRECT': 'DBIL',
+  'TOTAL_PROTEIN': 'TP',
+  'ALBUMIN': 'ALB',
+  'URIC_ACID': 'UA',
+  'CHOLESTEROL': 'CHOL',
+  'TRIGLYCERIDE': 'TG',
+  'HOMOCYSTEINE': 'HOMOCYSTEINE',
+  'VITAMIN_B12': 'B12',
+  'T3_FREE': 'FT3',
+  'T4_FREE': 'FT4',
+  // T3/T4 (общие) — отдельные от FT3/FT4 (свободных). Было WRONG: T3→FT3, T4→FT4.
+  'IGF-1': 'IGF1',
+  'IGF1': 'IGF1',
+  'PSA_FREE': 'PSA',
+  'PHOSPHORUS': 'P',
+  'FIBRINOGEN': 'FIBRINOGEN',
+  'D_DIMER': 'D_DIMER',
+  'APTT': 'APTT',
+  'PT': 'PT',
+  'INR': 'INR',
+  'ESR': 'ESR',
+  'HOMA-IR': 'HOMA',
+  'CK': 'CK',
+  'LDH': 'LDH',
+  'ALP': 'ALP',
+  'GGT': 'GGT',
+  'ALT': 'ALT',
+  'AST': 'AST',
+  'CRP': 'CRP',
+  'HS-CRP': 'CRP',
+  'TROPONIN_I': 'TROPONIN',
+  'TROPONIN_T': 'TROPONIN',
+  'CK_MB': 'CKMB',
+  'PTH': 'PTH',
+  'MPV': 'MPV',
+  'C-PEPTIDE': 'C_PEPTIDE',
+  'ACTH': 'ACTH',
+  'ALDOSTERONE': 'ALDOSTERONE',
+  'TPO_AB': 'TPO_AB',
+  'TG_AB': 'TG_AB',
+  'AMYLASE': 'AMYLASE',
+  'LIPASE': 'LIPASE',
+  'PROINSULIN': 'PROINSULIN',
+  'FRUCTOSAMINE': 'FRUCTOSAMINE',
+  'TRANSFERRIN': 'TRANSFERRIN',
+  'TIBC': 'TIBC',
+  'FERRITIN': 'FERRITIN',
+  'IRON': 'IRON',
+  'SHBG': 'SHBG',
+  'PSA': 'PSA',
+  'DHEA_S': 'DHEA_S',
+  'TSH': 'TSH',
+  'E2': 'E2',
+  'LH': 'LH',
+  'FSH': 'FSH',
+  'CORTISOL': 'CORTISOL',
+  'VITD': 'VITD',
+  'FOL': 'FOL',
+  'INS': 'INS',
+  'HGB': 'HGB',
+  'HCT': 'HCT',
+  'PLT': 'PLT',
+  'WBC': 'WBC',
+  'RBC': 'RBC',
+  // ── Russian/aliases ──
   'ВЛДЛ': 'VLDL',
   'ЛПВНП': 'VLDL',
   'АКТГ': 'ACTH',
@@ -52,7 +124,38 @@ const CODE_ALIAS: Record<string, string> = {
   'GLOB': 'GLOBULIN',
   'C_PEPTIDE': 'C_PEPTIDE',
   'AG_RATIO': 'A_G_RATIO',
-  'BILIR': 'BIL',
+  // ── Новые алиасы для маркёров из BIOMARKER_DICTIONARY ──
+  'CK-18': 'CK_18',
+  'OXLDL': 'OXLDL',
+  'CORTISOL_NIGHT': 'CORTISOL_NIGHT',
+  'MANGANESE': 'MANGANESE',
+  'IODINE': 'IODINE',
+  'CHROMIUM': 'CHROMIUM',
+  'GALECTIN-3': 'GALECTIN3',
+  'NEPHRIN': 'NEPHRIN',
+  // ── ОАМ алиасы (для совпадения кодов парсеров с UCUM_MAP) ──
+  'URINE_PROTEIN': 'PROTEIN_URINE',
+  'URINE_CA': 'URINE_CALCIUM',
+  'URINE_OX': 'URINE_OXALATE',
+  'NECHIP_LEUKOCYTES': 'NECHIP_LEU',
+  'NECHIP_ERYTHROCYTES': 'NECHIP_ERY',
+  'NECHIP_CYLINDERS': 'NECHIP_CYL',
+  'URINE_LEUKOCYTES': 'URINE_LEU',
+  'URINE_ERYTHROCYTES': 'URINE_ERY',
+  'URINE_EPITHELIUM': 'URINE_EPITHELIAL',
+  'URINE_CASTS': 'URINE_CYLINDERS',
+  'URINE_SPECIFIC_GRAVITY': 'URINE_SG',
+  'URINE_SG_VALUE': 'URINE_SG',
+  'URINE_VOLUME': 'URINE_VOLUME_24H',
+  'URINE_CREATININE': 'CREATININE_URINE',
+  'URINE_KETONES': 'URINE_KETONES_Q',
+  'URINE_GLUCOSE': 'URINE_GLUCOSE_Q',
+  'URINE_NITRITE': 'URINE_NITRITE_Q',
+  'URINE_BILIRUBIN': 'URINE_BILIRUBIN_Q',
+  'URINE_URATE': 'URINE_URATE',
+  'URINE_OXALATES': 'URINE_OXALATE',
+  'PROTEIN_URINE_24H': 'PROTEIN_24H',
+  'URINE_PROTEIN_24H': 'PROTEIN_24H',
 };
 
 function unitKey(unit: string): string {
@@ -114,9 +217,13 @@ function round(value: number): number {
 /** Convert any known code to a UCUM_MAP key (returns the code itself if no alias exists) */
 export function mapToUcumCode(code: string): string {
   const upper = code.trim().toUpperCase();
-  if (UCUM_MAP[upper]) return upper;
+  // Check alias FIRST — if there's a canonical mapping, use it even if the
+  // code exists directly in UCUM_MAP. This prevents duplicate entries when
+  // both a long-form key (e.g. TOTAL_PROTEIN) and its canonical short-form
+  // (e.g. TP) exist as separate UCUM_MAP keys.
   const alias = CODE_ALIAS[upper];
   if (alias && UCUM_MAP[alias]) return alias;
+  if (UCUM_MAP[upper]) return upper;
   return code;
 }
 

@@ -206,6 +206,96 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'ECHO_LA', name:'Левое предсердие (размер)', organ:'HEART', system:'cardio', mechanisms:['BP_REDUCTION','BETA1_BLOCKADE'], higherIsWorse:true, defaultValue:40, unit:'мм', correctionIds:['telmisartan','nebivolol','omega3','magnesium'] },
   { marker:'PROINSULIN', name:'Проинсулин', organ:'PANCREAS', system:'metabolic', mechanisms:['INSULIN_SENSITIVITY','AMPK_ACTIVATION'], higherIsWorse:true, defaultValue:10, unit:'пмоль/л', correctionIds:['berberine','alpha_lipoic','chromium','inositol'] },
   { marker:'A_G_RATIO', name:'Альбумин/глобулин коэффициент', organ:'LIVER', system:'hepatic', mechanisms:['PROTEIN_SYNTHESIS','AMINO_ACID_METABOLISM'], higherIsWorse:false, defaultValue:1.1, unit:'', correctionIds:['whey_protein','glutamine','vitamin_b6'] },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  ДОБАВЛЕНО: 37 маркёров — синхронизация UCUM_MAP ↔ LAB_MARKER_MAP
+  // ══════════════════════════════════════════════════════════════════════
+  // ── Coagulation ──
+  { marker:'PT', name:'Протромбиновое время', organ:'BLOOD', system:'hematologic', mechanisms:['ANTICOAGULANT','PLATELET_AGGREGATION_INHIBITION'], higherIsWorse:true, defaultValue:15, unit:'сек', correctionIds:['aspirin','nattokinase','omega3'] },
+  // ── Hematology indices ──
+  { marker:'MCV', name:'Средний объём эритроцита', organ:'BLOOD', system:'hematologic', mechanisms:['HEMOGLOBIN_SYNTHESIS','IRON_METABOLISM'], higherIsWorse:false, defaultValue:90, unit:'fL', correctionIds:['iron_supplement','folate','vitamin_b12'] },
+  { marker:'MCH', name:'Среднее содержание Hb', organ:'BLOOD', system:'hematologic', mechanisms:['HEMOGLOBIN_SYNTHESIS','IRON_METABOLISM'], higherIsWorse:false, defaultValue:30, unit:'пг', correctionIds:['iron_supplement','folate','vitamin_b12'] },
+  { marker:'MCHC', name:'Средняя конц. Hb в эр', organ:'BLOOD', system:'hematologic', mechanisms:['HEMOGLOBIN_SYNTHESIS'], higherIsWorse:false, defaultValue:340, unit:'г/л', correctionIds:['iron_supplement','folate','vitamin_b12'] },
+  { marker:'NEUT', name:'Нейтрофилы (UCUM)', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:75, unit:'%', correctionIds:['vitamin_d3','zinc_sup','probiotic'] },
+  { marker:'LYMPH', name:'Лимфоциты (UCUM)', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION','ANXIOLYTIC'], higherIsWorse:false, defaultValue:35, unit:'%', correctionIds:['vitamin_d3','zinc_sup','ashwagandha'] },
+  { marker:'MONO', name:'Моноциты', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:12, unit:'%', correctionIds:['vitamin_d3','zinc_sup'] },
+  { marker:'EO', name:'Эозинофилы', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION','ANXIOLYTIC'], higherIsWorse:true, defaultValue:5, unit:'%', correctionIds:['quercetin','vitamin_d3'] },
+  { marker:'BASO', name:'Базофилы', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:1, unit:'%', correctionIds:['quercetin'] },
+  // ── Thyroid total ──
+  { marker:'T4', name:'Т4 общий', organ:'THYROID', system:'endocrine', mechanisms:['THYROID_HORMONE_SYNTHESIS'], higherIsWorse:false, defaultValue:100, unit:'нмоль/л', correctionIds:['ashwagandha','zinc_sup','selenium_sup'] },
+  { marker:'T3', name:'Т3 общий', organ:'THYROID', system:'endocrine', mechanisms:['THYROID_HORMONE_METABOLISM','THYROID_HORMONE_SYNTHESIS'], higherIsWorse:false, defaultValue:1.5, unit:'нмоль/л', correctionIds:['ashwagandha','zinc_sup','selenium_sup'] },
+  // ── Tumor markers ──
+  { marker:'CA125', name:'CA-125', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:35, unit:'Е/мл', correctionIds:['curcumin_sup','omega3'] },
+  { marker:'AFP', name:'Альфа-фетопротеин', organ:'LIVER', system:'hepatic', mechanisms:['LIVER_REGENERATION'], higherIsWorse:true, defaultValue:10, unit:'МЕ/мл', correctionIds:['curcumin_sup','omega3'] },
+  { marker:'CEA', name:'РЭА', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:5, unit:'нг/мл', correctionIds:['curcumin_sup','omega3'] },
+  // ── Cardiac / Muscle ──
+  { marker:'MYOG', name:'Миоглобин', organ:'HEART', system:'cardio', mechanisms:['MITOCHONDRIAL_ENERGY'], higherIsWorse:true, defaultValue:90, unit:'нг/мл', correctionIds:['coq10','magnesium','alpha_lipoic'] },
+  // ── Immunoglobulins ──
+  { marker:'IGA', name:'IgA', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:false, defaultValue:2.0, unit:'г/л', correctionIds:['vitamin_d3','probiotic','zinc_sup'] },
+  { marker:'IGG', name:'IgG', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:false, defaultValue:11, unit:'г/л', correctionIds:['vitamin_d3','probiotic','zinc_sup'] },
+  { marker:'IGM', name:'IgM', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:false, defaultValue:1.2, unit:'г/л', correctionIds:['vitamin_d3','probiotic'] },
+  { marker:'IGE', name:'IgE общий', organ:'IMMUNE_SYSTEM', system:'immune', mechanisms:['IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:100, unit:'МЕ/мл', correctionIds:['quercetin','vitamin_d3','probiotic'] },
+  // ── Antioxidant system ──
+  { marker:'SOD', name:'Супероксиддисмутаза', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIOXIDANT','GLUTATHIONE_SYNTHESIS'], higherIsWorse:false, defaultValue:200, unit:'Е/мл', correctionIds:['nac','zinc_sup','copper_supplement'] },
+  { marker:'GLUT', name:'Глутатион', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIOXIDANT','GLUTATHIONE_SYNTHESIS'], higherIsWorse:false, defaultValue:600, unit:'мкмоль/л', correctionIds:['nac','glycine','vitamin_c'] },
+  { marker:'GPX', name:'Глутатионпероксидаза', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIOXIDANT','SELENOPROTEIN_SYNTHESIS'], higherIsWorse:false, defaultValue:20, unit:'Е/г Hb', correctionIds:['selenium_sup','nac'] },
+  // ── Catecholamines ──
+  { marker:'METAN', name:'Метанефрин', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE'], higherIsWorse:true, defaultValue:320, unit:'мкг/сут', correctionIds:['magnesium','l_theanine','ashwagandha'] },
+  { marker:'NMETAN', name:'Норметанефрин', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE'], higherIsWorse:true, defaultValue:390, unit:'мкг/сут', correctionIds:['magnesium','l_theanine','ashwagandha'] },
+  // ── Liver injury (from BIOMARKER_DICTIONARY) ──
+  { marker:'CK_18', name:'Цитокератин-18', organ:'LIVER', system:'hepatic', mechanisms:['LIVER_REGENERATION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:200, unit:'U/L', correctionIds:['tudca','milk_thistle','phosphatidylcholine'] },
+  { marker:'GLDH', name:'Глутаматдегидрогеназа', organ:'LIVER', system:'hepatic', mechanisms:['LIVER_REGENERATION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:7, unit:'U/L', correctionIds:['tudca','milk_thistle','alpha_lipoic'] },
+  // ── Vascular ──
+  { marker:'ADMA', name:'Асимметричный диметиларгинин', organ:'HEART', system:'cardio', mechanisms:['NO_RELEASE','BP_REDUCTION'], higherIsWorse:true, defaultValue:0.7, unit:'мкмоль/л', correctionIds:['pycnogenol','telmisartan','omega3'] },
+  { marker:'OXLDL', name:'Окисленные ЛПНП', organ:'HEART', system:'cardio', mechanisms:['ANTIOXIDANT','LIPID_PEROXIDATION_INHIBITION'], higherIsWorse:true, defaultValue:60, unit:'U/L', correctionIds:['vitamin_e','omega3','coq10'] },
+  // ── Cortisol night ──
+  { marker:'CORTISOL_NIGHT', name:'Кортизол ночной', organ:'ADRENALS', system:'endocrine', mechanisms:['CORTISOL_REDUCTION','ADAPTOGENIC'], higherIsWorse:true, defaultValue:150, unit:'нмоль/л', correctionIds:['ashwagandha','phosphatidylserine','magnesium_l_threonate'] },
+  // ── Neurotransmitter metabolite ──
+  { marker:'HVA', name:'Гомованилиновая кислота', organ:'BRAIN', system:'neuro', mechanisms:['DOPAMINE_PRECURSOR','NEUROTRANSMITTER_MODULATION'], higherIsWorse:true, defaultValue:7, unit:'мг/сут', correctionIds:['l_tyrosine','b6','magnesium'] },
+  // ── Trace minerals (from BIOMARKER_DICTIONARY) ──
+  { marker:'MANGANESE', name:'Марганец', organ:'BONES', system:'musculoskeletal', mechanisms:['ANTIOXIDANT','BONE_MINERALIZATION'], higherIsWorse:true, defaultValue:0.3, unit:'мкмоль/л', correctionIds:['magnesium','zinc_sup'] },
+  { marker:'IODINE', name:'Йод', organ:'THYROID', system:'endocrine', mechanisms:['THYROID_HORMONE_SYNTHESIS'], higherIsWorse:false, defaultValue:70, unit:'мкг/л', correctionIds:['kelp','selenium_sup'] },
+  { marker:'CHROMIUM', name:'Хром', organ:'PANCREAS', system:'metabolic', mechanisms:['INSULIN_SENSITIVITY','GLUCOSE_METABOLISM'], higherIsWorse:false, defaultValue:5, unit:'нмоль/л', correctionIds:['chromium','berberine'] },
+  // ── Bone turnover (from BIOMARKER_DICTIONARY) ──
+  { marker:'CTX', name:'C-телопептид', organ:'BONES', system:'musculoskeletal', mechanisms:['BONE_MINERALIZATION','CALCIUM_REGULATION'], higherIsWorse:true, defaultValue:0.5, unit:'нг/мл', correctionIds:['vitamin_d3','vitamin_k2','calcium'] },
+  { marker:'COMP', name:'COMP (хрящевой белок)', organ:'BONES', system:'musculoskeletal', mechanisms:['ANTIOXIDANT'], higherIsWorse:true, defaultValue:15, unit:'U/L', correctionIds:['collagen_ii','hyaluronic_acid','msm'] },
+  { marker:'P1NP', name:'Пропептид проколлагена 1', organ:'BONES', system:'musculoskeletal', mechanisms:['BONE_MINERALIZATION','COLLAGEN_SYNTHESIS'], higherIsWorse:false, defaultValue:40, unit:'нг/мл', correctionIds:['vitamin_d3','vitamin_k2','collagen_ii'] },
+  // ── Renal (from BIOMARKER_DICTIONARY) ──
+  { marker:'NEPHRIN', name:'Нефрин', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:150, unit:'нг/мл', correctionIds:['astragalus','cordyceps'] },
+  // ── Cardiac (from BIOMARKER_DICTIONARY) ──
+  { marker:'GALECTIN3', name:'Галектин-3', organ:'HEART', system:'cardio', mechanisms:['ANTIINFLAMMATORY','COENZYME_ELECTRON_TRANSPORT'], higherIsWorse:true, defaultValue:17, unit:'нг/мл', correctionIds:['coq10','omega3','curcumin_sup'] },
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  ОБЩИЙ АНАЛИЗ МОЧИ (ОАМ) — количественные и полуколичественные маркёры
+  // ══════════════════════════════════════════════════════════════════════
+  { marker:'URINE_SG', name:'Отн. плотность мочи', organ:'KIDNEYS', system:'renal', mechanisms:['OSMOREGULATION','RENOPROTECTION'], higherIsWorse:false, defaultValue:1.020, unit:'', correctionIds:['taurine','d_mannose','astragalus'] },
+  { marker:'URINE_LEU', name:'Лейкоциты мочи', organ:'KIDNEYS', system:'renal', mechanisms:['IMMUNE_MODULATION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:5, unit:'кл/мкл', correctionIds:['d_mannose','astragalus','probiotic','cranberry'] },
+  { marker:'URINE_ERY', name:'Эритроциты мочи', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:3, unit:'кл/мкл', correctionIds:['astragalus','vitamin_c','telmisartan'] },
+  { marker:'URINE_EPITHELIAL', name:'Эпителий мочи', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION'], higherIsWorse:true, defaultValue:5, unit:'кл/мкл', correctionIds:['d_mannose','astragalus'] },
+  { marker:'URINE_CYLINDERS', name:'Цилиндры мочи (гиал.)', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:2, unit:'кл/мкл', correctionIds:['astragalus','taurine','cordyceps'] },
+  { marker:'URINE_GLUCOSE_Q', name:'Глюкоза мочи (колич.)', organ:'KIDNEYS', system:'metabolic', mechanisms:['INSULIN_SENSITIVITY','GLUCOSE_METABOLISM'], higherIsWorse:true, defaultValue:0.8, unit:'ммоль/л', correctionIds:['berberine','alpha_lipoic','chromium'] },
+  { marker:'URINE_KETONES_Q', name:'Кетоны мочи (колич.)', organ:'LIVER', system:'metabolic', mechanisms:['MITOCHONDRIAL_ENERGY','FATTY_ACID_TRANSPORT'], higherIsWorse:true, defaultValue:0.05, unit:'ммоль/л', correctionIds:['alpha_lipoic','coq10','carnitine'] },
+  { marker:'PROTEIN_24H', name:'Суточная протеинурия', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:150, unit:'мг/сут', correctionIds:['telmisartan','astragalus','vitamin_d3','taurine'] },
+  { marker:'CREATININE_URINE', name:'Креатинин мочи', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','OSMOREGULATION'], higherIsWorse:false, defaultValue:13, unit:'ммоль/л', correctionIds:['astragalus','taurine','cordyceps'] },
+  { marker:'URINE_VOLUME_24H', name:'Суточный диурез', organ:'KIDNEYS', system:'renal', mechanisms:['OSMOREGULATION','RENOPROTECTION'], higherIsWorse:false, defaultValue:1500, unit:'мл/сут', correctionIds:['taurine','d_mannose'] },
+  { marker:'UROBILINOGEN', name:'Уробилиноген', organ:'LIVER', system:'hepatic', mechanisms:['BILE_FLOW_STIMULATION','BILE_ACID_MOD'], higherIsWorse:true, defaultValue:5, unit:'мг/л', correctionIds:['tudca','milk_thistle','vitamin_k2'] },
+  { marker:'URINE_NITRITE_Q', name:'Нитриты мочи (колич.)', organ:'KIDNEYS', system:'renal', mechanisms:['ANTIINFLAMMATORY','IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:0, unit:'мг/л', correctionIds:['d_mannose','cranberry','probiotic'] },
+  { marker:'URINE_BILIRUBIN_Q', name:'Билирубин мочи (колич.)', organ:'LIVER', system:'hepatic', mechanisms:['BILE_FLOW_STIMULATION','BILE_ACID_MOD'], higherIsWorse:true, defaultValue:0, unit:'мкмоль/л', correctionIds:['tudca','milk_thistle','vitamin_k2'] },
+  { marker:'NECHIP_LEU', name:'Нечипоренко лейкоциты', organ:'KIDNEYS', system:'renal', mechanisms:['IMMUNE_MODULATION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:4000, unit:'кл/мл', correctionIds:['d_mannose','astragalus','probiotic','cranberry'] },
+  { marker:'NECHIP_ERY', name:'Нечипоренко эритроциты', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:1000, unit:'кл/мл', correctionIds:['astragalus','vitamin_c','telmisartan'] },
+  { marker:'NECHIP_CYL', name:'Нечипоренко цилиндры', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:200, unit:'кл/мл', correctionIds:['astragalus','taurine','cordyceps'] },
+  { marker:'URINE_CALCIUM', name:'Кальций мочи (суточн.)', organ:'KIDNEYS', system:'renal', mechanisms:['CALCIUM_REGULATION','BONE_MINERALIZATION'], higherIsWorse:true, defaultValue:7.5, unit:'ммоль/сут', correctionIds:['vitamin_d3','vitamin_k2','magnesium','hydrochlorothiazide'] },
+  { marker:'URINE_OXALATE', name:'Оксалаты мочи', organ:'KIDNEYS', system:'renal', mechanisms:['ANTIOXIDANT','RENOPROTECTION'], higherIsWorse:true, defaultValue:0.4, unit:'ммоль/сут', correctionIds:['magnesium','pyridoxine','citrate','probiotic'] },
+  { marker:'URINE_URATE', name:'Ураты мочи (суточн.)', organ:'KIDNEYS', system:'renal', mechanisms:['ANTIOXIDANT','RENOPROTECTION'], higherIsWorse:true, defaultValue:7, unit:'ммоль/сут', correctionIds:['taurine','cordyceps','allopurinol','astragalus'] },
+  // ── Полуколичественные (шкала 0-4) ──
+  { marker:'URINE_PROTEIN_QR', name:'Белок мочи (кач.)', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:0.5, unit:'score', correctionIds:['telmisartan','astragalus','taurine'] },
+  { marker:'URINE_GLUCOSE_QR', name:'Глюкоза мочи (кач.)', organ:'KIDNEYS', system:'metabolic', mechanisms:['INSULIN_SENSITIVITY','GLUCOSE_METABOLISM'], higherIsWorse:true, defaultValue:0.5, unit:'score', correctionIds:['berberine','alpha_lipoic','chromium'] },
+  { marker:'URINE_KETONES_QR', name:'Кетоны мочи (кач.)', organ:'LIVER', system:'metabolic', mechanisms:['MITOCHONDRIAL_ENERGY','FATTY_ACID_TRANSPORT'], higherIsWorse:true, defaultValue:0.5, unit:'score', correctionIds:['alpha_lipoic','coq10','carnitine'] },
+  { marker:'URINE_BILIRUBIN_QR', name:'Билирубин мочи (кач.)', organ:'LIVER', system:'hepatic', mechanisms:['BILE_FLOW_STIMULATION','BILE_ACID_MOD'], higherIsWorse:true, defaultValue:0, unit:'score', correctionIds:['tudca','milk_thistle','vitamin_k2'] },
+  { marker:'UROBILINOGEN_QR', name:'Уробилиноген (кач.)', organ:'LIVER', system:'hepatic', mechanisms:['BILE_FLOW_STIMULATION','BILE_ACID_MOD'], higherIsWorse:true, defaultValue:0.5, unit:'score', correctionIds:['tudca','milk_thistle','vitamin_k2'] },
+  { marker:'URINE_NITRITE_QR', name:'Нитриты мочи (кач.)', organ:'KIDNEYS', system:'renal', mechanisms:['ANTIINFLAMMATORY','IMMUNE_MODULATION'], higherIsWorse:true, defaultValue:0, unit:'score', correctionIds:['d_mannose','cranberry','probiotic'] },
+  { marker:'URINE_LEU_QR', name:'Лейкоциты мочи (тест-полос.)', organ:'KIDNEYS', system:'renal', mechanisms:['IMMUNE_MODULATION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:0.5, unit:'score', correctionIds:['d_mannose','astragalus','probiotic','cranberry'] },
+  { marker:'URINE_BLOOD_QR', name:'Кровь мочи (тест-полос.)', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:0.5, unit:'score', correctionIds:['astragalus','vitamin_c','telmisartan'] },
 ];
 
 // ─── Quick lookup functions ───
