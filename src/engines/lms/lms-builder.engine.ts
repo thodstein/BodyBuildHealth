@@ -104,6 +104,7 @@ export interface LMSPlanWeek {
   days: LMSPlanDay[];
   /** Фаза, выведенная из оригинальной недельной раскладки PL-цикла. */
   sourcePhase?: MesocyclePhase;
+  sourcePhaseOrigin?: 'original' | 'inferred';
   /** Фаза годового макроцикла, если план собран из Macrocycle. */
   macroPhase?: string;
 }
@@ -739,7 +740,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const sourceLayouts = template.weeks && template.weeks.length > 0
     ? template.weeks
     : Array.from({ length: totalWeeks }, () => template.week1);
-  const sourceSnapshots = summarizeSourceCycleWeeks(sourceLayouts, template.meta.period);
+  const sourceSnapshots = summarizeSourceCycleWeeks(sourceLayouts, template.meta.period, template.meta.sourcePhases, template.meta.sourcePhaseSource ?? 'original');
   for (let w = 0; w < totalWeeks; w++) {
     const weekNumber = w + 1;
     const phase: MesocyclePhase = mesocyclePhaseForWeek(weekNumber, totalWeeks);
@@ -958,7 +959,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       d.metrics = calcSessionMetrics(metricsEx);
     }
 
-    weeks.push({ week: weekNumber, pmRow, days, sourcePhase: sourceSnapshots[w % sourceSnapshots.length]?.phase });
+    weeks.push({
+      week: weekNumber,
+      pmRow,
+      days,
+      sourcePhase: sourceSnapshots[w % sourceSnapshots.length]?.phase,
+      sourcePhaseOrigin: sourceSnapshots[w % sourceSnapshots.length]?.phaseOrigin,
+    });
   }
 
   const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({

@@ -9,8 +9,8 @@ import {
 } from '../../../engines/pro/mesocycle-progression.engine';
 import type { MesocyclePhase } from '../../../engines/rir-matrix.engine';
 import type { SourceWeekSnapshot } from '../../../engines/lms/source-phase.engine';
-import { SOURCE_PHASE_LABEL } from '../../../engines/lms/source-phase.engine';
-export { SOURCE_PHASE_LABEL, sourcePhaseForWeek, sourceWeekColor, summarizeSourceCycleWeeks } from '../../../engines/lms/source-phase.engine';
+import { SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL } from '../../../engines/lms/source-phase.engine';
+export { SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL, sourcePhaseForWeek, sourceWeekColor, summarizeSourceCycleWeeks } from '../../../engines/lms/source-phase.engine';
 export type { SourceWeekSnapshot } from '../../../engines/lms/source-phase.engine';
 import { applyToPlanner } from './planner-bridge';
 
@@ -158,7 +158,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
               minWidth: 340,
             }}>
               <span style={{ fontWeight: 700, color }}>{p.week}</span>
-              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{isSourceCalendar ? SOURCE_PHASE_LABEL[(p as SourceWeekSnapshot).phase] : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
+              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{isSourceCalendar ? `${SOURCE_PHASE_ORIGIN_LABEL[(p as SourceWeekSnapshot).phaseOrigin]} · ${SOURCE_PHASE_LABEL[(p as SourceWeekSnapshot).phase]}` : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
               <span style={{ color: 'rgba(255,255,255,0.7)' }}>{volumeMultiplierFor(p).toFixed(2)}</span>
               <span style={{ fontWeight: 600 }}>{p.volumeSets}</span>
               <span style={{ color: p.intensityPct > 0.85 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{Math.round(p.intensityPct * 100)}%</span>

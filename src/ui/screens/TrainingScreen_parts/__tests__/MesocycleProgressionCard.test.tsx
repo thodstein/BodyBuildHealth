@@ -25,6 +25,7 @@ describe('PL original mesocycle calendar', () => {
       intensityPct: 0.6,
       rir: 2,
       phase: 'base',
+      phaseOrigin: 'inferred',
     }]);
   });
 
@@ -56,6 +57,19 @@ describe('PL original mesocycle calendar', () => {
     expect(summarizeSourceCycleWeeks(weeks)[1].phase).toBe('deload');
   });
 
+  it('prefers explicit source phase blocks over inferred load phases', () => {
+    const weeks = [
+      [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, sets: [{ pct: 0.65, reps: 5, sets: 10 }] }] }],
+      [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, sets: [{ pct: 0.55, reps: 5, sets: 5 }] }] }],
+    ];
+
+    expect(summarizeSourceCycleWeeks(weeks, 'strength', [{ weekStart: 1, weekEnd: 2, phase: 'peak', title: 'Интенсификация' }]))
+      .toEqual([
+        expect.objectContaining({ phase: 'peak', phaseOrigin: 'original' }),
+        expect.objectContaining({ phase: 'peak', phaseOrigin: 'original' }),
+      ]);
+  });
+
   it('preserves the source layout for every PL cycle when building the program', () => {
     const plCycles = LMS_CYCLES.filter(cycle => normalizeCycleDirection(cycle.meta.direction) !== 'bodybuilding');
 
@@ -76,6 +90,7 @@ describe('PL original mesocycle calendar', () => {
       expect(plan.weeks.map(week => week.sourcePhase)).toEqual(
         summarizeSourceCycleWeeks(sourceWeeks, cycle.meta.period).map(week => week.phase),
       );
+      expect(plan.weeks.every(week => week.sourcePhaseOrigin === 'inferred')).toBe(true);
       for (let weekIndex = 0; weekIndex < sourceWeeks.length; weekIndex += 1) {
         const sourceWeek = sourceWeeks[weekIndex];
         const planWeek = plan.weeks[weekIndex];

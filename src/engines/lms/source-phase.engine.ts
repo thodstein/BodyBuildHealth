@@ -1,5 +1,7 @@
 import type { MesocyclePhase } from '../rir-matrix.engine';
-import type { SRDaySpec, SRPeriod } from '../../data/lms-cycles/lms-types';
+import type { SRDaySpec, SRPeriod, SRPhaseBlock } from '../../data/lms-cycles/lms-types';
+
+export type SourcePhaseOrigin = 'original' | 'inferred';
 
 export interface SourceWeekSnapshot {
   week: number;
@@ -7,6 +9,7 @@ export interface SourceWeekSnapshot {
   intensityPct: number;
   rir: number;
   phase: MesocyclePhase;
+  phaseOrigin: SourcePhaseOrigin;
 }
 
 export const SOURCE_PHASE_LABEL: Record<MesocyclePhase, string> = {
@@ -14,6 +17,11 @@ export const SOURCE_PHASE_LABEL: Record<MesocyclePhase, string> = {
   build: 'Накопление',
   peak: 'Интенсификация / пик',
   deload: 'Разгрузка',
+};
+
+export const SOURCE_PHASE_ORIGIN_LABEL: Record<SourcePhaseOrigin, string> = {
+  original: 'Оригинал',
+  inferred: 'По исходной нагрузке',
 };
 
 export function sourcePhaseForWeek(
@@ -33,7 +41,12 @@ export function sourcePhaseForWeek(
   return 'base';
 }
 
-export function summarizeSourceCycleWeeks(weeks: SRDaySpec[][], period: SRPeriod = 'strength'): SourceWeekSnapshot[] {
+export function summarizeSourceCycleWeeks(
+  weeks: SRDaySpec[][],
+  period: SRPeriod = 'strength',
+  explicitPhases?: SRPhaseBlock[],
+  explicitOrigin: SourcePhaseOrigin = 'original',
+): SourceWeekSnapshot[] {
   const summaries = weeks.map((week, index) => {
     let volumeSets = 0;
     let intensityNumerator = 0;
@@ -54,12 +67,27 @@ export function summarizeSourceCycleWeeks(weeks: SRDaySpec[][], period: SRPeriod
       intensityPct: volumeSets > 0 ? intensityNumerator / volumeSets : 0,
       rir: volumeSets > 0 ? rirNumerator / volumeSets : 0,
       phase: 'base' as MesocyclePhase,
+      phaseOrigin: 'inferred' as SourcePhaseOrigin,
     };
   });
   return summaries.map((summary, index) => ({
     ...summary,
-    phase: sourcePhaseForWeek(summary, index, summaries, period),
+    phase: explicitPhases?.find(block => index + 1 >= block.weekStart && index + 1 <= block.weekEnd)
+      ? phaseFromExplicitBlock(explicitPhases.find(block => index + 1 >= block.weekStart && index + 1 <= block.weekEnd)!)
+      : sourcePhaseForWeek(summary, index, summaries, period),
+    phaseOrigin: explicitPhases?.some(block => index + 1 >= block.weekStart && index + 1 <= block.weekEnd)
+      ? explicitOrigin
+      : 'inferred',
   }));
+}
+
+function phaseFromExplicitBlock(block: SRPhaseBlock): MesocyclePhase {
+  if (block.phase) return block.phase;
+  const title = (block.title || '').toLowerCase();
+  if (/разгруз|deload|восстанов/.test(title)) return 'deload';
+  if (/пик|peak|интенсиф|подвод/.test(title)) return 'peak';
+  if (/накоп|build|объ[её]м/.test(title)) return 'build';
+  return 'base';
 }
 
 export function sourceWeekColor(snapshot: SourceWeekSnapshot, allWeeks: SourceWeekSnapshot[]): string {
