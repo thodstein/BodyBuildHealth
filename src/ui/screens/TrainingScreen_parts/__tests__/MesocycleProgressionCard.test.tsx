@@ -24,6 +24,7 @@ describe('PL original mesocycle calendar', () => {
       volumeSets: 3,
       intensityPct: 0.6,
       rir: 2,
+      phase: 'base',
     }]);
   });
 
@@ -46,6 +47,15 @@ describe('PL original mesocycle calendar', () => {
     expect(new Set(weeks.map(week => sourceWeekColor(week, weeks))).size).toBe(3);
   });
 
+  it('marks a real source volume drop as deload', () => {
+    const weeks = [
+      [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, sets: [{ pct: 0.65, reps: 5, sets: 10 }] }] }],
+      [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, sets: [{ pct: 0.55, reps: 5, sets: 5 }] }] }],
+    ];
+
+    expect(summarizeSourceCycleWeeks(weeks)[1].phase).toBe('deload');
+  });
+
   it('preserves the source layout for every PL cycle when building the program', () => {
     const plCycles = LMS_CYCLES.filter(cycle => normalizeCycleDirection(cycle.meta.direction) !== 'bodybuilding');
 
@@ -63,6 +73,9 @@ describe('PL original mesocycle calendar', () => {
       });
 
       expect(plan.weeks, cycle.meta.id).toHaveLength(sourceWeeks.length);
+      expect(plan.weeks.map(week => week.sourcePhase)).toEqual(
+        summarizeSourceCycleWeeks(sourceWeeks, cycle.meta.period).map(week => week.phase),
+      );
       for (let weekIndex = 0; weekIndex < sourceWeeks.length; weekIndex += 1) {
         const sourceWeek = sourceWeeks[weekIndex];
         const planWeek = plan.weeks[weekIndex];

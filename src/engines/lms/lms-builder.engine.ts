@@ -21,6 +21,7 @@ import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
+import { summarizeSourceCycleWeeks } from './source-phase.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -101,6 +102,8 @@ export interface LMSPlanWeek {
   week: number;
   pmRow: Record<string, number>; // PM по упражнениям на эту неделю
   days: LMSPlanDay[];
+  /** Фаза, выведенная из оригинальной недельной раскладки PL-цикла. */
+  sourcePhase?: MesocyclePhase;
   /** Фаза годового макроцикла, если план собран из Macrocycle. */
   macroPhase?: string;
 }
@@ -733,6 +736,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const arRirShift = ar?.rirShift ?? 0;
 
   const weeks: LMSPlanWeek[] = [];
+  const sourceLayouts = template.weeks && template.weeks.length > 0
+    ? template.weeks
+    : Array.from({ length: totalWeeks }, () => template.week1);
+  const sourceSnapshots = summarizeSourceCycleWeeks(sourceLayouts, template.meta.period);
   for (let w = 0; w < totalWeeks; w++) {
     const weekNumber = w + 1;
     const phase: MesocyclePhase = mesocyclePhaseForWeek(weekNumber, totalWeeks);
@@ -951,7 +958,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       d.metrics = calcSessionMetrics(metricsEx);
     }
 
-    weeks.push({ week: weekNumber, pmRow, days });
+    weeks.push({ week: weekNumber, pmRow, days, sourcePhase: sourceSnapshots[w % sourceSnapshots.length]?.phase });
   }
 
   const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({

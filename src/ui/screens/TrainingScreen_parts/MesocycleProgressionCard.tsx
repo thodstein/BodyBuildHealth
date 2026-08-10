@@ -8,7 +8,10 @@ import {
   type InterMesoStep,
 } from '../../../engines/pro/mesocycle-progression.engine';
 import type { MesocyclePhase } from '../../../engines/rir-matrix.engine';
-import type { SRDaySpec } from '../../../data/lms-cycles/lms-types';
+import type { SourceWeekSnapshot } from '../../../engines/lms/source-phase.engine';
+import { SOURCE_PHASE_LABEL } from '../../../engines/lms/source-phase.engine';
+export { SOURCE_PHASE_LABEL, sourcePhaseForWeek, sourceWeekColor, summarizeSourceCycleWeeks } from '../../../engines/lms/source-phase.engine';
+export type { SourceWeekSnapshot } from '../../../engines/lms/source-phase.engine';
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
@@ -39,53 +42,6 @@ export interface MesocycleProgressionCardProps {
   title?: string;
   /** Исходная недельная раскладка СРЦ. При наличии отключает типовую кривую. */
   sourceWeeks?: SourceWeekSnapshot[];
-}
-
-export interface SourceWeekSnapshot {
-  week: number;
-  volumeSets: number;
-  intensityPct: number;
-  rir: number;
-}
-
-/** Цвет недели по фактической интенсивности и объёму исходного цикла. */
-export function sourceWeekColor(snapshot: SourceWeekSnapshot, allWeeks: SourceWeekSnapshot[]): string {
-  const intensities = allWeeks.map(week => week.intensityPct);
-  const volumes = allWeeks.map(week => week.volumeSets);
-  const minIntensity = Math.min(...intensities);
-  const maxIntensity = Math.max(...intensities);
-  const minVolume = Math.min(...volumes);
-  const maxVolume = Math.max(...volumes);
-  const intensityRatio = (snapshot.intensityPct - minIntensity) / Math.max(0.001, maxIntensity - minIntensity);
-  const volumeRatio = (snapshot.volumeSets - minVolume) / Math.max(1, maxVolume - minVolume);
-  const loadRatio = Math.max(0, Math.min(1, intensityRatio * 0.7 + volumeRatio * 0.3));
-  const hue = Math.round(145 - loadRatio * 145);
-  return `hsl(${hue} 72% 48%)`;
-}
-
-/** Сводка исходных недель без фазовой генерации и без округления исходных сетов. */
-export function summarizeSourceCycleWeeks(weeks: SRDaySpec[][]): SourceWeekSnapshot[] {
-  return weeks.map((week, index) => {
-    let volumeSets = 0;
-    let intensityNumerator = 0;
-    let rirNumerator = 0;
-    for (const day of week) {
-      for (const exercise of day.exercises) {
-        for (const set of exercise.sets) {
-          const sets = Math.max(0, Number(set.sets) || 0);
-          volumeSets += sets;
-          intensityNumerator += (Number(set.pct) || 0) * sets;
-          rirNumerator += (Number(set.rir) || 0) * sets;
-        }
-      }
-    }
-    return {
-      week: index + 1,
-      volumeSets,
-      intensityPct: volumeSets > 0 ? intensityNumerator / volumeSets : 0,
-      rir: volumeSets > 0 ? rirNumerator / volumeSets : 0,
-    };
-  });
 }
 
 export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> = ({
@@ -202,7 +158,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
               minWidth: 340,
             }}>
               <span style={{ fontWeight: 700, color }}>{p.week}</span>
-              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{isSourceCalendar ? 'Оригинал' : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
+              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{isSourceCalendar ? SOURCE_PHASE_LABEL[(p as SourceWeekSnapshot).phase] : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
               <span style={{ color: 'rgba(255,255,255,0.7)' }}>{volumeMultiplierFor(p).toFixed(2)}</span>
               <span style={{ fontWeight: 600 }}>{p.volumeSets}</span>
               <span style={{ color: p.intensityPct > 0.85 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{Math.round(p.intensityPct * 100)}%</span>
