@@ -3038,6 +3038,24 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
 /* ════════════════════════════════════════════════════════════════
    ПЛ-авто мобильная фикска — контент не вылезает за правый край
    ════════════════════════════════════════════════════════════════ */
+/* Фокус-подсветка полей ввода в тренировочном блоке */
+.training-screen input[type="text"]:focus,
+.training-screen input[type="search"]:focus,
+.training-screen input:focus,
+.training-screen select:focus,
+.training-screen textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.18) !important;
+}
+/* Текст в ПЛ-авто — ярко-белый для читаемости (только dim-белые, цветные данные не трогаем) */
+.pl-auto-screen [style*="color: rgba(255, 255, 255, 0.3"],
+.pl-auto-screen [style*="color: rgba(255, 255, 255, 0.4"],
+.pl-auto-screen [style*="color: rgba(255, 255, 255, 0.5"],
+.pl-auto-screen [style*="color: rgba(255, 255, 255, 0.6"],
+.pl-auto-screen [style*="color: rgba(255, 255, 255, 0.7"],
+.pl-auto-screen [style*="color: rgba(255, 255, 255, 0.8"] {
+  color: #fff !important;
+}
 .pl-auto-screen {
   overflow-x: hidden !important;
   max-width: 100% !important;

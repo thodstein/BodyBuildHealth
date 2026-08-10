@@ -103,11 +103,11 @@ const WorkoutWeekCard: React.FC<{
     <div style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
       <div onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
           <strong style={{ color: ACCENT, fontSize: 12 }}>{weekLabel}</strong>
           {isDeload && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 700 }}>ДЕЛОУД</span>}
         </div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff' }}>
           <span>{workouts.length} трен.</span>
           <span>{totalSets} подходов</span>
           <span>{(totalVol / 1000).toFixed(1)}т кг</span>
@@ -116,10 +116,10 @@ const WorkoutWeekCard: React.FC<{
       {expanded && workouts.map(workout => (
         <div key={workout.id} style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: 'rgba(255,255,255,0.5)' }}>{workout.split || 'Тренировка'}</span></span>
+            <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: '#fff' }}>{workout.split || 'Тренировка'}</span></span>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{Math.round(workout.exercises.reduce((sum, e) => sum + e.totalVolume, 0)).toLocaleString()} кг</span>
-              <button onClick={e => { e.stopPropagation(); const lines: string[] = [`${new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })} — ${workout.split || 'Тренировка'}`, '']; workout.exercises.forEach(ex => { lines.push(ex.exerciseName); ex.sets.forEach((s, i) => { lines.push(`  ${i+1}. ${s.weight}кг × ${s.reps}${s.rir !== undefined ? ` RIR${s.rir}` : ''}`); }); lines.push(''); }); if (workout.overallRPE) lines.push(`RPE: ${workout.overallRPE}`); if (workout.duration) lines.push(`Длительность: ${workout.duration} мин`); if (workout.notes) lines.push(`Заметки: ${workout.notes}`); navigator.clipboard?.writeText(lines.join('\n')); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Копировать тренировку">📋</button>
+              <span style={{ fontSize: 10, color: '#fff' }}>{Math.round(workout.exercises.reduce((sum, e) => sum + e.totalVolume, 0)).toLocaleString()} кг</span>
+              <button onClick={e => { e.stopPropagation(); const lines: string[] = [`${new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })} — ${workout.split || 'Тренировка'}`, '']; workout.exercises.forEach(ex => { lines.push(ex.exerciseName); ex.sets.forEach((s, i) => { lines.push(`  ${i+1}. ${s.weight}кг × ${s.reps}${s.rir !== undefined ? ` RIR${s.rir}` : ''}`); }); lines.push(''); }); if (workout.overallRPE) lines.push(`RPE: ${workout.overallRPE}`); if (workout.duration) lines.push(`Длительность: ${workout.duration} мин`); if (workout.notes) lines.push(`Заметки: ${workout.notes}`); navigator.clipboard?.writeText(lines.join('\n')); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Копировать тренировку">📋</button>
             </div>
           </div>
           <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
@@ -131,13 +131,13 @@ const WorkoutWeekCard: React.FC<{
               const isPR = delta !== null && delta > 0;
               return (
                 <div key={exercise.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                  <span style={{ flex: 1, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.exerciseName}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.4)', minWidth: 40, textAlign: 'right' }}>{exercise.sets.length}сет</span>
-                  <span style={{ color: 'rgba(255,255,255,0.5)', minWidth: 55, textAlign: 'right' }}>{current ? `${Math.round(current)}` : '—'}</span>
+                  <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.exerciseName}</span>
+                  <span style={{ color: '#fff', minWidth: 40, textAlign: 'right' }}>{exercise.sets.length}сет</span>
+                  <span style={{ color: '#fff', minWidth: 55, textAlign: 'right' }}>{current ? `${Math.round(current)}` : '—'}</span>
                   {deltaPct !== null && (
                     <span style={{
                       minWidth: 40, textAlign: 'right', fontWeight: 700,
-                      color: isPR ? '#22c55e' : delta === 0 ? 'rgba(255,255,255,0.3)' : '#ef4444',
+                      color: isPR ? '#22c55e' : delta === 0 ? 'rgba(255,255,255,0.8)' : '#ef4444',
                       fontSize: 10,
                     }}>
                       {isPR ? '+' : ''}{deltaPct}%
@@ -150,14 +150,14 @@ const WorkoutWeekCard: React.FC<{
           </div>
           {/* Workout meta + notes */}
           {(workout.overallRPE || workout.duration || workout.notes) && (
-            <div style={{ marginTop: 6, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+            <div style={{ marginTop: 6, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 6, fontSize: 9, color: 'rgba(255,255,255,0.9)' }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {workout.overallRPE && <span>RPE: <strong style={{ color: 'rgba(255,255,255,0.6)' }}>{workout.overallRPE}</strong></span>}
+                {workout.overallRPE && <span>RPE: <strong style={{ color: '#fff' }}>{workout.overallRPE}</strong></span>}
                 {workout.duration && <span>{workout.duration} мин</span>}
                 {workout.recoveryBefore && <span>Восст: {workout.recoveryBefore}/5</span>}
               </div>
               {workout.notes && (
-                <div style={{ marginTop: 3, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic', lineHeight: 1.3 }}>{workout.notes}</div>
+                <div style={{ marginTop: 3, color: '#fff', fontStyle: 'italic', lineHeight: 1.3 }}>{workout.notes}</div>
               )}
             </div>
           )}
@@ -169,8 +169,8 @@ const WorkoutWeekCard: React.FC<{
 
 const style: Record<string, React.CSSProperties> = {
   card: { padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 },
-  label: { fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase', marginBottom: 8 },
-  input: { width: '100%', padding: '6px 4px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' as any },
+  label: { fontSize: 10, color: '#fff', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase', marginBottom: 8 },
+  input: { width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, boxSizing: 'border-box' as any, outline: 'none', transition: 'border-color .15s, box-shadow .15s' },
   btn: { width: '100%', padding: 9, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 12 },
 };
 
@@ -469,6 +469,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   useEffect(() => { setMode(resolvedMode); }, [resolvedMode]);
   const [search, setSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
   const [notesFilter, setNotesFilter] = useState('');
   const isMobile = useIsMobile();
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
@@ -1087,15 +1088,46 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             );
           })()}
-          {/* Search + group filter + exercise filter */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          {/* Search + group filter */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={{ ...style.input, flex: 2 }} />
-            <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
-              style={{ ...style.input, flex: 1, padding: '6px 4px' }}>
-              <option value="all">Все группы</option>
-              {Object.entries(GRP_RU).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+            <button onClick={() => setGroupPickerOpen(true)} style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+              padding: '10px 12px', borderRadius: 10, cursor: 'pointer', minWidth: 0,
+              background: filterGroup !== 'all' ? `${GROUP_COLORS[filterGroup]}1a` : 'rgba(255,255,255,0.06)',
+              border: filterGroup !== 'all' ? `1px solid ${GROUP_COLORS[filterGroup]}66` : '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', fontSize: 12, fontWeight: 600,
+            }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>💪 {filterGroup === 'all' ? 'Все группы' : GRP_RU[filterGroup]}</span>
+              <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
+            </button>
           </div>
+          {groupPickerOpen && (
+            <div onClick={() => setGroupPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+              <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>💪 Выбор по группам</div>
+                  <button onClick={() => setGroupPickerOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <button onClick={() => { setFilterGroup('all'); setGroupPickerOpen(false); }} style={{
+                    padding: '10px 14px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    border: filterGroup === 'all' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.12)',
+                    background: filterGroup === 'all' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+                    color: '#fff',
+                  }}>Все группы</button>
+                  {Object.entries(GRP_RU).map(([k, v]) => (
+                    <button key={k} onClick={() => { setFilterGroup(k); setGroupPickerOpen(false); }} style={{
+                      padding: '10px 14px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: filterGroup === k ? `2px solid ${GROUP_COLORS[k]}` : '1px solid rgba(255,255,255,0.12)',
+                      background: filterGroup === k ? `${GROUP_COLORS[k]}1f` : 'rgba(255,255,255,0.04)',
+                      color: '#fff',
+                    }}>{v}{filterGroup === k ? ' ✓' : ''}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {allExerciseNames.length > 0 && (
             <div style={{ marginBottom: 6 }}>
               <input type="text" value={historyExerciseFilter} onChange={e => setHistoryExerciseFilter(e.target.value)}
@@ -1115,8 +1147,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           )}
           {filteredHistory.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6, gap: 6 }}>
-              <button onClick={() => setHistoryExpanded('__all__')} style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Развернуть все</button>
-              <button onClick={() => setHistoryExpanded(null)} style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Свернуть все</button>
+              <button onClick={() => setHistoryExpanded('__all__')} style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Развернуть все</button>
+              <button onClick={() => setHistoryExpanded(null)} style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Свернуть все</button>
             </div>
           )}
           {/* Exercise-specific stats when filtered */}
@@ -1133,19 +1165,19 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               <div style={style.card}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div style={style.label}>🏋️ {historyExerciseFilter}</div>
-                  <button onClick={() => setHistoryExerciseFilter('')} style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ сброс</button>
+                  <button onClick={() => setHistoryExerciseFilter('')} style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none', cursor: 'pointer' }}>✕ сброс</button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Объём</div>
+                    <div style={{ color: '#fff' }}>Объём</div>
                     <div style={{ fontWeight: 700, color: ACCENT }}>{(totalVol / 1000).toFixed(1)}т кг</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Лучший e1RM</div>
+                    <div style={{ color: '#fff' }}>Лучший e1RM</div>
                     <div style={{ fontWeight: 700, color: '#f59e0b' }}>{Math.round(bestE1RM)} кг</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)' }}>Сетов</div>
+                    <div style={{ color: '#fff' }}>Сетов</div>
                     <div style={{ fontWeight: 700, color: '#60a5fa' }}>{totalSets}</div>
                   </div>
                 </div>
@@ -1170,7 +1202,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           {filteredHistory.length === 0 && (
             <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
               <div style={{ fontSize: 28, marginBottom: 6 }}>📜</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{search || historyExerciseFilter ? 'Ничего не найдено' : 'Нет тренировок. Запишите первую во вкладке «Запись».'}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)' }}>{search || historyExerciseFilter ? 'Ничего не найдено' : 'Нет тренировок. Запишите первую во вкладке «Запись».'}</div>
             </div>
           )}
         </div>
