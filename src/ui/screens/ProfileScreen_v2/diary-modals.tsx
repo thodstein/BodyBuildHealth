@@ -909,7 +909,7 @@ export const DiaryModalShell: React.FC<{
                 ✕
               </button>
             </div>
-            <div style={{ padding: 15, overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>
+            <div style={{ padding: 15, overflowY: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>{children}</div>
             {footer ?? (
               <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${color}1e`, flexShrink: 0, background: 'rgba(0,0,0,0.16)' }}>
                 {fill && fill.total > 0 && (

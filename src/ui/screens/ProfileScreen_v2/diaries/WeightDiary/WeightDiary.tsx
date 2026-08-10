@@ -39,28 +39,26 @@ import { AnimatedCounter } from '@/ui/components/AnimatedCounter';
 
 const style = document.createElement('style');
 style.textContent = `
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
-  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-  @keyframes countUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-  .wd-card { animation: fadeIn 0.35s ease; transition: transform 0.2s, box-shadow 0.2s; }
-  .wd-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-  .wd-row { animation: fadeIn 0.3s ease; transition: background 0.15s; }
-  .wd-row:hover { background: '#27272a' !important; }
-  .wd-badge { animation: slideIn 0.25s ease; }
-  .wd-stat-value { animation: countUp 0.4s ease; }
-  .wd-btn { transition: background 0.2s, transform 0.15s; }
-  .wd-btn:hover { transform: scale(1.02); }
-  .wd-btn:active { transform: scale(0.98); }
-  @media (max-width: 520px) {
+  @keyframes wd-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes wd-slide { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes wd-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .wd-card { animation: wd-fade 0.3s ease; }
+  .wd-diary::-webkit-scrollbar { width: 8px; }
+  .wd-diary::-webkit-scrollbar-track { background: transparent; }
+  .wd-diary::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+  .wd-diary::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.24); }
+  .wd-table-wrap::-webkit-scrollbar { height: 6px; }
+  .wd-table-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 999px; }
+  @media (max-width: 560px) {
     .wd-chart-wrap svg { min-height: 180px; }
     .wd-table-wrap { overflow-x: visible !important; }
     .wd-table-wrap table { min-width: 0 !important; }
     .wd-table-wrap thead { display: none; }
-    .wd-table-wrap tbody tr { display: block; border: 1px solid #27272a; border-radius: 10px; margin-bottom: 10px; padding: 8px; background: #18181b; }
-    .wd-table-wrap td { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 4px !important; border-bottom: 1px dashed #27272a; }
+    .wd-table-wrap tbody tr { display: block; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; margin-bottom: 10px; padding: 10px; background: #131316; }
+    .wd-table-wrap td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 2px !important; border-bottom: 1px dashed rgba(255,255,255,0.07); }
     .wd-table-wrap td:last-child { border-bottom: none; }
-    .wd-table-wrap td::before { content: attr(data-label); color: #71717a; font-size: 11px; flex-shrink: 0; }
+    .wd-table-wrap td::before { content: attr(data-label); color: #8b8b96; font-size: 11px; flex-shrink: 0; }
+    .wd-table-wrap td[data-label="Заметка"] { flex-direction: column; align-items: flex-start; }
   }
 `;
 if (typeof document !== 'undefined') document.head.appendChild(style);
@@ -101,7 +99,28 @@ const button: React.CSSProperties = {
   color: '#fff',
   cursor: 'pointer',
 };
-const input: React.CSSProperties = { ...button, boxSizing: 'border-box', background: '#09090b', width: '100%' };
+const input: React.CSSProperties = { ...button, boxSizing: 'border-box', background: '#0c0c0e', width: '100%' };
+const btnBack: React.CSSProperties = {
+  width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#e4e4e7', fontSize: 15,
+};
+const btnGhost: React.CSSProperties = {
+  minHeight: 32, padding: '5px 11px', borderRadius: 9, cursor: 'pointer',
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#d4d4d8', fontSize: 12,
+  transition: 'background 0.15s, border-color 0.15s',
+};
+const btnPrimary: React.CSSProperties = {
+  minHeight: 32, padding: '5px 14px', borderRadius: 9, cursor: 'pointer', fontWeight: 700,
+  background: 'linear-gradient(135deg,#16a34a,#22c55e)', border: '1px solid rgba(34,197,94,0.5)', color: '#fff', fontSize: 12,
+  transition: 'filter 0.15s, transform 0.1s',
+};
+const sec: React.CSSProperties = { padding: 14, background: '#131316', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, marginBottom: 12 };
+const toolbar: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 };
+const seg: React.CSSProperties = { minHeight: 28, padding: '0 12px', borderRadius: 8, cursor: 'pointer', border: 'none', fontSize: 12, fontWeight: 600, transition: 'background 0.15s, color 0.15s' };
+const sum: React.CSSProperties = { cursor: 'pointer', fontWeight: 700, fontSize: 13, userSelect: 'none', padding: '2px 0' };
+const tile: React.CSSProperties = { padding: 12, borderRadius: 12, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' };
+const chip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', fontSize: 11 };
+const chipBtn: React.CSSProperties = { minHeight: 28, padding: '0 10px', borderRadius: 999, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', fontSize: 11, fontWeight: 600, transition: 'background 0.15s, color 0.15s' };
 const FIELDS = [
   'weight',
   'waistCm',
@@ -681,306 +700,322 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     (training && weightPoints.length >= 3 ? laggedCorrelation(weightPoints, training.volumePoints, 1) : null);
   if (!open) return null;
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+    <div className="wd-diary"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        background: '#09090b', color: colors.text,
+        overflowY: 'auto', overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+      }}
     >
       <header
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 3,
-          display: 'flex',
-          gap: 7,
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          padding: 12,
-          background: 'linear-gradient(135deg,#18181b 0%,#0d2817 100%)',
-          borderBottom: '1px solid #3f3f46',
+          position: 'sticky', top: 0, zIndex: 3,
+          display: 'flex', flexDirection: 'column', gap: 8,
+          padding: '10px 14px',
+          background: 'rgba(9,9,11,0.94)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
         }}
       >
-        <button style={button} onClick={onClose}>
-          ← Дневники
-        </button>
-        <b style={{ fontSize: 17, backgroundImage: 'linear-gradient(90deg,#4ade80,#a3e635)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>⚖️ Вес и все замеры</b>
-        <button
-          style={{ ...button, background: 'linear-gradient(135deg,#166534,#22c55e)', border: '1px solid #22c55e66', fontWeight: 700 }}
-          onClick={() => setModal(true)}
-        >
-          + Добавить
-        </button>
-        <button style={button} onClick={() => setModal(true)}>
-          ⚡ Сегодня
-        </button>
-        {body && (
-          <small style={{ marginLeft: 'auto', color: '#4ade80', fontSize: 11, opacity: 0.9 }}>
-            Текущий: {body.latest.weight} кг{goal ? ` · цель ${goal} кг` : ''}
-          </small>
-        )}
-        <button style={button} onClick={doExportCsv}>
-          CSV
-        </button>
-        <button style={button} onClick={doPrint}>
-          PDF / Печать
-        </button>
-        {undo && (
-          <button
-            style={button}
-            onClick={() => {
-              commit(undo, false);
-              setUndo(null);
-            }}
-          >
-            ↩ Отменить
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button style={btnBack} onClick={onClose} aria-label="Назад к дневникам">
+            ←
           </button>
-        )}
-        <button
-          style={{ ...button, color: '#f87171' }}
-          onClick={() => {
-            if (rows.length && confirm('Очистить весь дневник?')) commit([]);
-          }}
-        >
-          Очистить
-        </button>
-      </header>
-      <main style={{ maxWidth: 1200, margin: 'auto', padding: 16 }}>
-        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {(['all', '7', '30', '90'] as const).map((r) => (
+          <b style={{ fontSize: 16, letterSpacing: '-0.2px' }}>Вес и замеры</b>
+          {body && (
+            <small style={{ marginLeft: 'auto', color: '#a1a1aa', fontSize: 11 }}>
+              Сейчас <b style={{ color: colors.text }}>{body.latest.weight} кг</b>
+              {goal > 0 ? ` · цель ${goal} кг` : ''}
+            </small>
+          )}
+          {undo && (
             <button
-              key={r}
-              style={{ ...button, background: range === r ? '#166534' : button.background }}
-              onClick={() => {
-                setRange(r);
-                setPage(1);
-              }}
+              style={btnGhost}
+              onClick={() => { commit(undo, false); setUndo(null); }}
+              title="Отменить последнее изменение"
             >
-              {r === 'all' ? 'Всё время' : `${r} дней`}
+              ↩ Отменить
             </button>
-          ))}
-          <input
-            style={{ ...input, width: 220 }}
-            placeholder="Поиск по дате и полям"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-          />
-          <label>
-            Цель, кг{' '}
-            <input
-              style={{ ...input, width: 90, display: 'inline-block', marginLeft: 4 }}
-              type="number"
-              step="0.1"
-              value={goal || ''}
-              onChange={(e) => setGoal(Number(e.target.value) || 0)}
-            />
-          </label>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button style={btnPrimary} onClick={() => setModal(true)}>+ Добавить</button>
+          <button style={btnGhost} onClick={() => setModal(true)}>⚡ Сегодня</button>
+          <span style={{ flex: 1 }} />
+          <button style={btnGhost} onClick={doExportCsv} title="Экспорт CSV">CSV</button>
+          <button style={btnGhost} onClick={doPrint} title="Печать / PDF">PDF</button>
           <button
-            style={{ ...button, background: showArchive ? '#166534' : button.background }}
-            onClick={() => setShowArchive((v) => !v)}
+            style={{ ...btnGhost, color: showArchive ? '#22c55e' : undefined }}
+            onClick={() => setShowArchive(v => !v)}
             aria-pressed={showArchive}
           >
-            🗄 Архив ({archiveRows.length})
+            🗄 Архив{archiveRows.length > 0 ? ` (${archiveRows.length})` : ''}
           </button>
-          <button style={button} onClick={syncFromProfile}>
-            📋 Из профиля
-          </button>
-          <button style={button} onClick={syncToProfile}>
-            💾 В профиль
-          </button>
-        </section>
-        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: 12, background: 'linear-gradient(135deg,#18181b,#0d2817)', borderRadius: 10, marginBottom: 12, border: '1px solid #22c55e33' }}>
-          <b style={{ fontSize: 14 }}>⚡ Быстрый ввод</b>
-          <input
-            style={{ ...input, width: 110 }}
-            type="number"
-            step="0.1"
-            min={20}
-            max={400}
-            placeholder="Вес, кг"
-            value={quickW}
-            onChange={(e) => setQuickW(e.target.value)}
-          />
-          <select
-            style={{ ...input, width: 150 }}
-            value={quickTod}
-            onChange={(e) => setQuickTod(e.target.value as 'morning' | 'evening')}
-            aria-label="Время суток"
-          >
-            <option value="morning">🌅 Утро</option>
-            <option value="evening">🌙 Вечер</option>
-          </select>
+          <button style={btnGhost} onClick={syncFromProfile} title="Загрузить рост/пол/цель из профиля">📋</button>
+          <button style={btnGhost} onClick={syncToProfile} title="Сохранить текущий вес в профиль">💾</button>
           <button
-            style={{
-              ...button,
-              background: 'linear-gradient(135deg,#166534,#22c55e)',
-              border: '1px solid #22c55e66',
-              fontWeight: 700,
-            }}
-            onClick={quickAdd}
-            disabled={!(Number(quickW) > 0 && Number(quickW) <= 400)}
+            style={{ ...btnGhost, color: '#f87171' }}
+            onClick={() => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }}
+            title="Очистить дневник"
           >
-            + Записать
+            🗑
           </button>
-          {rows.some((r) => r.date === new Date().toISOString().slice(0, 10)) && (
-            <small style={{ color: '#fbbf24' }}>Сегодня уже есть запись — будет обновлена</small>
-          )}
-        </section>
+        </div>
+      </header>
+
+      <main style={{ maxWidth: 980, margin: '0 auto', padding: '14px 14px 48px' }}>
         {rows.length === 0 && (
-          <section style={{ padding: 24, textAlign: 'center', borderRadius: 12, background: 'linear-gradient(135deg,#18181b,#0d2817)', border: '1px dashed #22c55e55', marginBottom: 12 }}>
-            <div style={{ fontSize: 34, marginBottom: 8 }}>⚖️</div>
-            <b>Пока нет записей веса</b>
-            <p style={{ color: '#aaa', fontSize: 13, margin: '6px 0 12px' }}>Добавьте первую запись через «+ Добавить» или быстрый ввод выше</p>
-            <button
-              style={{ ...button, background: 'linear-gradient(135deg,#166534,#22c55e)', border: '1px solid #22c55e66', fontWeight: 700 }}
-              onClick={() => setModal(true)}
-            >
-              + Добавить запись
-            </button>
-          </section>
-        )}
-        {showArchive && archiveRows.length > 0 && (
-          <details style={card} open>
-            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>
-              🗄 Архив ({archiveRows.length} записей старше 365 дней)
-            </summary>
-            <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
-              <button style={button} onClick={exportArchiveCsv}>CSV архива</button>
+          <div style={sec}>
+            <div style={{ textAlign: 'center', padding: '26px 12px' }}>
+              <div style={{ fontSize: 30, marginBottom: 8 }}>⚖️</div>
+              <b style={{ fontSize: 14 }}>Пока нет записей веса</b>
+              <p style={{ color: '#8b8b96', fontSize: 12, margin: '6px 0 14px' }}>
+                Добавьте первую запись — через «+ Добавить» или быстрый ввод ниже
+              </p>
+              <button style={btnPrimary} onClick={() => setModal(true)}>+ Добавить запись</button>
             </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Дата</th>
-                  <th style={thStyle}>Вес</th>
-                  <th style={thStyle}>Жир %</th>
-                  <th style={thStyle}>Заметка</th>
-                </tr>
-              </thead>
-              <tbody>
-                {archiveRows.slice(0, 100).map((r) => (
-                  <tr key={r.date} style={{ borderBottom: '1px solid #27272a' }}>
-                    <td style={{ padding: 5 }}>{r.date}</td>
-                    <td style={{ padding: 5 }}>{r.weight ? r.weight.toFixed(1) : '—'}</td>
-                    <td style={{ padding: 5 }}>{r.bodyFat !== undefined ? r.bodyFat + '%' : '—'}</td>
-                    <td style={{ padding: 5 }}>{r.notes || '—'}</td>
+          </div>
+        )}
+
+        {showArchive && archiveRows.length > 0 && (
+          <details style={sec} open>
+            <summary style={sum}>🗄 Архив — {archiveRows.length} записей старше 365 дней</summary>
+            <div style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
+              <button style={btnGhost} onClick={exportArchiveCsv}>CSV архива</button>
+            </div>
+            <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Дата</th>
+                    <th style={thStyle}>Вес</th>
+                    <th style={thStyle}>Жир %</th>
+                    <th style={thStyle}>Заметка</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {archiveRows.slice(0, 100).map((r) => (
+                    <tr key={r.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: 6 }}>{r.date}</td>
+                      <td style={{ padding: 6 }}>{r.weight ? r.weight.toFixed(1) : '—'}</td>
+                      <td style={{ padding: 6 }}>{r.bodyFat !== undefined ? r.bodyFat + '%' : '—'}</td>
+                      <td style={{ padding: 6 }}>{r.notes || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </details>
         )}
+
+        <section style={toolbar}>
+          <div style={{ display: 'flex', gap: 4, padding: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 10 }}>
+            {(['all', '7', '30', '90'] as const).map((r) => (
+              <button
+                key={r}
+                style={{
+                  ...seg,
+                  background: range === r ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  color: range === r ? '#fff' : '#8b8b96',
+                }}
+                onClick={() => { setRange(r); setPage(1); }}
+              >
+                {r === 'all' ? 'Всё' : `${r}д`}
+              </button>
+            ))}
+          </div>
+          <input
+            style={{ ...input, flex: '1 1 140px', minWidth: 120, height: 34 }}
+            placeholder="Поиск"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+            aria-label="Поиск по дате и полям"
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8b8b96' }}>
+            Цель
+            <input
+              style={{ ...input, width: 74, height: 34 }}
+              type="number" step="0.1" min={0}
+              value={goal || ''}
+              onChange={(e) => setGoal(Number(e.target.value) || 0)}
+              aria-label="Целевой вес, кг"
+            />
+            кг
+          </label>
+        </section>
+
+        <section style={sec}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <b style={{ fontSize: 12, color: '#8b8b96', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Быстрый ввод</b>
+            <input
+              style={{ ...input, width: 96, height: 34 }}
+              type="number" step="0.1" min={20} max={400}
+              placeholder="Вес, кг"
+              value={quickW}
+              onChange={(e) => setQuickW(e.target.value)}
+              aria-label="Быстрый ввод веса"
+            />
+            <select
+              style={{ ...input, width: 130, height: 34 }}
+              value={quickTod}
+              onChange={(e) => setQuickTod(e.target.value as 'morning' | 'evening')}
+              aria-label="Время суток"
+            >
+              <option value="morning">🌅 Утро</option>
+              <option value="evening">🌙 Вечер</option>
+            </select>
+            <button
+              style={{ ...btnPrimary, height: 34, padding: '0 14px' }}
+              onClick={quickAdd}
+              disabled={!(Number(quickW) > 0 && Number(quickW) <= 400)}
+            >
+              + Записать
+            </button>
+            {rows.some((r) => r.date === new Date().toISOString().slice(0, 10)) && (
+              <small style={{ color: '#fbbf24', fontSize: 11 }}>Сегодня уже есть запись — будет обновлена</small>
+            )}
+          </div>
+        </section>
+
         {body && (
-          <section
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit,minmax(135px,1fr))',
-              gap: 8,
-              margin: '14px 0',
-            }}
-          >
-            {[
-              ['Текущий вес', body.latest.weight, 'кг', interpretWeight(body.weightDelta, goal)],
-              ['Δ веса', body.weightDelta, 'кг', interpretWeight(body.weightDelta, goal), body.weightDelta > 0 ? '+' : ''],
-              ['% жира', body.latest.bodyFat, '%', interpretFat(body.fatDelta)],
-              ['Δ жира', body.fatDelta, '%', interpretFat(body.fatDelta), body.fatDelta && body.fatDelta > 0 ? '+' : ''],
-              ['Мышцы', body.latest.muscleMass, 'кг', interpretMuscle(body.leanDelta)],
-              [
-                'Δ талии',
-                body.waistDelta,
-                'см',
-                interpretWaist(body.waistDelta),
-                body.waistDelta && body.waistDelta > 0 ? '+' : '',
-              ],
-              [
-                'BMI',
-                body.bmi,
-                '',
-                body.bmi === null ? '' : body.bmi >= 30 ? 'Ожирение' : body.bmi >= 25 ? 'Избыточный вес' : body.bmi < 18.5 ? 'Дефицит' : 'Норма',
-              ],
-            ].map(([k, val, unit, insight, prefix]) => {
-              const numVal = typeof val === 'number' ? val : null;
-              return (
-                <div
-                  key={String(k)}
-                  style={{ padding: 12, borderRadius: 9, background: '#22c55e18', border: '1px solid #22c55e44' }}
-                >
-                  <small>{k}</small>
-                  <strong style={{ display: 'block', marginTop: 4, fontSize: 16 }}>
-                    {numVal === null ? '—' : (
-                      <AnimatedCounter
-                        value={Math.abs(numVal)}
-                        decimals={unit === 'кг' || unit === 'см' || String(k) === 'BMI' ? 1 : 0}
-                        duration={500}
-                        prefix={typeof prefix === 'string' ? prefix : ''}
-                        suffix={` ${unit}`}
-                        style={{ fontSize: 16, fontWeight: 700 }}
-                      />
+          <section style={sec}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+              {[
+                ['Текущий вес', body.latest.weight, 'кг', interpretWeight(body.weightDelta, goal)],
+                ['Δ вес', body.weightDelta, 'кг', interpretWeight(body.weightDelta, goal), body.weightDelta > 0 ? '+' : ''],
+                ['% жира', body.latest.bodyFat, '%', interpretFat(body.fatDelta)],
+                ['Δ жира', body.fatDelta, '%', interpretFat(body.fatDelta), body.fatDelta && body.fatDelta > 0 ? '+' : ''],
+                ['Мышцы', body.latest.muscleMass, 'кг', interpretMuscle(body.leanDelta)],
+                ['Δ талии', body.waistDelta, 'см', interpretWaist(body.waistDelta), body.waistDelta && body.waistDelta > 0 ? '+' : ''],
+                ['BMI', body.bmi, '', body.bmi === null ? '' : body.bmi >= 30 ? 'Ожирение' : body.bmi >= 25 ? 'Избыточный вес' : body.bmi < 18.5 ? 'Дефицит' : 'Норма'],
+              ].map(([k, val, unit, insight, prefix]) => {
+                const numVal = typeof val === 'number' ? val : null;
+                const isDelta = String(k).startsWith('Δ');
+                const deltaColor = isDelta && numVal !== null ? (numVal < 0 ? '#22c55e' : numVal > 0 ? '#f87171' : '#a1a1aa') : undefined;
+                return (
+                  <div key={String(k)} style={tile}>
+                    <small style={{ color: '#8b8b96', fontSize: 10 }}>{k}</small>
+                    <strong style={{ display: 'block', marginTop: 3, fontSize: 17, color: deltaColor || colors.text }}>
+                      {numVal === null ? '—' : (
+                        <AnimatedCounter
+                          value={Math.abs(numVal)}
+                          decimals={unit === 'кг' || unit === 'см' || String(k) === 'BMI' ? 1 : 0}
+                          duration={400}
+                          prefix={typeof prefix === 'string' ? prefix : ''}
+                          suffix={` ${unit}`}
+                          style={{ fontSize: 17, fontWeight: 700, color: deltaColor || colors.text }}
+                        />
+                      )}
+                    </strong>
+                    {insight && (
+                      <small style={{ display: 'block', marginTop: 3, color: '#71717a', fontSize: 10 }}>{insight}</small>
                     )}
-                  </strong>
-                  {insight && (
-                    <small style={{ display: 'block', marginTop: 4, color: '#aaa', fontSize: 10 }}>
-                      {insight}
-                    </small>
-                  )}
-                </div>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              {[
+                ['Среднее', distribution?.mean, 'кг'],
+                ['Медиана', distribution?.median, 'кг'],
+                ['Мин/макс', extremes.min && extremes.max ? [extremes.min.value, extremes.max.value] : null, ''],
+                ['Серия', streak.current, 'дн'],
+                ['Δ нед.', comparison.delta, 'кг'],
+                ['Δ 30д', body.delta30 ?? null, 'кг'],
+                ['Δ 90д', body.delta90 ?? null, 'кг'],
+                ['Аномалии', anomalies.length, ''],
+              ].map(([k, v, u]) => {
+                let content: React.ReactNode = '—';
+                if (Array.isArray(v)) {
+                  content = <b>{v[0].toFixed(1)}/{v[1].toFixed(1)}</b>;
+                } else if (typeof v === 'number' && Number.isFinite(v)) {
+                  const decimals = u === 'дн' ? 0 : 1;
+                  const isDelta = String(k).startsWith('Δ');
+                  const color = isDelta ? (v < 0 ? '#22c55e' : v > 0 ? '#f87171' : '#a1a1aa') : undefined;
+                  content = (
+                    <b style={{ color }}>
+                      {v < 0 ? '−' : ''}{Math.abs(v).toFixed(decimals)} {u}
+                    </b>
+                  );
+                }
+                return (
+                  <span key={String(k)} style={chip}>
+                    <small style={{ color: '#8b8b96' }}>{k}</small> {content}
+                  </span>
+                );
+              })}
+            </div>
           </section>
         )}
-        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          {[
-            ['📊 Среднее', distribution?.mean],
-            ['🎯 Медиана', distribution?.median],
-            ['↕ Мин/макс', extremes.min && extremes.max ? [extremes.min.value, extremes.max.value] : null],
-            ['📅 Дней', streak.totalDays],
-            ['🔥 Серия', streak.current],
-            ['Δ нед.', comparison.delta],
-            ['Δ 30д', body?.delta30 ?? null],
-            ['Δ 90д', body?.delta90 ?? null],
-            ['⚠ Аномалии', anomalies.length],
-          ].map(([k, v]) => {
-            let content: React.ReactNode = '—';
-            if (Array.isArray(v)) {
-              content = `${v[0].toFixed(1)}/${v[1].toFixed(1)}`;
-            } else if (typeof v === 'number' && Number.isFinite(v)) {
-              const decimals = k === 'Дней' || k === 'Серия' || k === 'Аномалии' ? 0 : 1;
-              const isDelta = String(k).startsWith('Δ');
-              const color = isDelta ? (v < 0 ? '#22c55e' : v > 0 ? '#f87171' : '#aaa') : undefined;
-              content = <AnimatedCounter value={Math.abs(v)} decimals={decimals} duration={500} prefix={v < 0 ? '-' : ''} style={{ fontSize: 14, fontWeight: 700, color }} />;
-            }
-            return (
-              <div key={String(k)} style={{ padding: 10, background: '#27272a', borderRadius: 8 }}>
-                <small>{k}</small>
-                <b style={{ display: 'block' }}>{content}</b>
+
+        {goalProgress && (
+          <section style={sec}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <b style={{ fontSize: 13 }}>Цель {goal} кг</b>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <label style={{ fontSize: 11, color: '#8b8b96' }}>
+                  К дате
+                  <input
+                    type="date"
+                    style={{ ...input, width: 140, height: 30, display: 'inline-block', marginLeft: 6 }}
+                    value={goalDate}
+                    onChange={(e) => setGoalDate(e.target.value)}
+                  />
+                </label>
+                {eta ? (
+                  <small style={{ color: '#fbbf24', fontSize: 11 }}>
+                    {(weightFit ? (weightFit.slopePerDay * 7 >= 0 ? '+' : '') + (weightFit.slopePerDay * 7).toFixed(2) : '')} кг/нед · ETA ≈ {eta.weeks} нед
+                  </small>
+                ) : (
+                  <small style={{ color: '#71717a', fontSize: 11 }}>Тренд не направлен к цели</small>
+                )}
+                {pace && (
+                  <small style={{ color: Math.abs(pace.kgPerWeek) >= 0.25 ? '#fbbf24' : '#4ade80', fontSize: 11 }}>
+                    Нужно {pace.kgPerWeek > 0 ? '+' : ''}{pace.kgPerWeek.toFixed(2)} кг/нед · {pace.days} дн.
+                  </small>
+                )}
               </div>
-            );
-          })}
-        </section>
-        <section style={card}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <b>📈 График</b>
+            </div>
+            <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', marginTop: 10, overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: (goalProgress.pct === null ? 0 : Math.max(0, Math.min(100, goalProgress.pct))) + '%',
+                  borderRadius: 999,
+                  transition: 'width 0.5s ease',
+                  background: goalProgress.done ? '#22c55e' : goalProgress.pct === null ? '#a78bfa' : goalProgress.pct < 0 ? '#ef4444' : 'linear-gradient(90deg,#16a34a,#4ade80)',
+                }}
+              />
+            </div>
+            <small style={{ display: 'block', marginTop: 6, color: '#71717a', fontSize: 11 }}>
+              {goalProgress.start.toFixed(1)} → {goalProgress.cur.toFixed(1)} кг · прогресс {goalProgress.pct === null ? '—' : goalProgress.pct + '%'}
+              {!goalProgress.done && ` · осталось ${Math.abs(goal - goalProgress.cur).toFixed(1)} кг`}
+            </small>
+          </section>
+        )}
+
+        <section style={sec}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+            <b style={{ fontSize: 13 }}>График</b>
+            <span style={{ flex: 1 }} />
             <button
-              style={{
-                ...button,
-                background: showMA ? '#22c55e22' : '#27272a',
-                border: '1px solid ' + (showMA ? '#22c55e66' : '#3f3f46'),
-                color: showMA ? '#22c55e' : '#aaa',
-              }}
+              style={{ ...chipBtn, background: showMA ? 'rgba(34,197,94,0.14)' : 'transparent', color: showMA ? '#22c55e' : '#8b8b96' }}
               onClick={() => setShowMA(v => !v)}
               aria-pressed={showMA}
             >
-              Сглаживание 7д
+              MA 7д
             </button>
             {FIELDS.map(f => (
               <button
                 key={f}
                 style={{
-                  ...button,
-                  background: activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') + '33' : '#27272a',
-                  border: `1px solid ${activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') + '66' : '#3f3f46'}`,
-                  color: activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') : '#aaa',
+                  ...chipBtn,
+                  background: activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') + '2e' : 'transparent',
+                  color: activeChartFields.includes(f) ? (FIELD_COLORS[f] || '#22c55e') : '#8b8b96',
                 }}
                 onClick={() => toggleChartField(f)}
+                aria-pressed={activeChartFields.includes(f)}
               >
                 {LABELS[f]}
               </button>
@@ -998,79 +1033,25 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             onPng={(x) => exportSvgAsPng(x, `${svgName}.png`)}
             onSwipeField={(field) => {
               const f = field as Field;
-              if (activeChartFields.includes(f)) {
-                setActiveChartFields(prev => prev.filter(x => x !== f));
-              } else {
-                setActiveChartFields(prev => [...prev, f]);
-              }
+              if (activeChartFields.includes(f)) setActiveChartFields(prev => prev.filter(x => x !== f));
+              else setActiveChartFields(prev => [...prev, f]);
             }}
           />
         </section>
-        {goalProgress && (
-          <section style={card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <b>Цель {goal} кг</b>
-              {eta ? (
-                <small style={{ color: '#fbbf24' }}>
-                  Тренд: {weightFit ? (weightFit.slopePerDay * 7 >= 0 ? '+' : '') + (weightFit.slopePerDay * 7).toFixed(2) : ''} кг/нед · ETA ≈ {eta.weeks} нед
-                </small>
-              ) : (
-                <small style={{ color: '#aaa' }}>Тренд не направлен к цели</small>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
-              <label style={{ fontSize: 11, color: '#aaa' }}>
-                К дате:{' '}
-                <input
-                  type="date"
-                  style={{ ...input, width: 150, display: 'inline-block' }}
-                  value={goalDate}
-                  onChange={(e) => setGoalDate(e.target.value)}
-                />
-              </label>
-              {pace && (
-                <small style={{ color: pace.kgPerWeek <= -0.25 || pace.kgPerWeek >= 0.25 ? '#fbbf24' : '#4ade80' }}>
-                  Нужно {pace.kgPerWeek > 0 ? '+' : ''}
-                  {pace.kgPerWeek.toFixed(2)} кг/нед · осталось {pace.days} дн. ({Math.abs(pace.kgTotal).toFixed(1)} кг)
-                </small>
-              )}
-            </div>
-            <div style={{ height: 8, borderRadius: 4, background: '#27272a', marginTop: 8, overflow: 'hidden' }}>
-              <div
-                style={{
-                  height: '100%', width: (goalProgress.pct === null ? 0 : Math.max(0, Math.min(100, goalProgress.pct))) + '%',
-                  borderRadius: 4,
-                  transition: 'width 0.5s ease',
-                  background: goalProgress.done ? '#22c55e' : goalProgress.pct === null ? '#a78bfa' : goalProgress.pct < 0 ? '#ef4444' : 'linear-gradient(90deg,#22c55e,#a3e635)',
-                }}
-              />
-            </div>
-            <small style={{ display: 'block', marginTop: 6, color: '#aaa' }}>
-              {goalProgress.start.toFixed(1)} кг → {goalProgress.cur.toFixed(1)} кг (текущий) · прогресс{' '}
-              {goalProgress.pct === null ? '—' : goalProgress.pct + '%'}
-              {!goalProgress.done && ` · осталось ${Math.abs(goal - goalProgress.cur).toFixed(1)} кг`}
-            </small>
-          </section>
-        )}
+
         {photoPairs && (
-          <section style={card}>
+          <section style={sec}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <b>До / После</b>
-              <small style={{ color: '#888' }}>
-                {photoPairs.before.date} → {photoPairs.after.date}
-              </small>
+              <b style={{ fontSize: 13 }}>До / После</b>
+              <small style={{ color: '#71717a', fontSize: 11 }}>{photoPairs.before.date} → {photoPairs.after.date}</small>
             </div>
             <div
               style={{
-                position: 'relative', marginTop: 8, borderRadius: 10, overflow: 'hidden',
-                aspectRatio: '3/4', maxHeight: 360, width: '100%', background: '#09090b',
+                position: 'relative', marginTop: 10, borderRadius: 12, overflow: 'hidden',
+                aspectRatio: '3/4', maxHeight: 340, width: '100%', background: '#0c0c0e',
               }}
             >
-              <img
-                src={photoPairs.after.photos![0]}
-                alt="после"
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <img src={photoPairs.after.photos![0]} alt="после" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
               <img
                 src={photoPairs.before.photos![0]}
                 alt="до"
@@ -1080,49 +1061,31 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   transition: 'clip-path 0.1s linear',
                 }}
               />
-              <div
-                style={{
-                  position: 'absolute', top: 0, bottom: 0, left: comparePos + '%',
-                  width: 2, background: '#fff', opacity: 0.85, pointerEvents: 'none',
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute', top: '50%', left: -10, width: 20, height: 20, borderRadius: '50%',
-                    background: '#fff', transform: 'translateY(-50%)', boxShadow: '0 0 0 3px rgba(0,0,0,0.35)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
-                  }}
-                >
+              <div style={{ position: 'absolute', top: 0, bottom: 0, left: comparePos + '%', width: 2, background: '#fff', opacity: 0.85, pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', top: '50%', left: -11, width: 22, height: 22, borderRadius: '50%', background: '#fff', transform: 'translateY(-50%)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
                   <span style={{ color: '#111', fontSize: 10 }}>⇔</span>
                 </div>
               </div>
-              <span style={{ position: 'absolute', left: 8, top: 8, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', fontSize: 11, color: '#fff' }}>
+              <span style={{ position: 'absolute', left: 8, top: 8, padding: '3px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.6)', fontSize: 10, color: '#fff' }}>
                 До ({photoPairs.before.date.slice(5)})
               </span>
-              <span style={{ position: 'absolute', right: 8, top: 8, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', fontSize: 11, color: '#fff' }}>
+              <span style={{ position: 'absolute', right: 8, top: 8, padding: '3px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.6)', fontSize: 10, color: '#fff' }}>
                 После ({photoPairs.after.date.slice(5)})
               </span>
             </div>
             <input
-              type="range"
-              min={0}
-              max={100}
-              value={comparePos}
+              type="range" min={0} max={100} value={comparePos}
               onChange={(e) => setComparePos(Number(e.target.value))}
               aria-label="Позиция разделителя до/после"
-              style={{ width: '100%', marginTop: 8, accentColor: '#22c55e' }}
+              style={{ width: '100%', marginTop: 10, accentColor: '#22c55e' }}
             />
-            <small style={{ display: 'block', marginTop: 4, color: '#888', fontSize: 10 }}>
-              Перетащите ползунок, чтобы сравнить прогресс
-            </small>
           </section>
         )}
+
         {heatmap && (
-          <details style={card}>
-            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>
-              🗓 Календарь веса ({heatmap.cells.flat().filter(Boolean).length} записей)
-            </summary>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginTop: 8 }}>
+          <details style={sec}>
+            <summary style={sum}>🗓 Календарь веса ({heatmap.cells.flat().filter(Boolean).length} записей)</summary>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginTop: 10 }}>
               {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
                 <small key={d} style={{ textAlign: 'center', color: '#71717a', fontSize: 9 }}>{d}</small>
               ))}
@@ -1131,13 +1094,13 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   <div
                     key={i}
                     title={`${c.date}: ${c.value.toFixed(1)} кг`}
-                    style={{ aspectRatio: '1', borderRadius: 4, background: `rgba(34,197,94,${(0.12 + c.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ aspectRatio: '1', borderRadius: 5, background: `rgba(34,197,94,${(0.12 + c.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <small style={{ fontSize: 8, color: '#e5e5e5' }}>{c.value.toFixed(0)}</small>
+                    <small style={{ fontSize: 8, color: '#d4d4d8' }}>{c.value.toFixed(0)}</small>
                   </div>
                 ) : (
-                  <div key={i} style={{ aspectRatio: '1', borderRadius: 4, background: '#111113', border: '1px dashed #27272a' }} />
-                )
+                  <div key={i} style={{ aspectRatio: '1', borderRadius: 5, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.06)' }} />
+                ),
               )}
             </div>
             <small style={{ display: 'block', marginTop: 6, color: '#71717a', fontSize: 10 }}>
@@ -1145,259 +1108,209 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </small>
           </details>
         )}
+
         {(weekSummaries.length > 0 || monthSummaries.length > 0) && (
-          <details style={card}>
-            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>📊 Сводки по периодам</summary>
+          <details style={sec}>
+            <summary style={sum}>📊 Сводки по периодам</summary>
             {weekSummaries.length > 0 && (
               <>
-                <b style={{ fontSize: 12 }}>Недели</b>
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6, fontSize: 12 }}>
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Неделя</th>
-                      <th style={thStyle}>Записей</th>
-                      <th style={thStyle}>Средняя</th>
-                      <th style={thStyle}>Δ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weekSummaries.map((w) => (
-                      <tr key={w.weekStart} style={{ borderBottom: '1px solid #27272a' }}>
-                        <td style={{ padding: 5 }}>{w.weekStart}</td>
-                        <td style={{ padding: 5 }}>{w.count}</td>
-                        <td style={{ padding: 5 }}>{w.mean.toFixed(1)}</td>
-                        <td style={{ padding: 5, color: w.delta === null ? '#71717a' : w.delta < 0 ? '#22c55e' : '#f87171' }}>
-                          {w.delta === null ? '—' : (w.delta > 0 ? '+' : '') + w.delta.toFixed(1)}
-                        </td>
+                <b style={{ fontSize: 11, color: '#8b8b96' }}>Недели</b>
+                <div style={{ maxHeight: 260, overflowY: 'auto', marginTop: 6, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Неделя</th><th style={thStyle}>Записей</th><th style={thStyle}>Средняя</th><th style={thStyle}>Δ</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {weekSummaries.map((w) => (
+                        <tr key={w.weekStart} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: 6 }}>{w.weekStart}</td>
+                          <td style={{ padding: 6 }}>{w.count}</td>
+                          <td style={{ padding: 6 }}>{w.mean.toFixed(1)}</td>
+                          <td style={{ padding: 6, color: w.delta === null ? '#71717a' : w.delta < 0 ? '#22c55e' : '#f87171' }}>
+                            {w.delta === null ? '—' : (w.delta > 0 ? '+' : '') + w.delta.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
             {monthSummaries.length > 0 && (
               <>
-                <b style={{ fontSize: 12, display: 'block', marginTop: 10 }}>Месяцы</b>
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6, fontSize: 12 }}>
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Месяц</th>
-                      <th style={thStyle}>Записей</th>
-                      <th style={thStyle}>Средняя</th>
-                      <th style={thStyle}>Δ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthSummaries.map((m) => (
-                      <tr key={m.month} style={{ borderBottom: '1px solid #27272a' }}>
-                        <td style={{ padding: 5 }}>{m.month}</td>
-                        <td style={{ padding: 5 }}>{m.count}</td>
-                        <td style={{ padding: 5 }}>{m.mean.toFixed(1)}</td>
-                        <td style={{ padding: 5, color: m.delta === null ? '#71717a' : m.delta < 0 ? '#22c55e' : '#f87171' }}>
-                          {m.delta === null ? '—' : (m.delta > 0 ? '+' : '') + m.delta.toFixed(1)}
-                        </td>
+                <b style={{ fontSize: 11, color: '#8b8b96', display: 'block', marginTop: 10 }}>Месяцы</b>
+                <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 6, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Месяц</th><th style={thStyle}>Записей</th><th style={thStyle}>Средняя</th><th style={thStyle}>Δ</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {monthSummaries.map((m) => (
+                        <tr key={m.month} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ padding: 6 }}>{m.month}</td>
+                          <td style={{ padding: 6 }}>{m.count}</td>
+                          <td style={{ padding: 6 }}>{m.mean.toFixed(1)}</td>
+                          <td style={{ padding: 6, color: m.delta === null ? '#71717a' : m.delta < 0 ? '#22c55e' : '#f87171' }}>
+                            {m.delta === null ? '—' : (m.delta > 0 ? '+' : '') + m.delta.toFixed(1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </details>
         )}
+
         <WeightDiaryVisuals rows={rows} goal={goal} heightCm={profileHeight} sex={profileSex} />
-        {comparison.thisWeek && comparison.lastWeek && (
-          <section style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
-            📆 Эта неделя: <b>{comparison.thisWeek.mean.toFixed(1)} кг</b> · прошлая:{' '}
-            <b>{comparison.lastWeek.mean.toFixed(1)} кг</b> · Δ <b>{comparison.delta?.toFixed(1)} кг</b>
-          </section>
-        )}
+
         {bodyCorrelations.length > 0 && (
-          <details style={card}>
-            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>🔗 Связь веса с замерами ({bodyCorrelations.length})</summary>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <details style={sec}>
+            <summary style={sum}>🔗 Связь веса с замерами ({bodyCorrelations.length})</summary>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
               {bodyCorrelations.map((item) => (
-                <span
-                  key={item.field}
-                  style={{ padding: '6px 8px', borderRadius: 7, background: item.r >= 0 ? '#22c55e22' : '#ef444422' }}
-                >
-                  {LABELS[item.field]}: {item.r > 0 ? '+' : ''}
-                  {item.r.toFixed(2)} · n={item.n}
+                <span key={item.field} style={{ padding: '6px 10px', borderRadius: 999, background: item.r >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', fontSize: 11 }}>
+                  {LABELS[item.field]}: {item.r > 0 ? '+' : ''}{item.r.toFixed(2)} · n={item.n}
                 </span>
               ))}
             </div>
           </details>
         )}
+
         {anomalies.length > 0 && (
-          <details style={{ padding: 12, background: '#f59e0b18', borderRadius: 10, marginBottom: 12 }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>⚠ Аномалии ({anomalies.length})</summary>
+          <details style={sec}>
+            <summary style={{ ...sum, color: '#fbbf24' }}>⚠ Аномалии ({anomalies.length})</summary>
             {anomalies.slice(-5).map((a, i) => (
-              <div key={`${a.date}-${i}`}>
+              <div key={`${a.date}-${i}`} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12 }}>
                 {a.date}: {a.message}
               </div>
             ))}
           </details>
         )}
+
         {training && (
-          <details style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>🏋️ Сила и инсайты</summary>
-            <div>
+          <details style={sec}>
+            <summary style={sum}>🏋️ Сила и инсайты</summary>
+            <div style={{ fontSize: 12, marginTop: 6 }}>
               Последний объём: <b>{Math.round(training.volume)}</b>
               {correlation && (
-                <span>
-                  {' '}
-                  · связь вес/объём: <b>{correlation.r.toFixed(2)}</b> ({correlation.n} пар)
-                </span>
+                <span> · связь вес/объём: <b>{correlation.r.toFixed(2)}</b> ({correlation.n} пар)</span>
               )}
             </div>
             {training.progress.slice(-4).map((x) => (
-              <div key={x.week}>
-                Неделя {x.week}: объём {Math.round(x.totalVolume)}, тренировок {x.workoutCount}, 1RM{' '}
-                {Math.round(x.total1RM)}
+              <div key={x.week} style={{ fontSize: 12, padding: '4px 0', color: '#a1a1aa' }}>
+                Неделя {x.week}: объём {Math.round(x.totalVolume)} · тренировок {x.workoutCount} · 1RM {Math.round(x.total1RM)}
               </div>
             ))}
             {[...training.alerts, ...training.insights].map((x, i) => (
-              <div key={i} style={{ color: '#fbbf24' }}>
-                • {x}
-              </div>
+              <div key={i} style={{ color: '#fbbf24', fontSize: 12, padding: '3px 0' }}>• {x}</div>
             ))}
           </details>
         )}
-        <section style={{ overflowX: 'auto' }} className="wd-table-wrap">
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Дата</th>
-                {FIELDS.map((f) => (
-                  <th key={f} style={thStyle}>
-                    <button
-                      style={{ ...button, padding: 4 }}
-                      onClick={() =>
-                        setSort({ key: LABELS[f], dir: sort.key === LABELS[f] && sort.dir === 'asc' ? 'desc' : 'asc' })
-                      }
-                    >
-                      {LABELS[f]}
-                    </button>
-                  </th>
-                ))}
-                <th style={thStyle}>Время</th>
-                <th style={thStyle}>Заметка</th>
-                <th style={thStyle}>Фото</th>
-                <th style={thStyle}>Тренд</th>
-                <th style={thStyle}>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageData.pageItems.map((e) => {
-                const row = rows.find((r) => r.date === e.date);
-                if (!row) return null;
-                return (
-                  <tr key={row.date} style={{ animation: 'fadeIn 0.3s ease' }}>
-                    <td data-label="Дата">
-                      {editing === row.date ? (
-                        <input
-                          style={input}
-                          type="date"
-                          value={String(draft.date || row.date)}
-                          onChange={(x) => setDraft({ ...draft, date: x.target.value })}
-                        />
-                      ) : (
-                        row.date
-                      )}
-                    </td>
-                    {FIELDS.map((f) => (
-                      <td data-label={LABELS[f]} key={f}>{fieldCell(row, f)}</td>
-                    ))}
-                    <td data-label="Время">
-                      {editing === row.date ? (
-                        <select
-                          style={input}
-                          value={draft.timeOfDay || 'morning'}
-                          onChange={(e) => setDraft({ ...draft, timeOfDay: e.target.value as 'morning' | 'evening' })}
-                          aria-label="Время суток"
-                        >
-                          <option value="morning">🌅 Утро</option>
-                          <option value="evening">🌙 Вечер</option>
-                        </select>
-                      ) : row.timeOfDay === 'morning' ? '🌅 Утро' : row.timeOfDay === 'evening' ? '🌙 Вечер' : '—'}
-                    </td>
-                    <td data-label="Заметка">
-                      {editing === row.date ? (
-                        <input
-                          style={input}
-                          value={draft.notes || ''}
-                          onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                        />
-                      ) : (
-                        row.notes || '—'
-                      )}
-                    </td>
-                    <td data-label="Фото" style={{ whiteSpace: 'nowrap' }}>
-                      {row.photos && row.photos.length > 0 ? (
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {row.photos.map((src, i) => (
-                            <img
-                              key={i}
-                              src={src}
-                              alt=""
-                              style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', cursor: 'pointer', border: '1px solid #3f3f46' }}
-                              onClick={() => setViewPhoto({ src, date: row.date })}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td data-label="Тренд" style={{ whiteSpace: 'nowrap' }}>
-                      <TrendSpark row={row} rows={rows} />
-                    </td>
-                    <td data-label="Действия" style={{ whiteSpace: 'nowrap' }}>
-                      {editing === row.date ? (
-                        <>
-                          <button style={button} onClick={saveEdit}>
-                            Сохранить
-                          </button>{' '}
-                          <button style={button} onClick={() => setEditing(null)}>
-                            Отмена
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button style={button} onClick={() => beginEdit(row)}>
-                            Изменить
-                          </button>{' '}
-                          <button style={button} onClick={() => commit(rows.filter((r) => r.date !== row.date))}>
-                            Удалить
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-          Записей: {pageData.total}
-          <span>
-            <button style={button} onClick={() => setPage(Math.max(1, page - 1))}>
-              ←
-            </button>{' '}
-            {page}/{pageData.totalPages}{' '}
-            <button style={button} onClick={() => setPage(Math.min(pageData.totalPages, page + 1))}>
-              →
-            </button>
-          </span>
-        </div>
-        <h3>Последние записи</h3>
-        {rows.slice(0, 3).map((r) => (
-          <div key={r.date} style={{ padding: 8, borderBottom: '1px solid #27272a' }}>
-            {r.date}: {r.weight} кг{r.bodyFat !== undefined ? ` · ${r.bodyFat}% жира` : ''}
-            {r.waistCm !== undefined ? ` · талия ${r.waistCm} см` : ''}
+
+        <section style={sec}>
+          <div className="wd-table-wrap" style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 980, fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Дата</th>
+                  {FIELDS.map((f) => (
+                    <th key={f} style={thStyle}>
+                      <button
+                        style={{ background: 'none', border: 'none', color: sort.key === LABELS[f] ? '#22c55e' : '#a1a1aa', cursor: 'pointer', padding: 2, fontSize: 11 }}
+                        onClick={() => setSort({ key: LABELS[f], dir: sort.key === LABELS[f] && sort.dir === 'asc' ? 'desc' : 'asc' })}
+                      >
+                        {LABELS[f]}{sort.key === LABELS[f] ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
+                      </button>
+                    </th>
+                  ))}
+                  <th style={thStyle}>Время</th>
+                  <th style={thStyle}>Заметка</th>
+                  <th style={thStyle}>Фото</th>
+                  <th style={thStyle}>Тренд</th>
+                  <th style={thStyle}>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageData.pageItems.map((e) => {
+                  const row = rows.find((r) => r.date === e.date);
+                  if (!row) return null;
+                  return (
+                    <tr key={row.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td data-label="Дата" style={{ whiteSpace: 'nowrap' }}>
+                        {editing === row.date ? (
+                          <input style={input} type="date" value={String(draft.date || row.date)} onChange={(x) => setDraft({ ...draft, date: x.target.value })} />
+                        ) : (
+                          row.date
+                        )}
+                      </td>
+                      {FIELDS.map((f) => (
+                        <td data-label={LABELS[f]} key={f}>{fieldCell(row, f)}</td>
+                      ))}
+                      <td data-label="Время" style={{ whiteSpace: 'nowrap' }}>
+                        {editing === row.date ? (
+                          <select style={input} value={draft.timeOfDay || 'morning'} onChange={(e) => setDraft({ ...draft, timeOfDay: e.target.value as 'morning' | 'evening' })} aria-label="Время суток">
+                            <option value="morning">🌅 Утро</option>
+                            <option value="evening">🌙 Вечер</option>
+                          </select>
+                        ) : row.timeOfDay === 'morning' ? '🌅 Утро' : row.timeOfDay === 'evening' ? '🌙 Вечер' : '—'}
+                      </td>
+                      <td data-label="Заметка">
+                        {editing === row.date ? (
+                          <input style={input} value={draft.notes || ''} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+                        ) : (
+                          row.notes || '—'
+                        )}
+                      </td>
+                      <td data-label="Фото" style={{ whiteSpace: 'nowrap' }}>
+                        {row.photos && row.photos.length > 0 ? (
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {row.photos.map((src, i) => (
+                              <img key={i} src={src} alt="" style={{ width: 34, height: 34, borderRadius: 6, objectFit: 'cover', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)' }} onClick={() => setViewPhoto({ src, date: row.date })} />
+                            ))}
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td data-label="Тренд" style={{ whiteSpace: 'nowrap' }}>
+                        <TrendSpark row={row} rows={rows} />
+                      </td>
+                      <td data-label="Действия" style={{ whiteSpace: 'nowrap' }}>
+                        {editing === row.date ? (
+                          <>
+                            <button style={btnGhost} onClick={saveEdit}>Сохранить</button>{' '}
+                            <button style={btnGhost} onClick={() => setEditing(null)}>Отмена</button>
+                          </>
+                        ) : (
+                          <>
+                            <button style={btnGhost} onClick={() => beginEdit(row)}>Изменить</button>{' '}
+                            <button style={{ ...btnGhost, color: '#f87171' }} onClick={() => commit(rows.filter((r) => r.date !== row.date))}>Удалить</button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 12, color: '#8b8b96' }}>
+            Записей: {pageData.total}
+            <span>
+              <button style={btnGhost} onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>←</button>{' '}
+              {page}/{pageData.totalPages}{' '}
+              <button style={btnGhost} onClick={() => setPage(Math.min(pageData.totalPages, page + 1))} disabled={page >= pageData.totalPages}>→</button>
+            </span>
+          </div>
+        </section>
       </main>
+
       <AddBodyMeasurementsModal
         open={modal}
         onClose={() => setModal(false)}
@@ -1424,5 +1337,6 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         </div>
       )}
     </div>
+
   );
 };
