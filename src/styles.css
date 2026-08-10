@@ -3085,4 +3085,9 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
+  /* Страховка: сам экран тренировок не даёт боковых отступов */
+  .training-screen {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
 }
