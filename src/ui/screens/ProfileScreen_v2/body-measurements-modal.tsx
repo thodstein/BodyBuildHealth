@@ -250,41 +250,43 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         </SectionCard>
       ))}
 
-      <textarea
-        value={draft.notes}
-        onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
-        style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
-        placeholder="Заметка"
-      />
-      <div style={{ marginTop: 10 }}>
-        <label style={fieldLabel}>📷 Фото ({draft.photos.length}/{MAX_PHOTOS}, до {MAX_SIZE_MB}Мб каждое)</label>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={handlePhotoUpload}
-          style={{ ...fieldInput, padding: '8px' }}
+      <SectionCard icon="📝" title="Заметка и фото" color="#22c55e">
+        <textarea
+          value={draft.notes}
+          onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
+          style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
+          placeholder="Заметка"
         />
-        {draft.photos.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-            {draft.photos.map((src, i) => (
-              <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 10, overflow: 'hidden', border: '1px solid #3f3f46' }}>
-                <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button
-                  type="button"
-                  onClick={() => removePhoto(i)}
-                  style={{
-                    position: 'absolute', top: 2, right: 2, background: '#ef4444cc', color: '#fff',
-                    border: 'none', borderRadius: 4, width: 22, height: 22, cursor: 'pointer', fontSize: 12,
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        <div style={{ marginTop: 10 }}>
+          <label style={fieldLabel}>📷 Фото ({draft.photos.length}/{MAX_PHOTOS}, до {MAX_SIZE_MB}Мб каждое)</label>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handlePhotoUpload}
+            style={{ ...fieldInput, padding: '9px' }}
+          />
+          {draft.photos.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {draft.photos.map((src, i) => (
+                <div key={i} style={{ position: 'relative', width: 80, height: 80, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.16)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                  <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(i)}
+                    style={{
+                      position: 'absolute', top: 3, right: 3, background: '#ef4444cc', color: '#fff',
+                      border: 'none', borderRadius: 6, width: 24, height: 24, cursor: 'pointer', fontSize: 13,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SectionCard>
     </DiaryModalShell>
   );
 };

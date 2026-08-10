@@ -148,7 +148,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
         </div>
       </SectionCard>
 
-      <div style={{ marginBottom: 10 }}>
+      <SectionCard icon="📝" title="Пробуждения и заметки" color="#a78bfa">
         <TextField
           label="Пробуждений за ночь"
           value={draft.awakenings}
@@ -159,14 +159,13 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
           step={1}
           invalid={awakeningsInvalid}
         />
-      </div>
-
-      <textarea
-        value={draft.notes}
-        onChange={(e) => set('notes', e.target.value)}
-        style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
-        placeholder="Заметка (храп, сновидения, факторы…)"
-      />
+        <textarea
+          value={draft.notes}
+          onChange={(e) => set('notes', e.target.value)}
+          style={{ ...fieldInput, minHeight: 52, resize: 'vertical', marginTop: 10 }}
+          placeholder="Заметка (храп, сновидения, факторы…)"
+        />
+      </SectionCard>
 
       {lastRec && (
         <div style={{ marginTop: 6 }}>

@@ -57,48 +57,48 @@ export const daysSince = (lastDate: string | undefined): number | null => {
 /* ── Legacy style exports (backward-compat) ── */
 
 export const fieldLabel: React.CSSProperties = {
-  fontSize: 10.5,
+  fontSize: 11.5,
   color: colors.textMuted,
   fontWeight: 700,
-  marginBottom: 4,
+  marginBottom: 5,
   display: 'block',
-  letterSpacing: 0.2,
+  letterSpacing: 0.4,
 };
 export const fieldInput: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  borderRadius: 12,
-  padding: '11px 13px',
+  background: 'rgba(255,255,255,0.055)',
+  border: '1px solid rgba(255,255,255,0.14)',
+  borderRadius: 14,
+  padding: '12px 14px',
   color: colors.text,
-  fontSize: 14,
+  fontSize: 15,
   outline: 'none',
   boxSizing: 'border-box',
-  minHeight: 46,
+  minHeight: 48,
   transition: 'border-color 0.18s, box-shadow 0.18s, background 0.18s',
 };
 export const btnPrimary = (color: string): React.CSSProperties => ({
   flex: 1,
-  minHeight: 46,
-  padding: '10px 18px',
-  borderRadius: 13,
-  fontSize: 13,
+  minHeight: 50,
+  padding: '11px 20px',
+  borderRadius: 14,
+  fontSize: 14,
   fontWeight: 800,
-  background: `linear-gradient(135deg, ${color}dd, ${color}99)`,
+  background: `linear-gradient(135deg, ${color}e6, ${color}99)`,
   color: '#08120c',
   border: 'none',
   cursor: 'pointer',
-  boxShadow: `0 4px 18px ${color}3a, inset 0 1px 0 rgba(255,255,255,0.25)`,
+  boxShadow: `0 4px 18px ${color}3a, inset 0 1px 0 rgba(255,255,255,0.3)`,
   transition: 'transform 0.15s, box-shadow 0.15s, filter 0.15s',
 });
 export const btnGhost: React.CSSProperties = {
   flex: 1,
-  minHeight: 46,
-  padding: '10px 18px',
-  borderRadius: 13,
-  fontSize: 13,
+  minHeight: 50,
+  padding: '11px 20px',
+  borderRadius: 14,
+  fontSize: 14,
   fontWeight: 700,
-  background: 'rgba(255,255,255,0.04)',
+  background: 'rgba(255,255,255,0.05)',
   color: colors.text,
   border: `1px solid ${colors.borderHover}`,
   cursor: 'pointer',
@@ -240,42 +240,58 @@ export const SectionCard: React.FC<{
 }> = ({ icon, title, color, badge, hint, children, style }) => (
   <div
     style={{
-      borderRadius: 14,
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))',
-      border: `1px solid ${color}28`,
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
-      padding: 13,
-      marginBottom: 10,
+      borderRadius: 16,
+      background: `linear-gradient(180deg, ${color}10, rgba(255,255,255,0.015) 45%, rgba(255,255,255,0.02))`,
+      border: `1px solid ${color}30`,
+      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 0 rgba(0,0,0,0.18)`,
+      padding: 14,
+      marginBottom: 11,
+      position: 'relative',
+      overflow: 'hidden',
       ...style,
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        top: -40,
+        right: -40,
+        width: 130,
+        height: 130,
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${color}1c, transparent 70%)`,
+        pointerEvents: 'none',
+      }}
+    />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, position: 'relative' }}>
       {icon && (
         <span
           aria-hidden="true"
           style={{
-            fontSize: 12,
-            width: 24,
-            height: 24,
-            borderRadius: 7,
+            fontSize: 14,
+            width: 30,
+            height: 30,
+            borderRadius: 9,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: `${color}22`,
-            border: `1px solid ${color}33`,
+            background: `linear-gradient(135deg, ${color}36, ${color}12)`,
+            border: `1px solid ${color}46`,
+            boxShadow: `0 2px 8px ${color}22, inset 0 1px 0 rgba(255,255,255,0.12)`,
             flexShrink: 0,
           }}
         >
           {icon}
         </span>
       )}
-      <span style={{ fontSize: 10.5, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 0.6 }}>{title}</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 0.8 }}>{title}</span>
       {badge && (
         <span
           style={{
-            fontSize: 9, fontWeight: 800, color, background: `${color}26`,
-            padding: '2px 8px', borderRadius: 999, marginLeft: 'auto',
-            border: `1px solid ${color}44`,
+            fontSize: 10, fontWeight: 800, color, background: `${color}28`,
+            padding: '2px 9px', borderRadius: 999, marginLeft: 'auto',
+            border: `1px solid ${color}48`,
           }}
         >
           {badge}
@@ -283,7 +299,7 @@ export const SectionCard: React.FC<{
       )}
     </div>
     {children}
-    {hint && <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 6 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 7 }}>{hint}</div>}
   </div>
 );
 
@@ -291,12 +307,12 @@ export const SectionCard: React.FC<{
 export const LiveBadge: React.FC<{ color: string; icon?: string; children: React.ReactNode }> = ({ color, icon, children }) => (
   <div
     style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontSize: 11, fontWeight: 800, color,
-      background: `linear-gradient(135deg, ${color}24, ${color}10)`,
-      border: `1px solid ${color}55`,
-      borderRadius: 999, padding: '6px 14px',
-      boxShadow: `0 2px 10px ${color}26`,
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 12, fontWeight: 800, color,
+      background: `linear-gradient(135deg, ${color}28, ${color}10)`,
+      border: `1px solid ${color}58`,
+      borderRadius: 999, padding: '7px 16px',
+      boxShadow: `0 3px 12px ${color}2a, inset 0 1px 0 rgba(255,255,255,0.1)`,
       animation: 'diary-badge-in 0.25s ease-out',
     }}
   >
@@ -317,18 +333,18 @@ export const FormBanner: React.FC<{ tone: 'error' | 'warning' | 'info'; children
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       style={{
-        padding: '10px 12px',
-        borderRadius: 12,
+        padding: '11px 14px',
+        borderRadius: 14,
         background: m.bg,
         border: `1px solid ${m.color}55`,
         color: m.color,
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 700,
         marginBottom: 10,
         display: 'flex',
         alignItems: 'center',
-        gap: 7,
-        boxShadow: `0 2px 10px ${m.color}14`,
+        gap: 8,
+        boxShadow: `0 2px 12px ${m.color}16`,
         animation: 'diary-badge-in 0.2s ease-out',
       }}
     >
@@ -421,18 +437,18 @@ export const ScalePicker: React.FC<{
             aria-checked={active}
             onClick={() => onChange(v)}
             style={{
-              minHeight: height || (dense ? 36 : 44),
+              minHeight: height || (dense ? 40 : 48),
               padding: '4px 2px',
-              borderRadius: 9,
+              borderRadius: 11,
               cursor: 'pointer',
-              fontSize: dense ? 10 : 12,
+              fontSize: dense ? 11 : 13,
               fontWeight: 800,
-              border: `1px solid ${active ? c : 'rgba(255,255,255,0.08)'}`,
-              background: active ? `${c}2e` : 'rgba(255,255,255,0.025)',
+              border: `1px solid ${active ? c : 'rgba(255,255,255,0.09)'}`,
+              background: active ? `${c}30` : 'rgba(255,255,255,0.03)',
               color: active ? c : colors.textMuted,
               transition: 'all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              transform: active ? 'translateY(-2px) scale(1.03)' : undefined,
-              boxShadow: active ? `0 3px 12px ${c}45, inset 0 1px 0 rgba(255,255,255,0.12)` : undefined,
+              transform: active ? 'translateY(-2px) scale(1.04)' : undefined,
+              boxShadow: active ? `0 4px 16px ${c}50, inset 0 1px 0 rgba(255,255,255,0.14)` : undefined,
             }}
           >
             {labels ? labels(v) : v}
@@ -489,13 +505,13 @@ export const StepperInput: React.FC<{
     }, 380);
   };
   const btn: React.CSSProperties = {
-    width: compact ? 38 : 46,
-    minHeight: compact ? 34 : 46,
-    borderRadius: 12,
+    width: compact ? 40 : 50,
+    minHeight: compact ? 38 : 50,
+    borderRadius: 14,
     border: `1px solid ${colors.borderHover}`,
-    background: 'rgba(255,255,255,0.05)',
+    background: 'rgba(255,255,255,0.055)',
     color: colors.text,
-    fontSize: large ? 20 : 16,
+    fontSize: large ? 22 : 18,
     fontWeight: 700,
     cursor: 'pointer',
     flexShrink: 0,
@@ -528,19 +544,19 @@ export const StepperInput: React.FC<{
           style={{
             ...fieldInput,
             textAlign: 'center',
-            fontSize: large ? 26 : 16,
+            fontSize: large ? 28 : 17,
             fontWeight: 800,
             color: colors.text,
-            background: 'rgba(255,255,255,0.03)',
-            paddingRight: unit ? 30 : 12,
+            background: 'rgba(255,255,255,0.035)',
+            paddingRight: unit ? 32 : 12,
             borderColor: invalid ? '#ef444466' : undefined,
             boxShadow: invalid ? '0 0 0 3px rgba(239,68,68,0.12)' : undefined,
           }}
         />
         {unit && (
           <span style={{
-            position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 11, color: colors.textSubtle, pointerEvents: 'none',
+            position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 12, color: colors.textSubtle, pointerEvents: 'none',
           }}>
             {invalid ? '⚠' : unit}
           </span>
@@ -575,17 +591,17 @@ export const ChipGroup: React.FC<{
             type="button"
             onClick={() => toggle(o.id)}
             style={{
-              minHeight: 42,
-              padding: '7px 9px',
-              borderRadius: 10,
+              minHeight: 44,
+              padding: '8px 10px',
+              borderRadius: 12,
               cursor: 'pointer',
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               textAlign: 'left',
-              border: `1px solid ${on ? c : 'rgba(255,255,255,0.08)'}`,
-              background: on ? `${c}28` : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${on ? c : 'rgba(255,255,255,0.09)'}`,
+              background: on ? `${c}2c` : 'rgba(255,255,255,0.035)',
               color: on ? c : colors.textMuted,
-              boxShadow: on ? `0 2px 10px ${c}30` : undefined,
+              boxShadow: on ? `0 2px 12px ${c}34` : undefined,
               transition: 'all 0.15s',
             }}
           >
@@ -613,8 +629,8 @@ export const TextField: React.FC<{
   accent?: string;
   invalid?: boolean;
 }> = ({ label, value, onChange, type = 'text', placeholder, unit, min, max, step, options, hint, accent, invalid }) => (
-  <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-    <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>
       {label}
     </span>
     {type === 'select' && options ? (
@@ -654,15 +670,15 @@ export const TextField: React.FC<{
         />
         {(unit || invalid) && (
           <span style={{
-            position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 10, color: invalid ? '#ef4444' : colors.textSubtle, pointerEvents: 'none',
+            position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 11, color: invalid ? '#ef4444' : colors.textSubtle, pointerEvents: 'none',
           }}>
             {invalid ? '⚠' : unit}
           </span>
         )}
       </div>
     )}
-    {hint && <span style={{ fontSize: 9, color: colors.textSubtle }}>{hint}</span>}
+    {hint && <span style={{ fontSize: 10, color: colors.textSubtle }}>{hint}</span>}
   </label>
 );
 
@@ -789,13 +805,14 @@ export const DiaryModalShell: React.FC<{
             width: `min(${width}px, 94vw)`,
             maxHeight: '90vh',
             overflowY: 'auto',
-            background: 'linear-gradient(165deg, rgba(33,33,42,0.97), rgba(19,19,25,0.98))',
-            border: `1px solid ${color}38`,
-            borderRadius: 22,
+            background:
+              'linear-gradient(165deg, rgba(34,34,44,0.97), rgba(18,18,24,0.98) 60%, rgba(14,14,19,0.98))',
+            border: `1px solid ${color}3c`,
+            borderRadius: 24,
             padding: 0,
             color: colors.text,
             animation: 'dm-pop 0.22s cubic-bezier(0.32, 0.72, 0.28, 1)',
-            boxShadow: `0 0 0 1px ${color}12, 0 24px 70px rgba(0,0,0,0.62), 0 0 48px ${color}16, inset 0 1px 0 rgba(255,255,255,0.07)`,
+            boxShadow: `0 0 0 1px ${color}12, 0 28px 80px rgba(0,0,0,0.66), 0 0 56px ${color}18, inset 0 1px 0 rgba(255,255,255,0.08)`,
           }}
         >
           <form
@@ -851,13 +868,13 @@ export const DiaryModalShell: React.FC<{
                 className="dm-icon-box"
                 aria-hidden="true"
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 21,
+                  fontSize: 24,
                   lineHeight: 1,
                   flexShrink: 0,
                 }}
@@ -865,8 +882,8 @@ export const DiaryModalShell: React.FC<{
                 {icon}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color }}>{title}</div>
-                {subtitle && <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
+                <div style={{ fontSize: 18, fontWeight: 800, color, letterSpacing: -0.2 }}>{title}</div>
+                {subtitle && <div style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 3 }}>{subtitle}</div>}
               </div>
               {spark && <Sparkline data={spark.data} color={spark.color || color} />}
               {stale && staleColor && (
@@ -893,15 +910,15 @@ export const DiaryModalShell: React.FC<{
                 onClick={onClose}
                 aria-label="Закрыть"
                 style={{
-                  background: 'rgba(255,255,255,0.05)',
+                  background: 'rgba(255,255,255,0.055)',
                   border: `1px solid ${colors.borderHover}`,
                   color: colors.textMuted,
                   cursor: 'pointer',
-                  fontSize: 14,
+                  fontSize: 15,
                   lineHeight: 1,
-                  width: 32,
-                  height: 32,
-                  borderRadius: 10,
+                  width: 34,
+                  height: 34,
+                  borderRadius: 11,
                   flexShrink: 0,
                   transition: 'background 0.15s, color 0.15s',
                 }}
@@ -909,9 +926,9 @@ export const DiaryModalShell: React.FC<{
                 ✕
               </button>
             </div>
-            <div style={{ padding: 15, overflowY: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>{children}</div>
+            <div style={{ padding: 16, overflowY: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>{children}</div>
             {footer ?? (
-              <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${color}1e`, flexShrink: 0, background: 'rgba(0,0,0,0.16)' }}>
+              <div style={{ display: 'flex', gap: 10, padding: '14px 20px 18px', borderTop: `1px solid ${color}1e`, flexShrink: 0, background: 'rgba(0,0,0,0.18)' }}>
                 {fill && fill.total > 0 && (
                   <div
                     title={`Заполнено ${fill.current}/${fill.total}`}
@@ -919,7 +936,7 @@ export const DiaryModalShell: React.FC<{
                       display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, marginRight: 4,
                     }}
                   >
-                    <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.09)', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.09)', overflow: 'hidden' }}>
                       <div
                         style={{
                           height: '100%',
@@ -930,7 +947,7 @@ export const DiaryModalShell: React.FC<{
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: 9, fontWeight: 800, color: colors.textMuted, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: colors.textMuted, whiteSpace: 'nowrap' }}>
                       {fill.current}/{fill.total}
                     </span>
                   </div>
@@ -983,15 +1000,17 @@ export const TodayChip: React.FC<{ date: string; onToday: () => void }> = ({ dat
       onClick={onToday}
       disabled={isToday}
       style={{
-        padding: '7px 10px',
-        borderRadius: 8,
-        fontSize: 10,
+        padding: '9px 12px',
+        borderRadius: 10,
+        fontSize: 11,
         fontWeight: 700,
         cursor: isToday ? 'default' : 'pointer',
         border: `1px solid ${isToday ? 'rgba(34,197,94,0.35)' : colors.border}`,
         background: isToday ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.03)',
         color: isToday ? '#22c55e' : colors.textMuted,
         flexShrink: 0,
+        minHeight: 48,
+        transition: 'all 0.15s',
       }}
     >
       {isToday ? '✓ Сегодня' : '📅 Сегодня'}
@@ -1004,21 +1023,21 @@ export const RepeatLastChip: React.FC<{ label: string; onClick: () => void }> = 
   <button
     type="button"
     onClick={onClick}
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 5,
-      padding: '6px 10px',
-      borderRadius: 999,
-      fontSize: 10,
-      fontWeight: 700,
-      cursor: 'pointer',
-      border: `1px solid ${colors.border}`,
-      background: 'rgba(255,255,255,0.03)',
-      color: colors.textMuted,
-      marginBottom: 10,
-      transition: 'all 0.15s',
-    }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '8px 12px',
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 700,
+        cursor: 'pointer',
+        border: `1px solid ${colors.border}`,
+        background: 'rgba(255,255,255,0.035)',
+        color: colors.textMuted,
+        marginBottom: 10,
+        transition: 'all 0.15s',
+      }}
     onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.borderHover; e.currentTarget.style.color = colors.text; }}
     onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.color = colors.textMuted; }}
   >

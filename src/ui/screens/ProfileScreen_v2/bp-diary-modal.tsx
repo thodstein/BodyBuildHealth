@@ -8,6 +8,7 @@ import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import {
   DiaryModalShell,
+  SectionCard,
   TextField,
   FormBanner,
   LiveBadge,
@@ -114,30 +115,33 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
         <TodayChip date={draft.date} onToday={() => set('date', todayIso())} />
       </div>
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        {([['morning', '🌅 Утро'], ['evening', '🌙 Вечер']] as const).map(([k, l]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => set('timeOfDay', k)}
-            style={{
-              flex: 1,
-              minHeight: 40,
-              padding: '8px 10px',
-              borderRadius: 10,
-              cursor: 'pointer',
-              fontSize: 12,
-              fontWeight: 800,
-              border: `1px solid ${draft.timeOfDay === k ? '#ef4444' : colors.border}`,
-              background: draft.timeOfDay === k ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
-              color: draft.timeOfDay === k ? '#f87171' : colors.textMuted,
-              transition: 'all 0.15s',
-            }}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
+      <SectionCard icon="🕐" title="Время измерения" color="#ef4444">
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([['morning', '🌅 Утро'], ['evening', '🌙 Вечер']] as const).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => set('timeOfDay', k)}
+              style={{
+                flex: 1,
+                minHeight: 48,
+                padding: '10px 10px',
+                borderRadius: 12,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 800,
+                border: `1px solid ${draft.timeOfDay === k ? '#ef4444' : colors.border}`,
+                background: draft.timeOfDay === k ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
+                color: draft.timeOfDay === k ? '#f87171' : colors.textMuted,
+                boxShadow: draft.timeOfDay === k ? '0 3px 12px rgba(239,68,68,0.25), inset 0 1px 0 rgba(255,255,255,0.08)' : undefined,
+                transition: 'all 0.15s',
+              }}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      </SectionCard>
 
       {dge && <FormBanner tone="error">Диастола не может быть ≥ систолы ({d} ≥ {s}) — проверьте значения</FormBanner>}
       {!dge && !valid && (Number.isFinite(s) || Number.isFinite(d)) && (
@@ -145,22 +149,25 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       )}
       {valid && !dge && s >= 180 && <FormBanner tone="error">Систола ≥ 180 — гипертонический криз, обратитесь к врачу</FormBanner>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
-        <TextField label="Систола" value={draft.systolic} onChange={(v) => set('systolic', v)} type="number" min={50} max={250} unit="мм" accent="#ef4444" invalid={sInvalid} />
-        <TextField label="Диастола" value={draft.diastolic} onChange={(v) => set('diastolic', v)} type="number" min={30} max={180} unit="мм" accent="#ef4444" invalid={dInvalid} />
-        <TextField label="Пульс" value={draft.pulse} onChange={(v) => set('pulse', v)} type="number" min={20} max={250} unit="уд/мин" invalid={pInvalid} />
-      </div>
+      <SectionCard icon="🫀" title="Показатели" color="#ef4444" badge={cat.label}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          <TextField label="Систола" value={draft.systolic} onChange={(v) => set('systolic', v)} type="number" min={50} max={250} unit="мм" accent="#ef4444" invalid={sInvalid} />
+          <TextField label="Диастола" value={draft.diastolic} onChange={(v) => set('diastolic', v)} type="number" min={30} max={180} unit="мм" accent="#ef4444" invalid={dInvalid} />
+          <TextField label="Пульс" value={draft.pulse} onChange={(v) => set('pulse', v)} type="number" min={20} max={250} unit="уд/мин" invalid={pInvalid} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+          <LiveBadge color={cat.color} icon="🩺">{cat.label}</LiveBadge>
+        </div>
+      </SectionCard>
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-        <LiveBadge color={cat.color} icon="🩺">{cat.label}</LiveBadge>
-      </div>
-
-      <textarea
-        value={draft.notes}
-        onChange={(e) => set('notes', e.target.value)}
-        style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
-        placeholder="Заметка (самочувствие, лекарства…)"
-      />
+      <SectionCard icon="📝" title="Заметка" color="#ef4444">
+        <textarea
+          value={draft.notes}
+          onChange={(e) => set('notes', e.target.value)}
+          style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
+          placeholder="Заметка (самочувствие, лекарства…)"
+        />
+      </SectionCard>
 
       {lastRec && (
         <div style={{ marginTop: 6 }}>

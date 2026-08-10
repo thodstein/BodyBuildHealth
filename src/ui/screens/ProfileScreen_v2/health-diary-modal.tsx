@@ -321,20 +321,21 @@ export const AddHealthModal: React.FC<{
               onClick={() => setTab(t.id)}
               style={{
                 flex: 1,
-                minHeight: 40,
+                minHeight: 44,
                 minWidth: 88,
-                padding: '6px 8px',
-                borderRadius: 10,
+                padding: '7px 9px',
+                borderRadius: 12,
                 cursor: 'pointer',
-                fontSize: 11,
+                fontSize: 11.5,
                 fontWeight: 800,
-                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.08)'}`,
-                background: active ? `${t.color}20` : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.09)'}`,
+                background: active ? `${t.color}22` : 'rgba(255,255,255,0.025)',
                 color: active ? t.color : colors.textMuted,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 4,
+                boxShadow: active ? `0 3px 12px ${t.color}2e` : undefined,
                 transition: 'all 0.15s',
               }}
             >
@@ -386,8 +387,8 @@ export const AddHealthModal: React.FC<{
 
           <SectionCard icon="📋" title="Детали боли" color="#22c55e">
             <div style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Когда</span>
-              <div style={{ marginTop: 5 }}>
+              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Когда</span>
+              <div style={{ marginTop: 6 }}>
                 <ChipGroup
                   options={PAIN_TIMES}
                   selected={painTimeOfDay ? [painTimeOfDay] : []}
@@ -399,8 +400,8 @@ export const AddHealthModal: React.FC<{
               </div>
             </div>
             <div style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Триггеры</span>
-              <div style={{ marginTop: 5 }}>
+              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Триггеры</span>
+              <div style={{ marginTop: 6 }}>
                 <ChipGroup
                   options={PAIN_TRIGGERS}
                   selected={painTriggers}
@@ -442,7 +443,7 @@ export const AddHealthModal: React.FC<{
             </div>
             <datalist id="he-symptom-presets">{SYMPTOM_PRESETS.map((s) => <option key={s} value={s} />)}</datalist>
             <div style={{ flex: '1 1 130px' }}>
-              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, display: 'block', marginBottom: 3 }}>Тяжесть</span>
+              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', marginBottom: 4 }}>Тяжесть</span>
               <ScalePicker
                 value={newSymptomSeverity}
                 onChange={(v) => setNewSymptomSeverity(v as 1|2|3|4|5)}

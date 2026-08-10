@@ -223,18 +223,19 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 7,
+            gap: 8,
             width: '100%',
-            padding: '9px 12px',
-            borderRadius: 10,
+            padding: '10px 13px',
+            borderRadius: 12,
             marginBottom: 10,
             cursor: 'pointer',
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: 700,
             textAlign: 'left',
             background: 'rgba(245,158,11,0.10)',
             border: '1px solid rgba(245,158,11,0.4)',
             color: '#fbbf24',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
             transition: 'all 0.15s',
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(245,158,11,0.18)'; }}
@@ -265,14 +266,15 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
                 type="button"
                 onClick={() => setSubstanceSmart(s)}
                 style={{
-                  padding: '4px 9px',
+                  padding: '6px 11px',
                   borderRadius: 999,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 600,
                   cursor: 'pointer',
                   border: `1px solid ${draft.substance === s ? '#f59e0b' : 'rgba(255,255,255,0.1)'}`,
                   background: draft.substance === s ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.03)',
                   color: draft.substance === s ? '#fbbf24' : colors.textMuted,
+                  boxShadow: draft.substance === s ? '0 2px 8px rgba(245,158,11,0.22)' : undefined,
                   transition: 'all 0.15s',
                 }}
               >
@@ -303,8 +305,8 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
           options={INJECTION_ZONES.map((i) => ({ id: i.id, label: i.label }))}
         />
         <div>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Сторона</span>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Сторона</span>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['left', 'right'] as const).map((s) => (
                 <button
@@ -313,14 +315,16 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
                   onClick={() => setDraft((p) => ({ ...p, side: s }))}
                   style={{
                     flex: 1,
-                    minHeight: 44,
-                    borderRadius: 10,
+                    minHeight: 48,
+                    borderRadius: 12,
                     cursor: 'pointer',
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 800,
                     border: `1px solid ${draft.side === s ? '#f59e0b' : colors.border}`,
                     background: draft.side === s ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.03)',
                     color: draft.side === s ? '#fbbf24' : colors.textMuted,
+                    boxShadow: draft.side === s ? '0 3px 12px rgba(245,158,11,0.25)' : undefined,
+                    transition: 'all 0.15s',
                   }}
                 >
                   {s === 'left' ? 'Л' : 'R'}
@@ -368,12 +372,14 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
         ))}
       </div>
 
-      <textarea
-        value={draft.notes}
-        onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
-        style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
-        placeholder="Заметка"
-      />
+      <SectionCard icon="📝" title="Заметка" color="#f59e0b">
+        <textarea
+          value={draft.notes}
+          onChange={(e) => setDraft((p) => ({ ...p, notes: e.target.value }))}
+          style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
+          placeholder="Заметка (ощущения, температура, реакция…)"
+        />
+      </SectionCard>
 
       {lastRec && (
         <div style={{ marginTop: 6 }}>
