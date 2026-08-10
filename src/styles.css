@@ -3049,9 +3049,14 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   min-width: 0 !important;
   box-sizing: border-box !important;
 }
-/* Восстанавливаем overflow:hidden — глобальное правило ломает его */
-.pl-auto-screen [style*="overflow"],
-.pl-auto-screen [style*="hidden"] {
+/* Восстанавливаем overflow:hidden — глобальное правило ломает его.
+   НЕ трогаем скролл-контейнеры (overflow-x:auto/scroll) — иначе таблицы обрезаются. */
+.pl-auto-screen [style*="overflow: hidden"],
+.pl-auto-screen [style*="overflow-x: hidden"],
+.pl-auto-screen [style*="overflow: 'hidden'"],
+.pl-auto-screen [style*="overflow-x: 'hidden'"],
+.pl-auto-screen [style*="overflow:hidden"],
+.pl-auto-screen [style*="overflow-x:hidden"] {
   overflow-x: hidden !important;
 }
 /* Все grid-контейнеры — minmax(0,...) чтобы не расширялись */
