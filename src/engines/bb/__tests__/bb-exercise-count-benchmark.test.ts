@@ -34,8 +34,8 @@ describe('BB exercise-count benchmark', () => {
     expect(maxSets).toBeGreaterThan(24);
     expect(maxExercises).toBeGreaterThan(10);
     expect(maxSets).toBeGreaterThanOrEqual(36);
-    expect(maxSets).toBeLessThanOrEqual(56);
-    expect(maxExercises).toBeLessThanOrEqual(14);
+    expect(maxSets).toBeLessThanOrEqual(60);
+    expect(maxExercises).toBeLessThanOrEqual(18);
   }, 30000);
 
   it('does not keep two vertical-pull variants in one generic back session', () => {

@@ -160,6 +160,21 @@ function backVolumeProfile(level: string, trainingYears?: number): { targetMult:
   return { targetMult: 1, capMult: 1, extraExercises: 0 };
 }
 
+/**
+ * Объёмный профиль ног для продвинутых атлетов.
+ * Ноги — большая мышечная группа, которая на курсе восстанавливается быстрее,
+ * но требует реального распределения между quads/hamstrings/glutes, а не
+ * одного тяжёлого приседа и пары изоляций.
+ */
+function legVolumeProfile(level: string, trainingYears?: number): { targetMult: number; capMult: number; extraExercises: number } {
+  const years = Number.isFinite(trainingYears) ? Math.max(0, trainingYears as number) : 0;
+  if (level !== 'enhanced') return { targetMult: 1, capMult: 1, extraExercises: 0 };
+  if (years >= 6) return { targetMult: 1.80, capMult: 1.80, extraExercises: 2 };
+  if (years >= 3) return { targetMult: 1.45, capMult: 1.45, extraExercises: 1 };
+  if (years >= 1) return { targetMult: 1.15, capMult: 1.15, extraExercises: 0 };
+  return { targetMult: 1, capMult: 1, extraExercises: 0 };
+}
+
 
 export interface BBSet {
   reps: number;
@@ -945,9 +960,9 @@ export const defaultWorkMax = (key: string): number => {
  * Зависит только от dayInRotation (для чередования quads/hamstrings на Legs-днях).
  * Ранее реконструировалось при каждом вызове buildSession (~100+ раз на план).
  */
-function getTagPrimaryMuscles(dayInRotation: number): Record<string, Set<string>> {
-  const legPrimary = dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes']) : new Set(['quads', 'glutes']);
-  const lowerPrimary = dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes', 'calves']) : new Set(['quads', 'glutes', 'calves']);
+function getTagPrimaryMuscles(dayInRotation: number, highVolumeLegs = false): Record<string, Set<string>> {
+  const legPrimary = highVolumeLegs ? new Set(['quads', 'hamstrings', 'glutes']) : (dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes']) : new Set(['quads', 'glutes']));
+  const lowerPrimary = highVolumeLegs ? new Set(['quads', 'hamstrings', 'glutes', 'calves']) : (dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes', 'calves']) : new Set(['quads', 'glutes', 'calves']));
   return {
     Chest: new Set(['chest']),
     Back: new Set(['back']),
@@ -1081,7 +1096,7 @@ function buildSession(
     // Остальные мышцы тега — добивочные (accessory), даже если тяж-день.
     // Это предотвращает: delt_front=primary в Chest-дне → блокирует Shoulders-день.
     // C10: вынесено в getTagPrimaryMuscles (модульный уровень) — без реконструкции на каждый вызов.
-    const TAG_PRIMARY_MUSCLES = getTagPrimaryMuscles(dayInRotation);
+    const TAG_PRIMARY_MUSCLES = getTagPrimaryMuscles(dayInRotation, level === 'enhanced' && (trainingYears ?? 0) >= 3);
     const tagPrimaries = sched.sessionTag ? TAG_PRIMARY_MUSCLES[sched.sessionTag] : undefined;
     // Glute priority для женщин ИЛИ при focusGroup='glutes': glutes всегда primary в любом ножном дне.
     // Также для FullBody — glutes добавляется в fbPrimaryToday при focus.
@@ -1104,10 +1119,21 @@ function buildSession(
     // ИСКЛЮЧЕНИЕ: dual-primary теги (ChestBack, ShouldersArms, Upper, Torso) — 2 primary
     // (chest+back, shoulders+arms), иначе back=1ex в ChestBack — недопустимо.
     const DUAL_PRIMARY_TAGS = new Set(['ChestBack', 'ShouldersArms', 'Upper', 'UpperPower', 'UpperHyp', 'Torso', 'LegsBiceps']);
-    const maxPrimaries = DUAL_PRIMARY_TAGS.has(sched.sessionTag || '') ? 2 : 1;
+    // Для опытного enhanced: Lower-день получает 2 primary (quads+hamstrings),
+    // а не только одну группу по ротации. Это даёт обеим группам полноценный бюджет.
+    const highVolumeLegsSession = level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Legs|Lower|LowerPower|LowerHyp/.test(sched.sessionTag || '');
+    const maxPrimaries = highVolumeLegsSession ? 3 : (DUAL_PRIMARY_TAGS.has(sched.sessionTag || '') ? 2 : 1);
+    // Для high-volume legs: quads принудительно primary даже если hamstrings
+    // уже занял primary-слот. Без этого quads всегда accessory в чётные дни.
+    const forceLegsPrimary = highVolumeLegsSession && ['quads', 'hamstrings', 'glutes'].includes(muscle);
     // focusGroup: мышца специализации получает primary-слот даже если maxPrimaries достигнут.
     const isFocusMuscle = focusGroup && (muscle === focusGroup || isWeak(muscle, [focusGroup]));
-    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary && (musclePrimaryAssigned.size < maxPrimaries || muscle === sessionLeadMuscle || isFocusMuscle)) {
+    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary && (musclePrimaryAssigned.size < maxPrimaries || muscle === sessionLeadMuscle || isFocusMuscle || forceLegsPrimary)) {
+      role = 'primary'; musclePrimaryAssigned.add(muscle);
+    }
+    // High-volume legs: принудительно primary для quads/hamstrings/glutes
+    // даже если maxPrimaries уже достигнут.
+    if (forceLegsPrimary && !musclePrimaryAssigned.has(muscle) && !SMALL_NEVER_PRIMARY.has(muscle)) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     // Слабые группы (weakPoints): структурное повышение до primary —
@@ -1137,6 +1163,11 @@ function buildSession(
     // 3+ лет — 18 сетов, 6+ лет — 22 сета до дальнейшего fatigue/recovery fit.
     if (muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
       sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 22 : 18);
+    }
+    // High-volume enhanced legs: ноги тоже получают повышенный минимум,
+    // а не остаточный бюджет после рук/пресса.
+    if (['quads', 'hamstrings', 'glutes'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 20 : 14);
     }
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
@@ -1212,6 +1243,7 @@ function buildSession(
     // Теперь: multi-day primary = 4 (доминирует), multi-day accessory = 1 (добивка),
     // кроме biceps/triceps на PED (=2). В solo-day (1-2 мышцы) — как раньше (accessory=2).
     const backProfile = muscle === 'back' ? backVolumeProfile(level, trainingYears) : { targetMult: 1, capMult: 1, extraExercises: 0 };
+    const legProfile = muscle === 'quads' || muscle === 'hamstrings' || muscle === 'glutes' ? legVolumeProfile(level, trainingYears) : { targetMult: 1, capMult: 1, extraExercises: 0 };
     let exerciseCount = role === 'primary'
       ? (isMultiDay ? 4 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
       : (isMultiDay
@@ -1222,6 +1254,11 @@ function buildSession(
     else if (levelBase >= 4 && role === 'primary') exerciseCount = Math.min(8, exerciseCount + 1);
     if (muscle === 'back' && role === 'primary' && backProfile.extraExercises > 0) {
       exerciseCount = Math.min(8, exerciseCount + backProfile.extraExercises);
+    }
+    // Опытный enhanced: ноги получают дополнительные качественные слоты
+    // (не только один присед + изоляция).
+    if (['quads', 'hamstrings', 'glutes'].includes(muscle) && role === 'primary' && legProfile.extraExercises > 0) {
+      exerciseCount = Math.min(8, exerciseCount + legProfile.extraExercises);
     }
     // В Upper/Lower back может быть не lead-мышцей, но опытный enhanced
     // профиль всё равно требует полноценного back-блока, а не одного
@@ -1707,6 +1744,24 @@ function buildSession(
   // P0-1: резервируем бюджет для arms (biceps/triceps) ДО того, как chest/back его потратят.
   // Раньше: chest/back забирали весь fatigue budget → biceps/triceps получали 0 упражнений.
   const armPlans = plans.filter(p => ARM_MUSCLES_SET.has(p.muscle));
+  // Indirect arm overlap: жимы дают трицепсу ~0.5 effective sets на каждый сет,
+  // тяги дают бицепсу ~0.5. Это должно снижать прямой объём рук, а не
+  // добавляться поверх.
+  let indirectBiceps = 0;
+  let indirectTriceps = 0;
+  for (const pl of plans) {
+    if (ARM_MUSCLES_SET.has(pl.muscle)) continue;
+    const n = (pl.exDatas[0]?.name || '').toLowerCase();
+    const totalSets = pl.sets || 0;
+    if (/жим|bench|press|dip|отжим.*брус|жим.*узк|close.?grip/i.test(n) && !/ног|leg|сгибан|curl/i.test(n)) {
+      indirectTriceps += totalSets * 0.5;
+    }
+    if (/подтяг|pull.?up|chin|тяга|row|пуллдаун|верхн.*блок|lat.?pull/i.test(n) && !/лиц|face/i.test(n)) {
+      indirectBiceps += totalSets * 0.5;
+    }
+  }
+  // Базовый резерв для рук снижается пропорционально косвенной нагрузке.
+  // Если косвенный объём уже покрывает 50% target — прямой объём сокращается.
   const armReserveBudget = armPlans.length * 6 * 5; // 6 sets (2 ex × 3 sets) × fatigueCost 5 per arm muscle
   let availableBudget = dayFatigueBudget;
   if (armPlans.length > 0 && availableBudget > armReserveBudget) {
@@ -1720,11 +1775,15 @@ function buildSession(
     const repMin = isAcc ? adjMin + 2 : adjMin;
     const repMax = isAcc ? adjMax + 5 : adjMax;
     const isArmMuscle = ARM_MUSCLES_SET.has(pl.muscle);
+    // Indirect overlap reduction: если жимы/тяги уже дали существенный
+    // косвенный объём, прямой объём рук снижается, а не добавляется поверх.
+    const indirectOverlap = pl.muscle === 'biceps' ? indirectBiceps : pl.muscle === 'triceps' ? indirectTriceps : 0;
+    const indirectReduction = indirectOverlap > 8 ? 0.5 : indirectOverlap > 4 ? 0.75 : 1.0;
     // P0-1: для arms — используем зарезервированный бюджет напрямую (не пропорционально totalExpectedFatigue).
     // Раньше: muscleBudget = floor(15 × 1 × 3 × 5 / 130) = 1 (chest/back размывают резерв).
     // Теперь: arms получают гарантированный budget = armReserve / armPlans.length.
     const armBudgetPerMuscle = armPlans.length > 0 ? (armReserveBudget / armPlans.length) : 0;
-    const budgetSource = isArmMuscle ? armBudgetPerMuscle : availableBudget;
+    const budgetSource = isArmMuscle ? armBudgetPerMuscle * indirectReduction : availableBudget;
     const muscleBudget = isArmMuscle
       ? Math.max(armBudgetPerMuscle, 15) // минимум 3 сета × 5 fatigue
       : (totalExpectedFatigue > 0
@@ -1732,10 +1791,18 @@ function buildSession(
         : Math.floor(budgetSource / Math.max(1, plans.length)));
     // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
     const highVolumeBack = pl.muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
+    const highVolumeLegs = ['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = highVolumeBack
       ? Math.max(muscleBudget, pl.sets * 10)
-      : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
+      : highVolumeLegs
+        ? Math.max(muscleBudget, pl.sets * 8)
+        : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
+    // High-volume legs: fatigue budget не должен резать ноги до остатка.
+    // Минимум — целевые сеты × fatigueCost, а не пропорция от общего бюджета.
+    if (highVolumeLegs && remainingBudget < pl.sets * 5) {
+      remainingBudget = pl.sets * 5;
+    }
     // Гарантированный минимум для arms/shoulders — на PED нужно минимум 3-4 сета
     // даже если бюджет мал (chest забирал большую часть). Без этого triceps получает 1 сет.
     // minBudget = fatigueCost(5) × minSets(3-4) × minExercises(2) = 30-40
@@ -1757,7 +1824,9 @@ function buildSession(
       // P1-4: минимум 2 сета на упражнение (1 сет = разминка, не рабочий объём для гипертрофии).
        // back target уже масштабирован на недельном prescription-уровне выше;
        // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
-       const setCap = pl.muscle === 'back' && trainingYears !== undefined ? 10 : 5;
+       const setCap = (pl.muscle === 'back' && trainingYears !== undefined) ? 10
+         : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && trainingYears !== undefined) ? 8
+         : 5;
        const exSets = Math.max(2, Math.min(setCap, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
@@ -2011,6 +2080,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const avAxial = input.avoidAxialLoad || false;
   const eqList = input.equipment || [];
   const backProfile = backVolumeProfile(level, input.trainingYears);
+  const legProfile = legVolumeProfile(level, input.trainingYears);
 
   const today = todayStr();
   const excludedMuscles = getExcludedMuscles(injuries, today);
@@ -2084,6 +2154,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (m === 'back' && input.trainingYears !== undefined) {
         v = Math.round(v * backProfile.targetMult);
       }
+      // Enhanced объём ног масштабируется подтверждённым стажем.
+      // quads/hamstrings/glutes — большие группы, на курсе восстанавливаются
+      // быстрее, но объём не должен расти только из-за флага enhanced.
+      if (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined) {
+        v = Math.round(v * legProfile.targetMult);
+      }
       // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
       v = Math.round(v * (input.labMrvMultiplier ?? 1));
       // PRO: cross-mesocycle volume progression — +1-2 сета per muscle из предыдущего мезо
@@ -2109,7 +2185,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1));
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1) * (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined ? legProfile.capMult : 1));
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
@@ -2251,7 +2327,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions);
+       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -2877,8 +2953,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     checkOrder: true,
     // Высокообъёмный предел применяется только при явно переданном стаже
     // enhanced-атлета; натуральные и legacy-вызовы сохраняют 24/10.
-    maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 56 : 24,
-    maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 16 : 10,
+    maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : 24,
+    maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : 10,
     trainingYears: input.trainingYears,
   });
 }
