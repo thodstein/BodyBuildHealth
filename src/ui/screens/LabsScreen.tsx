@@ -65,6 +65,7 @@ const sysLabels: Record<string, string> = {
   cardio: 'Сердечно-сосудистая', hepatic: 'Печень', renal: 'Почки',
   neuro: 'Нервная система', endocrine: 'Эндокринная', hematologic: 'Кровь',
   reproductive: 'Репродуктивная', musculoskeletal: 'Мышечная', metabolic: 'Метаболизм',
+  urinalysis: 'Моча',
   other: 'Прочее',
 };
 
