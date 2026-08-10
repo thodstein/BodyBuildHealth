@@ -461,8 +461,8 @@ export function buildMapperCtx(
     .map((a: any) => ({
       id: (a.id as string).toLowerCase(),
       pClass: classifyPed(a.id),
-       mgPerWeek: Number(a.mgPerWeek ?? a.dosePerWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500)) || 0,
-      form: (a.form === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
+       mgPerWeek: Number(a.mgPerWeek ?? a.dosePerWeek ?? a.doseMgWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500)) || 0,
+      form: (a.form === 'oral' || a.route === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
     }));
   const ghIU = state.pharma.ghIU || 0;
   if (ghIU > 0) pedDoses.push({ id: 'somatropin', pClass: 'gh', iuPerDay: ghIU, form: 'subq' } as any);
@@ -1142,13 +1142,56 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               const health = s.health || {};
               const pharma = s.pharma || {};
               const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'base' };
-              const aas = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((sub: any) => ({ id: sub.id || sub.substanceId || '', mgPerWeek: sub.doseMgWeek || sub.weeklyDose || 0, weeks: sub.weeks || 12, form: sub.form || 'inject' })) : [];
+              const aas = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((sub: any) => ({
+                id: sub.id || sub.substanceId || '',
+                mgPerWeek: sub.doseMgWeek || sub.weeklyDose || sub.doseMg || 0,
+                weeks: sub.weeks || (sub.endWeek || 12) - (sub.startWeek || 0) || 12,
+                form: sub.form || (sub.route === 'oral' ? 'oral' : 'inject'),
+              })) : [];
+              // Вывод PED-флагов и доз из currentSubstances
+              const csIds = new Set((pharma.currentSubstances || []).map((s: any) => s.id));
+              const csHasAI = ['anastrozole','anastro','letrozole','exemestane'].some(id => csIds.has(id));
+              const csHasSERM = ['tamoxifen','clomiphene','enclomiphene'].some(id => csIds.has(id));
+              const csHasCaber = csIds.has('caberg') || csIds.has('cabergoline');
+              const csHasGH = csIds.has('somatropin') || csIds.has('hgh') || csIds.has('gh');
+              const csHasIGF = csIds.has('igf1_lr3') || csIds.has('igf1_des');
+              const csHasInsulin = ['ins_short','ins_long','ins_aspart','ins_detemir'].some(id => csIds.has(id));
+              const csHasSARMs = ['ostarine','lgd','rad140','s23','andarine'].some(id => csIds.has(id));
+              const csHasMGF = csIds.has('mgf');
+              let csGhIU = 0, csInsulinIU = 0, csIgfMcg = 0, csClenMcg = 0, csT3Mcg = 0;
+              for (const s of (pharma.currentSubstances || [])) {
+                const dose = Number((s as any).doseMg || (s as any).doseValue || 0);
+                const id = (s as any).id;
+                if (id === 'somatropin' || id === 'hgh' || id === 'gh') csGhIU += dose;
+                if (['ins_short','ins_long','ins_aspart','ins_detemir'].includes(id)) csInsulinIU += dose;
+                if (id === 'igf1_lr3' || id === 'igf1_des') csIgfMcg += dose;
+                if (id === 'clenbuterol' || id === 'clen') csClenMcg += dose;
+                if (id === 't3' || id === 'liothyronine') csT3Mcg += dose;
+              }
               onStateChange({
                 ...state,
                 profile: { ...state.profile, weight: personal.weight || state.profile.weight, age: personal.age || state.profile.age, sleepHours: lifestyle.sleepHours ?? state.profile.sleepHours, stressLevel: lifestyle.stressLevel ?? state.profile.stressLevel, height: personal.height ?? state.profile.height },
                 neuro: { ...state.neuro, aggressionScore: (health.aggressionScore ?? 3) * 2, dopamineScore: health.dopamineScore ?? state.neuro.dopamineScore, serotoninScore: health.serotoninScore ?? state.neuro.serotoninScore, memoryIssues: health.memoryIssues ?? state.neuro.memoryIssues, focusIssues: health.focusIssues ?? state.neuro.focusIssues, slowThinking: health.slowThinking ?? state.neuro.slowThinking, headaches: health.headaches ?? state.neuro.headaches, gabaBalance: health.gabaBalance || state.neuro.gabaBalance, coordinationIssues: health.coordinationIssues ?? state.neuro.coordinationIssues },
                 oda: { ...state.oda, jointPain: health.jointPainSeverity ?? (health.jointPain ? 'moderate' : state.oda.jointPain), ligamentIssues: health.ligamentIssues ?? state.oda.ligamentIssues, backPain: health.backPain ?? state.oda.backPain },
-                pharma: { ...state.pharma, phase: (phaseMap[pharma.phase] || state.pharma.phase) as any, aas: aas.length > 0 ? aas : state.pharma.aas, hasHCG: pharma.hcgEnabled ?? state.pharma.hasHCG, hasAI: pharma.aiEnabled ?? state.pharma.hasAI, hasCaber: pharma.hasCaber ?? state.pharma.hasCaber, hasGH: pharma.hasGH ?? state.pharma.hasGH, ghIU: pharma.ghIU ?? state.pharma.ghIU, insulinIU: pharma.insulinIU ?? state.pharma.insulinIU, igfMcg: pharma.igfMcg ?? state.pharma.igfMcg },
+                pharma: {
+                  ...state.pharma,
+                  phase: (phaseMap[pharma.phase] || state.pharma.phase) as any,
+                  aas: aas.length > 0 ? aas : state.pharma.aas,
+                  hasHCG: pharma.hcgEnabled ?? state.pharma.hasHCG,
+                  hasAI: csHasAI || pharma.aiEnabled || state.pharma.hasAI,
+                  hasSERM: csHasSERM || state.pharma.hasSERM,
+                  hasCaber: csHasCaber || pharma.hasCaber || state.pharma.hasCaber,
+                  hasGH: csHasGH || pharma.hasGH || state.pharma.hasGH,
+                  hasIGF: csHasIGF || pharma.hasIGF || state.pharma.hasIGF,
+                  hasInsulin: csHasInsulin || pharma.hasInsulin || state.pharma.hasInsulin,
+                  hasSARMs: csHasSARMs || pharma.hasSARMs || state.pharma.hasSARMs,
+                  hasMGF: csHasMGF || pharma.hasMGF || state.pharma.hasMGF,
+                  ghIU: csGhIU > 0 ? csGhIU : (pharma.ghIU ?? state.pharma.ghIU),
+                  insulinIU: csInsulinIU > 0 ? csInsulinIU : (pharma.insulinIU ?? state.pharma.insulinIU),
+                  igfMcg: csIgfMcg > 0 ? csIgfMcg : (pharma.igfMcg ?? state.pharma.igfMcg),
+                  clenMcg: csClenMcg > 0 ? csClenMcg : (pharma.clenMcg ?? state.pharma.clenMcg),
+                  t3Mcg: csT3Mcg > 0 ? csT3Mcg : (pharma.t3Mcg ?? state.pharma.t3Mcg),
+                },
                 healthConditions: Array.isArray(health.chronicConditions) ? health.chronicConditions : state.healthConditions,
               });
             } catch {}

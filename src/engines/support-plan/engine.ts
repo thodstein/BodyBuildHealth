@@ -729,24 +729,51 @@ export function hydrateState(): Partial<CalculatorState> {
       // ── Pharma: из pharma.* с маппингом ──
       if (!result.pharma) {
         const phaseMap: Record<string, string> = { baseline: 'base', course: 'course', bridge: 'bridge', pct: 'pct', post_pct: 'pct', fertility: 'base' };
+        // Маппинг currentSubstances → aas с поддержкой разных имён полей (doseMgWeek/weeklyDose/doseMg)
+        const csAas = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((s: any) => ({
+          id: s.id || s.substanceId || '',
+          doseMgWeek: s.doseMgWeek || s.weeklyDose || s.doseMg || 0,
+          weeks: s.weeks || (s.endWeek && s.startWeek != null ? Math.max(1, s.endWeek - s.startWeek) : 0),
+          form: s.form || (s.route === 'oral' ? 'oral' : 'inject'),
+        })) : [];
+        // Вывод PED-флагов и доз из currentSubstances (зеркало course_log)
+        const csIds = new Set((pharma.currentSubstances || []).map((s: any) => s.id));
+        const csHasAI = ['anastrozole','anastro','letrozole','exemestane'].some(id => csIds.has(id));
+        const csHasSERM = ['tamoxifen','clomiphene','enclomiphene'].some(id => csIds.has(id));
+        const csHasCaber = csIds.has('caberg') || csIds.has('cabergoline');
+        const csHasGH = csIds.has('somatropin') || csIds.has('hgh') || csIds.has('gh');
+        const csHasIGF = csIds.has('igf1_lr3') || csIds.has('igf1_des');
+        const csHasInsulin = ['ins_short','ins_long','ins_aspart','ins_detemir'].some(id => csIds.has(id));
+        const csHasSARMs = ['ostarine','lgd','rad140','s23','andarine'].some(id => csIds.has(id));
+        const csHasMGF = csIds.has('mgf');
+        let csGhIU = 0, csInsulinIU = 0, csIgfMcg = 0, csClenMcg = 0, csT3Mcg = 0;
+        for (const s of (pharma.currentSubstances || [])) {
+          const dose = Number((s as any).doseMg || (s as any).doseValue || 0);
+          const id = (s as any).id;
+          if (id === 'somatropin' || id === 'hgh' || id === 'gh') csGhIU += dose;
+          if (['ins_short','ins_long','ins_aspart','ins_detemir'].includes(id)) csInsulinIU += dose;
+          if (id === 'igf1_lr3' || id === 'igf1_des') csIgfMcg += dose;
+          if (id === 'clenbuterol' || id === 'clen') csClenMcg += dose;
+          if (id === 't3' || id === 'liothyronine') csT3Mcg += dose;
+        }
         result.pharma = {
           phase: (phaseMap[pharma.phase] || pharma.phase || 'course') as any,
-          aas: Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances.map((s: any) => ({ id: s.id || s.substanceId || '', doseMgWeek: s.doseMgWeek || s.weeklyDose || 0, weeks: s.weeks || 0 })) : [],
-          hasGH: pharma.hasGH ?? false,
-          hasIGF: pharma.hasIGF ?? false,
-          hasInsulin: pharma.hasInsulin ?? false,
+          aas: csAas,
+          hasGH: pharma.hasGH ?? csHasGH ?? false,
+          hasIGF: pharma.hasIGF ?? csHasIGF ?? false,
+          hasInsulin: pharma.hasInsulin ?? csHasInsulin ?? false,
           hasHCG: pharma.hcgEnabled ?? false,
-          hasAI: pharma.aiEnabled ?? false,
-          hasCaber: pharma.hasCaber ?? false,
-          hasSERM: pharma.hasSERM ?? false,
-          hasSARMs: pharma.hasSARMs ?? false,
-          hasMGF: pharma.hasMGF ?? false,
+          hasAI: pharma.aiEnabled ?? csHasAI ?? false,
+          hasCaber: pharma.hasCaber ?? csHasCaber ?? false,
+          hasSERM: pharma.hasSERM ?? csHasSERM ?? false,
+          hasSARMs: pharma.hasSARMs ?? csHasSARMs ?? false,
+          hasMGF: pharma.hasMGF ?? csHasMGF ?? false,
           hasGLP1: pharma.hasGLP1 ?? false,
-          ghIU: pharma.ghIU ?? 0,
-          insulinIU: pharma.insulinIU ?? 0,
-          igfMcg: pharma.igfMcg ?? 0,
-          clenMcg: pharma.clenMcg ?? 0,
-          t3Mcg: pharma.t3Mcg ?? 0,
+          ghIU: pharma.ghIU ?? csGhIU ?? 0,
+          insulinIU: pharma.insulinIU ?? csInsulinIU ?? 0,
+          igfMcg: pharma.igfMcg ?? csIgfMcg ?? 0,
+          clenMcg: pharma.clenMcg ?? csClenMcg ?? 0,
+          t3Mcg: pharma.t3Mcg ?? csT3Mcg ?? 0,
         } as any;
       }
       // ── Symptoms: из symptoms.recent → string[] ──

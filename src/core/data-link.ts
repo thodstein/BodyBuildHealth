@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { UserProfile, LabPoint, CourseEntry, InjuryRecord } from './types';
+import type { UserProfile, LabPoint, CourseEntry, InjuryRecord, PharmaSubstanceEntry } from './types';
 import { getProfile, updateProfile, onProfileChange } from './profile-manager';
 import { db } from './db';
 import { UCUM_MAP, ALL_RISK_SYSTEMS } from './constants';
@@ -11,6 +11,7 @@ import { calculateSupport, type SupportInput } from '../engines/support.engine';
 import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
 import { readRiskBridge } from '../engines/risk-bridge';
 import type { ReadinessScores, RiskCalculationResult } from './types';
+import { mapCourseToSubstances, hasCourseDiff, derivePedFlagsFromCourse } from './course-sync';
 
 let globalTick = 0;
 const listeners = new Set<() => void>();
@@ -99,6 +100,29 @@ function computeActiveDrugs(course: CourseEntry[]): Record<string, { dosePerWeek
   return map;
 }
 
+/**
+ * Синхронизация course_log (IndexedDB) → profile.pharma.currentSubstances (UnifiedSettings).
+ * Делегирует чистые функции в course-sync.ts.
+ */
+export function syncCourseToProfile(course: CourseEntry[]): void {
+  if (!Array.isArray(course) || course.length === 0) return;
+  try {
+    const profile = getProfile();
+    const pharma = (profile.settings?.pharma ?? {}) as any;
+    const existing: PharmaSubstanceEntry[] = Array.isArray(pharma.currentSubstances) ? pharma.currentSubstances : [];
+    if (!hasCourseDiff(course, existing)) return;
+    const mapped = mapCourseToSubstances(course);
+    const pedFlags = derivePedFlagsFromCourse(course);
+    const nextPharma = { ...pharma, currentSubstances: mapped, ...pedFlags };
+    updateProfile({ settings: { ...(profile.settings || {}), pharma: nextPharma } });
+  } catch (e) {
+    console.warn('syncCourseToProfile failed:', e);
+  }
+}
+
+// Ре-экспорт для обратной совместимости
+export { mapCourseToSubstances, hasCourseDiff, derivePedFlagsFromCourse } from './course-sync';
+
 export function useDataLink(): LinkedData {
   const [profile, setProfile] = useState<UserProfile>(getProfile());
   const [labs, setLabs] = useState<LabPoint[]>([]);
@@ -136,6 +160,8 @@ export function useDataLink(): LinkedData {
            endWeek: Number.isFinite(Number(c.endWeek)) ? Number(c.endWeek) : 12,
          }));
          setCourse(validCourse);
+         // Автосинхронизация course_log → profile.currentSubstances + PED-флаги/дозы
+         syncCourseToProfile(validCourse);
       } catch {}
     };
     load();
