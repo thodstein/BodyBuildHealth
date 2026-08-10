@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run sync-ocr-assets && tsc && vite build",
+    "vercel-build": "npm run sync-ocr-assets && vite build",
     "type-check": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",

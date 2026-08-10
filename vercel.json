@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "NODE_OPTIONS=--max-old-space-size=2048 npm run build",
+  "buildCommand": "npm run vercel-build",
   "installCommand": "npm ci",
   "outputDirectory": "dist",
   "rewrites": [
