@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui';
+import { btnBase, btnPrimary, chip, chipActive, header as pageHeader, main as pageMain, statCard } from '../diary-page-styles';
 import {
   INJECTION_ZONES,
   NEEDLE_GAUGES,
@@ -60,15 +61,9 @@ const emptyDraft = (zone = 'glute_dorsal'): Draft => ({
   notes: '',
 });
 
-const button: React.CSSProperties = {
-  minHeight: 40,
-  padding: '8px 12px',
-  borderRadius: 9,
-  border: `1px solid ${colors.border}`,
-  background: 'rgba(255,255,255,.07)',
-  color: colors.text,
-  cursor: 'pointer',
-};
+const ACCENT = '#f59e0b';
+
+const button: React.CSSProperties = { ...btnBase(ACCENT) };
 const dangerButton: React.CSSProperties = {
   ...button,
   color: '#fecaca',
@@ -104,7 +99,7 @@ const Metric: React.FC<{ label: string; value: React.ReactNode; tone?: string }>
 }) => (
   <div style={{ ...card, minWidth: 135, flex: '1 1 135px' }}>
     <div style={{ ...labelStyle, marginBottom: 7 }}>{label}</div>
-    <strong style={{ fontSize: 23, color: tone }}>{value}</strong>
+    <strong style={{ fontSize: 20, color: tone }}>{value}</strong>
   </div>
 );
 
@@ -581,33 +576,37 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const chartMax = 10;
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+      className="injection-window"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        background:
+          'radial-gradient(900px 480px at 15% -10%, rgba(245,158,11,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(139,92,246,0.06), transparent 55%), #0a0a0d',
+        color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+      }}
     >
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 5,
-          background: 'rgba(24,24,27,.97)',
-          borderBottom: `1px solid ${colors.border}`,
-          padding: '12px max(14px, calc((100vw - 1180px)/2))',
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
+      <style>{`
+        .injection-window button { font-family: inherit; }
+        .injection-window::-webkit-scrollbar { width: 10px; }
+        .injection-window::-webkit-scrollbar-track { background: transparent; }
+        .injection-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; }
+        .injection-window::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,0.4); }
+        @media (hover: none) and (pointer: coarse) {
+          .injection-window button { min-height: 44px; }
+          .injection-window input, .injection-window textarea, .injection-window select { font-size: 16px; }
+        }
+      `}</style>
+      <header style={{ ...pageHeader, padding: '12px max(14px, calc((100vw - 1180px)/2))' }}>
         <button style={button} onClick={onClose}>
           ← Дневники
         </button>
         <div style={{ flex: 1, minWidth: 190 }}>
-          <strong style={{ fontSize: 18 }}>💉 Дневник инъекций</strong>
+          <strong style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
+            💉 Инъекции
+            <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{entries.length} записей</span>
+          </strong>
           <div style={{ color: colors.textMuted, fontSize: 11 }}>Журнал · статистика · график · ротация зон</div>
         </div>
-        <button
-          style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800 }}
-          onClick={() => setEditor({ open: true })}
-        >
+        <button style={btnPrimary(ACCENT)} onClick={() => setEditor({ open: true })}>
           ＋ Добавить
         </button>
         {repeatLast && (
@@ -660,16 +659,12 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           </button>
         )}
       </header>
-      <main style={{ maxWidth: 1180, margin: 'auto', padding: 14 }}>
+      <main style={{ ...pageMain, maxWidth: 1180 }}>
         <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap' }}>
           {(['journal', 'stats', 'chart'] as ViewMode[]).map((value) => (
             <button
               key={value}
-              style={{
-                ...button,
-                background: mode === value ? colors.primaryDim : undefined,
-                color: mode === value ? colors.primary : undefined,
-              }}
+              style={mode === value ? chipActive(ACCENT) : chip(ACCENT)}
               onClick={() => setMode(value)}
             >
               {value === 'journal' ? '📋 Журнал' : value === 'stats' ? '📊 Статистика' : '📈 График боли / PIP'}

@@ -2,6 +2,18 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import { AddHealthModal } from '../../health-diary-modal';
 import {
+  btnBase,
+  btnPrimary,
+  chip,
+  chipActive,
+  glassSection,
+  header as pageHeader,
+  main as pageMain,
+  statCard,
+  tableTh,
+  tableTd,
+} from '../diary-page-styles';
+import {
   addUnifiedHealthEntry,
   deleteUnifiedHealthEntry,
   getUnifiedAcneStats,
@@ -40,29 +52,22 @@ import {
 import { PAIN_ZONES, NEURO_SYMPTOMS, ACNE_AREAS, HEMATO_SYMPTOMS, painZoneColor } from '../../diary-modals';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
-const button: React.CSSProperties = {
-  minHeight: 40,
-  padding: '7px 11px',
-  borderRadius: 8,
-  background: '#27272a',
-  border: '1px solid #3f3f46',
-  color: '#fff',
-  cursor: 'pointer',
-};
-const card: React.CSSProperties = {
-  padding: 12,
-  borderRadius: 12,
-  background: 'rgba(255,255,255,.035)',
-  border: '1px solid rgba(255,255,255,.09)',
-};
+const ACCENT = '#ec4899';
+
+const button: React.CSSProperties = { ...btnBase(ACCENT) };
+const card: React.CSSProperties = { ...glassSection };
 const input: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
-  padding: '8px 9px',
-  borderRadius: 7,
-  border: '1px solid #3f3f46',
-  background: '#18181b',
+  padding: '8px 10px',
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  background: 'rgba(255,255,255,0.06)',
   color: '#fff',
+  fontSize: 14,
+  outline: 'none',
+  minHeight: 38,
+  fontFamily: 'inherit',
 };
 
 type Symptom = UnifiedHealthEntry['symptoms'][number];
@@ -141,8 +146,8 @@ const ToggleGrid: React.FC<{
             ...button,
             minHeight: 44,
             textAlign: 'left',
-            borderColor: active ? color : '#3f3f46',
-            background: active ? `${color}22` : '#18181b',
+            borderColor: active ? color : 'rgba(255,255,255,0.12)',
+            background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
             color: active ? color : colors.text,
           }}
         >
@@ -487,7 +492,7 @@ const EntryEditor: React.FC<{
             style={{
               ...button,
               flex: 1,
-              background: valid ? colors.primary : '#3f3f46',
+              background: valid ? colors.primary : 'rgba(255,255,255,0.08)',
               color: valid ? '#07130d' : '#aaa',
             }}
             onClick={() => valid && onSave(draft)}
@@ -640,28 +645,34 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   if (!open) return null;
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+      className="health-window"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        background:
+          'radial-gradient(900px 480px at 15% -10%, rgba(236,72,153,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(59,130,246,0.06), transparent 55%), #0a0a0d',
+        color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+      }}
     >
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 5,
-          display: 'flex',
-          gap: 7,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          padding: 12,
-          background: '#18181b',
-          borderBottom: '1px solid #27272a',
-        }}
-      >
+      <style>{`
+        .health-window button { font-family: inherit; }
+        .health-window::-webkit-scrollbar { width: 10px; }
+        .health-window::-webkit-scrollbar-track { background: transparent; }
+        .health-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; }
+        .health-window::-webkit-scrollbar-thumb:hover { background: rgba(236,72,153,0.4); }
+        @media (hover: none) and (pointer: coarse) {
+          .health-window button { min-height: 44px; }
+          .health-window input, .health-window textarea, .health-window select { font-size: 16px; }
+        }
+      `}</style>
+      <header style={pageHeader}>
         <button style={button} onClick={onClose}>
           ← Дневники
         </button>
-        <b style={{ fontSize: 16 }}>🩺 Единый дневник здоровья</b>
+        <b style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
+          🩺 Здоровье
+          <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{rows.length} записей</span>
+        </b>
         <div style={{
-          marginLeft: 'auto',
           padding: '4px 10px',
           borderRadius: 8,
           background: `${healthScore.breakdown.recovery.score > 60 ? colors.greenDim : colors.warningDim}`,
@@ -673,7 +684,8 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         }} title={`Индекс здоровья: ${diaryScore}/100`}>
           💚 {diaryScore}
         </div>
-        <button style={{ ...button, background: colors.primary, color: '#07130d' }} onClick={() => setAddOpen(true)}>
+        <div style={{ flex: 1 }} />
+        <button style={btnPrimary(ACCENT)} onClick={() => setAddOpen(true)}>
           + Добавить
         </button>
         <button style={button} onClick={() => setAddOpen(true)}>
@@ -707,7 +719,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         </button>
         {undo && (
           <button
-            style={button}
+            style={{ ...button, borderColor: `${ACCENT}55`, color: '#f472b6' }}
             onClick={() => {
               commit(undo, false);
               setUndo(null);
@@ -717,7 +729,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           </button>
         )}
       </header>
-      <main style={{ maxWidth: 1150, margin: 'auto', padding: 14 }}>
+      <main style={{ ...pageMain, maxWidth: 1150 }}>
         {status && (
           <div role="status" style={{ ...card, marginBottom: 10, color: status.color, borderColor: status.color }}>
             ⚠ {status.message}
@@ -740,9 +752,9 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             ['Симптомы', symptomStats?.total || 0, '#ec4899'],
             ['Серия', streak.current, '#f59e0b'],
           ].map(([label, value, color]) => (
-            <div key={String(label)} style={{ ...card, borderColor: `${color}55` }}>
-              <small style={{ color: colors.textMuted }}>{label}</small>
-              <strong style={{ display: 'block', color: String(color), fontSize: 18 }}>{value}</strong>
+            <div key={String(label)} style={{ ...statCard, border: `1px solid ${String(color)}44` }}>
+              <small style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</small>
+              <strong style={{ display: 'block', color: String(color), fontSize: 20, fontWeight: 800 }}>{value}</strong>
             </div>
           ))}
         </section>
@@ -964,7 +976,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             {(['all', '7', '30', '90'] as const).map((r) => (
               <button
                 key={r}
-                style={{ ...button, borderColor: range === r ? colors.primary : '#3f3f46' }}
+                style={range === r ? chipActive(ACCENT) : chip(ACCENT)}
                 onClick={() => {
                   setRange(r);
                   setPage(1);
@@ -979,21 +991,21 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 setQuery(e.target.value);
                 setPage(1);
               }}
-              placeholder="Поиск по дате/показателю"
+              placeholder="🔍 Поиск по дате/показателю"
               style={{ ...input, flex: 1, minWidth: 180 }}
             />
-            <button style={button} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>
+            <button style={chip(ACCENT)} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>
               ↕ Дата
             </button>
           </div>
         </section>
         <section style={{ ...card, overflowX: 'auto' }}>
           <h3 style={{ marginTop: 0 }}>Последние записи ({pageData.total})</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {['Дата', 'Боль', 'Нейро', 'Акне', 'Гемат', 'Симптомы', 'Время', 'Тип', 'Триггеры', 'Упр.', 'Заметка', 'Действия'].map((h) => (
-                  <th key={h} style={{ textAlign: 'left', padding: 7, borderBottom: '1px solid #52525b' }}>
+                  <th key={h} style={tableTh}>
                     {h}
                   </th>
                 ))}
@@ -1005,18 +1017,18 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 if (!row) return null;
                 return (
                   <tr key={row.id}>
-                    <td style={{ padding: 7 }}>{row.date}</td>
-                    <td>{row.pain?.totalScore || 0}/70</td>
-                    <td>{row.neuro?.totalScore || 0}/10</td>
-                    <td>{row.acne?.totalScore || 0}/12</td>
-                    <td>{row.hemato?.totalScore || 0}/8</td>
-                    <td>{row.symptoms.length}</td>
-                    <td>{row.pain?.timeOfDay || ''}</td>
-                    <td>{row.pain?.painType || ''}</td>
-                    <td>{(row.pain?.triggers || []).join(', ')}</td>
-                    <td>{row.pain?.linkedExercise || ''}</td>
-                    <td>{row.notes ? (row.notes.length > 20 ? row.notes.slice(0, 20) + '…' : row.notes) : ''}</td>
-                    <td>
+                    <td style={tableTd}>{row.date}</td>
+                    <td style={tableTd}>{row.pain?.totalScore || 0}/70</td>
+                    <td style={tableTd}>{row.neuro?.totalScore || 0}/10</td>
+                    <td style={tableTd}>{row.acne?.totalScore || 0}/12</td>
+                    <td style={tableTd}>{row.hemato?.totalScore || 0}/8</td>
+                    <td style={tableTd}>{row.symptoms.length}</td>
+                    <td style={tableTd}>{row.pain?.timeOfDay || ''}</td>
+                    <td style={tableTd}>{row.pain?.painType || ''}</td>
+                    <td style={tableTd}>{(row.pain?.triggers || []).join(', ')}</td>
+                    <td style={tableTd}>{row.pain?.linkedExercise || ''}</td>
+                    <td style={tableTd}>{row.notes ? (row.notes.length > 20 ? row.notes.slice(0, 20) + '…' : row.notes) : ''}</td>
+                    <td style={tableTd}>
                       <button style={{ ...button, minHeight: 32, padding: '3px 7px' }} onClick={() => setEdit(row)}>
                         ✏️
                       </button>{' '}

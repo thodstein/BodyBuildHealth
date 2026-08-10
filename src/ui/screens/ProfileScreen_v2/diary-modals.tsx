@@ -57,7 +57,7 @@ export const daysSince = (lastDate: string | undefined): number | null => {
 /* ── Legacy style exports (backward-compat) ── */
 
 export const fieldLabel: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 11,
   color: colors.textMuted,
   fontWeight: 700,
   marginBottom: 5,
@@ -68,35 +68,35 @@ export const fieldInput: React.CSSProperties = {
   width: '100%',
   background: 'rgba(255,255,255,0.06)',
   border: '1px solid rgba(255,255,255,0.16)',
-  borderRadius: 16,
-  padding: '13px 15px',
+  borderRadius: 14,
+  padding: '12px 14px',
   color: colors.text,
-  fontSize: 16,
+  fontSize: 14,
   outline: 'none',
   boxSizing: 'border-box',
-  minHeight: 50,
+  minHeight: 46,
   transition: 'border-color 0.18s, box-shadow 0.18s, background 0.18s',
 };
 export const btnPrimary = (color: string): React.CSSProperties => ({
   flex: 1,
-  minHeight: 52,
-  padding: '12px 22px',
-  borderRadius: 16,
-  fontSize: 15,
+  minHeight: 46,
+  padding: '10px 18px',
+  borderRadius: 14,
+  fontSize: 13,
   fontWeight: 800,
   background: `linear-gradient(135deg, ${color}, ${color}99)`,
   color: '#08120c',
   border: 'none',
   cursor: 'pointer',
-  boxShadow: `0 6px 22px ${color}40, inset 0 1px 0 rgba(255,255,255,0.35)`,
+  boxShadow: `0 5px 18px ${color}38, inset 0 1px 0 rgba(255,255,255,0.32)`,
   transition: 'transform 0.15s, box-shadow 0.15s, filter 0.15s',
 });
 export const btnGhost: React.CSSProperties = {
   flex: 1,
-  minHeight: 52,
-  padding: '12px 22px',
-  borderRadius: 16,
-  fontSize: 15,
+  minHeight: 46,
+  padding: '10px 18px',
+  borderRadius: 14,
+  fontSize: 13,
   fontWeight: 700,
   background: 'rgba(255,255,255,0.055)',
   color: colors.text,
@@ -285,13 +285,13 @@ export const SectionCard: React.FC<{
           {icon}
         </span>
       )}
-      <span style={{ fontSize: 12, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</span>
+      <span style={{ fontSize: 11, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 0.9 }}>{title}</span>
       {badge && (
         <span
           style={{
-            fontSize: 11, fontWeight: 800, color, background: `${color}2c`,
-            padding: '3px 10px', borderRadius: 999, marginLeft: 'auto',
-            border: `1px solid ${color}50`,
+        fontSize: 11, fontWeight: 800, color, background: `${color}2c`,
+        padding: '3px 10px', borderRadius: 999, marginLeft: 'auto',
+        border: `1px solid ${color}50`,
           }}
         >
           {badge}
@@ -299,7 +299,7 @@ export const SectionCard: React.FC<{
       )}
     </div>
     {children}
-    {hint && <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 10.5, color: colors.textMuted, marginTop: 8 }}>{hint}</div>}
   </div>
 );
 
@@ -308,10 +308,10 @@ export const LiveBadge: React.FC<{ color: string; icon?: string; children: React
   <div
     style={{
       display: 'inline-flex', alignItems: 'center', gap: 7,
-      fontSize: 13, fontWeight: 800, color,
+      fontSize: 12, fontWeight: 800, color,
       background: `linear-gradient(135deg, ${color}2c, ${color}12)`,
       border: `1px solid ${color}5c`,
-      borderRadius: 999, padding: '8px 18px',
+      borderRadius: 999, padding: '7px 16px',
       boxShadow: `0 4px 14px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.12)`,
       animation: 'diary-badge-in 0.25s ease-out',
     }}
@@ -333,12 +333,12 @@ export const FormBanner: React.FC<{ tone: 'error' | 'warning' | 'info'; children
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       style={{
-        padding: '12px 16px',
-        borderRadius: 16,
+        padding: '11px 15px',
+        borderRadius: 15,
         background: m.bg,
         border: `1px solid ${m.color}55`,
         color: m.color,
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 700,
         marginBottom: 12,
         display: 'flex',
@@ -437,11 +437,11 @@ export const ScalePicker: React.FC<{
             aria-checked={active}
             onClick={() => onChange(v)}
             style={{
-              minHeight: height || (dense ? 42 : 52),
+              minHeight: height || (dense ? 40 : 48),
               padding: '4px 2px',
               borderRadius: 12,
               cursor: 'pointer',
-              fontSize: dense ? 12 : 14,
+              fontSize: dense ? 11 : 12,
               fontWeight: 800,
               border: `1px solid ${active ? c : 'rgba(255,255,255,0.1)'}`,
               background: active ? `${c}32` : 'rgba(255,255,255,0.035)',
@@ -505,13 +505,13 @@ export const StepperInput: React.FC<{
     }, 380);
   };
   const btn: React.CSSProperties = {
-    width: compact ? 42 : 54,
-    minHeight: compact ? 40 : 54,
-    borderRadius: 16,
+    width: compact ? 42 : 50,
+    minHeight: compact ? 40 : 50,
+    borderRadius: 14,
     border: `1px solid ${colors.borderHover}`,
     background: 'rgba(255,255,255,0.06)',
     color: colors.text,
-    fontSize: large ? 24 : 19,
+    fontSize: large ? 22 : 17,
     fontWeight: 700,
     cursor: 'pointer',
     flexShrink: 0,
@@ -544,7 +544,7 @@ export const StepperInput: React.FC<{
           style={{
             ...fieldInput,
             textAlign: 'center',
-            fontSize: large ? 32 : 18,
+            fontSize: large ? 30 : 16,
             fontWeight: 800,
             color: colors.text,
             background: 'rgba(255,255,255,0.04)',
@@ -591,11 +591,11 @@ export const ChipGroup: React.FC<{
             type="button"
             onClick={() => toggle(o.id)}
             style={{
-              minHeight: 46,
+              minHeight: 44,
               padding: '9px 11px',
-              borderRadius: 13,
+              borderRadius: 12,
               cursor: 'pointer',
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
               textAlign: 'left',
               border: `1px solid ${on ? c : 'rgba(255,255,255,0.1)'}`,
@@ -630,7 +630,7 @@ export const TextField: React.FC<{
   invalid?: boolean;
 }> = ({ label, value, onChange, type = 'text', placeholder, unit, min, max, step, options, hint, accent, invalid }) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-    <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+    <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
       {label}
     </span>
     {type === 'select' && options ? (
@@ -678,7 +678,7 @@ export const TextField: React.FC<{
         )}
       </div>
     )}
-    {hint && <span style={{ fontSize: 11, color: colors.textSubtle }}>{hint}</span>}
+    {hint && <span style={{ fontSize: 10.5, color: colors.textSubtle }}>{hint}</span>}
   </label>
 );
 
@@ -894,8 +894,8 @@ export const DiaryModalShell: React.FC<{
                 {icon}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 21, fontWeight: 800, color, letterSpacing: -0.3 }}>{title}</div>
-                {subtitle && <div style={{ fontSize: 12.5, color: colors.textMuted, marginTop: 3 }}>{subtitle}</div>}
+                <div style={{ fontSize: 18, fontWeight: 800, color, letterSpacing: -0.3 }}>{title}</div>
+                {subtitle && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 3 }}>{subtitle}</div>}
               </div>
               {spark && <Sparkline data={spark.data} color={spark.color || color} />}
               {stale && staleColor && (
@@ -1012,16 +1012,16 @@ export const TodayChip: React.FC<{ date: string; onToday: () => void }> = ({ dat
       onClick={onToday}
       disabled={isToday}
       style={{
-        padding: '10px 14px',
+        padding: '9px 13px',
         borderRadius: 12,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 700,
         cursor: isToday ? 'default' : 'pointer',
         border: `1px solid ${isToday ? 'rgba(34,197,94,0.35)' : colors.border}`,
         background: isToday ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)',
         color: isToday ? '#22c55e' : colors.textMuted,
         flexShrink: 0,
-        minHeight: 50,
+        minHeight: 46,
         transition: 'all 0.15s',
       }}
     >
@@ -1039,9 +1039,9 @@ export const RepeatLastChip: React.FC<{ label: string; onClick: () => void }> = 
         display: 'inline-flex',
         alignItems: 'center',
         gap: 7,
-        padding: '9px 14px',
+        padding: '8px 13px',
         borderRadius: 999,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 700,
         cursor: 'pointer',
         border: `1px solid ${colors.border}`,

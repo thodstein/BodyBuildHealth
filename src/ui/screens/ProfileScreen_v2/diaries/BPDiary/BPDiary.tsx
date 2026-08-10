@@ -1,6 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import {
+  btnBase,
+  btnPrimary,
+  chip,
+  chipActive,
+  glassSection,
+  header as pageHeader,
+  main as pageMain,
+  tableTh,
+  tableTd,
+  statCard,
+  sectionTitle,
+} from '../diary-page-styles';
+import {
   buildWeeklyHistogram,
   compareWithLastWeek,
   crossCorrelation,
@@ -61,28 +74,27 @@ type BPForm = {
   notes?: string;
 };
 
-const btn: React.CSSProperties = {
-  minHeight: 44, padding: '6px 10px', borderRadius: 7,
-  background: '#27272a', border: '1px solid #3f3f46', color: '#fff', cursor: 'pointer',
-  fontSize: 13,
+const ACCENT = '#ef4444';
+
+const btn: React.CSSProperties = { ...btnBase(ACCENT) };
+const input: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 10,
+  border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)',
+  color: colors.text, fontSize: 14, outline: 'none', minHeight: 38,
+  fontFamily: 'inherit',
 };
-const input: React.CSSProperties = { ...btn, width: '100%', background: '#18181b', boxSizing: 'border-box' };
-const card: React.CSSProperties = {
-  padding: 12, borderRadius: 10,
-  background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.2)',
-};
-const infoCard: React.CSSProperties = {
-  padding: 12, borderRadius: 10,
-  background: 'rgba(59,130,246,.12)', border: '1px solid rgba(59,130,246,.2)',
-};
-const goodCard: React.CSSProperties = {
-  padding: 12, borderRadius: 10,
-  background: 'rgba(34,197,94,.12)', border: '1px solid rgba(34,197,94,.2)',
-};
-const warnCard: React.CSSProperties = {
-  padding: 12, borderRadius: 10,
-  background: 'rgba(245,158,11,.12)', border: '1px solid rgba(245,158,11,.2)',
-};
+const tintCard = (bg: string, border: string): React.CSSProperties => ({
+  padding: 14,
+  borderRadius: 16,
+  background: `linear-gradient(180deg, ${bg}, transparent 85%)`,
+  border: `1px solid ${border}`,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+  marginBottom: 12,
+});
+const card: React.CSSProperties = { ...glassSection };
+const infoCard: React.CSSProperties = tintCard('rgba(59,130,246,.12)', 'rgba(59,130,246,.25)');
+const goodCard: React.CSSProperties = tintCard('rgba(34,197,94,.12)', 'rgba(34,197,94,.25)');
+const warnCard: React.CSSProperties = tintCard('rgba(245,158,11,.12)', 'rgba(245,158,11,.25)');
 const esc = (v: unknown) =>
   String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
 
@@ -348,13 +360,36 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   if (!open) return null;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh', background: '#09090b', color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+    <div
+      className="bp-window"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        background:
+          'radial-gradient(900px 480px at 15% -10%, rgba(239,68,68,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(56,189,248,0.06), transparent 55%), #0a0a0d',
+        color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+      }}
+    >
+      <style>{`
+        .bp-window button { font-family: inherit; }
+        .bp-window::-webkit-scrollbar { width: 10px; }
+        .bp-window::-webkit-scrollbar-track { background: transparent; }
+        .bp-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; }
+        .bp-window::-webkit-scrollbar-thumb:hover { background: rgba(239,68,68,0.4); }
+        .bp-window h3 { font-size: 11px; font-weight: 700; color: ${ACCENT}; text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 10px; }
+        @media (hover: none) and (pointer: coarse) {
+          .bp-window button { min-height: 44px; }
+          .bp-window input, .bp-window textarea, .bp-window select { font-size: 16px; }
+        }
+      `}</style>
       {/* Header */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 2, padding: 12, display: 'flex', gap: 7, flexWrap: 'wrap', background: '#18181b' }}>
+      <header style={pageHeader}>
         <button style={btn} onClick={onClose}>← Дневники</button>
-        <b>❤️ Давление и пульс</b>
-        <span>{rows.length} записей</span>
-        <button style={btn} onClick={openNew}>+ Добавить</button>
+        <b style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
+          ❤️ Давление
+          <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{rows.length} записей</span>
+        </b>
+        <div style={{ flex: 1 }} />
+        <button style={btnPrimary(ACCENT)} onClick={openNew}>+ Добавить</button>
         <button style={btn} onClick={openNew}>⚡ Сегодня</button>
         <button style={btn} onClick={exportCsv}>CSV</button>
         <button style={btn} onClick={print}>PDF/Печать</button>
@@ -362,7 +397,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         <button style={btn} onClick={() => svg.current && exportSvgAsPng(svg.current!, `bp-${todayIso()}.png`)}>PNG</button>
         <button style={btn} onClick={() => { if (window.confirm('Очистить дневник давления?')) commit([]); }}>Очистить</button>
         {undo && (
-          <button style={btn} onClick={() => { commit(undo, false); setUndo(null); }}>↩ Отменить</button>
+          <button style={{ ...btn, borderColor: `${ACCENT}55`, color: '#f87171' }} onClick={() => { commit(undo, false); setUndo(null); }}>↩ Отменить</button>
         )}
       </header>
 
@@ -394,19 +429,20 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         </div>
       )}
 
-      <main style={{ padding: 16, maxWidth: 1100, margin: 'auto' }}>
+      <main style={pageMain}>
         {/* Filter bar */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
           {(['all', '7', '30', '90'] as const).map(x => (
-            <button key={x} style={btn} onClick={() => { setRange(x); setPage(1); }}>
+            <button key={x} style={range === x ? chipActive(ACCENT) : chip(ACCENT)} onClick={() => { setRange(x); setPage(1); }}>
               {x === 'all' ? 'Всё' : `${x} дней`}
             </button>
           ))}
-          <input style={{ ...input, width: 180 }} placeholder="Поиск" value={query}
+          <div style={{ flex: 1 }} />
+          <input style={{ ...input, width: 180 }} placeholder="🔍 Поиск" value={query}
             onChange={e => { setQuery(e.target.value); setPage(1); }} />
-          <button style={btn} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>↕ Сортировать</button>
+          <button style={chip(ACCENT)} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>↕ Дата</button>
           {(['journal', 'stats', 'analysis'] as const).map(t => (
-            <button key={t} style={btn} onClick={() => setTab(t)}>
+            <button key={t} style={tab === t ? chipActive(ACCENT) : chip(ACCENT)} onClick={() => setTab(t)}>
               {t === 'journal' ? '📋 Журнал' : t === 'stats' ? '📊 Статистика' : '🔬 Анализ'}
             </button>
           ))}
@@ -431,12 +467,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             } else if (v && typeof v === 'object' && 's' in v) {
               content = `${v.s}/${v.d}`;
             } else if (typeof v === 'number') {
-              content = <AnimatedCounter value={v} decimals={0} duration={500} style={{ fontSize: 18, fontWeight: 700 }} />;
+              content = <AnimatedCounter value={v} decimals={0} duration={500} style={{ fontSize: 20, fontWeight: 800 }} />;
             }
             return (
-              <div key={String(l)} style={{ ...card, borderLeft: color ? `4px solid ${color}` : undefined }}>
-                <small>{String(l)}</small>
-                <strong style={{ display: 'block', fontSize: 18, color: typeof color === 'string' ? color : undefined }}>{content}</strong>
+              <div key={String(l)} style={{ ...statCard, border: `1px solid ${color ? `${color}44` : colors.border}` }}>
+                <small style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{String(l)}</small>
+                <strong style={{ display: 'block', fontSize: 20, fontWeight: 800, color: typeof color === 'string' ? color : undefined }}>{content}</strong>
               </div>
             );
           })}
@@ -499,7 +535,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
               <thead>
                 <tr>
-                  <th>Дата</th><th>АД</th><th>Пульс</th><th>MAP</th><th>Класс</th><th>Контекст</th><th>Действия</th>
+                  <th style={tableTh}>Дата</th><th style={tableTh}>АД</th><th style={tableTh}>Пульс</th><th style={tableTh}>MAP</th><th style={tableTh}>Класс</th><th style={tableTh}>Контекст</th><th style={tableTh}>Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -509,14 +545,14 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                   const cls = classifyBP(x.systolic, x.diastolic);
                   const clr = getBpClassificationColor(cls);
                   return (
-                    <tr key={x.id || x.date} style={{ borderBottom: '1px solid #29292f' }}>
-                      <td>{x.date}</td>
-                      <td style={{ color: clr }}>{x.systolic}/{x.diastolic}</td>
-                      <td>{x.hr}</td>
-                      <td>{calcMAP(x.systolic, x.diastolic)}</td>
-                      <td style={{ color: clr }}>{getBpClassificationLabel(cls)}</td>
-                      <td>{x.position || '—'} · {x.timeOfDay || '—'}{x.medicationTaken ? ' · 💊' : ''}</td>
-                      <td>
+                    <tr key={x.id || x.date}>
+                      <td style={tableTd}>{x.date}</td>
+                      <td style={{ ...tableTd, color: clr, fontWeight: 700 }}>{x.systolic}/{x.diastolic}</td>
+                      <td style={tableTd}>{x.hr}</td>
+                      <td style={tableTd}>{calcMAP(x.systolic, x.diastolic)}</td>
+                      <td style={{ ...tableTd, color: clr }}>{getBpClassificationLabel(cls)}</td>
+                      <td style={tableTd}>{x.position || '—'} · {x.timeOfDay || '—'}{x.medicationTaken ? ' · 💊' : ''}</td>
+                      <td style={tableTd}>
                         <button style={btn} onClick={() => editRow(x)}>Изменить</button>{' '}
                         <button style={btn} onClick={() => { if (window.confirm('Удалить запись?')) deleteRow(x.id || x.date); }}>Удалить</button>
                       </td>
@@ -570,7 +606,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               ].map(([label, pct]) => (
                 <div key={String(label)} style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>{label}</span><b>{pct}%</b></div>
-                  <div style={{ height: 8, borderRadius: 4, background: '#29292f', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: Number(pct) >= 70 ? '#22c55e' : Number(pct) >= 40 ? '#f59e0b' : '#ef4444' }} /></div>
+                  <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: Number(pct) >= 70 ? '#22c55e' : Number(pct) >= 40 ? '#f59e0b' : '#ef4444' }} /></div>
                 </div>
               ))}
             </section>
@@ -622,7 +658,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 ]).map(({ key, label }) => {
                   const g = circadian[key];
                   if (g.count === 0) return (
-                    <div key={key} style={{ padding: 10, borderRadius: 8, background: '#29292f', textAlign: 'center', fontSize: 12, color: '#666' }}>
+                    <div key={key} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.05)', textAlign: 'center', fontSize: 12, color: colors.textMuted }}>
                       {label}<br />Нет данных
                     </div>
                   );
@@ -691,12 +727,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
       {/* Latest entries footer */}
       {rows.length > 0 && (
         <section style={{ padding: '0 16px 16px', maxWidth: 1100, margin: 'auto' }}>
-          <div style={{ ...card, background: '#18181b' }}>
+          <div style={{ ...card, padding: 14 }}>
             <h3 style={{ marginTop: 0 }}>Последние записи</h3>
             {sortEntriesByTimestamp(rows).slice(0, 3).map(row => {
               const cls = classifyBP(row.systolic, row.diastolic);
               return (
-                <div key={row.id || `latest-${row.date}`} style={{ padding: 8, borderBottom: '1px solid #29292f', borderLeft: `3px solid ${getBpClassificationColor(cls)}`, paddingLeft: 8 }}>
+                <div key={row.id || `latest-${row.date}`} style={{ padding: '9px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: `3px solid ${getBpClassificationColor(cls)}`, paddingLeft: 12 }}>
                   <b>{row.date}</b> · {row.systolic}/{row.diastolic} · {row.hr} уд/мин · MAP {calcMAP(row.systolic, row.diastolic)}
                   {row.position ? ` · ${row.position}` : ''}
                   {row.timeOfDay ? ` · ${row.timeOfDay}` : ''}
@@ -710,13 +746,13 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
 
       {/* Add/Edit modal */}
       {modal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: '#000b', display: 'grid', placeItems: 'center', padding: 16 }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(5,5,9,0.66)', backdropFilter: 'blur(10px)', display: 'grid', placeItems: 'center', padding: 16 }}
           onClick={(e) => { if (e.target === e.currentTarget) setModal(false); }}>
           <form onSubmit={e => { e.preventDefault(); save(); }}
-            style={{ background: '#18181b', padding: 18, borderRadius: 12, width: 'min(560px,100%)', maxHeight: '90dvh', overflowY: 'auto' }}>
-            <h3>{editing ? 'Редактирование АД' : 'Добавить запись АД'}</h3>
+            style={{ background: 'linear-gradient(165deg, rgba(36,36,48,0.98), rgba(19,19,26,0.98))', padding: 18, borderRadius: 20, border: `1px solid ${ACCENT}38`, width: 'min(560px,100%)', maxHeight: '90dvh', overflowY: 'auto', boxShadow: '0 24px 70px rgba(0,0,0,0.6)' }}>
+            <h3>{editing ? '✏️ Редактирование АД' : '➕ Добавить запись АД'}</h3>
             {validationErrors.length > 0 && (
-              <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+              <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 10, padding: 10, marginBottom: 10 }}>
                 {validationErrors.map(error => <div key={`${error.field}-${error.message}`} style={{ color: '#ef4444', fontSize: 13 }}>⚠ {error.message}</div>)}
               </div>
             )}
@@ -768,7 +804,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {BP_SYMPTOMS.map(symptom => {
                   const active = draft.selectedSymptoms.includes(symptom);
-                  return <button key={symptom} type="button" style={{ minHeight: 32, padding: '4px 9px', borderRadius: 16, border: active ? '1px solid #ef4444' : '1px solid #3f3f46', background: active ? 'rgba(239,68,68,.2)' : '#27272a', color: active ? '#ef4444' : '#aaa', cursor: 'pointer' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
+                  return <button key={symptom} type="button" style={{ minHeight: 32, padding: '4px 9px', borderRadius: 16, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(239,68,68,.2)' : 'rgba(255,255,255,0.05)', color: active ? '#ef4444' : '#aaa', cursor: 'pointer' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
                 })}
               </div>
             </div>
@@ -778,7 +814,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             </label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
               <button type="button" style={btn} onClick={() => setModal(false)}>Отмена</button>
-              <button type="submit" style={{ ...btn, background: '#ef4444' }}>{editing ? 'Сохранить' : 'Добавить'}</button>
+              <button type="submit" style={btnPrimary(ACCENT)}>{editing ? 'Сохранить' : 'Добавить'}</button>
             </div>
           </form>
         </div>
