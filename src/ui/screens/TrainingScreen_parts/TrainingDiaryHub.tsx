@@ -470,6 +470,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [search, setSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+  const [exPickerOpen, setExPickerOpen] = useState(false);
+  const [exSearch, setExSearch] = useState('');
+  const [notesPickerOpen, setNotesPickerOpen] = useState(false);
   const [notesFilter, setNotesFilter] = useState('');
   const isMobile = useIsMobile();
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
@@ -1128,22 +1131,89 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             </div>
           )}
+          {/* Exercise filter (card-button + popup) */}
           {allExerciseNames.length > 0 && (
-            <div style={{ marginBottom: 6 }}>
-              <input type="text" value={historyExerciseFilter} onChange={e => setHistoryExerciseFilter(e.target.value)}
-                placeholder="🏋️ Фильтр по упражнению..." list="exerciseSearchList"
-                style={{ ...style.input, width: '100%' }} />
-              <datalist id="exerciseSearchList">
-                {allExerciseNames.slice(0, 30).map(n => <option key={n} value={n} />)}
-              </datalist>
-            </div>
+            <>
+              <div style={{ marginBottom: 6 }}>
+                <button onClick={() => { setExSearch(''); setExPickerOpen(true); }} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: historyExerciseFilter ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.06)',
+                  border: historyExerciseFilter ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff', fontSize: 12, fontWeight: 600, minHeight: 40,
+                }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏋️ {historyExerciseFilter || 'Все упражнения'}</span>
+                  {historyExerciseFilter ? (
+                    <span onClick={e => { e.stopPropagation(); setHistoryExerciseFilter(''); }} style={{ flexShrink: 0, fontSize: 13, opacity: 0.85 }}>✕</span>
+                  ) : (
+                    <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
+                  )}
+                </button>
+              </div>
+              {exPickerOpen && (
+                <div onClick={() => setExPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+                  <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>🏋️ Фильтр по упражнению</div>
+                      <button onClick={() => setExPickerOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                    </div>
+                    <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="🔍 Найти упражнение..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 10 }} />
+                    <div style={{ maxHeight: '50vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {allExerciseNames.filter(n => !exSearch || n.toLowerCase().includes(exSearch.toLowerCase())).map(n => (
+                        <button key={n} onClick={() => { setHistoryExerciseFilter(n); setExPickerOpen(false); }} style={{
+                          width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                          border: historyExerciseFilter === n ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                          background: historyExerciseFilter === n ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                          color: '#fff', fontSize: 12,
+                        }}>{n}{historyExerciseFilter === n ? ' ✓' : ''}</button>
+                      ))}
+                      <button onClick={() => { setHistoryExerciseFilter(''); setExPickerOpen(false); }} style={{
+                        width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                        border: !historyExerciseFilter ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                        background: !historyExerciseFilter ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        color: '#fff', fontSize: 12, fontWeight: 700,
+                      }}>Все упражнения</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
+          {/* Notes filter (card-button + popup) */}
           {groupedHistory.some(([, ws]) => ws.some(w => w.notes)) && (
-            <div style={{ marginBottom: 6 }}>
-              <input type="text" value={notesFilter} onChange={e => setNotesFilter(e.target.value)}
-                placeholder="📝 Фильтр по заметкам/сплиту..."
-                style={{ ...style.input, width: '100%' }} />
-            </div>
+            <>
+              <div style={{ marginBottom: 6 }}>
+                <button onClick={() => setNotesPickerOpen(true)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: notesFilter ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.06)',
+                  border: notesFilter ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff', fontSize: 12, fontWeight: 600, minHeight: 40,
+                }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📝 {notesFilter || 'Фильтр по заметкам'}</span>
+                  {notesFilter ? (
+                    <span onClick={e => { e.stopPropagation(); setNotesFilter(''); }} style={{ flexShrink: 0, fontSize: 13, opacity: 0.85 }}>✕</span>
+                  ) : (
+                    <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
+                  )}
+                </button>
+              </div>
+              {notesPickerOpen && (
+                <div onClick={() => setNotesPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+                  <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>📝 Фильтр по заметкам</div>
+                      <button onClick={() => setNotesPickerOpen(false)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                    </div>
+                    <input type="text" value={notesFilter} onChange={e => setNotesFilter(e.target.value)} placeholder="Текст заметки / сплита..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 12 }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => { setNotesFilter(''); setNotesPickerOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 600, fontSize: 12 }}>Сбросить</button>
+                      <button onClick={() => setNotesPickerOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 12 }}>Готово</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {filteredHistory.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6, gap: 6 }}>
