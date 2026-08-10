@@ -207,8 +207,8 @@ const InjectionEditor: React.FC<{
         inset: 0,
         zIndex: 2200,
         background: 'rgba(0,0,0,.76)',
-        display: 'grid',
-        placeItems: 'center',
+        display: 'flex',
+        overflowY: 'auto',
         padding: 14,
       }}
       onMouseDown={(event) => {
@@ -221,8 +221,9 @@ const InjectionEditor: React.FC<{
         style={{
           ...card,
           width: 'min(760px, 100%)',
-          maxHeight: 'calc(100vh - 28px)',
-          overflow: 'auto',
+          maxHeight: 'calc(100dvh - 28px)',
+          overflowY: 'auto',
+          margin: 'auto',
           background: '#202024',
         }}
       >
@@ -579,7 +580,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
     <div
       className="injection-window"
       style={{
-        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        position: 'fixed', inset: 0, zIndex: 2000,
         background:
           'radial-gradient(900px 480px at 15% -10%, rgba(245,158,11,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(139,92,246,0.06), transparent 55%), #0a0a0d',
         color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',

@@ -760,7 +760,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   return (
     <div className="wd-diary"
       style={{
-        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        position: 'fixed', inset: 0, zIndex: 2000,
         background:
           'radial-gradient(900px 480px at 15% -10%, rgba(34,197,94,0.08), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(56,189,248,0.05), transparent 55%), #0a0a0a',
         color: c.text,

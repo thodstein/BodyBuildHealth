@@ -773,7 +773,7 @@ export const DiaryModalShell: React.FC<{
         .dm-card .dm-primary-btn:active { transform: translateY(0); }
         @media (max-width: 480px) {
           .dm-overlay { align-items: flex-end !important; padding: 0 !important; }
-          .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 88dvh !important; border-radius: 26px 26px 0 0 !important; animation: dm-slide-up 0.28s cubic-bezier(0.32, 0.72, 0.28, 1) !important; }
+          .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 88dvh !important; border-radius: 26px 26px 0 0 !important; margin: auto 0 0 0 !important; animation: dm-slide-up 0.28s cubic-bezier(0.32, 0.72, 0.28, 1) !important; }
           .dm-card form { max-height: 88dvh !important; }
           .dm-grabber { display: block !important; }
         }
@@ -789,8 +789,7 @@ export const DiaryModalShell: React.FC<{
           inset: 0,
           zIndex: 1000,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          overflowY: 'auto',
           padding: 12,
           background:
             'radial-gradient(1000px 500px at 50% -8%, rgba(0,230,138,0.05), transparent 60%), rgba(5,5,9,0.66)',
@@ -803,8 +802,9 @@ export const DiaryModalShell: React.FC<{
           onClick={(e) => e.stopPropagation()}
           style={{
             width: `min(${width}px, 94vw)`,
-            maxHeight: '90vh',
+            maxHeight: 'calc(100dvh - 24px)',
             overflow: 'hidden',
+            margin: 'auto',
             background:
               'linear-gradient(165deg, rgba(36,36,48,0.98), rgba(19,19,26,0.98) 55%, rgba(13,13,18,0.99))',
             border: `1px solid ${color}42`,
@@ -817,7 +817,7 @@ export const DiaryModalShell: React.FC<{
         >
           <form
             onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
-            style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', position: 'relative' }}
+            style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100dvh - 24px)', position: 'relative' }}
           >
             <div
               className="dm-grabber"

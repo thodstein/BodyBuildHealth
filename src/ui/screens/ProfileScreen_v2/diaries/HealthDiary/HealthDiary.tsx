@@ -266,7 +266,8 @@ const EntryEditor: React.FC<{
         inset: 0,
         zIndex: 2200,
         background: 'rgba(0,0,0,.78)',
-        overflow: 'auto',
+        display: 'flex',
+        overflowY: 'auto',
         padding: 14,
       }}
       onClick={onCancel}
@@ -274,7 +275,8 @@ const EntryEditor: React.FC<{
       <div
         style={{
           maxWidth: 650,
-          margin: '0 auto',
+          width: '100%',
+          margin: 'auto',
           background: '#1a1a1d',
           color: colors.text,
           borderRadius: 15,
@@ -647,7 +649,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     <div
       className="health-window"
       style={{
-        position: 'fixed', inset: 0, zIndex: 2000, height: '100dvh', maxHeight: '100dvh',
+        position: 'fixed', inset: 0, zIndex: 2000,
         background:
           'radial-gradient(900px 480px at 15% -10%, rgba(236,72,153,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(59,130,246,0.06), transparent 55%), #0a0a0d',
         color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
