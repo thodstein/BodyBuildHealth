@@ -50,7 +50,9 @@ export interface Series {
 export interface OverlayChartProps {
   series: Series[];
   target?: number;
+  targetZone?: number;
   projections?: Point[];
+  movingAverage?: Point[];
   onSvg?: (svg: SVGSVGElement) => void;
   onPng?: (svg: SVGSVGElement) => void;
   notes?: { date: string; text: string }[];
@@ -125,7 +127,9 @@ export const ChartLegend: React.FC<{ series: Series[] }> = ({ series }) => (
 export const OverlayChart: React.FC<OverlayChartProps> = ({
   series,
   target,
+  targetZone,
   projections = [],
+  movingAverage,
   onSvg,
   onPng,
   notes,
@@ -302,6 +306,17 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
           </>
         )}
 
+        {/* target zone band */}
+        {target !== undefined && targetZone !== undefined && (
+          <rect
+            x="42"
+            y={yLeft(target + targetZone)}
+            width="540"
+            height={Math.max(1, yLeft(target - targetZone) - yLeft(target + targetZone))}
+            fill="#22c55e0d"
+          />
+        )}
+
         {/* series + gradient fill */}
         {activeSeries.map(s => {
           const useR = !!s.useRightAxis;
@@ -325,6 +340,20 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
             </g>
           );
         })}
+
+        {/* moving average (7d) */}
+        {movingAverage && movingAverage.length > 1 && (() => {
+          const maByDate = new Map(movingAverage.map(p => [p.date, p.value]));
+          let d = '';
+          for (let i = 0; i < dates.length; i++) {
+            const mv = maByDate.get(dates[i]);
+            if (mv === undefined || !Number.isFinite(mv)) continue;
+            d += (d ? 'L' : 'M') + x(i).toFixed(1) + ',' + yLeft(mv).toFixed(1);
+          }
+          return d ? (
+            <path d={d} fill="none" stroke="rgba(34,197,94,0.55)" strokeWidth="2.8" strokeLinecap="round" />
+          ) : null;
+        })()}
 
         {/* note markers */}
         {noteIndexes.map(idx => (

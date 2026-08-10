@@ -10,6 +10,7 @@ import { generateNutritionReport, type NutritionReport } from "../../../../engin
 import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
 import { updateSection } from "../../../../core/profile-manager";
+import { getWeightLog, saveWeightLog } from "../../../../engines/profile-store";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets } from "./planner-targets";
@@ -369,14 +370,47 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [expectedLossKgWeek, setExpectedLossKgWeek] = useState(0.5);
   const [showWeightAdaptModal, setShowWeightAdaptModal] = useState(false);
   const [weightLogEntries, setWeightLogEntries] = useState<{ date: string; weight: number }[]>(() => {
-    try { const savedEntries = JSON.parse(localStorage.getItem('he_weight_log_entries') || 'null'); if (savedEntries && Array.isArray(savedEntries) && savedEntries.length > 0) return savedEntries; } catch {}
+    try {
+      const canonical = getWeightLog();
+      const savedEntries = JSON.parse(localStorage.getItem('he_weight_log_entries') || 'null');
+      const byDate = new Map<string, number>();
+      if (Array.isArray(savedEntries)) {
+        for (const e of savedEntries) {
+          const w = Number(e?.weight);
+          if (e?.date && Number.isFinite(w) && w > 0) byDate.set(e.date, w);
+        }
+      }
+      for (const e of canonical) {
+        if (e?.date && Number.isFinite(e.weight) && e.weight > 0) byDate.set(e.date, e.weight);
+      }
+      const merged = [...byDate.entries()]
+        .map(([date, weight]) => ({ date, weight }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      if (merged.length > 0) return merged;
+    } catch {}
     const e: { date: string; weight: number }[] = [];
     for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: d.toISOString().split('T')[0], weight: 80 }); }
     return e;
   });
   const [weightLogPeriod, setWeightLogPeriod] = useState('every3');
   useEffect(() => {
-    try { localStorage.setItem('he_weight_log_entries', JSON.stringify(weightLogEntries)); } catch {}
+    try {
+      // Канонический лог: обновляем weight у существующих записей, добавляем недостающие
+      const log = getWeightLog();
+      const byDate = new Map(log.map(e => [e.date, e]));
+      for (const e of weightLogEntries) {
+        if (!e?.date || !Number.isFinite(e.weight) || e.weight <= 0) continue;
+        const existing = byDate.get(e.date);
+        if (existing) {
+          if (existing.weight !== e.weight) existing.weight = e.weight;
+        } else {
+          byDate.set(e.date, { date: e.date, weight: e.weight });
+        }
+      }
+      saveWeightLog([...byDate.values()]);
+      // Legacy-зеркало для обратной совместимости
+      localStorage.setItem('he_weight_log_entries', JSON.stringify(weightLogEntries));
+    } catch {}
     setWeightLogWeek(weightLogEntries.map(e => e.weight));
   }, [weightLogEntries]);
   const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState(false);

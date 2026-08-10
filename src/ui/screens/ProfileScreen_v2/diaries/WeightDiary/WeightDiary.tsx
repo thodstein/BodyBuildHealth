@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
-import { getWeightLog, saveWeightLog, type WeightEntry } from '../../../../../engines/profile-store';
+import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, type WeightEntry } from '../../../../../engines/profile-store';
 import { strengthDiary } from '../../../../../engines/strength-diary.engine';
 import { generateInsights, type DiarySession, type DiarySet } from '../../../../../engines/diary-insights.engine';
 import { projectWeight, calcFFMI } from '../../../../../engines/body-composition.engine';
@@ -12,12 +12,16 @@ import {
   computeExtremes,
   computeStreak,
   crossCorrelation,
+  daysToTarget,
   detectAnomalies,
   exportSvgAsFile,
   exportSvgAsPng,
   filterByRange,
+  fitLinearTrend,
   laggedCorrelation,
+  movingAverage,
   paginate,
+  projectToDate,
   sortEntries,
   todayIso,
   type DiaryEntryLike,
@@ -50,6 +54,15 @@ style.textContent = `
 `;
 if (typeof document !== 'undefined') document.head.appendChild(style);
 
+const thStyle: React.CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 1,
+  background: '#18181b',
+  padding: '8px 6px',
+  textAlign: 'left',
+  borderBottom: '1px solid #3f3f46',
+};
 const button: React.CSSProperties = {
   minHeight: 38,
   padding: '7px 10px',
@@ -202,6 +215,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const [training, setTraining] = useState<TrainingState | null>(null);
   const [goal, setGoal] = useState(goals?.weightKg || 0);
   const [activeChartFields, setActiveChartFields] = useState<Field[]>(['weight', 'bodyFat', 'muscleMass']);
+  const [showMA, setShowMA] = useState(true);
+  const [comparePos, setComparePos] = useState(50);
+  const [quickW, setQuickW] = useState('');
+  const [quickTod, setQuickTod] = useState<'morning' | 'evening'>('morning');
   const [profileHeight, setProfileHeight] = useState<number | undefined>();
   const [profileSex, setProfileSex] = useState<'male' | 'female' | undefined>();
   const svgName = `weight-${todayIso()}`;
@@ -219,15 +236,29 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       setGoal(goals?.weightKg || 0);
     }
     try {
-      const raw = localStorage.getItem('he_training_profile');
-      if (raw) {
-        const profile = JSON.parse(raw);
-        if (profile.bodyHeightCm) setProfileHeight(Number(profile.bodyHeightCm));
-        if (profile.sex) setProfileSex(profile.sex);
+      // Приоритет: UnifiedSettings (he_profile_v2) → legacy he_training_profile.
+      const unifiedRaw = localStorage.getItem('he_profile_v2');
+      let height: number | undefined;
+      let sex: 'male' | 'female' | undefined;
+      if (unifiedRaw) {
+        const unified = JSON.parse(unifiedRaw);
+        if (Number(unified?.personal?.height) > 0) height = Number(unified.personal.height);
+        if (unified?.personal?.sex) sex = unified.personal.sex === 'female' ? 'female' : 'male';
       }
+      if (!height) {
+        const raw = localStorage.getItem('he_training_profile');
+        if (raw) {
+          const profile = JSON.parse(raw);
+          if (profile.bodyHeightCm) height = Number(profile.bodyHeightCm);
+          if (profile.sex) sex = profile.sex;
+        }
+      }
+      if (height) setProfileHeight(height);
+      if (sex) setProfileSex(sex);
     } catch {
       /* ignore */
     }
+    migrateWeightLogLegacy();
   }, [open, goals?.weightKg]);
   useEffect(() => {
     if (goal > 0) {
@@ -255,6 +286,17 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     saveWeightLog(ordered);
     setRows(ordered);
     onDataChange?.();
+  };
+  const quickAdd = () => {
+    const w = Number(quickW);
+    if (!Number.isFinite(w) || w <= 0 || w > 400) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const next = rows.some((r) => r.date === today)
+      ? rows.map((r) => (r.date === today ? { ...r, weight: w, timeOfDay: quickTod } : r))
+      : [{ date: today, weight: w, timeOfDay: quickTod }, ...rows];
+    commit(next);
+    setQuickW('');
+    setQuickTod('morning');
   };
   const entries = useMemo<DiaryEntryLike[]>(
     () =>
@@ -304,16 +346,43 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     }
     return series;
   }, [rows, activeChartFields, profileHeight]);
+  const ma7 = useMemo(() => movingAverage(pointsFor(rows, 'weight'), 7), [rows]);
+  const photoPairs = useMemo(() => {
+    const withPhotos = rows.filter(r => r.photos && r.photos.length > 0);
+    if (withPhotos.length < 2) return null;
+    const first = withPhotos[withPhotos.length - 1];
+    const last = withPhotos[0];
+    return { before: first, after: last, beforeDates: withPhotos.map(r => r.date) };
+  }, [rows]);
+  const weightFit = useMemo(() => fitLinearTrend(pointsFor(rows, 'weight')), [rows]);
   const chartProjection = useMemo(() => {
-    if (goal <= 0 || rows.length < 3) return [] as OverlayChartProps['projections'];
-    const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
-    const last = sorted[sorted.length - 1];
-    const first = sorted[0];
-    const daysDiff = (Date.parse(last.date) - Date.parse(first.date)) / 86400000;
-    if (daysDiff <= 0) return [];
-    const weeklyRate = ((last.weight - first.weight) / daysDiff) * 7;
-    const proj = projectWeight(last.weight, weeklyRate, goal, 12);
-    return proj.map(p => ({ date: p.date, value: p.weight }));
+    if (goal <= 0 || !weightFit) return [] as OverlayChartProps['projections'];
+    const out: OverlayChartProps['projections'] = [];
+    for (let w = 0; w <= 12; w++) {
+      const d = new Date();
+      d.setDate(d.getDate() + w * 7);
+      const iso = d.toISOString().split('T')[0];
+      const val = projectToDate(weightFit, iso);
+      const reached = weightFit.slopePerDay > 0 ? val >= goal : weightFit.slopePerDay < 0 ? val <= goal : false;
+      if (reached) { out.push({ date: iso, value: goal }); break; }
+      out.push({ date: iso, value: val });
+    }
+    return out;
+  }, [goal, weightFit]);
+  const eta = useMemo(() => {
+    if (goal <= 0 || !weightFit) return null;
+    const days = daysToTarget(weightFit, todayIso(), goal);
+    if (days === null) return null;
+    return { days, weeks: Math.round((days / 7) * 10) / 10 };
+  }, [goal, weightFit]);
+  const goalProgress = useMemo(() => {
+    const pts = pointsFor(rows, 'weight').sort((a, b) => a.date.localeCompare(b.date));
+    if (pts.length === 0 || goal <= 0) return null;
+    const start = pts[0].value;
+    const cur = pts[pts.length - 1].value;
+    if (start === cur) return { start, cur, pct: null, done: false };
+    const pct = Math.max(-200, Math.min(200, Math.round(((cur - start) / (goal - start)) * 100)));
+    return { start, cur, pct, done: Math.abs(cur - goal) < 0.5 };
   }, [rows, goal]);
   const chartNotes = useMemo(() => rows.filter(r => r.notes).map(r => ({ date: r.date, text: r.notes! })), [rows]);
   const rightAxis = useMemo(() => {
@@ -345,9 +414,18 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const latest = rows[0];
     const first = rows.at(-1);
     if (!latest) return null;
+    const daysAgo = (n: number) => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - n);
+      const iso = cutoff.toISOString().split('T')[0];
+      const hit = rows.find(r => r.date <= iso);
+      return hit ? latest.weight - hit.weight : null;
+    };
     return {
       latest,
       weightDelta: first ? latest.weight - first.weight : 0,
+      delta30: daysAgo(30),
+      delta90: daysAgo(90),
       fatDelta: latest.bodyFat !== undefined && first?.bodyFat !== undefined ? latest.bodyFat - first.bodyFat : null,
       leanDelta:
         latest.muscleMass !== undefined && first?.muscleMass !== undefined
@@ -549,20 +627,28 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           flexWrap: 'wrap',
           alignItems: 'center',
           padding: 12,
-          background: '#18181b',
+          background: 'linear-gradient(135deg,#18181b 0%,#0d2817 100%)',
           borderBottom: '1px solid #3f3f46',
         }}
       >
         <button style={button} onClick={onClose}>
           ← Дневники
         </button>
-        <b style={{ fontSize: 16 }}>⚖️ Вес и все замеры</b>
-        <button style={button} onClick={() => setModal(true)}>
+        <b style={{ fontSize: 17, backgroundImage: 'linear-gradient(90deg,#4ade80,#a3e635)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>⚖️ Вес и все замеры</b>
+        <button
+          style={{ ...button, background: 'linear-gradient(135deg,#166534,#22c55e)', border: '1px solid #22c55e66', fontWeight: 700 }}
+          onClick={() => setModal(true)}
+        >
           + Добавить
         </button>
         <button style={button} onClick={() => setModal(true)}>
           ⚡ Сегодня
         </button>
+        {body && (
+          <small style={{ marginLeft: 'auto', color: '#4ade80', fontSize: 11, opacity: 0.9 }}>
+            Текущий: {body.latest.weight} кг{goal ? ` · цель ${goal} кг` : ''}
+          </small>
+        )}
         <button style={button} onClick={doExportCsv}>
           CSV
         </button>
@@ -623,6 +709,56 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             />
           </label>
         </section>
+        <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: 12, background: 'linear-gradient(135deg,#18181b,#0d2817)', borderRadius: 10, marginBottom: 12, border: '1px solid #22c55e33' }}>
+          <b style={{ fontSize: 14 }}>⚡ Быстрый ввод</b>
+          <input
+            style={{ ...input, width: 110 }}
+            type="number"
+            step="0.1"
+            min={20}
+            max={400}
+            placeholder="Вес, кг"
+            value={quickW}
+            onChange={(e) => setQuickW(e.target.value)}
+          />
+          <select
+            style={{ ...input, width: 150 }}
+            value={quickTod}
+            onChange={(e) => setQuickTod(e.target.value as 'morning' | 'evening')}
+            aria-label="Время суток"
+          >
+            <option value="morning">🌅 Утро</option>
+            <option value="evening">🌙 Вечер</option>
+          </select>
+          <button
+            style={{
+              ...button,
+              background: 'linear-gradient(135deg,#166534,#22c55e)',
+              border: '1px solid #22c55e66',
+              fontWeight: 700,
+            }}
+            onClick={quickAdd}
+            disabled={!(Number(quickW) > 0 && Number(quickW) <= 400)}
+          >
+            + Записать
+          </button>
+          {rows.some((r) => r.date === new Date().toISOString().slice(0, 10)) && (
+            <small style={{ color: '#fbbf24' }}>Сегодня уже есть запись — будет обновлена</small>
+          )}
+        </section>
+        {rows.length === 0 && (
+          <section style={{ padding: 24, textAlign: 'center', borderRadius: 12, background: 'linear-gradient(135deg,#18181b,#0d2817)', border: '1px dashed #22c55e55', marginBottom: 12 }}>
+            <div style={{ fontSize: 34, marginBottom: 8 }}>⚖️</div>
+            <b>Пока нет записей веса</b>
+            <p style={{ color: '#aaa', fontSize: 13, margin: '6px 0 12px' }}>Добавьте первую запись через «+ Добавить» или быстрый ввод выше</p>
+            <button
+              style={{ ...button, background: 'linear-gradient(135deg,#166534,#22c55e)', border: '1px solid #22c55e66', fontWeight: 700 }}
+              onClick={() => setModal(true)}
+            >
+              + Добавить запись
+            </button>
+          </section>
+        )}
         {body && (
           <section
             style={{
@@ -683,6 +819,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             ['Дней', streak.totalDays],
             ['Серия', streak.current],
             ['Δ нед.', comparison.delta],
+            ['Δ 30д', body?.delta30 ?? null],
+            ['Δ 90д', body?.delta90 ?? null],
             ['Аномалии', anomalies.length],
           ].map(([k, v]) => {
             let content: React.ReactNode = '—';
@@ -703,6 +841,18 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             <b>📈 График</b>
+            <button
+              style={{
+                ...button,
+                background: showMA ? '#22c55e22' : '#27272a',
+                border: '1px solid ' + (showMA ? '#22c55e66' : '#3f3f46'),
+                color: showMA ? '#22c55e' : '#aaa',
+              }}
+              onClick={() => setShowMA(v => !v)}
+              aria-pressed={showMA}
+            >
+              Сглаживание 7д
+            </button>
             {FIELDS.map(f => (
               <button
                 key={f}
@@ -721,7 +871,9 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           <OverlayChart
             series={chartSeries}
             target={activeChartFields.includes('weight') && goal > 0 ? goal : undefined}
+            targetZone={0.5}
             projections={chartProjection}
+            movingAverage={showMA && activeChartFields.includes('weight') ? ma7 : undefined}
             rightAxis={rightAxis}
             notes={chartNotes}
             onSvg={(x) => exportSvgAsFile(x, `${svgName}.svg`)}
@@ -736,6 +888,87 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             }}
           />
         </section>
+        {goalProgress && (
+          <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <b>Цель {goal} кг</b>
+              {eta ? (
+                <small style={{ color: '#fbbf24' }}>
+                  Тренд: {weightFit ? (weightFit.slopePerDay * 7 >= 0 ? '+' : '') + (weightFit.slopePerDay * 7).toFixed(2) : ''} кг/нед · ETA ≈ {eta.weeks} нед
+                </small>
+              ) : (
+                <small style={{ color: '#aaa' }}>Тренд не направлен к цели</small>
+              )}
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: '#27272a', marginTop: 8, overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%', width: (goalProgress.pct === null ? 0 : Math.max(0, Math.min(100, goalProgress.pct))) + '%',
+                  borderRadius: 4,
+                  background: goalProgress.done ? '#22c55e' : goalProgress.pct === null ? '#a78bfa' : goalProgress.pct < 0 ? '#ef4444' : 'linear-gradient(90deg,#22c55e,#a3e635)',
+                }}
+              />
+            </div>
+            <small style={{ display: 'block', marginTop: 6, color: '#aaa' }}>
+              {goalProgress.start.toFixed(1)} кг → {goalProgress.cur.toFixed(1)} кг (текущий) · прогресс{' '}
+              {goalProgress.pct === null ? '—' : goalProgress.pct + '%'}
+            </small>
+          </section>
+        )}
+        {photoPairs && (
+          <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <b>До / После</b>
+              <small style={{ color: '#888' }}>
+                {photoPairs.before.date} → {photoPairs.after.date}
+              </small>
+            </div>
+            <div
+              style={{
+                position: 'relative', marginTop: 8, borderRadius: 10, overflow: 'hidden',
+                aspectRatio: '3/4', maxHeight: 360, width: '100%', background: '#09090b',
+              }}
+            >
+              <img
+                src={photoPairs.after.photos![0]}
+                alt="после"
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <img
+                src={photoPairs.before.photos![0]}
+                alt="до"
+                style={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+                  clipPath: 'inset(0 ' + (100 - comparePos) + '% 0 0)',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute', top: 0, bottom: 0, left: comparePos + '%',
+                  width: 2, background: '#fff', opacity: 0.85, pointerEvents: 'none',
+                }}
+              />
+              <span style={{ position: 'absolute', left: 8, top: 8, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', fontSize: 11, color: '#fff' }}>
+                До ({photoPairs.before.date.slice(5)})
+              </span>
+              <span style={{ position: 'absolute', right: 8, top: 8, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.55)', fontSize: 11, color: '#fff' }}>
+                После ({photoPairs.after.date.slice(5)})
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={comparePos}
+              onChange={(e) => setComparePos(Number(e.target.value))}
+              aria-label="Позиция разделителя до/после"
+              style={{ width: '100%', marginTop: 8, accentColor: '#22c55e' }}
+            />
+            <small style={{ display: 'block', marginTop: 4, color: '#888', fontSize: 10 }}>
+              Перетащите ползунок, чтобы сравнить прогресс
+            </small>
+          </section>
+        )}
         <WeightDiaryVisuals rows={rows} goal={goal} heightCm={profileHeight} sex={profileSex} />
         {comparison.thisWeek && comparison.lastWeek && (
           <section style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
@@ -744,8 +977,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           </section>
         )}
         {bodyCorrelations.length > 0 && (
-          <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
-            <b>🔗 Связь веса с замерами</b>
+          <details style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>🔗 Связь веса с замерами ({bodyCorrelations.length})</summary>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {bodyCorrelations.map((item) => (
                 <span
@@ -757,21 +990,21 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 </span>
               ))}
             </div>
-          </section>
+          </details>
         )}
         {anomalies.length > 0 && (
-          <section style={{ padding: 12, background: '#f59e0b18', borderRadius: 10, marginBottom: 12 }}>
-            <b>⚠ Аномалии</b>
+          <details style={{ padding: 12, background: '#f59e0b18', borderRadius: 10, marginBottom: 12 }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>⚠ Аномалии ({anomalies.length})</summary>
             {anomalies.slice(-5).map((a, i) => (
               <div key={`${a.date}-${i}`}>
                 {a.date}: {a.message}
               </div>
             ))}
-          </section>
+          </details>
         )}
         {training && (
-          <section style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
-            <h3 style={{ margin: '0 0 8px' }}>🏋️ Сила и инсайты</h3>
+          <details style={{ padding: 12, background: '#3b82f622', borderRadius: 10, marginBottom: 12 }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, userSelect: 'none' }}>🏋️ Сила и инсайты</summary>
             <div>
               Последний объём: <b>{Math.round(training.volume)}</b>
               {correlation && (
@@ -792,15 +1025,15 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 • {x}
               </div>
             ))}
-          </section>
+          </details>
         )}
         <section style={{ overflowX: 'auto' }} className="wd-table-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
             <thead>
               <tr>
-                <th>Дата</th>
+                <th style={thStyle}>Дата</th>
                 {FIELDS.map((f) => (
-                  <th key={f}>
+                  <th key={f} style={thStyle}>
                     <button
                       style={{ ...button, padding: 4 }}
                       onClick={() =>
@@ -811,9 +1044,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                     </button>
                   </th>
                 ))}
-                <th>Заметка</th>
-                <th>Фото</th>
-                <th>Действия</th>
+                <th style={thStyle}>Время</th>
+                <th style={thStyle}>Заметка</th>
+                <th style={thStyle}>Фото</th>
+                <th style={thStyle}>Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -837,6 +1071,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                     {FIELDS.map((f) => (
                       <td key={f}>{fieldCell(row, f)}</td>
                     ))}
+                    <td>{row.timeOfDay === 'morning' ? '🌅 Утро' : row.timeOfDay === 'evening' ? '🌙 Вечер' : '—'}</td>
                     <td>
                       {editing === row.date ? (
                         <input

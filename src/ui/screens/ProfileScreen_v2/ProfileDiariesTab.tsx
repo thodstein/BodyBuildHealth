@@ -4,7 +4,7 @@
  * к дневникам в других блоках (открывает конкретный дневник/отчёт).
  */
 import React, { useState, useEffect } from 'react';
-import { getWeightLog, saveWeightLog } from '../../../engines/profile-store';
+import { getWeightLog, saveWeightLog, WEIGHT_LOG_KEY } from '../../../engines/profile-store';
 import { useProfileRefresh } from '../../../core/profile-manager';
 import { AccordionSection, colors } from './ui';
 import {
@@ -45,7 +45,6 @@ import {
   commitBpEntries,
   getBpEntries,
   generateEntryId,
-  sortEntriesByTimestamp,
   type BPEntry as CoreBPEntry,
 } from '../../../core/bp-hr-data';
 
@@ -888,6 +887,7 @@ export const ProfileDiariesTab: React.FC<{
         [NEURO_DIARY_KEY]: neuroEntries,
         [ACNE_DIARY_KEY]: acneEntries,
         [HEMATO_DIARY_KEY]: hematoEntries,
+        [WEIGHT_LOG_KEY]: weights,
       },
     };
     const json = JSON.stringify(payload, null, 2);
@@ -944,6 +944,10 @@ export const ProfileDiariesTab: React.FC<{
         if (diaries[HEMATO_DIARY_KEY] && Array.isArray(diaries[HEMATO_DIARY_KEY])) {
           saveDiary(HEMATO_DIARY_KEY, diaries[HEMATO_DIARY_KEY]);
           setHematoEntries(diaries[HEMATO_DIARY_KEY]);
+        }
+        if (diaries[WEIGHT_LOG_KEY] && Array.isArray(diaries[WEIGHT_LOG_KEY])) {
+          saveWeightLog(diaries[WEIGHT_LOG_KEY]);
+          setWeights(diaries[WEIGHT_LOG_KEY]);
         }
         if (data.goals && typeof data.goals === 'object') {
           setGoals({ ...goals, ...data.goals });

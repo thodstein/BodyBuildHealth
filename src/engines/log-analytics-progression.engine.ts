@@ -9,6 +9,7 @@
  *
  * @module log-analytics-progression-engine
  */
+import { saveWeightLog } from './profile-store';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -336,8 +337,9 @@ export function saveMeasurement(m: BodyMeasurement): BodyMeasurement[] {
     const raw = JSON.parse(localStorage.getItem(WEIGHT_LOG_KEY) || '[]');
     const log: any[] = Array.isArray(raw) ? raw : [];
     const idx = log.findIndex((e: any) => e.date === m.date);
+    const weight = Number(m.weightKg) > 0 ? Number(m.weightKg) : undefined;
     const patch = {
-      weight: Number(m.weightKg) || 0,
+      weight,
       bodyFat: Number(m.bodyFatPercent) || undefined,
       neckCm: Number(m.neckCm) || undefined,
       chestCm: Number(m.chestCm) || undefined,
@@ -354,11 +356,11 @@ export function saveMeasurement(m: BodyMeasurement): BodyMeasurement[] {
     };
     if (idx >= 0) {
       log[idx] = { ...log[idx], ...patch };
-    } else {
+      saveWeightLog(log);
+    } else if (weight || Object.keys(patch).some((k: string) => k !== 'weight' && k !== 'notes' && patch[k as keyof typeof patch])) {
       log.push({ date: m.date, ...patch });
+      saveWeightLog(log);
     }
-    log.sort((a: any, b: any) => (a.date || '').localeCompare(b.date || ''));
-    localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(log.slice(-365)));
   } catch { /* quota — silent */ }
   return loadMeasurements();
 }
@@ -387,7 +389,12 @@ export function analyzeMeasurements(heightCm: number): MeasurementAnalytics | nu
 
   // Projection
   const trend = changes.weightKg / Math.max(1, measurements.length);
-  const goalWeight = 80; // default
+  const goalWeight = (() => {
+    try {
+      const g = JSON.parse(localStorage.getItem('he_diary_goals') || '{}');
+      return Number(g.weightKg) > 0 ? Number(g.weightKg) : 80;
+    } catch { return 80; }
+  })();
   const weeksToGoal = trend !== 0 ? Math.round(Math.abs((goalWeight - last.weightKg) / (trend / measurements.length))) : 0;
 
   return {

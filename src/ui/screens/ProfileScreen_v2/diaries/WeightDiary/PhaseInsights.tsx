@@ -232,7 +232,17 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
     return result;
   }, [rows]);
 
-  if (!phases.length) return null;
+  if (!rows.length) return null;
+  if (rows.length < 2) {
+    return (
+      <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
+        <b>Фазы курса</b>
+        <small style={{ display: 'block', marginTop: 6, color: '#888' }}>
+          Добавьте минимум 2 записи веса — анализ фаз курса появится автоматически.
+        </small>
+      </section>
+    );
+  }
 
   return (
     <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>

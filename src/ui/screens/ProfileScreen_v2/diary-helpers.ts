@@ -1004,3 +1004,62 @@ export const computeSleepTrends = (entries: DiaryEntryLike[]): MetricTrend[] => 
     return { label, thisWeek, lastWeek, delta, betterWhenUp };
   });
 };
+
+/* ── Тренды веса: скользящее среднее и линейная регрессия (чистые функции) ── */
+
+export interface TrendPoint { date: string; value: number }
+
+/** Скользящее среднее по окну (trailing). Возвращает [] если точек < window. */
+export function movingAverage(points: TrendPoint[], window: number): TrendPoint[] {
+  if (window < 1 || !points.length || points.length < window) return [];
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const out: TrendPoint[] = [];
+  for (let i = window - 1; i < sorted.length; i++) {
+    let sum = 0;
+    for (let j = i - window + 1; j <= i; j++) sum += sorted[j].value;
+    out.push({ date: sorted[i].date, value: sum / window });
+  }
+  return out;
+}
+
+/** Линейная регрессия по датам (X в днях от первой точки). */
+export function fitLinearTrend(points: TrendPoint[]): { slopePerDay: number; intercept: number; r2: number; startX: number; startY: number } | null {
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) return null;
+  const x0 = +new Date(sorted[0].date) / 86400000;
+  const days = sorted.map(p => +new Date(p.date) / 86400000 - x0);
+  const n = days.length;
+  const meanX = days.reduce((s, v) => s + v, 0) / n;
+  const meanY = sorted.reduce((s, p) => s + p.value, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (days[i] - meanX) * (sorted[i].value - meanY);
+    den += (days[i] - meanX) * (days[i] - meanX);
+  }
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = meanY - slope * meanX;
+  let ssRes = 0, ssTot = 0;
+  for (let i = 0; i < n; i++) {
+    const pred = intercept + slope * days[i];
+    ssRes += (sorted[i].value - pred) ** 2;
+  }
+  for (let i = 0; i < n; i++) ssTot += (sorted[i].value - meanY) ** 2;
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  return { slopePerDay: slope, intercept, r2, startX: x0, startY: sorted[0].value };
+}
+
+/** Прогноз значения на абсолютную дату (X = дни от эпохи). */
+export function projectToDate(fit: { slopePerDay: number; intercept: number; startX: number }, dateIso: string): number {
+  const x = +new Date(dateIso) / 86400000;
+  return fit.intercept + fit.slopePerDay * (x - fit.startX);
+}
+
+/** Количество дней до достижения target (null если тренд не в ту сторону). */
+export function daysToTarget(fit: { slopePerDay: number; intercept: number; startX: number }, todayIsoStr: string, target: number): number | null {
+  if (Math.abs(fit.slopePerDay) < 1e-9) return null;
+  const xToday = +new Date(todayIsoStr) / 86400000;
+  const targetX = (target - fit.intercept) / fit.slopePerDay + fit.startX;
+  const days = targetX - xToday;
+  if (days < 0) return null;
+  return Math.ceil(days);
+}

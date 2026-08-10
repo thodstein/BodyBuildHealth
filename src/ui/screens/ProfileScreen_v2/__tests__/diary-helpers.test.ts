@@ -15,6 +15,10 @@ import {
   defaultGoals,
   type DiaryEntryLike,
   type DiaryKey,
+  movingAverage,
+  fitLinearTrend,
+  projectToDate,
+  daysToTarget,
 } from '../diary-helpers';
 
 const makeEntry = (date: string, fields: { label: string; value: string; unit?: string }[]): DiaryEntryLike => ({
@@ -314,5 +318,99 @@ describe('filterByRange', () => {
   it('включает записи с невалидной датой', () => {
     const entries = [makeEntry('не-дата', [{ label: 'Часы', value: '7', unit: 'ч' }])];
     expect(filterByRange(entries, '7')).toHaveLength(1);
+  });
+});
+
+/* ── Тренды веса: movingAverage / fitLinearTrend / projectToDate / daysToTarget ── */
+
+describe('movingAverage', () => {
+  it('возвращает [] при пустом списке', () => {
+    expect(movingAverage([], 7)).toEqual([]);
+  });
+  it('возвращает [] при точек меньше окна', () => {
+    expect(movingAverage([{ date: '2026-08-01', value: 80 }], 7)).toEqual([]);
+  });
+  it('считает trailing-среднее по окну', () => {
+    const pts = ['2026-08-01', '2026-08-02', '2026-08-03'].map((date, i) => ({ date, value: 80 + i }));
+    expect(movingAverage(pts, 3)).toEqual([{ date: '2026-08-03', value: 81 }]);
+  });
+  it('окно 1 = исходные точки', () => {
+    const pts = [{ date: '2026-08-01', value: 80 }, { date: '2026-08-02', value: 81 }];
+    expect(movingAverage(pts, 1)).toEqual(pts);
+  });
+  it('сортирует по дате перед расчётом', () => {
+    const pts = [
+      { date: '2026-08-03', value: 83 },
+      { date: '2026-08-01', value: 80 },
+      { date: '2026-08-02', value: 82 },
+    ];
+    const out = movingAverage(pts, 2);
+    expect(out[0].date).toBe('2026-08-02');
+    expect(out[0].value).toBe(81);
+    expect(out[1].value).toBe(82.5);
+  });
+});
+
+describe('fitLinearTrend', () => {
+  it('null при < 2 точек', () => {
+    expect(fitLinearTrend([{ date: '2026-08-01', value: 80 }])).toBeNull();
+  });
+  it('плоский тренд: slope=0, r2=1', () => {
+    const fit = fitLinearTrend([
+      { date: '2026-08-01', value: 80 },
+      { date: '2026-08-08', value: 80 },
+    ]);
+    expect(fit!.slopePerDay).toBe(0);
+    expect(fit!.r2).toBe(1);
+  });
+  it('восходящий тренд: +0.1 кг/день за 10 дней', () => {
+    const pts = [];
+    for (let i = 0; i < 11; i++) {
+      const d = new Date('2026-08-01');
+      d.setDate(d.getDate() + i);
+      pts.push({ date: d.toISOString().slice(0, 10), value: 80 + i * 0.1 });
+    }
+    const fit = fitLinearTrend(pts)!;
+    expect(fit.slopePerDay).toBeCloseTo(0.1, 6);
+    expect(fit.r2).toBeGreaterThan(0.99);
+  });
+  it('идеально линейный нисходящий тренд r2=1', () => {
+    const pts = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date('2026-08-01');
+      d.setDate(d.getDate() + i);
+      pts.push({ date: d.toISOString().slice(0, 10), value: 90 - i * 0.5 });
+    }
+    const fit = fitLinearTrend(pts)!;
+    expect(fit.slopePerDay).toBeCloseTo(-0.5, 6);
+    expect(fit.r2).toBe(1);
+  });
+});
+
+describe('projectToDate', () => {
+  it('прогноз на дату через 10 дней при slope 0.1', () => {
+    const fit = { slopePerDay: 0.1, intercept: 80, startX: +new Date('2026-08-01') / 86400000, startY: 80 };
+    const d = new Date('2026-08-01');
+    d.setDate(d.getDate() + 10);
+    expect(projectToDate(fit, d.toISOString().slice(0, 10))).toBeCloseTo(81, 5);
+  });
+});
+
+describe('daysToTarget', () => {
+  it('null при нулевом наклоне', () => {
+    const fit = { slopePerDay: 0, intercept: 80, startX: 0, startY: 80 };
+    expect(daysToTarget(fit, '2026-08-01', 85)).toBeNull();
+  });
+  it('null если тренд не в сторону цели (растём, цель ниже)', () => {
+    const fit = { slopePerDay: 0.1, intercept: 80, startX: +new Date('2026-08-01') / 86400000, startY: 80 };
+    expect(daysToTarget(fit, '2026-08-01', 75)).toBeNull();
+  });
+  it('достижение цели за 50 дней при 0.1 кг/день', () => {
+    const fit = { slopePerDay: 0.1, intercept: 80, startX: +new Date('2026-08-01') / 86400000, startY: 80 };
+    expect(daysToTarget(fit, '2026-08-01', 85)).toBe(50);
+  });
+  it('цель уже достигнута → null (дней <= 0)', () => {
+    const fit = { slopePerDay: 0.1, intercept: 80, startX: +new Date('2026-08-01') / 86400000, startY: 80 };
+    expect(daysToTarget(fit, '2027-01-01', 85)).toBeNull();
   });
 });

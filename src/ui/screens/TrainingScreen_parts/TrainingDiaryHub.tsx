@@ -3000,7 +3000,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         const existM = loadMeasurements();
                         const existDates = new Set(existM.map((m: any) => m.date));
                         const newM = data.measurements.filter((m: any) => !existDates.has(m.date));
-                        if (newM.length) { try { localStorage.setItem('he_body_measurements', JSON.stringify([...existM, ...newM])); } catch {} }
+                        if (newM.length) { try { newM.forEach((m: any) => saveMeasurement(m)); } catch {} }
                       }
                       alert(`Импортировано: ${newWorkouts.length} тренировок${data.measurements?.length ? `, ${data.measurements.length} замеров` : ''}`);
                       onRefresh();
