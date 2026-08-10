@@ -75,6 +75,7 @@ const LAB_SYSTEM_GROUPS: Record<string, string[]> = {
   hematologic: ['HGB','HCT','PLT','WBC','RBC','MCV','MCH','MCHC','RDW','IRON','TRANSFERRIN','TIBC','IRON_SAT','FERRITIN'],
   cardio: ['LDL','HDL','TG','APOB','APOA1','NON_HDL','LP_A','CRP','hsCRP','FIBRINOGEN','D_DIMER'],
   metabolic: ['GLUCOSE','GLU','HBA1C','INSULIN','HOMA_IR','VITD','VITAMIN_D','CALCIDIOL','B12','VITAMIN_B12','FOLATE'],
+  urinalysis: ['URINE_SG','URINE_PH','URINE_PROTEIN_QR','URINE_GLUCOSE_QR','URINE_KETONES_QR','URINE_BILIRUBIN_QR','UROBILINOGEN_QR','URINE_NITRITE_QR','URINE_LEU_QR','URINE_BLOOD_QR','URINE_LEU','URINE_ERY','URINE_EPITHELIAL','URINE_CYLINDERS'],
   reproductive: ['PSA','DHEA_S','AMH','INHIBIN_B','PROGESTERONE','DHT','FT','TESTOSTERONE','ESTRADIOL'],
   neuro: ['HOMOCYSTEINE','BDNF','SEROTONIN','DOPAMINE','GABA','VITAMIN_B12','FOLATE'],
 };
@@ -1563,8 +1564,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>
                   {(() => {
                     const phases: Record<string,string> = {
-                      baseline:'Перед началом курса — полный базовый скрининг (49 маркеров)',
-                      on_cycle:'Каждые 4 недели на курсе — контроль печени, липидов, гормонов (35 маркеров)',
+                       baseline:`Перед началом курса — полный базовый скрининг (${requiredLabs.length} маркеров, включая ОАМ)`,
+                       on_cycle:`Каждые 4 недели на курсе — контроль печени, липидов, гормонов и ОАМ (${requiredLabs.length} маркеров)`,
                       bridge:'Между курсами — восстановительный мониторинг (30 маркеров)',
                       pct:'Послекурсовая терапия — контроль восстановления оси HPG (29 маркеров)',
                       post_pct:'Через 4-6 недель после ПКТ — финальная проверка (32 маркера)',
