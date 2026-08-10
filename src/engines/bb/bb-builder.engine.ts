@@ -74,6 +74,16 @@ export interface BBBuilderInput {
   level: string;                 // beginner/intermediate/advanced/enhanced
   /** Реальный стаж силовых тренировок. Не заменяется ярлыком level. */
   trainingYears?: number;
+  /** Способность к bodyweight-упражнениям. Если нет данных — подтягивания
+   *  не ставятся как primary; используется pulldown/assisted вместо них. */
+  bodyweightCapability?: {
+    pullUpsStrict?: number;
+    chinUpsStrict?: number;
+    dipsStrict?: number;
+    pushUpsStrict?: number;
+    weightedPullUpLoad?: number;
+    assistedPullUpLoad?: number;
+  };
   goal: BBGoal;
   weeks: number;                 // длительность мезоцикла
   workMax?: Record<string, number>; // рабочий максимум на мышцу/движение (кг)
@@ -1042,6 +1052,7 @@ function buildSession(
   eccentricMult?: number,
   mobilityRestrictions?: string[],
   trainingYears?: number,
+  bodyweightCapability?: BBBuilderInput['bodyweightCapability'],
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup);
@@ -1327,6 +1338,13 @@ function buildSession(
       if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
       if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
       if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
+      // Bodyweight capability: подтягивания не ставятся как primary тяжёлое
+      // движение без подтверждённой способности. Для accessory — допустимо.
+      if (role === 'primary' && /подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
+        const cap = bodyweightCapability;
+        const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+        if (!canPullUp) return false;
+      }
       if (equipmentList.length > 0) {
         const rawEq = ex.equipment;
         const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
@@ -2362,7 +2380,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears);
+       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
