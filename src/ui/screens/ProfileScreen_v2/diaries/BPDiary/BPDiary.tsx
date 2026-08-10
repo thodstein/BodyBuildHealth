@@ -22,6 +22,7 @@ import {
 import type { DiaryWindowProps } from '../../DiaryWindow';
 import {
   BPEntry,
+  BP_SYMPTOMS,
   classifyBP,
   getBpClassificationLabel,
   getBpClassificationColor,
@@ -34,6 +35,12 @@ import {
   compareMedsVsNoMeds,
   calculateGoalAchievement,
   getDefaultGoals,
+  generateEntryId,
+  sortEntriesByTimestamp,
+  validateBpEntry,
+  getBpEntries,
+  commitBpEntries,
+  type BPValidationError,
 } from '../../../../../core/bp-hr-data';
 import { BPChart } from './BPChart';
 import { useBPAlerts } from './useBPAlerts';
@@ -50,12 +57,12 @@ type BPForm = {
   arm?: BPEntry['arm'];
   timeOfDay?: BPEntry['timeOfDay'];
   medicationTaken?: boolean;
-  symptomsText: string;
+  selectedSymptoms: string[];
   notes?: string;
 };
 
 const btn: React.CSSProperties = {
-  minHeight: 36, padding: '6px 10px', borderRadius: 7,
+  minHeight: 44, padding: '6px 10px', borderRadius: 7,
   background: '#27272a', border: '1px solid #3f3f46', color: '#fff', cursor: 'pointer',
 };
 const input: React.CSSProperties = { ...btn, width: '100%', background: '#18181b', boxSizing: 'border-box' };
@@ -78,36 +85,10 @@ const warnCard: React.CSSProperties = {
 const esc = (v: unknown) =>
   String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
 
-function readEntries(): BPEntry[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || '[]');
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .filter((x: any) => x && typeof x.date === 'string')
-      .map((x: any) => ({
-        date: x.date,
-        systolic: Number(x.systolic), diastolic: Number(x.diastolic),
-        hr: Number(x.hr ?? x.pulse),
-        notes: x.notes, position: x.position, arm: x.arm,
-        timeOfDay: x.timeOfDay, medicationTaken: x.medicationTaken,
-        symptoms: Array.isArray(x.symptoms) ? x.symptoms : [],
-      }))
-      .filter((x: BPEntry) =>
-        Number.isFinite(x.systolic) && Number.isFinite(x.diastolic) && Number.isFinite(x.hr)
-      );
-  } catch { return []; }
-}
-
-function commitEntries(entries: BPEntry[]): BPEntry[] {
-  const ordered = [...entries].sort((a, b) => b.date.localeCompare(a.date));
-  localStorage.setItem(KEY, JSON.stringify(ordered.slice(0, 365)));
-  return ordered;
-}
-
 const defaultDraft = (): BPForm => ({
   date: todayIso(), systolic: '120', diastolic: '80', pulse: '70',
   position: 'sitting', arm: 'left', timeOfDay: 'morning',
-  medicationTaken: false, symptomsText: '',
+  medicationTaken: false, selectedSymptoms: [],
 });
 
 export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDataChange }) => {
@@ -121,9 +102,10 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<'journal' | 'stats' | 'analysis'>('journal');
+  const [validationErrors, setValidationErrors] = useState<BPValidationError[]>([]);
   const svg = useRef<SVGSVGElement>(null);
 
-  useEffect(() => { if (open) setRows(readEntries()); }, [open]);
+  useEffect(() => { if (open) setRows(getBpEntries()); }, [open]);
 
   const [alerts, dismissAlert] = useBPAlerts({
     entries: rows,
@@ -132,40 +114,50 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   });
 
   const commit = (next: BPEntry[], remember = true) => {
-    const ordered = commitEntries(next);
+    const ordered = commitBpEntries(next);
     setRows(ordered);
     if (remember) setUndo(rows);
     onDataChange?.();
   };
 
-  const openNew = () => { setEditing(null); setDraft(defaultDraft()); setModal(true); };
+  const openNew = () => { setEditing(null); setDraft(defaultDraft()); setValidationErrors([]); setModal(true); };
 
   const save = () => {
     const s = Number(draft.systolic), d = Number(draft.diastolic), p = Number(draft.pulse);
-    if (!draft.date || ![s, d, p].every(Number.isFinite) ||
-      s < 50 || s > 250 || d < 30 || d > 180 || p < 20 || p > 250 || d >= s) return;
+    const errors = validateBpEntry(s, d, p, draft.date);
+    if (errors.length) { setValidationErrors(errors); return; }
+    setValidationErrors([]);
     const entry: BPEntry = {
+      id: editing || generateEntryId(),
       date: draft.date, systolic: Math.round(s), diastolic: Math.round(d), hr: Math.round(p),
+      timestamp: editing ? (rows.find(r => r.id === editing)?.timestamp ?? Date.now()) : Date.now(),
       position: draft.position, arm: draft.arm, timeOfDay: draft.timeOfDay,
       medicationTaken: draft.medicationTaken,
-       symptoms: (draft.symptomsText || '').split(',').map((x: string) => x.trim()).filter(Boolean),
+      symptoms: draft.selectedSymptoms,
       notes: draft.notes?.trim() || undefined,
     };
     commit(editing
-      ? rows.map(x => x.date === editing ? entry : x)
-      : [entry, ...rows.filter(x => x.date !== entry.date)]);
+      ? rows.map(x => x.id === editing ? entry : x)
+      : sortEntriesByTimestamp([entry, ...rows]));
     setModal(false); setEditing(null);
   };
 
   const editRow = (x: BPEntry) => {
-    setEditing(x.date);
-    setDraft({ ...defaultDraft(), ...x, systolic: String(x.systolic), diastolic: String(x.diastolic), pulse: String(x.hr), symptomsText: (x.symptoms || []).join(', ') });
+    setEditing(x.id || '');
+    setDraft({ ...defaultDraft(), ...x, systolic: String(x.systolic), diastolic: String(x.diastolic), pulse: String(x.hr), selectedSymptoms: x.symptoms || [] });
+    setValidationErrors([]);
     setModal(true);
+  };
+
+  const deleteRow = (id: string) => {
+    setUndo(rows);
+    commit(rows.filter(r => r.id !== id), true);
   };
 
   // --- computed values ---
   const entries: DiaryEntryLike[] = useMemo(() =>
     rows.map(x => ({
+      id: x.id,
       date: x.date,
       fields: [
         { label: 'Систола', value: String(x.systolic), unit: 'мм рт.ст.' },
@@ -194,7 +186,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const weekly = buildWeeklyHistogram(points);
   const normal = getNormalRange('bp');
 
-  const latest = rows[0];
+  const latest = rows.length > 0 ? sortEntriesByTimestamp(rows)[0] : undefined;
   const recentRows = rows.filter(x => visible.some(v => v.date === x.date));
   const bpGoal = goals?.systolicTarget > 0 ? goals.systolicTarget : 120;
   const bpClass = latest ? classifyBP(latest.systolic, latest.diastolic) : 'normal';
@@ -465,7 +457,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             {/* Chart using BPChart component */}
             {recentRows.length > 0 && (
               <section style={{ marginTop: 12 }}>
-                <BPChart ref={svg} data={recentRows.map(r => ({ date: r.date, systolic: r.systolic, diastolic: r.diastolic, pulse: r.hr }))}
+                <BPChart ref={svg} data={sortEntriesByTimestamp(recentRows).map(r => ({ date: r.date, systolic: r.systolic, diastolic: r.diastolic, pulse: r.hr }))}
                   goalSystolic={bpGoal} goalDiastolic={80}
                   normalRange={normal ? { low: normal.low, high: normal.high } : { low: 120, high: 80 }} />
               </section>
@@ -511,11 +503,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               </thead>
               <tbody>
                 {pageData.pageItems.map(e => {
-                  const x = rows.find(r => r.date === e.date)!;
+                  const x = rows.find(r => r.id === e.id) || rows.find(r => r.date === e.date)!;
+                  if (!x) return null;
                   const cls = classifyBP(x.systolic, x.diastolic);
                   const clr = getBpClassificationColor(cls);
                   return (
-                    <tr key={x.date} style={{ borderBottom: '1px solid #29292f' }}>
+                    <tr key={x.id || x.date} style={{ borderBottom: '1px solid #29292f' }}>
                       <td>{x.date}</td>
                       <td style={{ color: clr }}>{x.systolic}/{x.diastolic}</td>
                       <td>{x.hr}</td>
@@ -524,7 +517,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                       <td>{x.position || '—'} · {x.timeOfDay || '—'}{x.medicationTaken ? ' · 💊' : ''}</td>
                       <td>
                         <button style={btn} onClick={() => editRow(x)}>Изменить</button>{' '}
-                        <button style={btn} onClick={() => commit(rows.filter(r => r.date !== x.date))}>Удалить</button>
+                        <button style={btn} onClick={() => { if (window.confirm('Удалить запись?')) deleteRow(x.id || x.date); }}>Удалить</button>
                       </td>
                     </tr>
                   );
@@ -568,10 +561,17 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
 
             <section style={{ ...goodCard, marginTop: 12 }}>
               <h3>🎯 Достижение целей</h3>
-              <div>Цель: систола ≤{bpGoal}, диастола ≤80, пульс ≤72</div>
-              <div>Систола в цели: <b>{goalAchievement.systolicAchieved}%</b></div>
-              <div>Диастола в цели: <b>{goalAchievement.diastolicAchieved}%</b></div>
-              <div>Пульс в цели: <b>{goalAchievement.hrAchieved}%</b></div>
+              <div style={{ marginBottom: 8 }}>Цель: систола ≤{bpGoal}, диастола ≤80, пульс ≤72</div>
+              {[
+                ['Систола', goalAchievement.systolicAchieved],
+                ['Диастола', goalAchievement.diastolicAchieved],
+                ['Пульс', goalAchievement.hrAchieved],
+              ].map(([label, pct]) => (
+                <div key={String(label)} style={{ marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>{label}</span><b>{pct}%</b></div>
+                  <div style={{ height: 8, borderRadius: 4, background: '#29292f', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: Number(pct) >= 70 ? '#22c55e' : Number(pct) >= 40 ? '#f59e0b' : '#ef4444' }} /></div>
+                </div>
+              ))}
             </section>
 
             <section style={{ ...infoCard, marginTop: 12 }}>
@@ -612,16 +612,19 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
 
             <section style={{ ...card, marginTop: 12 }}>
               <h3>🌙 Циркадный паттерн</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
               {(['morning', 'afternoon', 'evening', 'night'] as const).map(tod => {
                 const g = circadian[tod];
-                if (g.count === 0) return null;
+                if (g.count === 0) return <div key={tod} style={{ padding: 8, background: '#29292f', borderRadius: 8, fontSize: 12 }}>Нет данных</div>;
+                const color = getBpClassificationColor(classifyBP(g.avgS, g.avgD));
                 return (
-                  <div key={tod} style={{ margin: '4px 0' }}>
+                  <div key={tod} style={{ margin: '4px 0', padding: 8, borderRadius: 8, background: `${color}18`, border: `1px solid ${color}44` }}>
                     {tod === 'morning' ? '🌅 Утро' : tod === 'afternoon' ? '☀️ День' : tod === 'evening' ? '🌆 Вечер' : '🌙 Ночь'}:{' '}
-                    <b>{g.avgS}/{g.avgD}</b> ({g.count} изм.)
+                    <b style={{ color }}>{g.avgS}/{g.avgD}</b><br />({g.count} изм.)
                   </div>
                 );
               })}
+              </div>
               {circadian.isNonDipper && (
                 <div style={{ color: '#f59e0b', marginTop: 6 }}>⚠ Non-dipper паттерн: ночное АД не снижается (риск поражения органов-мишеней)</div>
               )}
@@ -675,10 +678,10 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         <section style={{ padding: '0 16px 16px', maxWidth: 1100, margin: 'auto' }}>
           <div style={{ ...card, background: '#18181b' }}>
             <h3 style={{ marginTop: 0 }}>Последние записи</h3>
-            {rows.slice(0, 3).map(row => {
+            {sortEntriesByTimestamp(rows).slice(0, 3).map(row => {
               const cls = classifyBP(row.systolic, row.diastolic);
               return (
-                <div key={`latest-${row.date}`} style={{ padding: 8, borderBottom: '1px solid #29292f', borderLeft: `3px solid ${getBpClassificationColor(cls)}`, paddingLeft: 8 }}>
+                <div key={row.id || `latest-${row.date}`} style={{ padding: 8, borderBottom: '1px solid #29292f', borderLeft: `3px solid ${getBpClassificationColor(cls)}`, paddingLeft: 8 }}>
                   <b>{row.date}</b> · {row.systolic}/{row.diastolic} · {row.hr} уд/мин · MAP {calcMAP(row.systolic, row.diastolic)}
                   {row.position ? ` · ${row.position}` : ''}
                   {row.notes ? ` · ${row.notes}` : ''}
@@ -695,6 +698,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
           <form onSubmit={e => { e.preventDefault(); save(); }}
             style={{ background: '#18181b', padding: 18, borderRadius: 12, width: 'min(560px,100%)' }}>
             <h3>{editing ? 'Редактирование АД' : 'Добавить запись АД'}</h3>
+            {validationErrors.length > 0 && (
+              <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                {validationErrors.map(error => <div key={`${error.field}-${error.message}`} style={{ color: '#ef4444', fontSize: 13 }}>⚠ {error.message}</div>)}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8 }}>
               {[
                 ['Дата', 'date'],
@@ -737,10 +745,15 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               <input type="checkbox" checked={!!draft.medicationTaken} onChange={e => setDraft({ ...draft, medicationTaken: e.target.checked })} />{' '}
               Лекарство принято
             </label>
-            <label style={{ display: 'block', marginTop: 8 }}>
-              Симптомы (через запятую)
-              <input style={input} value={draft.symptomsText || ''} onChange={e => setDraft({ ...draft, symptomsText: e.target.value })} />
-            </label>
+            <div style={{ display: 'block', marginTop: 8 }}>
+              <div style={{ marginBottom: 6 }}>Симптомы</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {BP_SYMPTOMS.map(symptom => {
+                  const active = draft.selectedSymptoms.includes(symptom);
+                  return <button key={symptom} type="button" style={{ minHeight: 32, padding: '4px 9px', borderRadius: 16, border: active ? '1px solid #ef4444' : '1px solid #3f3f46', background: active ? 'rgba(239,68,68,.2)' : '#27272a', color: active ? '#ef4444' : '#aaa', cursor: 'pointer' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
+                })}
+              </div>
+            </div>
             <label style={{ display: 'block', marginTop: 8 }}>
               Заметки
               <textarea style={{ ...input, minHeight: 60 }} value={draft.notes || ''} onChange={e => setDraft({ ...draft, notes: e.target.value })} />

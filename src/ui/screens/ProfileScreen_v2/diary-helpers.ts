@@ -3,7 +3,7 @@
  * Без React, без UI, без localStorage. Импортируются тестами и компонентом.
  */
 
-export type DiaryEntryLike = { date: string; fields: { label: string; value: string; unit: string }[] };
+export type DiaryEntryLike = { id?: string; date: string; fields: { label: string; value: string; unit: string }[] };
 
 export type DiaryKey =
   | 'sleep' | 'bp' | 'weight' | 'measurements'
@@ -427,8 +427,16 @@ export const detectAnomalies = (
       if (Number.isFinite(pulse) && pulse < 50 && pulse > 0) issues.push({ date: e.date, severity: 'warn', message: `Пульс ${pulse.toFixed(0)} (брадикардия)` });
     } else if (key === 'sleep') {
       const hours = parseFloat(e.fields.find(x => x.label === 'Часы')?.value || 'NaN');
+      const quality = parseFloat(e.fields.find(x => x.label === 'Качество')?.value || 'NaN');
+      const latency = parseFloat(e.fields.find(x => x.label === 'Латентность')?.value || 'NaN');
+      const alcohol = e.fields.find(x => x.label === 'Алкоголь')?.value === 'да';
       if (Number.isFinite(hours) && hours < 5) issues.push({ date: e.date, severity: 'danger', message: `Сон ${hours.toFixed(1)} ч (очень мало)` });
       else if (Number.isFinite(hours) && hours < 6) issues.push({ date: e.date, severity: 'warn', message: `Сон ${hours.toFixed(1)} ч (мало)` });
+      if (Number.isFinite(quality) && quality <= 1) issues.push({ date: e.date, severity: 'danger', message: 'Качество сна 1/5 (критично низкое)' });
+      else if (Number.isFinite(quality) && quality === 2) issues.push({ date: e.date, severity: 'warn', message: 'Качество сна 2/5 (низкое)' });
+      if (Number.isFinite(latency) && latency > 45) issues.push({ date: e.date, severity: 'warn', message: `Засыпание ${latency.toFixed(0)} мин (долгое)` });
+      if (alcohol && Number.isFinite(quality) && quality <= 2)
+        issues.push({ date: e.date, severity: 'warn', message: 'Алкоголь + плохое качество сна' });
     } else if (key === 'pain') {
       const total = parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
       if (Number.isFinite(total) && total >= 60) issues.push({ date: e.date, severity: 'danger', message: `Боль Σ=${total.toFixed(0)}/70 (критично)` });
@@ -505,9 +513,9 @@ export type SortDir = 'asc' | 'desc';
 export interface SortState { key: string; dir: SortDir; }
 
 export const sortEntries = (
-  entries: { date: string; fields: { label: string; value: string; unit: string }[] }[],
+  entries: DiaryEntryLike[],
   sort: SortState
-): typeof entries => {
+): DiaryEntryLike[] => {
   const sorted = [...entries];
   sorted.sort((a, b) => {
     let av: number | string = a.date;
@@ -856,4 +864,143 @@ export const exportSvgAsFile = (svgEl: SVGSVGElement, filename: string) => {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 500);
+};
+
+// ─── Сводный балл сна (0-100) ────────────────────────────────────────────
+
+export interface SleepScoreBreakdown { label: string; pct: number; ok: boolean; detail: string; }
+export interface SleepScore { score: number; breakdown: SleepScoreBreakdown[]; }
+export interface SleepScoreGoals { targetHours: number; targetQuality: number; targetLatency: number; targetAwakenings: number; }
+
+export const computeSleepScore = (entries: DiaryEntryLike[], goals: SleepScoreGoals): SleepScore | null => {
+  if (entries.length === 0) return null;
+  const avg = (arr: number[]) => arr.reduce((s, v) => s + v, 0) / arr.length;
+  const hoursVals = entries.map(e => extractValue('sleep', e)).filter((v): v is number => v !== null);
+  if (hoursVals.length === 0) return null;
+  const qualityVals = entries
+    .map(e => parseFloat(e.fields.find(f => f.label === 'Качество')?.value || 'NaN'))
+    .filter(Number.isFinite);
+  const latencyVals = entries
+    .map(e => parseFloat(e.fields.find(f => f.label === 'Латентность')?.value || 'NaN'))
+    .filter(Number.isFinite);
+  const awakeningVals = entries
+    .map(e => parseFloat(e.fields.find(f => f.label === 'Пробуждений')?.value || 'NaN'))
+    .filter(Number.isFinite);
+  const avgHours = avg(hoursVals);
+  const avgQuality = qualityVals.length ? avg(qualityVals) : 0;
+  const avgLatency = latencyVals.length ? avg(latencyVals) : goals.targetLatency;
+  const avgAwakenings = awakeningVals.length ? avg(awakeningVals) : goals.targetAwakenings;
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  const hoursPct = clamp((avgHours / Math.max(0.1, goals.targetHours)) * 100);
+  const qualityPct = clamp((avgQuality / Math.max(0.1, goals.targetQuality)) * 100);
+  const latencyPct = clamp((goals.targetLatency / Math.max(1, avgLatency)) * 100);
+  const awakeningsPct = clamp((goals.targetAwakenings / Math.max(0.1, avgAwakenings)) * 100);
+  const breakdown: SleepScoreBreakdown[] = [
+    { label: 'Часы', pct: hoursPct, ok: avgHours >= goals.targetHours, detail: `${avgHours.toFixed(1)} / ${goals.targetHours} ч` },
+    { label: 'Качество', pct: qualityPct, ok: avgQuality >= goals.targetQuality, detail: `${avgQuality.toFixed(1)} / ${goals.targetQuality}` },
+    { label: 'Засыпание', pct: latencyPct, ok: avgLatency <= goals.targetLatency, detail: `${avgLatency.toFixed(0)} / ≤ ${goals.targetLatency} мин` },
+    { label: 'Пробуждения', pct: awakeningsPct, ok: avgAwakenings <= goals.targetAwakenings, detail: `${avgAwakenings.toFixed(1)} / ≤ ${goals.targetAwakenings}` },
+  ];
+  return { score: Math.round(breakdown.reduce((s, b) => s + b.pct, 0) / 4), breakdown };
+};
+
+// ─── Средние по дням недели ──────────────────────────────────────────────
+
+export interface WeekdayAvg { dayName: string; idx: number; avgHours: number | null; avgQuality: number | null; count: number; }
+
+export const computeWeekdayAverages = (entries: DiaryEntryLike[]): WeekdayAvg[] => {
+  const days: { dayName: string; idx: number; hours: number[]; quality: number[] }[] = [
+    { dayName: 'Пн', idx: 1, hours: [], quality: [] },
+    { dayName: 'Вт', idx: 2, hours: [], quality: [] },
+    { dayName: 'Ср', idx: 3, hours: [], quality: [] },
+    { dayName: 'Чт', idx: 4, hours: [], quality: [] },
+    { dayName: 'Пт', idx: 5, hours: [], quality: [] },
+    { dayName: 'Сб', idx: 6, hours: [], quality: [] },
+    { dayName: 'Вс', idx: 0, hours: [], quality: [] },
+  ];
+  for (const e of entries) {
+    const d = new Date(e.date);
+    if (isNaN(d.getTime())) continue;
+    const day = days.find(x => x.idx === d.getDay());
+    if (!day) continue;
+    const h = extractValue('sleep', e);
+    const q = parseFloat(e.fields.find(f => f.label === 'Качество')?.value || 'NaN');
+    if (h !== null) day.hours.push(h);
+    if (Number.isFinite(q)) day.quality.push(q);
+  }
+  return days.map(d => ({
+    dayName: d.dayName,
+    idx: d.idx,
+    avgHours: d.hours.length ? d.hours.reduce((s, v) => s + v, 0) / d.hours.length : null,
+    avgQuality: d.quality.length ? d.quality.reduce((s, v) => s + v, 0) / d.quality.length : null,
+    count: d.hours.length,
+  }));
+};
+
+// ─── Календарь-хитмап сна ────────────────────────────────────────────────
+
+export interface CalendarCell { date: string; hours: number | null; quality: number | null; }
+
+export const buildSleepCalendar = (entries: DiaryEntryLike[], days: number): CalendarCell[] => {
+  const out: CalendarCell[] = [];
+  const byDate = new Map<string, DiaryEntryLike>();
+  for (const e of entries) byDate.set(e.date, e);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = localDateKey(d);
+    const e = byDate.get(key);
+    let hours: number | null = null;
+    let quality: number | null = null;
+    if (e) {
+      hours = extractValue('sleep', e);
+      const q = parseFloat(e.fields.find(f => f.label === 'Качество')?.value || 'NaN');
+      quality = Number.isFinite(q) ? q : null;
+    }
+    out.push({ date: key, hours, quality });
+  }
+  return out;
+};
+
+export type SleepCellLevel = 'none' | 'bad' | 'low' | 'good' | 'great' | 'high';
+
+export const sleepCellLevel = (hours: number | null, quality: number | null): SleepCellLevel => {
+  if (hours === null) return 'none';
+  if (hours < 6) return 'bad';
+  if (hours < 7) return 'low';
+  if (hours <= 9) return quality !== null && quality >= 4 ? 'great' : 'good';
+  return 'high';
+};
+
+// ─── Тренды метрик: эта неделя vs прошлая ────────────────────────────────
+
+export interface MetricTrend { label: string; thisWeek: number | null; lastWeek: number | null; delta: number | null; betterWhenUp: boolean; }
+
+export const computeSleepTrends = (entries: DiaryEntryLike[]): MetricTrend[] => {
+  const metrics = ['Часы', 'Качество', 'Латентность', 'Пробуждений'] as const;
+  const now = Date.now();
+  const weekAgo = now - 7 * 86400000;
+  const twoWeeks = now - 14 * 86400000;
+  const avg = (arr: number[]) => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : null);
+  return metrics.map(label => {
+    const thisVals: number[] = [];
+    const lastVals: number[] = [];
+    for (const e of entries) {
+      const t = Date.parse(e.date);
+      if (!Number.isFinite(t)) continue;
+      const f = e.fields.find(x => x.label === label);
+      if (!f) continue;
+      const v = parseFloat(f.value);
+      if (!Number.isFinite(v)) continue;
+      if (t >= weekAgo) thisVals.push(v);
+      else if (t >= twoWeeks) lastVals.push(v);
+    }
+    const thisWeek = avg(thisVals);
+    const lastWeek = avg(lastVals);
+    const delta = thisWeek !== null && lastWeek !== null ? thisWeek - lastWeek : null;
+    const betterWhenUp = label === 'Часы' || label === 'Качество';
+    return { label, thisWeek, lastWeek, delta, betterWhenUp };
+  });
 };
