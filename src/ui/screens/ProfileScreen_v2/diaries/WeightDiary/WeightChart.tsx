@@ -173,11 +173,7 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
   const yRight = (v: number) => 170 - ((v - rightLo) / (rightHi - rightLo)) * 140;
   const y = (v: number, useRight?: boolean) => (useRight ? yRight(v) : yLeft(v));
 
-  if (activeSeries.length === 0) {
-    return <div style={{ padding: 20, color: colors.textMuted }}>Недостаточно данных для графика.</div>;
-  }
-
-  const dates = activeSeries[0].points.map(p => p.date);
+  const dates = activeSeries[0]?.points.map(p => p.date) ?? [];
   const noteIndexes = useMemo(() => {
     if (!notes?.length) return [] as number[];
     const set = new Set<number>();
@@ -223,6 +219,10 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
     for (let i = 0; i <= rightTicks; i++) arr.push(rightLo + (rightHi - rightLo) * (i / rightTicks));
     return arr;
   }, [rightLo, rightHi, rightTicks]);
+
+  if (activeSeries.length === 0) {
+    return <div style={{ padding: 20, color: colors.textMuted }}>Недостаточно данных для графика.</div>;
+  }
 
   return (
     <div>
