@@ -326,9 +326,9 @@ export const AddHealthModal: React.FC<{
                 padding: '7px 9px',
                 borderRadius: 12,
                 cursor: 'pointer',
-                fontSize: 11.5,
+                fontSize: 12,
                 fontWeight: 800,
-                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.09)'}`,
+                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.1)'}`,
                 background: active ? `${t.color}22` : 'rgba(255,255,255,0.025)',
                 color: active ? t.color : colors.textMuted,
                 display: 'flex',
@@ -387,7 +387,7 @@ export const AddHealthModal: React.FC<{
 
           <SectionCard icon="📋" title="Детали боли" color="#22c55e">
             <div style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Когда</span>
+              <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Когда</span>
               <div style={{ marginTop: 6 }}>
                 <ChipGroup
                   options={PAIN_TIMES}
@@ -400,7 +400,7 @@ export const AddHealthModal: React.FC<{
               </div>
             </div>
             <div style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Триггеры</span>
+              <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Триггеры</span>
               <div style={{ marginTop: 6 }}>
                 <ChipGroup
                   options={PAIN_TRIGGERS}
@@ -443,7 +443,7 @@ export const AddHealthModal: React.FC<{
             </div>
             <datalist id="he-symptom-presets">{SYMPTOM_PRESETS.map((s) => <option key={s} value={s} />)}</datalist>
             <div style={{ flex: '1 1 130px' }}>
-              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', marginBottom: 4 }}>Тяжесть</span>
+              <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 4 }}>Тяжесть</span>
               <ScalePicker
                 value={newSymptomSeverity}
                 onChange={(v) => setNewSymptomSeverity(v as 1|2|3|4|5)}

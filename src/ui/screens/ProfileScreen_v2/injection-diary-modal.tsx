@@ -266,9 +266,9 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
                 type="button"
                 onClick={() => setSubstanceSmart(s)}
                 style={{
-                  padding: '6px 11px',
+                  padding: '7px 12px',
                   borderRadius: 999,
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
                   border: `1px solid ${draft.substance === s ? '#f59e0b' : 'rgba(255,255,255,0.1)'}`,
@@ -306,7 +306,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
         />
         <div>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Сторона</span>
+            <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>Сторона</span>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['left', 'right'] as const).map((s) => (
                 <button

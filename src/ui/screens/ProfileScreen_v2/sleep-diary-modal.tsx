@@ -142,9 +142,9 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
           labels={(v) => `${SLEEP_QUALITY_EMOJI[v - 1]}`}
           toneFn={(v) => (v >= 4 ? '#22c55e' : v === 3 ? '#f59e0b' : v === 2 ? '#f97316' : '#ef4444')}
         />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-          <span style={{ fontSize: 9, color: colors.textSubtle }}>1 — не выспался</span>
-          <span style={{ fontSize: 9, color: colors.textSubtle }}>5 — полный отдых</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+          <span style={{ fontSize: 10.5, color: colors.textSubtle }}>1 — не выспался</span>
+          <span style={{ fontSize: 10.5, color: colors.textSubtle }}>5 — полный отдых</span>
         </div>
       </SectionCard>
 
