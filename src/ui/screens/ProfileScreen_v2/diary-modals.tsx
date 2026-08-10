@@ -399,7 +399,11 @@ export const ScalePicker: React.FC<{
   };
   return (
     <div
-      style={{ display: 'flex', gap: 3 }}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(30px, 1fr))',
+        gap: 3,
+      }}
       role="radiogroup"
       tabIndex={0}
       onKeyDown={onKeyDown}
@@ -417,7 +421,6 @@ export const ScalePicker: React.FC<{
             aria-checked={active}
             onClick={() => onChange(v)}
             style={{
-              flex: 1,
               minHeight: height || (dense ? 36 : 44),
               padding: '4px 2px',
               borderRadius: 9,
@@ -906,7 +909,7 @@ export const DiaryModalShell: React.FC<{
                 ✕
               </button>
             </div>
-            <div style={{ padding: 15, overflowY: 'auto', flex: 1 }}>{children}</div>
+            <div style={{ padding: 15, overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>
             {footer ?? (
               <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${color}1e`, flexShrink: 0, background: 'rgba(0,0,0,0.16)' }}>
                 {fill && fill.total > 0 && (
