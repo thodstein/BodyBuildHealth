@@ -48,6 +48,21 @@ export interface SourceWeekSnapshot {
   rir: number;
 }
 
+/** Цвет недели по фактической интенсивности и объёму исходного цикла. */
+export function sourceWeekColor(snapshot: SourceWeekSnapshot, allWeeks: SourceWeekSnapshot[]): string {
+  const intensities = allWeeks.map(week => week.intensityPct);
+  const volumes = allWeeks.map(week => week.volumeSets);
+  const minIntensity = Math.min(...intensities);
+  const maxIntensity = Math.max(...intensities);
+  const minVolume = Math.min(...volumes);
+  const maxVolume = Math.max(...volumes);
+  const intensityRatio = (snapshot.intensityPct - minIntensity) / Math.max(0.001, maxIntensity - minIntensity);
+  const volumeRatio = (snapshot.volumeSets - minVolume) / Math.max(1, maxVolume - minVolume);
+  const loadRatio = Math.max(0, Math.min(1, intensityRatio * 0.7 + volumeRatio * 0.3));
+  const hue = Math.round(145 - loadRatio * 145);
+  return `hsl(${hue} 72% 48%)`;
+}
+
 /** Сводка исходных недель без фазовой генерации и без округления исходных сетов. */
 export function summarizeSourceCycleWeeks(weeks: SRDaySpec[][]): SourceWeekSnapshot[] {
   return weeks.map((week, index) => {

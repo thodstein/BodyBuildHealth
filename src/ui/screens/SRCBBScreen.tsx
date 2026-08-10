@@ -40,7 +40,7 @@ import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastC
 import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
-import { MesocycleProgressionCard, summarizeSourceCycleWeeks } from './TrainingScreen_parts/MesocycleProgressionCard';
+import { MesocycleProgressionCard, sourceWeekColor, summarizeSourceCycleWeeks } from './TrainingScreen_parts/MesocycleProgressionCard';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
@@ -1200,22 +1200,39 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           </div>
            <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
           {builtSrc && (() => {
-            const W = builtSrc.weeks;
-            const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
-            const totalW = W.length;
-            const phase = displayPhaseForWeek(wk, totalW);
-            const PH_RU: Record<string,string> = { base: 'База (накопление)', build: 'Накопление (рост объёма)', peak: 'Пик (интенсификация)', deload: 'Разгрузка' };
-            const PH_COLOR: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
-            const PH_DESC: Record<string,string> = {
-              base: 'Фаза базы: акклиматизация, наращивание объёма при контроле техники. RIR 2-3, вес = PM_нед × %ПМ.',
-              build: 'Фаза накопления: пик объёма (MAV), прогрессия весов, RIR 1-2. КПШ и тоннаж максимальны.',
-              peak: 'Пиковая фаза: интенсификация — %ПМ растёт, объём снижается, RIR 0-1. Готовность к тесту/соревнованию.',
-              deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
-            };
+             const W = builtSrc.weeks;
+             const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
+             const totalW = W.length;
+             const phase = displayPhaseForWeek(wk, totalW);
+             const PH_RU: Record<string,string> = { base: 'База (накопление)', build: 'Накопление (рост объёма)', peak: 'Пик (интенсификация)', deload: 'Разгрузка' };
+             const PH_COLOR: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
+             const PH_DESC: Record<string,string> = {
+               base: 'Фаза базы: акклиматизация, наращивание объёма при контроле техники. RIR 2-3, вес = PM_нед × %ПМ.',
+               build: 'Фаза накопления: пик объёма (MAV), прогрессия весов, RIR 1-2. КПШ и тоннаж максимальны.',
+               peak: 'Пиковая фаза: интенсификация — %ПМ растёт, объём снижается, RIR 0-1. Готовность к тесту/соревнованию.',
+               deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
+             };
+             const sourceCycle = getCycleById(selectedCycleId);
+             const sourceCalendar = sourceCycle && !W.some(week => week.macroPhase)
+               ? summarizeSourceCycleWeeks(sourceCycle.weeks && sourceCycle.weeks.length > 0
+                 ? sourceCycle.weeks
+                 : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1))
+               : undefined;
+             const sourceWeek = sourceCalendar?.[wk.week - 1];
+             const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : PH_COLOR[phase];
+             const calendarTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : PH_COLOR[phase] + '14';
+             const calendarBorderTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : PH_COLOR[phase] + '30';
+             const calendarBadgeTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : PH_COLOR[phase] + '22';
+             const calendarLabel = sourceWeek
+               ? `Оригинал · ${Math.round(sourceWeek.intensityPct * 100)}% · ${sourceWeek.volumeSets} сетов`
+               : PH_RU[phase];
+             const calendarDescription = sourceWeek
+               ? `Исходная неделя цикла: ${sourceWeek.volumeSets} рабочих сетов, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
+               : PH_DESC[phase];
             return <div style={{ ...CARD, overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8 }}>
                    <div style={{ ...H, margin:0, minWidth:0, overflowWrap:'break-word' }}>План: {builtSrc.template.meta.title}</div>
-                <span style={{ fontSize:11, fontWeight:700, color: PH_COLOR[phase], background: PH_COLOR[phase]+'22', padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{PH_RU[phase]}</span>
+                 <span style={{ fontSize:11, fontWeight:700, color: calendarColor, background: calendarBadgeTint, padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{calendarLabel}</span>
               </div>
                <div style={{ ...SMALL, marginTop:4, wordBreak:'break-word' }}>{builtSrc.progressionRationale}</div>
                {autoRegMode === 'off' && best && modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle) && (
@@ -1223,13 +1240,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                    ⚠ {modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle)}
                  </div>
                )}
-              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: PH_COLOR[phase]+'14', border:'1px solid '+PH_COLOR[phase]+'30' }}>
+               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: calendarTint, border:'1px solid '+calendarBorderTint }}>
                 <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background: PH_COLOR[phase], flexShrink:0 }} />
-                  <span style={{ fontSize:12, fontWeight:800, color: PH_COLOR[phase] }}>{PH_RU[phase]}</span>
+                   <span style={{ width:8, height:8, borderRadius:'50%', background: calendarColor, flexShrink:0 }} />
+                   <span style={{ fontSize:12, fontWeight:800, color: calendarColor }}>{calendarLabel}</span>
                   <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginLeft:'auto' }}>Неделя {wk.week} из {totalW}</span>
                 </div>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)', lineHeight:1.4, wordBreak:'break-word' }}>{PH_DESC[phase]}</div>
+                 <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)', lineHeight:1.4, wordBreak:'break-word' }}>{calendarDescription}</div>
               </div>
               {methodHints.label && <div style={{ marginTop:4, fontSize:11, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
               {plWeakPoints.length > 0 && (
@@ -1317,22 +1334,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               <div style={{ marginTop:10 }}>
                 <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span style={{ fontWeight:700, color:'#fff' }}>Неделя {wk.week} из {totalW}</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:PH_COLOR[phase], background:PH_COLOR[phase]+'22', padding:'2px 10px', borderRadius:8 }}>{PH_RU[phase]}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                  {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+PH_RU[ph]} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? PH_COLOR[ph] : PH_COLOR[ph]+'1a', color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{w.week}</button>; })}
+                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : PH_COLOR[ph]; const tint = original ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = original ? `Оригинал ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
+                    {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
                     <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
-                      <span style={{ width: 4, height: 14, borderRadius: 2, background: PH_COLOR[ph], flexShrink: 0 }} title={PH_RU[ph]} />
+                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `Оригинал: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
-                        {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${PH_COLOR[ph]}, ${PH_COLOR[ph]}88)` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
+                          {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${color}, ${colorFade})` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
                       </div>
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
                     </div>

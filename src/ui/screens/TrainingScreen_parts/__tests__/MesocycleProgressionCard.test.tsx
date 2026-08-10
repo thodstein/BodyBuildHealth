@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../../data/lms-cycles/lms-cycle-index';
 import { buildLMSPlan, originalCycleWeeks } from '../../../../engines/lms/lms-builder.engine';
-import { summarizeSourceCycleWeeks } from '../MesocycleProgressionCard';
+import { sourceWeekColor, summarizeSourceCycleWeeks } from '../MesocycleProgressionCard';
 
 describe('PL original mesocycle calendar', () => {
   it('uses the explicit source week count for every PL cycle', () => {
@@ -34,6 +34,16 @@ describe('PL original mesocycle calendar', () => {
 
     expect(source).toHaveLength(cycle!.weeks!.length);
     expect(source.some((week, index) => index > 0 && week.volumeSets !== source[0].volumeSets)).toBe(true);
+  });
+
+  it('assigns calendar colors from the original weekly load, not generic phases', () => {
+    const weeks = [
+      { week: 1, volumeSets: 12, intensityPct: 0.45, rir: 3 },
+      { week: 2, volumeSets: 20, intensityPct: 0.75, rir: 2 },
+      { week: 3, volumeSets: 16, intensityPct: 0.9, rir: 1 },
+    ];
+
+    expect(new Set(weeks.map(week => sourceWeekColor(week, weeks))).size).toBe(3);
   });
 
   it('preserves the source layout for every PL cycle when building the program', () => {
