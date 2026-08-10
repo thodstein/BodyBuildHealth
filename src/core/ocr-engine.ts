@@ -9,6 +9,36 @@ import { notifyDataChange } from './data-link';
 import { formatDate } from './utils/date-utils';
 import type { LabPoint } from './types';
 
+/**
+ * Robust file-as-text reader. Uses Blob.text() when available (modern browsers),
+ * falls back to FileReader + TextDecoder for older browsers / jsdom where
+ * File.prototype.text is not implemented.
+ */
+async function readFileAsText(file: File | Blob): Promise<string> {
+  if (typeof (file as any).text === 'function') {
+    try {
+      return await (file as any).text();
+    } catch {
+      // fall through to FileReader path
+    }
+  }
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const result = reader.result;
+        if (typeof result === 'string') resolve(result);
+        else if (result instanceof ArrayBuffer) resolve(new TextDecoder('utf-8').decode(result));
+        else resolve('');
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsText(file);
+  });
+}
+
 export interface OCRResult {
   text: string;
   labs: ParsedLabValue[];
@@ -103,20 +133,41 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
   const merged = mergeParsedResults(pdfLabs, providerResults, provider);
   const labs = merged.labs;
   const regexResults = parseWithBiomarkerRegex(rawText, extractionMethod);
-  const existingCodes = new Set(labs.map(l => mapToUcumCode(l.code)));
+
+  // Build a lookup of existing labs by canonical code so the regex parser can
+  // augment rather than be blocked by earlier (possibly lower-quality) results.
+  const labsByCode = new Map<string, ParsedLabValue>();
+  for (const l of labs) labsByCode.set(mapToUcumCode(l.code), l);
+
   for (const marker of regexResults.extractedMarkers) {
     const code = mapToUcumCode(marker.code);
-    if (existingCodes.has(code)) continue;
-    existingCodes.add(code);
     const normalized = normalizeLabMeasurement(code, marker.value, marker.unit);
-    labs.push({
+    const refHigh = marker.ec50 > 0 ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value : undefined;
+    const newLab: ParsedLabValue = {
       code,
       name: marker.name,
       value: normalized.value,
       unit: normalized.unit,
-      refHigh: marker.ec50 > 0 ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value : undefined,
+      refHigh,
       raw: isUsefulRawLine(marker.sourceLine) ? marker.sourceLine : undefined,
-    });
+    };
+    const existing = labsByCode.get(code);
+    if (!existing) {
+      // New marker not found by other parsers — add it.
+      labsByCode.set(code, newLab);
+      labs.push(newLab);
+      continue;
+    }
+    // Marker already found — only override if the new result is strictly better
+    // (has a reference range when the existing one doesn't, or has a unit when
+    // the existing one doesn't).
+    const existingHasRange = existing.refLow !== undefined || existing.refHigh !== undefined;
+    const newHasRange = newLab.refHigh !== undefined;
+    if (newHasRange && !existingHasRange) {
+      const idx = labs.indexOf(existing);
+      if (idx >= 0) labs[idx] = newLab;
+      labsByCode.set(code, newLab);
+    }
   }
   return { labs, provider: provider || 'unknown', warnings: [...merged.warnings, ...regexResults.warnings] };
 }
@@ -134,21 +185,54 @@ function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
   const byCode = new Map<string, ParsedLabValue>();
   for (const lab of labs) {
     const code = mapToUcumCode(lab.code);
-    if (!code || !Number.isFinite(lab.value) || lab.value <= 0 || !lab.unit) continue;
+    if (!code || !Number.isFinite(lab.value) || lab.value <= 0) continue;
+    // Skip false-positive codes from combined-line parsing: section headers
+    // concatenated with marker names (e.g. "ОБЩИЙ АНАЛИЗ КРОВИ ГЕМОГЛОБИН")
+    // produce codes that are clearly not canonical marker identifiers.
+    if (code.includes(' ') || code.length > 30) continue;
+    // Infer unit from canonical defaults when OCR couldn't extract one.
+    // Previously, labs without a unit were silently dropped, which caused
+    // many valid markers to be lost when the OCR split units into separate
+    // columns or failed to recognize abbreviated unit forms.
+    let unit = lab.unit;
+    if (!unit) {
+      const info = UCUM_MAP[code.toUpperCase()];
+      if (info?.prefUnit) unit = info.prefUnit;
+      else {
+        // Fall back to the biomarker-regex UNIT_MAP defaults by canonical code.
+        const biomarkerUnit = INFERRED_UNITS_BY_CODE[code.toUpperCase()];
+        if (biomarkerUnit) unit = biomarkerUnit;
+      }
+    }
+    if (!unit) continue; // truly unknown marker with no known unit
     const current = byCode.get(code);
     if (!current) {
-      byCode.set(code, { ...lab, code });
+      byCode.set(code, { ...lab, code, unit });
       continue;
     }
     const currentHasRange = current.refLow !== undefined || current.refHigh !== undefined;
     const nextHasRange = lab.refLow !== undefined || lab.refHigh !== undefined;
-    if (nextHasRange && !currentHasRange) byCode.set(code, { ...lab, code });
+    if (nextHasRange && !currentHasRange) byCode.set(code, { ...lab, code, unit });
     else if (nextHasRange === currentHasRange && lab.value === current.value && !current.isAbnormal && lab.isAbnormal) {
-      byCode.set(code, { ...lab, code });
+      byCode.set(code, { ...lab, code, unit });
     }
   }
   return [...byCode.values()];
 }
+
+// Fallback unit lookup for codes that are in the biomarker dictionary but
+// not in UCUM_MAP. This keeps markers alive even when OCR loses the unit.
+const INFERRED_UNITS_BY_CODE: Record<string, string> = {
+  'TSH': 'mIU/L', 'E2': 'pmol/L', 'PRL': 'mIU/L', 'LH': 'IU/L', 'FSH': 'IU/L',
+  'IGF-1': 'ng/mL', 'PSA': 'ng/mL', 'HGB': 'g/L', 'HCT': '%', 'WBC': '10^9/L',
+  'RBC': '10^12/L', 'PLT': '10^9/L', 'FERRITIN': 'ng/mL', 'VITD': 'ng/mL',
+  'B12': 'pg/mL', 'FOL': 'ng/mL', 'INS': 'mIU/L', 'HbA1c': '%',
+  'D_DIMER': 'ng/mL', 'FIBRINOGEN': 'g/L', 'TROPONIN': 'ng/mL',
+  'HOMOCYSTEINE': 'mcmol/L', 'CORTISOL': 'nmol/L', 'AMYLASE': 'U/L',
+  'LIPASE': 'U/L', 'C_PEPTIDE': 'ng/mL', 'ACTH': 'pg/mL',
+  'ALDOSTERONE': 'pg/mL', 'PTH': 'pg/mL', 'MPV': 'fL',
+  'TPO_AB': 'IU/mL', 'TG_AB': 'IU/mL', 'APTT': 's', 'PT': 's', 'INR': '',
+};
 
 function isUsefulRawLine(raw: string | undefined): boolean {
   if (!raw) return false;
@@ -176,7 +260,16 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     source = 'pdf';
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const result = await parseLabFile(file, arrayBuffer);
+      let result;
+      try {
+        result = await parseLabFile(file, arrayBuffer);
+      } catch (pdfParseError: any) {
+        // parseLabFile can throw when pdfjs worker fails to load. Fall back to
+        // direct OCR of the rendered pages so a broken PDF text-layer pipeline
+        // does not turn a valid scanned PDF into "nothing recognized".
+        warnings.push(`PDF text-layer extraction failed: ${pdfParseError?.message || String(pdfParseError)}. Пробую OCR страниц.`);
+        result = { values: [], rawText: '', source: 'pdf' as const, warnings: [] };
+      }
       rawText = result.rawText;
       let parsedAll = parseLabTextAllWays(rawText, 'pdf-parse');
       // Scanned PDFs have no text layer. Render their pages and run the same
@@ -195,9 +288,11 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
             };
             rawText = `${rawText}\n${ocrText}`.trim();
             warnings.push('PDF обработан через OCR страниц.');
+          } else {
+            warnings.push('OCR PDF вернул пустой текст. Возможно, файл защищён или изображение неразборчиво.');
           }
         } catch (ocrError: any) {
-          warnings.push(`OCR PDF недоступен: ${ocrError?.message || 'неизвестная ошибка'}`);
+          warnings.push(`OCR PDF недоступен: ${ocrError?.message || 'неизвестная ошибка'}. Проверьте подключение к интернету или попробуйте скриншот.`);
         }
       }
       labs = finalizeLabCandidates(parsedAll.labs);
@@ -245,13 +340,13 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
         warnings.push('Не удалось распознать текст на изображении. Попробуйте более чёткое фото.');
       }
     } catch (err: any) {
-      warnings.push('Ошибка OCR: ' + (err?.message || String(err)));
+      warnings.push('Ошибка OCR: ' + (err?.message || String(err)) + '. Проверьте, что файл является корректным изображением.');
       // Fallback silently
     }
   } else if (isText) {
     source = 'text';
     try {
-      rawText = await file.text();
+      rawText = await readFileAsText(file);
        const parsedAll = parseLabTextAllWays(rawText, 'text');
        labs = finalizeLabCandidates(parsedAll.labs);
        const providerName = parsedAll.provider;

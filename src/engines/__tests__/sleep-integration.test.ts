@@ -112,12 +112,12 @@ describe('sleep-integration.engine', () => {
 
     it('should detect negative impact of stimulants on sleep', () => {
       const sleepDiary: SleepEntry[] = [
-        createEntry('2024-01-01', { quality: 5 }),
-        createEntry('2024-01-02', { quality: 4 }),
-        createEntry('2024-01-03', { quality: 5 }),
-        createEntry('2024-01-04', { quality: 8 }),
-        createEntry('2024-01-05', { quality: 7 }),
-        createEntry('2024-01-06', { quality: 8 }),
+        createEntry('2024-01-01', { quality: 3 }),
+        createEntry('2024-01-02', { quality: 2 }),
+        createEntry('2024-01-03', { quality: 3 }),
+        createEntry('2024-01-04', { quality: 4 }),
+        createEntry('2024-01-05', { quality: 5 }),
+        createEntry('2024-01-06', { quality: 4 }),
       ];
 
       const intake = [
@@ -231,17 +231,17 @@ describe('sleep-integration.engine', () => {
 
     it('should generate report with basic statistics', () => {
       const diary: SleepEntry[] = [
-        createEntry('2024-01-01', { hours: 8, quality: 8 }),
-        createEntry('2024-01-02', { hours: 7, quality: 7 }),
-        createEntry('2024-01-03', { hours: 9, quality: 8 }),
+        createEntry('2024-01-01', { hours: 8, quality: 5 }),
+        createEntry('2024-01-02', { hours: 7, quality: 4 }),
+        createEntry('2024-01-03', { hours: 9, quality: 5 }),
       ];
 
-      const goals = { targetHours: 8, targetQuality: 7 };
+      const goals = { targetHours: 8, targetQuality: 4 };
       const report = generateSleepReport(diary, goals);
 
       expect(report).toContain('ОТЧЁТ О КАЧЕСТВЕ СНА');
       expect(report).toContain('Часы сна: 8.0 ч');
-      expect(report).toContain('Качество: 7.7/10');
+      expect(report).toContain('Качество: 4.7/5');
     });
 
     it('should include recommendations in report', () => {

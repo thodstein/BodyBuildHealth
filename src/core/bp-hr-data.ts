@@ -16,10 +16,13 @@ export interface BPEntry {
 }
 
 export const BP_SYMPTOMS = [
-  'Головная боль', 'Головокружение', 'Шум в ушах', 'Боль в груди',
-  'Одышка', 'Тошнота', 'Мелькание мушек', 'Слабость', 'Отёки',
-  'Потливость', 'Учащённое сердцебиение', 'Нарушение зрения',
+  'Головная боль', 'Головокружение', 'Шум в ушах',
+  'Боль в груди', 'Одышка', 'Тошнота', 'Мелькание мушек',
+  'Слабость', 'Отёки', 'Потливость', 'Учащённое сердцебиение',
+  'Нарушение зрения', 'Боль в спине', 'Чувство тревоги',
 ] as const;
+
+export type BPSymptom = typeof BP_SYMPTOMS[number];
 
 export function generateEntryId(): string {
   return `bp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -173,7 +176,7 @@ export function getBpEntries(): BPEntry[] {
   } catch { return []; }
 }
 
-export function saveBpEntry(entry: BPEntry) {
+export function saveBpEntry(entry: BPEntry): void {
   const entries = getBpEntries();
   const normalized = normalizeBpEntry(entry);
   entries.push(normalized);

@@ -7,6 +7,10 @@ node_modules
 dist
 .vite
 
+# Generated OCR assets (synced from node_modules via scripts/sync-ocr-assets.mjs)
+public/tesseract
+public/pdfjs
+
 # Environment
 .env
 .env.local

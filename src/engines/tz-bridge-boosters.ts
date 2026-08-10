@@ -78,7 +78,7 @@ export function buildGapFillSuggestions(gaps: GapFillMech[] = []): GapFillSugges
   return Array.from(byStack.values());
 }
 
-export type BoosterKey = 'neuro' | 'joints' | 'stack';
+export type BoosterKey = 'neuro' | 'joints' | 'hemato' | 'stack';
 
 export interface BoosterSubstance {
   substanceId: string;
@@ -233,6 +233,59 @@ export const JOINTS_BOOST: BoosterDef = {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
+//  3. HEMATO BOOSTER — эритроцитоз на курсе ААС (HIF-1α → Hct↑ → тромбоз)
+//  Триггер: AAS в стеке (болденон/тест/оксиметолон/нандролон/трен), Hct>48%, HGB>175
+//
+//  Эритроцитоз → гипервязкость → тромбоз. Это ОДИН каскад риска.
+//  Снижение идёт по 3 направлениям:
+//    1. ↓RBC масса: эритроцитаферез (первая линия при Hct>52%), флеботомия (fallback)
+//    2. ↑Плазма (разведение): гидратация 40+ мл/кг, телмисартан (↑PV + ↓EPO)
+//    3. ↓Тромбоз-риск (основная опасность эритроцитоза):
+//       фибринолитики (натто/сера/бромелайн), антиагреганты (аспирин, омега, чеснок),
+//       реология (пентоксифиллин, цитруллин)
+// ════════════════════════════════════════════════════════════════════════════
+export const HEMATO_BOOST: BoosterDef = {
+  key: 'hemato',
+  label: '🩸 Гемато-бустер',
+  description: 'Эритроцитоз на курсе ААС: ↓Hct + ↓тромбоз-риск + ↑плазма.',
+  trigger: 'AAS в стеке (болденон/тест/оксиметолон/нандролон/трен), Hct>48%, HGB>175.',
+  // ── LV1 (профилактика, Hct<48%) — ↑плазма + ↓тромбоз ──
+  // Гидратация 40-45 мл/кг → ↑PV на 5-10% → Hct -3-5% (Fellmann 1992)
+  // Кардио 30-45 мин 5×/нед → PV+5-20% за 4-6 нед (Convertino 1980)
+  // Электролиты Na/K/Mg — удержание воды в сосудистом русле (без них вода уходит в ткани)
+  // Натто+сера+бромелайн = 3 pathway фибринолиза (↓тромбоз — конец каскада эритроцитоза)
+  // Телмисартан — ARB: ↑PV + ↓EPO (Vlahakos 2003)
+  subs: [
+    { substanceId: 'hydration',        reason: '★ 40-45 мл/кг/день → ↑PV на 5-10% → Hct -3-5% (Fellmann 1992). Без электролитов вода уходит в ткани', category: 'lifestyle' },
+    { substanceId: 'cardio_aerobic',   reason: '★ 30-45 мин 5×/нед → PV+5-20% за 4-6 нед (Convertino 1980). «Спортивная псевдоанемия»', category: 'lifestyle' },
+    { substanceId: 'electrolyte_balance', reason: '★ Na 3-5 г + K 3.5-4.7 г + Mg 400 мг — удержание воды в сосудистом русле. Без них гидратация неэффективна', category: 'mineral' },
+    { substanceId: 'nattokinase',      reason: '★ Фибринолитик: плазминоген→плазмин, ↓PAI-1. ↓тромбоз-риск (конец каскада эритроцитоза)', category: 'enzyme' },
+    { substanceId: 'serrapeptase',     reason: '★ ↓α2-макроглобулин, ↓фибрин, ↓вязкости на фоне эритроцитоза', category: 'enzyme' },
+    { substanceId: 'bromelain',        reason: '★ ↓PAI-1, ↓COX-2/TXA2 (антиагрегант). ↓тромбоз при ↑Hct', category: 'enzyme' },
+    { substanceId: 'telmisartan',      reason: '★ ARB: ↑PV + ↓EPO (Vlahakos 2003). Двойной эффект — ↓Hct через разведение + ↓стимул эритропоэза', category: 'pharma' },
+  ],
+  // ── LV2 (ранняя коррекция, Hct 48-52%) — +антиагрегант + реология + ↑плазма ──
+  subsLv2: [
+    { substanceId: 'omega3',        reason: '↓агрегации (cv4), ↓вязкости (hem1), ↓фибриногена. Кардио+гемато защита', category: 'omega' },
+    { substanceId: 'garlic',        reason: 'Аллицин — ↓агрегации, ↓фибриногена (Bordia 1998)', category: 'cardioprotector' },
+    { substanceId: 'citrulline',    reason: 'NO-донор → ↑деформируемость RBC, ↓вязкости, ↑микроциркуляция', category: 'amino' },
+    { substanceId: 'nac',           reason: '↑GSH в эритроцитах → ↑текучесть мембраны RBC', category: 'antioxidant' },
+    { substanceId: 'aspirin',       reason: 'COX-1 ингибитор → ↓TXA2. Антиагрегант при эритроцитозе. Только ≥2 фактора тромбориска + ИПП', category: 'pharma' },
+  ],
+  // ── LV3 (терапия, Hct 52-54%) — +усиленный фибринолиз + рецептурные ──
+  subsLv3: [
+    { substanceId: 'lumbrokinase',  reason: 'Сильнейший прямой активатор плазминогена, ↓фибриноген. Усиленный фибринолиз', category: 'enzyme' },
+    { substanceId: 'pentoxifylline',reason: 'Реологический: ↓вязкости, ↑деформируемость RBC, ↓TNF-α. При Hct 48-52%', category: 'pharma' },
+    { substanceId: 'dipyridamole',  reason: 'Антиагрегант (PDE-ингиб → ↑cAMP), вазодилататор, ↑микроциркуляция', category: 'pharma' },
+    { substanceId: 'pycnogenol',    reason: 'Эндотелий (NO), антиагрегант, ↓АД — защита сосудов при эритроцитозе', category: 'antioxidant' },
+    { substanceId: 'ginkgo',       reason: 'PAF-антагонист (антиагрегант), микроциркуляция мозга (защита от TIA)', category: 'nootropic' },
+  ],
+  mechs: ['cv4', 'hem1'],
+  organs: ['hematologic', 'cardio'],
+  rationale: 'Эритроцитоз на курсе ААС (HIF-1α → Hct↑ → гипервязкость → тромбоз) — ОДИН каскад риска. LV1: ↑плазма (гидратация 40-45 мл/кг + электролиты Na/K/Mg для удержания воды в сосудах + кардио 30-45 мин 5×/нед → PV+5-20%) + ↓тромбоз (натто+сера+бромелайн = 3 pathway фибринолиза) + телмисартан (↑PV+↓EPO). LV2: +омега/чеснок/цитруллин/NAC/аспирин. LV3: +лумброкиназа/пентоксифиллин/дипиридамол/пикногенол/гинкго. Hct>52% → эритроцитаферез (первая линия), флеботомия fallback. 2 меха ТЗ: эритроцитоз (hem1) + протромботический (cv4).',
+};
+
+// ════════════════════════════════════════════════════════════════════════════
 //  3. STACK BOOSTER — добавить весь стек как один блок
 //  Источник: STACK_DB (25 готовых стеков)
 // ════════════════════════════════════════════════════════════════════════════
@@ -349,15 +402,24 @@ export interface BoosterTriggerCtx {
   jointPainScore?: number;        // 0-10
   acuteInjuryWeeks?: number;      // 0-4 нед
   crpLevel?: number;               // мг/л
+  // hemato
+  hematocrit?: number;             // %
+  hemoglobin?: number;             // г/л
+  plt?: number;                    // тромбоциты 10⁹/L
+  fibrinogen?: number;             // г/л
+  dDimer?: number;                 // мг/L
   // stack — активированные стеки (id из STACK_DB)
   triggeredStackIds?: string[];
   // ── Tier-based triggering (Фаза 1: PED-risk + symptom + force) ──
   symptomNeuro?: boolean;          // insomnia/anxiety/mood_swings из pill-кнопок
   symptomJoints?: boolean;         // joint_pain из pill-кнопки
+  symptomHemato?: boolean;         // гипервязкость: головная боль, плетора, тиннитус
   forceNeuro?: boolean;            // принудительно на level='max'
   forceJoints?: boolean;           // принудительно на level='max'
+  forceHemato?: boolean;           // принудительно на level='max'
   pedNeuroTier?: 0 | 1 | 2 | 3;   // tier из assessPedRisk (приоритет над level)
   pedJointsTier?: 0 | 1 | 2 | 3;  // tier из assessPedRisk
+  pedHematoTier?: 0 | 1 | 2 | 3;  // tier из assessPedRisk
   pedRiskReasons?: string[];       // причины для UI-баннера
 }
 
@@ -406,6 +468,22 @@ export function shouldActivateJoints(ctx: BoosterTriggerCtx): boolean {
   return false;
 }
 
+export function shouldActivateHemato(ctx: BoosterTriggerCtx): boolean {
+  // PED-risk tier (приоритет — AAS в стеке → проактивная защита до повышения Hct)
+  if ((ctx.pedHematoTier ?? 0) > 0) return true;
+  // Принудительно на «Максимум»
+  if (ctx.forceHemato) return true;
+  // Симптом-кнопка (гипервязкость: головная боль, плетора, тиннитус)
+  if (ctx.symptomHemato) return true;
+  // Лабораторные показатели
+  if (ctx.hematocrit != null && ctx.hematocrit > 48) return true;
+  if (ctx.hemoglobin != null && ctx.hemoglobin > 175) return true;
+  if (ctx.plt != null && ctx.plt > 400) return true;
+  if (ctx.fibrinogen != null && ctx.fibrinogen > 4) return true;
+  if (ctx.dDimer != null && ctx.dDimer > 0.5) return true;
+  return false;
+}
+
 export function getTriggeredStacks(ctx: BoosterTriggerCtx): string[] {
   return ctx.triggeredStackIds || [];
 }
@@ -439,6 +517,30 @@ function computeJointsTier(ctx: BoosterTriggerCtx): 0 | 1 | 2 | 3 {
     (ctx.crpLevel != null && ctx.crpLevel > 3)
   ) ? 2 : 0;
   const forceTier = ctx.forceJoints ? 1 : 0;
+  return Math.max(pedTier, symptomTier, stateTier, forceTier) as 0 | 1 | 2 | 3;
+}
+
+function computeHematoTier(ctx: BoosterTriggerCtx): 0 | 1 | 2 | 3 {
+  const pedTier = ctx.pedHematoTier ?? 0;
+  const symptomTier = ctx.symptomHemato ? 2 : 0;
+  // state-estimate trigger — по лабам (Hct/HGB/PLT/фибриноген/D-димер)
+  let stateTier: 0 | 1 | 2 | 3 = 0;
+  if (ctx.hematocrit != null) {
+    if (ctx.hematocrit >= 57) stateTier = 3;       // ургентный
+    else if (ctx.hematocrit >= 52) stateTier = 3;  // терапия
+    else if (ctx.hematocrit >= 48) stateTier = 2;  // ранняя коррекция
+  }
+  if (ctx.hemoglobin != null) {
+    if (ctx.hemoglobin >= 185) stateTier = Math.max(stateTier, 3) as 0 | 1 | 2 | 3;
+    else if (ctx.hemoglobin >= 175) stateTier = Math.max(stateTier, 2) as 0 | 1 | 2 | 3;
+  }
+  if (ctx.plt != null && ctx.plt > 450) stateTier = Math.max(stateTier, 2) as 0 | 1 | 2 | 3;
+  if (ctx.fibrinogen != null && ctx.fibrinogen > 4) stateTier = Math.max(stateTier, 2) as 0 | 1 | 2 | 3;
+  if (ctx.dDimer != null) {
+    if (ctx.dDimer > 2.5) stateTier = Math.max(stateTier, 3) as 0 | 1 | 2 | 3;
+    else if (ctx.dDimer > 0.5) stateTier = Math.max(stateTier, 2) as 0 | 1 | 2 | 3;
+  }
+  const forceTier = ctx.forceHemato ? 1 : 0;
   return Math.max(pedTier, symptomTier, stateTier, forceTier) as 0 | 1 | 2 | 3;
 }
 
@@ -514,6 +616,22 @@ export function applyBoosters(
     }
   }
 
+  // HEMATO
+  if (shouldActivateHemato(ctx)) {
+    const tier = computeHematoTier(ctx);
+    const subs = selectBoosterSubsByTier(HEMATO_BOOST, tier, existing);
+    if (subs.length) {
+      result.push({
+        key: 'hemato', label: HEMATO_BOOST.label, subs,
+        mechs: HEMATO_BOOST.mechs, organs: HEMATO_BOOST.organs,
+        rationale: HEMATO_BOOST.rationale, triggered: true,
+        tier,
+        reasons: ctx.pedRiskReasons,
+      });
+      subs.forEach(s => existing.add(s.substanceId.toLowerCase()));
+    }
+  }
+
   // STACK (один или несколько готовых стеков)
   for (const stackId of getTriggeredStacks(ctx)) {
     const booster = getStackBooster(stackId);
@@ -554,7 +672,7 @@ export function describeBooster(b: BoosterDef): string {
 
 // Все определения бустеров
 export function getAllBoosters(): BoosterDef[] {
-  return [NEURO_BOOST, JOINTS_BOOST];
+  return [NEURO_BOOST, JOINTS_BOOST, HEMATO_BOOST];
 }
 
 // PEER-EFFECT: индикация, если бустер доступен (для пресета manual)
@@ -707,6 +825,23 @@ export function getJointsBoosterSubstanceIds(tier: 0 | 1 | 2 | 3): string[] {
   }
   if (tier >= 3 && JOINTS_BOOST.subsLv3) {
     ids.push(...JOINTS_BOOST.subsLv3.map(s => s.substanceId));
+  }
+  return Array.from(new Set(ids));
+}
+
+/**
+ * Возвращает список ID веществ HEMATO_BOOST для данного tier.
+ * tier 1 → LV1 (натто+сера+бромелайн), tier 2 → +LV2 (+омега/чеснок/цитруллин/NAC/аспирин),
+ * tier 3 → +LV3 (+лумброкиназа/пентоксифиллин/дипиридамол/пикногенол/гинкго)
+ */
+export function getHematoBoosterSubstanceIds(tier: 0 | 1 | 2 | 3): string[] {
+  if (tier === 0) return [];
+  const ids: string[] = HEMATO_BOOST.subs.map(s => s.substanceId);
+  if (tier >= 2 && HEMATO_BOOST.subsLv2) {
+    ids.push(...HEMATO_BOOST.subsLv2.map(s => s.substanceId));
+  }
+  if (tier >= 3 && HEMATO_BOOST.subsLv3) {
+    ids.push(...HEMATO_BOOST.subsLv3.map(s => s.substanceId));
   }
   return Array.from(new Set(ids));
 }

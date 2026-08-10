@@ -227,7 +227,7 @@ export function generateSleepReport(
     '',
     '--- СРЕДНИЕ ПОКАЗАТЕЛИ ---',
     `Часы сна: ${avgHours.toFixed(1)} ч (цель: ${goals.targetHours} ч)`,
-    `Качество: ${avgQuality.toFixed(1)}/10 (цель: ${goals.targetQuality}/10)`,
+    `Качество: ${avgQuality.toFixed(1)}/5 (цель: ${goals.targetQuality}/5)`,
     avgLatency > 0 ? `Латентность: ${avgLatency.toFixed(0)} мин` : null,
     '',
     '--- ОЦЕНКА ---',

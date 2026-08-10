@@ -249,21 +249,27 @@ const ESTER_TO_GENERIC: Record<string, string> = {
   tren_base: 'trenbolone', parabolan: 'trenbolone',
   // Nandrolone esters
   npp: 'nandrolone', deca: 'nandrolone', nandrolone_decanoate: 'nandrolone',
+  nand_dec: 'nandrolone', nand_pp: 'nandrolone', nand_pheny: 'nandrolone',
+  trest_acet: 'nandrolone', trest_enan: 'nandrolone',
   // Boldenone esters
   bold_undec: 'boldenone', boldenone_undecylenate: 'boldenone', eq: 'boldenone', equipoise: 'boldenone',
+  dhb: 'boldenone', dihydroboldenone: 'boldenone', bolde_undecy: 'boldenone', dhb_cyp: 'boldenone',
   // Drostanolone (Masteron) esters
   drostanolone_prop: 'masteron', drostanolone_enan: 'masteron',
   masteron_propionate: 'masteron', masteron_enanthate: 'masteron',
   // Primobolan / Methenolone
-  prim_enan: 'primobolan', methenolone: 'primobolan',
+  prim_enan: 'primobolan', methenolone: 'primobolan', prim_oral: 'primobolan', metenolon_oral: 'primobolan',
   // Oral 17-aa
   methand: 'dianabol', methandrostenolone: 'dianabol', dbol: 'dianabol',
-  oxan: 'oxandrolone', anavar: 'oxandrolone',
-  stan: 'stanozolol', stanozolol_oral: 'stanozolol', winstrol: 'stanozolol',
-  anadrol: 'anadrol', oxymetholone: 'anadrol',
+  metandienone: 'dianabol', methandriol: 'dianabol',
+  oxan: 'oxandrolone', anavar: 'oxandrolone', anavar_dht: 'oxandrolone',
+  stan: 'stanozolol', stanozolol_oral: 'stanozolol', winstrol: 'stanozolol', stanoz: 'stanozolol',
+  anadrol: 'anadrol', oxymetholone: 'anadrol', oximetholone: 'anadrol',
   trena: 'dianabol', turinabol: 'dianabol',
   halo: 'halotestin', fluoxymesterone: 'halotestin', halotestin_oral: 'halotestin',
   superdrol: 'dianabol', methyltrienolone: 'methyltrienolone', metribolone: 'methyltrienolone',
+  dimethazine: 'dianabol', methyltestosterone: 'testosterone', dimethandrosten: 'dianabol',
+  mentbolone: 'nandrolone',
   // DHT derivatives
   mesterolone: 'proviron',
   // Peptides/support
@@ -282,6 +288,33 @@ const ESTER_TO_GENERIC: Record<string, string> = {
   igf1_lr3: 'igf1', igf1_des: 'igf1',
   // SARMs — map to closest known drug
   ostarine: 'oxandrolone', lgd: 'dianabol', rad140: 'dianabol', s23: 'dianabol',
+  ligandrol: 'dianabol', andarine: 'oxandrolone', yk11: 'dianabol',
+  // PCT / Ancillaries
+  clomi: 'clomiphene', enclomiphene: 'clomiphene', tamox: 'tamoxifen',
+  anastro: 'anastrozole', letrozole: 'letrozole', hcg: 'hcg',
+  caberg: 'cabergoline', pramipex: 'cabergoline', cabergoline: 'cabergoline',
+  // Insulin
+  humalog: 'insulin', humulin_r: 'insulin', lantus: 'insulin',
+  // GLP-1
+  liraglutide: 'glp1', semaglutide: 'glp1', dulaglutide: 'glp1', exenatide: 'glp1', lixisenatide: 'glp1',
+  // Thyroid
+  liothyronine: 'thyroid', levothyroxine: 'thyroid', thyroid_extract: 'thyroid',
+  // Fat burners / CNS
+  dnp: 'dnp', albuterol: 'clenbuterol', caffeine: 'caffeine', ephedrine: 'ephedrine', pseudoephedrine: 'ephedrine',
+  // Diuretics
+  furosemide: 'diuretic', spironolactone: 'diuretic', hydrochlorothiazide: 'diuretic',
+  indapamide: 'diuretic', torasemide: 'diuretic',
+  // Support pharma
+  telmi: 'telmisartan', nebivolol: 'beta_blocker', metformin: 'metformin',
+  isotretinoin: 'isotretinoin', lisinopril: 'ace_inhibitor', amlodipine: 'ccb',
+  carvedilol: 'beta_blocker', bisoprolol: 'beta_blocker', statin: 'statin',
+  ezetimibe: 'ezetimibe', fibrate: 'fibrate', allopurinol: 'allopurinol',
+  pde5_inhib: 'pde5', prilosec: 'ppi',
+  // Sleeping / Anxiety
+  melatonin: 'melatonin', zolpidem: 'z_drug', trazodone: 'antidepressant',
+  mirtazapine: 'antidepressant', pregabalin: 'gabapentinoid',
+  // CNS Stimulants
+  methylphenidate: 'stimulant', modafinil: 'stimulant', atomoxetine: 'stimulant', adderall: 'stimulant',
 };
 
 /** Regex patterns for fuzzy matching: startsWith or includes */
@@ -289,7 +322,7 @@ const GENERIC_PATTERNS: [RegExp, string][] = [
   [/^test/i, 'testosterone'],
   [/^tren/i, 'trenbolone'],
   [/^nandrolone|^npp|^deca/i, 'nandrolone'],
-  [/bold|eq/i, 'boldenone'],
+  [/bold|eq|dhb|dihydrobold/i, 'boldenone'],
   [/masteron|drostanolone/i, 'masteron'],
   [/prim|methenolone/i, 'primobolan'],
   [/proviron|mesterolone/i, 'proviron'],

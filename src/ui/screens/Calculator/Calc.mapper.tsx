@@ -8,8 +8,8 @@ import type { SupportLevel } from '../../../engines/tz-bridge-mechanism';
 import type { PhaseContext, PhaseKey } from '../../../engines/tz-bridge-phase';
 import type { BoosterTriggerCtx } from '../../../engines/tz-bridge-boosters';
 import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
-import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
-import { assessPedRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
+import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
+import { assessPedRisk, computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { CalcSafetyLayer } from './CalcSafetyLayer';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
@@ -247,6 +247,69 @@ const JOINT_DOMAINS: DomainCfg[] = [
     substances: new Set(['bpc','tb500','collagen']) },
 ];
 
+// ── HEMATO CATALOG (🩸 Кровь — фибринолиз/антиагрегант/реология) ─────────────
+const HEMATO_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[] = [
+  // ── LV1: ↑плазма + электролиты + фибринолитики + телмисартан ──
+  { id: 'hydration', nameRu: '💧 Гидратация', dose: '40-45 мл/кг/день', desc: '★ ↑PV на 5-10% → Hct -3-5% (Fellmann 1992). Без электролитов вода уходит в ткани' },
+  { id: 'cardio_aerobic', nameRu: '🏃 Кардио (аэроб)', dose: '30-45 мин 5×/нед', desc: '★ PV+5-20% за 4-6 нед (Convertino 1980). «Спортивная псевдоанемия»' },
+  { id: 'electrolyte_balance', nameRu: '🧂 Электролиты (Na/K/Mg)', dose: 'Na 3-5г + K 3.5-4.7г + Mg 400мг', desc: '★ Удержание воды в сосудистом русле. Без них гидратация неэффективна' },
+  { id: 'nattokinase', nameRu: 'Наттокиназа', dose: '100-200 мг натощак', desc: '★ Фибринолитик: ↓тромбоз-риск эритроцитоза (плазминоген→плазмин, ↓PAI-1)' },
+  { id: 'serrapeptase', nameRu: 'Серрапептаза', dose: '20-30 мг ×2-3 натощак', desc: '★ ↓α2-макроглобулин, ↓фибрин, ↓вязкости на фоне эритроцитоза' },
+  { id: 'bromelain', nameRu: 'Бромелайн', dose: '500-1000 мг натощак', desc: '★ ↓PAI-1, ↓COX-2/TXA2 (антиагрегант). ↓тромбоз при ↑Hct' },
+  { id: 'telmisartan', nameRu: 'Телмисартан', dose: '40-80 мг/день', desc: '★ ARB: ↑PV + ↓EPO (Vlahakos 2003). Двойной эффект' },
+  // ── LV2: реология + антиагрегант + антиоксидант RBC ──
+  { id: 'omega3', nameRu: 'Омега-3 (EPA+DHA)', dose: '2-4 г с едой', desc: '↓агрегации, ↓вязкости, ↓фибриногена, ↑NO' },
+  { id: 'garlic', nameRu: 'Чеснок (аллицин)', dose: '600-1200 мг 2×/д', desc: 'Аллицин — ↓агрегации, ↓фибриногена (Bordia 1998)' },
+  { id: 'citrulline', nameRu: 'Л-Цитруллин', dose: '6-8 г/д', desc: 'NO-донор → ↑деформируемость RBC, ↓вязкости' },
+  { id: 'nac', nameRu: 'NAC (АЦЦ)', dose: '600-1200 мг 2×/д', desc: '↑GSH в эритроцитах → ↑текучесть мембраны' },
+  { id: 'aspirin', nameRu: 'Аспирин кардио', dose: '100 мг вечером', desc: 'COX-1 ингибитор → ↓TXA2. Антиагрегант при эритроцитозе. ≥2 фактора тромбориска + ИПП' },
+  // ── LV3: усиленный фибринолиз + рецептурные ──
+  { id: 'lumbrokinase', nameRu: 'Лумброкиназа', dose: '40-80 мг натощак', desc: 'Сильнейший прямой активатор плазминогена' },
+  { id: 'pentoxifylline', nameRu: 'Пентоксифиллин 💊', dose: '400 мг 2×/д с едой', desc: 'Реологический: ↓вязкости, ↑деформируемость RBC (по назначению)' },
+  { id: 'dipyridamole', nameRu: 'Дипиридамол 💊', dose: '75 мг 3×/д', desc: 'Антиагрегант (PDE-ингиб), вазодилататор (по назначению)' },
+  { id: 'pycnogenol', nameRu: 'Пикногенол', dose: '100 мг 2×/д', desc: 'Эндотелий (NO), антиагрегант, ↓АД' },
+  { id: 'ginkgo', nameRu: 'Гинкго Билоба', dose: '120 мг 2×/д', desc: 'PAF-антагонист (антиагрегант), микроциркуляция мозга' },
+  // ── LV4: антикоагулянты (только по назначению при тромбозе) ──
+  { id: 'enoxaparin', nameRu: 'Эноксапарин (НМГ) 💊', dose: '40 мг п/к 1×/д', desc: 'Антикоагулянт при D-димер>500. По назначению врача' },
+  { id: 'warfarin', nameRu: 'Варфарин 💊', dose: '2.5-5 мг под контролем МНО', desc: 'Антикоагулянт (вит.K-антагонист) при тромбозе. Контроль МНО 2-3' },
+  { id: 'sulodexide', nameRu: 'Сулодексид 💊', dose: '250 МЕ 2×/д', desc: 'Гепариноид: ↑фибринолиз + эндотелий (по назначению)' },
+  { id: 'vitamin_e', nameRu: 'Витамин E', dose: '200-400 МЕ', desc: 'Антиагрегант (выс.доза, Steiner 1995). Осторожно >400 МЕ' },
+];
+const HEMATO_PRESETS: { id: string; name: string; desc: string; subs: string[] }[] = [
+  { id: 'fibrinolytic_trio', name: 'База: плазма+фибринолиз (LV1)', desc: 'Гидратация+кардио+электролиты+натто+сера+бромелайн+телмисартан. ↓Hct через ↑плазма + ↓тромбоз', subs: ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain','telmisartan'] },
+  { id: 'rheology', name: 'Реология + антиагрегант (LV2)', desc: 'База + омега + чеснок + цитруллин + NAC + аспирин. При Hct 48-52%', subs: ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain','telmisartan','omega3','garlic','citrulline','nac','aspirin'] },
+  { id: 'therapy', name: 'Терапия (LV3)', desc: '+лумброкиназа+пентоксифиллин+дипиридамол+пикногенол+гинкго. При Hct 52-54%', subs: ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain','telmisartan','omega3','garlic','citrulline','nac','aspirin','lumbrokinase','pentoxifylline','dipyridamole','pycnogenol','ginkgo'] },
+  { id: 'urgent', name: 'Ургент (LV4, по назначению)', desc: 'Антикоагулянты при тромбозе. Hct>54% — эритроцитаферез + STOP AAS', subs: ['enoxaparin','warfarin','sulodexide'] },
+];
+const HEMATO_DOMAINS: DomainCfg[] = [
+  { id: 'fibrinolysis', label: 'Фибринолиз', icon: '🩸', color: '#14b8a6',
+    symptoms: [
+      { code: 'fibrinogen_up', label: 'Фибриноген >4 г/л' },
+      { code: 'ddimer_up', label: 'D-димер >0.5 мг/L' },
+    ],
+    substances: new Set(['nattokinase','serrapeptase','bromelain','lumbrokinase']) },
+  { id: 'antiplatelet', label: 'Антиагрегант', icon: '🚫', color: '#f59e0b',
+    symptoms: [
+      { code: 'plt_up', label: 'Тромбоциты >400×10⁹/L' },
+    ],
+    substances: new Set(['aspirin','garlic','ginkgo','pycnogenol','dipyridamole','omega3']) },
+  { id: 'rheology', label: 'Реология / вязкость', icon: '💧', color: '#06b6d4',
+    symptoms: [
+      { code: 'hct_up', label: 'Гематокрит >48%' },
+      { code: 'hct_high', label: 'Гематокрит >52%' },
+      { code: 'hgb_up', label: 'Гемоглобин >175 г/л' },
+    ],
+    substances: new Set(['pentoxifylline','citrulline','omega3','nac','sulodexide']) },
+  { id: 'hyperviscosity', label: 'Симптомы гипервязкости', icon: '⚠️', color: '#ef4444',
+    symptoms: [
+      { code: 'hyperviscosity_symptom', label: 'Головная боль / плетора / тиннитус' },
+    ],
+    substances: new Set(['nattokinase','serrapeptase','omega3','garlic']) },
+  { id: 'anticoagulation', label: 'Антикоагуляция (только врач)', icon: '💊', color: '#7c3aed',
+    symptoms: [],
+    substances: new Set(['enoxaparin','warfarin','sulodexide']) },
+];
+
 function buildNeuroSymptomsFromState(state: any): Set<string> {
   const s = new Set<string>();
   const n = state?.neuro || {};
@@ -286,6 +349,25 @@ function buildJointSymptomsFromState(state: any): Set<string> {
   if (symptoms.includes('joint_pain')) s.add('load_pain');
   const crp = labs['CRP'] || labs['HSCRP'];
   if (crp != null && crp > 3) s.add('crp_up');
+  return s;
+}
+function buildHematoSymptomsFromState(state: any): Set<string> {
+  const s = new Set<string>();
+  const symptoms = (state?.symptoms as string[]) || [];
+  const labs = labSliceToValues(state?.labs?.fullPanel);
+  const hct = labs['HEMATOCRIT'] || labs['HCT'];
+  const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
+  const plt = labs['PLT'];
+  const fib = labs['FIBRINOGEN'];
+  const dd = labs['D_DIMER'];
+  if (hct != null && hct > 48) s.add('hct_up');
+  if (hct != null && hct > 52) s.add('hct_high');
+  if (hgb != null && hgb > 175) s.add('hgb_up');
+  if (plt != null && plt > 400) s.add('plt_up');
+  if (fib != null && fib > 4) s.add('fibrinogen_up');
+  if (dd != null && dd > 0.5) s.add('ddimer_up');
+  // Симптомы гипервязкости
+  if (symptoms.some(sym => ['hyperviscosity','headache','plethora','tinnitus'].includes(sym))) s.add('hyperviscosity_symptom');
   return s;
 }
 
@@ -487,14 +569,23 @@ export function buildMapperCtx(
     irritability: state.neuro.aggressionScore > 6,
     jointPainScore: state.oda.jointPain === 'severe' ? 8 : state.oda.jointPain === 'moderate' ? 5 : state.oda.jointPain === 'mild' ? 3 : 0,
     crpLevel: labs['CRP'] || labs['HSCRP'],
+    // hemato labs (для computeHematoTier)
+    hematocrit: labs['HEMATOCRIT'] || labs['HCT'],
+    hemoglobin: labs['HEMOGLOBIN'] || labs['HGB'],
+    plt: labs['PLT'],
+    fibrinogen: labs['FIBRINOGEN'],
+    dDimer: labs['D_DIMER'],
     triggeredStackIds: stackTriggers || [],
     // Фаза 1: symptom-кнопки + force на max + PED-risk tiers
     symptomJoints: symptomsList.includes('joint_pain'),
     symptomNeuro: symptomsList.some(s => ['insomnia','anxiety','mood_swings'].includes(s)),
+    symptomHemato: symptomsList.some(s => ['hyperviscosity','headache','plethora','tinnitus'].includes(s)) || (labs['HEMATOCRIT'] != null && labs['HEMATOCRIT'] > 50),
     forceNeuro: level === 'max',
     forceJoints: level === 'max',
+    forceHemato: level === 'max',
     pedNeuroTier: pedRisk.neuroBoosterTier,
     pedJointsTier: pedRisk.jointsBoosterTier,
+    pedHematoTier: pedRisk.hematoBoosterTier,
     pedRiskReasons: pedRisk.triggeredBy,
   };
   return {
@@ -661,6 +752,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [neuroConfirm, setNeuroConfirm] = useState<boolean>(false);
   const [neuroSymptoms, setNeuroSymptoms] = useState<Set<string>>(new Set());
   const [jointSymptoms, setJointSymptoms] = useState<Set<string>>(new Set());
+  // ── Hemato (🩸 Кровь) ──
+  const [hematoPreset, setHematoPreset] = useState<string | null>(null);
+  const [hematoSelected, setHematoSelected] = useState<Set<string>>(new Set());
+  const [hematoConfirm, setHematoConfirm] = useState<boolean>(false);
+  const [hematoSymptoms, setHematoSymptoms] = useState<Set<string>>(new Set());
   const [applyFlash, setApplyFlash] = useState(false);
   const [showContraindications, setShowContraindications] = useState(false);
   const [showMonitoring, setShowMonitoring] = useState(false);
@@ -706,6 +802,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     return next;
   }, [rec, removedSubs, addedSubs]);
 
+  // ── RESIDUAL RISK — пересчёт риска с учётом выбранных веществ ──
+  // Gross risk (из PED доз) → Net risk (после митигации). Показывает gross→net в баннере.
+  const finalRecWithResidual = useMemo<SupportRecommendation | null>(() => {
+    if (!finalRec || !finalRec.pedRisk) return finalRec;
+    const planSubs = finalRec.subs.map(s => s.substanceId);
+    const netRisk = computeResidualRisk(finalRec.pedRisk, planSubs);
+    return { ...finalRec, pedRisk: netRisk };
+  }, [finalRec]);
+
   // Автоподбор стеков под недокрытые механизмы ТЗ (режим «Усиление»)
   const gapFill = useMemo(() => buildGapFillSuggestions((finalRec?.gaps as any) || []), [finalRec]);
 
@@ -716,16 +821,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     if (gapBased.length > 0) return gapBased;
     // ── Fallback: если gaps пуст (нет лаб-данных), предлагаем по PED-risk ──
     const pedRisk = finalRec.pedRisk;
-    if (pedRisk && (pedRisk.neuroBoosterTier > 0 || pedRisk.jointsBoosterTier > 0)) {
+    if (pedRisk && (pedRisk.neuroBoosterTier > 0 || pedRisk.jointsBoosterTier > 0 || pedRisk.hematoBoosterTier > 0)) {
       const neuroIds = getNeuroBoosterSubstanceIds(pedRisk.neuroBoosterTier);
       const jointIds = getJointsBoosterSubstanceIds(pedRisk.jointsBoosterTier);
-      const allBoosterIds = [...neuroIds, ...jointIds];
+      const hematoIds = getHematoBoosterSubstanceIds(pedRisk.hematoBoosterTier);
+      const allBoosterIds = [...neuroIds, ...jointIds, ...hematoIds];
       const existingSet = new Set(currentSubs.map(s => s.toLowerCase().replace(/[^a-z0-9]/g, '')));
       return allBoosterIds
         .filter(id => !existingSet.has(id.toLowerCase().replace(/[^a-z0-9]/g, '')))
         .map(id => ({
           substanceId: id,
-          reason: pedRisk.triggeredBy.filter(r => r.includes('нейро') || r.includes('Нейро') || r.includes('сустав') || r.includes('Сустав') || r.includes('19-нор') || r.includes('стан') || r.includes('трен') || r.includes('Эскалация')).slice(0,1).join('; ') || 'PED-risk',
+          reason: pedRisk.triggeredBy.filter(r => r.includes('нейро') || r.includes('Нейро') || r.includes('сустав') || r.includes('Сустав') || r.includes('гемато') || r.includes('Гемато') || r.includes('эритропоэз') || r.includes('19-нор') || r.includes('стан') || r.includes('трен') || r.includes('Эскалация')).slice(0,1).join('; ') || 'PED-risk',
           mechsCovered: [] as any,
           synergyWith: [] as string[],
           breadth: 1,
@@ -1095,36 +1201,61 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       , document.body)}
       
-      {/* ===== PED-RISK БАННЕР: авто-активация нейро/суставы по стеку PED ===== */}
-      {rec?.pedRisk && (rec.pedRisk.neuroBoosterTier > 0 || rec.pedRisk.jointsBoosterTier > 0) && (
+      {/* ===== PED-RISK БАННЕР: авто-активация нейро/суставы/гемато по стеку PED (gross→net) ===== */}
+      {finalRecWithResidual?.pedRisk && (finalRecWithResidual.pedRisk.grossNeuroTier !== undefined ? finalRecWithResidual.pedRisk.grossNeuroTier! > 0 : finalRecWithResidual.pedRisk.neuroBoosterTier > 0 || finalRecWithResidual.pedRisk.jointsBoosterTier > 0 || finalRecWithResidual.pedRisk.hematoBoosterTier > 0) && (
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
           <div style={{ fontSize:9, fontWeight:800, color:'#a5b4fc', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
-            ⚡ Авто-защита по стеку PED
+            ⚡ Авто-защита по стеку PED (gross→net)
           </div>
-          {rec.pedRisk.neuroBoosterTier > 0 && (
-            <div style={{ fontSize:8, color:'#818cf8', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
-              <span style={{ fontSize:10 }}>🧠</span>
-              <div>
-                <b>Нейрозащита LV{rec.pedRisk.neuroBoosterTier}</b> (авто)
-                <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4 }}>— риск: {rec.pedRisk.neuroRisk}</span>
-                {rec.pedRisk.triggeredBy.filter(r => r.includes('нейро') || r.includes('Нейро') || r.includes('19-нор') || r.includes('трен') || r.includes('Трен') || r.includes('Эскалация')).slice(0,2).map((r,i) => (
-                  <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
-                ))}
-              </div>
-            </div>
-          )}
-          {rec.pedRisk.jointsBoosterTier > 0 && (
-            <div style={{ fontSize:8, color:'#4ade80', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
-              <span style={{ fontSize:10 }}>🦴</span>
-              <div>
-                <b>Суставы LV{rec.pedRisk.jointsBoosterTier}</b> (авто)
-                <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4 }}>— риск: {rec.pedRisk.jointsRisk}</span>
-                {rec.pedRisk.triggeredBy.filter(r => r.includes('сустав') || r.includes('Сустав') || r.includes('стан') || r.includes('Стан') || r.includes('tendin') || r.includes('компенс') || r.includes('Эскалация')).slice(0,2).map((r,i) => (
-                  <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
-                ))}
-              </div>
-            </div>
-          )}
+          {(() => {
+            const pr = finalRecWithResidual.pedRisk!;
+            const grossN = pr.grossNeuroTier ?? pr.neuroBoosterTier;
+            const grossJ = pr.grossJointsTier ?? pr.jointsBoosterTier;
+            const grossH = pr.grossHematoTier ?? pr.hematoBoosterTier;
+            return (
+              <>
+                {grossN > 0 && (
+                  <div style={{ fontSize:8, color: pr.neuroBoosterTier === 0 ? '#4ade80' : '#818cf8', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>🧠</span>
+                    <div>
+                      <b>Нейрозащита LV{grossN}{pr.neuroBoosterTier !== grossN ? ` → LV${pr.neuroBoosterTier}` : ''}</b>
+                      {pr.neuroCoverage != null && pr.neuroRecommended ? <span style={{ color: pr.neuroBoosterTier === 0 ? '#4ade80' : 'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>{pr.neuroCovered}/{pr.neuroRecommended}{pr.neuroBoosterTier === 0 ? ' ✓ покрыто' : ''}</span> : null}
+                      <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>— {pr.neuroRisk}</span>
+                      {pr.triggeredBy.filter(r => r.includes('нейро') || r.includes('Нейро') || r.includes('19-нор') || r.includes('трен') || r.includes('Трен') || r.includes('Эскалация')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {grossJ > 0 && (
+                  <div style={{ fontSize:8, color: pr.jointsBoosterTier === 0 ? '#4ade80' : '#4ade80', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>🦴</span>
+                    <div>
+                      <b>Суставы LV{grossJ}{pr.jointsBoosterTier !== grossJ ? ` → LV${pr.jointsBoosterTier}` : ''}</b>
+                      {pr.jointsCoverage != null && pr.jointsRecommended ? <span style={{ color: pr.jointsBoosterTier === 0 ? '#4ade80' : 'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>{pr.jointsCovered}/{pr.jointsRecommended}{pr.jointsBoosterTier === 0 ? ' ✓ покрыто' : ''}</span> : null}
+                      <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>— {pr.jointsRisk}</span>
+                      {pr.triggeredBy.filter(r => r.includes('сустав') || r.includes('Сустав') || r.includes('стан') || r.includes('Стан') || r.includes('tendin') || r.includes('компенс') || r.includes('Эскалация')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {grossH > 0 && (
+                  <div style={{ fontSize:8, color: pr.hematoBoosterTier === 0 ? '#4ade80' : '#14b8a6', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>🩸</span>
+                    <div>
+                      <b>Гемато LV{grossH}{pr.hematoBoosterTier !== grossH ? ` → LV${pr.hematoBoosterTier}` : ''}</b>
+                      {pr.hematoCoverage != null && pr.hematoRecommended ? <span style={{ color: pr.hematoBoosterTier === 0 ? '#4ade80' : 'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>{pr.hematoCovered}/{pr.hematoRecommended}{pr.hematoBoosterTier === 0 ? ' ✓ покрыто' : ''}</span> : null}
+                      <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:4, fontSize:7 }}>— {pr.hematoRisk}</span>
+                      {pr.triggeredBy.filter(r => r.includes('гемато') || r.includes('Гемато') || r.includes('эритропоэз') || r.includes('Эритропоэз') || r.includes('HIF') || r.includes('ЭПО') || r.includes('болденон') || r.includes('Болденон') || r.includes('Эскалация')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -1210,16 +1341,22 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             {([
               ['articular_stack', '🦴', 'Суставы', '#4ade80'],
               ['neuroprotection_stack', '🧠', 'Нейро', '#818cf8'],
+              ['hemato_stack', '🩸', 'Кровь', '#14b8a6'],
               ['mega_total_support_35', '🚀', 'Мега', '#f87171'],
             ] as const).map(([id, icon, label, col]) => {
               const active = selectedStacks.includes(id) || (id === 'mega_total_support_35' && megaSelected.size > 0);
-              // PED-risk AUTO badge
-              const pedAuto = id === 'articular_stack' ? (rec?.pedRisk?.jointsBoosterTier ?? 0) : id === 'neuroprotection_stack' ? (rec?.pedRisk?.neuroBoosterTier ?? 0) : 0;
+              // PED-risk AUTO badge — используем net tier (finalRecWithResidual)
+              const netPedRisk = finalRecWithResidual?.pedRisk;
+              const pedAuto = id === 'articular_stack' ? (netPedRisk?.jointsBoosterTier ?? 0) : id === 'neuroprotection_stack' ? (netPedRisk?.neuroBoosterTier ?? 0) : id === 'hemato_stack' ? (netPedRisk?.hematoBoosterTier ?? 0) : 0;
               return (
                 <button key={id} onClick={() => {
                   if (id === 'mega_total_support_35') {
                     setMegaSelected(new Set());
                     setShowMegaPopup(true);
+                  } else if (id === 'hemato_stack') {
+                    setStackModulePopup('hemato_stack');
+                    setHematoPreset(null); setHematoSelected(new Set()); setHematoConfirm(false);
+                    setHematoSymptoms(buildHematoSymptomsFromState(state));
                   } else {
                     setStackModulePopup(id);
                     if (id === 'articular_stack') { setArticularPreset(null); setArticularSelected(new Set()); setArticularConfirm(false); setJointSymptoms(buildJointSymptomsFromState(state)); }
@@ -1227,7 +1364,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   }
                 }}
                   style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative',
-                    background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : '239,68,68'},0.1))` : pedAuto > 0 ? `${col}10` : 'rgba(255,255,255,0.03)',
+                    background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : col === '#14b8a6' ? '20,184,166' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : col === '#14b8a6' ? '20,184,166' : '239,68,68'},0.1))` : pedAuto > 0 ? `${col}10` : 'rgba(255,255,255,0.03)',
                     border: active ? `1.5px solid ${col}55` : pedAuto > 0 ? `1.5px solid ${col}40` : '1px solid rgba(255,255,255,0.06)',
                     color: active ? col : pedAuto > 0 ? col : 'rgba(255,255,255,0.5)' }}>
                   <span style={{fontSize:13}}>{icon}</span>
@@ -1510,8 +1647,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const jointPain = state.oda.jointPain;
           const hasJointSymptom = symptoms.includes('joint_pain');
           const crp = labs['CRP'] || labs['HSCRP'];
-          const pedJointsTier = rec?.pedRisk?.jointsBoosterTier ?? 0;
-          const pedJointsRisk = rec?.pedRisk?.jointsRisk ?? 'none';
+          const pedJointsTier = finalRecWithResidual?.pedRisk?.jointsBoosterTier ?? 0;
+          const pedJointsRisk = finalRecWithResidual?.pedRisk?.jointsRisk ?? 'none';
+          const grossJointsTier = finalRecWithResidual?.pedRisk?.grossJointsTier ?? pedJointsTier;
+          const jointsCoverage = finalRecWithResidual?.pedRisk?.jointsCoverage;
           const jointScore = (hasJointSymptom ? 20 : 0) + (jointPain === 'severe' ? 30 : jointPain === 'moderate' ? 15 : jointPain === 'mild' ? 5 : 0) + (crp && crp > 3 ? 15 : 0) + (pedJointsTier >= 2 ? 30 : pedJointsTier === 1 ? 10 : 0);
           const presetColor = jointScore < 20 ? '#22c55e' : jointScore < 40 ? '#f59e0b' : jointScore < 60 ? '#f97316' : '#ef4444';
 
@@ -1607,7 +1746,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           <span style={{ fontSize:14 }}>⚡</span>
                           <div style={{ flex:1 }}>
                             <div style={{ fontSize:9, fontWeight:700, color: pedAutoActive ? '#4ade80' : '#4ade80' }}>
-                              PED AUTO — LV{pedJointsTier} ({pedJointsRisk}) {pedAutoActive && '✓'}
+                              PED AUTO — LV{grossJointsTier}{pedJointsTier !== grossJointsTier ? ` → LV${pedJointsTier}` : ''} ({pedJointsRisk}) {pedAutoActive && '✓'}
                             </div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
                               Авто-выбор по стеку PED: {pedAutoIds.length} веществ
@@ -1701,8 +1840,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const sleepHours = state.profile.sleepHours || 7;
           const stressLevel = state.profile.stressLevel || 5;
           const aggressionScore = state.neuro.aggressionScore || 0;
-          const pedNeuroTier = rec?.pedRisk?.neuroBoosterTier ?? 0;
-          const pedNeuroRisk = rec?.pedRisk?.neuroRisk ?? 'none';
+          const pedNeuroTier = finalRecWithResidual?.pedRisk?.neuroBoosterTier ?? 0;
+          const pedNeuroRisk = finalRecWithResidual?.pedRisk?.neuroRisk ?? 'none';
+          const grossNeuroTier = finalRecWithResidual?.pedRisk?.grossNeuroTier ?? pedNeuroTier;
+          const neuroCoverage = finalRecWithResidual?.pedRisk?.neuroCoverage;
           const neuroScore = (hasInsomnia ? 20 : 0) + (hasAnxiety ? 15 : 0) + (sleepHours < 7 ? 15 : 0) + (stressLevel > 7 ? 20 : 0) + (aggressionScore > 6 ? 15 : 0) + (pedNeuroTier >= 2 ? 30 : pedNeuroTier === 1 ? 10 : 0);
           const presetColor = neuroScore < 20 ? '#22c55e' : neuroScore < 40 ? '#f59e0b' : neuroScore < 60 ? '#f97316' : '#ef4444';
 
@@ -1787,7 +1928,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           <span style={{ fontSize:14 }}>⚡</span>
                           <div style={{ flex:1 }}>
                             <div style={{ fontSize:9, fontWeight:700, color: pedAutoActive ? '#818cf8' : '#818cf8' }}>
-                              PED AUTO — LV{pedNeuroTier} ({pedNeuroRisk}) {pedAutoActive && '✓'}
+                              PED AUTO — LV{grossNeuroTier}{pedNeuroTier !== grossNeuroTier ? ` → LV${pedNeuroTier}` : ''} ({pedNeuroRisk}) {pedAutoActive && '✓'}
                             </div>
                             <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
                               Авто-выбор по стеку PED: {pedAutoIds.length} веществ
@@ -1866,13 +2007,170 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                      }} style={{ flex:2, padding:'10px', borderRadius:10, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', color:'#000',
                        background: neuroSelected.size > 0 ? 'linear-gradient(135deg,#818cf8,#6366f1)' : 'rgba(255,255,255,0.06)',
                      }}>
-                       ✅ Добавить ({neuroSelected.size} веществ)
-                     </button>
+                        ✅ Добавить ({neuroSelected.size} веществ)
+                      </button>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           );
+        }
+
+        // ── 🩸 HEMATO попап (по образцу Joints/Neuro) ──
+        if (stackModulePopup === 'hemato_stack') {
+          const pedHematoTier = finalRecWithResidual?.pedRisk?.hematoBoosterTier ?? 0;
+          const pedHematoRisk = finalRecWithResidual?.pedRisk?.hematoRisk ?? 'none';
+          const grossHematoTier = finalRecWithResidual?.pedRisk?.grossHematoTier ?? pedHematoTier;
+          const hematoCoverage = finalRecWithResidual?.pedRisk?.hematoCoverage;
+          const hematoCovered = finalRecWithResidual?.pedRisk?.hematoCovered ?? 0;
+          const hematoRecommended = finalRecWithResidual?.pedRisk?.hematoRecommended ?? 0;
+          const labs = labSliceToValues(state?.labs?.fullPanel);
+          const hct = labs['HEMATOCRIT'] || labs['HCT'];
+          const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
+          const plt = labs['PLT'];
+          const fibrinogen = labs['FIBRINOGEN'];
+          const ddimer = labs['D_DIMER'];
+          // Risk score
+          let hematoScore = 0;
+          if (hct != null) { if (hct >= 57) hematoScore += 30; else if (hct >= 52) hematoScore += 25; else if (hct >= 48) hematoScore += 15; else if (hct >= 45) hematoScore += 5; }
+          if (hgb != null && hgb > 175) hematoScore += 10;
+          if (plt != null && plt > 400) hematoScore += 10;
+          if (fibrinogen != null && fibrinogen > 4) hematoScore += 10;
+          if (ddimer != null && ddimer > 0.5) hematoScore += 15;
+          hematoScore += pedHematoTier * 10;
+          if (hematoSymptoms.has('hyperviscosity_symptom')) hematoScore += 15;
+          const riskColor = hematoScore >= 50 ? '#ef4444' : hematoScore >= 30 ? '#f97316' : hematoScore >= 15 ? '#f59e0b' : '#22c55e';
+          const riskLabel = hematoScore >= 50 ? '🔴 Высокий' : hematoScore >= 30 ? '🟠 Умеренный' : hematoScore >= 15 ? '🟡 Низкий' : '🟢 Минимальный';
+          const toggleSub = (id: string) => { setHematoSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
+          const toggleHematoSymptom = (code: string) => setHematoSymptoms(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });
+          const hematoRecSet = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
+          // PED-AUTO ids
+          const pedAutoIds = getHematoBoosterSubstanceIds(pedHematoTier)
+            .filter(id => HEMATO_CATALOG.some(c => c.id === id || canonIdLocal(c.id) === canonIdLocal(id)));
+          const pedAutoActive = pedAutoIds.length > 0 && pedAutoIds.every(id => hematoSelected.has(id));
+          return ReactDOM.createPortal(
+            <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setStackModulePopup(null)}>
+              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(20,184,166,0.2)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+                <div style={{ height:3, background:'linear-gradient(90deg,#14b8a6,#14b8a688)' }} />
+                <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                    <span style={{ fontSize:13, fontWeight:800, color:'#14b8a6' }}>🩸 Кровь — гемато-защита</span>
+                    <button onClick={() => setStackModulePopup(null)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:11, fontWeight:600 }}>✕</button>
+                  </div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginBottom:8 }}>Профилактика эритроцитоза, фибринолиз, антиагрегант, реология. Синергийные группы: натто+сера+бромелайн = 3 pathway фибринолиза.</div>
+
+                  {/* Контекст / risk score */}
+                  <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:8, background:`${riskColor}10`, border:`1px solid ${riskColor}22` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:riskColor }}>{riskLabel}</span>
+                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>Счет: {hematoScore}</span>
+                    </div>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
+                      {hct != null && <div>• Гематокрит: {hct}% {hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма'}</div>}
+                      {hgb != null && <div>• Гемоглобин: {hgb} г/л {hgb > 175 ? '⚠️' : '✓'}</div>}
+                      {plt != null && <div>• Тромбоциты: {plt} {plt > 400 ? '⚠️' : '✓'}</div>}
+                      {fibrinogen != null && <div>• Фибриноген: {fibrinogen} г/л {fibrinogen > 4 ? '⚠️' : '✓'}</div>}
+                      {ddimer != null && <div>• D-димер: {ddimer} мг/L {ddimer > 0.5 ? '⚠️' : '✓'}</div>}
+                      {pedHematoTier > 0 && <div style={{ marginTop:2, color:'#14b8a6' }}>⚡ PED AUTO LV{grossHematoTier}{pedHematoTier !== grossHematoTier ? ` → LV${pedHematoTier}` : ''} ({pedHematoRisk}){hematoCoverage != null && hematoRecommended ? ` · ${hematoCovered}/${hematoRecommended}${pedHematoTier === 0 ? ' ✓' : ''}` : ''}</div>}
+                    </div>
+                  </div>
+
+                  {/* Симптомы гипервязкости */}
+                  <DomainSymptomMap domains={HEMATO_DOMAINS} checked={hematoSymptoms} onToggle={toggleHematoSymptom} />
+
+                  {/* Quick protocols */}
+                  <div style={{ fontSize:9, fontWeight:700, color:'#ffffff', marginBottom:4 }}>⚡ Протоколы</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
+                    {HEMATO_PRESETS.map(p => {
+                      const active = hematoPreset === p.id;
+                      return (
+                        <button key={p.id} onClick={() => {
+                          if (active) { setHematoPreset(null); setHematoSelected(new Set()); }
+                          else { setHematoPreset(p.id); setHematoSelected(new Set(p.subs.filter(id => HEMATO_CATALOG.some(c => c.id === id)))); }
+                        }} style={{ padding:'6px 8px', borderRadius:8, fontSize:8, fontWeight:600, cursor:'pointer', textAlign:'left',
+                          background: active ? 'rgba(20,184,166,0.15)' : 'rgba(255,255,255,0.03)',
+                          border: active ? '1.5px solid #14b8a655' : '1px solid rgba(255,255,255,0.06)',
+                          color: active ? '#14b8a6' : 'rgba(255,255,255,0.7)' }}>
+                          <div style={{ fontWeight:700, marginBottom:1 }}>{p.name}</div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>{p.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* PED-AUTO preset */}
+                  {pedHematoTier > 0 && pedAutoIds.length > 0 && (
+                    <div style={{ marginBottom:8 }}>
+                      <button onClick={() => {
+                        if (pedAutoActive) { setHematoPreset(null); setHematoSelected(new Set()); }
+                        else { setHematoPreset('ped_auto'); setHematoSelected(new Set(pedAutoIds)); }
+                      }} style={{ width:'100%', padding:'8px 10px', borderRadius:8, cursor:'pointer', textAlign:'left',
+                        background: pedAutoActive ? 'rgba(20,184,166,0.15)' : 'rgba(20,184,166,0.06)',
+                        border: pedAutoActive ? '1.5px solid #14b8a655' : '1.5px solid #14b8a630' }}>
+                        <div style={{ fontSize:9, fontWeight:700, color:'#14b8a6' }}>⚡ PED AUTO — LV{grossHematoTier}{pedHematoTier !== grossHematoTier ? ` → LV${pedHematoTier}` : ''} ({pedHematoRisk}) {pedAutoActive && '✓'}</div>
+                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', marginTop:2 }}>Авто-выбор по стеку PED: {pedAutoIds.length} веществ</div>
+                        {pedAutoIds.length > 0 && (
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
+                            {pedAutoIds.slice(0,6).map(sid => <span key={sid} style={{ background:'rgba(20,184,166,0.08)', padding:'1px 4px', borderRadius:3, fontSize:7 }}>{subNameRu(sid).slice(0,12)}</span>)}
+                            {pedAutoIds.length > 6 && <span style={{color:'rgba(255,255,255,0.2)', fontSize:7}}>+{pedAutoIds.length-6}</span>}
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Ургентный баннер при Hct>57% */}
+                  {hct != null && hct > 57 && (
+                    <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:8, background:'rgba(239,68,68,0.1)', border:'1.5px solid rgba(239,68,68,0.3)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#ef4444' }}>🚨 УРГЕНТ: Hct {hct}% &gt; 57%</div>
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginTop:2, lineHeight:1.4 }}>
+                        • <b>Эритроцитаферез</b> — первая линия (1 процедура = 3-4 кровопускания)<br/>
+                        • Флеботомия 400-500 мл — fallback (если аферез недоступен)<br/>
+                        • Эноксапарин 40 мг при D-димер&gt;500<br/>
+                        • <b>STOP AAS</b> — критично<br/>
+                        • Срочная консультация гематолога
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Substance list */}
+                  <div style={{ fontSize:9, fontWeight:700, color:'#ffffff', marginBottom:4 }}>💊 Выберите вещества ({hematoSelected.size} из {HEMATO_CATALOG.length})</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:10 }}>
+                    {HEMATO_CATALOG.map(item => {
+                      const inPlan = (rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(item.id));
+                      const checked = hematoSelected.has(item.id);
+                      const isRec = hematoRecSet.has(canonIdLocal(item.id));
+                      return (
+                        <div key={item.id} onClick={() => { if (!inPlan) toggleSub(item.id); }}
+                          style={{ padding:'6px 8px', borderRadius:6, cursor: inPlan ? 'default' : 'pointer', opacity: inPlan ? 0.5 : 1,
+                            background: checked ? 'rgba(20,184,166,0.12)' : 'rgba(255,255,255,0.02)',
+                            border: checked ? '1px solid rgba(20,184,166,0.3)' : '1px solid rgba(255,255,255,0.05)' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ fontSize:10, color: checked ? '#14b8a6' : 'rgba(255,255,255,0.3)' }}>{checked ? '✓' : '○'}</span>
+                            <div style={{ flex:1 }}>
+                              <span style={{ fontSize:9, fontWeight:600, color:'#ffffff' }}>{item.nameRu}</span>
+                              <span style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginLeft:4 }}>{item.dose}</span>
+                              {isRec && !inPlan && <span style={{ fontSize:6, color:'#0ea5e9', marginLeft:4, padding:'1px 3px', borderRadius:2, background:'rgba(14,165,233,0.1)' }}>рек.</span>}
+                              {inPlan && <span style={{ fontSize:6, color:'#0ea5e9', marginLeft:4, padding:'1px 3px', borderRadius:2, background:'rgba(0,230,138,0.1)' }}>в плане</span>}
+                            </div>
+                          </div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:1, marginLeft:18 }}>{item.desc}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button onClick={() => setStackModulePopup(null)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:11, fontWeight:600 }}>Отмена</button>
+                    <button onClick={() => { if (hematoSelected.size > 0) { setHematoConfirm(true); setStackModulePopup(null); } }}
+                      style={{ flex:2, padding:'10px', borderRadius:10, border:'none', cursor:'pointer', fontSize:11, fontWeight:700, color:'#000',
+                        background: hematoSelected.size > 0 ? 'linear-gradient(135deg,#14b8a6,#0d9488)' : 'rgba(255,255,255,0.06)' }}>
+                      ✅ Добавить ({hematoSelected.size} веществ)
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          );
+            </div>, document.body);
         }
 
         // Старый попап для остальных модулей
@@ -2005,6 +2303,43 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
+      {/* ── Карточка подтверждения для гемато-модуля ── */}
+      {hematoConfirm && !stackModulePopup && (
+        <div style={{ marginBottom:8, padding:'10px', borderRadius:12, background:'linear-gradient(135deg,rgba(20,184,166,0.08),rgba(13,148,136,0.04))', border:'2px solid rgba(20,184,166,0.25)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#14b8a6', marginBottom:6, display:'flex', alignItems:'center', gap:4 }}>
+            🩸 Кровь — подтверждение
+          </div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginBottom:5, lineHeight:1.3 }}>
+            Выбрано <b style={{color:'#14b8a6'}}>{hematoSelected.size}</b> веществ:
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
+            {Array.from(hematoSelected).map(sid => (
+              <span key={sid} style={{ fontSize:8, padding:'2px 6px', borderRadius:5, fontWeight:600, background:'rgba(20,184,166,0.12)', border:'1px solid rgba(20,184,166,0.2)', color:'#14b8a6' }}>
+                {subNameRu(sid)}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:8, lineHeight:1.3 }}>
+            Вещества будут добавлены в план поддержки. Дубли с уже назначенными автоматически исключаются.
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={() => { setHematoConfirm(false); setHematoPreset(null); setHematoSelected(new Set()); setStackModulePopup('hemato_stack'); }}
+              style={{ flex:1, padding:'8px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#ffffff' }}>
+              ✕ Отмена
+            </button>
+            <button onClick={() => {
+              const newSubs = Array.from(hematoSelected).filter(sid => !(rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid)));
+              setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+              setHematoConfirm(false);
+              setStackModulePopup(null);
+              if (!selectedStacks.includes('hemato_stack')) setSelectedStacks(prev => [...prev, 'hemato_stack']);
+            }} style={{ flex:2, padding:'8px', borderRadius:8, fontSize:9, fontWeight:800, cursor:'pointer', background:'linear-gradient(135deg,#14b8a6,#0d9488)', border:'none', color:'#000' }}>
+              ✅ Подтвердить и добавить в план
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ===== КАРТОЧКА СИМПТОМОВ ===== */}
       <div style={{ margin:'6px 0', borderRadius:10, overflow:'hidden' }}>
         <div onClick={() => setShowSymptoms(!showSymptoms)} style={{ padding:'7px 9px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)', borderRadius: showSymptoms ? '10px 10px 0 0' : 10 }}>
@@ -2109,24 +2444,37 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       )}
 
       {/* PED-risk детали (если есть) */}
-      {rec?.pedRisk && (rec.pedRisk.neuroBoosterTier > 0 || rec.pedRisk.jointsBoosterTier > 0) && (
+      {finalRecWithResidual?.pedRisk && (finalRecWithResidual.pedRisk.grossNeuroTier! > 0 || finalRecWithResidual.pedRisk.grossJointsTier! > 0 || finalRecWithResidual.pedRisk.grossHematoTier! > 0) && (
         <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(99,102,241,0.04)', border:'1px solid rgba(99,102,241,0.1)' }}>
-          <div style={{ fontSize:8, fontWeight:700, color:'#a5b4fc', marginBottom:3 }}>⚡ О подборе (PED-risk)</div>
-          {rec.pedRisk.neuroBoosterTier > 0 && (
-            <div style={{ fontSize:7, color:'#818cf8', lineHeight:1.4, marginBottom:2 }}>
-              🧠 <b>Нейрозащита LV{rec.pedRisk.neuroBoosterTier}</b> — {rec.pedRisk.neuroRisk} риск
-              {rec.pedRisk.perSubstance.filter(ps => ps.neuro === 'high' || ps.neuro === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+          <div style={{ fontSize:8, fontWeight:700, color:'#a5b4fc', marginBottom:3 }}>⚡ О подборе (PED-risk, gross→net)</div>
+          {(() => { const pr = finalRecWithResidual.pedRisk!; const gN = pr.grossNeuroTier ?? pr.neuroBoosterTier; const gJ = pr.grossJointsTier ?? pr.jointsBoosterTier; const gH = pr.grossHematoTier ?? pr.hematoBoosterTier; return (
+            <>
+          {gN > 0 && (
+            <div style={{ fontSize:7, color: pr.neuroBoosterTier === 0 ? '#4ade80' : '#818cf8', lineHeight:1.4, marginBottom:2 }}>
+              🧠 <b>Нейрозащита LV{gN}{pr.neuroBoosterTier !== gN ? ` → LV${pr.neuroBoosterTier}` : ''}</b> — {pr.neuroRisk}
+              {pr.perSubstance.filter(ps => ps.neuro === 'high' || ps.neuro === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+              {pr.neuroCoverage != null && pr.neuroRecommended && pr.neuroBoosterTier === 0 ? ` ✓ (${pr.neuroCovered}/${pr.neuroRecommended})` : pr.neuroCoverage != null && pr.neuroRecommended ? ` (${pr.neuroCovered}/${pr.neuroRecommended})` : ''}
             </div>
           )}
-          {rec.pedRisk.jointsBoosterTier > 0 && (
-            <div style={{ fontSize:7, color:'#4ade80', lineHeight:1.4, marginBottom:2 }}>
-              🦴 <b>Суставы LV{rec.pedRisk.jointsBoosterTier}</b> — {rec.pedRisk.jointsRisk} риск
-              {rec.pedRisk.perSubstance.filter(ps => ps.joints === 'high' || ps.joints === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+          {gJ > 0 && (
+            <div style={{ fontSize:7, color: pr.jointsBoosterTier === 0 ? '#4ade80' : '#4ade80', lineHeight:1.4, marginBottom:2 }}>
+              🦴 <b>Суставы LV{gJ}{pr.jointsBoosterTier !== gJ ? ` → LV${pr.jointsBoosterTier}` : ''}</b> — {pr.jointsRisk}
+              {pr.perSubstance.filter(ps => ps.joints === 'high' || ps.joints === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+              {pr.jointsCoverage != null && pr.jointsRecommended && pr.jointsBoosterTier === 0 ? ` ✓ (${pr.jointsCovered}/${pr.jointsRecommended})` : pr.jointsCoverage != null && pr.jointsRecommended ? ` (${pr.jointsCovered}/${pr.jointsRecommended})` : ''}
             </div>
           )}
-          {rec.pedRisk.triggeredBy.length > 0 && (
+          {gH > 0 && (
+            <div style={{ fontSize:7, color: pr.hematoBoosterTier === 0 ? '#4ade80' : '#14b8a6', lineHeight:1.4, marginBottom:2 }}>
+              🩸 <b>Гемато LV{gH}{pr.hematoBoosterTier !== gH ? ` → LV${pr.hematoBoosterTier}` : ''}</b> — {pr.hematoRisk}
+              {pr.perSubstance.filter(ps => ps.hemato === 'high' || ps.hemato === 'moderate').slice(0,3).map(ps => ` · ${ps.substanceId}`).join('')}
+              {pr.hematoCoverage != null && pr.hematoRecommended && pr.hematoBoosterTier === 0 ? ` ✓ (${pr.hematoCovered}/${pr.hematoRecommended})` : pr.hematoCoverage != null && pr.hematoRecommended ? ` (${pr.hematoCovered}/${pr.hematoRecommended})` : ''}
+            </div>
+          )}
+            </>
+          ); })()}
+          {finalRecWithResidual.pedRisk.triggeredBy.length > 0 && (
             <div style={{ fontSize:6, color:'rgba(255,255,255,0.35)', lineHeight:1.3, marginTop:2 }}>
-              {rec.pedRisk.triggeredBy.slice(0,3).map((r,i) => <div key={i}>• {r}</div>)}
+              {finalRecWithResidual.pedRisk.triggeredBy.slice(0,3).map((r,i) => <div key={i}>• {r}</div>)}
             </div>
           )}
         </div>
@@ -2230,7 +2578,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <CalcSubstanceDetail
                   key={s.substanceId + i}
                   sub={s}
-                  rec={finalRec}
+                  rec={finalRecWithResidual ?? finalRec}
                   subNameRu={subNameRu}
                   subDosage={subDosage}
                   subTier={subTier}
@@ -2862,7 +3210,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   {[{ id:'hep', icon:'🫁', name:'Печёночная панель', color:'#f59e0b', active:hasHepatic, markers:'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq:'Каждые 4 нед', targets:'АЛТ/АСТ <40 Ед/л, ГГТ <55, билирубин <21 мкмоль/л', alert:'АЛТ >80 → снижение доз · >200 → СТОП' },
                     { id:'cardio', icon:'❤️', name:'Кардио-липидная панель', color:'#f87171', active:hasCardio, markers:'ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I (при боли)', freq:'Каждые 4 нед', targets:'ЛПНП <2.6, ЛПВП >1.0, ТГ <1.7, hs-СРБ <1.0', alert:'ЛПНП >4.0 → статины · Д-димер >0.5 → УЗДГ вен' },
                     { id:'renal', icon:'💧', name:'Почечная панель', color:'#38bdf8', active:hasRenal, markers:'Креатинин, рСКФ (CKD-EPI), цистатин C, мочевина, мочевая кислота, электролиты (Na⁺, K⁺, Cl⁻), общий белок мочи, микроальбуминурия', freq:'Каждые 4 нед', targets:'Креатинин <115, рСКФ >90, K⁺ 3.5–5.0, микроальбумин <30 мг/сут', alert:'Креатинин >130 → УЗИ почек · K⁺ <3.5/>5.5 → ЭКГ' },
-                    { id:'hema', icon:'🩸', name:'Гематологическая панель', color:'#ef4444', active:hasHemat, markers:'ОАК: HCT, Hgb, RBC, PLT, WBC, ретикулоциты, ферритин, сыв. железо, коагулограмма (МНО, АЧТВ)', freq:'Каждые 4 нед', targets:'HCT 40–50% (♂), Hgb 140–170 г/л, PLT 150–400×10⁹/л', alert:'HCT >54% → кровопускание · >60% → СТОП + госпитализация' },
+                    { id:'hema', icon:'🩸', name:'Гематологическая панель', color:'#ef4444', active:hasHemat, markers:'ОАК: HCT, Hgb, RBC, PLT, WBC, ретикулоциты, ферритин, сыв. железо, коагулограмма (МНО, АЧТВ, фибриноген, D-димер), JAK2 V617F (при Hct>52%)', freq:'Каждые 2-4 нед (при ↑Hct — каждые 2 нед)', targets:'HCT 40–50% (♂), Hgb 140–170 г/л, PLT 150–400×10⁹/л, фибриноген 2-4 г/л, D-димер <0.5', alert:'HCT >52% → эритроцитаферез (первая линия) / флеботомия · >54% → СТОП AAS + эритроцитаферез · >60% → госпитализация' },
                     { id:'horm', icon:'🧬', name:'Гормональная панель', color:'#a78bfa', active:hasRepro || subs.some(s => (s.mechsCovered||[]).some(m => m.startsWith('rep')||m.startsWith('hem'))), markers:'Тестостерон общ./своб., эстрадиол (чувств.), пролактин, ЛГ, ФСГ, SHBG, кортизол (утро), ДГТ, прогестерон', freq:'Каждые 4 нед (на курсе), каждые 2 нед (ПКТ)', targets:'E2 20–50 пг/мл (♂ на курсе), пролактин <15 нг/мл, кортизол 140–690 нмоль/л', alert:'E2 >60 → ↑ИА · пролактин >25 → каберголин · ЛГ<1.0 → ХГЧ' },
                     { id:'meta', icon:'🍬', name:'Метаболическая панель', color:'#f97316', active:hasHemat || hasCardio, markers:'Глюкоза натощак, HbA1c, инсулин, HOMA-IR, гомоцистеин, СРБ', freq:'Каждые 4–8 нед', targets:'Глюкоза <5.6, HbA1c <5.7%, HOMA-IR <2.5, гомоцистеин <10', alert:'HbA1c >6.0 → метформин · глюкоза >11 → ER · HOMA-IR >3 → берберин' },
                     { id:'thy', icon:'🦋', name:'Тиреоидная панель', color:'#22d3ee', active:subs.some(s => s.substanceId === 'selenium' || s.substanceId === 'iodine' || s.substanceId === 't3' || s.substanceId === 't4'), markers:'ТТГ, Т3 своб., Т4 своб., АТ-ТПО', freq:'Каждые 8 нед (при приёме T3/T4 — каждые 4 нед)', targets:'ТТГ 0.4–4.0, Т3 св. 3.5–6.5, Т4 св. 11.5–22.7', alert:'ТТГ >4.5 → гипотиреоз · ТТГ <0.1 → гипертиреоз · ↑T3 → ↓дозу' },
@@ -2920,15 +3268,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(251,191,36,0.06)', border:'1px solid rgba(251,191,36,0.1)' }}>
                     <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.8 }}>
                       {[
-                        ['❤️', 'АД утром (сист/диаст) + пульс'],
-                        ['😴', 'Качество сна (1–5) + часы'],
-                        ['😤', 'Настроение/агрессия (1–5)'],
-                        ['🔥', 'Либидо (1–5)'],
-                        ['⚖️', 'Вес утром (еженедельно)'],
-                        ['💪', 'Отёки голеней/лица (да/нет)'],
-                        ['🩺', 'Гинекомастия (нет / чувств. / уплотнение)'],
-                        ['🧠', 'Головные боли / шум в ушах'],
-                      ].map(([icon, text], i) => (
+                         ['❤️', 'АД утром (сист/диаст) + пульс'],
+                         ['😴', 'Качество сна (1–5) + часы'],
+                         ['😤', 'Настроение/агрессия (1–5)'],
+                         ['🔥', 'Либидо (1–5)'],
+                         ['⚖️', 'Вес утром (еженедельно)'],
+                         ['💪', 'Отёки голеней/лица (да/нет)'],
+                         ['🩺', 'Гинекомастия (нет / чувств. / уплотнение)'],
+                         ['🧠', 'Головные боли / шум в ушах'],
+                         ['🩸', 'Покраснение лица/кожи (плетора — признак ↑Hct)'],
+                         ['💧', 'Гидратация: мл выпито / цвет мочи (тёмная = дегидратация)'],
+                       ].map(([icon, text], i) => (
                         <div key={i} style={{ display:'flex', alignItems:'center', gap:4 }}>
                           <span style={{ width:16, textAlign:'center', flexShrink:0 }}>{icon}</span>
                           <span>{text}</span>
@@ -2944,17 +3294,19 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.6 }}>
                     • АД &gt;160/100 на фоне покоя<br/>
                     • ЧСС &gt;120 в покое / аритмия<br/>
-                    • Боль в груди / одышка / кровохарканье<br/>
+                    • Боль в груди / одышка / кровохарканье (ТЭЛА!)<br/>
+                    • Боль/отёк/покраснение одной ноги (ТГВ!)<br/>
                     • Желтуха (пожелтение кожи/склер)<br/>
                     • Отёки лица/голеней + олигурия (&lt;500 мл/сут)<br/>
-                    • Сильная головная боль + нарушение зрения<br/>
+                    • Сильная головная боль + нарушение зрения (Hct↑ → гипервязкость)<br/>
+                    • Покраснение лица + головокружение + одышка (плетора — Hct возможно &gt;54%)<br/>
                     • Судороги / потеря сознания<br/>
                     • Температура &gt;38.5°C + боль в месте инъекции (абсцесс)
                   </div>
                 </div>
 
                 {/* ===== ДИНАМИЧЕСКИЙ СЛОЙ БЕЗОПАСНОСТИ (з движка) ===== */}
-                <CalcSafetyLayer rec={finalRec} planResult={planResult} />
+                <CalcSafetyLayer rec={finalRecWithResidual ?? finalRec} planResult={planResult} />
 
                 {/* ===== ОСОБЫЕ УКАЗАНИЯ БУСТЕРОВ (PED-risk + LV3) ===== */}
                 {finalRec.boosters && finalRec.boosters.length > 0 && (() => {
@@ -3024,7 +3376,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       )}
 
       {/* CalcActions (сохранить/копировать/врачу) */}
-      {finalRec && <CalcActions rec={finalRec} level={level} state={state} />}
+      {finalRecWithResidual && <CalcActions rec={finalRecWithResidual} level={level} state={state} />}
     </div>
     </React.Fragment>
   );

@@ -17,7 +17,7 @@ describe('sleep-correlation.engine', () => {
   const createSleepEntry = (date: string, overrides: Partial<SleepEntry> = {}): SleepEntry => ({
     date,
     hours: 7,
-    quality: 7,
+    quality: 4,
     awakenings: 1,
     bedtime: '23:00',
     wakeTime: '07:00',
@@ -57,12 +57,12 @@ describe('sleep-correlation.engine', () => {
   describe('analyzeAlcoholCorrelation', () => {
     it('should detect negative correlation when alcohol reduces sleep quality', () => {
       const diary: SleepEntry[] = [
-        createSleepEntry('2024-01-01', { alcohol: true, quality: 5, awakenings: 3 }),
-        createSleepEntry('2024-01-02', { alcohol: true, quality: 4, awakenings: 4 }),
-        createSleepEntry('2024-01-03', { alcohol: true, quality: 5, awakenings: 3 }),
-        createSleepEntry('2024-01-04', { alcohol: false, quality: 8, awakenings: 1 }),
-        createSleepEntry('2024-01-05', { alcohol: false, quality: 7, awakenings: 1 }),
-        createSleepEntry('2024-01-06', { alcohol: false, quality: 8, awakenings: 0 }),
+        createSleepEntry('2024-01-01', { alcohol: true, quality: 2, awakenings: 3 }),
+        createSleepEntry('2024-01-02', { alcohol: true, quality: 3, awakenings: 4 }),
+        createSleepEntry('2024-01-03', { alcohol: true, quality: 2, awakenings: 3 }),
+        createSleepEntry('2024-01-04', { alcohol: false, quality: 4, awakenings: 1 }),
+        createSleepEntry('2024-01-05', { alcohol: false, quality: 5, awakenings: 1 }),
+        createSleepEntry('2024-01-06', { alcohol: false, quality: 4, awakenings: 0 }),
       ];
 
       const result = analyzeAlcoholCorrelation(diary);
@@ -90,6 +90,36 @@ describe('sleep-correlation.engine', () => {
       expect(result).not.toBeNull();
       expect(result?.factor).toBe('Экран > 60 мин перед сном');
       expect(result?.direction).toBe('negative');
+    });
+  });
+
+  describe('analyzeSleepTrainingCorrelation', () => {
+    it('корреляция = разница качества по шкале 1-5, без смешения с часами', () => {
+      // С тренировками: качество 5,5,4 (сон короткий) / без: качество 2,2,3 (сон долгий)
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { quality: 5, hours: 6 }),
+        createSleepEntry('2024-01-02', { quality: 5, hours: 6 }),
+        createSleepEntry('2024-01-03', { quality: 4, hours: 6.5 }),
+        createSleepEntry('2024-01-04', { quality: 2, hours: 9 }),
+        createSleepEntry('2024-01-05', { quality: 2, hours: 10 }),
+        createSleepEntry('2024-01-06', { quality: 3, hours: 9.5 }),
+      ];
+      const trainingDates = ['2024-01-01', '2024-01-02', '2024-01-03'];
+
+      const result = analyzeSleepTrainingCorrelation(diary, trainingDates);
+
+      expect(result).not.toBeNull();
+      // (5+5+4)/3 = 4.67 против (2+2+3)/3 = 2.33 → diff ≈ +2.3 (положительная связь)
+      expect(result?.correlation).toBeCloseTo(2.3, 1);
+      expect(result?.direction).toBe('positive');
+      expect(result?.description).toContain('/5');
+      expect(result?.description).not.toContain('/10');
+      expect(result?.sampleSize).toBe(3);
+    });
+
+    it('возвращает null при недостаточных данных', () => {
+      const diary: SleepEntry[] = [createSleepEntry('2024-01-01', { quality: 4 }), createSleepEntry('2024-01-02', { quality: 4 })];
+      expect(analyzeSleepTrainingCorrelation(diary, ['2024-01-01'])).toBeNull();
     });
   });
 

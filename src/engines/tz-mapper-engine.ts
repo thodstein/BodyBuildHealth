@@ -64,6 +64,7 @@ import {
   getBoosterMechs,
   NEURO_BOOST,
   JOINTS_BOOST,
+  HEMATO_BOOST,
   type BoosterTriggerCtx,
   type AppliedBooster,
 } from './tz-bridge-boosters';
@@ -1364,6 +1365,19 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
           substanceId: id, category: 'amino' as TzCategory,
           k: 0.5, q: 'B' as const,
           reason: '[МАКС: обязательная защита суставов]', mechsCovered: [],
+          priority: 1,
+        });
+      }
+    }
+    // Гемато (эритроцитоз/антиагрегант) — фибринолитическое трио
+    const hematoIds = new Set(HEMATO_BOOST.subs.map(s => s.substanceId.toLowerCase()));
+    if (!subs.some(s => hematoIds.has(s.substanceId.toLowerCase()))) {
+      for (const id of ['nattokinase','serrapeptase','bromelain']) {
+        if (subs.some(s => canonId(s.substanceId) === canonId(id))) continue;
+        subs.push({
+          substanceId: id, category: 'enzyme' as TzCategory,
+          k: 0.5, q: 'C' as const,
+          reason: '[МАКС: обязательная фибринолитическая защита]', mechsCovered: [],
           priority: 1,
         });
       }

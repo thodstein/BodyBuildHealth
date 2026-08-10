@@ -10,15 +10,19 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   test_enan: ['TT','FT','E2','LH','FSH','SHBG','DHT','HCT','HGB','RBC','LDL','HDL','PSA','BP_SYSTOLIC','BP_DIASTOLIC','NT_PROBNP','D_DIMER'],
   test_cyp:  ['TT','FT','E2','LH','FSH','SHBG','DHT','HCT','HGB','RBC','LDL','HDL','PSA','NT_PROBNP'],
   test_prop: ['TT','FT','E2','LH','FSH','SHBG','DHT','HCT','RBC','LDL','HDL'],
+  test_undec: ['TT','FT','E2','LH','FSH','SHBG','DHT','HCT','HGB','RBC','LDL','HDL','PSA','NT_PROBNP'],
   test_suspension: ['TT','FT','E2','LH','FSH','DHT','HCT'],
   test_mix:  ['TT','FT','E2','LH','FSH','SHBG','HCT','LDL','HDL','PSA','NT_PROBNP'],
 
   // ── AAS: 19-Nor ──
   tren_a:   ['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
   tren_e:   ['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
+  tren_hex: ['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
   nand_dec: ['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
   nand_pp:  ['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
   nand_pheny:['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
+  trest_acet: ['HCT','LDL','HDL','PRL','LH','FSH','E2','CORTISOL','ALT','AST'],
+  trest_enan: ['HCT','LDL','HDL','PRL','LH','FSH','E2','CORTISOL','ALT','AST'],
 
   // ── AAS: DHT derivatives ──
   oxan:     ['ALT','AST','GGT','HDL','LDL','SHBG','TT','FT','NT_PROBNP'],
@@ -31,6 +35,9 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   // ── AAS: Boldenone ──
   bolde_undecy: ['HCT','RBC','HGB','HDL','TT','E2','CREATININE','NT_PROBNP'],
   dhb:      ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
+  dhb_cyp:  ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
+  dihydroboldenone: ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
+  boldenone_undecylenate: ['HCT','RBC','HGB','HDL','TT','E2','CREATININE','NT_PROBNP'],
 
   // ── AAS: Orals ──
   metandienone: ['ALT','AST','GGT','HDL','LDL','E2','SHBG','BP_SYSTOLIC','NT_PROBNP','D_DIMER'],
@@ -62,16 +69,24 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   // ── SARMs ──
   ostarine:  ['HDL','LDL','SHBG','LH','FSH','TT'],
   ligandrol:  ['HDL','LDL','SHBG','LH','FSH','TT'],
+  lgd:       ['HDL','LDL','SHBG','LH','FSH','TT'],
   rad140:    ['HDL','LDL','SHBG','LH','FSH','TT'],
   andarine:   ['HDL','LDL','SHBG'],
   yk11:     ['HDL','LDL','SHBG','LH','FSH','TT'],
+  s23:      ['HDL','LDL','SHBG','LH','FSH','TT'],
 
   // ── Peptides / GH / Insulin ──
   hgh:      ['IGF1','IGFBP3','GLU','INS','HCT','FT4','TSH','NT_PROBNP'],
   igf1lr3:  ['GLU','INS','IGF1','IGFBP3','Creatinine','NT_PROBNP'],
+  igf1_des: ['GLU','INS','IGF1','IGFBP3','Creatinine'],
+  mgf:      ['IGF1','IGFBP3','GLU','INS'],
   humalog:  ['GLU','INS','HbA1c','K','MAGNESIUM','PHOSPHORUS'],
   humulin_r:['GLU','INS','HbA1c','K'],
   lantus:   ['GLU','INS','HbA1c'],
+  ins_short:['GLU','INS','HbA1c','K'],
+  ins_long: ['GLU','INS','HbA1c'],
+  ins_aspart:['GLU','INS','HbA1c','K'],
+  ins_detemir:['GLU','INS','HbA1c'],
   mk677:    ['IGF1','IGFBP3','GLU','INS','PRL','CORTISOL','FT4'],
   cjc1295:  ['IGF1','IGFBP3','GLU','INS'],
   ipamorelin: ['IGF1','GH','CORTISOL'],

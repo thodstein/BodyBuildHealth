@@ -64,6 +64,7 @@ type BPForm = {
 const btn: React.CSSProperties = {
   minHeight: 44, padding: '6px 10px', borderRadius: 7,
   background: '#27272a', border: '1px solid #3f3f46', color: '#fff', cursor: 'pointer',
+  fontSize: 13,
 };
 const input: React.CSSProperties = { ...btn, width: '100%', background: '#18181b', boxSizing: 'border-box' };
 const card: React.CSSProperties = {
@@ -612,24 +613,38 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
 
             <section style={{ ...card, marginTop: 12 }}>
               <h3>🌙 Циркадный паттерн</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              {(['morning', 'afternoon', 'evening', 'night'] as const).map(tod => {
-                const g = circadian[tod];
-                if (g.count === 0) return <div key={tod} style={{ padding: 8, background: '#29292f', borderRadius: 8, fontSize: 12 }}>Нет данных</div>;
-                const color = getBpClassificationColor(classifyBP(g.avgS, g.avgD));
-                return (
-                  <div key={tod} style={{ margin: '4px 0', padding: 8, borderRadius: 8, background: `${color}18`, border: `1px solid ${color}44` }}>
-                    {tod === 'morning' ? '🌅 Утро' : tod === 'afternoon' ? '☀️ День' : tod === 'evening' ? '🌆 Вечер' : '🌙 Ночь'}:{' '}
-                    <b style={{ color }}>{g.avgS}/{g.avgD}</b><br />({g.count} изм.)
-                  </div>
-                );
-              })}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
+                {([
+                  { key: 'morning' as const, label: '🌅 Утро' },
+                  { key: 'afternoon' as const, label: '☀️ День' },
+                  { key: 'evening' as const, label: '🌆 Вечер' },
+                  { key: 'night' as const, label: '🌙 Ночь' },
+                ]).map(({ key, label }) => {
+                  const g = circadian[key];
+                  if (g.count === 0) return (
+                    <div key={key} style={{ padding: 10, borderRadius: 8, background: '#29292f', textAlign: 'center', fontSize: 12, color: '#666' }}>
+                      {label}<br />Нет данных
+                    </div>
+                  );
+                  const cls = classifyBP(g.avgS, g.avgD);
+                  const bg = getBpClassificationColor(cls);
+                  return (
+                    <div key={key} style={{
+                      padding: 10, borderRadius: 8, textAlign: 'center',
+                      background: `${bg}18`, border: `1px solid ${bg}44`,
+                    }}>
+                      <div style={{ fontSize: 12, color: '#aaa' }}>{label}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: bg }}>{g.avgS}/{g.avgD}</div>
+                      <div style={{ fontSize: 11, color: '#888' }}>{g.count} изм.</div>
+                    </div>
+                  );
+                })}
               </div>
               {circadian.isNonDipper && (
-                <div style={{ color: '#f59e0b', marginTop: 6 }}>⚠ Non-dipper паттерн: ночное АД не снижается (риск поражения органов-мишеней)</div>
+                <div style={{ color: '#f59e0b', marginTop: 8, fontSize: 13 }}>⚠ Non-dipper: ночное АД не снижается (риск поражения органов-мишеней)</div>
               )}
               {!circadian.isNonDipper && circadian.morning.avgS > 0 && (
-                <div style={{ color: '#22c55e', marginTop: 6 }}>✓ Dipper паттерн: нормальное ночное снижение АД</div>
+                <div style={{ color: '#22c55e', marginTop: 8, fontSize: 13 }}>✓ Dipper: нормальное ночное снижение АД</div>
               )}
             </section>
 
@@ -684,6 +699,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 <div key={row.id || `latest-${row.date}`} style={{ padding: 8, borderBottom: '1px solid #29292f', borderLeft: `3px solid ${getBpClassificationColor(cls)}`, paddingLeft: 8 }}>
                   <b>{row.date}</b> · {row.systolic}/{row.diastolic} · {row.hr} уд/мин · MAP {calcMAP(row.systolic, row.diastolic)}
                   {row.position ? ` · ${row.position}` : ''}
+                  {row.timeOfDay ? ` · ${row.timeOfDay}` : ''}
                   {row.notes ? ` · ${row.notes}` : ''}
                 </div>
               );
@@ -694,27 +710,29 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
 
       {/* Add/Edit modal */}
       {modal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: '#000b', display: 'grid', placeItems: 'center', padding: 16 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: '#000b', display: 'grid', placeItems: 'center', padding: 16 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setModal(false); }}>
           <form onSubmit={e => { e.preventDefault(); save(); }}
-            style={{ background: '#18181b', padding: 18, borderRadius: 12, width: 'min(560px,100%)' }}>
+            style={{ background: '#18181b', padding: 18, borderRadius: 12, width: 'min(560px,100%)', maxHeight: '90dvh', overflowY: 'auto' }}>
             <h3>{editing ? 'Редактирование АД' : 'Добавить запись АД'}</h3>
             {validationErrors.length > 0 && (
               <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 8, padding: 10, marginBottom: 10 }}>
                 {validationErrors.map(error => <div key={`${error.field}-${error.message}`} style={{ color: '#ef4444', fontSize: 13 }}>⚠ {error.message}</div>)}
               </div>
             )}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: 8 }}>
-              {[
+              {([
                 ['Дата', 'date'],
                 ['Систола', 'systolic'],
                 ['Диастола', 'diastolic'],
                 ['Пульс', 'pulse'],
-              ].map(([label, key]) => (
+              ] as const).map(([label, key]) => (
                 <label key={key}>
                   {label}
                   <input style={input} type={key === 'date' ? 'date' : 'number'}
-                    value={draft[key as 'date' | 'systolic' | 'diastolic' | 'pulse']}
-                    onChange={e => setDraft({ ...draft, [key]: e.target.value } as BPForm)} />
+                    value={draft[key]}
+                    onChange={e => setDraft({ ...draft, [key]: e.target.value })} />
                 </label>
               ))}
             </div>

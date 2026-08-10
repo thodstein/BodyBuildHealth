@@ -197,6 +197,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     setSelectedLabs(new Set());
     setShowImport(false);
   }, []);
+  // Backdrop click should NOT cancel an in-flight OCR: on mobile, a "ghost click"
+  // can fire on the backdrop after the native file picker closes, which would
+  // invalidate the request via cancelOcr and leave the user with no result.
+  const backdropClick = useCallback(() => {
+    if (ocrLoading) return;
+    cancelOcr();
+  }, [ocrLoading, cancelOcr]);
   const [chartMarkerSearch, setChartMarkerSearch] = useState('');
   const [chartSelectedCodes, setChartSelectedCodes] = useState<Set<string>>(new Set());
   const [chartFilterSys, setChartFilterSys] = useState('all');
@@ -895,20 +902,20 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             </button>
           </div>
 
-          {/* Import buttons — PDF + Фото */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {/* Import button — opens modal with file/camera/paste options */}
+          <div style={{ marginBottom: 10 }}>
             <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
-            <button onClick={() => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 100); }} style={{
-              flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-            }}>📄 Загрузить PDF</button>
-            <button onClick={() => { setShowImport(true); setTimeout(() => cameraInputRef.current?.click(), 100); }} style={{
-              flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border)',
-              background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
-            }}>📸 Загрузить JPG</button>
+            <button onClick={() => setShowImport(true)} style={{
+              width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.25)',
+              background: 'linear-gradient(135deg, rgba(0,230,138,0.12) 0%, rgba(0,230,138,0.04) 100%)',
+              color: 'var(--accent)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <span style={{ fontSize: 16 }}>📄</span> Импорт анализов (PDF / фото / текст)
+            </button>
           </div>
 
           {/* Inline batch form — same layout as progress card chips */}
@@ -1989,9 +1996,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       </div>
       )}
 
-      {/* OCR Import Modal — centered */}
+       {/* OCR Import Modal — centered */}
       {showImport && (
-         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={cancelOcr}>
+         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={backdropClick}>
           <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
@@ -2096,6 +2103,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     color: selectedLabs.size > 0 ? '#000' : 'var(--text-dim)',
                     border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
                   }}>✓ Сохранить {selectedLabs.size} показателей</button>
+                  {ocrResult.labs.length === 0 && (
+                    <button onClick={() => { setOcrResult(null); setSelectedLabs(new Set()); }} style={{
+                      width: '100%', marginTop: 6, padding: 10,
+                      background: 'var(--bg-secondary)', color: 'var(--text-dim)',
+                      border: '1px solid var(--border)', borderRadius: 10, fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                    }}>🔄 Попробовать другой файл или вставить текст</button>
+                  )}
                 </div>
               )}
             </div>

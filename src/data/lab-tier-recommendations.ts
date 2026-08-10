@@ -168,6 +168,92 @@ const TIER_RULES: TierRule[] = [
   { marker: 'AMMONIA', tier1: { add: [['nac', 'NAC 1200 мг'], ['l_carnitine', 'L-Карнитин 2 г']], nutrition: [['↓ белок', '1.5 г/кг временно']] }, tier2: { titrate: [['nac', 1.5, 'NAC ↑1800 мг'], ['l_carnitine', 2.0, 'Carnitine ↑4 г']], nutrition: [['STOP белок', '0.8 г/кг'], ['Lactulose', 'По рецепту врача']] }, tier3: { alerts: ['⛔ Аммиак = {value} mcmol/L — печёночная энцефалопатия. ER.'], stopCourse: true } },
 
   { marker: 'ALP', tier1: { add: [['tudca', 'TUDCA 500 мг — желчеотток']], nutrition: [['Витамин D', 'Проверить D3'] ] }, tier2: { titrate: [['tudca', 2.0, 'TUDCA ↑1000 мг']], nutrition: [['УЗИ', 'Кости/печень']] }, tier3: { alerts: ['ЩФ = {value} U/L — болезни костей или холестаз. Врач.'] } },
+
+  // ─── НЕДОСТАЮЩИЕ МАРКЁРЫ (37 шт.) ───
+  { marker: 'CHOLESTEROL_TOTAL', tier1: { nutrition: [['↓ насыщ. жиры', '<10% калор'], ['Клетчатка', '30+ г/день']] }, tier2: { add: [['bergamot', 'Бергамот 1000 мг'], ['omega3', 'Омега-3 3 г']], nutrition: [['Статины?', 'Через врача']] }, tier3: { alerts: ['Холестерин общий = {value} ммоль/л — высокий. Кардиолог.'] } },
+
+  { marker: 'DHT', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { add: [['saw_palmetto', 'Со Пальметто 320 мг'], ['zinc', 'Цинк 30 мг']], nutrition: [['↓ DHT', '5α-редуктаза']] }, tier3: { alerts: ['DHT = {value} — выраженная андрогенная нагрузка. Облысение/простата.'] } },
+
+  { marker: 'PROG', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { add: [['cabergoline', 'Каберголин 0.25 мг (если пролактин также ↑)']], nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['Прогестерон = {value} — гинекомастия/либидо. Эндокринолог.'] } },
+
+  { marker: 'PROGESTERONE', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { add: [['cabergoline', 'Каберголин 0.25 мг']], nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['Прогестерон = {value} — гинекомастия. Эндокринолог.'] } },
+
+  { marker: 'T3_FREE', tier1: { nutrition: [['Селен', '200 мкг'], ['Йод', '150 мкг']] }, tier2: { add: [['selenium', 'Селен 200 мкг']], nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['T3 свободный = {value} — тиреотоксикоз. Эндокринолог.'] } },
+
+  { marker: 'T4_FREE', tier1: { nutrition: [['Селен', '200 мкг'], ['Йод', '150 мкг']] }, tier2: { add: [['selenium', 'Селен 200 мкг']], nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['T4 свободный = {value} — гипертиреоз. Эндокринолог.'] } },
+
+  { marker: 'HSCRP', tier1: { add: [['curcumin', 'Куркумин 500 мг'], ['omega3', 'Омега-3 3 г']], nutrition: [['Антиоксиданты', 'Ягоды/куркума']] }, tier2: { titrate: [['curcumin', 2.0, 'Куркумин ↑1000 мг']], add: [['berberine', 'Берберин 1500 мг']], nutrition: [['Врач', 'Кардиолог']] }, tier3: { alerts: ['hs-СРБ = {value} мг/л — высокий кардиориск. Кардиолог.'] } },
+
+  { marker: 'IL6', tier1: { add: [['curcumin', 'Куркумин 500 мг'], ['omega3', 'Омега-3 3 г']] }, tier2: { titrate: [['curcumin', 2.0, 'Куркумин ↑1000 мг']], add: [['berberine', 'Берберин 1500 мг']] }, tier3: { alerts: ['ИЛ-6 = {value} пг/мл — выраженное воспаление. Врач.'] } },
+
+  { marker: 'TNF_ALPHA', tier1: { add: [['curcumin', 'Куркумин 500 мг'], ['omega3', 'Омега-3 3 г']] }, tier2: { titrate: [['curcumin', 2.0, 'Куркумин ↑1000 мг']] }, tier3: { alerts: ['ФНО-α = {value} пг/мл — выраженное воспаление. Врач.'] } },
+
+  { marker: 'FOLATE', tier1: { add: [['methylfolate', 'Метилфолат 400 мкг']] }, tier2: { titrate: [['methylfolate', 2.5, 'Метилфолат ↑1000 мкг']], add: [['methylcobalamin', 'B12 1000 мкг']] }, tier3: { alerts: ['Фолат = {value} — тяжёлый дефицит. Врач.'] } },
+
+  { marker: 'IRON', tier1: { nutrition: [['Красное мясо', 'Heme-iron'], ['Витамин C', '500 мг с едой']] }, tier2: { add: [['iron_bisglycinate', 'Железо бисглицинат 30 мг'], ['vitamin_c', 'Витамин C 500 мг']] }, tier3: { alerts: ['Железо = {value} — тяжёлый дефицит. Гематолог.'] } },
+
+  { marker: 'CALCIUM', tier1: { nutrition: [['Молочные', '500 мг Ca с едой'], ['Витамин D', 'Проверить D3']] }, tier2: { add: [['vitamin_d3', 'D3 5000 МЕ'], ['vitamin_k2', 'K2 200 мкг']] }, tier3: { alerts: ['Кальций = {value} — нарушение кальциевого обмена. Врач.'] } },
+
+  { marker: 'PHOSPHORUS', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { nutrition: [['Врач', 'Нефролог/эндокринолог']] }, tier3: { alerts: ['Фосфор = {value} ммоль/л — нарушение. Врач.'] } },
+
+  { marker: 'SELENIUM', tier1: { add: [['selenium_sup', 'Селен 200 мкг']] }, tier2: { titrate: [['selenium_sup', 1.5, 'Селен ↑300 мкг']] }, tier3: { alerts: ['Селен = {value} — дефицит/токсичность. Врач.'] } },
+
+  { marker: 'VITAMIN_B6', tier1: { add: [['p5p', 'P5P 50 мг']] }, tier2: { titrate: [['p5p', 2.0, 'P5P ↑100 мг']] }, tier3: { alerts: ['B6 = {value} — нейропатия при высоких дозах. Врач.'] } },
+
+  { marker: 'CYSTATIN_C', tier1: { add: [['astragalus', 'Астрагал 500 мг']] }, tier2: { add: [['cordyceps', 'Кордицепс 2000 мг']], nutrition: [['↓ белок', '1.6 г/кг']] }, tier3: { alerts: ['⛔ Цистатин C = {value} мг/л — ХБП. Нефролог. STOP AAS.'], stopCourse: true } },
+
+  { marker: 'UREA', tier1: { nutrition: [['↓ белок', '1.8 г/кг'], ['Вода', '45+ мл/кг']] }, tier2: { nutrition: [['↓ белок', '1.5 г/кг'], ['Вода', '45+ мл/кг'], ['STOP creatine', 'ZERO']] }, tier3: { alerts: ['Мочевина = {value} ммоль/л — почечная недостаточность? Врач.'] } },
+
+  { marker: 'MICROALB', tier1: { add: [['astragalus', 'Астрагал 500 мг']], nutrition: [['Вода', '45+ мл/кг']] }, tier2: { add: [['telmisartan', 'Телмисартан 80 мг (антипротеинурический)']], nutrition: [['↓ белок', '1.6 г/кг']] }, tier3: { alerts: ['Микроальбумин = {value} мг/л — диабетическая нефропатия? Нефролог.'] } },
+
+  { marker: 'NGAL', tier1: { add: [['astragalus', 'Астрагал 500 мг'], ['taurine', 'Таурин 1 г']] }, tier2: { add: [['cordyceps', 'Кордицепс 2000 мг']], nutrition: [['↓ белок', '1.6 г/кг']] }, tier3: { alerts: ['NGAL = {value} нг/мл — острое почечное повреждение. Нефролог.'] } },
+
+  { marker: 'KIM1', tier1: { add: [['astragalus', 'Астрагал 500 мг'], ['taurine', 'Таурин 1 г']] }, tier2: { add: [['cordyceps', 'Кордицепс 2000 мг']] }, tier3: { alerts: ['KIM-1 = {value} нг/мл — тубулярное повреждение. Нефролог.'] } },
+
+  { marker: 'RETICULOCYTES', tier1: { nutrition: [['Контроль', 'Повтор через 2 нед']] }, tier2: { nutrition: [['Врач', 'Гематолог']] }, tier3: { alerts: ['Ретикулоциты = {value} — нарушение эритропоэза. Гематолог.'] } },
+
+  { marker: 'INR', tier1: { nutrition: [['Контроль', 'Повтор через 1 нед']] }, tier2: { nutrition: [['Витамин K', 'Контроль потребления'], ['Врач', 'Гематолог']] }, tier3: { alerts: ['⛔ МНО = {value} — риск кровотечения (>3) или тромбоза (<1.5). Гематолог.'] } },
+
+  { marker: 'RBC', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { nutrition: [['Врач', 'Гематолог']] }, tier3: { alerts: ['Эритроциты = {value}×10¹²/л — полицитемия или анемия. Гематолог.'] } },
+
+  { marker: 'WBC', tier1: { nutrition: [['Контроль', 'Повтор через 2 нед'], ['Витамин C', '500 мг']] }, tier2: { nutrition: [['Врач', 'Терапевт (инфекция?)']] }, tier3: { alerts: ['Лейкоциты = {value}×10⁹/л — лейкоцитоз/лейкопения. Врач.'] } },
+
+  { marker: 'CK_MB', tier1: { nutrition: [['Контроль', 'Повтор через 3 дня'], ['ЭКГ', 'Срочно']] }, tier2: { nutrition: [['STOP AAS', 'Немедленно'], ['ER', 'Скорая']] }, tier3: { alerts: ['⛔ КФК-MB = {value} U/L — инфаркт миокарда? ER НЕМЕДЛЕННО.'], stopCourse: true } },
+
+  { marker: 'APO_B', tier1: { add: [['bergamot', 'Бергамот 1000 мг'], ['omega3', 'Омега-3 3 г']] }, tier2: { add: [['berberine', 'Берберин 1500 мг'], ['red_yeast_rice', 'Красный рис 1200 мг']] }, tier3: { alerts: ['ApoB = {value} г/л — высокий атерогенный риск. Кардиолог.'] } },
+
+  { marker: 'LP_A', tier1: { add: [['omega3', 'Омега-3 4 г'], ['niacin', 'Ниацин 500 мг']] }, tier2: { titrate: [['niacin', 2.0, 'Ниацин ↑1000 мг']] }, tier3: { alerts: ['Lp(a) = {value} мг/дл — генетический риск. Кардиолог.'] } },
+
+  { marker: 'BILE_ACIDS', tier1: { add: [['tudca', 'TUDCA 500 мг']] }, tier2: { titrate: [['tudca', 2.0, 'TUDCA ↑1000 мг']] }, tier3: { alerts: ['⛔ Жёлчные кислоты = {value} мкмоль/л — холестаз. STOP AAS. Гепатолог.'], stopCourse: true } },
+
+  { marker: 'AMH', tier1: { nutrition: [['Контроль', 'Повтор через 8 нед']] }, tier2: { nutrition: [['Врач', 'Репродуктолог']] }, tier3: { alerts: ['AMH = {value} — овариальный резерв. Репродуктолог.'] } },
+
+  { marker: 'FT3', tier1: { add: [['selenium', 'Селен 200 мкг']], nutrition: [['Йод', '150 мкг']] }, tier2: { nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['T3 св. = {value} пмоль/л — тиреотоксикоз. Эндокринолог.'] } },
+
+  { marker: 'FT4', tier1: { add: [['selenium', 'Селен 200 мкг']], nutrition: [['Йод', '150 мкг']] }, tier2: { nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['T4 св. = {value} пмоль/л — гипертиреоз. Эндокринолог.'] } },
+
+  { marker: 'CHOLESTEROL_TOTAL', tier1: { nutrition: [['↓ насыщ. жиры', '<10%'], ['Клетчатка', '30+ г']] }, tier2: { add: [['bergamot', 'Бергамот 1000 мг']], nutrition: [['Врач', 'Кардиолог']] }, tier3: { alerts: ['Холестерин = {value} — высокий. Кардиолог.'] } },
+
+  // ─── МАРКЁРЫ МОЧИ (ОАМ) ───
+  { marker: 'URINE_PH', tier1: { nutrition: [['Контроль', 'Повтор через 2 нед'], ['Вода', '40+ мл/кг']] }, tier2: { nutrition: [['Диета', 'Закисление/ощелачивание'], ['Врач', 'Нефролог']] }, tier3: { alerts: ['pH мочи = {value} — нарушение кислотно-щелочного баланса. Врач.'] } },
+
+  { marker: 'URINE_OSM', tier1: { nutrition: [['Вода', '40+ мл/кг'], ['Контроль', 'Повтор через 2 нед']] }, tier2: { nutrition: [['Врач', 'Нефролог (диабет?)']] }, tier3: { alerts: ['Осмолярность мочи = {value} — нарушение концентрационной способности. Нефролог.'] } },
+
+  { marker: 'URINE_GLUCOSE', tier1: { nutrition: [['Lowcarb', '<100 г/день'], ['Контроль глюкозы', 'Сдать кровь']] }, tier2: { add: [['berberine', 'Берберин 1500 мг']], nutrition: [['Lowcarb', '<50 г'], ['Врач', 'Эндокринолог']] }, tier3: { alerts: ['Глюкоза в моче = {value} — диабет? Эндокринолог.'] } },
+
+  { marker: 'URINE_KETONES', tier1: { nutrition: [['Контроль', 'Повтор через 3 дня']] }, tier2: { nutrition: [['Углеводы', '↑50-100 г/день (если не кето)'], ['Врач', 'Эндокринолог']] }, tier3: { alerts: ['Кетоны в моче = {value} — кетоацидоз? ER.'] } },
+
+  { marker: 'URINE_LEUKOCYTES', tier1: { add: [['d_mannose', 'D-манноза 1 г'], ['cranberry', 'Клюква 500 мг']] }, tier2: { nutrition: [['Врач', 'Уролог (инфекция)'], ['Антибиотик?', 'Через врача']] }, tier3: { alerts: ['Лейкоциты в моче = {value} — инфекция МВП. Уролог.'] } },
+
+  { marker: 'URINE_NITRITE', tier1: { nutrition: [['Контроль', 'Повтор через 3 дня'], ['D-манноза', '1 г/день']] }, tier2: { nutrition: [['Врач', 'Уролог (бактерии)']] }, tier3: { alerts: ['Нитриты в моче = {value} — бактериальная инфекция. Уролог.'] } },
+
+  { marker: 'URINE_BLOOD', tier1: { nutrition: [['Контроль', 'Повтор через 1 нед']] }, tier2: { nutrition: [['УЗИ', 'Почки/МВП'], ['Врач', 'Уролог']] }, tier3: { alerts: ['Кровь в моче = {value} — гематурия. Уролог срочно.'] } },
+
+  { marker: 'URINE_SPECIFIC_GRAVITY', tier1: { nutrition: [['Вода', '40+ мл/кг (если ↑SG — дегидратация)']] }, tier2: { nutrition: [['Вода', 'контроль intake'], ['Врач', 'Нефролог']] }, tier3: { alerts: ['Удельный вес мочи = {value} — нарушение концентрации. Нефролог.'] } },
+
+  { marker: 'UROBILINOGEN', tier1: { nutrition: [['Контроль', 'Повтор через 2 нед']] }, tier2: { nutrition: [['Врач', 'Гепатолог (печень?)']] }, tier3: { alerts: ['Уробилиноген = {value} — печёночная патология. Гепатолог.'] } },
+
+  { marker: 'URINE_BILIRUBIN', tier1: { nutrition: [['Контроль', 'Повтор через 1 нед']] }, tier2: { add: [['tudca', 'TUDCA 500 мг']], nutrition: [['Врач', 'Гепатолог']] }, tier3: { alerts: ['Билирубин в моче = {value} — холестаз/гепатит. Гепатолог.'] } },
 ];
 
 // ════════════════════════════════════════════════════════════════════════════

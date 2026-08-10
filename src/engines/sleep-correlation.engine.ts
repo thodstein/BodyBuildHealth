@@ -65,18 +65,16 @@ export function analyzeSleepTrainingCorrelation(
   const avgHoursWithTraining = sleepWithTraining.reduce((sum, e) => sum + e.hours, 0) / sleepWithTraining.length;
   const avgHoursWithoutTraining = sleepWithoutTraining.reduce((sum, e) => sum + e.hours, 0) / sleepWithoutTraining.length;
 
+  // Качество оценивается по шкале 1-5 (единые единицы — разница средних качеств)
   const qualityDiff = avgQualityWithTraining - avgQualityWithoutTraining;
-  const hoursDiff = avgHoursWithTraining - avgHoursWithoutTraining;
-
-  // Простая корреляция (разница средних)
-  const correlation = (qualityDiff + hoursDiff) / 2; // нормализованное значение
+  const correlation = Math.round(qualityDiff * 10) / 10;
 
   return {
     factor: 'Тренировки',
-    correlation: Math.round(correlation * 10) / 10,
+    correlation,
     strength: Math.abs(correlation) > 1 ? 'strong' : Math.abs(correlation) > 0.5 ? 'moderate' : 'weak',
     direction: correlation > 0 ? 'positive' : correlation < 0 ? 'negative' : 'neutral',
-    description: `При тренировках: качество ${avgQualityWithTraining.toFixed(1)}/10, сон ${avgHoursWithTraining.toFixed(1)}ч. Без тренировок: ${avgQualityWithoutTraining.toFixed(1)}/10, ${avgHoursWithoutTraining.toFixed(1)}ч`,
+    description: `С тренировками: качество ${avgQualityWithTraining.toFixed(1)}/5, сон ${avgHoursWithTraining.toFixed(1)} ч. Без тренировок: ${avgQualityWithoutTraining.toFixed(1)}/5, ${avgHoursWithoutTraining.toFixed(1)} ч`,
     sampleSize: sleepWithTraining.length
   };
 }
@@ -128,7 +126,7 @@ export function analyzeAlcoholCorrelation(sleepDiary: SleepEntry[]): Correlation
     correlation: Math.round(qualityDiff * 10) / 10,
     strength: Math.abs(qualityDiff) > 1.5 ? 'strong' : Math.abs(qualityDiff) > 0.8 ? 'moderate' : 'weak',
     direction: qualityDiff < 0 ? 'negative' : 'positive',
-    description: `С алкоголем: качество ${avgQualityAlcohol.toFixed(1)}/10, пробуждений ${avgAwakeningsAlcohol.toFixed(1)}. Без алкоголя: ${avgQualityNoAlcohol.toFixed(1)}/10, ${avgAwakeningsNoAlcohol.toFixed(1)} пробуждений`,
+    description: `С алкоголем: качество ${avgQualityAlcohol.toFixed(1)}/5, пробуждений ${avgAwakeningsAlcohol.toFixed(1)}. Без алкоголя: ${avgQualityNoAlcohol.toFixed(1)}/5, ${avgAwakeningsNoAlcohol.toFixed(1)} пробуждений`,
     sampleSize: alcoholDays.length
   };
 }

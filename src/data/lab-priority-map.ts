@@ -897,6 +897,89 @@ export const LAB_PRIORITY_MAP: LabPriorityMap[] = [
 
   // ─── ЭХО СЕРДЦА (фиктивные ids — используются в ECHO_*) ───
   // (ECHO_LV_MASS, ECHO_EF, ECHO_LA выше)
+
+  // ═══════════════════════════════════════════════════════════════
+  //  ДОБАВЛЕНО: НЕДОСТАЮЩИЕ МАРКЁРЫ (audit 2026-08-10)
+  // ═══════════════════════════════════════════════════════════════
+
+  // ─── Алиасы маркёров (UPPERCASE из lab-tier-ranges → canonical) ───
+  { marker: 'CHOLESTEROL_TOTAL', entries: [
+    { substanceId: 'bergamot', priority: 1, brandName: 'Бергамот', reason: '↓ синтеза холестерина (натуральный статин)', minSeverity: 'mild' },
+    { substanceId: 'omega3', priority: 2, brandName: 'Омега-3', reason: '↓ синтеза холестерина, ↑ ЛПВП', minSeverity: 'mild' },
+    { substanceId: 'berberine', priority: 3, brandName: 'Берберин', reason: 'AMPK → ↓ синтез холестерина', minSeverity: 'moderate' },
+  ]},
+  { marker: 'TESTOSTERONE', entries: [
+    { substanceId: 'zinc_sup', priority: 1, brandName: 'Цинк', reason: 'Кофактор 17β-HSD, синтез T', minSeverity: 'moderate' },
+    { substanceId: 'boron', priority: 2, brandName: 'Бор', reason: '↓ SHBG → ↑ свободного T', minSeverity: 'moderate' },
+    { substanceId: 'tongkat_ali', priority: 3, brandName: 'Тонгкат Али', reason: '↑ LH → ↑ синтез T', minSeverity: 'moderate' },
+  ]},
+  { marker: 'TOTAL_T', entries: [
+    { substanceId: 'zinc_sup', priority: 1, brandName: 'Цинк', reason: 'Кофактор синтеза T', minSeverity: 'moderate' },
+    { substanceId: 'boron', priority: 2, brandName: 'Бор', reason: '↓ SHBG', minSeverity: 'moderate' },
+  ]},
+  { marker: 'FREE_TESTOSTERONE', entries: [
+    { substanceId: 'boron', priority: 1, brandName: 'Бор', reason: '↓ SHBG → ↑ свободного T (+28%)', minSeverity: 'moderate' },
+    { substanceId: 'tongkat_ali', priority: 2, brandName: 'Тонгкат Али', reason: '↑ свободного T', minSeverity: 'moderate' },
+  ]},
+  { marker: 'ESTRADIOL', entries: [
+    { substanceId: 'dim', priority: 1, brandName: 'DIM', reason: 'Сдвиг метаболизма E2 в сторону 2-гидрокси', minSeverity: 'mild' },
+    { substanceId: 'zinc_sup', priority: 2, brandName: 'Цинк', reason: 'Ингибиция ароматазы', minSeverity: 'moderate' },
+  ]},
+  { marker: 'PROLACTIN', entries: [
+    { substanceId: 'vitex', priority: 1, brandName: 'Витекс', reason: 'Дофаминергический эффект → ↓ пролактина', minSeverity: 'mild' },
+    { substanceId: 'p5p', priority: 2, brandName: 'P5P', reason: 'Кофактор L-ДОФА → дофамин', minSeverity: 'mild' },
+    { substanceId: 'cabergoline', priority: 3, brandName: 'Достинекс', reason: 'D2-агонист', minSeverity: 'moderate' },
+  ]},
+  { marker: 'HSCRP', entries: [
+    { substanceId: 'curcumin_sup', priority: 1, brandName: 'Куркумин', reason: 'NF-κB → ↓ hs-СРБ', minSeverity: 'mild' },
+    { substanceId: 'omega3', priority: 2, brandName: 'Омега-3', reason: '↓ IL-6, TNF-α → ↓ СРБ', minSeverity: 'moderate' },
+    { substanceId: 'ashwagandha', priority: 3, brandName: 'Ашваганда', reason: '↓ CRP на 30%', minSeverity: 'moderate' },
+  ]},
+  { marker: 'T3_FREE', entries: [
+    { substanceId: 'selenium_sup', priority: 1, brandName: 'Селен', reason: 'Кофактор дейодиназы D1/D2 → T4→T3', minSeverity: 'moderate' },
+    { substanceId: 'zinc_sup', priority: 2, brandName: 'Цинк', reason: 'Кофактор дейодиназы', minSeverity: 'moderate' },
+  ]},
+  { marker: 'T4_FREE', entries: [
+    { substanceId: 'selenium_sup', priority: 1, brandName: 'Селен', reason: 'Защита щитовидной железы', minSeverity: 'moderate' },
+    { substanceId: 'zinc_sup', priority: 2, brandName: 'Цинк', reason: 'Кофактор синтеза T4', minSeverity: 'moderate' },
+  ]},
+  { marker: 'FOLATE', entries: [
+    { substanceId: 'methylfolate', priority: 1, brandName: 'Метилфолат (5-MTHF)', reason: 'Активная форма фолата', minSeverity: 'moderate' },
+    { substanceId: 'methylcobalamin', priority: 2, brandName: 'B12', reason: 'Синергия с фолатом', minSeverity: 'moderate' },
+  ]},
+
+  // ─── МАРКЁРЫ МОЧИ (ОАМ) ───
+  { marker: 'URINE_GLUCOSE', entries: [
+    { substanceId: 'berberine', priority: 1, brandName: 'Берберин', reason: 'AMPK → ↓ глюкозы → ↓ глюкозурии', minSeverity: 'moderate' },
+    { substanceId: 'chromium', priority: 2, brandName: 'Хром', reason: 'Кофактор инсулина → ↓ глюкозы', minSeverity: 'moderate' },
+  ]},
+  { marker: 'URINE_KETONES', entries: [
+    { substanceId: 'berberine', priority: 1, brandName: 'Берберин', reason: '↓ кетогенеза через AMPK (если не кето-диета)', minSeverity: 'moderate' },
+  ]},
+  { marker: 'URINE_LEUKOCYTES', entries: [
+    { substanceId: 'd_mannose', priority: 1, brandName: 'D-Манноза', reason: 'Профилактика инфекции МВП, ↑ вымывания бактерий', minSeverity: 'mild' },
+    { substanceId: 'cranberry', priority: 2, brandName: 'Клюква (проантоцианидины)', reason: '↓ адгезии E.coli к слизистой МВП', minSeverity: 'mild' },
+    { substanceId: 'vitamin_c', priority: 3, brandName: 'Витамин C', reason: '↑ иммунитет МВП, ↓ бактериальной активности', minSeverity: 'moderate' },
+  ]},
+  { marker: 'URINE_NITRITE', entries: [
+    { substanceId: 'd_mannose', priority: 1, brandName: 'D-Манноза', reason: 'Антибактериальное действие МВП', minSeverity: 'mild' },
+    { substanceId: 'cranberry', priority: 2, brandName: 'Клюква', reason: '↓ адгезии бактерий', minSeverity: 'mild' },
+  ]},
+  { marker: 'URINE_BLOOD', entries: [
+    { substanceId: 'astragalus', priority: 1, brandName: 'Астрагал', reason: 'Нефропротекция при гематурии', minSeverity: 'moderate' },
+    { substanceId: 'vitamin_c', priority: 2, brandName: 'Витамин C', reason: '↑ прочности капилляров клубочков', minSeverity: 'moderate' },
+  ]},
+  { marker: 'URINE_SPECIFIC_GRAVITY', entries: [
+    { substanceId: 'electrolyte_balance', priority: 1, brandName: 'Электролиты Na/K/Mg', reason: 'Нормализация водного баланса', minSeverity: 'mild' },
+  ]},
+  { marker: 'UROBILINOGEN', entries: [
+    { substanceId: 'tudca', priority: 1, brandName: 'TUDCA', reason: 'Улучшение желчеоттока → ↓ уробилиногена', minSeverity: 'mild' },
+    { substanceId: 'milk_thistle', priority: 2, brandName: 'Легалон', reason: 'Защита гепатоцитов', minSeverity: 'moderate' },
+  ]},
+  { marker: 'URINE_BILIRUBIN', entries: [
+    { substanceId: 'tudca', priority: 1, brandName: 'TUDCA', reason: 'Стимуляция BSEP → ↓ билирубина в моче', minSeverity: 'mild' },
+    { substanceId: 'milk_thistle', priority: 2, brandName: 'Легалон', reason: 'Защита жёлчных канальцев', minSeverity: 'moderate' },
+  ]},
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -980,6 +1063,27 @@ const MARKER_ALIASES: Record<string, string> = {
   'Calcium': 'CALCIUM',
   'Phosphorus': 'PHOSPHORUS',
   'Magnesium': 'MAGNESIUM',
+  // Алиасы для UPPERCASE маркёров из lab-tier-ranges (audit 2026-08-10)
+  'CHOLESTEROL_TOTAL': 'CHOLESTEROL_TOTAL',
+  'TESTOSTERONE': 'TESTOSTERONE',
+  'TOTAL_T': 'TOTAL_T',
+  'FREE_TESTOSTERONE': 'FREE_TESTOSTERONE',
+  'ESTRADIOL': 'ESTRADIOL',
+  'PROLACTIN': 'PROLACTIN',
+  'HSCRP': 'HSCRP',
+  'T3_FREE': 'T3_FREE',
+  'T4_FREE': 'T4_FREE',
+  'FOLATE': 'FOLATE',
+  'URINE_PH': 'URINE_PH',
+  'URINE_OSM': 'URINE_OSM',
+  'URINE_GLUCOSE': 'URINE_GLUCOSE',
+  'URINE_KETONES': 'URINE_KETONES',
+  'URINE_LEUKOCYTES': 'URINE_LEUKOCYTES',
+  'URINE_NITRITE': 'URINE_NITRITE',
+  'URINE_BLOOD': 'URINE_BLOOD',
+  'URINE_SPECIFIC_GRAVITY': 'URINE_SPECIFIC_GRAVITY',
+  'UROBILINOGEN': 'UROBILINOGEN',
+  'URINE_BILIRUBIN': 'URINE_BILIRUBIN',
 };
 
 function resolveMarker(marker: string): string {
