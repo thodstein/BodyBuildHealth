@@ -17,6 +17,7 @@ import {
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
+  daysSince,
 } from './diary-modals';
 
 /* ── Модалка АД ── */
@@ -57,16 +58,17 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
 }) => {
   const initial = (): BPDraft => {
     const last = lastEntryOf(readDiaryEntries<BpRec>('he_bp_diary'));
+    const lastPulse = last?.pulse ?? last?.hr;
     return {
       date: todayIso(),
       systolic: last?.systolic ? String(last.systolic) : '120',
       diastolic: last?.diastolic ? String(last.diastolic) : '80',
-      pulse: last?.pulse ?? last?.hr ? String(last?.pulse ?? last?.hr ?? 70) : '70',
+      pulse: lastPulse && lastPulse > 0 ? String(lastPulse) : '70',
       timeOfDay: last?.timeOfDay === 'evening' ? 'evening' : 'morning',
       notes: '',
     };
   };
-  const [draft, setDraft, clearDraft] = useDiaryDraft<BPDraft>('he_draft_bp', initial);
+  const [draft, setDraft, resetDraft] = useDiaryDraft<BPDraft>('he_draft_bp', initial);
   const lastRec = useMemo(() => lastEntryOf(readDiaryEntries<BpRec>('he_bp_diary')), [open]);
   const set = (key: keyof BPDraft, val: string) => setDraft((p) => ({ ...p, [key]: val }));
 
@@ -80,8 +82,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
   const save = () => {
     if (!draft.date || !valid || dge) return;
     onSave({ date: draft.date, systolic: s, diastolic: d, hr: p, pulse: p, timeOfDay: draft.timeOfDay, notes: draft.notes.trim() || undefined });
-    clearDraft();
-    setDraft(initial());
+    resetDraft();
     onClose();
   };
 
@@ -100,6 +101,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       subtitle="Систола, диастола и пульс в покое"
       onSubmit={save}
       spark={{ data: spark, color: '#f87171' }}
+      stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>

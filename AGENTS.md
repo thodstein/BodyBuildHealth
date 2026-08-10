@@ -9,6 +9,44 @@
 
 ---
 
+## Diary Modals Round 3 — Reset-guard, stale-чипы, умные дефолты (Aug 10 2026, uncommitted)
+
+Третья ротация дневниковых модалок Профиля v2 (поверх коммита 95e5593d6, незакоммичено — 11 файлов + 25 новых тестов).
+
+### 1. Reset-политика черновиков (`diary-modals.tsx` + все 5 модалок)
+- `useDiaryDraft` теперь возвращает `reset(next?)` вместо `clear`; `skipPersist` guard:
+  после сохранения storage удаляется, а первый persist-эффект (свежий дефолт `initial()`) **пропускается** — мусорная перезапись «следующий залив дефолт» устранена.
+- Все 5 save() переведены с `clearDraft()+setDraft(initial())` на `resetDraft()`.
+
+### 2. Stale-чип «🕒 N дн. назад» в шапке DiaryModalShell
+- Новые экспорты: `daysSince(lastDate)` (0=сегодня, null=нет записей), `daysAgoLabel`, `staleColorFor` (≥14дн — красный, ≥7 — оранжевый, ≥3 — янтарный), `stale?: {days} | null` prop.
+- Подключён во всех 5 модалках (сон, АД, вес, инъекция, здоровье).
+
+### 3. Умные дефолты из последней записи
+- **АД**: пофикшен баг приоритета `last?.pulse ?? last?.hr ? x : '70'` (тернарник поверх `??`) — вынесено в `lastPulse` с проверкой `> 0`.
+- **Сон**: `awakenings` теперь наследуется из последней записи.
+- **Инъекция**: авто-ротация стороны (последняя left → предлагается right и наоборот) + зона из последней записи; добавлен спарклайн боли за 7 дней.
+
+### 4. Undo-очередь вынесена в diary-modals (тестируемость)
+- `pushUndoAction(q, label, undo)` (кап 5, TTL 5с), `topUndo`, `dismissTopUndo`, `UNDO_TTL_MS`, `nextRoutineStep('sleep'|'bp'|'weight') → следующий шаг утреннего рутинга`.
+- `ProfileDiariesTab` использует их для undo ×5 и цепочки «сон → давление → вес».
+
+### 5. UI polish (diary-modals.tsx)
+- Градиентная подложка модалки + blur 14px, анимация `dm-pop`, focus-кольцо инпутов (rgba(0,230,138,0.5)), hover-классы (dm-close-btn/dm-ghost-btn/dm-primary-btn), icon-box с градиентом.
+- Sparkline: area-заливка градиентом + точка на последнем значении (useId для градиента).
+- Секции/карточки/чипы/степперы: скругления 12-14px, тени, min-height 46.
+
+### 6. body-measurements: `alert()` → `showToast` + try/catch compressImage.
+
+### Tests
+- NEW `src/ui/screens/ProfileScreen_v2/__tests__/diary-modals-audit.test.tsx` — **25 тестов**: daysSince (6: сегодня/вчера/дней/будущее/invalid/пусто), daysAgoLabel (4), staleColorFor (4), pushUndoAction (2), topUndo/dismiss (2), nextRoutineStep (3), useDiaryDraft (2), DiaryModalShell stale-чип (2).
+- Verification: `tsc --noEmit` 0 ошибок, целевой тест-файл 25/25, `vite build` OK.
+
+### Not ours in worktree (другой агент, uncommitted)
+- `TrainingScreen.tsx` / `nav.ts` / `DiaryAnalyticsZone.tsx` / `TrainingDiaryHub.tsx` — переименование tab id (insights→analytics, strength→history, +progress/reports), удалён внутренний MODES-селектор в TrainingDiaryHub.
+
+---
+
 ## BB-auto Full Critical Audit (Aug 10 2026)
 
 Полный критический анализ всех параметров ББ-авто: методика порядка (compound_first/pre_exhaust/post_exhaust), специализация по слабым точкам, методика финиша (taper/peak week), профицит калорий, эксцентрик, cross-mesocycle continuity, feeders. Найдено и исправлено **10 багов** (5 P0 + 3 P1 + 2 P2).

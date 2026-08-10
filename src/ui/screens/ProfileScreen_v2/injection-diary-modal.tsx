@@ -19,6 +19,7 @@ import {
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
+  daysSince,
 } from './diary-modals';
 
 /* ── Модалка инъекции ── */
@@ -61,22 +62,26 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
   onClose,
   onSave,
 }) => {
-  const initial = (): InjectionDraft => ({
-    date: todayIso(),
-    substance: '',
-    dose: '',
-    zone: 'glute_dorsal',
-    side: 'left',
-    volumeMl: '1',
-    needleGauge: '23G',
-    technique: 'im',
-    painLevel: '0',
-    pipLevel: '0',
-    swelling: '0',
-    reactions: { redness: false, lump: false, bruise: false },
-    notes: '',
-  });
-  const [draft, setDraft, clearDraft] = useDiaryDraft<InjectionDraft>('he_draft_injection', initial);
+  const initial = (): InjectionDraft => {
+    const last = lastEntryOf(readDiaryEntries<InjRec>('he_injection_diary'));
+    const lastSide = last?.side === 'right' ? 'right' as const : 'left' as const;
+    return {
+      date: todayIso(),
+      substance: '',
+      dose: '',
+      zone: typeof last?.zone === 'string' ? last.zone : 'glute_dorsal',
+      side: lastSide === 'left' ? 'right' : 'left',
+      volumeMl: '1',
+      needleGauge: '23G',
+      technique: 'im',
+      painLevel: '0',
+      pipLevel: '0',
+      swelling: '0',
+      reactions: { redness: false, lump: false, bruise: false },
+      notes: '',
+    };
+  };
+  const [draft, setDraft, resetDraft] = useDiaryDraft<InjectionDraft>('he_draft_injection', initial);
 
   const allInjections = useMemo(() => readDiaryEntries<InjRec>('he_injection_diary'), [open]);
   const recent = useMemo(() => {
@@ -162,8 +167,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       bruise: !!draft.reactions.bruise,
       notes: draft.notes.trim() || undefined,
     });
-    clearDraft();
-    setDraft(initial());
+    resetDraft();
     onClose();
   };
 
@@ -171,6 +175,11 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
     setDraft((p) => ({ ...p, [key]: String(v) }));
 
   const zoneLabel = (id: string) => INJECTION_ZONES.find((z) => z.id === id)?.label || id;
+
+  const spark = useMemo(
+    () => allInjections.slice(-7).map((e) => (typeof e?.painLevel === 'number' ? e.painLevel : null)),
+    [allInjections],
+  );
 
   return (
     <DiaryModalShell
@@ -182,6 +191,8 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       subtitle="Препарат, доза и реакция места укола"
       width={460}
       onSubmit={save}
+      spark={{ data: spark, color: '#fbbf24' }}
+      stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>

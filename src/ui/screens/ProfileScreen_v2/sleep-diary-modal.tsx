@@ -19,12 +19,13 @@ import {
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
+  daysSince,
 } from './diary-modals';
 
 const SLEEP_QUALITY_EMOJI = ['😖', '😞', '😐', '🙂', '😴'];
 const SLEEP_QUALITY_LABEL = ['Плохо', 'Тяжело', 'Средне', 'Хорошо', 'Отлично'];
 
-type SleepRec = { date?: string; bedtime?: string; wakeTime?: string; hours?: number };
+type SleepRec = { date?: string; bedtime?: string; wakeTime?: string; hours?: number; awakenings?: number };
 interface SleepDraft {
   date: string;
   hours: string;
@@ -46,13 +47,13 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       date: todayIso(),
       hours: last && typeof last.hours === 'number' ? String(last.hours) : '7.5',
       quality: '4',
-      awakenings: '1',
+      awakenings: last && typeof last.awakenings === 'number' ? String(last.awakenings) : '1',
       bedtime: last?.bedtime || '23:00',
       wakeTime: last?.wakeTime || '07:00',
       notes: '',
     };
   };
-  const [draft, setDraft, clearDraft] = useDiaryDraft<SleepDraft>('he_draft_sleep', initial);
+  const [draft, setDraft, resetDraft] = useDiaryDraft<SleepDraft>('he_draft_sleep', initial);
   const lastRec = useMemo(() => lastEntryOf(readDiaryEntries<SleepRec>('he_sleep_diary')), [open]);
   const set = (key: keyof SleepDraft, val: string) => setDraft((p) => ({ ...p, [key]: val }));
 
@@ -73,8 +74,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       wakeTime: draft.wakeTime,
       notes: draft.notes.trim() || undefined,
     });
-    clearDraft();
-    setDraft(initial());
+    resetDraft();
     onClose();
   };
 
@@ -93,6 +93,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       subtitle="Продолжительность, качество и режим за ночь"
       onSubmit={save}
       spark={{ data: spark, color: '#a78bfa' }}
+      stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>

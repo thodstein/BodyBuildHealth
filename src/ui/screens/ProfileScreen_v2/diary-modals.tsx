@@ -11,62 +11,98 @@
  *  - лонг-пресс степперов, клавиатура в шкалах, спарклайн в шапке
  * Public API (open/onClose/onSave и экспорты) сохранён для обратной совместимости.
  */
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
 import { colors, BoolChip } from './ui';
 import { todayIso } from './diary-helpers';
 import { getWeightLog } from '../../../engines/profile-store';
 import { INJECTION_ZONES, NEEDLE_GAUGES, TECHNIQUES } from '../../../engines/injection-diary.engine';
 
 export interface UndoAction {
+  id: number;
   label: string;
   undo: () => void;
   expiresAt: number;
 }
 
+export const UNDO_TTL_MS = 5000;
+
+/** Очередь undo-действий: последний добавленный — верхний (показывается первым). Кап 5. */
+export const pushUndoAction = (queue: UndoAction[], label: string, undo: () => void): UndoAction[] => [
+  ...queue.slice(-4),
+  { id: Date.now() + Math.random(), label, undo, expiresAt: Date.now() + UNDO_TTL_MS },
+];
+export const topUndo = (queue: UndoAction[]): UndoAction | null => (queue.length ? queue[queue.length - 1] : null);
+export const dismissTopUndo = (queue: UndoAction[]): UndoAction[] => queue.slice(0, -1);
+
+/** Следующий шаг утреннего рутинга: сон → давление → вес → конец. */
+export const nextRoutineStep = (r: 'sleep' | 'bp' | 'weight'): 'sleep' | 'bp' | 'weight' | null =>
+  r === 'sleep' ? 'bp' : r === 'bp' ? 'weight' : null;
+
+export const daysAgoLabel = (days: number): string =>
+  days <= 0 ? 'сегодня' : days === 1 ? 'вчера' : `${days} дн. назад`;
+export const staleColorFor = (days: number, base: string): string =>
+  days >= 14 ? '#ef4444' : days >= 7 ? '#f97316' : days >= 3 ? '#f59e0b' : base;
+
+/** Дней с последней записи (0 = сегодня, null — записей нет). */
+export const daysSince = (lastDate: string | undefined): number | null => {
+  if (!lastDate) return null;
+  const last = new Date(lastDate);
+  if (isNaN(last.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  last.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.floor((today.getTime() - last.getTime()) / 86400000));
+};
+
 /* ── Legacy style exports (backward-compat) ── */
 
 export const fieldLabel: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 10.5,
   color: colors.textMuted,
-  fontWeight: 600,
+  fontWeight: 700,
   marginBottom: 4,
   display: 'block',
+  letterSpacing: 0.2,
 };
 export const fieldInput: React.CSSProperties = {
   width: '100%',
   background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 10,
-  padding: '10px 12px',
+  border: '1px solid rgba(255,255,255,0.13)',
+  borderRadius: 12,
+  padding: '11px 13px',
   color: colors.text,
   fontSize: 14,
   outline: 'none',
   boxSizing: 'border-box',
-  minHeight: 44,
+  minHeight: 46,
+  transition: 'border-color 0.18s, box-shadow 0.18s, background 0.18s',
 };
 export const btnPrimary = (color: string): React.CSSProperties => ({
   flex: 1,
-  minHeight: 44,
-  padding: '10px 16px',
-  borderRadius: 10,
+  minHeight: 46,
+  padding: '10px 18px',
+  borderRadius: 13,
   fontSize: 13,
-  fontWeight: 700,
-  background: color,
-  color: '#000',
+  fontWeight: 800,
+  background: `linear-gradient(135deg, ${color}dd, ${color}99)`,
+  color: '#08120c',
   border: 'none',
   cursor: 'pointer',
+  boxShadow: `0 4px 18px ${color}3a, inset 0 1px 0 rgba(255,255,255,0.25)`,
+  transition: 'transform 0.15s, box-shadow 0.15s, filter 0.15s',
 });
 export const btnGhost: React.CSSProperties = {
   flex: 1,
-  minHeight: 44,
-  padding: '10px 16px',
-  borderRadius: 10,
+  minHeight: 46,
+  padding: '10px 18px',
+  borderRadius: 13,
   fontSize: 13,
-  fontWeight: 600,
-  background: 'rgba(255,255,255,0.03)',
+  fontWeight: 700,
+  background: 'rgba(255,255,255,0.04)',
   color: colors.text,
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${colors.borderHover}`,
   cursor: 'pointer',
+  transition: 'background 0.15s, border-color 0.15s',
 };
 
 export const styles = { fieldLabel, fieldInput, btnGhost, btnPrimary };
@@ -90,11 +126,14 @@ export function lastEntryOf<T extends { date?: string; timestamp?: number }>(arr
   )[0];
 }
 
-/** Черновик модалки в sessionStorage: переживает переключение вкладок профиля. */
+/** Черновик модалки в sessionStorage: переживает переключение вкладок профиля.
+ *  Третий элемент — reset(next?): очищает storage и сбрасывает состояние,
+ *  следующая запись persist пропускается (guard от мусорной перезаписи свежим дефолтом). */
 export function useDiaryDraft<T extends object>(
   storageKey: string,
   initial: () => T,
-): [T, React.Dispatch<React.SetStateAction<T>>, () => void] {
+): [T, React.Dispatch<React.SetStateAction<T>>, (next?: T) => void] {
+  const skipPersist = useRef(false);
   const [state, setState] = useState<T>(() => {
     try {
       const s = sessionStorage.getItem(storageKey);
@@ -106,16 +145,25 @@ export function useDiaryDraft<T extends object>(
     return initial();
   });
   useEffect(() => {
+    if (skipPersist.current) {
+      skipPersist.current = false;
+      return;
+    }
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(state));
     } catch {}
   }, [state, storageKey]);
-  const clear = useCallback(() => {
-    try {
-      sessionStorage.removeItem(storageKey);
-    } catch {}
-  }, [storageKey]);
-  return [state, setState, clear];
+  const reset = useCallback(
+    (next?: T) => {
+      skipPersist.current = true;
+      try {
+        sessionStorage.removeItem(storageKey);
+      } catch {}
+      setState(next ?? initial());
+    },
+    [storageKey],
+  );
+  return [state, setState, reset];
 }
 
 /* ── Шкалы, пресеты, метаданные (сохранены как есть) ── */
@@ -187,22 +235,42 @@ export const SectionCard: React.FC<{
 }> = ({ icon, title, color, badge, hint, children, style }) => (
   <div
     style={{
-      borderRadius: 12,
-      background: 'rgba(255,255,255,0.025)',
-      border: `1px solid ${color}22`,
-      padding: 12,
+      borderRadius: 14,
+      background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015))',
+      border: `1px solid ${color}28`,
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+      padding: 13,
       marginBottom: 10,
       ...style,
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-      {icon && <span style={{ fontSize: 13 }}>{icon}</span>}
-      <span style={{ fontSize: 11, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.4 }}>{title}</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 9 }}>
+      {icon && (
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: 12,
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: `${color}22`,
+            border: `1px solid ${color}33`,
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </span>
+      )}
+      <span style={{ fontSize: 10.5, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: 0.6 }}>{title}</span>
       {badge && (
         <span
           style={{
             fontSize: 9, fontWeight: 800, color, background: `${color}26`,
-            padding: '1px 7px', borderRadius: 8, marginLeft: 'auto',
+            padding: '2px 8px', borderRadius: 999, marginLeft: 'auto',
+            border: `1px solid ${color}44`,
           }}
         >
           {badge}
@@ -219,9 +287,11 @@ export const LiveBadge: React.FC<{ color: string; icon?: string; children: React
   <div
     style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
-      fontSize: 11, fontWeight: 700, color,
-      background: `${color}1c`, border: `1px solid ${color}55`,
-      borderRadius: 999, padding: '5px 12px',
+      fontSize: 11, fontWeight: 800, color,
+      background: `linear-gradient(135deg, ${color}24, ${color}10)`,
+      border: `1px solid ${color}55`,
+      borderRadius: 999, padding: '6px 14px',
+      boxShadow: `0 2px 10px ${color}26`,
       animation: 'diary-badge-in 0.25s ease-out',
     }}
   >
@@ -242,8 +312,8 @@ export const FormBanner: React.FC<{ tone: 'error' | 'warning' | 'info'; children
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       style={{
-        padding: '9px 12px',
-        borderRadius: 10,
+        padding: '10px 12px',
+        borderRadius: 12,
         background: m.bg,
         border: `1px solid ${m.color}55`,
         color: m.color,
@@ -253,6 +323,7 @@ export const FormBanner: React.FC<{ tone: 'error' | 'warning' | 'info'; children
         display: 'flex',
         alignItems: 'center',
         gap: 7,
+        boxShadow: `0 2px 10px ${m.color}14`,
         animation: 'diary-badge-in 0.2s ease-out',
       }}
     >
@@ -262,24 +333,34 @@ export const FormBanner: React.FC<{ tone: 'error' | 'warning' | 'info'; children
   );
 };
 
-/** Мини-спарклайн последних значений */
+/** Мини-спарклайн последних значений с градиентной заливкой */
 export const Sparkline: React.FC<{ data: (number | null)[]; color: string; width?: number; height?: number }> = ({
   data,
   color,
   width = 64,
   height = 22,
 }) => {
+  const gid = useId();
   const pts = data.filter((d): d is number => typeof d === 'number' && Number.isFinite(d)).slice(-7);
   if (pts.length < 2) return null;
   const min = Math.min(...pts);
   const max = Math.max(...pts);
   const range = max - min || 1;
-  const path = pts
-    .map((v, i) => `${i === 0 ? 'M' : 'L'}${((i * (width - 4)) / (pts.length - 1) + 2).toFixed(1)},${(height - 3 - ((v - min) / range) * (height - 6)).toFixed(1)}`)
-    .join(' ');
+  const x = (i: number) => ((i * (width - 4)) / (pts.length - 1) + 2).toFixed(1);
+  const y = (v: number) => (height - 3 - ((v - min) / range) * (height - 6)).toFixed(1);
+  const path = pts.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`).join(' ');
+  const area = `${path} L${x(pts.length - 1)},${height - 1} L${x(0)},${height - 1} Z`;
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ opacity: 0.9, flexShrink: 0 }} aria-hidden="true">
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ opacity: 0.95, flexShrink: 0 }} aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.30" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
       <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1])} r="2.4" fill={color} />
     </svg>
   );
 };
@@ -334,16 +415,16 @@ export const ScalePicker: React.FC<{
               flex: 1,
               minHeight: height || (dense ? 36 : 44),
               padding: '4px 2px',
-              borderRadius: 8,
+              borderRadius: 9,
               cursor: 'pointer',
               fontSize: dense ? 10 : 12,
               fontWeight: 800,
-              border: `1px solid ${active ? c : 'rgba(255,255,255,0.07)'}`,
-              background: active ? `${c}30` : 'rgba(255,255,255,0.02)',
+              border: `1px solid ${active ? c : 'rgba(255,255,255,0.08)'}`,
+              background: active ? `${c}2e` : 'rgba(255,255,255,0.025)',
               color: active ? c : colors.textMuted,
-              transition: 'all 0.15s',
-              transform: active ? 'translateY(-1px)' : undefined,
-              boxShadow: active ? `0 2px 8px ${c}40` : undefined,
+              transition: 'all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              transform: active ? 'translateY(-2px) scale(1.03)' : undefined,
+              boxShadow: active ? `0 3px 12px ${c}45, inset 0 1px 0 rgba(255,255,255,0.12)` : undefined,
             }}
           >
             {labels ? labels(v) : v}
@@ -399,11 +480,11 @@ export const StepperInput: React.FC<{
     }, 380);
   };
   const btn: React.CSSProperties = {
-    width: compact ? 36 : 44,
-    minHeight: compact ? 32 : 44,
-    borderRadius: 10,
-    border: `1px solid ${colors.border}`,
-    background: 'rgba(255,255,255,0.04)',
+    width: compact ? 38 : 46,
+    minHeight: compact ? 34 : 46,
+    borderRadius: 12,
+    border: `1px solid ${colors.borderHover}`,
+    background: 'rgba(255,255,255,0.05)',
     color: colors.text,
     fontSize: large ? 20 : 16,
     fontWeight: 700,
@@ -482,16 +563,17 @@ export const ChipGroup: React.FC<{
             type="button"
             onClick={() => toggle(o.id)}
             style={{
-              minHeight: 40,
-              padding: '7px 8px',
-              borderRadius: 9,
+              minHeight: 42,
+              padding: '7px 9px',
+              borderRadius: 10,
               cursor: 'pointer',
               fontSize: 11,
               fontWeight: 700,
               textAlign: 'left',
               border: `1px solid ${on ? c : 'rgba(255,255,255,0.08)'}`,
-              background: on ? `${c}24` : 'rgba(255,255,255,0.03)',
+              background: on ? `${c}28` : 'rgba(255,255,255,0.03)',
               color: on ? c : colors.textMuted,
+              boxShadow: on ? `0 2px 10px ${c}30` : undefined,
               transition: 'all 0.15s',
             }}
           >
@@ -561,7 +643,7 @@ export const TextField: React.FC<{
 );
 
 /** Стеклянный контейнер модалки: шапка в цвет дневника, bottom-sheet на мобильных,
- *  фокус-трап, блокировка скролла, autofocus, Escape, спарклайн. */
+ *  фокус-трап, блокировка скролла, autofocus, Escape, спарклайн, stale-чип. */
 export const DiaryModalShell: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -573,8 +655,9 @@ export const DiaryModalShell: React.FC<{
   onSubmit: () => void;
   footer?: React.ReactNode;
   spark?: { data: (number | null)[]; color?: string };
+  stale?: { days: number } | null;
   children: React.ReactNode;
-}> = ({ open, onClose, title, icon, color, subtitle, width = 420, onSubmit, footer, spark, children }) => {
+}> = ({ open, onClose, title, icon, color, subtitle, width = 420, onSubmit, footer, spark, stale, children }) => {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -610,14 +693,36 @@ export const DiaryModalShell: React.FC<{
   }, [open, onClose]);
 
   if (!open) return null;
+  const staleColor = stale ? staleColorFor(stale.days, color) : null;
   return (
     <>
       <style>{`
         @keyframes diary-badge-in { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes dm-pop { from { transform: scale(0.96) translateY(14px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes dm-slide-up { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes dm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        .dm-overlay { animation: dm-fade-in 0.2s ease-out; }
+        .dm-card input, .dm-card select, .dm-card textarea {
+          transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+        }
+        .dm-card input:focus, .dm-card select:focus, .dm-card textarea:focus {
+          border-color: rgba(0,230,138,0.5) !important;
+          box-shadow: 0 0 0 3px rgba(0,230,138,0.10);
+          background: rgba(255,255,255,0.065) !important;
+        }
+        .dm-card button:focus-visible { outline: 2px solid rgba(0,230,138,0.55); outline-offset: 2px; }
+        .dm-card .dm-icon-box {
+          background: linear-gradient(135deg, ${color}33, ${color}12);
+          border: 1px solid ${color}55;
+          box-shadow: 0 4px 14px ${color}2e, inset 0 1px 0 rgba(255,255,255,0.14);
+        }
+        .dm-card .dm-close-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .dm-card .dm-ghost-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3); }
+        .dm-card .dm-primary-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+        .dm-card .dm-primary-btn:active { transform: translateY(0); }
         @media (max-width: 480px) {
           .dm-overlay { align-items: flex-end !important; padding: 0 !important; }
-          .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 88dvh !important; border-radius: 20px 20px 0 0 !important; animation: dm-slide-up 0.25s ease-out !important; }
+          .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 88dvh !important; border-radius: 24px 24px 0 0 !important; animation: dm-slide-up 0.28s cubic-bezier(0.32, 0.72, 0.28, 1) !important; }
           .dm-card form { max-height: 88dvh !important; }
         }
       `}</style>
@@ -635,8 +740,9 @@ export const DiaryModalShell: React.FC<{
           alignItems: 'center',
           justifyContent: 'center',
           padding: 12,
-          background: 'rgba(0,0,0,0.7)',
-          backdropFilter: 'blur(6px)',
+          background:
+            'radial-gradient(1000px 500px at 50% -8%, rgba(0,230,138,0.05), transparent 60%), rgba(5,5,9,0.66)',
+          backdropFilter: 'blur(14px)',
         }}
       >
         <div
@@ -647,12 +753,13 @@ export const DiaryModalShell: React.FC<{
             width: `min(${width}px, 94vw)`,
             maxHeight: '90vh',
             overflowY: 'auto',
-            background: 'rgba(24,24,28,0.96)',
-            border: `1px solid ${color}44`,
-            borderRadius: 18,
+            background: 'linear-gradient(165deg, rgba(33,33,42,0.97), rgba(19,19,25,0.98))',
+            border: `1px solid ${color}38`,
+            borderRadius: 22,
             padding: 0,
             color: colors.text,
-            boxShadow: `0 16px 60px rgba(0,0,0,0.6), 0 0 0 1px ${color}11, inset 0 1px 0 rgba(255,255,255,0.06)`,
+            animation: 'dm-pop 0.22s cubic-bezier(0.32, 0.72, 0.28, 1)',
+            boxShadow: `0 0 0 1px ${color}12, 0 24px 70px rgba(0,0,0,0.62), 0 0 48px ${color}16, inset 0 1px 0 rgba(255,255,255,0.07)`,
           }}
         >
           <form
@@ -661,28 +768,27 @@ export const DiaryModalShell: React.FC<{
           >
             <div
               style={{
-                padding: '14px 18px',
-                borderRadius: '18px 18px 0 0',
-                background: `linear-gradient(135deg, ${color}1f, rgba(255,255,255,0.02) 55%)`,
-                borderBottom: `1px solid ${color}22`,
+                padding: '15px 18px',
+                borderRadius: '22px 22px 0 0',
+                background: `linear-gradient(135deg, ${color}26, ${color}0d 45%, transparent)`,
+                borderBottom: `1px solid ${color}1e`,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
+                gap: 11,
                 flexShrink: 0,
               }}
             >
               <div
+                className="dm-icon-box"
                 aria-hidden="true"
                 style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 11,
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: `${color}2a`,
-                  border: `1px solid ${color}55`,
-                  fontSize: 20,
+                  fontSize: 21,
                   lineHeight: 1,
                   flexShrink: 0,
                 }}
@@ -690,35 +796,55 @@ export const DiaryModalShell: React.FC<{
                 {icon}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color }}>{title}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color }}>{title}</div>
                 {subtitle && <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
               </div>
               {spark && <Sparkline data={spark.data} color={spark.color || color} />}
+              {stale && staleColor && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    padding: '4px 9px',
+                    borderRadius: 999,
+                    whiteSpace: 'nowrap',
+                    color: staleColor,
+                    background: `${staleColor}1c`,
+                    border: `1px solid ${staleColor}44`,
+                    animation: 'diary-badge-in 0.25s ease-out',
+                  }}
+                  title="Давность последней записи"
+                >
+                  🕒 {daysAgoLabel(stale.days)}
+                </span>
+              )}
               <button
                 type="button"
+                className="dm-close-btn"
                 onClick={onClose}
                 aria-label="Закрыть"
                 style={{
                   background: 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${colors.border}`,
+                  border: `1px solid ${colors.borderHover}`,
                   color: colors.textMuted,
                   cursor: 'pointer',
                   fontSize: 14,
                   lineHeight: 1,
-                  width: 30,
-                  height: 30,
-                  borderRadius: 8,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 10,
                   flexShrink: 0,
+                  transition: 'background 0.15s, color 0.15s',
                 }}
               >
                 ✕
               </button>
             </div>
-            <div style={{ padding: 14, overflowY: 'auto', flex: 1 }}>{children}</div>
+            <div style={{ padding: 15, overflowY: 'auto', flex: 1 }}>{children}</div>
             {footer ?? (
-              <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${colors.border}`, flexShrink: 0 }}>
-                <button type="button" onClick={onClose} style={btnGhost}>Отмена</button>
-                <button type="submit" style={btnPrimary(color)}>Сохранить</button>
+              <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${color}1e`, flexShrink: 0, background: 'rgba(0,0,0,0.16)' }}>
+                <button type="button" className="dm-ghost-btn" onClick={onClose} style={btnGhost}>Отмена</button>
+                <button type="submit" className="dm-primary-btn" style={btnPrimary(color)}>Сохранить</button>
               </div>
             )}
           </form>

@@ -30,6 +30,11 @@ import {
   ACNE_AREAS,
   HEMATO_SYMPTOMS,
   DIARY_META,
+  pushUndoAction,
+  topUndo,
+  dismissTopUndo,
+  nextRoutineStep,
+  type UndoAction,
 } from './diary-modals';
 import {
   getUnifiedHealthEntries,
@@ -333,14 +338,13 @@ interface QuickLink {
   desc?: string;
 }
 
-interface UndoAction {
-  label: string;
-  undo: () => void;
-  expiresAt: number;
-}
 let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
-const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> = ({ action, onDismiss }) => {
+const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDismiss: () => void }> = ({
+  action,
+  onUndo,
+  onDismiss,
+}) => {
   useEffect(() => {
     if (!action) return;
     if (undoTimer) clearTimeout(undoTimer);
@@ -354,6 +358,7 @@ const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> =
     };
   }, [action, onDismiss]);
   if (!action) return null;
+  const remaining = Math.max(0, action.expiresAt - Date.now());
   return (
     <div
       role="status"
@@ -366,52 +371,70 @@ const Snackbar: React.FC<{ action: UndoAction | null; onDismiss: () => void }> =
         zIndex: 1100,
         maxWidth: 480,
         margin: '0 auto',
-        background: '#1f2937',
+        background: 'rgba(22,22,28,0.92)',
+        backdropFilter: 'blur(14px)',
         border: '1px solid rgba(255,255,255,0.14)',
-        borderRadius: 12,
-        padding: '10px 14px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        animation: 'snackbar-in 0.25s ease-out',
+        borderRadius: 16,
+        padding: '10px 14px 8px',
+        boxShadow: '0 14px 44px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
+        animation: 'snackbar-in 0.28s cubic-bezier(0.32, 0.72, 0.28, 1)',
       }}
     >
-      <span style={{ flex: 1, color: '#fff', fontSize: 13 }}>{action.label}</span>
-      <button
-        onClick={() => {
-          action.undo();
-          onDismiss();
-        }}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: 600 }}>{action.label}</span>
+        <button
+          onClick={onUndo}
+          style={{
+            background: 'linear-gradient(135deg, #00e68a, #00c478)',
+            border: 'none',
+            color: '#04120c',
+            padding: '7px 14px',
+            borderRadius: 10,
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+            minHeight: 36,
+            boxShadow: '0 3px 12px rgba(0,230,138,0.3)',
+            flexShrink: 0,
+          }}
+        >
+          ↩ Отменить
+        </button>
+        <button
+          onClick={onDismiss}
+          aria-label="Закрыть уведомление"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(255,255,255,0.7)',
+            fontSize: 18,
+            cursor: 'pointer',
+            minWidth: 32,
+            minHeight: 36,
+            flexShrink: 0,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+      <div
         style={{
-          background: '#60a5fa',
-          border: 'none',
-          color: '#0a0a0a',
-          padding: '6px 12px',
-          borderRadius: 8,
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: 'pointer',
-          minHeight: 32,
+          height: 3,
+          borderRadius: 999,
+          background: 'rgba(255,255,255,0.07)',
+          marginTop: 8,
+          overflow: 'hidden',
         }}
       >
-        ↩ Отменить
-      </button>
-      <button
-        onClick={onDismiss}
-        aria-label="Закрыть уведомление"
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: 'rgba(255,255,255,0.7)',
-          fontSize: 18,
-          cursor: 'pointer',
-          minWidth: 32,
-          minHeight: 32,
-        }}
-      >
-        ✕
-      </button>
+        <div
+          style={{
+            height: '100%',
+            borderRadius: 999,
+            background: 'linear-gradient(90deg, #00e68a, #60a5fa)',
+            animation: `snackbar-shrink ${Math.max(200, remaining)}ms linear forwards`,
+          }}
+        />
+      </div>
     </div>
   );
 };
@@ -628,11 +651,37 @@ export const ProfileDiariesTab: React.FC<{
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
-  const [routine, setRoutine] = useState<'sleep' | 'bp' | 'weight' | null>(null);
+  const [undoQueue, setUndoQueue] = useState<UndoAction[]>([]);
+
+  const ROUTINE_KEY = 'he_routine_active';
+  const [routine, setRoutine] = useState<'sleep' | 'bp' | 'weight' | null>(() => {
+    try {
+      const v = sessionStorage.getItem(ROUTINE_KEY);
+      return v === 'sleep' || v === 'bp' || v === 'weight' ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  /** Рутинг персистентен: переживает переключение вкладок и перезагрузку. */
+  const setRoutinePersist = (r: 'sleep' | 'bp' | 'weight' | null) => {
+    setRoutine(r);
+    try {
+      if (r) sessionStorage.setItem(ROUTINE_KEY, r);
+      else sessionStorage.removeItem(ROUTINE_KEY);
+    } catch {}
+  };
 
   const pushUndo = (label: string, undo: () => void) => {
-    setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
+    setUndoQueue((q) => pushUndoAction(q, label, undo));
+  };
+  const dismissTopUndoAction = () => {
+    setUndoQueue((q) => dismissTopUndo(q));
+  };
+  const applyTopUndo = () => {
+    const top = topUndo(undoQueue);
+    if (!top) return;
+    top.undo();
+    dismissTopUndoAction();
   };
 
   const setAddXxxOpenForKey = (key: DiaryKey) => {
@@ -650,7 +699,6 @@ export const ProfileDiariesTab: React.FC<{
     )
       setAddHealthOpen(true);
   };
-  const dismissUndo = () => setUndoAction(null);
 
   interface DiaryGoals {
     sleepHours: number;
@@ -1169,7 +1217,7 @@ export const ProfileDiariesTab: React.FC<{
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
-                    <svg viewBox="0 0 64 64" width="64" height="64">
+                    <svg viewBox="0 0 64 64" width="64" height="64" style={{ filter: `drop-shadow(0 0 6px ${ringColor}55)` }}>
                       <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
                       <circle
                         cx="32"
@@ -1261,13 +1309,14 @@ export const ProfileDiariesTab: React.FC<{
                       alignItems: 'center',
                       gap: 8,
                       marginTop: 10,
-                      padding: '8px 10px',
-                      borderRadius: 10,
-                      background: 'rgba(245,158,11,0.10)',
+                      padding: '9px 11px',
+                      borderRadius: 12,
+                      background: 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))',
                       border: '1px solid rgba(245,158,11,0.4)',
+                      boxShadow: '0 4px 14px rgba(245,158,11,0.10)',
                     }}
                   >
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap' }}>
                       🌅 Утренний лог · {routine === 'sleep' ? 'Сон' : routine === 'bp' ? 'Давление' : 'Вес'} ({routine === 'sleep' ? 1 : routine === 'bp' ? 2 : 3}/3)
                     </span>
                     <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
@@ -1275,15 +1324,15 @@ export const ProfileDiariesTab: React.FC<{
                         style={{
                           width: `${(routine === 'sleep' ? 1 : routine === 'bp' ? 2 : 3) * 33}%`,
                           height: '100%',
-                          background: '#fbbf24',
+                          background: 'linear-gradient(90deg, #fbbf24, #f59e0b)',
                           borderRadius: 2,
-                          transition: 'width 0.3s ease',
+                          transition: 'width 0.35s ease',
                         }}
                       />
                     </div>
                     <button
                       type="button"
-                      onClick={() => setRoutine(null)}
+                      onClick={() => setRoutinePersist(null)}
                       aria-label="Отменить утренний лог"
                       style={{
                         background: 'transparent',
@@ -1303,19 +1352,20 @@ export const ProfileDiariesTab: React.FC<{
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setRoutine('sleep')}
+                    onClick={() => setRoutinePersist('sleep')}
                     style={{
                       width: '100%',
                       marginTop: 10,
-                      padding: '9px 12px',
-                      borderRadius: 10,
+                      padding: '10px 12px',
+                      borderRadius: 12,
                       cursor: 'pointer',
                       fontSize: 12,
-                      fontWeight: 700,
+                      fontWeight: 800,
                       textAlign: 'center',
-                      background: 'rgba(245,158,11,0.10)',
-                      border: '1px solid rgba(245,158,11,0.35)',
+                      background: 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))',
+                      border: '1px solid rgba(245,158,11,0.4)',
                       color: '#fbbf24',
+                      boxShadow: '0 4px 16px rgba(245,158,11,0.12)',
                       transition: 'all 0.2s',
                     }}
                   >
@@ -1639,7 +1689,7 @@ export const ProfileDiariesTab: React.FC<{
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
           <AddSleepModal
             open={addSleepOpen}
-            onClose={() => { setAddSleepOpen(false); if (routine === 'sleep') setRoutine(null); }}
+            onClose={() => { setAddSleepOpen(false); if (routine === 'sleep') setRoutinePersist(nextRoutineStep('sleep')); }}
             onSave={(e) => {
               const prev = sleepEntries;
               const updated = [...sleepEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
@@ -1651,12 +1701,12 @@ export const ProfileDiariesTab: React.FC<{
                 saveDiary(SLEEP_DIARY_KEY, prev);
                 setSleepEntries(prev);
               });
-              if (routine === 'sleep') setRoutine('bp');
+              if (routine === 'sleep') setRoutinePersist(nextRoutineStep('sleep'));
             }}
           />
           <AddBPModal
             open={addBPOpen}
-            onClose={() => { setAddBPOpen(false); if (routine === 'bp') setRoutine(null); }}
+            onClose={() => { setAddBPOpen(false); if (routine === 'bp') setRoutinePersist(nextRoutineStep('bp')); }}
             onSave={(e) => {
               const entry: CoreBPEntry = {
                 id: e.id || generateEntryId(),
@@ -1676,12 +1726,12 @@ export const ProfileDiariesTab: React.FC<{
                 const restored = commitBpEntries(prev);
                 setBpEntries(restored.map((x) => ({ ...x, pulse: x.hr })));
               });
-              if (routine === 'bp') setRoutine('weight');
+              if (routine === 'bp') setRoutinePersist(nextRoutineStep('bp'));
             }}
           />
           <AddBodyMeasurementsModal
             open={addBodyMeasurementsOpen}
-            onClose={() => { setAddBodyMeasurementsOpen(false); if (routine === 'weight') setRoutine(null); }}
+            onClose={() => { setAddBodyMeasurementsOpen(false); if (routine === 'weight') setRoutinePersist(nextRoutineStep('weight')); }}
             onSave={(e) => {
               const prev = getWeightLog() || [];
               const updated = [...prev.filter((x) => x.date !== e.date), e].sort((a, b) =>
@@ -1696,7 +1746,7 @@ export const ProfileDiariesTab: React.FC<{
                   setWeights(prev);
                 },
               );
-              if (routine === 'weight') setRoutine(null);
+              if (routine === 'weight') setRoutinePersist(null);
             }}
           />
           <AddInjectionModal
@@ -1782,8 +1832,12 @@ export const ProfileDiariesTab: React.FC<{
 
       <style>{`
         @keyframes snackbar-in {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+          from { transform: translateY(20px) scale(0.97); opacity: 0; }
+          to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes snackbar-shrink {
+          from { width: 100%; }
+          to { width: 0%; }
         }
         @keyframes diary-row-in {
           from { transform: translateX(-8px); opacity: 0; }
@@ -1795,7 +1849,7 @@ export const ProfileDiariesTab: React.FC<{
           100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
         }
       `}</style>
-      <Snackbar action={undoAction} onDismiss={dismissUndo} />
+      <Snackbar action={topUndo(undoQueue)} onUndo={applyTopUndo} onDismiss={dismissTopUndoAction} />
     </div>
   );
 };

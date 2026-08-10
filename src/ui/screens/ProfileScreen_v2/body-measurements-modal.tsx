@@ -19,6 +19,7 @@ import {
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
+  daysSince,
 } from './diary-modals';
 
 /* ── Модалка веса и замеров ── */
@@ -85,9 +86,13 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       photos: [],
     };
   };
-  const [draft, setDraft, clearDraft] = useDiaryDraft<WeightDraft>('he_draft_weight', initial);
+  const [draft, setDraft, resetDraft] = useDiaryDraft<WeightDraft>('he_draft_weight', initial);
   const MAX_PHOTOS = 5;
   const MAX_SIZE_MB = 2;
+
+  const notify = (msg: string, type: 'success' | 'warning' | 'error' = 'warning') => {
+    if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, type);
+  };
 
   const prev = useMemo(() => {
     try {
@@ -110,14 +115,18 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
     if (!files.length) return;
     const remaining = MAX_PHOTOS - draft.photos.length;
     if (remaining <= 0) {
-      alert(`Максимум ${MAX_PHOTOS} фото на запись`);
+      notify(`Максимум ${MAX_PHOTOS} фото на запись`);
       return;
     }
     const toProcess = files.slice(0, remaining);
-    const compressed = await Promise.all(
-      toProcess.map((file) => compressImage(file, 800, 0.7)),
-    );
-    setDraft((p) => ({ ...p, photos: [...p.photos, ...compressed].slice(0, MAX_PHOTOS) }));
+    try {
+      const compressed = await Promise.all(
+        toProcess.map((file) => compressImage(file, 800, 0.7)),
+      );
+      setDraft((p) => ({ ...p, photos: [...p.photos, ...compressed].slice(0, MAX_PHOTOS) }));
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Не удалось сжать фото');
+    }
     e.target.value = '';
   };
 
@@ -152,8 +161,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
     }
     entry.weight = weightNum;
     onSave(entry);
-    clearDraft();
-    setDraft(initial());
+    resetDraft();
     onClose();
   };
 
@@ -161,6 +169,8 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
     () => getWeightLog().slice(-7).map((e) => (typeof e.weight === 'number' ? e.weight : null)),
     [open],
   );
+
+  const lastDate = prev?.date ? String(prev.date) : undefined;
 
   return (
     <DiaryModalShell
@@ -173,6 +183,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       width={460}
       onSubmit={save}
       spark={{ data: spark, color: '#22c55e' }}
+      stale={lastDate ? { days: daysSince(lastDate) ?? 0 } : null}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>

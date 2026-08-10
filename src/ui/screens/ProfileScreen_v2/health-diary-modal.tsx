@@ -6,7 +6,7 @@
  * Формат сохраняемой записи (UnifiedHealthEntry) не изменён.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import { loadSessions, type WorkoutExercise } from '../../../engines/workout-logger.engine';
@@ -26,6 +26,9 @@ import {
   HEMATO_SYMPTOMS,
   painZoneColor,
   acneAreaColor,
+  readDiaryEntries,
+  lastEntryOf,
+  daysSince,
 } from './diary-modals';
 
 const DRAFT_KEY = 'he_draft_health';
@@ -245,6 +248,12 @@ export const AddHealthModal: React.FC<{
     { id: 'hemato', icon: '🩸', label: 'Кровь', badge: hematoTotal > 0 ? `${hematoTotal}` : undefined, color: '#3b82f6' },
   ];
 
+  const lastHealth = useMemo(
+    () => lastEntryOf(readDiaryEntries<{ date?: string }>('he_health_diary')),
+    [open],
+  );
+  const healthStale = lastHealth?.date ? daysSince(lastHealth.date) ?? 0 : null;
+
   return (
     <DiaryModalShell
       open={open}
@@ -255,6 +264,7 @@ export const AddHealthModal: React.FC<{
       subtitle="Отмечайте все симптомы за день — можно заполнять несколько разделов"
       width={520}
       onSubmit={submit}
+      stale={healthStale !== null ? { days: healthStale } : null}
       footer={
         <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${colors.border}` }}>
           <button type="button" onClick={onClose} style={btnGhost}>Отмена</button>
