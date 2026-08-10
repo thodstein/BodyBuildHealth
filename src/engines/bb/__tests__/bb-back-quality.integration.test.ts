@@ -45,4 +45,35 @@ describe('experienced enhanced back prescription', () => {
     const backSets = upper.exercises.filter(e => e.muscle === 'back').reduce((sum, e) => sum + e.sets, 0);
     expect(backSets).toBeLessThan(18);
   }, 30000);
+
+  it('gives experienced enhanced legs a real volume budget', () => {
+    const plan = buildBBPlan({
+      patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const lowers = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Lower');
+    expect(lowers).toHaveLength(2);
+    for (const session of lowers) {
+      const quads = session.exercises.filter(e => e.muscle === 'quads').reduce((sum, e) => sum + e.sets, 0);
+      const hams = session.exercises.filter(e => e.muscle === 'hamstrings').reduce((sum, e) => sum + e.sets, 0);
+      expect(quads + hams).toBeGreaterThanOrEqual(10);
+    }
+  }, 30000);
+
+  it('reduces direct arm volume when indirect overlap from presses/pulls is high', () => {
+    const plan = buildBBPlan({
+      patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const uppers = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Upper');
+    for (const session of uppers) {
+      const biceps = session.exercises.filter(e => e.muscle === 'biceps').reduce((sum, e) => sum + e.sets, 0);
+      const triceps = session.exercises.filter(e => e.muscle === 'triceps').reduce((sum, e) => sum + e.sets, 0);
+      // Arms should not exceed 12 sets per session when indirect overlap is high
+      expect(biceps).toBeLessThanOrEqual(12);
+      expect(triceps).toBeLessThanOrEqual(12);
+    }
+  }, 30000);
 });
