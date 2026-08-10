@@ -111,6 +111,12 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
   const weightDelta = Number.isFinite(weightNum) && prevWeight !== null ? weightNum - prevWeight : null;
   const weightInvalid = draft.values.weight === '' || !Number.isFinite(weightNum) || weightNum <= 0;
 
+  const allMeasureFields = MEASURE_GROUPS.flatMap((g) => g.fields);
+  const filledMeasures = allMeasureFields.filter((f) => {
+    const v = draft.values[f.key];
+    return v !== undefined && v !== '' && Number.isFinite(Number(v));
+  }).length;
+
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -189,6 +195,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       onSubmit={save}
       spark={{ data: spark, color: '#22c55e' }}
       stale={lastDate ? { days: daysSince(lastDate) ?? 0 } : null}
+      fill={{ current: (weightInvalid ? 0 : 1) + filledMeasures, total: 1 + allMeasureFields.length }}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>
@@ -211,7 +218,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       )}
 
       <SectionCard icon="⚖️" title="Вес" color="#22c55e" badge={weightDelta !== null ? `${weightDelta >= 0 ? '+' : ''}${weightDelta.toFixed(1)} кг` : undefined}>
-        <StepperInput value={draft.values.weight || ''} onChange={(v) => setValue('weight', v)} step={0.1} min={20} max={400} unit="кг" large />
+        <StepperInput value={draft.values.weight || ''} onChange={(v) => setValue('weight', v)} step={0.1} min={20} max={400} unit="кг" large invalid={weightInvalid} />
         {prevWeight !== null && (
           <div style={{ fontSize: 9, color: colors.textSubtle, marginTop: 6, textAlign: 'center' }}>
             Прошлый вес: {prevWeight} кг · {prev && prev.date ? String(prev.date) : ''}

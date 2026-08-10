@@ -197,6 +197,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       subtitle="Препарат, доза и реакция места укола"
       width={460}
       onSubmit={save}
+      fill={{ current: 5 + (substanceInvalid ? 0 : 1) + (doseInvalid ? 0 : 1), total: 7 }}
       spark={{ data: spark, color: '#fbbf24' }}
       stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
     >
@@ -254,6 +255,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
           onChange={setSubstanceSmart}
           placeholder="Тестостерон энантат"
           accent="#f59e0b"
+          invalid={substanceInvalid}
         />
         {(recent.length > 0 || COMMON_INJECTIONS.length > 0) && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
@@ -288,6 +290,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
           onChange={(v) => setDraft((p) => ({ ...p, dose: v }))}
           placeholder="250 мг / 1 мл / 100 IU"
           accent="#f59e0b"
+          invalid={doseInvalid}
         />
       </div>
 

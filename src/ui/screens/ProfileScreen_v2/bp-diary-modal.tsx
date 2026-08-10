@@ -75,7 +75,10 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
   const s = Number(draft.systolic);
   const d = Number(draft.diastolic);
   const p = Number(draft.pulse);
-  const valid = Number.isFinite(s) && Number.isFinite(d) && Number.isFinite(p) && s >= 50 && s <= 250 && d >= 30 && d <= 180 && p >= 20 && p <= 250;
+  const sInvalid = !Number.isFinite(s) || s < 50 || s > 250;
+  const dInvalid = !Number.isFinite(d) || d < 30 || d > 180 || (Number.isFinite(d) && Number.isFinite(s) && d >= s);
+  const pInvalid = !Number.isFinite(p) || p < 20 || p > 250;
+  const valid = !sInvalid && !dInvalid && !pInvalid;
   const dge = Number.isFinite(s) && Number.isFinite(d) && d >= s;
   const cat = bpCategory(s, d);
 
@@ -102,6 +105,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       onSubmit={save}
       spark={{ data: spark, color: '#f87171' }}
       stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
+      fill={{ current: (sInvalid ? 0 : 1) + (dInvalid ? 0 : 1) + (pInvalid ? 0 : 1), total: 3 }}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>
@@ -142,9 +146,9 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       {valid && !dge && s >= 180 && <FormBanner tone="error">Систола ≥ 180 — гипертонический криз, обратитесь к врачу</FormBanner>}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
-        <TextField label="Систола" value={draft.systolic} onChange={(v) => set('systolic', v)} type="number" min={50} max={250} unit="мм" accent="#ef4444" />
-        <TextField label="Диастола" value={draft.diastolic} onChange={(v) => set('diastolic', v)} type="number" min={30} max={180} unit="мм" accent="#ef4444" />
-        <TextField label="Пульс" value={draft.pulse} onChange={(v) => set('pulse', v)} type="number" min={20} max={250} unit="уд/мин" />
+        <TextField label="Систола" value={draft.systolic} onChange={(v) => set('systolic', v)} type="number" min={50} max={250} unit="мм" accent="#ef4444" invalid={sInvalid} />
+        <TextField label="Диастола" value={draft.diastolic} onChange={(v) => set('diastolic', v)} type="number" min={30} max={180} unit="мм" accent="#ef4444" invalid={dInvalid} />
+        <TextField label="Пульс" value={draft.pulse} onChange={(v) => set('pulse', v)} type="number" min={20} max={250} unit="уд/мин" invalid={pInvalid} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>

@@ -270,6 +270,10 @@ export const AddHealthModal: React.FC<{
       width={520}
       onSubmit={submit}
       stale={healthStale !== null ? { days: healthStale } : null}
+      fill={{
+        current: (painTotal > 0 ? 1 : 0) + (symptoms.length > 0 ? 1 : 0) + (neuroTotal > 0 ? 1 : 0) + (acneTotal > 0 ? 1 : 0) + (hematoTotal > 0 ? 1 : 0) + (notes.trim() ? 1 : 0),
+        total: 6,
+      }}
       footer={
         <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${colors.border}` }}>
           <button type="button" onClick={onClose} style={btnGhost}>Отмена</button>

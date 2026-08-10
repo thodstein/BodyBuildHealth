@@ -450,7 +450,8 @@ export const StepperInput: React.FC<{
   unit?: string;
   large?: boolean;
   compact?: boolean;
-}> = ({ value, onChange, step = 1, min, max, unit, large, compact }) => {
+  invalid?: boolean;
+}> = ({ value, onChange, step = 1, min, max, unit, large, compact, invalid }) => {
   const valueRef = useRef(value);
   useEffect(() => {
     valueRef.current = value;
@@ -519,6 +520,7 @@ export const StepperInput: React.FC<{
           min={min}
           max={max}
           step={step}
+          aria-invalid={invalid || undefined}
           onChange={(e) => onChange(e.target.value)}
           style={{
             ...fieldInput,
@@ -528,6 +530,8 @@ export const StepperInput: React.FC<{
             color: colors.text,
             background: 'rgba(255,255,255,0.03)',
             paddingRight: unit ? 30 : 12,
+            borderColor: invalid ? '#ef444466' : undefined,
+            boxShadow: invalid ? '0 0 0 3px rgba(239,68,68,0.12)' : undefined,
           }}
         />
         {unit && (
@@ -535,7 +539,7 @@ export const StepperInput: React.FC<{
             position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
             fontSize: 11, color: colors.textSubtle, pointerEvents: 'none',
           }}>
-            {unit}
+            {invalid ? '⚠' : unit}
           </span>
         )}
       </div>
@@ -604,13 +608,23 @@ export const TextField: React.FC<{
   options?: { id: string; label: string }[];
   hint?: string;
   accent?: string;
-}> = ({ label, value, onChange, type = 'text', placeholder, unit, min, max, step, options, hint, accent }) => (
+  invalid?: boolean;
+}> = ({ label, value, onChange, type = 'text', placeholder, unit, min, max, step, options, hint, accent, invalid }) => (
   <label style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
     <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>
       {label}
     </span>
     {type === 'select' && options ? (
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...fieldInput, cursor: 'pointer' }}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          ...fieldInput,
+          cursor: 'pointer',
+          borderColor: invalid ? '#ef444466' : undefined,
+          boxShadow: invalid ? '0 0 0 3px rgba(239,68,68,0.12)' : undefined,
+        }}
+      >
         {options.map((o) => (
           <option key={o.id} value={o.id} style={{ background: '#1c1c20' }}>{o.label}</option>
         ))}
@@ -625,20 +639,22 @@ export const TextField: React.FC<{
           max={max}
           step={step}
           placeholder={placeholder}
+          aria-invalid={invalid || undefined}
           onChange={(e) => onChange(e.target.value)}
           style={{
             ...fieldInput,
             colorScheme: 'dark',
-            borderColor: accent ? `${accent}66` : undefined,
-            paddingRight: unit ? 30 : 12,
+            borderColor: invalid ? '#ef444466' : accent ? `${accent}66` : undefined,
+            boxShadow: invalid ? '0 0 0 3px rgba(239,68,68,0.12)' : undefined,
+            paddingRight: unit || invalid ? 30 : 12,
           }}
         />
-        {unit && (
+        {(unit || invalid) && (
           <span style={{
             position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 10, color: colors.textSubtle, pointerEvents: 'none',
+            fontSize: 10, color: invalid ? '#ef4444' : colors.textSubtle, pointerEvents: 'none',
           }}>
-            {unit}
+            {invalid ? '⚠' : unit}
           </span>
         )}
       </div>
@@ -661,8 +677,9 @@ export const DiaryModalShell: React.FC<{
   footer?: React.ReactNode;
   spark?: { data: (number | null)[]; color?: string };
   stale?: { days: number } | null;
+  fill?: { current: number; total: number } | null;
   children: React.ReactNode;
-}> = ({ open, onClose, title, icon, color, subtitle, width = 420, onSubmit, footer, spark, stale, children }) => {
+}> = ({ open, onClose, title, icon, color, subtitle, width = 420, onSubmit, footer, spark, stale, fill, children }) => {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -705,8 +722,17 @@ export const DiaryModalShell: React.FC<{
         @keyframes diary-badge-in { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes dm-pop { from { transform: scale(0.96) translateY(14px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes dm-slide-up { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes dm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes dm-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes dm-aurora {
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.75; }
+          50% { transform: translate(14px, -10px) scale(1.18); opacity: 1; }
+        }
         .dm-overlay { animation: dm-fade-in 0.2s ease-out; }
+        .dm-card { scrollbar-width: thin; scrollbar-color: ${color}55 transparent; }
+        .dm-card::-webkit-scrollbar { width: 6px; }
+        .dm-card::-webkit-scrollbar-track { background: transparent; }
+        .dm-card::-webkit-scrollbar-thumb { background: ${color}44; border-radius: 999px; }
+        .dm-card::-webkit-scrollbar-thumb:hover { background: ${color}77; }
         .dm-card input, .dm-card select, .dm-card textarea {
           transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
         }
@@ -724,11 +750,13 @@ export const DiaryModalShell: React.FC<{
         .dm-card .dm-close-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .dm-card .dm-ghost-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.3); }
         .dm-card .dm-primary-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+        .dm-card .dm-primary-btn:hover .dm-save-arrow { transform: translateX(3px); }
         .dm-card .dm-primary-btn:active { transform: translateY(0); }
         @media (max-width: 480px) {
           .dm-overlay { align-items: flex-end !important; padding: 0 !important; }
           .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 88dvh !important; border-radius: 24px 24px 0 0 !important; animation: dm-slide-up 0.28s cubic-bezier(0.32, 0.72, 0.28, 1) !important; }
           .dm-card form { max-height: 88dvh !important; }
+          .dm-grabber { display: block !important; }
         }
       `}</style>
       <div
@@ -769,8 +797,39 @@ export const DiaryModalShell: React.FC<{
         >
           <form
             onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
-            style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}
+            style={{ display: 'flex', flexDirection: 'column', maxHeight: '90vh', position: 'relative' }}
           >
+            <div
+              className="dm-grabber"
+              aria-hidden="true"
+              style={{
+                display: 'none',
+                width: 40,
+                height: 4,
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.28)',
+                position: 'absolute',
+                top: 8,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 2,
+              }}
+            />
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: -70,
+                right: -30,
+                width: 200,
+                height: 200,
+                borderRadius: '50%',
+                background: `radial-gradient(circle, ${color}26, transparent 70%)`,
+                filter: 'blur(24px)',
+                pointerEvents: 'none',
+                animation: 'dm-aurora 6s ease-in-out infinite',
+              }}
+            />
             <div
               style={{
                 padding: '15px 18px',
@@ -781,6 +840,8 @@ export const DiaryModalShell: React.FC<{
                 alignItems: 'center',
                 gap: 11,
                 flexShrink: 0,
+                position: 'relative',
+                zIndex: 1,
               }}
             >
               <div
@@ -848,8 +909,33 @@ export const DiaryModalShell: React.FC<{
             <div style={{ padding: 15, overflowY: 'auto', flex: 1 }}>{children}</div>
             {footer ?? (
               <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${color}1e`, flexShrink: 0, background: 'rgba(0,0,0,0.16)' }}>
+                {fill && fill.total > 0 && (
+                  <div
+                    title={`Заполнено ${fill.current}/${fill.total}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, marginRight: 4,
+                    }}
+                  >
+                    <div style={{ flex: 1, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.09)', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${Math.min(100, (fill.current / fill.total) * 100)}%`,
+                          borderRadius: 999,
+                          background: `linear-gradient(90deg, ${color}88, ${color})`,
+                          transition: 'width 0.35s cubic-bezier(0.32, 0.72, 0.28, 1)',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: colors.textMuted, whiteSpace: 'nowrap' }}>
+                      {fill.current}/{fill.total}
+                    </span>
+                  </div>
+                )}
                 <button type="button" className="dm-ghost-btn" onClick={onClose} style={btnGhost}>Отмена</button>
-                <button type="submit" className="dm-primary-btn" style={btnPrimary(color)}>Сохранить</button>
+                <button type="submit" className="dm-primary-btn" style={btnPrimary(color)}>
+                  💾 Сохранить <span className="dm-save-arrow" style={{ display: 'inline-block', transition: 'transform 0.15s' }}>→</span>
+                </button>
               </div>
             )}
           </form>

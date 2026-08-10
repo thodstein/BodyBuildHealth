@@ -66,6 +66,8 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
   const q = Number(draft.quality);
   const hoursInvalid = !Number.isFinite(h) || h < 0 || h > 24;
   const qualityInvalid = !Number.isFinite(q) || q < 1 || q > 5;
+  const aw = Number(draft.awakenings);
+  const awakeningsInvalid = draft.awakenings.trim() !== '' && (!Number.isFinite(aw) || aw < 0 || aw > 20);
   const coherenceWarn = !hoursInvalid && !qualityInvalid && h >= 8 && q <= 2;
 
   const save = () => {
@@ -99,6 +101,10 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       onSubmit={save}
       spark={{ data: spark, color: '#a78bfa' }}
       stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
+      fill={{
+        current: (!hoursInvalid ? 1 : 0) + (!qualityInvalid ? 1 : 0) + (!awakeningsInvalid ? 1 : 0) + (draft.bedtime ? 1 : 0) + (draft.wakeTime ? 1 : 0),
+        total: 5,
+      }}
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>
@@ -120,7 +126,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       )}
 
       <SectionCard icon="⏰" title="Продолжительность" color="#a78bfa">
-        <StepperInput value={draft.hours} onChange={(v) => set('hours', v)} step={0.5} min={0} max={24} unit="ч" large />
+        <StepperInput value={draft.hours} onChange={(v) => set('hours', v)} step={0.5} min={0} max={24} unit="ч" large invalid={hoursInvalid} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
           <TextField label="Лёг спать" value={draft.bedtime} onChange={(v) => set('bedtime', v)} type="time" />
           <TextField label="Встал" value={draft.wakeTime} onChange={(v) => set('wakeTime', v)} type="time" />
@@ -151,6 +157,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
           min={0}
           max={20}
           step={1}
+          invalid={awakeningsInvalid}
         />
       </div>
 
