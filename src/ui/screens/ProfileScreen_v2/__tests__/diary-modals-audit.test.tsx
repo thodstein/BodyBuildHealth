@@ -1,7 +1,7 @@
 /**
  * diary-modals-audit.test.ts — тесты доработок quick-add модалок (Aug 10 2026):
  * undo-очередь, утренний рутинг, bpCategory, daysAgo/stale, useDiaryDraft reset-guard,
- * stale-чип в шапке модалки.
+ * stale-чип в шапке модалки, findByDate + баннеры замены записи (Round 4).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor, render, screen } from '@testing-library/react';
@@ -10,6 +10,7 @@ import {
   daysAgoLabel,
   staleColorFor,
   daysSince,
+  findByDate,
   nextRoutineStep,
   pushUndoAction,
   topUndo,
@@ -18,6 +19,11 @@ import {
   useDiaryDraft,
   DiaryModalShell,
 } from '../diary-modals';
+import { AddSleepModal } from '../sleep-diary-modal';
+import { AddBodyMeasurementsModal } from '../body-measurements-modal';
+import { AddInjectionModal } from '../injection-diary-modal';
+import { AddHealthModal } from '../health-diary-modal';
+import { todayIso } from '../diary-helpers';
 
 describe('bpCategory — классификация АД', () => {
   it('норма (<120/<80)', () => {
@@ -197,5 +203,72 @@ describe('DiaryModalShell — stale-чип и анимации', () => {
     );
     expect(screen.queryByText(/дн\. назад|вчера|сегодня/)).toBeNull();
     expect(screen.getByRole('dialog').querySelector('svg')).toBeTruthy();
+  });
+});
+
+describe('findByDate — поиск записи за дату', () => {
+  it('находит запись за дату', () => {
+    const entries = [{ date: '2026-08-01' }, { date: '2026-08-10' }];
+    expect(findByDate(entries, '2026-08-10')?.date).toBe('2026-08-10');
+  });
+  it('не находит за отсутствующую дату', () => {
+    const entries = [{ date: '2026-08-01' }];
+    expect(findByDate(entries, '2026-08-02')).toBeUndefined();
+  });
+  it('пустой массив → undefined', () => {
+    expect(findByDate([], '2026-08-01')).toBeUndefined();
+  });
+  it('записи без date не ломают поиск', () => {
+    const entries: { date?: string }[] = [{ notes: 'x' }, { date: '2026-08-10' }];
+    expect(findByDate(entries, '2026-08-10')).toBeTruthy();
+    expect(findByDate(entries, '2026-08-01')).toBeUndefined();
+  });
+});
+
+describe('Round 4 — баннер «запись уже есть» (замена)', () => {
+  const noop = () => {};
+  const today = todayIso();
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('сон: баннер при записи за ту же дату, summary содержит часы', () => {
+    localStorage.setItem('he_sleep_diary', JSON.stringify([{ date: today, hours: 7.5, quality: 4 }]));
+    render(<AddSleepModal open onClose={noop} onSave={noop} />);
+    expect(screen.getByText(new RegExp('Запись за ' + today + ' уже есть'))).toBeTruthy();
+    expect(screen.getByText(/7\.5 ч/)).toBeTruthy();
+    expect(screen.getByText(/будет заменена/)).toBeTruthy();
+  });
+  it('сон: нет баннера, если запись за другую дату', () => {
+    localStorage.setItem('he_sleep_diary', JSON.stringify([{ date: '2020-01-01', hours: 6 }]));
+    render(<AddSleepModal open onClose={noop} onSave={noop} />);
+    expect(screen.queryByText(/уже есть/)).toBeNull();
+  });
+  it('вес: баннер при записи за ту же дату с весом', () => {
+    localStorage.setItem('he_weight_log', JSON.stringify([{ date: today, weight: 82.5 }]));
+    render(<AddBodyMeasurementsModal open onClose={noop} onSave={noop} />);
+    const banner = screen.getByRole('status');
+    expect(banner.textContent).toMatch(new RegExp('Запись за ' + today + ' уже есть'));
+    expect(banner.textContent).toMatch(/82\.5 кг/);
+    expect(banner.textContent).toMatch(/будет заменена/);
+  });
+  it('вес: нет баннера при другой дате', () => {
+    localStorage.setItem('he_weight_log', JSON.stringify([{ date: '2020-01-01', weight: 80 }]));
+    render(<AddBodyMeasurementsModal open onClose={noop} onSave={noop} />);
+    expect(screen.queryByText(/уже есть/)).toBeNull();
+  });
+  it('инъекция: баннер с названием препарата', () => {
+    localStorage.setItem('he_injection_diary', JSON.stringify([{ date: today, substance: 'Тестостерон энантат', dose: '250 мг' }]));
+    render(<AddInjectionModal open onClose={noop} onSave={noop} />);
+    const banner = screen.getByRole('status');
+    expect(banner.textContent).toMatch(new RegExp('Запись за ' + today + ' уже есть'));
+    expect(banner.textContent).toMatch(/Тестостерон энантат/);
+    expect(banner.textContent).toMatch(/250 мг/);
+  });
+  it('здоровье: баннер при существующей записи за дату', () => {
+    localStorage.setItem('he_health_diary', JSON.stringify([{ date: today, pain: { totalScore: 5 } }]));
+    render(<AddHealthModal open onClose={noop} onSave={noop} />);
+    expect(screen.getByText(new RegExp('Запись здоровья за ' + today + ' уже есть'))).toBeTruthy();
   });
 });

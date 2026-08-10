@@ -16,6 +16,7 @@ import {
   fieldInput,
   fieldLabel,
   lastEntryOf,
+  findByDate,
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
@@ -171,6 +172,10 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
   );
 
   const lastDate = prev?.date ? String(prev.date) : undefined;
+  const existing = useMemo(
+    () => findByDate(getWeightLog() as { date?: string }[], draft.date),
+    [open, draft.date],
+  );
 
   return (
     <DiaryModalShell
@@ -193,6 +198,11 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
       </div>
 
       {weightInvalid && <FormBanner tone="error">Вес обязателен — введите число больше 0</FormBanner>}
+      {existing && (
+        <FormBanner tone="warning">
+          Запись за {existing.date} уже есть: {typeof (existing as Record<string, unknown>).weight === 'number' ? `${(existing as Record<string, unknown>).weight} кг` : 'замеры'} — при сохранении будет заменена
+        </FormBanner>
+      )}
 
       {prev && (
         <div style={{ marginBottom: 10 }}>

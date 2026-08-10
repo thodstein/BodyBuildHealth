@@ -28,6 +28,7 @@ import {
   acneAreaColor,
   readDiaryEntries,
   lastEntryOf,
+  findByDate,
   daysSince,
 } from './diary-modals';
 
@@ -253,6 +254,10 @@ export const AddHealthModal: React.FC<{
     [open],
   );
   const healthStale = lastHealth?.date ? daysSince(lastHealth.date) ?? 0 : null;
+  const existingHealth = useMemo(
+    () => findByDate<{ date?: string }>(readDiaryEntries('he_health_diary'), date),
+    [open, date],
+  );
 
   return (
     <DiaryModalShell
@@ -284,6 +289,9 @@ export const AddHealthModal: React.FC<{
     >
       {!hasAnyData && (
         <FormBanner tone="info">Заполните хотя бы один раздел — кнопка «Сохранить» активируется</FormBanner>
+      )}
+      {existingHealth && (
+        <FormBanner tone="warning">Запись здоровья за {date} уже есть — при сохранении будет заменена</FormBanner>
       )}
 
       {/* Дата + заметка */}

@@ -1692,12 +1692,13 @@ export const ProfileDiariesTab: React.FC<{
             onClose={() => { setAddSleepOpen(false); if (routine === 'sleep') setRoutinePersist(nextRoutineStep('sleep')); }}
             onSave={(e) => {
               const prev = sleepEntries;
+              const replaced = prev.some((x) => x.date === e.date);
               const updated = [...sleepEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveDiary(SLEEP_DIARY_KEY, updated);
               setSleepEntries(updated);
-              pushUndo('Запись сна добавлена', () => {
+              pushUndo(replaced ? 'Запись сна обновлена' : 'Запись сна добавлена', () => {
                 saveDiary(SLEEP_DIARY_KEY, prev);
                 setSleepEntries(prev);
               });
@@ -1734,13 +1735,18 @@ export const ProfileDiariesTab: React.FC<{
             onClose={() => { setAddBodyMeasurementsOpen(false); if (routine === 'weight') setRoutinePersist(nextRoutineStep('weight')); }}
             onSave={(e) => {
               const prev = getWeightLog() || [];
+              const replaced = prev.some((x) => x.date === e.date);
               const updated = [...prev.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveWeightLog(updated);
               setWeights(updated);
               pushUndo(
-                routine === 'weight' ? '🌅 Утренний лог завершён · вес записан' : 'Запись веса добавлена',
+                routine === 'weight'
+                  ? '🌅 Утренний лог завершён · вес записан'
+                  : replaced
+                    ? 'Запись веса обновлена'
+                    : 'Запись веса добавлена',
                 () => {
                   saveWeightLog(prev);
                   setWeights(prev);
@@ -1754,12 +1760,13 @@ export const ProfileDiariesTab: React.FC<{
             onClose={() => setAddInjectionOpen(false)}
             onSave={(e) => {
               const prev = injectionEntries;
+              const replaced = prev.some((x) => x.date === e.date);
               const updated = [...injectionEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveDiary(INJECTION_DIARY_KEY, updated);
               setInjectionEntries(updated);
-              pushUndo('Запись инъекции добавлена', () => {
+              pushUndo(replaced ? 'Запись инъекции обновлена' : 'Запись инъекции добавлена', () => {
                 saveDiary(INJECTION_DIARY_KEY, prev);
                 setInjectionEntries(prev);
               });
@@ -1775,6 +1782,7 @@ export const ProfileDiariesTab: React.FC<{
               const prevAcne = acneEntries;
               const prevHemato = hematoEntries;
               const prevSymptoms = symptomEntries;
+              const replacedHealth = prevUnified.some((x) => x.date === e.date);
               const updated = [...healthEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
@@ -1816,7 +1824,7 @@ export const ProfileDiariesTab: React.FC<{
                 saveDiary(SYMPTOMS_DIARY_KEY, s);
                 setSymptomEntries(s);
               }
-              pushUndo('Запись здоровья добавлена', () => {
+              pushUndo(replacedHealth ? 'Запись здоровья обновлена' : 'Запись здоровья добавлена', () => {
                 saveUnifiedHealthEntries(prevUnified);
                 setHealthEntries(prevUnified);
                 if (e.pain) { saveDiary(PAIN_DIARY_KEY, prevPain); setPainEntries(prevPain); }

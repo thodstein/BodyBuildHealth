@@ -16,6 +16,7 @@ import {
   fieldInput,
   readDiaryEntries,
   lastEntryOf,
+  findByDate,
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
@@ -25,7 +26,7 @@ import {
 const SLEEP_QUALITY_EMOJI = ['😖', '😞', '😐', '🙂', '😴'];
 const SLEEP_QUALITY_LABEL = ['Плохо', 'Тяжело', 'Средне', 'Хорошо', 'Отлично'];
 
-type SleepRec = { date?: string; bedtime?: string; wakeTime?: string; hours?: number; awakenings?: number };
+type SleepRec = { date?: string; bedtime?: string; wakeTime?: string; hours?: number; awakenings?: number; quality?: number };
 interface SleepDraft {
   date: string;
   hours: string;
@@ -55,6 +56,10 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
   };
   const [draft, setDraft, resetDraft] = useDiaryDraft<SleepDraft>('he_draft_sleep', initial);
   const lastRec = useMemo(() => lastEntryOf(readDiaryEntries<SleepRec>('he_sleep_diary')), [open]);
+  const existing = useMemo(
+    () => findByDate(readDiaryEntries<SleepRec>('he_sleep_diary'), draft.date),
+    [open, draft.date],
+  );
   const set = (key: keyof SleepDraft, val: string) => setDraft((p) => ({ ...p, [key]: val }));
 
   const h = Number(draft.hours);
@@ -106,6 +111,12 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       {!hoursInvalid && qualityInvalid && <FormBanner tone="error">Качество: оценка от 1 до 5</FormBanner>}
       {coherenceWarn && (
         <FormBanner tone="warning">8+ часов сна с качеством «{SLEEP_QUALITY_LABEL[q - 1]}» — проверьте ввод (или зафиксируйте как есть)</FormBanner>
+      )}
+      {existing && (
+        <FormBanner tone="warning">
+          Запись за {existing.date} уже есть: {typeof existing.hours === 'number' ? `${existing.hours} ч` : 'данные'}
+          {typeof existing.quality === 'number' ? ` · качество ${SLEEP_QUALITY_LABEL[existing.quality - 1] || '—'}` : ''} — при сохранении будет заменена
+        </FormBanner>
       )}
 
       <SectionCard icon="⏰" title="Продолжительность" color="#a78bfa">

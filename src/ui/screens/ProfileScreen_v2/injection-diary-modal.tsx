@@ -16,6 +16,7 @@ import {
   fieldInput,
   readDiaryEntries,
   lastEntryOf,
+  findByDate,
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
@@ -176,6 +177,11 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
 
   const zoneLabel = (id: string) => INJECTION_ZONES.find((z) => z.id === id)?.label || id;
 
+  const existing = useMemo(
+    () => findByDate<InjRec>(readDiaryEntries<InjRec>('he_injection_diary'), draft.date),
+    [open, draft.date],
+  );
+
   const spark = useMemo(
     () => allInjections.slice(-7).map((e) => (typeof e?.painLevel === 'number' ? e.painLevel : null)),
     [allInjections],
@@ -203,6 +209,11 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
 
       {substanceInvalid && <FormBanner tone="error">Укажите препарат (подсказки ниже)</FormBanner>}
       {!substanceInvalid && doseInvalid && <FormBanner tone="error">Укажите дозу (например, «250 мг»)</FormBanner>}
+      {existing && (
+        <FormBanner tone="warning">
+          Запись за {existing.date} уже есть: {typeof existing.substance === 'string' && existing.substance ? existing.substance : 'инъекция'}{typeof existing.dose === 'string' && existing.dose ? ` ${existing.dose}` : typeof existing.dose === 'number' ? ` ${existing.dose}` : ''} — при сохранении будет заменена
+        </FormBanner>
+      )}
 
       {rotation && (
         <button

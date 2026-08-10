@@ -126,6 +126,11 @@ export function lastEntryOf<T extends { date?: string; timestamp?: number }>(arr
   )[0];
 }
 
+/** Запись за конкретную дату (используется для предупреждения о замене). */
+export function findByDate<T extends { date?: string }>(entries: T[], date: string): T | undefined {
+  return entries.find((e) => e.date === date);
+}
+
 /** Черновик модалки в sessionStorage: переживает переключение вкладок профиля.
  *  Третий элемент — reset(next?): очищает storage и сбрасывает состояние,
  *  следующая запись persist пропускается (guard от мусорной перезаписи свежим дефолтом). */
