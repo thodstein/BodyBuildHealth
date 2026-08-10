@@ -3073,12 +3073,16 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   box-sizing: border-box !important;
   overflow-x: hidden !important;
 }
-@media (max-width: 480px) {
+/* На мобильных — контент на всю ширину экрана, без боковых отступов
+   (портрет + ландшафт телефона, где maxWidth:720 центрирует и оставляет гуттеры) */
+@media (max-width: 960px) {
   .pl-auto-screen {
-    padding: 8px 4px !important;
+    padding: 8px 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
   }
   .pl-auto-screen > div {
-    padding-left: 8px !important;
-    padding-right: 8px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 }
