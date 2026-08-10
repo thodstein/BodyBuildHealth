@@ -287,8 +287,11 @@ function weakExerciseBonus(exName: string, weakPoints: string[]): number {
   return bonus;
 }
 
-/** Маппинг гранулярных слабых групп в канонические мышцы (для объёма/MRV). */
-const WEAK_TO_MUSCLE: Record<string, string> = {
+/** Маппинг гранулярных слабых групп в канонические мышцы (для объёма/MRV).
+ *  P0-3 (audit 2026-08): экспортирован для переиспользования в cycle-to-plan / bb-weakpoint / bb-selector,
+ *  чтобы гранулярные слабые группы (chest_upper, back_width, delt_mid) корректно
+ *  маппились в канонические мышцы (chest, back, shoulders) при проверках. */
+export const WEAK_TO_MUSCLE: Record<string, string> = {
   chest: 'chest', chest_upper: 'chest', chest_lower: 'chest',
   back: 'back', back_width: 'back', back_thickness: 'back',
   shoulders: 'shoulders', delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
@@ -497,7 +500,10 @@ function catalogGroupFor(muscle: string): string {
 const PARENT_MUSCLE: Record<string, string> = {
   delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
 };
-function isWeak(muscle: string, weakPoints: string[]): boolean {
+/** Проверить, является ли мышца слабой (с учётом гранулярных групп).
+ *  P0-3 (audit 2026-08): экспортирован для переиспользования в cycle-to-plan / bb-weakpoint / bb-selector.
+ *  Поддерживает маппинг: chest_upper → chest, back_width → back, delt_mid → shoulders. */
+export function isWeak(muscle: string, weakPoints: string[]): boolean {
   if (weakPoints.includes(muscle)) return true;
   // Гранулярные: delt_mid → shoulders, chest_upper → chest, back_width → back
   const parent = WEAK_TO_MUSCLE[muscle];
@@ -509,10 +515,23 @@ function isWeak(muscle: string, weakPoints: string[]): boolean {
   }
   return weakPoints.includes(PARENT_MUSCLE[muscle] ?? '');
 }
-/** Развернуть родительские группы (shoulders→3 delt) для проверки специализации. */
+/** Развернуть родительские/гранулярные группы для проверки специализации.
+ *  P0-2 (audit 2026-08): раньше разворачивало только shoulders → delt_*,
+ *  но гранулярные слабые (chest_upper, back_width) НЕ разворачивались в канонические
+ *  мышцы (chest, back), и специализация для них не работала (landmarksForRotation
+ *  для 'chest_upper' возвращает null). Теперь разворачиваем все гранулярные ключи
+ *  через WEAK_TO_MUSCLE в канонические мышцы. */
 function expandWeakForSpecialization(weakPoints: string[]): string[] {
   const expanded = [...weakPoints];
+  // Разворачиваем родительские группы в дочерние (shoulders → 3 delt)
   if (weakPoints.includes('shoulders')) expanded.push('delt_front', 'delt_mid', 'delt_rear');
+  // P0-2: добавляем канонические мышцы для гранулярных слабых групп
+  for (const wp of weakPoints) {
+    const canonical = WEAK_TO_MUSCLE[wp];
+    if (canonical && canonical !== wp && !expanded.includes(canonical)) {
+      expanded.push(canonical);
+    }
+  }
   return expanded;
 }
 function musclesForTag(tag?: string): string[] {
@@ -523,9 +542,15 @@ function musclesForTag(tag?: string): string[] {
 /** fix Z: ключ коллапса для дедупликации.
  *  delt_front/mid/rear — три пучка одной мышцы (shoulders), один пул упражнений →
  *  обрабатываем ОДИН раз как 'shoulders'. Остальные PRO-ключи остаются как есть
- *  (calves/glutes/forearms имеют собственные landmark-записи). */
+ *  (calves/glutes/forearms имеют собственные landmark-записи).
+ *  P0-2 (audit 2026-08): гранулярные слабые группы (chest_upper, chest_lower,
+ *  back_width, back_thickness) коллапсируются к канонической мышце, чтобы
+ *  landmarksForRotation нашёл запись и объём планировался корректно. */
 function collapseKey(muscle: string): string {
   if (muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') return 'shoulders';
+  // P0-2: гранулярные группы → канонические мышцы
+  const canonical = WEAK_TO_MUSCLE[muscle];
+  if (canonical && canonical !== muscle) return canonical;
   return muscle;
 }
 /** fix Z: дедуплицирует PRO-ключи тега по collapseKey.

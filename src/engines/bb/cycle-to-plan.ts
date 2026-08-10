@@ -6,7 +6,7 @@
  */
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec, SRDirection, SRLevel, SRPeriod } from '../../data/lms-cycles/lms-types';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
-import { getBBVolumeLandmarks } from './bb-builder.engine';
+import { getBBVolumeLandmarks, isWeak, WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { PCT_FOR_RIR } from '../rir-table';
@@ -27,6 +27,7 @@ import { finalizeBBPlan } from './bb-finalize.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
 import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
+import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -358,6 +359,8 @@ export interface CycleToPlanInput {
   /** Цель по объёму: MEV (минимум) | MAV (оптимум) | MRV (максимум). */
   volumeGoal?: BBVolumeGoal;
   /** Режим специализации: топ-2 слабые на MAV+10%, остальные на MEV. */
+  /** P1-7 (audit 2026-08): цель мезоцикла — для cross-mesocycle continuity (extractMesocycleProgression). */
+  goal?: string;
   specialization?: boolean;
   /** Фокус-группа (акцент +30% объём). */
   focusGroup?: string;
@@ -388,6 +391,10 @@ export interface CycleToPlanInput {
   mobilityRestrictions?: string[];
   /** Lab-based MRV multiplier. */
   labMrvMultiplier?: number;
+  /** P1-7 (audit 2026-08): предыдущий мезоцикл — для cross-mesocycle continuity
+   *  (auto-progress весов, ротация упражнений, объёмная прогрессия).
+   *  Ранее не передавался в cycle/program пути — continuity работала только для generic split. */
+  previousPlan?: BBPlan;
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -487,6 +494,30 @@ function createBBSet(pct: number, targetReps: number, rir: number, workMaxVal: n
   const adjustedPct = pct * (0.95 / basePct); // normalize: SR cycle pct is typically at rir 3, adjust for target rir
   const weight = Math.round(workMaxVal * Math.min(adjustedPct, 1.0) * 10) / 10;
   return { reps: targetReps, rir, weight, restSeconds: 90 };
+}
+
+/**
+ * P0-4 (audit 2026-08): применить eccentricMult к primary-упражнениям плана.
+ * Ранее eccentricMult был объявлен в интерфейсах cycle-to-plan, но НИГДЕ не применялся —
+ * UI передавал его, но движок игнорировал. eccentric overload (Schoenfeld 2021) требует
+ * повышенного веса для primary compounds (1.1-1.2× от концентрического).
+ * Паритет с bb-builder.engine.ts:1124-1125. */
+function applyEccentricOverloadToPlan(plan: BBPlan, eccentricMult?: number): BBPlan {
+  if (!eccentricMult || eccentricMult <= 1.0 || !Number.isFinite(eccentricMult)) return plan;
+  for (const w of plan.weeks) {
+    for (const s of w.sessions) {
+      for (const ex of s.exercises) {
+        if (ex.role !== 'primary') continue;
+        // Skip deload weeks (eccentric overload unsafe при разгрузке)
+        if (w.phase === 'deload' || w.deload) continue;
+        ex.workSets = (ex.workSets || []).map(ws => ({
+          ...ws,
+          weight: Math.round((ws.weight || 0) * eccentricMult * 10) / 10,
+        }));
+      }
+    }
+  }
+  return plan;
 }
 
 function computeRirForEx(
@@ -753,7 +784,7 @@ function classifyAngle(exName: string): string {
  */
 export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const {
-    cycle, workMax, peds = [], pedDoses, courseIntensity,
+    cycle, workMax: inputWorkMax, peds = [], pedDoses, courseIntensity,
     loadStrategy = 'double_progression', injuries = [],
     intensityTechnique, autoDeload, deloadType, autoRegResult,
     favoriteExercises = [], excludedExercises = [], avoidAxialLoad = false,
@@ -763,6 +794,13 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const weakPoints = mode === 'faithful' ? [] : (input.weakPoints || []);
   const focusGroup = mode === 'faithful' ? '' : (input.focusGroup || '');
   const specialization = mode === 'faithful' ? false : (input.specialization || false);
+  // P1-7 (audit 2026-08): cross-mesocycle continuity — auto-progress весов из предыдущего плана.
+  // Применяется только в adapt режиме (faithful сохраняет цикл дословно).
+  let workMax = inputWorkMax;
+  if (mode === 'adapt' && input.previousPlan) {
+    const progression = extractMesocycleProgression(input.previousPlan, level, input.goal || 'mass');
+    workMax = applyWeightProgression(workMax, progression);
+  }
   const meta = cycle.meta;
   const totalWeeks = meta.weeks;
   const daysPerWeek = meta.sessionsPerWeek;
@@ -919,22 +957,23 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (excludedMuscles.has(muscle)) return null as any;
         // Добавить в seen (дедупликация)
         seenNames.add(finalExName);
-        const isWeak = weakPoints.includes(muscle);
-        const isFocus = focusGroup === muscle || (focusGroup && isWeak && weakPoints.includes(focusGroup));
+        // P0-3 (audit 2026-08): используем isWeak из bb-builder для маппинга гранулярных групп
+        const isWeakMuscle = isWeak(muscle, weakPoints);
+        const isFocus = focusGroup === muscle || (focusGroup && isWeak(focusGroup, [muscle])) || (focusGroup && isWeak(muscle, [focusGroup]));
         const isSubstituted = finalExName !== exSpec.name;
 
         // Volume boost: weak groups + PED adaptation + volumeGoal + specialization + focusGroup.
         // PED: primary × mrvMult, accessory × max(1, mrvMult×0.8) — как в buildBBPlan.
         // Faithful: pedFactor=1.0 — не меняем объём программы.
         const pedFactor = (mode === 'adapt' && peds.length > 0) ? (isPrimary ? mrvMult : Math.max(1.0, mrvMult * 0.8)) : 1.0;
-        // specialization: слабые (топ-2) на +10%, остальные на MEV (×0.7)
-        const specFactor = specialization ? (specWeak.includes(muscle) ? 1.10 : 0.70) : 1.0;
+        // P0-3: specialization — specWeak теперь проверяется через isWeak (гранулярные группы)
+        const specFactor = specialization ? (specWeak.some(sw => isWeak(muscle, [sw]) || sw === muscle) ? 1.10 : 0.70) : 1.0;
         // focusGroup: +30%
         const focusFactor = isFocus ? 1.30 : 1.0;
         // P0-1: female glute boost ×1.2 (как в buildBBPlan:590) —女性 glutes требуют большего объёма
         const femaleGluteBoost = (input.sex === 'female' && muscle === 'glutes') ? 1.2 : 1.0;
         // volumeGoal: MEV×0.7 / MAV×1.0 / MRV×1.15
-        const setMult = (isWeak ? 1.2 : 1.0) * pedFactor * volGoalMult * specFactor * focusFactor * femaleGluteBoost;
+        const setMult = (isWeakMuscle ? 1.2 : 1.0) * pedFactor * volGoalMult * specFactor * focusFactor * femaleGluteBoost;
         const baseSets = exSpec.sets[0]?.sets || 3;
         let targetSets = Math.max(1, Math.round(baseSets * setMult));
         // Минимум 2 сета для любого упражнения (ББ-практика)
@@ -953,7 +992,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         }
 
         // RIR: weak groups get 0.5 harder
-        const effectiveRir = isWeak ? Math.max(0, exRir - 1) : exRir;
+        const effectiveRir = isWeakMuscle ? Math.max(0, exRir - 1) : exRir;
         const targetReps = exSpec.sets[0]?.reps || 10;
         const pct = exSpec.sets[0]?.pct || 0.65;
 
@@ -1113,6 +1152,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
 
   // Volume-landmarks (единый источник, как в generic split)
   const pedMrvMult = pedAdapt.combinedMrvMultiplier ?? 1;
+  // P0-4 (audit 2026-08): применяем eccentricMult к primary-упражнениям
+  finalPlan = applyEccentricOverloadToPlan(finalPlan, input.eccentricMult);
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
 
   // muscleFrequency: вычислить из дней недели 1 — сколько раз каждая мышца тренируется
@@ -1199,6 +1240,8 @@ export interface ProgramToBBPlanOpts {
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   labMrvMultiplier?: number;
+  /** P1-7 (audit 2026-08): предыдущий мезоцикл — для cross-mesocycle continuity. */
+  previousPlan?: BBPlan;
 }
 
 function parseReps(repsStr: string | undefined): number {
@@ -1370,7 +1413,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const mode = opts.mode || 'adapt';
   const totalWeeks = program.weeks.length;
   const daysPerWeek = program.daysPerWeek;
-  const workMax = opts.workMax || {};
+  const level = opts.level || 'intermediate';
+  // P1-7 (audit 2026-08): cross-mesocycle continuity — auto-progress весов из предыдущего плана.
+  // Применяется только в adapt режиме (faithful сохраняет программу дословно).
+  let workMax = opts.workMax || {};
+  if (mode === 'adapt' && opts.previousPlan) {
+    const progression = extractMesocycleProgression(opts.previousPlan, level, 'mass');
+    workMax = applyWeightProgression(workMax, progression);
+  }
   const weakPoints = mode === 'faithful' ? [] : (opts.weakPoints || []);
   const focusGroup = mode === 'faithful' ? undefined : opts.focusGroup;
   const excludedMuscles = getExcludedMuscles(opts.injuries || [], new Date().toISOString().slice(0, 10));
@@ -1381,7 +1431,6 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const favNames = new Set<string>((opts.favoriteExercises || []).flatMap(id => { const cat = EXERCISE_CATALOG.find(e => e.id === id); return cat ? [cat.name] : [id]; }));
   const eqList = opts.equipment || [];
   const avAxial = opts.avoidAxialLoad || false;
-  const level = opts.level || 'intermediate';
 
   // PED adaptation для MRV-кап (добивка слабых групп не превышает MRV)
   const levelForLandmarks = (['beginner', 'intermediate', 'advanced'].includes(level) ? level : 'intermediate') as 'beginner' | 'intermediate' | 'advanced';
@@ -1563,11 +1612,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         let adjRir = rir;
         let usedSets = workSets;
         if (mode === 'adapt') {
-          const isWeak = weakPoints.includes(muscle);
-          const isFocus = focusGroup === muscle;
-          if (isWeak) adjSets = Math.round(adjSets * 1.15);
+          // P0-3 (audit 2026-08): isWeak из bb-builder для маппинга гранулярных групп
+          const isWeakMuscle = isWeak(muscle, weakPoints);
+          const isFocus = focusGroup === muscle || (focusGroup ? isWeak(focusGroup, [muscle]) : false) || (focusGroup ? isWeak(muscle, [focusGroup]) : false);
+          if (isWeakMuscle) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
-          if (isWeak) adjRir = Math.max(0, rir - 1);
+          if (isWeakMuscle) adjRir = Math.max(0, rir - 1);
           // P0-1: female glute boost ×1.2 (как в buildBBPlan:590)
           if (opts.sex === 'female' && muscle === 'glutes') adjSets = Math.round(adjSets * 1.2);
           // PED volume boost (как в buildBBPlan): primary × mrvMult, accessory × max(1, mrvMult×0.8)
@@ -1621,7 +1671,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           workSets: usedSets,
           restSeconds: restSec,
           exerciseName: finalExName,
-          comment: `${role === 'primary' ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${usedSets.length}×${reps} @${Math.round(workWeight)} кг, RIR ${adjRir}.${ex.notes ? ' ' + ex.notes : ''}${ex.progression ? ' ' + ex.progression : ''}${mode === 'adapt' && weakPoints.includes(muscle) ? ' 🔥 Слабая группа.' : ''}${mode === 'adapt' && focusGroup === muscle ? ' ⭐ Фокус.' : ''} ${formatExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec })}`,
+          comment: `${role === 'primary' ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${usedSets.length}×${reps} @${Math.round(workWeight)} кг, RIR ${adjRir}.${ex.notes ? ' ' + ex.notes : ''}${ex.progression ? ' ' + ex.progression : ''}${mode === 'adapt' && isWeak(muscle, weakPoints) ? ' 🔥 Слабая группа.' : ''}${mode === 'adapt' && (focusGroup === muscle || (focusGroup ? isWeak(muscle, [focusGroup]) : false)) ? ' ⭐ Фокус.' : ''} ${formatExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec })}`,
           executionProfile: buildExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec }),
           warmupSets: role === 'primary' ? parseWarmup(workWeight, pd.warmup) : [],
           rationale: `${finalExName} (${muscle}) из программы «${program.name}» недели ${weekNum}`,
@@ -1854,6 +1904,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   }
 
   // Volume-landmarks
+  // P0-4 (audit 2026-08): применяем eccentricMult к primary-упражнениям
+  finalPlan = applyEccentricOverloadToPlan(finalPlan, opts.eccentricMult);
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
   return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
     reorder: mode !== 'faithful',

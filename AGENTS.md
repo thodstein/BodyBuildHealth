@@ -1,11 +1,89 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Aug 6 2026)
+## Current project state (Aug 10 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 1951 passing (174 test files; **Support Calculator PED-risk audit** — PED-risk matrix, tiered LV1-LV3 boosters, profile autopull, 15 new substances, 199 new tests)
+- `vitest` - 2644 passing (211 test files; **BB-auto full audit** — 10 исправлений, 42 новых теста)
+
+---
+
+## BB-auto Full Critical Audit (Aug 10 2026)
+
+Полный критический анализ всех параметров ББ-авто: методика порядка (compound_first/pre_exhaust/post_exhaust), специализация по слабым точкам, методика финиша (taper/peak week), профицит калорий, эксцентрик, cross-mesocycle continuity, feeders. Найдено и исправлено **10 багов** (5 P0 + 3 P1 + 2 P2).
+
+### P0 — Критические (5)
+
+1. **P0-1: Методика порядка сломана для cycle/program путей** — `tidySessionExercises` хардкодил `compound_first`, игнорируя выбор пользователя (pre_exhaust/post_exhaust). `finalizeBBPlan` не пробрасывал `methodology`. Выбор методики в UI не имел эффекта для циклов/программ. Fixed: добавлен параметр `methodology` в `tidySessionExercises`, `finalizeBBPlan` пробрасывает `options.methodology`.
+2. **P0-2: Специализация не работала для гранулярных слабых групп** — `expandWeakForSpecialization` разворачивал только `shoulders→delt_*`, но `chest_upper`, `back_width`, `back_thickness`, `chest_lower` оставались неразвёрнутыми. `landmarksForRotation('chest_upper')` возвращал null → объём 0. `collapseKey` не коллапсировал гранулярные в канонические. Fixed: разворот через `WEAK_TO_MUSCLE`, `collapseKey` теперь коллапсирует гранулярные.
+3. **P0-3: cycle-to-plan `weakPoints.includes(muscle)` без маппинга** — для `weakPoints=['chest_upper']` и `muscle='chest'` возвращал false → бонус объёма не применялся. Fixed: экспортирован `isWeak` из `bb-builder`, заменяет `weakPoints.includes` в обоих функциях (`convertCycleToBBPlan`, `programToBBPlan`).
+4. **P0-4: `eccentricMult` не применялся в cycle-to-plan** — UI передавал параметр, но движок игнорировал. eccentric overload (Schoenfeld 2021) не работал для циклов/программ. Fixed: `applyEccentricOverloadToPlan` применяет `eccentricMult` к primary (с пропуском deload).
+5. **P0-5: `suggestFeeders` — несоответствие ключей гранулярных групп** — UI использует `chest_upper`, а в `suggestFeeders` был case `upper_chest` (не matches!). Также отсутствовали `chest_lower`, `back_width`, `back_thickness`. Feeders не добавлялись для гранулярных групп. Fixed: добавлены case для всех гранулярных ключей.
+
+### P1 — Важные (3)
+
+6. **P1-5: bb-selector `freq[гранулярная] = 0`** — `freq['chest_upper']` всегда 0 (нет такой мышцы в TAG_MUSCLES) → бонус слабых групп не срабатывал. Fixed: маппинг через `WEAK_TO_MUSCLE`.
+7. **P1-6: bb-weakpoint.ts `planWeakPoints` не маппил гранулярные** — `weakPoints.includes(m)` для гранулярных возвращал false → UI-отображение специализации показывало неверные данные. Fixed: `muscleIsWeak` с маппингом, `expandToCanonical` для emphasisList.
+8. **P1-7: `previousPlan` не передавался в cycle/program пути** — cross-mesocycle continuity работал только для generic split. Fixed: `previousPlan` добавлен в `CycleToPlanInput` и `ProgramToBBPlanOpts`, `applyWeightProgression` применяется в adapt режиме.
+
+### P2 — Качество (2)
+
+9. **P2-8: Peak week хардкодил `mens_physique`** — нет выбора категории. Fixed: state `peakWeekCategory` + селектор (Men's Physique / Classic / 212 / Open / Bikini / Figure / Wellness) с перегенерацией протокола.
+10. **P2-9: `post_exhaust` = `compound_first`** — не было различия. Fixed: в `rankKey` для `post_exhaust` изоляция primary мышцы получает `tier=1` (сразу после compound, приоритетнее других изоляций).
+
+### Files modified (9)
+- `src/engines/bb/bb-session-order.engine.ts` — P0-1 (tidySessionExercises + methodology), P2-9 (post_exhaust tier)
+- `src/engines/bb/bb-finalize.engine.ts` — P0-1 (проброс methodology в tidySessionExercises)
+- `src/engines/bb/bb-builder.engine.ts` — P0-2 (expandWeakForSpecialization + collapseKey гранулярные), экспорт `isWeak`/`WEAK_TO_MUSCLE`
+- `src/engines/bb/cycle-to-plan.ts` — P0-3 (isWeak), P0-4 (applyEccentricOverloadToPlan), P1-7 (previousPlan в обоих функциях)
+- `src/engines/bb/bb-selector.engine.ts` — P1-5 (freq маппинг через WEAK_TO_MUSCLE)
+- `src/engines/bb/bb-weakpoint.ts` — P1-6 (muscleIsWeak + expandToCanonical)
+- `src/engines/bb/bb-autocoach.engine.ts` — P0-5 (suggestFeeders гранулярные: chest_upper/chest_lower/back_width/back_thickness)
+- `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` — P1-7 (previousPlan в cycle/program ветки), P2-8 (peakWeekCategory state + селектор)
+- NEW: `src/engines/bb/__tests__/bb-audit-2026-08-extended.test.ts` — **42 теста** (P0-1: 5, P0-2: 5, P0-3: 5, P0-4: 2, P0-5: 4, P1-5: 3, P1-6: 6, P1-7: 2, P2-8: 1, P2-9: 3, E2E cycle-to-plan: 6)
+
+### Verification
+- `tsc --noEmit` — 0 ошибок
+- `vitest run` — **2644/2644 passing** (211 test files), +42 новых теста
+- `vite build` — OK
+
+---
+
+## Profile Diaries: Undo + Morning Routine + Health Draft (Aug 10 2026)
+
+Доработка вкладки «📓 Дневники» Профиля v2: отмена последнего добавления, утренний лог-рутинг, черновик записи здоровья.
+
+### 1. Undo для быстрых модалок (`ProfileDiariesTab.tsx`)
+- Каждый из 5 onSave (сон, давление, вес, инъекция, здоровье) теперь вызывает `pushUndo(label, undo)` — восстановление предыдущего состояния:
+  - **Сон**: `saveDiary(SLEEP_DIARY_KEY, prev)` + `setSleepEntries(prev)`
+  - **Давление**: `commitBpEntries(prev)` (prev = `getBpEntries()` до добавления)
+  - **Вес**: `saveWeightLog(prev)` + `setWeights(prev)`
+  - **Инъекция**: `saveDiary(INJECTION_DIARY_KEY, prev)`
+  - **Здоровье**: полный откат всех 6 ключей (unified + pain + neuro + acne + hemato + symptoms) с prev-массивами
+- Snackbar «↩ Отменить» (уже существовал, 5с) теперь реально работает для добавлений из карточек дневников.
+
+### 2. Утренний лог-рутинг («🌅 Утренний лог: сон → давление → вес»)
+- Кнопка в виджете «Сегодня заполнено» (кольцо прогресса): запускает цепочку из 3 модалок.
+- `routine: 'sleep' | 'bp' | 'weight' | null` — после сохранения сна открывается давление, затем вес; после веса — завершение.
+- Прогресс-полоса (1/3 → 2/3 → 3/3) + кнопка ✕ отмены; закрытие модалки вручную отменяет рутинг.
+- Финальный шаг (вес) получает особый undo-лейбл «🌅 Утренний лог завершён · вес записан».
+
+### 3. Черновик записи здоровья (`health-diary-modal.tsx`)
+- **Draft persistence**: всё содержимое формы (дата, заметка, pain/symptoms/neuro/acne/hemato) сохраняется в `sessionStorage` (`he_draft_health`) при каждом изменении и восстанавливается при повторном открытии — переживает закрытие модалки и переключение вкладок.
+- `savedRef` guard: после успешного сохранения черновик очищается и не перезаписывается сброшенным состоянием.
+- **FormBanner (info)**: «Заполните хотя бы один раздел — кнопка "Сохранить" активируется», когда `hasAnyData = false`.
+
+### Files modified
+- `src/ui/screens/ProfileScreen_v2/ProfileDiariesTab.tsx` — undo ×5, routine state + widget-кнопка + прогресс, onClose-отмена рутинга
+- `src/ui/screens/ProfileScreen_v2/health-diary-modal.tsx` — draft restore/persist (sessionStorage), savedRef, FormBanner
+
+### Verification
+- `tsc --noEmit` — 0 ошибок
+- `vitest run` — 2634/2634 passing (211 test files)
+- `vite build` — OK
+
+---
 
 ---
 

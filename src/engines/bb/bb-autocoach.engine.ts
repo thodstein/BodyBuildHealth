@@ -373,11 +373,19 @@ export function suggestFeeders(weakPoints: string[], equipment: string[]): Feede
         feeders.push({ muscle: 'shoulders', exercise: 'Махи гантелями в наклоне', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Акцент на заднюю дельту, не широчайшие.' });
         break;
       case 'upper_chest':
+      case 'chest_upper':
       case 'chest':
         feeders.push({ muscle: 'chest', exercise: 'Разводка гантелями на наклонной', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на растянутую позицию.' });
         break;
+      case 'chest_lower':
+        feeders.push({ muscle: 'chest', exercise: 'Разводка гантелей на скамье с отрицательным наклоном', sets: 3, reps: 12, notes: 'Ежедневно 3×12, RIR 3. Акцент на нижнюю часть груди.' });
+        break;
       case 'back':
-        feeders.push({ muscle: 'back', exercise: 'Тяга резины/блока к лицу', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для задней дельты и вращательной манжеты.' });
+      case 'back_width':
+        feeders.push({ muscle: 'back', exercise: 'Тяга резины/блока к лицу', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для ширины спины и задней дельты.' });
+        break;
+      case 'back_thickness':
+        feeders.push({ muscle: 'back', exercise: 'Тяга резины к поясу сидя', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Для толщины спины (горизонтальная тяга).' });
         break;
       case 'forearms':
         feeders.push({ muscle: 'forearms', exercise: 'Сгибания кистей со штангой', sets: 3, reps: 15, notes: 'Ежедневно 3×15, RIR 3. Хват снизу.' });

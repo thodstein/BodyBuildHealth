@@ -324,6 +324,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
           undefined,
           session.sessionTag,
           options.priorityMuscles,
+          options.methodology,
         );
         dedupeAdaptivePatterns(session, options.priorityMuscles);
       }

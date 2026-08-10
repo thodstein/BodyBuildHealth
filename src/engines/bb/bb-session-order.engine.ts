@@ -174,6 +174,9 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   const isPrimaryIsolation = isPrimaryMuscle && !compound;
   let tier: number;
   if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
+  // P2-9 (audit 2026-08): post_exhaust — изоляция primary мышцы идёт СРАЗУ после compound
+  // (tier=1, приоритетнее других изоляций). Раньше post_exhaust = compound_first без различий.
+  else if (methodology === 'post_exhaust' && isPrimaryIsolation) tier = 1;
   else if (isFinisher) tier = 3;
   else if (isPrimaryHeavy) tier = 0;
   else if (compound) tier = 1;
@@ -260,7 +263,16 @@ export function capExercisesPerMuscle(exercises: BBExercise[]): BBExercise[] {
 // Cap redundancy then apply coaching-grade ordering for a session.
 // sessionTag preferred — lets orderSessionExercises derive primaryMuscle from TAG_MUSCLES
 // (chest for ChestBack, back for Pull, etc.). Falls back to explicit primaryMuscle.
-export function tidySessionExercises(exercises: BBExercise[], primaryMuscle?: string, sessionTag?: string, priorityMuscles?: string[]): BBExercise[] {
+// P0-1 (audit 2026-08): добавлен параметр methodology — ранее хардкодился "compound_first",
+// что сбрасывало выбор пользователя (pre_exhaust/post_exhaust) в finalizeBBPlan для
+// cycle/program путей. По умолчанию остаётся compound_first (обратная совместимость).
+export function tidySessionExercises(
+  exercises: BBExercise[],
+  primaryMuscle?: string,
+  sessionTag?: string,
+  priorityMuscles?: string[],
+  methodology?: SessionMethodology,
+): BBExercise[] {
   const capped = capExercisesPerMuscle(exercises);
-  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: "compound_first", priorityMuscles });
+  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: methodology || "compound_first", priorityMuscles });
 }

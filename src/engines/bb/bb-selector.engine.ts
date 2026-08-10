@@ -5,6 +5,7 @@
 import { SPLIT_PATTERNS, type SplitPattern } from './bb-split-patterns';
 import { normLevel } from '../volume-landmarks.engine';
 import { TAG_MUSCLES } from './bb-day-types';
+import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -106,7 +107,13 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
     // слабые группы: частота 2+×/нед = бонус
     if (input.weakPoints && input.weakPoints.length > 0) {
-      const wpFreq = input.weakPoints.map(w => freq[w] || 0);
+      // P1-5 (audit 2026-08): маппим гранулярные слабые группы (chest_upper, back_width,
+      // delt_mid) в канонические мышцы через WEAK_TO_MUSCLE — раньше freq['chest_upper']=0
+      // и бонус слабых групп никогда не срабатывал для гранулярных ключей.
+      const wpFreq = input.weakPoints.map(w => {
+        const canonical = WEAK_TO_MUSCLE[w] || w;
+        return freq[canonical] || freq[w] || 0;
+      });
       const wpAvg = wpFreq.reduce((a,b)=>a+b,0)/wpFreq.length;
       if (wpAvg >= 2) score += 10;
     }

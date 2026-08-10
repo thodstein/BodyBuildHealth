@@ -252,6 +252,8 @@ export const BbAutoConstructor: React.FC = () => {
   // PRO: peak week protocol для BB-соревнований
   const [showPeakWeek, setShowPeakWeek] = useState(false);
   const [peakWeekProtocol, setPeakWeekProtocol] = useState<PeakWeekProtocol | null>(null);
+  // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
+  const [peakWeekCategory, setPeakWeekCategory] = useState<string>('mens_physique');
   // PRO: per-muscle frequency optimization
   const [freqOptResult, setFreqOptResult] = useState<FrequencyOptimizationResult | null>(null);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
@@ -585,6 +587,7 @@ export const BbAutoConstructor: React.FC = () => {
            eccentricMult,
            mobilityRestrictions,
            labMrvMultiplier: labAdjust.mrvMultiplier,
+           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
           });
         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
         if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
@@ -616,6 +619,7 @@ export const BbAutoConstructor: React.FC = () => {
            mode: bbAdaptMode,
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
+           goal: bbGoal,
             sex: linked.profile?.settings?.personal?.sex,
              bodyFat: linked.profile.settings.personal.bodyFat,
              leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
@@ -627,6 +631,7 @@ export const BbAutoConstructor: React.FC = () => {
             eccentricMult,
             mobilityRestrictions,
             labMrvMultiplier: labAdjust.mrvMultiplier,
+            previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
         });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
@@ -2804,7 +2809,7 @@ export const BbAutoConstructor: React.FC = () => {
                if (!builtPlan) return;
                const weight = linked.profile?.settings?.personal?.weight || 80;
                const sex = linked.profile?.settings?.personal?.sex || 'male';
-               const proto = buildPeakWeekProtocol(weight, 'mens_physique', sex);
+                const proto = buildPeakWeekProtocol(weight, peakWeekCategory, sex);
                setPeakWeekProtocol(proto);
                const updated = applyPeakWeekToPlan(builtPlan, proto);
                setBuiltPlan(updated);
@@ -2818,6 +2823,27 @@ export const BbAutoConstructor: React.FC = () => {
           {showPeakWeek && peakWeekProtocol && (
             <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
               <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Peak Week протокол (7 дней)</div>
+              <div style={{ marginBottom:10, fontSize:11 }}>
+                <span style={{ color:'rgba(255,255,255,0.6)', marginRight:6 }}>Категория:</span>
+                <select value={peakWeekCategory} onChange={e => {
+                  setPeakWeekCategory(e.target.value);
+                  if (builtPlan) {
+                    const weight = linked.profile?.settings?.personal?.weight || 80;
+                    const sex = linked.profile?.settings?.personal?.sex || 'male';
+                    const proto = buildPeakWeekProtocol(weight, e.target.value, sex);
+                    setPeakWeekProtocol(proto);
+                    setBuiltPlan(applyPeakWeekToPlan(builtPlan, proto));
+                  }
+                }} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
+                  <option value="mens_physique">Men's Physique</option>
+                  <option value="classic">Classic Physique</option>
+                  <option value="bb_212">212 Bodybuilding</option>
+                  <option value="open">Open Bodybuilding</option>
+                  <option value="bikini">Bikini</option>
+                  <option value="figure">Figure</option>
+                  <option value="wellness">Wellness</option>
+                </select>
+              </div>
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse' }}>
                   <thead>
