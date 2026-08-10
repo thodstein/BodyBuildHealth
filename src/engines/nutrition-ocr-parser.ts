@@ -148,6 +148,9 @@ const INLINE_MACRO_REGEX = /(?:белки?|б|протеин|protein|p)\s*[:\-]?
 const INLINE_FAT_REGEX = /(?:жиры?|ж|fat|f)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const INLINE_CARB_REGEX = /(?:углевод|угл|у|carb|c|carbs)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const KCAL_FIRST_REGEX = /^\s*(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal)\s+(.+?)(?:\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|ml))?$/i;
+// FatSecret screenshots can lose the P/F/C captions and leave numeric macro
+// columns after calories: "Chicken 200 g 330 kcal 40 10 0".
+const UNLABELED_MACRO_ROW_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|ml|oz|serving|порц(?:ия|ии)?)\s+(\d+(?:[.,]\d+)?)\s*(?:ккал|кал|kcal|cal)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)(?:\s|$)/i;
 
 const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'куриная грудка': 'chicken_breast', 'курица': 'chicken_breast', 'грудка куриная': 'chicken_breast',
@@ -448,6 +451,12 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
 
     if (attachMicros(currentMeal, line)) continue;
 
+    const unlabeledMacroItem = parseUnlabeledMacroRow(line);
+    if (unlabeledMacroItem) {
+      currentMeal.items.push(unlabeledMacroItem);
+      continue;
+    }
+
     const delimitedItem = parseDelimitedItem(line);
     if (delimitedItem) {
       currentMeal.items.push(delimitedItem);
@@ -509,6 +518,13 @@ function parseMacroLabel(text: string): { p: number; f: number; c: number } {
   };
 }
 
+function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | null {
+  const match = line.match(UNLABELED_MACRO_ROW_REGEX);
+  if (!match) return null;
+  const [, name, qty, unit, kcal, p, f, c] = match;
+  return normalizeItem(name.trim(), `${numberFrom(qty, 100)} ${unit}`, numberFrom(kcal, 0), numberFrom(p, 0), numberFrom(f, 0), numberFrom(c, 0));
+}
+
 export function parseFatSecretText(text: string): ParsedMeal[] {
   const lines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1);
   const meals: ParsedMeal[] = [];
@@ -544,6 +560,12 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
     }
 
     if (attachMicros(currentMeal, line)) continue;
+
+    const unlabeledMacroItem = parseUnlabeledMacroRow(line);
+    if (unlabeledMacroItem) {
+      currentMeal.items.push(unlabeledMacroItem);
+      continue;
+    }
 
     const delimitedItem = parseDelimitedItem(line);
     if (delimitedItem) {

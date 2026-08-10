@@ -15,6 +15,12 @@ describe('nutrition-ocr-parser', () => {
       expect(names.some(n => n.includes('Овсянка'))).toBe(true);
     });
 
+    it('parses FatSecret screenshot rows when macro captions are missing', () => {
+      const meals = parseFatSecretText('Завтрак\nChicken breast 200 g 330 kcal 40 10 0');
+      const item = meals.flatMap(meal => meal.items)[0];
+      expect(item).toMatchObject({ qtyGrams: 200, kcal: 165, p: 20, f: 5, c: 0 });
+    });
+
     it('skips total lines', () => {
       const text = `Завтрак
 Яйца 100 г 150 ккал
