@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
+import { DiaryHeader } from '../DiaryHeader';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
 import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, type WeightEntry } from '../../../../../engines/profile-store';
 import { updateSection } from '../../../../../core/profile-manager';
@@ -44,7 +45,6 @@ import {
   sectionHeader,
   btn,
   btnPrimary,
-  iconBtn,
   segWrap,
   segBtn,
   chip,
@@ -768,63 +768,26 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
       }}
     >
-      <header
-        style={{
-          position: 'sticky', top: 0, zIndex: 3,
-          display: 'flex', flexDirection: 'column', gap: 10,
-          padding: '12px 16px 10px',
-          background: 'rgba(10,10,10,0.88)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button style={iconBtn} onClick={onClose} aria-label="Назад к дневникам">
-            ←
-          </button>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.3px', lineHeight: 1.2 }}>
-              Вес и замеры
-            </div>
-            <div style={{ fontSize: 11, color: c.text3, marginTop: 1 }}>
-              {body ? `Сейчас ${body.latest.weight.toFixed(1)} кг${goal > 0 ? ` · цель ${goal} кг` : ''}` : 'Дневник прогресса'}
-            </div>
-          </div>
-          {undo && (
-            <button
-              style={{ ...btn, marginLeft: 'auto', fontSize: 12 }}
-              onClick={() => { commit(undo, false); setUndo(null); }}
-              title="Отменить последнее изменение"
-            >
-              ↩ Отменить
-            </button>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button style={btnPrimary} onClick={() => setModal(true)}>+ Добавить</button>
-          <button style={btn} onClick={() => setModal(true)}>⚡ Сегодня</button>
-          <span style={{ flex: 1 }} />
-          <button style={iconBtn} onClick={doExportCsv} title="Экспорт CSV">CSV</button>
-          <button style={iconBtn} onClick={doPrint} title="Печать / PDF">PDF</button>
-          <button
-            style={{ ...iconBtn, color: showArchive ? c.green : undefined, width: 'auto', padding: '0 10px', fontSize: 12 }}
-            onClick={() => setShowArchive(v => !v)}
-            aria-pressed={showArchive}
-          >
-            🗄{archiveRows.length > 0 ? ` ${archiveRows.length}` : ''}
-          </button>
-          <button style={iconBtn} onClick={syncFromProfile} title="Загрузить рост/пол/цель из профиля">📋</button>
-          <button style={iconBtn} onClick={syncToProfile} title="Сохранить текущий вес в профиль">💾</button>
-          <button
-            style={{ ...iconBtn, color: '#ff453a' }}
-            onClick={() => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }}
-            title="Очистить дневник"
-          >
-            🗑
-          </button>
-        </div>
-      </header>
+      <DiaryHeader
+        accent="#34c759"
+        title="⚖️ Вес и замеры"
+        count={rows.length}
+        countLabel="записей"
+        onClose={onClose}
+        onAdd={() => setModal(true)}
+        addLabel="+ Добавить"
+        onToday={() => setModal(true)}
+        undoActive={!!undo}
+        onUndo={() => { if (undo) { commit(undo, false); setUndo(null); } }}
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: doExportCsv },
+          { label: '🖨 Печать / PDF', onClick: doPrint },
+          { label: '🗄 Архив', onClick: () => setShowArchive((v: boolean) => !v), danger: false },
+          { label: '📋 Из профиля', onClick: syncFromProfile },
+          { label: '💾 В профиль', onClick: syncToProfile },
+          { label: '🗑 Очистить дневник', onClick: () => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }, danger: true },
+        ]}
+      />
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '8px 14px 48px' }}>
         {rows.length === 0 && (

@@ -7,12 +7,12 @@ import {
   chip,
   chipActive,
   glassSection,
-  header as pageHeader,
   main as pageMain,
   statCard,
   tableTh,
   tableTd,
 } from '../diary-page-styles';
+import { DiaryHeader } from '../DiaryHeader';
 import {
   addUnifiedHealthEntry,
   deleteUnifiedHealthEntry,
@@ -664,71 +664,38 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           .health-window input, .health-window textarea, .health-window select { font-size: 16px; }
         }
       `}</style>
-      <header style={pageHeader}>
-        <button style={button} onClick={onClose}>
-          ← Дневники
-        </button>
-        <b style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-          🩺 Здоровье
-          <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{rows.length} записей</span>
-        </b>
-        <div style={{
-          padding: '4px 10px',
-          borderRadius: 8,
-          background: `${healthScore.breakdown.recovery.score > 60 ? colors.greenDim : colors.warningDim}`,
-          border: `1px solid ${healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning}`,
-          color: healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning,
-          fontSize: 12,
-          fontWeight: 700,
-          whiteSpace: 'nowrap',
-        }} title={`Индекс здоровья: ${diaryScore}/100`}>
-          💚 {diaryScore}
-        </div>
-        <div style={{ flex: 1 }} />
-        <button style={btnPrimary(ACCENT)} onClick={() => setAddOpen(true)}>
-          + Добавить
-        </button>
-        <button style={button} onClick={() => setAddOpen(true)}>
-          ⚡ Сегодня
-        </button>
-        <button style={button} onClick={exportCsv}>
-          CSV
-        </button>
-        <button style={button} onClick={printPdf}>
-          PDF/Печать
-        </button>
-        <button
-          style={button}
-          onClick={() => svgRef.current && exportSvgAsFile(svgRef.current, `health-${todayIso()}.svg`)}
-        >
-          SVG
-        </button>
-        <button
-          style={button}
-          onClick={() => svgRef.current && exportSvgAsPng(svgRef.current, `health-${todayIso()}.png`)}
-        >
-          PNG
-        </button>
-        <button
-          style={button}
-          onClick={() => {
-            if (confirm('Очистить единый дневник здоровья?')) commit([]);
-          }}
-        >
-          Очистить
-        </button>
-        {undo && (
-          <button
-            style={{ ...button, borderColor: `${ACCENT}55`, color: '#f472b6' }}
-            onClick={() => {
-              commit(undo, false);
-              setUndo(null);
-            }}
-          >
-            ↩ Отменить
-          </button>
-        )}
-      </header>
+      <DiaryHeader
+        accent={ACCENT}
+        title="🩺 Здоровье"
+        count={rows.length}
+        onClose={onClose}
+        onAdd={() => setAddOpen(true)}
+        addLabel="+ Добавить"
+        onToday={() => setAddOpen(true)}
+        undoActive={!!undo}
+        onUndo={() => { if (undo) { commit(undo, false); setUndo(null); } }}
+        badge={
+          <div style={{
+            padding: '4px 10px',
+            borderRadius: 8,
+            background: `${healthScore.breakdown.recovery.score > 60 ? colors.greenDim : colors.warningDim}`,
+            border: `1px solid ${healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning}`,
+            color: healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning,
+            fontSize: 12,
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+          }} title={`Индекс здоровья: ${diaryScore}/100`}>
+            💚 {diaryScore}
+          </div>
+        }
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: exportCsv },
+          { label: '🖨 Печать / PDF', onClick: printPdf },
+          { label: '📈 График SVG', onClick: () => { if (svgRef.current) exportSvgAsFile(svgRef.current, `health-${todayIso()}.svg`); } },
+          { label: '🖼 График PNG', onClick: () => { if (svgRef.current) exportSvgAsPng(svgRef.current, `health-${todayIso()}.png`); } },
+          { label: '🗑 Очистить дневник', onClick: () => { if (confirm('Очистить единый дневник здоровья?')) commit([]); }, danger: true },
+        ]}
+      />
       <main style={{ ...pageMain, maxWidth: 1150 }}>
         {status && (
           <div role="status" style={{ ...card, marginBottom: 10, color: status.color, borderColor: status.color }}>

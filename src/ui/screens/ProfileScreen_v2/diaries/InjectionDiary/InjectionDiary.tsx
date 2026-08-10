@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui';
-import { btnBase, btnPrimary, chip, chipActive, header as pageHeader, main as pageMain, statCard } from '../diary-page-styles';
+import { btnBase, btnPrimary, chip, chipActive, main as pageMain } from '../diary-page-styles';
+import { DiaryHeader } from '../DiaryHeader';
 import {
   INJECTION_ZONES,
   NEEDLE_GAUGES,
@@ -595,24 +596,15 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           .injection-window input, .injection-window textarea, .injection-window select { font-size: 16px; }
         }
       `}</style>
-      <header style={{ ...pageHeader, padding: '12px max(14px, calc((100vw - 1180px)/2))' }}>
-        <button style={button} onClick={onClose}>
-          ← Дневники
-        </button>
-        <div style={{ flex: 1, minWidth: 190 }}>
-          <strong style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-            💉 Инъекции
-            <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{entries.length} записей</span>
-          </strong>
-          <div style={{ color: colors.textMuted, fontSize: 11 }}>Журнал · статистика · график · ротация зон</div>
-        </div>
-        <button style={btnPrimary(ACCENT)} onClick={() => setEditor({ open: true })}>
-          ＋ Добавить
-        </button>
-        {repeatLast && (
-          <button
-            style={{ ...button, background: colors.blueDim, color: colors.blue, fontWeight: 700 }}
-            onClick={() => {
+      <DiaryHeader
+        accent={ACCENT}
+        title="💉 Инъекции"
+        count={entries.length}
+        onClose={onClose}
+        onAdd={() => setEditor({ open: true })}
+        addLabel="＋ Добавить"
+        onToday={repeatLast
+          ? () => {
               const last = entries[entries.length - 1];
               setRepeatDraft({
                 date: todayLocalStr(),
@@ -632,33 +624,19 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 notes: '',
               });
               setEditor({ open: true });
-            }}
-            title={`Повторить: ${repeatLast.substance} ${repeatLast.dose} → ${zoneLabel(repeatLast.zone)}`}
-          >
-            ↻ Повторить
-          </button>
-        )}
-        <button style={button} onClick={exportCsv}>
-          CSV
-        </button>
-        <button style={button} onClick={print}>
-          PDF / печать
-        </button>
-        <button style={button} onClick={() => exportChart()}>
-          SVG
-        </button>
-        <button style={button} onClick={() => exportChart(true)}>
-          PNG
-        </button>
-        <button style={dangerButton} onClick={clear}>
-          Очистить
-        </button>
-        {undo && (
-          <button style={{ ...button, color: colors.warning }} onClick={restore}>
-            ↩ Undo
-          </button>
-        )}
-      </header>
+            }
+          : undefined}
+        todayLabel="↻ Повторить"
+        undoActive={!!undo}
+        onUndo={restore}
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: exportCsv },
+          { label: '🖨 Печать / PDF', onClick: print },
+          { label: '📈 График SVG', onClick: exportChart },
+          { label: '🖼 График PNG', onClick: () => exportChart(true) },
+          { label: '🗑 Очистить дневник', onClick: clear, danger: true },
+        ]}
+      />
       <main style={{ ...pageMain, maxWidth: 1180 }}>
         <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap' }}>
           {(['journal', 'stats', 'chart'] as ViewMode[]).map((value) => (

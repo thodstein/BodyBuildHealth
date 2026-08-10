@@ -6,13 +6,12 @@ import {
   chip,
   chipActive,
   glassSection,
-  header as pageHeader,
   main as pageMain,
   tableTh,
   tableTd,
   statCard,
-  sectionTitle,
 } from '../diary-page-styles';
+import { DiaryHeader } from '../DiaryHeader';
 import {
   buildWeeklyHistogram,
   compareWithLastWeek,
@@ -382,24 +381,24 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         }
       `}</style>
       {/* Header */}
-      <header style={pageHeader}>
-        <button style={btn} onClick={onClose}>← Дневники</button>
-        <b style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-          ❤️ Давление
-          <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{rows.length} записей</span>
-        </b>
-        <div style={{ flex: 1 }} />
-        <button style={btnPrimary(ACCENT)} onClick={openNew}>+ Добавить</button>
-        <button style={btn} onClick={openNew}>⚡ Сегодня</button>
-        <button style={btn} onClick={exportCsv}>CSV</button>
-        <button style={btn} onClick={print}>PDF/Печать</button>
-        <button style={btn} onClick={() => svg.current && exportSvgAsFile(svg.current!, `bp-${todayIso()}.svg`)}>SVG</button>
-        <button style={btn} onClick={() => svg.current && exportSvgAsPng(svg.current!, `bp-${todayIso()}.png`)}>PNG</button>
-        <button style={btn} onClick={() => { if (window.confirm('Очистить дневник давления?')) commit([]); }}>Очистить</button>
-        {undo && (
-          <button style={{ ...btn, borderColor: `${ACCENT}55`, color: '#f87171' }} onClick={() => { commit(undo, false); setUndo(null); }}>↩ Отменить</button>
-        )}
-      </header>
+      <DiaryHeader
+        accent={ACCENT}
+        title="❤️ Давление"
+        count={rows.length}
+        onClose={onClose}
+        onAdd={openNew}
+        addLabel="+ Добавить"
+        onToday={openNew}
+        undoActive={!!undo}
+        onUndo={() => { if (undo) { commit(undo, false); setUndo(null); } }}
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: exportCsv },
+          { label: '🖨 Печать / PDF', onClick: print },
+          { label: '📈 График SVG', onClick: () => { if (svg.current) exportSvgAsFile(svg.current, `bp-${todayIso()}.svg`); } },
+          { label: '🖼 График PNG', onClick: () => { if (svg.current) exportSvgAsPng(svg.current, `bp-${todayIso()}.png`); } },
+          { label: '🗑 Очистить дневник', onClick: () => { if (window.confirm('Очистить дневник давления?')) commit([]); }, danger: true },
+        ]}
+      />
 
       {/* Alerts */}
       {alerts.filter(a => !a.dismissed).length > 0 && (
