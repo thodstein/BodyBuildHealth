@@ -41,6 +41,9 @@ export interface BBExercise {
   warmupSets?: { load: number; reps: number }[];
   rationale?: string;
   executionProfile?: import('./bb-exercise-instructions.engine').ExerciseInstructionProfile;
+  /** Функциональная подгруппа/паттерн для quality-aware распределения объёма. */
+  backSubgroup?: 'back_width' | 'back_thickness' | 'upper_back' | 'rear_delts' | 'traps' | 'erectors';
+  movementPattern?: string;
 }
 
 export interface BBSession {

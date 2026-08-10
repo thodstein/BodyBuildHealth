@@ -41,6 +41,8 @@ export const TAG_MUSCLES: Record<string, string[]> = {
   Push: ['chest', 'delt_front', 'delt_mid', 'triceps'],
   Pull: ['back', 'biceps', 'delt_rear', 'traps'],
   Legs: ['quads', 'hamstrings', 'glutes', 'calves'],
+  // Upper имеет две полноценные верхние сессии: спина не должна быть
+  // остаточным одним упражнением между грудью и руками.
   Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
   Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
   FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms'],

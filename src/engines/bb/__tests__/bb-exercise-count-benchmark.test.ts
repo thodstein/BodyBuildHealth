@@ -23,4 +23,29 @@ describe('BB exercise-count benchmark', () => {
     expect(enhancedMax).toBeGreaterThanOrEqual(naturalMax);
     expect(enhancedMax).toBeLessThanOrEqual(10);
   }, 30000);
+
+  it('gives experienced enhanced athletes a larger back/session budget', () => {
+    const plan = buildBBPlan({
+      patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 4, workMax, pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const maxSets = Math.max(...plan.weeks.flatMap(w => w.sessions.map(s => s.exercises.reduce((n, e) => n + e.sets, 0))));
+    const maxExercises = Math.max(...plan.weeks.flatMap(w => w.sessions.map(s => s.exercises.length)));
+    expect(maxSets).toBeGreaterThan(24);
+    expect(maxExercises).toBeGreaterThan(10);
+    expect(maxSets).toBeGreaterThanOrEqual(36);
+    expect(maxSets).toBeLessThanOrEqual(56);
+    expect(maxExercises).toBeLessThanOrEqual(14);
+  }, 30000);
+
+  it('does not keep two vertical-pull variants in one generic back session', () => {
+    const plan = buildBBPlan({
+      patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax, pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    for (const session of plan.weeks[0].sessions) {
+      const backPulls = session.exercises.filter(e => e.muscle === 'back' && /подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун|vertical_pull/i.test(e.name));
+      expect(backPulls.length).toBeLessThanOrEqual(1);
+    }
+  }, 30000);
 });

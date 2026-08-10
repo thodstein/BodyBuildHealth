@@ -12,10 +12,11 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
+import { annotateBackExercise, backQualityIssues } from './bb-back-quality.engine';
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
 
-function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: string[] = []): void {
+function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: string[] = [], optionsHighVolumeBack = false): void {
   const priority = new Set(priorityMuscles);
   const counts = new Map<string, number>();
   const ranked = session.exercises.map((exercise, index) => ({ exercise, index })).sort((a, b) => {
@@ -27,9 +28,12 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
   const keep = new Set<any>();
   for (const item of ranked) {
     const muscle = item.exercise.muscle || '';
-    const pattern = derivePattern(item.exercise);
+    const pattern = item.exercise.muscle === 'back'
+      ? (annotateBackExercise(item.exercise).movementPattern || derivePattern(item.exercise))
+      : derivePattern(item.exercise);
     const key = `${muscle}:${pattern}`;
-    const cap = SMALL_MUSCLES.has(muscle) ? 1 : 2;
+    const highVolumeBack = muscle === 'back' && optionsHighVolumeBack;
+    const cap = highVolumeBack ? 4 : (SMALL_MUSCLES.has(muscle) ? 1 : 2);
     const count = counts.get(key) || 0;
     if (count >= cap && item.exercise.role !== 'primary') continue;
     counts.set(key, count + 1);
@@ -37,6 +41,91 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
   }
   session.exercises = session.exercises.filter(exercise => keep.has(exercise));
 }
+
+/**
+ * Финальная раскладка back-бюджета для experienced enhanced.
+ * Нельзя оставлять вторую Upper/Pull-сессию с одним движением только из-за
+ * freshness/rotation. Добавляются реальные упражнения из каталога, а не
+ * переименованные копии; затем бюджет распределяется по ним.
+ */
+function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (!/^(Upper|UpperPower|UpperHyp|Pull|Back|ChestBack|Torso|FullBody)$/i.test(session.sessionTag || '')) return;
+
+  let current: any[] = session.exercises.filter((e: any) => e.muscle === 'back');
+  // В adapt библиотечная FullBody-программа может вообще не содержать back
+  // после исходной фильтрации. Добавляем back-блок только в каждую вторую
+  // подходящую сессию, чтобы не превратить FullBody в ежедневный Pull-день.
+  if (!current.length) {
+    if (session.day % 2 === 0) return;
+    const seed = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === 'back' && /row|тяга/i.test(x.name));
+    if (!seed) return;
+    const wm = options.workMax?.back || 80;
+    const base = {
+      muscle: 'back', name: seed.name, exerciseName: seed.name, role: 'primary', character: 'тяж',
+      sets: 4, repsRange: [8, 12], rir: 2, exerciseType: seed.type || 'compound', restSeconds: 150,
+      workSets: Array.from({ length: 4 }, () => ({ reps: 10, rir: 2, weight: Math.round(wm * 0.65 * 10) / 10, restSeconds: 150 })),
+      warmupSets: [], rationale: 'Experienced enhanced adapt: back budget allocation', comment: 'Адаптация: добавлен полноценный блок спины.',
+    };
+    session.exercises.push(base);
+    current = [base];
+  }
+  const years = options.trainingYears ?? 0;
+  const targetExercises = years >= 6 ? 6 : 5;
+  const targetSets = years >= 6 ? 22 : 18;
+  const usedNames = new Set(current.map(e => e.name));
+  const usedPatterns = new Set(current.map(e => annotateBackExercise(e).movementPattern));
+  const template = current[0];
+  const allowed = (candidate: any) => {
+    if (trueMuscleOf(candidate) !== 'back') return false;
+    if (usedNames.has(candidate.name)) return false;
+    if (options.avoidAxialLoad && isAxialLoadExercise(candidate)) return false;
+    if (options.equipment?.length) {
+      const eq = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
+      if (eq.length && !eq.some((x: string) => options.equipment!.includes(x))) return false;
+    }
+    return true;
+  };
+
+  // Приоритет: закрыть разные функциональные классы, а не набрать ещё один
+  // верхний блок. Каталог остаётся источником реального названия упражнения.
+  const wanted = ['heavy_row', 'supported_row', 'vertical_pull', 'unilateral_row', 'lat_isolation', 'upper_back'];
+  for (const wantedPattern of wanted) {
+    if (current.length >= targetExercises) break;
+    if (usedPatterns.has(wantedPattern)) continue;
+    const candidate = EXERCISE_CATALOG.find((x: any) => allowed(x) && annotateBackExercise({ ...template, name: x.name } as any).movementPattern === wantedPattern);
+    if (!candidate) continue;
+    const tagged: any = annotateBackExercise({ ...template, name: candidate.name } as any);
+    const added: any = structuredClone(template);
+    added.name = candidate.name;
+    added.exerciseName = candidate.name;
+    added.movementPattern = tagged.movementPattern;
+    added.backSubgroup = tagged.backSubgroup;
+    added.role = 'primary';
+    added.sets = Math.max(3, Math.min(5, template.sets || 4));
+    const sample = template.workSets?.[template.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+    added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
+    session.exercises.push(added);
+    current.push(added);
+    usedNames.add(candidate.name);
+    usedPatterns.add(wantedPattern);
+  }
+
+  // Если каталог не дал все классы, увеличиваем рабочие подходы в уже
+  // выбранных реальных движениях до profile target.
+  let total = current.reduce((sum, e) => sum + (e.sets || 0), 0);
+  for (const exercise of current) {
+    while (total < targetSets && exercise.sets < 8) {
+      const sample = exercise.workSets?.[exercise.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+      exercise.sets += 1;
+      exercise.workSets.push({ ...sample });
+      total += 1;
+    }
+    if (total >= targetSets) break;
+  }
+}
+
+
 
 export interface BBFinalizeOptions {
   reorder?: boolean;
@@ -55,6 +144,10 @@ export interface BBFinalizeOptions {
   mrvMultiplier?: number;
   checkOrder?: boolean;
   preserveSource?: boolean;
+  /** Высокообъёмный профиль: лимит всей сессии, а не одной мышцы. */
+  maxWorkingSets?: number;
+  maxExercises?: number;
+  trainingYears?: number;
 }
 
 function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
@@ -311,6 +404,9 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       sessions: week.sessions.map(session => ({ ...session, exercises: [...session.exercises] })),
     })),
   };
+  for (const week of next.weeks) for (const session of week.sessions) {
+    session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
+  }
   syncBBPlanSetShape(next);
   if (!options.preserveSource && options.phaseSafety) applyAdaptivePhaseSafety(next);
   if (!options.preserveSource && options.reorder !== false) repairAdaptiveSafety(next, options);
@@ -326,11 +422,14 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
           options.priorityMuscles,
           options.methodology,
         );
-        dedupeAdaptivePatterns(session, options.priorityMuscles);
+        dedupeAdaptivePatterns(session, options.priorityMuscles, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3);
       }
       // Faithful сохраняет исходный набор и порядок, но safety-budget
       // обязателен для каждого режима и источника BB-auto.
-      const fitted = options.preserveSource ? { removed: [], cost: estimateBBSessionCost(session) } : fitBBSessionToBudget(session, { maxExercises: 10, maxWorkingSets: 24 });
+      const fitted = options.preserveSource ? { removed: [], cost: estimateBBSessionCost(session) } : fitBBSessionToBudget(session, {
+        maxExercises: options.maxExercises ?? 10,
+        maxWorkingSets: options.maxWorkingSets ?? 24,
+      });
       if (fitted.removed.length > 0) {
         next.rationale.push(`Fatigue budget: ${session.sessionTag || `день ${session.day}`} — удалено ${fitted.removed.length} вторичных упражнений, расчётная длительность ${Math.round(fitted.cost.timeSeconds / 60)} мин.`);
       }
@@ -344,6 +443,12 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     next.weeks = tapered.weeks;
     syncBBPlanSetShape(next);
   }
+  // Последний back allocation после rotation/fatigue/taper: именно здесь
+  // проверяем фактические финальные сеты, а не промежуточный план.
+  for (const week of next.weeks) for (const session of week.sessions) {
+    allocateExperiencedBackSession(session, options);
+  }
+  syncBBPlanSetShape(next);
   if (options.level) {
     const peakWeek = next.weeks.reduce((best, week) => {
       const total = week.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);
@@ -419,6 +524,13 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .slice(0, 20)
     .map(issue => `⚠ Валидация: ${issue.message}`);
   if (warnings.length) next.rationale = [...next.rationale, ...warnings];
+  const backQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => e.muscle === 'back')).reduce((acc, e) => {
+    const pattern = e.movementPattern || 'other';
+    acc[pattern] = (acc[pattern] || 0) + e.sets;
+    return acc;
+  }, {} as Record<string, number>);
+  next.rationale.push(`🧩 Спина по паттернам: ${Object.entries(backQuality).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы'}`);
+  next.rationale.push(...backQualityIssues(next.weeks).map(issue => `⚠ Качество спины: ${issue}`));
   const errors = validation.issues
     .filter(issue => issue.level === 'error')
     .slice(0, 20)

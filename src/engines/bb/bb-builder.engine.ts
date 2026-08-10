@@ -72,6 +72,8 @@ export interface MusclePlan {
 export interface BBBuilderInput {
   patternId: string;
   level: string;                 // beginner/intermediate/advanced/enhanced
+  /** Реальный стаж силовых тренировок. Не заменяется ярлыком level. */
+  trainingYears?: number;
   goal: BBGoal;
   weeks: number;                 // длительность мезоцикла
   workMax?: Record<string, number>; // рабочий максимум на мышцу/движение (кг)
@@ -143,6 +145,21 @@ export interface BBBuilderInput {
   previousPlan?: BBPlan;
 }
 
+/**
+ * Объёмный профиль спины для продвинутых атлетов.
+ * В старой версии enhanced менял в основном число упражнений, но не имел
+ * отдельного недельного бюджета back. Здесь стаж ограничивает доступный
+ * enhanced-объём: PED не превращает новичка в pro автоматически.
+ */
+function backVolumeProfile(level: string, trainingYears?: number): { targetMult: number; capMult: number; extraExercises: number } {
+  const years = Number.isFinite(trainingYears) ? Math.max(0, trainingYears as number) : 0;
+  if (level !== 'enhanced') return { targetMult: 1, capMult: 1, extraExercises: 0 };
+  if (years >= 6) return { targetMult: 2.20, capMult: 2.20, extraExercises: 3 };
+  if (years >= 3) return { targetMult: 1.80, capMult: 1.80, extraExercises: 2 };
+  if (years >= 1) return { targetMult: 1.15, capMult: 1.15, extraExercises: 0 };
+  return { targetMult: 1, capMult: 1, extraExercises: 0 };
+}
+
 
 export interface BBSet {
   reps: number;
@@ -171,6 +188,8 @@ export interface BBExercise {
   rationale?: string;       // PRO: почему выбрано именно это упражнение
   /** Структурированная инструкция из Exercise Lab, без необходимости парсить comment. */
   executionProfile?: import('./bb-exercise-instructions.engine').ExerciseInstructionProfile;
+  backSubgroup?: 'back_width' | 'back_thickness' | 'upper_back' | 'rear_delts' | 'traps' | 'erectors';
+  movementPattern?: string;
 }
 
 export interface BBSession {
@@ -996,6 +1015,7 @@ function buildSession(
   trainingFocus?: BBTrainingFocus,
   eccentricMult?: number,
   mobilityRestrictions?: string[],
+  trainingYears?: number,
 ): BBSession {
   const character = sched.character as DayCharacter;
   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup);
@@ -1041,6 +1061,10 @@ function buildSession(
   const sessionSelectedIds: string[] = [...preSelectedIds, ...rotationBlockIds];
   const sessionSelectedNames: string[] = [...preSelectedNames];
   const rotationNamesSet = new Set(preSelectedNames); // cross-session rotation only (excludes prior days/weeks, not this session's own picks)
+  // У опытного enhanced-профиля ротация упражнений спины не должна оставлять
+  // вторую back-сессию с одним движением. Повтор разрешён между сессиями,
+  // но внутри одной сессии dedupe по функциональному паттерну остаётся.
+  const relaxBackRotation = level === 'enhanced' && (trainingYears ?? 0) >= 3;
   
   for (const mp of musclePlans) {
     const muscle = mp.group;      // каталог-группа (shoulders/arms/back/legs/core…)
@@ -1108,6 +1132,12 @@ function buildSession(
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
     let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt, isFemale);
+    // High-volume enhanced back: это прямой бюджет спины на одну сессию,
+    // а не общий лимит Pull-дня. Минимум зависит от подтверждённого стажа.
+    // 3+ лет — 18 сетов, 6+ лет — 22 сета до дальнейшего fatigue/recovery fit.
+    if (muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 22 : 18);
+    }
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
@@ -1181,6 +1211,7 @@ function buildSession(
     // primary=3, а accessories суммарно = 2+2+2+1 = 7 (back=3 vs accessories=7 — бред!).
     // Теперь: multi-day primary = 4 (доминирует), multi-day accessory = 1 (добивка),
     // кроме biceps/triceps на PED (=2). В solo-day (1-2 мышцы) — как раньше (accessory=2).
+    const backProfile = muscle === 'back' ? backVolumeProfile(level, trainingYears) : { targetMult: 1, capMult: 1, extraExercises: 0 };
     let exerciseCount = role === 'primary'
       ? (isMultiDay ? 4 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
       : (isMultiDay
@@ -1189,6 +1220,18 @@ function buildSession(
     // P3: Level-based exerciseCount (Schoenfeld 2022: advanced → more exercises for detail)
     if (levelBase <= 1 && exerciseCount > 2) exerciseCount = Math.max(2, exerciseCount - 1);
     else if (levelBase >= 4 && role === 'primary') exerciseCount = Math.min(8, exerciseCount + 1);
+    if (muscle === 'back' && role === 'primary' && backProfile.extraExercises > 0) {
+      exerciseCount = Math.min(8, exerciseCount + backProfile.extraExercises);
+    }
+    // В Upper/Lower back может быть не lead-мышцей, но опытный enhanced
+    // профиль всё равно требует полноценного back-блока, а не одного
+    // случайного упражнения между грудью и руками.
+    if (muscle === 'back' && trainingYears !== undefined && trainingYears >= 3 && level === 'enhanced' && role === 'primary') {
+      exerciseCount = Math.max(exerciseCount, trainingYears >= 6 ? 7 : 6);
+    }
+    if (muscle === 'back' && trainingYears !== undefined && trainingYears >= 3 && level === 'enhanced' && role === 'accessory') {
+      exerciseCount = Math.max(exerciseCount, trainingYears >= 6 ? 6 : 5);
+    }
     // ★ B: focusGroup/weakPoint — больше СЕТОВ (не упражнений).
     // Объём уже усилен через sessionShareFor (×1.2 weak, ×1.3 focus).
     // exerciseCount НЕ повышаем — качество > количество.
@@ -1202,7 +1245,8 @@ function buildSession(
     // ПАМП-дни: для главных мышц сессии разрешить compound в пуле,
     // чтобы первое упражнение было базовым (compound-first порядок),
     // даже если роль accessory. Без этого памп-день открывается изоляцией.
-    const effectiveSelType = (role === 'accessory' && character === 'памп' && isMainMuscle) ? 'any' : selType;
+     const highVolumeBack = muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
+     const effectiveSelType = highVolumeBack ? 'any' : ((role === 'accessory' && character === 'памп' && isMainMuscle) ? 'any' : selType);
     // Корень фикса: пул строится по ИСТИННОЙ мышце упражнения (movementPattern +
     // targetMuscle), а не по композитной группе каталога. Это устраняет
     // неверную атрибуцию (leg curl → «calves», farmer walk → «biceps»,
@@ -1340,10 +1384,14 @@ function buildSession(
       primaryBySlot.set(primarySlot, (exDatas[0] as any).name);
     }
     // Freshness guard: не повторять упражнение в той же неделе на той же мышце.
-    {
-      const weekUsedForMuscle = weekLocalUsed.get(muscle) || new Set<string>();
-      const fresh = exDatas.filter(d => !weekUsedForMuscle.has((d as any).name || ''));
-      if (fresh.length > 0) exDatas = fresh;
+     {
+       const weekUsedForMuscle = weekLocalUsed.get(muscle) || new Set<string>();
+       const fresh = exDatas.filter(d => !weekUsedForMuscle.has((d as any).name || ''));
+       // Для high-volume enhanced back не сокращаем второй back-день до
+       // одного упражнения из-за freshness-guard: повтор паттерна между
+       // сессиями допустим, а недобор недельного бюджета — нет.
+       const preserveBackVolume = muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
+       if (fresh.length > 0 && !preserveBackVolume) exDatas = fresh;
       for (const d of exDatas) weekUsedForMuscle.add((d as any).name || '');
       weekLocalUsed.set(muscle, weekUsedForMuscle);
     }
@@ -1464,7 +1512,7 @@ function buildSession(
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
-          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id) && !rotationNamesSet.has(e.name));
+           let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id) && (relaxBackRotation && muscle === 'back' ? true : !rotationNamesSet.has(e.name)));
           // _score BB-приоритет ВСЕГДА (hack +15 > barbell -10, incline +15 > flat -10)
           // FIX-B4: lengthenedBonus — +10 для упражнений в растянутой позиции
           // (Schoenfeld 2022, Maeo 2023: lengthened-position → больше гипертрофии).
@@ -1500,7 +1548,7 @@ function buildSession(
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
-          let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
+           let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           candidates = candidates.sort((a, b) => {
             const sa = (a as any)._score ?? 0;
             const sb = (b as any)._score ?? 0;
@@ -1543,6 +1591,20 @@ function buildSession(
             if (comp) { exDatas[0] = comp; usedIds.add(comp.id); sessionSelectedIds.push(comp.id); sessionSelectedNames.push(comp.name); }
           }
         }
+      }
+    }
+
+    // Back high-volume composition: если rotation/selector оставили слишком
+    // мало движений, добираем только неповторяющиеся функциональные классы.
+    if (muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3) {
+      const targetExercises = Math.min((trainingYears ?? 0) >= 6 ? 7 : 6, exerciseCount);
+      const used = new Set(exDatas.map(e => e.id));
+      for (const ac of ANGLE_CLASSES.back) {
+        if (exDatas.length >= targetExercises) break;
+        const candidate = [...pool, ...EXERCISE_CATALOG].find(e => !used.has(e.id) && trueMuscleOf(e) === 'back' && !isBBJunk(e) && ac.match(e));
+        if (!candidate) continue;
+        exDatas.push(candidate);
+        used.add(candidate.id);
       }
     }
 
@@ -1669,8 +1731,11 @@ function buildSession(
         ? Math.floor(budgetSource * pl.exerciseCount * Math.max(1, Math.round(pl.sets / pl.exerciseCount)) * ((pl.exDatas[0] as any)?.fatigueCost || 5) / totalExpectedFatigue)
         : Math.floor(budgetSource / Math.max(1, plans.length)));
     // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
+    const highVolumeBack = pl.muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
-    let remainingBudget = Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
+    let remainingBudget = highVolumeBack
+      ? Math.max(muscleBudget, pl.sets * 10)
+      : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
     // Гарантированный минимум для arms/shoulders — на PED нужно минимум 3-4 сета
     // даже если бюджет мал (chest забирал большую часть). Без этого triceps получает 1 сет.
     // minBudget = fatigueCost(5) × minSets(3-4) × minExercises(2) = 30-40
@@ -1690,7 +1755,10 @@ function buildSession(
       const isSubstituted = (exData as any).substituted === true;
       const repsCap = (exData as any).repsCap ?? 20;
       // P1-4: минимум 2 сета на упражнение (1 сет = разминка, не рабочий объём для гипертрофии).
-      const exSets = Math.max(2, Math.min(5, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
+       // back target уже масштабирован на недельном prescription-уровне выше;
+       // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
+       const setCap = pl.muscle === 'back' && trainingYears !== undefined ? 10 : 5;
+       const exSets = Math.max(2, Math.min(setCap, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;
@@ -1942,6 +2010,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const exclIds = input.excludedExercises || [];
   const avAxial = input.avoidAxialLoad || false;
   const eqList = input.equipment || [];
+  const backProfile = backVolumeProfile(level, input.trainingYears);
 
   const today = todayStr();
   const excludedMuscles = getExcludedMuscles(injuries, today);
@@ -2012,6 +2081,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.05);
       // PED-адаптация: увеличиваем целевой объём пропорционально MRV-множителю
       v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
+      if (m === 'back' && input.trainingYears !== undefined) {
+        v = Math.round(v * backProfile.targetMult);
+      }
       // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
       v = Math.round(v * (input.labMrvMultiplier ?? 1));
       // PRO: cross-mesocycle volume progression — +1-2 сета per muscle из предыдущего мезо
@@ -2037,7 +2109,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult);
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1));
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
@@ -2519,8 +2591,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         return true;
       });
       // 2. Дубликаты по паттерну (5 ягодичных мостов → оставить 2)
-      const PER_MUSCLE_MAX: Record<string, number> = {
-        glutes: 3, hamstrings: 3, quads: 4, chest: 4, back: 4,
+       const PER_MUSCLE_MAX: Record<string, number> = {
+         glutes: 3, hamstrings: 3, quads: 4, chest: 4, back: (level === 'enhanced' && (input.trainingYears ?? 0) >= 3) ? 8 : 4,
         shoulders: 3, biceps: 3, triceps: 3, calves: 2, abs: 3,
         traps: 2, forearms: 2, core: 2, lower_back: 2,
       };
@@ -2537,8 +2609,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (/жим.*лёж|bench.*press/i.test(n) && !/наклон|incline/i.test(n)) return 'bench_press';
         if (/жим.*наклон|incline.*press/i.test(n)) return 'incline_press';
         if (/развод|fly|сведен|пек.?дек|butterfly|кроссовер.*сведен/i.test(n)) return 'fly';
-        if (/подтяг|pull.?up|chin/i.test(n)) return 'pullup';
-        if (/тяга.*верхн.*блок|lat.?pull/i.test(n)) return 'pulldown';
+        // Подтягивание и верхний блок — один функциональный vertical-pull
+        // паттерн. Разный хват не делает их двумя независимыми слотами.
+        if (/подтяг|pull.?up|chin|тяга.*верхн.*блок|lat.?pull|пуллдаун|верхн.*блок/i.test(n)) return 'vertical_pull';
         if (/тяга.*лиц|face.?pull/i.test(n)) return 'face_pull';
         if (/тяга|row|йейтс|seal|пендл/i.test(n) && !/подтяг|лиц|резин/i.test(n)) return 'row';
         if (/шраг/i.test(n)) return 'shrug';
@@ -2568,7 +2641,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         perMuscleCount[m] = (perMuscleCount[m] || 0) + 1;
         if (perMuscleCount[m] > muscleCap) return false;
         // Кап по паттерну (1 для малых мышц, 2 для крупных)
-        const patMax = SINGLE_PATTERN_MUSCLES.has(m) ? 1 : 2;
+         // Для спины два разных vertical-pull в одной сессии — это обычно
+         // дубль функции, а не второй качественный слот. Разводить ширину
+         // следует между сессиями/неделями, а не двумя верхними тягами подряд.
+      const patMax = m === 'back' && (pat === 'vertical_pull' || pat === 'pulldown' || pat === 'pullup')
+           ? 1
+           : (SINGLE_PATTERN_MUSCLES.has(m) ? 1 : 2);
         const patKey = m + ':' + pat;
         perPatternCount[patKey] = (perPatternCount[patKey] || 0) + 1;
         if (perPatternCount[patKey] > patMax) return false;
@@ -2588,7 +2666,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Теперь: max(6, min(10, muscles+2)) → FullBody (6+2=8) = 8 упражнений. Профессионал
       // ставит 6-8 упражнений в полный день, 4-6 в специализированный.
       const sessMuscleCount = new Set(s.exercises.map(e => collapseKey(e.muscle))).size;
-      const finalCap = Math.max(6, Math.min(10, sessMuscleCount + 2));
+       const highVolumeEnhanced = level === 'enhanced' && (input.trainingYears ?? 0) >= 3;
+       const finalCap = highVolumeEnhanced
+         ? Math.max(10, Math.min(16, sessMuscleCount + 7))
+         : Math.max(6, Math.min(10, sessMuscleCount + 2));
       if (s.exercises.length > finalCap) {
         s.exercises.length = finalCap;
       }
@@ -2794,6 +2875,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     workMax,
     mrvMultiplier: effectiveMrvMult,
     checkOrder: true,
+    // Высокообъёмный предел применяется только при явно переданном стаже
+    // enhanced-атлета; натуральные и legacy-вызовы сохраняют 24/10.
+    maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 56 : 24,
+    maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 16 : 10,
+    trainingYears: input.trainingYears,
   });
 }
 

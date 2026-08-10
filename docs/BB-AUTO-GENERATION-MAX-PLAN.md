@@ -108,6 +108,9 @@
 - Оставить один финальный `orderBBSessionExercises`.
 - Устранить конкурирующий A3-сортировщик.
 - Порядок: primary compound, secondary compound, secondary muscles, lengthened, mid-range, shortened isolation, small muscles, finishers, feeders.
+- В этот же порядок явно включить руки: после косвенной нагрузки от жимов/тяг распределять biceps/triceps по остаточному effective-volume бюджету, не выдавать им независимый объём поверх уже превышенного overlap.
+- Для рук разделять biceps, triceps и forearms; учитывать long/short head, положение плеча, overhead/elbow-extension и различать прямые сеты от косвенных сетов из жимов и тяг.
+- Не позволять arm-guarantee добавлять фиксированные сеты после общего бюджета без повторного пересчёта effective volume и fatigue.
 - Сохранить корректную работу `compound_first`, `pre_exhaust`, `post_exhaust`.
 - Обрезать сессию только через приоритетный planner, а не простым удалением хвоста.
 

@@ -366,6 +366,8 @@ export interface CycleToPlanInput {
   focusGroup?: string;
   /** Уровень атлета (для volume-landmarks валидации). */
   level?: string;
+  /** Реальный тренировочный стаж; ограничивает enhanced-объём. */
+  trainingYears?: number;
   /** Доступное оборудование — фильтр отбора упражнений. */
   equipment?: string[];
   /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
@@ -1190,6 +1192,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     mrvMultiplier: mrvMult,
     checkOrder: mode !== 'faithful',
     preserveSource: mode === 'faithful',
+    trainingYears: input.trainingYears,
   });
 }
 
@@ -1218,6 +1221,7 @@ export interface ProgramToBBPlanOpts {
   pedDoses?: Record<string, number>;
   courseIntensity?: CourseIntensity;
   level?: string;
+  trainingYears?: number;
   volumeGoal?: BBVolumeGoal;
   specialization?: boolean;
   /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
@@ -1924,6 +1928,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     mrvMultiplier: pedMrvMult,
     checkOrder: mode !== 'faithful',
     preserveSource: mode === 'faithful',
+    trainingYears: opts.trainingYears,
   });
 }
 
