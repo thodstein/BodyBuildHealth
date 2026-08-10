@@ -526,13 +526,58 @@ function injectDiagnosticExercises(
   fallbackPm: number,
 ): void {
   if (!exerciseMap) return;
+
+  const mainNameMap: Record<string, string> = {
+    bench: 'Жим лежа',
+    squat: 'Присед',
+    deadlift: 'Становая тяга',
+    ohp: 'Жим стоя',
+    row: 'Тяга',
+    pulldown: 'Тяга',
+    incline_press: 'Жим гантелей',
+  };
+
+  const autoDaysFor = (key: string): number[] => {
+    const lift = key.split('|')[0];
+    const mainName = mainNameMap[lift];
+    if (!mainName) return [0];
+
+    const ranked = days.map((day, index) => ({
+      index,
+      mainSets: day.exercises
+        .filter(exercise => {
+          const exerciseName = norm(exercise.name);
+          const targetName = norm(mainName);
+          return exerciseName === targetName || exerciseName.includes(targetName) || targetName.includes(exerciseName);
+        })
+        .reduce((total, exercise) => total + exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
+    })).filter(day => day.mainSets > 0);
+
+    if (ranked.length === 0) return [0];
+    const heavy = [...ranked].sort((a, b) => b.mainSets - a.mainSets)[0].index;
+    const light = [...ranked]
+      .filter(day => day.index !== heavy)
+      .sort((a, b) => a.mainSets - b.mainSets)[0]?.index;
+    return light == null ? [heavy] : [heavy, light];
+  };
+
   for (const [key, names] of Object.entries(exerciseMap)) {
     if (!names?.length) continue;
-    const selectedDays = (dayMap?.[key] || [1]).map(day => day - 1).filter(day => day >= 0 && day < days.length);
-    for (let index = 0; index < names.length; index++) {
-      const day = days[selectedDays[index % Math.max(1, selectedDays.length)]];
+    const configuredDays = dayMap?.[key];
+    const selectedDays = Array.isArray(configuredDays) && configuredDays.length > 0
+      ? configuredDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
+      : autoDaysFor(key);
+    const targetDays = selectedDays.length > 0 ? selectedDays : autoDaysFor(key);
+
+    // Один выбранный ассистент повторяется в выбранных днях; несколько
+    // распределяются по дням, чтобы не перегружать одну сессию.
+    const placements = targetDays.length > names.length
+      ? targetDays.map((dayIndex, index) => ({ dayIndex, name: names[index % names.length] }))
+      : names.map((name, index) => ({ dayIndex: targetDays[index % targetDays.length], name }));
+
+    for (const { dayIndex, name } of placements) {
+      const day = days[dayIndex];
       if (!day) continue;
-      const name = names[index];
       if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
       const pm = pmRow[name] ?? fallbackPm;
       day.exercises.push({

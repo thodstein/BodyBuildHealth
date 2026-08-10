@@ -232,10 +232,10 @@ describe('PL-auto key coverage 4.1-4.15', () => {
      expect(daysWithArms.length).toBe(2);
    });
 
-   it('4.21 plWeakPoints: упражнения из диагностики добавляются в план', () => {
-     const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
-       plWeakPoints: [{ lift: 'bench' as const, weakPoint: 'lockout' as const }],
-       plWeakPointDayMap: { 'bench|lockout': [1, 3] },
+    it('4.21 plWeakPoints: упражнения из диагностики добавляются в план', () => {
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        plWeakPoints: [{ lift: 'bench' as const, weakPoint: 'lockout' as const }],
+        plWeakPointDayMap: { 'bench|lockout': [1, 3] },
        currentReadiness: 100 });
      // Проверяем, что упражнения из диагностики добавлены в выбранные дни
      const day1Exercises = p.weeks[0].days[0].exercises;
@@ -243,7 +243,31 @@ describe('PL-auto key coverage 4.1-4.15', () => {
      // В дне 1 и 3 должны быть упражнения, которых нет в исходном шаблоне для этих дней
      const day1New = day1Exercises.filter(e => !CYCLE_01.week1[0].exercises.some(te => te.name === e.name));
      const day3New = day3Exercises.filter(e => !CYCLE_01.week1[2].exercises.some(te => te.name === e.name));
-     expect(day1New.length).toBeGreaterThan(0);
-     expect(day3New.length).toBeGreaterThan(0);
-   });
- });
+      expect(day1New.length).toBeGreaterThan(0);
+      expect(day3New.length).toBeGreaterThan(0);
+    });
+
+    it('4.22 diagnostic assistant: one exercise is added to every explicitly selected day', () => {
+      const name = 'Выбранный ассистент';
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        diagnosticExerciseMap: { 'bench|barpath|forward_drift': [name] },
+        diagnosticDayMap: { 'bench|barpath|forward_drift': [1, 3] },
+        currentReadiness: 100 });
+
+      expect(p.weeks[0].days[0].exercises.some(e => e.name === name)).toBe(true);
+      expect(p.weeks[0].days[2].exercises.some(e => e.name === name)).toBe(true);
+      expect(p.weeks[0].days[1].exercises.some(e => e.name === name)).toBe(false);
+    });
+
+    it('4.23 diagnostic assistant: empty day selection uses automatic heavy/light days', () => {
+      const name = 'Авто ассистент';
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        diagnosticExerciseMap: { 'bench|barpath|forward_drift': [name] },
+        currentReadiness: 100 });
+      const daysWithAssistant = p.weeks[0].days
+        .map((day, index) => day.exercises.some(e => e.name === name) ? index : -1)
+        .filter(index => index >= 0);
+
+      expect(daysWithAssistant).toEqual([0, 2]);
+    });
+  });

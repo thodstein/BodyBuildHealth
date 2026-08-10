@@ -29,7 +29,7 @@ const CARD: React.CSSProperties = {
   marginTop: 8,
 };
 
-export const PlDeadpointsBarPathCard: React.FC = () => {
+export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number }> = ({ dayCount = 7 }) => {
   const [lift, setLift] = useState<Lift>('squat');
   const [phase, setPhase] = useState('');
   const [issues, setIssues] = useState<BarPathIssue[]>([]);
@@ -53,6 +53,12 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
     const values = new Set(current[key] || []);
     if (values.has(day)) values.delete(day); else values.add(day);
     return { ...current, [key]: [...values].sort((a, b) => a - b) };
+  });
+  const setAutoDays = (key: string) => setDays(current => {
+    if (!(key in current)) return current;
+    const next = { ...current };
+    delete next[key];
+    return next;
   });
   const applySelected = () => applyToPlanner({
     kind: 'weakpoints',
@@ -94,7 +100,7 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
             {diagnosis.corrections.map((item, index) => <div key={index} style={{ fontSize: 10, color: DIM, marginTop: 2 }}>• {item}</div>)}
             <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 7 }}>🏋️ Ассистенты: {diagnosis.assistance.join(', ') || 'нет данных'} · {Math.round(diagnosis.assistanceIntensityPct * 100)}% ПМ</div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>💡 Load cue: {diagnosis.loadCues}</div>
-            <DiagnosticExercisePicker label="Ассистенты мёртвой точки" exerciseKey={`${lift}|${phase}`} names={diagnosis.assistance} selected={selected} days={days} onExercise={toggleExercise} onDay={toggleDay} />
+            <DiagnosticExercisePicker label="Ассистенты мёртвой точки" exerciseKey={`${lift}|${phase}`} names={diagnosis.assistance} selected={selected} days={days} dayCount={dayCount} onExercise={toggleExercise} onDay={toggleDay} onAuto={setAutoDays} />
           </div>
         )}
       </div>
@@ -108,7 +114,7 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
           })}
         </div>
         {barPath && <div style={{ marginTop: 8 }}>{barPath.diagnoses.map(item => <div key={item.issue} style={{ fontSize: 10, color: DIM, marginTop: 5 }}><b style={{ color: '#c084fc' }}>{ISSUE_RU[item.issue]}:</b> {item.cause} <span style={{ color: ACCENT }}>→ {item.correction}</span></div>)}</div>}
-        {issues.map(issue => <DiagnosticExercisePicker key={issue} label={`Ассистенты bar-path: ${ISSUE_RU[issue]}`} exerciseKey={`${lift}|barpath|${issue}`} names={BAR_PATH_EXERCISES[issue]} selected={selected} days={days} onExercise={toggleExercise} onDay={toggleDay} />)}
+        {issues.map(issue => <DiagnosticExercisePicker key={issue} label={`Ассистенты bar-path: ${ISSUE_RU[issue]}`} exerciseKey={`${lift}|barpath|${issue}`} names={BAR_PATH_EXERCISES[issue]} selected={selected} days={days} dayCount={dayCount} onExercise={toggleExercise} onDay={toggleDay} onAuto={setAutoDays} />)}
       </div>
 
       <button onClick={applySelected} style={{ width: '100%', minHeight: 44, marginTop: 8, border: 'none', borderRadius: 9, cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }}>
@@ -124,15 +130,18 @@ export const PlDeadpointsBarPathCard: React.FC = () => {
 
 const DiagnosticExercisePicker: React.FC<{
   label: string; exerciseKey: string; names: string[]; selected: Record<string, string[]>;
-  days: Record<string, number[]>; onExercise: (key: string, name: string) => void; onDay: (key: string, day: number) => void;
-}> = ({ label, exerciseKey, names, selected, days, onExercise, onDay }) => (
+  days: Record<string, number[]>; dayCount: number; onExercise: (key: string, name: string) => void;
+  onDay: (key: string, day: number) => void; onAuto: (key: string) => void;
+}> = ({ label, exerciseKey, names, selected, days, dayCount, onExercise, onDay, onAuto }) => (
   <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,.05)', border: '1px solid rgba(0,230,138,.15)' }}>
     <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT }}>{label}</div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
       {names.map(name => <button key={name} onClick={() => onExercise(exerciseKey, name)} style={{ padding: '4px 7px', borderRadius: 7, cursor: 'pointer', fontSize: 10, border: selected[exerciseKey]?.includes(name) ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,.1)', background: selected[exerciseKey]?.includes(name) ? 'rgba(0,230,138,.15)' : 'transparent', color: selected[exerciseKey]?.includes(name) ? ACCENT : DIM }}>{name}{selected[exerciseKey]?.includes(name) ? ' ✓' : ''}</button>)}
     </div>
-    <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
-      {[1, 2, 3, 4, 5, 6, 7].map(day => <button key={day} onClick={() => onDay(exerciseKey, day)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: days[exerciseKey]?.includes(day) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,.1)', background: days[exerciseKey]?.includes(day) ? 'rgba(168,85,247,.15)' : 'transparent', color: days[exerciseKey]?.includes(day) ? '#c084fc' : DIM }}>Д{day}</button>)}
+    <div style={{ display: 'flex', gap: 4, marginTop: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ fontSize: 9, color: DIM }}>Дни (пусто = авто):</span>
+      <button onClick={() => onAuto(exerciseKey)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: !days[exerciseKey]?.length ? '1px solid #a855f7' : '1px solid rgba(255,255,255,.1)', background: !days[exerciseKey]?.length ? 'rgba(168,85,247,.15)' : 'transparent', color: !days[exerciseKey]?.length ? '#c084fc' : DIM }}>Авто</button>
+      {Array.from({ length: Math.max(1, dayCount) }, (_, index) => index + 1).map(day => <button key={day} onClick={() => onDay(exerciseKey, day)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: days[exerciseKey]?.includes(day) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,.1)', background: days[exerciseKey]?.includes(day) ? 'rgba(168,85,247,.15)' : 'transparent', color: days[exerciseKey]?.includes(day) ? '#c084fc' : DIM }}>Д{day}</button>)}
     </div>
   </div>
 );

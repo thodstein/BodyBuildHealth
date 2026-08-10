@@ -236,16 +236,30 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'add_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name: pickerExName, group: pickerGroup, sets: pickerScheme.sets, reps: pickerScheme.reps, weight: pickerScheme.weight }] }));
     setPickerExName(''); setPickerDay(null);
   };
-  const addAccessory = (dk: string, name: string, group: string, phase?: string) => {
+  const addAccessory = (dayKeys: string[], name: string, group: string, phase?: string) => {
     const PHASE_SCHEMES: Record<string,{reps:number;pct:number}> = { base:{reps:10,pct:0.67}, build:{reps:8,pct:0.73}, peak:{reps:5,pct:0.80}, deload:{reps:12,pct:0.50} };
-    const p = (phase && PHASE_SCHEMES[phase]) ? phase : 'base';
-    const s = PHASE_SCHEMES[p] || PHASE_SCHEMES.base;
     const totalW = builtSrc?.weeks.length || 12;
     // расчёт фазы из контекста вызова (сейчас глобальная переменная недоступна в момент вызова)
-    const wkNum = Number(dk.split('_')[0]) || 1;
+    const wkNum = Number(dayKeys[0]?.split('_')[0]) || 1;
     const ph = mesocyclePhaseForWeek(wkNum, totalW);
     const sc = PHASE_SCHEMES[ph] || PHASE_SCHEMES.base;
-    setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'acc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name, group, sets: 3, reps: sc.reps, weight: Math.round((loadTrainingProfile().workMax[group] || 80) * sc.pct) }] }));
+    const profile = loadTrainingProfile();
+    setSrcAdditions(prev => {
+      const next = { ...prev };
+      for (const dk of [...new Set(dayKeys)]) {
+        const entries = next[dk] || [];
+        if (entries.some(entry => entry.name === name)) continue;
+        next[dk] = [...entries, {
+          uid: 'acc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          name,
+          group,
+          sets: 3,
+          reps: sc.reps,
+          weight: Math.round((profile.workMax[group] || 80) * sc.pct),
+        }];
+      }
+      return next;
+    });
   };
 
   // U7: связь композиции методик с планом (оверлей, безопасно — движок не трогаем)
@@ -1111,7 +1125,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
               Выберите фазу, отклонения траектории, упражнения из диагностики и дни добавления. Исходный цикл не изменяется.
             </div>
-            <PlDeadpointsBarPathCard />
+            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
           </div>
            {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
           <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
@@ -1711,30 +1725,50 @@ legs: [
                 return <MetricCard title='🎯 Рекомендации тренера: ПЛ-ассистенты по слабым группам' icon='🎯' accent='#ff9100'>
                   <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
                     Фаза: <b style={{color:'#ff9100'}}>{PH_RU[phase]}</b> · схема: <b style={{color:'#ff9100'}}>{scheme.label}</b> (вес ≈ {Math.round(scheme.pct*100)}% workMax)
-                  </div>
-                  {weakPoints.map(g => {
-                    const di = FIND_DAY_FOR_GROUP(g);
-                    const dk = dayKey(wk.week, di);
-                    const pool = (PL_EXERCISES[g] || PL_EXERCISES.chest).filter(eqOk).slice(0, 3);
-                    const dayLabel = `День ${di+1}`;
-                    const dayName = `День ${di+1}`;
-                    return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
-                        <span>{GRP_RU[g] || g}</span>
-                        <span style={{ fontSize:10, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel} ({dayName})</span>
-                      </div>
-                      {pool.map(ex => (
-                        <button key={ex.name} onClick={() => addAccessory(dk, ex.name, g)}
-                          style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:11, cursor:'pointer', textAlign:'left',
-                            border:'1px solid rgba(255,145,0,0.25)', background:'rgba(255,145,0,0.06)', color:'#ff9100', transition:'all 0.15s' }}>
+                   </div>
+                   {weakPoints.map(g => {
+                     const autoDi = FIND_DAY_FOR_GROUP(g);
+                     const selectedDayNumbers = (weakGroupDayMap[g] || [])
+                       .filter(day => day >= 1 && day <= wk.days.length);
+                     const targetDayIndices = selectedDayNumbers.length > 0
+                       ? selectedDayNumbers.map(day => day - 1)
+                       : [autoDi];
+                     const targetDayKeys = targetDayIndices.map(dayIndex => dayKey(wk.week, dayIndex));
+                     const pool = (PL_EXERCISES[g] || PL_EXERCISES.chest).filter(eqOk).slice(0, 3);
+                     const dayLabel = selectedDayNumbers.length > 0
+                       ? `выбрано: ${selectedDayNumbers.map(day => `Д${day}`).join(', ')}`
+                       : `авто → День ${autoDi + 1}`;
+                     return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
+                       <div style={{ fontSize:11, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
+                         <span>{GRP_RU[g] || g}</span>
+                         <span style={{ fontSize:10, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel}</span>
+                       </div>
+                       <div style={{ display:'flex', gap:3, flexWrap:'wrap', alignItems:'center', marginBottom:5 }}>
+                         <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>Куда добавлять:</span>
+                         <button onClick={() => setWeakGroupDayMap(current => {
+                           if (!(g in current)) return current;
+                           const next = { ...current };
+                           delete next[g];
+                           return next;
+                         })} style={{ padding:'3px 7px', borderRadius:6, fontSize:9, cursor:'pointer', border:selectedDayNumbers.length === 0 ? '1px solid #ff9100' : '1px solid rgba(255,255,255,0.1)', background:selectedDayNumbers.length === 0 ? 'rgba(255,145,0,0.15)' : 'transparent', color:selectedDayNumbers.length === 0 ? '#ff9100' : 'rgba(255,255,255,0.55)' }}>Авто</button>
+                         {wk.days.map((_, dayIndex) => {
+                           const dayNumber = dayIndex + 1;
+                           const selected = selectedDayNumbers.includes(dayNumber);
+                           return <button key={dayNumber} onClick={() => toggleDayInMap(g, dayNumber, 'wg')} style={{ padding:'3px 7px', borderRadius:6, fontSize:9, cursor:'pointer', border:selected ? '1px solid #ff9100' : '1px solid rgba(255,255,255,0.1)', background:selected ? 'rgba(255,145,0,0.15)' : 'transparent', color:selected ? '#ff9100' : 'rgba(255,255,255,0.55)' }}>Д{dayNumber}</button>;
+                         })}
+                       </div>
+                       {pool.map(ex => (
+                         <button key={ex.name} onClick={() => addAccessory(targetDayKeys, ex.name, g)}
+                           style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:11, cursor:'pointer', textAlign:'left',
+                             border:'1px solid rgba(255,145,0,0.25)', background:'rgba(255,145,0,0.06)', color:'#ff9100', transition:'all 0.15s' }}>
                           <span style={{fontWeight:700}}>＋ {ex.name}</span>
                           <span style={{fontSize:10, color:'rgba(255,255,255,0.45)', marginLeft:6}}>— {ex.note}</span>
                         </button>
                       ))}
                     </div>;
                   })}
-                  <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>
-                    Добавляется в {phase === 'base' ? 'базовый' : phase === 'build' ? 'накопительный' : phase === 'peak' ? 'пиковый' : 'восстановительный'} день цикла: {scheme.reps}П × 3 подхода, вес {Math.round(scheme.pct*100)}% workMax (фазовая схема). Можно отредактировать в режиме правки.
+                   <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>
+                     Ассистент добавляется в авто-день или все выбранные дни текущей недели: {scheme.reps}П × 3 подхода, вес {Math.round(scheme.pct*100)}% workMax (фазовая схема). Можно отредактировать в режиме правки.
                   </div>
                   <div style={{ fontSize:10, color:'rgba(255,145,0,0.5)', marginTop:4 }}>
                     💡 Совет тренера: не ставьте изоляцию — для ПЛ слабая точка лечится вариациями соревновательного движения, а не махами гантелей. Каждое упражнение — это устранение конкретной фазы.
