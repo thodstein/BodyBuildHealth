@@ -1,20 +1,60 @@
 /**
  * health-diary-modal.tsx — Единая модалка добавления записи здоровья.
  * Заменяет 5 отдельных модалок (боль, симптомы, нейро, акне, гематология).
+ *
+ * Redesign (Aug 10 2026): вкладки с бейджами заполненности + шкалы ScalePicker.
+ * Формат сохраняемой записи (UnifiedHealthEntry) не изменён.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import { loadSessions, type WorkoutExercise } from '../../../engines/workout-logger.engine';
 import type { UnifiedHealthEntry } from '../../../engines/health-diary.engine';
-import { PAIN_ZONES, NEURO_SYMPTOMS, ACNE_AREAS, HEMATO_SYMPTOMS, painZoneColor } from './diary-modals';
+import {
+  DiaryModalShell,
+  SectionCard,
+  ScalePicker,
+  ChipGroup,
+  TextField,
+  FormBanner,
+  btnGhost,
+  btnPrimary,
+  PAIN_ZONES,
+  NEURO_SYMPTOMS,
+  ACNE_AREAS,
+  HEMATO_SYMPTOMS,
+  painZoneColor,
+  acneAreaColor,
+} from './diary-modals';
+
+const DRAFT_KEY = 'he_draft_health';
 
 const SYMPTOM_PRESETS = [
   'Головная боль', 'Тошнота', 'Бессонница', 'Боль в суставах', 'Отёки',
   'Сыпь', 'Акне', 'Потливость', 'Раздражительность', 'Снижение либидо',
   'Сердцебиение', 'Головокружение', 'Слабость', 'Боль в пояснице', 'Судороги',
 ];
+
+const PAIN_TIMES = [
+  { id: 'morning', label: '🌅 Утро' },
+  { id: 'afternoon', label: '☀️ День' },
+  { id: 'evening', label: '🌆 Вечер' },
+  { id: 'night', label: '🌙 Ночь' },
+];
+
+const PAIN_TRIGGERS = [
+  { id: 'load', label: 'Физ. нагрузка' },
+  { id: 'stress', label: 'Стресс' },
+  { id: 'weather', label: 'Погода' },
+  { id: 'after_training', label: 'После тренировки' },
+  { id: 'sitting', label: 'Долгое сидение' },
+];
+
+const SEVERITY_TONE = (v: number) =>
+  v === 1 ? '#22c55e' : v === 2 ? '#84cc16' : v === 3 ? '#f59e0b' : v === 4 ? '#f97316' : '#ef4444';
+
+type TabId = 'pain' | 'symptoms' | 'neuro' | 'acne' | 'hemato';
 
 export const AddHealthModal: React.FC<{
   open: boolean;
@@ -23,6 +63,7 @@ export const AddHealthModal: React.FC<{
 }> = ({ open, onClose, onSave }) => {
   const [date, setDate] = useState(todayIso());
   const [notes, setNotes] = useState('');
+  const [tab, setTab] = useState<TabId>('pain');
 
   // Pain
   const [painZones, setPainZones] = useState<Record<string, number>>({});
@@ -65,6 +106,45 @@ export const AddHealthModal: React.FC<{
     } catch { setRecentExercises([]); }
   }, [open]);
 
+  const savedRef = useRef(false);
+
+  // Восстановление черновика (переживает закрытие и переключение вкладок)
+  useEffect(() => {
+    try {
+      const s = sessionStorage.getItem(DRAFT_KEY);
+      if (!s) return;
+      const d = JSON.parse(s) as Record<string, unknown>;
+      if (!d || typeof d !== 'object') return;
+      if (typeof d.date === 'string') setDate(d.date);
+      if (typeof d.notes === 'string') setNotes(d.notes);
+      if (d.painZones && typeof d.painZones === 'object') setPainZones(d.painZones as Record<string, number>);
+      if (typeof d.painTimeOfDay === 'string') setPainTimeOfDay(d.painTimeOfDay);
+      if (typeof d.painType === 'string') setPainType(d.painType);
+      if (Array.isArray(d.painTriggers)) setPainTriggers(d.painTriggers as string[]);
+      if (typeof d.painDuration === 'string') setPainDuration(d.painDuration);
+      if (typeof d.linkedExercise === 'string') setLinkedExercise(d.linkedExercise);
+      if (Array.isArray(d.symptoms)) setSymptoms(d.symptoms as typeof symptoms);
+      if (typeof d.newSymptomName === 'string') setNewSymptomName(d.newSymptomName);
+      if (typeof d.newSymptomSeverity === 'number') setNewSymptomSeverity(d.newSymptomSeverity as 1|2|3|4|5);
+      if (typeof d.newSymptomDuration === 'string') setNewSymptomDuration(d.newSymptomDuration);
+      if (d.neuroSymptoms && typeof d.neuroSymptoms === 'object') setNeuroSymptoms(d.neuroSymptoms as Record<string, boolean>);
+      if (d.acneAreas && typeof d.acneAreas === 'object') setAcneAreas(d.acneAreas as Record<string, number>);
+      if (d.hematoSymptoms && typeof d.hematoSymptoms === 'object') setHematoSymptoms(d.hematoSymptoms as Record<string, boolean>);
+    } catch {}
+  }, []);
+
+  // Сохранение черновика при каждом изменении (кроме сброса после сохранения)
+  useEffect(() => {
+    if (savedRef.current) { savedRef.current = false; return; }
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        date, notes, painZones, painTimeOfDay, painType, painTriggers, painDuration,
+        linkedExercise, symptoms, newSymptomName, newSymptomSeverity, newSymptomDuration,
+        neuroSymptoms, acneAreas, hematoSymptoms,
+      }));
+    } catch {}
+  });
+
   const painTotal = Object.values(painZones).reduce((s, v) => s + (v || 0), 0);
   const neuroTotal = Object.values(neuroSymptoms).filter(Boolean).length;
   const acneTotal = Object.values(acneAreas).reduce((s, v) => s + (v || 0), 0);
@@ -76,7 +156,7 @@ export const AddHealthModal: React.FC<{
 
   const submit = () => {
     if (!date || !hasAnyData) return;
-    
+
     const entry: Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'> = {
       date,
       pain: painTotal > 0 ? {
@@ -116,7 +196,10 @@ export const AddHealthModal: React.FC<{
       createdAt: '',
       updatedAt: '',
     } as any);
-    
+
+    savedRef.current = true;
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
+
     // Reset
     setPainZones({});
     setPainTimeOfDay(undefined);
@@ -133,6 +216,7 @@ export const AddHealthModal: React.FC<{
     setAcneAreas({});
     setHematoSymptoms({});
     setNotes('');
+    setTab('pain');
     onClose();
   };
 
@@ -153,182 +237,313 @@ export const AddHealthModal: React.FC<{
     setSymptoms(p => p.filter(s => s.id !== id));
   };
 
-  if (!open) return null;
+  const TABS: { id: TabId; icon: string; label: string; badge?: string; color: string }[] = [
+    { id: 'pain', icon: '🦴', label: 'Боль', badge: painTotal > 0 ? `${painTotal}` : undefined, color: '#22c55e' },
+    { id: 'symptoms', icon: '🩺', label: 'Симптомы', badge: symptoms.length > 0 ? `${symptoms.length}` : undefined, color: '#ec4899' },
+    { id: 'neuro', icon: '🧠', label: 'Нейро', badge: neuroTotal > 0 ? `${neuroTotal}` : undefined, color: '#ef4444' },
+    { id: 'acne', icon: '🔴', label: 'Акне', badge: acneTotal > 0 ? `${acneTotal}` : undefined, color: '#f97316' },
+    { id: 'hemato', icon: '🩸', label: 'Кровь', badge: hematoTotal > 0 ? `${hematoTotal}` : undefined, color: '#3b82f6' },
+  ];
+
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
-    }} onClick={onClose}>
-      <div style={{
-        width: 'min(520px, 94vw)', maxHeight: '90vh', overflowY: 'auto',
-        background: '#1a1a1d', border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 16, padding: 20, color: colors.text,
-      }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: colors.primary }}>🩺 Запись здоровья</div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: colors.textMuted, fontSize: 20, cursor: 'pointer', padding: 4, minWidth: 32, minHeight: 32 }}>✕</button>
+    <DiaryModalShell
+      open={open}
+      onClose={onClose}
+      title="Запись здоровья"
+      icon="🩺"
+      color="#ec4899"
+      subtitle="Отмечайте все симптомы за день — можно заполнять несколько разделов"
+      width={520}
+      onSubmit={submit}
+      footer={
+        <div style={{ display: 'flex', gap: 8, padding: '12px 18px 16px', borderTop: `1px solid ${colors.border}` }}>
+          <button type="button" onClick={onClose} style={btnGhost}>Отмена</button>
+          <button
+            type="submit"
+            disabled={!hasAnyData}
+            style={{
+              ...btnPrimary(colors.primary),
+              opacity: hasAnyData ? 1 : 0.5,
+              cursor: hasAnyData ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Сохранить
+          </button>
         </div>
+      }
+    >
+      {!hasAnyData && (
+        <FormBanner tone="info">Заполните хотя бы один раздел — кнопка «Сохранить» активируется</FormBanner>
+      )}
 
-        <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 12, lineHeight: 1.4 }}>
-          Отмечайте все симптомы за день. Можно заполнять несколько разделов одновременно.
+      {/* Дата + заметка */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 140px' }}>
+          <TextField label="Дата" value={date} onChange={setDate} type="date" />
         </div>
-
-        {/* Date + Notes */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 140px' }}>
-            <label style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600, marginBottom: 4, display: 'block' }}>Дата</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} max={todayIso()} style={{
-              width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, padding: '8px 10px', color: colors.text, fontSize: 13, outline: 'none', boxSizing: 'border-box',
-            }} />
-          </div>
-          <div style={{ flex: '2 1 200px' }}>
-            <label style={{ fontSize: 10, color: colors.textMuted, fontWeight: 600, marginBottom: 4, display: 'block' }}>Заметка (необязательно)</label>
-            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Триггеры, лечение, наблюдения..." style={{
-              width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, padding: '8px 10px', color: colors.text, fontSize: 13, outline: 'none', boxSizing: 'border-box',
-            }} />
-          </div>
+        <div style={{ flex: '2 1 200px' }}>
+          <TextField label="Заметка (необязательно)" value={notes} onChange={setNotes} placeholder="Триггеры, лечение, наблюдения…" />
         </div>
+      </div>
 
-        {/* Pain zones */}
-        <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🦴 Боль в суставах (VAS 0–10)</div>
-          {PAIN_ZONES.map(z => {
-            const v = painZones[z.id] || 0;
-            const c = painZoneColor(v);
-            return (
-              <div key={z.id} style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: colors.text, width: 72, flexShrink: 0 }}>{z.label}</span>
-                 <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                   {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                     <button key={n} type="button" onClick={() => setPainZones(p => ({ ...p, [z.id]: n }))} style={{
-                       flex: 1, minHeight: 44, padding: '4px 0', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                       border: `1px solid ${n === v ? c : 'rgba(255,255,255,0.06)'}`,
-                       background: n === v ? `${c}33` : 'transparent',
-                       color: n === v ? c : colors.textMuted,
-                     }}>{n}</button>
-                   ))}
-                 </div>
+      {/* Табы */}
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }} role="tablist" aria-label="Разделы здоровья">
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              style={{
+                flex: 1,
+                minHeight: 40,
+                minWidth: 88,
+                padding: '6px 8px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 800,
+                border: `1px solid ${active ? t.color : 'rgba(255,255,255,0.08)'}`,
+                background: active ? `${t.color}20` : 'rgba(255,255,255,0.02)',
+                color: active ? t.color : colors.textMuted,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                transition: 'all 0.15s',
+              }}
+            >
+              <span>{t.icon}</span>
+              {t.label}
+              {t.badge && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    color: t.color,
+                    background: `${t.color}30`,
+                    borderRadius: 999,
+                    padding: '1px 6px',
+                  }}
+                >
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Боль ── */}
+      {tab === 'pain' && (
+        <>
+          <SectionCard icon="🦴" title="Боль в суставах (VAS 0–10)" color="#22c55e" badge={painTotal > 0 ? `Σ ${painTotal}` : undefined} hint="0 — нет боли, 10 — невыносимая">
+            {PAIN_ZONES.map((z) => {
+              const v = painZones[z.id] || 0;
+              const c = painZoneColor(v);
+              return (
+                <div key={z.id} style={{ marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: colors.text, width: 78, flexShrink: 0 }}>{z.label}</span>
+                  <div style={{ flex: 1 }}>
+                    <ScalePicker
+                      value={v}
+                      onChange={(n) => setPainZones(p => ({ ...p, [z.id]: n }))}
+                      max={10}
+                      dense
+                      height={32}
+                      toneFn={(n) => painZoneColor(n)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </SectionCard>
+
+          <SectionCard icon="📋" title="Детали боли" color="#22c55e">
+            <div style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Когда</span>
+              <div style={{ marginTop: 5 }}>
+                <ChipGroup
+                  options={PAIN_TIMES}
+                  selected={painTimeOfDay ? [painTimeOfDay] : []}
+                  onChange={(ids) => setPainTimeOfDay(ids[0])}
+                  color="#22c55e"
+                  columns={4}
+                  single
+                />
               </div>
-            );
-          })}
-            <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 4 }}>
-             Σ: <b style={{ color: painZoneColor(Math.round(painTotal / PAIN_ZONES.length)) }}>{painTotal}/{PAIN_ZONES.length * 10}</b>
-          </div>
-        </div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Триггеры</span>
+              <div style={{ marginTop: 5 }}>
+                <ChipGroup
+                  options={PAIN_TRIGGERS}
+                  selected={painTriggers}
+                  onChange={setPainTriggers}
+                  color="#22c55e"
+                  columns={2}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <TextField label="Тип боли" value={painType || ''} onChange={setPainType} placeholder="напр. ноющая" />
+              <TextField label="Длительность" value={painDuration} onChange={setPainDuration} placeholder="напр. 2 часа" />
+            </div>
+            {recentExercises.length > 0 && (
+              <TextField
+                label="Связано с упражнением"
+                value={linkedExercise}
+                onChange={setLinkedExercise}
+                type="select"
+                options={[{ id: '', label: '— не связано —' }, ...recentExercises.map((e) => ({ id: e, label: e }))]}
+              />
+            )}
+          </SectionCard>
+        </>
+      )}
 
-        {/* General symptoms */}
-        <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#ec4899', marginBottom: 6 }}>🩺 Симптомы</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            <input type="text" value={newSymptomName} onChange={e => setNewSymptomName(e.target.value)} list="he-symptom-presets" placeholder="Симптом..." style={{
-              flex: '1 1 120px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 6, padding: '6px 8px', color: colors.text, fontSize: 12, outline: 'none',
-            }} />
-            <datalist id="he-symptom-presets">{SYMPTOM_PRESETS.map(s => <option key={s} value={s} />)}</datalist>
-            <select value={newSymptomSeverity} onChange={e => setNewSymptomSeverity(Number(e.target.value) as 1|2|3|4|5)} style={{
-              background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', color: colors.text, fontSize: 12,
-            }}>
-              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}/5</option>)}
-            </select>
-            <input type="text" value={newSymptomDuration} onChange={e => setNewSymptomDuration(e.target.value)} placeholder="Длительность" style={{
-              width: 90, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 6, padding: '6px 8px', color: colors.text, fontSize: 12, outline: 'none',
-            }} />
-            <button onClick={addSymptom} style={{
-              padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-              background: colors.primary, color: '#000', border: 'none',
-            }}>+</button>
+      {/* ── Симптомы ── */}
+      {tab === 'symptoms' && (
+        <SectionCard icon="🩺" title="Симптомы" color="#ec4899" badge={symptoms.length > 0 ? `${symptoms.length}` : undefined}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '1 1 140px' }}>
+              <TextField
+                label="Симптом"
+                value={newSymptomName}
+                onChange={setNewSymptomName}
+                placeholder="Симптом…"
+                hint="Список подскажет варианты"
+              />
+            </div>
+            <datalist id="he-symptom-presets">{SYMPTOM_PRESETS.map((s) => <option key={s} value={s} />)}</datalist>
+            <div style={{ flex: '1 1 130px' }}>
+              <span style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, display: 'block', marginBottom: 3 }}>Тяжесть</span>
+              <ScalePicker
+                value={newSymptomSeverity}
+                onChange={(v) => setNewSymptomSeverity(v as 1|2|3|4|5)}
+                min={1}
+                max={5}
+                dense
+                toneFn={SEVERITY_TONE}
+              />
+            </div>
+            <div style={{ flex: '1 1 100px' }}>
+              <TextField label="Длительность" value={newSymptomDuration} onChange={setNewSymptomDuration} placeholder="напр. 3 дня" />
+            </div>
+            <button
+              type="button"
+              onClick={addSymptom}
+              disabled={!newSymptomName.trim()}
+              style={{
+                ...btnPrimary(colors.primary),
+                flex: 0,
+                padding: '0 18px',
+                minHeight: 44,
+                opacity: newSymptomName.trim() ? 1 : 0.4,
+              }}
+            >
+              + Добавить
+            </button>
           </div>
           {symptoms.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {symptoms.map(s => (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-                  <span style={{ flex: 1, fontSize: 11, color: colors.text }}>{s.name}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{s.severity}/5</span>
-                  {s.duration && <span style={{ fontSize: 9, color: colors.textMuted }}>{s.duration}</span>}
-                   <button onClick={() => removeSymptom(s.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '4px 8px', minWidth: 44, minHeight: 44, borderRadius: 6 }}>×</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {symptoms.map((s) => (
+                <div
+                  key={s.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 9,
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: colors.text }}>{s.name}</span>
+                  <span
+                    style={{
+                      fontSize: 10, fontWeight: 800, color: SEVERITY_TONE(s.severity),
+                      background: `${SEVERITY_TONE(s.severity)}1f`, borderRadius: 999, padding: '2px 8px',
+                    }}
+                  >
+                    {s.severity}/5
+                  </span>
+                  {s.duration && <span style={{ fontSize: 10, color: colors.textMuted }}>{s.duration}</span>}
+                  <button
+                    type="button"
+                    onClick={() => removeSymptom(s.id)}
+                    aria-label={`Удалить симптом ${s.name}`}
+                    style={{
+                      background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer',
+                      fontSize: 16, padding: '4px 8px', minWidth: 40, minHeight: 40, borderRadius: 8,
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </SectionCard>
+      )}
 
-        {/* Neuro symptoms */}
-        <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🧠 Нейросимптомы</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {NEURO_SYMPTOMS.map(s => {
-              const on = !!neuroSymptoms[s.id];
-              return (
-                 <button key={s.id} type="button" onClick={() => setNeuroSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
-                   padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, minHeight: 44,
-                   border: `1px solid ${on ? '#ef4444' : 'rgba(255,255,255,0.06)'}`,
-                   background: on ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
-                   color: on ? '#ef4444' : colors.text, textAlign: 'left',
-                 }}>{s.label}</button>
-              );
-            })}
-          </div>
-          {neuroTotal > 0 && <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 4 }}>Отмечено: <b style={{ color: '#ef4444' }}>{neuroTotal}/10</b></div>}
-        </div>
+      {/* ── Нейро ── */}
+      {tab === 'neuro' && (
+        <SectionCard icon="🧠" title="Нейросимптомы" color="#ef4444" badge={neuroTotal > 0 ? `${neuroTotal}/10` : undefined}>
+          <ChipGroup
+            options={NEURO_SYMPTOMS}
+            selected={Object.entries(neuroSymptoms).filter(([, on]) => on).map(([id]) => id)}
+            onChange={(ids) => {
+              const next: Record<string, boolean> = {};
+              NEURO_SYMPTOMS.forEach((s) => { next[s.id] = ids.includes(s.id); });
+              setNeuroSymptoms(next);
+            }}
+            color="#ef4444"
+            columns={2}
+          />
+        </SectionCard>
+      )}
 
-        {/* Acne */}
-        <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316', marginBottom: 6 }}>🔴 Акне (0–3)</div>
-          {ACNE_AREAS.map(a => {
+      {/* ── Акне ── */}
+      {tab === 'acne' && (
+        <SectionCard icon="🔴" title="Акне (0–3)" color="#f97316" badge={acneTotal > 0 ? `Σ ${acneTotal}/12` : undefined}>
+          {ACNE_AREAS.map((a) => {
             const v = acneAreas[a.id] || 0;
-            const c = v === 0 ? '#22c55e' : v === 1 ? '#f59e0b' : v === 2 ? '#f97316' : '#ef4444';
             return (
-              <div key={a.id} style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: colors.text, width: 60, flexShrink: 0 }}>{a.label}</span>
-                <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                   {[0, 1, 2, 3].map(n => (
-                     <button key={n} type="button" onClick={() => setAcneAreas(p => ({ ...p, [a.id]: n }))} style={{
-                       flex: 1, minHeight: 44, padding: '4px 0', borderRadius: 4, cursor: 'pointer', fontSize: 10, fontWeight: 700,
-                       border: `1px solid ${n === v ? c : 'rgba(255,255,255,0.06)'}`,
-                       background: n === v ? `${c}33` : 'transparent',
-                       color: n === v ? c : colors.textMuted,
-                     }}>{n === 0 ? 'Чисто' : n === 1 ? 'Ед.' : n === 2 ? 'Умер.' : 'Тяж.'}</button>
-                   ))}
+              <div key={a.id} style={{ marginBottom: 7, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: colors.text, width: 60, flexShrink: 0 }}>{a.label}</span>
+                <div style={{ flex: 1 }}>
+                  <ScalePicker
+                    value={v}
+                    onChange={(n) => setAcneAreas(p => ({ ...p, [a.id]: n }))}
+                    max={3}
+                    dense
+                    height={32}
+                    labels={(n) => (n === 0 ? 'Чисто' : n === 1 ? 'Ед.' : n === 2 ? 'Умер.' : 'Тяж.')}
+                    toneFn={(n) => acneAreaColor(n)}
+                  />
                 </div>
               </div>
             );
           })}
-          {acneTotal > 0 && <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 4 }}>Σ: <b style={{ color: '#f97316' }}>{acneTotal}/12</b></div>}
-        </div>
+        </SectionCard>
+      )}
 
-        {/* Hematological */}
-        <div style={{ marginBottom: 14, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>🩸 Гематологические симптомы</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-            {HEMATO_SYMPTOMS.map(s => {
-              const on = !!hematoSymptoms[s.id];
-              return (
-                <button key={s.id} type="button" onClick={() => setHematoSymptoms(p => ({ ...p, [s.id]: !on }))} style={{
-                  padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, minHeight: 44,
-                  border: `1px solid ${on ? '#3b82f6' : 'rgba(255,255,255,0.06)'}`,
-                  background: on ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: on ? '#3b82f6' : colors.text, textAlign: 'left',
-                }}>{s.label}</button>
-              );
-            })}
-          </div>
-          {hematoTotal > 0 && <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 4 }}>Отмечено: <b style={{ color: '#3b82f6' }}>{hematoTotal}/8</b></div>}
-        </div>
-
-        {/* Submit */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <button onClick={onClose} style={{ flex: 1, minHeight: 40, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'transparent', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer' }}>Отмена</button>
-          <button onClick={submit} disabled={!hasAnyData} style={{
-            flex: 1, minHeight: 40, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
-            background: colors.primary, color: '#000', border: 'none', cursor: hasAnyData ? 'pointer' : 'not-allowed',
-            opacity: hasAnyData ? 1 : 0.5,
-          }}>Сохранить</button>
-        </div>
-      </div>
-    </div>
+      {/* ── Гематология ── */}
+      {tab === 'hemato' && (
+        <SectionCard icon="🩸" title="Гематологические симптомы" color="#3b82f6" badge={hematoTotal > 0 ? `${hematoTotal}/8` : undefined}>
+          <ChipGroup
+            options={HEMATO_SYMPTOMS}
+            selected={Object.entries(hematoSymptoms).filter(([, on]) => on).map(([id]) => id)}
+            onChange={(ids) => {
+              const next: Record<string, boolean> = {};
+              HEMATO_SYMPTOMS.forEach((s) => { next[s.id] = ids.includes(s.id); });
+              setHematoSymptoms(next);
+            }}
+            color="#3b82f6"
+            columns={2}
+          />
+        </SectionCard>
+      )}
+    </DiaryModalShell>
   );
 };

@@ -74,13 +74,24 @@
 - `savedRef` guard: после успешного сохранения черновик очищается и не перезаписывается сброшенным состоянием.
 - **FormBanner (info)**: «Заполните хотя бы один раздел — кнопка "Сохранить" активируется», когда `hasAnyData = false`.
 
+### 4. Модалки разнесены по файлам (4 новых файла)
+Архитектура quick-add модалок: `diary-modals.tsx` = только shared-компоненты (DiaryModalShell, SectionCard, ScalePicker, StepperInput, ChipGroup, TextField, FormBanner, Sparkline, LiveBadge, DateInput, Modal, TodayChip, RepeatLastChip, readDiaryEntries, lastEntryOf, useDiaryDraft, bpCategory больше не тут) + реэкспорты. Каждая модалка — отдельный файл:
+- `sleep-diary-modal.tsx` — AddSleepModal (умный дефолт часов/режима из последней записи, спарклайн 7 дней, валидация, coherence-warning)
+- `bp-diary-modal.tsx` — AddBPModal + `bpCategory` (классификация АД, спарклайн, валидация криза ≥180)
+- `body-measurements-modal.tsx` — AddBodyMeasurementsModal (дельта веса vs прошлое, подсказки «было N», фото со сжатием, «Повторить прошлые замеры»)
+- `injection-diary-modal.tsx` — AddInjectionModal (ассистент ротации зон, память дозы по препарату, чипы препаратов, шкалы боли/PIP/отёка, реакции)
+- `diary-modals.tsx` — реэкспорты: `AddSleepModal`, `AddBPModal`+`bpCategory`, `AddBodyMeasurementsModal`, `AddInjectionModal`, `AddHealthModal` (из `health-diary-modal.tsx`)
+- Все модалки: черновики в sessionStorage (`he_draft_sleep/bp/weight/injection/health`), «Повторить последнюю», TodayChip, autofocus, блокировка скролла.
+
 ### Files modified
 - `src/ui/screens/ProfileScreen_v2/ProfileDiariesTab.tsx` — undo ×5, routine state + widget-кнопка + прогресс, onClose-отмена рутинга
 - `src/ui/screens/ProfileScreen_v2/health-diary-modal.tsx` — draft restore/persist (sessionStorage), savedRef, FormBanner
+- `src/ui/screens/ProfileScreen_v2/diary-modals.tsx` — обрезан до shared + реэкспорты, TodayChip/RepeatLastChip стали export
+- NEW: `src/ui/screens/ProfileScreen_v2/sleep-diary-modal.tsx`, `bp-diary-modal.tsx`, `body-measurements-modal.tsx`, `injection-diary-modal.tsx`
 
 ### Verification
 - `tsc --noEmit` — 0 ошибок
-- `vitest run` — 2634/2634 passing (211 test files)
+- `vitest run` — 2644/2644 passing (211 test files; изредка флейки-таймауты profile-e2e/course-sync на полном параллельном прогоне, по отдельности проходят)
 - `vite build` — OK
 
 ---

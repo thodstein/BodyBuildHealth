@@ -629,6 +629,7 @@ export const ProfileDiariesTab: React.FC<{
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [routine, setRoutine] = useState<'sleep' | 'bp' | 'weight' | null>(null);
 
   const pushUndo = (label: string, undo: () => void) => {
     setUndoAction({ label, undo, expiresAt: Date.now() + 5000 });
@@ -1253,6 +1254,74 @@ export const ProfileDiariesTab: React.FC<{
                     );
                   })}
                 </div>
+                {routine ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginTop: 10,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: 'rgba(245,158,11,0.10)',
+                      border: '1px solid rgba(245,158,11,0.4)',
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', whiteSpace: 'nowrap' }}>
+                      🌅 Утренний лог · {routine === 'sleep' ? 'Сон' : routine === 'bp' ? 'Давление' : 'Вес'} ({routine === 'sleep' ? 1 : routine === 'bp' ? 2 : 3}/3)
+                    </span>
+                    <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${(routine === 'sleep' ? 1 : routine === 'bp' ? 2 : 3) * 33}%`,
+                          height: '100%',
+                          background: '#fbbf24',
+                          borderRadius: 2,
+                          transition: 'width 0.3s ease',
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRoutine(null)}
+                      aria-label="Отменить утренний лог"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fbbf24',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        flexShrink: 0,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setRoutine('sleep')}
+                    style={{
+                      width: '100%',
+                      marginTop: 10,
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      background: 'rgba(245,158,11,0.10)',
+                      border: '1px solid rgba(245,158,11,0.35)',
+                      color: '#fbbf24',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    🌅 Утренний лог: сон → давление → вес
+                  </button>
+                )}
                 {/* Темп-цели и streak-карта */}
                 <div
                   style={{
@@ -1570,18 +1639,24 @@ export const ProfileDiariesTab: React.FC<{
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
           <AddSleepModal
             open={addSleepOpen}
-            onClose={() => setAddSleepOpen(false)}
+            onClose={() => { setAddSleepOpen(false); if (routine === 'sleep') setRoutine(null); }}
             onSave={(e) => {
+              const prev = sleepEntries;
               const updated = [...sleepEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveDiary(SLEEP_DIARY_KEY, updated);
               setSleepEntries(updated);
+              pushUndo('Запись сна добавлена', () => {
+                saveDiary(SLEEP_DIARY_KEY, prev);
+                setSleepEntries(prev);
+              });
+              if (routine === 'sleep') setRoutine('bp');
             }}
           />
           <AddBPModal
             open={addBPOpen}
-            onClose={() => setAddBPOpen(false)}
+            onClose={() => { setAddBPOpen(false); if (routine === 'bp') setRoutine(null); }}
             onSave={(e) => {
               const entry: CoreBPEntry = {
                 id: e.id || generateEntryId(),
@@ -1593,37 +1668,63 @@ export const ProfileDiariesTab: React.FC<{
                 timeOfDay: e.timeOfDay,
                 notes: e.notes,
               };
-              const existing = getBpEntries().filter((x) => x.id !== entry.id);
+              const prev = getBpEntries();
+              const existing = prev.filter((x) => x.id !== entry.id);
               const updated = commitBpEntries([...existing, entry]);
               setBpEntries(updated.map((x) => ({ ...x, pulse: x.hr })));
+              pushUndo('Запись давления добавлена', () => {
+                const restored = commitBpEntries(prev);
+                setBpEntries(restored.map((x) => ({ ...x, pulse: x.hr })));
+              });
+              if (routine === 'bp') setRoutine('weight');
             }}
           />
           <AddBodyMeasurementsModal
             open={addBodyMeasurementsOpen}
-            onClose={() => setAddBodyMeasurementsOpen(false)}
+            onClose={() => { setAddBodyMeasurementsOpen(false); if (routine === 'weight') setRoutine(null); }}
             onSave={(e) => {
-              const updated = [...(getWeightLog() || []).filter((x) => x.date !== e.date), e].sort((a, b) =>
+              const prev = getWeightLog() || [];
+              const updated = [...prev.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveWeightLog(updated);
               setWeights(updated);
+              pushUndo(
+                routine === 'weight' ? '🌅 Утренний лог завершён · вес записан' : 'Запись веса добавлена',
+                () => {
+                  saveWeightLog(prev);
+                  setWeights(prev);
+                },
+              );
+              if (routine === 'weight') setRoutine(null);
             }}
           />
           <AddInjectionModal
             open={addInjectionOpen}
             onClose={() => setAddInjectionOpen(false)}
             onSave={(e) => {
+              const prev = injectionEntries;
               const updated = [...injectionEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveDiary(INJECTION_DIARY_KEY, updated);
               setInjectionEntries(updated);
+              pushUndo('Запись инъекции добавлена', () => {
+                saveDiary(INJECTION_DIARY_KEY, prev);
+                setInjectionEntries(prev);
+              });
             }}
           />
           <AddHealthModal
             open={addHealthOpen}
             onClose={() => setAddHealthOpen(false)}
             onSave={(e) => {
+              const prevUnified = healthEntries;
+              const prevPain = painEntries;
+              const prevNeuro = neuroEntries;
+              const prevAcne = acneEntries;
+              const prevHemato = hematoEntries;
+              const prevSymptoms = symptomEntries;
               const updated = [...healthEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
@@ -1665,6 +1766,15 @@ export const ProfileDiariesTab: React.FC<{
                 saveDiary(SYMPTOMS_DIARY_KEY, s);
                 setSymptomEntries(s);
               }
+              pushUndo('Запись здоровья добавлена', () => {
+                saveUnifiedHealthEntries(prevUnified);
+                setHealthEntries(prevUnified);
+                if (e.pain) { saveDiary(PAIN_DIARY_KEY, prevPain); setPainEntries(prevPain); }
+                if (e.neuro) { saveDiary(NEURO_DIARY_KEY, prevNeuro); setNeuroEntries(prevNeuro); }
+                if (e.acne) { saveDiary(ACNE_DIARY_KEY, prevAcne); setAcneEntries(prevAcne); }
+                if (e.hemato) { saveDiary(HEMATO_DIARY_KEY, prevHemato); setHematoEntries(prevHemato); }
+                if (e.symptoms && e.symptoms.length > 0) { saveDiary(SYMPTOMS_DIARY_KEY, prevSymptoms); setSymptomEntries(prevSymptoms); }
+              });
             }}
           />
         </>
