@@ -162,16 +162,27 @@ function backVolumeProfile(level: string, trainingYears?: number): { targetMult:
 
 /**
  * Объёмный профиль ног для продвинутых атлетов.
- * Ноги — большая мышечная группа, которая на курсе восстанавливается быстрее,
- * но требует реального распределения между quads/hamstrings/glutes, а не
- * одного тяжёлого приседа и пары изоляций.
  */
 function legVolumeProfile(level: string, trainingYears?: number): { targetMult: number; capMult: number; extraExercises: number } {
   const years = Number.isFinite(trainingYears) ? Math.max(0, trainingYears as number) : 0;
   if (level !== 'enhanced') return { targetMult: 1, capMult: 1, extraExercises: 0 };
   if (years >= 6) return { targetMult: 1.80, capMult: 1.80, extraExercises: 2 };
   if (years >= 3) return { targetMult: 1.45, capMult: 1.45, extraExercises: 1 };
-  if (years >= 1) return { targetMult: 1.15, capMult: 1.15, extraExercises: 0 };
+  if (years >= 1) return { targetMult: 1.15, capMult: 1, extraExercises: 0 };
+  return { targetMult: 1, capMult: 1, extraExercises: 0 };
+}
+
+/**
+ * Объёмный профиль груди/плеч для продвинутых атлетов.
+ * Грудь требует разных углов (плоский/наклонный/растянутый), а плечи —
+ * разделения front/mid/rear с учётом косвенной нагрузки от жимов.
+ */
+function torsoVolumeProfile(level: string, trainingYears?: number): { targetMult: number; capMult: number; extraExercises: number } {
+  const years = Number.isFinite(trainingYears) ? Math.max(0, trainingYears as number) : 0;
+  if (level !== 'enhanced') return { targetMult: 1, capMult: 1, extraExercises: 0 };
+  if (years >= 6) return { targetMult: 1.60, capMult: 1.60, extraExercises: 1 };
+  if (years >= 3) return { targetMult: 1.35, capMult: 1.35, extraExercises: 1 };
+  if (years >= 1) return { targetMult: 1.12, capMult: 1.12, extraExercises: 0 };
   return { targetMult: 1, capMult: 1, extraExercises: 0 };
 }
 
@@ -1169,6 +1180,16 @@ function buildSession(
     if (['quads', 'hamstrings', 'glutes'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
       sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 20 : 14);
     }
+    // High-volume enhanced chest/shoulders: грудь и плечи получают
+    // повышенный минимум, а не остаток после спины.
+    if (['chest', 'shoulders'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 14 : 10);
+    }
+    // Shoulders в Upper-днях: даже если плечи не lead-мышца, опытный enhanced
+    // должен получать минимум работы на среднюю дельту в каждой Upper-сессии.
+    if (muscle === 'shoulders' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Push|Pull/.test(sched.sessionTag || '') && phase !== 'deload') {
+      sets = Math.max(sets, 6);
+    }
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
@@ -1244,6 +1265,7 @@ function buildSession(
     // кроме biceps/triceps на PED (=2). В solo-day (1-2 мышцы) — как раньше (accessory=2).
     const backProfile = muscle === 'back' ? backVolumeProfile(level, trainingYears) : { targetMult: 1, capMult: 1, extraExercises: 0 };
     const legProfile = muscle === 'quads' || muscle === 'hamstrings' || muscle === 'glutes' ? legVolumeProfile(level, trainingYears) : { targetMult: 1, capMult: 1, extraExercises: 0 };
+    const torsoProfile = muscle === 'chest' || muscle === 'shoulders' ? torsoVolumeProfile(level, trainingYears) : { targetMult: 1, capMult: 1, extraExercises: 0 };
     let exerciseCount = role === 'primary'
       ? (isMultiDay ? 4 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
       : (isMultiDay
@@ -1259,6 +1281,11 @@ function buildSession(
     // (не только один присед + изоляция).
     if (['quads', 'hamstrings', 'glutes'].includes(muscle) && role === 'primary' && legProfile.extraExercises > 0) {
       exerciseCount = Math.min(8, exerciseCount + legProfile.extraExercises);
+    }
+    // Опытный enhanced: грудь/плечи получают дополнительный качественный слот
+    // для разных углов жима/махов, а не только один жим.
+    if (['chest', 'shoulders'].includes(muscle) && role === 'primary' && torsoProfile.extraExercises > 0) {
+      exerciseCount = Math.min(8, exerciseCount + torsoProfile.extraExercises);
     }
     // В Upper/Lower back может быть не lead-мышцей, но опытный enhanced
     // профиль всё равно требует полноценного back-блока, а не одного
@@ -1792,12 +1819,15 @@ function buildSession(
     // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
     const highVolumeBack = pl.muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const highVolumeLegs = ['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
+    const highVolumeTorso = ['chest', 'shoulders'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = highVolumeBack
       ? Math.max(muscleBudget, pl.sets * 10)
       : highVolumeLegs
         ? Math.max(muscleBudget, pl.sets * 8)
-        : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
+        : highVolumeTorso
+          ? Math.max(muscleBudget, pl.sets * 6)
+          : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
     // High-volume legs: fatigue budget не должен резать ноги до остатка.
     // Минимум — целевые сеты × fatigueCost, а не пропорция от общего бюджета.
     if (highVolumeLegs && remainingBudget < pl.sets * 5) {
@@ -2081,6 +2111,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const eqList = input.equipment || [];
   const backProfile = backVolumeProfile(level, input.trainingYears);
   const legProfile = legVolumeProfile(level, input.trainingYears);
+  const torsoProfile = torsoVolumeProfile(level, input.trainingYears);
 
   const today = todayStr();
   const excludedMuscles = getExcludedMuscles(injuries, today);
@@ -2160,6 +2191,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined) {
         v = Math.round(v * legProfile.targetMult);
       }
+      // Enhanced объём груди/плеч масштабируется подтверждённым стажем.
+      if (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined) {
+        v = Math.round(v * torsoProfile.targetMult);
+      }
       // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
       v = Math.round(v * (input.labMrvMultiplier ?? 1));
       // PRO: cross-mesocycle volume progression — +1-2 сета per muscle из предыдущего мезо
@@ -2185,7 +2220,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1) * (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined ? legProfile.capMult : 1));
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1) * (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined ? legProfile.capMult : 1) * (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined ? torsoProfile.capMult : 1));
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
