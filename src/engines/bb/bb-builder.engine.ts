@@ -1144,7 +1144,7 @@ function buildSession(
     // Для опытного enhanced: Lower-день получает 2 primary (quads+hamstrings),
     // а не только одну группу по ротации. Это даёт обеим группам полноценный бюджет.
     const highVolumeLegsSession = level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Legs|Lower|LowerPower|LowerHyp/.test(sched.sessionTag || '');
-    const maxPrimaries = highVolumeLegsSession ? 3 : (DUAL_PRIMARY_TAGS.has(sched.sessionTag || '') ? 2 : 1);
+    const maxPrimaries = highVolumeLegsSession ? 4 : (DUAL_PRIMARY_TAGS.has(sched.sessionTag || '') ? 2 : 1);
     // Для high-volume legs: quads принудительно primary даже если hamstrings
     // уже занял primary-слот. Без этого quads всегда accessory в чётные дни.
     const forceLegsPrimary = highVolumeLegsSession && ['quads', 'hamstrings', 'glutes'].includes(muscle);
@@ -1190,6 +1190,11 @@ function buildSession(
     // а не остаточный бюджет после рук/пресса.
     if (['quads', 'hamstrings', 'glutes'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
       sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 20 : 14);
+    }
+    // Glutes гарантированно получают минимум в каждой Lower-сессии,
+    // даже если они не primary по ротации.
+    if (muscle === 'glutes' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Legs|Lower/.test(sched.sessionTag || '') && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
     }
     // High-volume enhanced chest/shoulders: грудь и плечи получают
     // повышенный минимум, а не остаток после спины.
@@ -2140,7 +2145,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
 
   // Вычисляем dailyCap (max групп в день) для S-MRV-бюджета — по дедуплицированным каталог-группам (fix Z)
   const maxGroupsPerSession = Math.max(1, ...sessions.map(s => dedupeMuscles(s.sessionTag, excludedMuscles).length));
-  const dailyCap = Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
+  const dailyCap = level === 'enhanced' && (input.trainingYears ?? 0) >= 3
+    ? Math.max(14, Math.min(22, Math.round(8 + maxGroupsPerSession * 3)))
+    : Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
 
   // fix Z + BUG-B5: muscleSessionCount ключом является collapseKey (delt heads→shoulders, остальные как есть).
   // BUG-B5 РАНЬШЕ: musclesForTag('Push') = [chest, delt_front, delt_mid, triceps] →

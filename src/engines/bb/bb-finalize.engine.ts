@@ -448,6 +448,38 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   for (const week of next.weeks) for (const session of week.sessions) {
     allocateExperiencedBackSession(session, options);
   }
+  // Аналогично для ног: если после всех проходов glutes/quads отсутствуют
+  // в Lower-сессии опытного enhanced — добавляем из каталога.
+  if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) continue;
+      const present = new Set(session.exercises.map((e: any) => e.muscle));
+      const template = session.exercises[0];
+      if (!template) continue;
+      for (const muscle of ['glutes', 'quads', 'hamstrings']) {
+        if (present.has(muscle)) continue;
+        const candidate = EXERCISE_CATALOG.find((x: any) => {
+          if (trueMuscleOf(x) !== muscle) return false;
+          if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
+          if (options.equipment?.length) {
+            const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+            if (eq.length && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+          }
+          return true;
+        });
+        if (!candidate) continue;
+        const added: any = structuredClone(template);
+        added.muscle = muscle;
+        added.name = candidate.name;
+        added.exerciseName = candidate.name;
+        added.role = 'accessory';
+        added.sets = 4;
+        const sample = template.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
+        added.workSets = Array.from({ length: 4 }, () => ({ ...sample }));
+        session.exercises.push(added);
+      }
+    }
+  }
   syncBBPlanSetShape(next);
   if (options.level) {
     const peakWeek = next.weeks.reduce((best, week) => {
