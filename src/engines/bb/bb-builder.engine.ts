@@ -1055,8 +1055,11 @@ function buildSession(
   bodyweightCapability?: BBBuilderInput['bodyweightCapability'],
 ): BBSession {
   const character = sched.character as DayCharacter;
-   const tagHasFocus = !!focusGroup && musclesForTag(sched.sessionTag).some(m => collapseKey(m) === collapseKey(focusGroup));
-   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup, tagHasFocus);
+    const tagHasFocus = !!focusGroup && (
+      musclesForTag(sched.sessionTag).some(m => collapseKey(m) === collapseKey(focusGroup))
+      || /FullBody|Legs|Lower|Glute/i.test(sched.sessionTag || '')
+    );
+    const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup, tagHasFocus);
   const exercises: BBExercise[] = [];
 
   // BUG-B11: leadMuscle для orderSessionExercises — основная мышца дня (первый compound).
