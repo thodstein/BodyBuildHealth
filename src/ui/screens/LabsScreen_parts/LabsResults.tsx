@@ -36,6 +36,11 @@ const sysIcons: Record<string, string> = {
 };
 
 function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
+  if (lab.refLow !== undefined && lab.refHigh !== undefined) {
+    if (lab.value > lab.refHigh) return 'high';
+    if (lab.value < lab.refLow) return 'low';
+    return 'normal';
+  }
   const info = UCUM_MAP[lab.code.toUpperCase()];
   if (!info) return 'unknown';
   if (lab.value > info.uln) return 'high';

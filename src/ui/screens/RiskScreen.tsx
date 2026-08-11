@@ -1640,16 +1640,20 @@ const LabsRisksTab: React.FC = () => {
     for (const lab of labs) {
       const ref = UCUM_MAP[lab.code];
       if (!ref?.uln || !ref?.lln) continue;
-      const norm = lab.value * (ref.coeff || 1);
+      const coeff = ref.coeff || 1;
+      const norm = lab.value * coeff;
+      // Prefer stored reference ranges from parsed lab forms
+      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : ref.uln;
+      const lln = lab.refLow !== undefined ? lab.refLow * coeff : ref.lln;
       let deviation = 0;
-      if (norm > ref.uln) deviation = (norm - ref.uln) / ref.uln;
-      else if (norm < ref.lln) deviation = -((ref.lln - norm) / ref.lln);
+      if (norm > uln) deviation = (norm - uln) / uln;
+      else if (norm < lln) deviation = -((lln - norm) / lln);
       if (Math.abs(deviation) > 0.01) {
         let sys = 'other';
         for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
           if (codes.includes(lab.code.toUpperCase())) { sys = s; break; }
         }
-        devs.push({ code: lab.code, name: ref.name || lab.code, value: lab.value, uln: ref.uln, lln: ref.lln, deviation: Math.round(deviation*100), system: sys });
+        devs.push({ code: lab.code, name: ref.name || lab.code, value: lab.value, uln, lln, deviation: Math.round(deviation*100), system: sys });
       }
     }
     devs.sort((a,b) => Math.abs(b.deviation)-Math.abs(a.deviation));

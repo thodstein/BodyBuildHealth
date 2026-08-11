@@ -407,9 +407,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       if (!ref) continue;
       const coeff = ref.coeff || 1;
       const norm = lab.value * coeff;
+      // Prefer stored reference ranges from parsed lab forms;
+      // fall back to UCUM_MAP defaults when not available.
+      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : ref.uln;
+      const lln = lab.refLow !== undefined ? lab.refLow * coeff : ref.lln;
       let deviation = 0;
-      if (norm > ref.uln) deviation = (norm - ref.uln) / ref.uln;
-      else if (norm < ref.lln) deviation = -((ref.lln - norm) / ref.lln);
+      if (norm > uln) deviation = (norm - uln) / uln;
+      else if (norm < lln) deviation = -((lln - norm) / lln);
       if (Math.abs(deviation) > 0.01) {
         let sys = 'other';
         for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
@@ -417,7 +421,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         }
         markerDeviations.push({
           code: lab.code, name: ref.name || lab.code, value: lab.value,
-          uln: ref.uln, lln: ref.lln,
+          uln, lln,
           deviation: Math.round(deviation * 100),
           system: sys,
         });

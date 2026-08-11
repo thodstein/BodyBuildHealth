@@ -143,12 +143,16 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
     const code = mapToUcumCode(marker.code);
     const normalized = normalizeLabMeasurement(code, marker.value, marker.unit);
     const refHigh = marker.ec50 > 0 ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value : undefined;
+    const info = UCUM_MAP[code];
     const newLab: ParsedLabValue = {
       code,
       name: marker.name,
       value: normalized.value,
       unit: normalized.unit,
       refHigh,
+      isAbnormal: refHigh !== undefined
+        ? normalized.value > refHigh
+        : info ? normalized.value > info.uln || normalized.value < info.lln : undefined,
       raw: isUsefulRawLine(marker.sourceLine) ? marker.sourceLine : undefined,
     };
     const existing = labsByCode.get(code);
@@ -381,6 +385,9 @@ export async function saveParsedLabs(labs: ParsedLabValue[], phase: string): Pro
         unit: lab.unit,
         date: formatDate(new Date()),
         phase,
+        refLow: lab.refLow,
+        refHigh: lab.refHigh,
+        isAbnormal: lab.isAbnormal,
       };
       await db.put('labs_log', point);
       saved++;

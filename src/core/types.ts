@@ -444,6 +444,9 @@ export interface LabPoint {
   source?: string;
   patientId?: string;
   archived?: boolean;
+  refLow?: number;
+  refHigh?: number;
+  isAbnormal?: boolean;
 }
 export interface CourseEntry {
   id: string;
@@ -1203,6 +1206,10 @@ export interface StrengthLogEntry {
   weekNumber?: number;
   mesocycleId?: string;
   notes?: string;
+  /** Структурный суперсет (не кодируется в имени упражнения). */
+  supersetGroup?: number;
+  /** Заметка к упражнению (не кодируется в имени упражнения). */
+  note?: string;
 }
 
 export interface WorkoutLog {

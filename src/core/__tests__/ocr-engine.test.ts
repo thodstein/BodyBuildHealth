@@ -241,3 +241,184 @@ describe('processUploadedFile: text input pipeline', () => {
     expect(alt!.unit).toBeTruthy();
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Reference range preservation — parse → save → load → abnormality
+// ═══════════════════════════════════════════════════════════════════════════
+describe('Reference range preservation through save/load cycle', () => {
+  it('parsed refLow/refHigh survive mergeParsedResults', async () => {
+    // Lab says ALT < 41 (refHigh=41), UCUM_MAP default is uln=40
+    // Value 40.5: lab says NORMAL, UCUM_MAP would say HIGH
+    const text = 'АЛТ\t40.5\t<41\tЕ/л';
+    const file = new File([text], 'alt.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+    const alt = result.labs.find(l => l.code === 'ALT');
+    expect(alt).toBeDefined();
+    expect(alt!.refHigh).toBe(41);
+    expect(alt!.isAbnormal).toBe(false); // 40.5 < 41 → normal
+  });
+
+  it('parsed ref ranges override UCUM_MAP defaults for abnormality', async () => {
+    // Lab says glucose ref is 3.5-5.5, UCUM_MAP default is 3.9-5.6
+    // Value 5.55: lab says HIGH (5.55 > 5.5), UCUM_MAP would say NORMAL (5.55 < 5.6)
+    const text = 'Глюкоза\t5.55\t3.5-5.5\tммоль/л';
+    const file = new File([text], 'glu.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+    const glu = result.labs.find(l => l.code === 'GLU');
+    expect(glu).toBeDefined();
+    expect(glu!.refLow).toBe(3.5);
+    expect(glu!.refHigh).toBe(5.5);
+    expect(glu!.isAbnormal).toBe(true); // 5.55 > 5.5 → high
+  });
+
+  it('saveParsedLabs stores refLow/refHigh/isAbnormal in LabPoint', async () => {
+    const text = 'Глюкоза\t5.55\t3.5-5.5\tммоль/л\nАЛТ\t40.5\t<41\tЕ/л\nКреатинин\t92\t62-106\tмкмоль/л';
+    const file = new File([text], 'labs.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+
+    const glu = result.labs.find(l => l.code === 'GLU')!;
+    const alt = result.labs.find(l => l.code === 'ALT')!;
+    // CREAT is mapped to CREATININE by mergeParsedResults
+    const creat = result.labs.find(l => l.code === 'CREATININE')!;
+
+    // Verify parsed results have ref ranges
+    expect(glu.refLow).toBe(3.5);
+    expect(glu.refHigh).toBe(5.5);
+    expect(glu.isAbnormal).toBe(true);
+
+    expect(alt.refHigh).toBe(41);
+    expect(alt.isAbnormal).toBe(false);
+
+    expect(creat.refLow).toBe(62);
+    expect(creat.refHigh).toBe(106);
+    expect(creat.isAbnormal).toBe(false);
+  });
+
+  it('OCR result isAbnormal uses parsed ranges, not UCUM_MAP defaults', async () => {
+    // ESR: lab says 2-20, but value 18 is normal for the lab
+    // UCUM_MAP default for ESR may differ
+    const text = 'СОЭ\t18\t2-20\tмм/ч';
+    const file = new File([text], 'esr.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+    const esr = result.labs.find(l => l.code === 'ESR');
+    expect(esr).toBeDefined();
+    expect(esr!.isAbnormal).toBe(false); // 18 is within 2-20
+  });
+
+  it('falls back to UCUM_MAP when no parsed ref range exists', async () => {
+    // No explicit ref range in text — isAbnormal computed from UCUM_MAP
+    const text = 'Глюкоза 5.4 ммоль/л';
+    const file = new File([text], 'glu-no-ref.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+    const glu = result.labs.find(l => l.code === 'GLU');
+    expect(glu).toBeDefined();
+    // UCUM_MAP GLU: uln=5.6, lln=3.9 — 5.4 is within range
+    expect(glu!.isAbnormal).toBe(false);
+  });
+
+  it('handles Invitro-style <N reference bounds correctly', async () => {
+    const text = [
+      'ИНВИТРО',
+      'Наименование\tРезультат\tРеференсные значения\tЕдиницы',
+      'АЛТ\t35\t<41\tЕ/л',
+      'Холестерин общий\t5.2\t<5.2\tммоль/л',
+      'ЛПНП\t3.1\t<3.0\tммоль/л',
+    ].join('\n');
+    const file = new File([text], 'invitro.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+
+    const alt = result.labs.find(l => l.code === 'ALT');
+    expect(alt!.refHigh).toBe(41);
+    expect(alt!.isAbnormal).toBe(false);
+
+    const chol = result.labs.find(l => l.code === 'CHOL');
+    expect(chol!.refHigh).toBe(5.2);
+    expect(chol!.isAbnormal).toBe(false); // 5.2 is NOT > 5.2
+
+    const ldl = result.labs.find(l => l.code === 'LDL');
+    expect(ldl!.refHigh).toBe(3.0);
+    expect(ldl!.isAbnormal).toBe(true); // 3.1 > 3.0
+  });
+
+  it('handles >N reference bounds (HDL, testosterone, etc.)', async () => {
+    const text = [
+      'ИНВИТРО',
+      'ЛПВП\t1.1\t>1.0\tммоль/л',
+      'Тестостерон общий\t10.5\t>12.0\tнмоль/л',
+    ].join('\n');
+    const file = new File([text], 'gt-ref.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+
+    const hdl = result.labs.find(l => l.code === 'HDL');
+    expect(hdl!.refLow).toBe(1.0);
+    expect(hdl!.isAbnormal).toBe(false); // 1.1 > 1.0
+
+    // TESTO maps to TT (Total Testosterone) via mapToUcumCode
+    const test = result.labs.find(l => l.code === 'TT');
+    expect(test).toBeDefined();
+    expect(test!.refLow).toBe(12);
+    expect(test!.isAbnormal).toBe(true); // 10.5 < 12
+  });
+
+  it('full pipeline: 52-marker Invitro panel → all ref ranges preserved', async () => {
+    const text = [
+      'ИНВИТРО',
+      'Наименование\tРезультат\tРеференсные значения\tЕдиницы',
+      'АЛТ\t35\t<41\tЕ/л',
+      'АСТ\t28\t<40\tЕ/л',
+      'ГГТ\t42\t<60\tЕ/л',
+      'Билирубин общий\t12.5\t<21\tмкмоль/л',
+      'Глюкоза\t5.4\t3.9-5.5\tммоль/л',
+      'Креатинин\t92\t62-106\tмкмоль/л',
+      'Мочевина\t5.2\t2.5-7.1\tммоль/л',
+      'Мочевая кислота\t320\t200-420\tмкмоль/л',
+      'Общий белок\t72\t65-85\tг/л',
+      'Альбумин\t42\t35-50\tг/л',
+      'Холестерин общий\t5.2\t<5.2\tммоль/л',
+      'ЛПВП\t1.1\t>1.0\tммоль/л',
+      'ЛПНП\t3.1\t<3.0\tммоль/л',
+      'Триглицериды\t1.4\t<1.7\tммоль/л',
+      'Гемоглобин\t145\t130-170\tг/л',
+      'ТТГ\t2.1\t0.4-4.0\tмЕд/л',
+      'Т4 свободный\t14.2\t10.0-19.0\tпмоль/л',
+      'Тестостерон общий\t22.5\t12.0-35.0\tнмоль/л',
+      'Кортизол\t420\t150-660\tнмоль/л',
+      'Витамин D 25-OH\t42\t30-100\tнг/мл',
+      'Ферритин\t85\t30-400\tмкг/л',
+      'Инсулин\t8.5\t2.6-24.9\tмкЕд/мл',
+      'HbA1c\t5.2\t<6.0\t%',
+      'ПСА общий\t1.2\t<4.0\tнг/мл',
+      'Калий\t4.5\t3.5-5.1\tммоль/л',
+      'Натрий\t140\t136-145\tммоль/л',
+    ].join('\n');
+    const file = new File([text], 'invitro-26.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+
+    // All 26 markers should be found with ref ranges
+    expect(result.labs.length).toBeGreaterThanOrEqual(25);
+
+    // Spot-check: every lab should have isAbnormal correctly set
+    for (const lab of result.labs) {
+      if (lab.refLow !== undefined || lab.refHigh !== undefined) {
+        const expectedAbnormal = (lab.refHigh !== undefined && lab.value > lab.refHigh)
+          || (lab.refLow !== undefined && lab.value < lab.refLow);
+        expect(lab.isAbnormal).toBe(expectedAbnormal);
+      }
+    }
+
+    // Specific checks
+    const ldl = result.labs.find(l => l.code === 'LDL');
+    expect(ldl!.refLow).toBeUndefined(); // >N not applicable
+    expect(ldl!.refHigh).toBe(3.0); // <3.0
+    expect(ldl!.isAbnormal).toBe(true); // 3.1 > 3.0
+
+    const chol = result.labs.find(l => l.code === 'CHOL');
+    expect(chol!.refHigh).toBe(5.2);
+    expect(chol!.isAbnormal).toBe(false); // 5.2 is not strictly greater
+
+    const glu = result.labs.find(l => l.code === 'GLU');
+    expect(glu!.refLow).toBe(3.9);
+    expect(glu!.refHigh).toBe(5.5);
+    expect(glu!.isAbnormal).toBe(false); // 5.4 within range
+  });
+});

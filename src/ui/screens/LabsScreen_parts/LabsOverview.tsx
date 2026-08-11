@@ -9,6 +9,11 @@ Object.entries(UCUM_MAP).forEach(([code, info]) => {
 });
 
 function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
+  if (lab.refLow !== undefined && lab.refHigh !== undefined) {
+    if (lab.value > lab.refHigh) return 'high';
+    if (lab.value < lab.refLow) return 'low';
+    return 'normal';
+  }
   const range = LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return 'unknown';
   if (lab.value > range.max) return 'high';
@@ -17,6 +22,9 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
 }
 
 function getLabRefInfo(lab: LabPoint): string {
+  if (lab.refLow !== undefined && lab.refHigh !== undefined) {
+    return `${lab.refLow}–${lab.refHigh} ${lab.unit || ''}`;
+  }
   const range = LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return '';
   return `${range.min}–${range.max} ${range.unit}`;
