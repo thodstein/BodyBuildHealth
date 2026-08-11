@@ -175,7 +175,7 @@ const style: Record<string, React.CSSProperties> = {
 };
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'body' | 'calendar' | 'checkin' | 'mmc';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -184,6 +184,7 @@ interface TrainingDiaryHubProps {
   selectedWeek: number;
   level: string;
   onRefresh: () => void;
+  onGoRecord?: () => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
   daysPerWeek: number;
@@ -194,7 +195,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'body' | 'tools' | 'calendar' | 'checkin' | 'mmc';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc';
 
 /* ─── Extracted sub-components (fix: useState inside IIFE violates rules of hooks) ─── */
 
@@ -459,7 +460,7 @@ const WarmupRampCard: React.FC = () => {
 };
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
-  initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh,
+  initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
   trainingOutput, goal, daysPerWeek, splitType, periodizationType, mesoLength, tprofile, linked,
 }) => {
   const resolvedMode: HubMode = initialMode === 'diary' ? 'record' : initialMode === 'reports' ? 'tools' : (initialMode as HubMode) || 'record';
@@ -703,53 +704,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined}
             onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} supportCoverage={linked.supportCoverage}
           />}
-          {/* Calendar heatmap */}
-          {historyWorkouts.length >= 2 && (() => {
-            const weeks = 16;
-            const today = new Date();
-            const calStart = new Date(today);
-            calStart.setDate(calStart.getDate() - (weeks * 7) + 1 - calStart.getDay());
-            const dayMap = new Map<string, number>();
-            historyWorkouts.forEach((w: any) => {
-              const ds = w.date.slice(0, 10);
-              dayMap.set(ds, (dayMap.get(ds) || 0) + 1);
-            });
-            const maxPerDay = Math.max(1, ...dayMap.values());
-            const days: { date: string; count: number; dayOfWeek: number; weekIdx: number }[] = [];
-            for (let w = 0; w < weeks; w++) {
-              for (let d = 0; d < 7; d++) {
-                const dt = new Date(calStart);
-                dt.setDate(dt.getDate() + w * 7 + d);
-                const ds = dt.toISOString().slice(0, 10);
-                days.push({ date: ds, count: dayMap.get(ds) || 0, dayOfWeek: d, weekIdx: w });
-              }
-            }
-            const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
-            return (
-              <div style={style.card}>
-                <div style={style.label}>📅 Календарь ({weeks} нед)</div>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginRight: 2 }}>
-                    {dayLabels.map((l, i) => <div key={i} style={{ height: 10, fontSize: 7, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}>{l}</div>)}
-                  </div>
-                  {Array.from({ length: weeks }, (_, wi) => (
-                    <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      {days.filter(d => d.weekIdx === wi).map(d => {
-                        const intensity = d.count / maxPerDay;
-                        const bg = d.count === 0 ? 'rgba(255,255,255,0.03)' : intensity > 0.7 ? 'rgba(0,230,138,0.6)' : intensity > 0.3 ? 'rgba(0,230,138,0.35)' : 'rgba(0,230,138,0.15)';
-                        return <div key={d.date} style={{ width: 10, height: 10, borderRadius: 2, background: bg }} title={`${d.date}: ${d.count} трен.`} />;
-                      })}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4, justifyContent: 'flex-end' }}>
-                  <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Меньше</span>
-                  {[0, 0.15, 0.35, 0.6].map(op => <div key={op} style={{ width: 8, height: 8, borderRadius: 1, background: `rgba(0,230,138,${op || 0.03})` }} />)}
-                  <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>Больше</span>
-                </div>
-              </div>
-            );
-          })()}
           <div style={style.card}>
             <div style={style.label}>📜 История тренировок</div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -2316,35 +2270,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         </div>
                       );
                     })()}
-                    {/* PR Leaderboard */}
-                    {historyWorkouts.length >= 2 && (() => {
-                      const exMap = new Map<string, { name: string; e1rm: number; weight: number; reps: number; date: string }>();
-                      historyWorkouts.forEach((w: any) => w.exercises.forEach((ex: any) => {
-                        (ex.sets || []).forEach((s: any) => {
-                          const e1rm = s.reps > 0 ? Math.round(s.weight * (1 + s.reps / 30)) : 0;
-                          const prev = exMap.get(ex.exerciseId || ex.exerciseName);
-                          if (!prev || e1rm > prev.e1rm) exMap.set(ex.exerciseId || ex.exerciseName, { name: ex.exerciseName, e1rm, weight: s.weight, reps: s.reps, date: w.date });
-                        });
-                      }));
-                      const sorted = [...exMap.values()].sort((a, b) => b.e1rm - a.e1rm).slice(0, 10);
-                      if (sorted.length === 0) return null;
-                      return (
-                        <div style={style.card}>
-                          <div style={style.label}>🏆 Таблица лидеров (лучшие 1ПМ)</div>
-                          <div style={{ display: 'grid', gap: 3 }}>
-                            {sorted.map((e, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                <span style={{ minWidth: 16, textAlign: 'center', fontWeight: 700, color: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#cd7f32' : 'rgba(255,255,255,0.3)' }}>{i + 1}</span>
-                                <span style={{ flex: 1, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
-                                <span style={{ color: ACCENT, fontWeight: 700, minWidth: 40, textAlign: 'right' }}>{e.e1rm}кг</span>
-                                <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, minWidth: 55, textAlign: 'right' }}>{e.weight}×{e.reps}</span>
-                                <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 8, minWidth: 45, textAlign: 'right' }}>{e.date.slice(5, 10)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
                     <StandardForecastCard sessions={historyWorkouts} />
                     {/* Volume Landmarks per muscle */}
                     {historyWorkouts.length >= 4 && (() => {
@@ -2586,7 +2511,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   : 'Нужно минимум 2 тренировки для расчёта аналитики.'}
               </div>
               {historyWorkouts.length === 0 && (
-                <button onClick={() => setMode('record')} style={{
+                <button onClick={() => { setMode('record'); onGoRecord?.(); }} style={{
                   padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)',
                   background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
                 }}>📝 Записать тренировку</button>
@@ -2863,72 +2788,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'calendar' && <TrainingCalendarTab />}
       {mode === 'checkin' && <CheckinMetricsCard />}
       {mode === 'mmc' && <MMCTrackingCard />}
-
-      {/* ═══ MODE: BODY ═══ — calendar + MMC + body metrics */}
-      {mode === 'body' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <TrainingCalendarTab />
-          <MMCTrackingCard />
-          {/* Inline body measurements (was progress mode) */}
-          <div style={style.card}>
-            <div style={style.label}>📏 Замеры тела</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-              <div><label style={{ fontSize: 10 }}>Вес</label><input type="number" value={mWeight} onChange={e => setMWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' as any }} /></div>
-              <div><label style={{ fontSize: 10 }}>Талия</label><input type="number" value={mWaist} onChange={e => setMWaist(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' as any }} /></div>
-              <div><label style={{ fontSize: 10 }}>Грудь</label><input type="number" value={mChest} onChange={e => setMChest(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' as any }} /></div>
-              <div><label style={{ fontSize: 10 }}>Бицепс</label><input type="number" value={mArm} onChange={e => setMArm(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' as any }} /></div>
-              <div><label style={{ fontSize: 10 }}>Бедро</label><input type="number" value={mThigh} onChange={e => setMThigh(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' as any }} /></div>
-              <div><label style={{ fontSize: 10 }}>Дата</label><input type="date" value={mDate || ''} onChange={e => setMDate(e.target.value)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' as any }} /></div>
-            </div>
-            <button onClick={saveMeasurementHandler} style={{ width: '100%', marginTop: 6, padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12 }}>Сохранить замер</button>
-          </div>
-          {measurements.length > 0 && (
-            <div style={style.card}>
-              <div style={style.label}>📊 История замеров ({measurements.length})</div>
-              {/* Trend sparklines */}
-              {measurements.length >= 2 && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Вес (кг)</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Sparkline data={measurements.map((m: any) => m.weightKg || 0)} width={60} height={18} color="#00e68a" />
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-                        {measurements[measurements.length - 1]?.weightKg || '—'} кг
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Талия (см)</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Sparkline data={measurements.map((m: any) => m.waistCm || 0)} width={60} height={18} color="#60a5fa" />
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-                        {measurements[measurements.length - 1]?.waistCm || '—'} см
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {measurements.slice(-5).reverse().map((m: any, i) => (
-                <div key={i} style={{ fontSize: 10, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  {m.date}: Вес {m.weightKg}кг | Талия {m.waistCm}см | Грудь {m.chestCm}см | Бицепс {m.armLeftCm || m.armRightCm}см | Бедро {m.thighLeftCm || m.thighRightCm}см
-                </div>
-              ))}
-            </div>
-          )}
-          {measureAnalytics && (
-            <div style={style.card}>
-              <div style={style.label}>📈 Аналитика тела</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px', fontSize: 10 }}>
-                <span>FFMI:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.ffmi?.toFixed(1)}</span>
-                <span>LBM:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.lbm?.toFixed(1)} кг</span>
-                <span>BMI:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.bmi?.toFixed(1)}</span>
-                <span>Жир:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.fatMass?.toFixed(1)} кг</span>
-              </div>
-            </div>
-          )}
-          <CheckinMetricsCard />
-        </div>
-      )}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
       {mode === 'tools' && (

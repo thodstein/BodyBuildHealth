@@ -13,7 +13,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'body' | 'calendar' | 'checkin' | 'mmc';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -22,6 +22,7 @@ interface Props {
   selectedWeek: number;
   level: string;
   onRefresh: () => void;
+  onTabChange?: (tab: TrainingTab) => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
   daysPerWeek: number;
@@ -33,7 +34,7 @@ interface Props {
 }
 
 /** Map old external tabs and legacy mode names to hub modes */
-export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'body' | 'calendar' | 'checkin' | 'mmc' {
+export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' {
   // Legacy initialDiaryMode values
   if (initialDiaryMode === 'reports') return 'tools';
   if (initialDiaryMode === 'diary') return 'record';
@@ -64,6 +65,7 @@ export const DiaryAnalyticsZone: React.FC<Props> = (p) => {
         selectedWeek={p.selectedWeek}
         level={p.level}
         onRefresh={p.onRefresh}
+        onGoRecord={p.onTabChange ? () => p.onTabChange!('diary') : undefined}
         trainingOutput={p.trainingOutput}
         goal={p.goal}
         daysPerWeek={p.daysPerWeek}

@@ -306,6 +306,19 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  // Глобальный хендлер внешней навигации (SRCBB → «Качество программы» и др.)
+  useEffect(() => {
+    const handler = (t: string) => {
+      if (t === 'programcalc') { setZone('calculators'); setTab('calc_quality'); setPage('tabs'); return; }
+      const tabId = t as TrainingTab;
+      if (TAB_LABELS[tabId] && zoneForTab(tabId) !== 'planner') {
+        setZone(zoneForTab(tabId)); setTab(tabId); setPage('tabs');
+      }
+    };
+    (window as any).__navigateToTrainingTab = handler;
+    return () => { delete (window as any).__navigateToTrainingTab; };
+  }, []);
+
   // Держим активную вкладку валидной для текущей зоны
   useEffect(() => {
     if (!zone) return;
@@ -497,7 +510,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {page !== 'hero' && (
       <div style={{ padding: '0 4px' }}>
-      {zone && zone !== 'diary' && (
+      {zone && (
         <h2 style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
       )}
 
@@ -642,6 +655,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           goal={goal} daysPerWeek={daysPerWeek} splitType={splitType}
           periodizationType={periodizationType} mesoLength={mesoLength}
           tprofile={tprofile} linked={linked}
+          onTabChange={setTab}
         />
       )}
 
