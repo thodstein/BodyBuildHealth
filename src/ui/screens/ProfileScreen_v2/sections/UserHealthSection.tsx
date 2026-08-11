@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, GroupHeader, colors } from '../ui';
 import {
   CHRONIC_CONDITIONS_LIST, ALLERGEN_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS,
 } from '../../../../core/contraindications';
@@ -69,9 +69,7 @@ export const UserHealthSection: React.FC = () => {
     >
       {/* Хронические заболевания */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>
-          ⚠ Хронические заболевания
-        </div>
+        <GroupHeader icon="⚠" title="Хронические заболевания" color={colors.danger} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {CHRONIC_CONDITIONS_LIST.map(c => (
             <BoolChip
@@ -94,9 +92,7 @@ export const UserHealthSection: React.FC = () => {
 
       {/* Генетика */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>
-          🧬 Генетика (SNP)
-        </div>
+        <GroupHeader icon="🧬" title="Генетика (SNP)" color={colors.purple} />
         <FieldRow cols={2}>
           {SNP_LIST.map(snp => (
             <PopupValueEditor
@@ -113,8 +109,8 @@ export const UserHealthSection: React.FC = () => {
       </div>
 
       {/* Кардио */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.05)', border: `1px solid ${colors.dangerDim}` }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.danger, marginBottom: 10 }}>❤️ Кардио</div>
+      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(239,68,68,0.05)', border: `1px solid ${colors.dangerDim}` }}>
+        <GroupHeader icon="❤️" title="Кардио" color={colors.danger} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
           <PopupValueEditor
             label="Стадия АД"
@@ -174,7 +170,7 @@ export const UserHealthSection: React.FC = () => {
             color={colors.danger}
           />
           <BoolChip
-            label="Семейная ССЗ"
+            label="ССЗ в семье"
             checked={health.familyCVD}
             onChange={v => updateHealth({ familyCVD: v })}
             color={colors.danger}
@@ -183,8 +179,8 @@ export const UserHealthSection: React.FC = () => {
       </div>
 
       {/* Неврология */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: `1px solid ${colors.purpleDim}` }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.purple, marginBottom: 10 }}>🧠 Неврология</div>
+      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: `1px solid ${colors.purpleDim}` }}>
+        <GroupHeader icon="🧠" title="Неврология" color={colors.purple} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
           <div>
             <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Дофамин (1-5)</div>
@@ -219,8 +215,8 @@ export const UserHealthSection: React.FC = () => {
       </div>
 
       {/* ЖКТ */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.05)', border: `1px solid ${colors.greenDim}` }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.green, marginBottom: 10 }}>🍽 ЖКТ</div>
+      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(34,197,94,0.05)', border: `1px solid ${colors.greenDim}` }}>
+        <GroupHeader icon="🍽" title="ЖКТ" color={colors.green} style={{ marginBottom: 10 }} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'bloating', l: 'Вздутие' },
@@ -243,8 +239,8 @@ export const UserHealthSection: React.FC = () => {
       </div>
 
       {/* Психология */}
-      <div style={{ marginBottom: 16, padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.05)', border: `1px solid ${colors.pinkDim}` }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.pink, marginBottom: 10 }}>💭 Психология</div>
+      <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(236,72,153,0.05)', border: `1px solid ${colors.pinkDim}` }}>
+        <GroupHeader icon="💭" title="Психология" color={colors.pink} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
           <div>
             <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Страх потери (1-5)</div>
@@ -263,7 +259,7 @@ export const UserHealthSection: React.FC = () => {
 
       {/* ОДА */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>🦴 Опорно-двигательный аппарат</div>
+        <GroupHeader icon="🦴" title="Опорно-двигательный аппарат" color={colors.orange} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
           {[
             { k: 'jointPain', l: 'Суставы' },
@@ -310,7 +306,7 @@ export const UserHealthSection: React.FC = () => {
 
       {/* Эпикриз */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>📋 Эпикриз</div>
+        <GroupHeader icon="📋" title="Эпикриз" color={colors.teal} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'pastGyno', l: 'Гинекомастия' },
@@ -331,7 +327,7 @@ export const UserHealthSection: React.FC = () => {
 
       {/* Стоматология */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>🦷 Стоматология</div>
+        <GroupHeader icon="🦷" title="Стоматология" color={colors.blue} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {[
             { k: 'bleedingGums', l: 'Кровоточат дёсны' },
@@ -350,7 +346,7 @@ export const UserHealthSection: React.FC = () => {
 
       {/* Токсическая нагрузка */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>☣️ Токсическая нагрузка</div>
+        <GroupHeader icon="☣️" title="Токсическая нагрузка" color={colors.warning} />
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <BoolChip
             label="Вредная работа"
@@ -367,7 +363,7 @@ export const UserHealthSection: React.FC = () => {
 
       {/* Аллергии и исключения */}
       <div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>💊 Аллергии на лекарства и исключения</div>
+        <GroupHeader icon="💊" title="Аллергии на лекарства и исключения" color={colors.pink} />
         <FieldRow cols={2}>
           <PopupValueEditor
             label="Аллергия на лекарства"
@@ -377,20 +373,20 @@ export const UserHealthSection: React.FC = () => {
             placeholder="пенициллин, аспирин..."
           />
           <PopupValueEditor
-            label="Исключить БАДы (id)"
+            label="Исключить БАДы (код)"
             value={(health.excludedSupplements || []).join(', ')}
             type="text"
             onChange={v => updateHealth({ excludedSupplements: String(v).split(',').map(x => x.trim()).filter(Boolean) })}
-            placeholder="через запятую"
+            placeholder="коды через запятую"
           />
         </FieldRow>
         <div style={{ marginTop: 12 }}>
           <PopupValueEditor
-            label="Исключить лекарства (id)"
+            label="Исключить лекарства (код)"
             value={(health.excludedMeds || []).join(', ')}
             type="text"
             onChange={v => updateHealth({ excludedMeds: String(v).split(',').map(x => x.trim()).filter(Boolean) })}
-            placeholder="через запятую"
+            placeholder="коды через запятую"
           />
         </div>
       </div>

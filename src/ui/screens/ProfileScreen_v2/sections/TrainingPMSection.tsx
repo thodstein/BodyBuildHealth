@@ -35,6 +35,7 @@ export const TrainingPMSection: React.FC = () => {
 
   return (
     <AccordionSection
+      id="profile-section-1-8"
       title="2.2 Личные рекорды (ПМ)"
       subtitle="Главные лифты + рабочие максимумы по группам мышц"
       icon="🏆"

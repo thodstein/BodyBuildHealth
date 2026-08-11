@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, GroupHeader, colors } from '../ui';
 import { ALLERGEN_LIST } from '../../../../core/contraindications';
 
 const DIET_TYPES = [
@@ -68,7 +68,7 @@ export const UserDietSection: React.FC = () => {
       </FieldRow>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>⚠ Аллергии</div>
+        <GroupHeader icon="⚠" title="Аллергии" color={colors.danger} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {ALLERGEN_LIST.map(a => (
             <BoolChip
@@ -83,7 +83,7 @@ export const UserDietSection: React.FC = () => {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>Непереносимости</div>
+        <GroupHeader icon="⚠" title="Непереносимости" color={colors.warning} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {ALLERGEN_LIST.map(a => (
             <BoolChip
@@ -144,9 +144,9 @@ export const UserDietSection: React.FC = () => {
           placeholder="—"
         />
         <PopupValueEditor
-          label="Алкоголь/нед"
+          label="Алкоголь в неделю"
           value={nutrition.alcoholPerWeek}
-          unit="дринков"
+          unit="порций"
           type="number"
           min={0} max={30}
           onChange={v => updateNutrition({ alcoholPerWeek: v ?? 0 })}

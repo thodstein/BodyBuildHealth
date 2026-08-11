@@ -9,10 +9,10 @@ import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
 
 const BLOOD_TYPES: { id: string; label: string }[] = [
-  { id: 'I+', label: 'I (Rh+)' }, { id: 'I-', label: 'I (Rh−)' },
-  { id: 'II+', label: 'II (Rh+)' }, { id: 'II-', label: 'II (Rh−)' },
-  { id: 'III+', label: 'III (Rh+)' }, { id: 'III-', label: 'III (Rh−)' },
-  { id: 'IV+', label: 'IV (Rh+)' }, { id: 'IV-', label: 'IV (Rh−)' },
+  { id: 'I+', label: 'I (резус +)' }, { id: 'I-', label: 'I (резус −)' },
+  { id: 'II+', label: 'II (резус +)' }, { id: 'II-', label: 'II (резус −)' },
+  { id: 'III+', label: 'III (резус +)' }, { id: 'III-', label: 'III (резус −)' },
+  { id: 'IV+', label: 'IV (резус +)' }, { id: 'IV-', label: 'IV (резус −)' },
 ];
 const SEX_OPTIONS = [
   { id: 'male', label: '♂ Мужской' },
@@ -96,7 +96,7 @@ export const UserPersonalSection: React.FC = () => {
 
       <FieldRow cols={3}>
         <PopupValueEditor
-          label="Email"
+          label="Электронная почта"
           value={system.email}
           type="text"
           onChange={v => setSystem({ email: v })}
@@ -120,21 +120,34 @@ export const UserPersonalSection: React.FC = () => {
 
       {personal.weight && personal.height && personal.weight > 0 && personal.height > 0 && (
         <div style={{
-          marginTop: 12, padding: 12, borderRadius: 10,
-          background: 'rgba(0,230,138,0.08)', border: `1px solid ${colors.primaryDim}`,
+          marginTop: 12, padding: 14, borderRadius: 12,
+          background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.03))',
+          border: `1px solid ${colors.primaryDim}`,
         }}>
-          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap' }}>
-            <span>BMI: <b style={{ color: colors.primary }}>{((personal.weight / Math.pow(personal.height / 100, 2))).toFixed(1)}</b></span>
+          <div style={{
+            fontSize: 11, fontWeight: 700, color: colors.primary, marginBottom: 8, letterSpacing: 0.5,
+          }}>📊 Композиция тела</div>
+          <div style={{ display: 'flex', gap: 20, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap' }}>
+            <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span>ИМТ</span>
+              <b style={{ color: colors.primary, fontSize: 15 }}>{((personal.weight / Math.pow(personal.height / 100, 2))).toFixed(1)}</b>
+            </span>
             {(() => {
-              // FFMI = LBM / height² — формула Mattila et al. 2001
+              // Тощая масса = LBM — формула Mattila et al. 2001
               const bodyFat = personal.bodyFat ?? 0;
               if (bodyFat <= 0) return null;
               const lbm = personal.weight * (1 - bodyFat / 100);
               const ffmi = lbm / Math.pow(personal.height / 100, 2);
               return (
                 <>
-                  <span>LBM: <b style={{ color: colors.primary }}>{lbm.toFixed(1)} кг</b></span>
-                  <span>FFMI: <b style={{ color: colors.primary }}>{ffmi.toFixed(1)}</b></span>
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                    <span>Тощая масса</span>
+                    <b style={{ color: colors.primary, fontSize: 15 }}>{lbm.toFixed(1)} кг</b>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                    <span>FFMI</span>
+                    <b style={{ color: colors.primary, fontSize: 15 }}>{ffmi.toFixed(1)}</b>
+                  </span>
                 </>
               );
             })()}

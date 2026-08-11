@@ -87,7 +87,7 @@ export const UserPharmaSection: React.FC = () => {
           placeholder="—"
         />
         <PopupValueEditor
-          label="Месяцев с последнего"
+          label="Месяцев с последнего курса"
           value={pharma.monthsSinceLastCourse}
           type="number"
           min={0} max={120}
@@ -95,7 +95,7 @@ export const UserPharmaSection: React.FC = () => {
           placeholder="—"
         />
         <PopupValueEditor
-          label="Время с последнего"
+          label="Время с последнего курса"
           value={pharma.timeSinceLastCycle}
           type="select"
           options={TIME_SINCE}

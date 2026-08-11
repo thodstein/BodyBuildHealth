@@ -94,7 +94,7 @@ export const UserLifestyleSection: React.FC = () => {
           <SliderInput value={lifestyle.activityLevel} onChange={v => updateLifestyle({ activityLevel: v })} min={1} max={10} color={colors.primary} />
         </div>
         <PopupValueEditor
-          label="HRV baseline"
+          label="Базовый HRV (коэф.)"
           value={lifestyle.baselineHrvRatio}
           unit="коэф. 0.5-1.5"
           type="number"
@@ -123,7 +123,7 @@ export const UserLifestyleSection: React.FC = () => {
           placeholder="—"
         />
         <PopupValueEditor
-          label="HRV"
+          label="Утренний HRV"
           value={lifestyle.morningHRV}
           unit="мс"
           type="number"

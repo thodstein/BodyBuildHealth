@@ -40,6 +40,7 @@ export const TrainingWeakPointsSection: React.FC = () => {
 
   return (
     <AccordionSection
+      id="profile-section-1-9"
       title="2.3 Слабые стороны и оборудование"
       subtitle="Отстающие группы, доступный инвентарь"
       icon="🎯"

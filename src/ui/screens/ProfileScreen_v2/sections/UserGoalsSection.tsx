@@ -25,14 +25,14 @@ const CYCLE_GOALS = [
   { id: 'recomp', label: 'Рекомпозиция' },
 ];
 const BB_CATEGORIES = [
-  { id: "Men's Physique", label: "Men's Physique" },
-  { id: "Classic Physique", label: "Classic Physique" },
-  { id: "Bodybuilding", label: "Bodybuilding" },
-  { id: "Bikini", label: "Bikini" },
-  { id: "Figure", label: "Figure" },
-  { id: "Wellness", label: "Wellness" },
-  { id: "Crossfit", label: "Crossfit" },
-  { id: "Powerlifting", label: "Powerlifting" },
+  { id: "Men's Physique", label: "Менс Физик" },
+  { id: "Classic Physique", label: "Классик Физик" },
+  { id: "Bodybuilding", label: "Бодибилдинг" },
+  { id: "Bikini", label: "Бикини" },
+  { id: "Figure", label: "Фигура" },
+  { id: "Wellness", label: "Уэлнес" },
+  { id: "Crossfit", label: "Кроссфит" },
+  { id: "Powerlifting", label: "Пауэрлифтинг" },
 ];
 const LIFE_STAGES = [
   { id: 'cut', label: 'Сушка' },
@@ -111,7 +111,7 @@ export const UserGoalsSection: React.FC = () => {
           placeholder="—"
         />
         <PopupValueEditor
-          label="BB-категория"
+          label="Категория ББ"
           value={goals.bbCategory}
           type="select"
           options={BB_CATEGORIES}

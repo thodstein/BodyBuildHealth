@@ -35,6 +35,7 @@ export const TrainingProfileSection: React.FC = () => {
 
   return (
     <AccordionSection
+      id="profile-section-1-7"
       title="2.1 Профиль"
       subtitle="Цель, уровень, спорт, стаж, расписание"
       icon="🎯"

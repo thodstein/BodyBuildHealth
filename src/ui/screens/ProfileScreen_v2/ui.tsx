@@ -86,11 +86,27 @@ export const selectStyle: React.CSSProperties = {
 export const labelStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: colors.textMuted,
+  color: 'rgba(255,255,255,0.62)',
   textTransform: 'uppercase',
   letterSpacing: '0.5px',
   marginBottom: 4,
   display: 'block',
+};
+
+/* ── Заголовок подгруппы (иконка-бокс + текст) ── */
+
+export const GroupHeader: React.FC<{ icon: string; title: string; color?: string; style?: React.CSSProperties }> = ({ icon, title, color, style }) => {
+  const c = color || colors.text;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, ...style }}>
+      <span aria-hidden="true" style={{
+        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 14, background: `${c}1f`, border: `1px solid ${c}40`,
+      }}>{icon}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: c, letterSpacing: 0.2 }}>{title}</span>
+    </div>
+  );
 };
 
 export const sectionTitleStyle: React.CSSProperties = {
@@ -198,7 +214,7 @@ export const BoolChip: React.FC<{
       onClick={() => onChange(!checked)}
       style={{
         padding: '6px 12px',
-        borderRadius: 16,
+        borderRadius: 14,
         fontSize: 12,
         fontWeight: 600,
         cursor: 'pointer',
@@ -206,7 +222,8 @@ export const BoolChip: React.FC<{
         background: checked ? `${c}22` : 'transparent',
         color: checked ? c : colors.textMuted,
         transition: 'all 0.15s',
-        minHeight: 32,
+        minHeight: 34,
+        boxShadow: checked ? `0 2px 10px ${c}22` : 'none',
       }}
     >
       {checked ? '✓ ' : ''}{label}
@@ -288,8 +305,14 @@ export const AccordionSection: React.FC<{
         padding: 0,
         overflow: 'hidden',
         scrollMarginTop: 70, // для smooth scroll с учётом sticky quick-jump
+        position: 'relative',
       }}
     >
+      {/* Акцентная полоса сверху в цвет секции */}
+      <div aria-hidden="true" style={{
+        height: 3, width: '100%',
+        background: `linear-gradient(90deg, ${c}, ${c}26 55%, transparent)`,
+      }} />
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -298,30 +321,42 @@ export const AccordionSection: React.FC<{
           display: 'flex',
           alignItems: 'center',
           gap: 12,
-          padding: 16,
+          padding: 14,
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
           textAlign: 'left',
           color: colors.text,
-          minHeight: 56,
+          minHeight: 60,
         }}
       >
-        {icon && <span style={{ fontSize: 20 }}>{icon}</span>}
-        <div style={{ flex: 1 }}>
+        {icon && (
+          <span aria-hidden="true" style={{
+            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, background: `${c}22`, border: `1px solid ${c}44`,
+            boxShadow: `inset 0 0 14px ${c}1a`,
+          }}>{icon}</span>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: c }}>{title}</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: c, letterSpacing: -0.2 }}>{title}</span>
             {badge && (
               <span style={{
                 fontSize: 10, fontWeight: 700, color: c, background: `${c}22`,
-                padding: '2px 8px', borderRadius: 8,
+                padding: '2px 8px', borderRadius: 8, border: `1px solid ${c}33`,
+                whiteSpace: 'nowrap',
               }}>{badge}</span>
             )}
           </div>
           {subtitle && <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{subtitle}</div>}
         </div>
         <span style={{
-          fontSize: 18, color: colors.textMuted, transition: 'transform 0.2s',
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: open ? `${c}22` : 'rgba(255,255,255,0.05)',
+          fontSize: 13, color: open ? c : colors.textMuted,
+          transition: 'transform 0.2s',
           transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
         }}>▾</span>
       </button>
@@ -385,9 +420,10 @@ export const PopupValueEditor: React.FC<{
   const [local, setLocal] = useState<string>('');
   const c = color || colors.primary;
 
+  const hasValue = value !== undefined && value !== null && value !== '' && value !== 0;
+
   const displayValue = () => {
-    // Не показывать "0" как валидное значение (это default для нового профиля)
-    if (value === undefined || value === null || value === '' || value === 0) return placeholder || '—';
+    if (!hasValue) return placeholder || '—';
     if (unit) return `${value} ${unit}`;
     return String(value);
   };
@@ -422,28 +458,45 @@ export const PopupValueEditor: React.FC<{
       <button
         type="button"
         onClick={openPopup}
+        aria-label={`${label}: ${displayValue()}`}
         style={{
           ...glassCard,
           background: 'rgba(255,255,255,0.04)',
           padding: '10px 12px',
           cursor: 'pointer',
-          border: `1px solid ${colors.border}`,
+          border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          gap: 3,
           width: '100%',
           textAlign: 'left',
           color: colors.text,
-          minHeight: 44,
-          transition: 'border-color 0.15s',
+          minHeight: 58,
+          transition: 'all 0.15s',
+          boxShadow: hasValue ? `0 2px 14px ${c}14` : undefined,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = `${c}66`;
+          e.currentTarget.style.transform = 'translateY(-1px)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = hasValue ? `${c}44` : colors.border;
+          e.currentTarget.style.transform = 'translateY(0)';
         }}
       >
-        <span style={{ fontSize: 12, color: colors.textMuted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
         <span style={{
-          fontSize: 14, fontWeight: 600, color: value ? colors.text : colors.textSubtle,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60%',
+          fontSize: 10, fontWeight: 600, color: colors.textMuted, letterSpacing: 0.3,
+          whiteSpace: 'normal', overflow: 'hidden', display: '-webkit-box',
+          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', maxWidth: '100%', lineHeight: 1.3,
+        }}>{label}</span>
+        <span style={{
+          fontSize: 15, fontWeight: 700, color: hasValue ? c : colors.textSubtle,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
         }}>
           {displayValue()}
+          {hasValue && <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.55, fontWeight: 600 }}>✎</span>}
         </span>
       </button>
 
