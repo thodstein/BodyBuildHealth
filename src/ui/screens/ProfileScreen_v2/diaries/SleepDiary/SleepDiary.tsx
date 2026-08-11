@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BoolChip, SliderInput, colors, glassCard, inputStyle } from '../../ui';
 import {
   analyzeAllSleepCorrelations,
@@ -12,6 +12,13 @@ import {
   getSupplementIntakeFromStorage,
   getTrainingDatesFromStorage,
 } from '../../../../../engines/sleep-integration.engine';
+import {
+  avgSleepEfficiency,
+  computeSleepRegularity,
+  cumulativeSleepDebt,
+  recommendedBedtime,
+  syncSleepToProfile,
+} from '../../../../../engines/sleep-facts.engine';
 import {
   buildSleepCalendar,
   buildWeeklyHistogram,
@@ -500,6 +507,15 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
     setRows([...next].sort((a, b) => b.date.localeCompare(a.date)));
     onDataChange?.();
   };
+
+  useEffect(() => {
+    if (!open) return;
+    try {
+      syncSleepToProfile(rows);
+    } catch {
+      /* профиль-синк не должен ронять дневник */
+    }
+  }, [rows, open]);
   const add = (entry: RichSleepEntry) => {
     const existing = rows.find((r) => r.date === entry.date);
     if (existing) {
@@ -577,8 +593,13 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
   }, [points]);
 
   const recent = rows.slice(0, 7);
-  const debt = recent.reduce((n, r) => n + Math.max(0, goals.targetHours - r.hours), 0);
+  const debtCalc = cumulativeSleepDebt(rows, goals.targetHours, 7);
+  const debt = debtCalc.debt;
   const avgQuality = recent.length ? recent.reduce((n, r) => n + r.quality, 0) / recent.length : 0;
+  const efficiency = avgSleepEfficiency(rows, 30);
+  const regularity = computeSleepRegularity(rows, 14);
+  const lastWake = rows[0]?.wakeTime;
+  const bedtimeRec = lastWake ? recommendedBedtime(lastWake, goals.targetHours) : null;
 
   const correlations = analyzeAllSleepCorrelations({
     sleepDiary: rows,
@@ -917,6 +938,11 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                           ? 'Чуть меньше цели — можно лечь пораньше'
                           : 'Мало сна — попробуйте лечь на час раньше'}
                     </div>
+                    {bedtimeRec && (
+                      <div style={{ fontSize: 12, color: ACCENT, marginTop: 2, fontWeight: 700 }}>
+                        🌜 Чтобы встать в {todays.wakeTime}, ложитесь в {bedtimeRec}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -924,6 +950,11 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                     <div style={{ fontSize: 12, color: colors.textSubtle, marginTop: 2 }}>
                       Добавьте сон — статистика и тренды обновятся мгновенно
                     </div>
+                    {bedtimeRec && lastWake && (
+                      <div style={{ fontSize: 12, color: ACCENT, marginTop: 2, fontWeight: 700 }}>
+                        🌜 Чтобы встать в {lastWake}, ложитесь в {bedtimeRec}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -939,10 +970,52 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
           <StatCard icon="🌙" label="Среднее" value={dist ? `${dist.mean.toFixed(1)} ч` : '—'} color={meanStatColor} hint={`медиана ${dist ? dist.median.toFixed(1) : '—'} ч`} />
           <StatCard icon="🔻" label="Мин / Макс" value={extremes.min && extremes.max ? `${extremes.min.value}/${extremes.max.value} ч` : '—'} color={colors.purple} />
           <StatCard icon="🔥" label="Серия" value={`${streak.current} дн.`} color={streak.current >= 7 ? '#34d399' : '#fbbf24'} hint={`лучшая ${streak.best} дн.`} />
-          <StatCard icon="⏳" label="Долг за 7д" value={`${debt.toFixed(1)} ч`} color={debt > 2 ? '#f87171' : debt > 0 ? '#fbbf24' : '#34d399'} />
+          <StatCard icon="⏳" label="Долг за 7д" value={`${debt.toFixed(1)} ч`} color={debt > 2 ? '#f87171' : debt > 0 ? '#fbbf24' : '#34d399'} hint={`записано ${debtCalc.recordedDays} дн.`} />
+          {efficiency !== null && (
+            <StatCard
+              icon="🛏"
+              label="Эффективность (30д)"
+              value={`${efficiency}%`}
+              color={efficiency >= 85 ? '#34d399' : efficiency >= 75 ? '#fbbf24' : '#f87171'}
+              hint={efficiency >= 85 ? 'норма ≥85%' : efficiency >= 75 ? 'пограничная' : 'маркер инсомнии'}
+            />
+          )}
           <StatCard icon="⭐" label="Качество (7д)" value={recent.length ? `${avgQuality.toFixed(1)}/5` : '—'} color={avgQuality >= 4 ? '#34d399' : avgQuality >= 3 ? '#fbbf24' : '#f87171'} />
           <StatCard icon="⚠️" label="Аномалии" value={String(anomalies.length)} color={anomalies.length ? '#f87171' : '#34d399'} hint={anomalies.length ? 'требуют внимания' : 'всё в порядке'} />
         </div>
+
+        {/* Регулярность режима */}
+        {regularity && regularity.samples >= 2 && (
+          <section style={{ ...glassCard, marginBottom: 12 }}>
+            <b style={{ display: 'block', marginBottom: 10 }}>🕰 Регулярность режима (14 дней)</b>
+            <div className="sleep-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8 }}>
+              <StatCard
+                icon="🛌"
+                label="Разброс отбоя (σ)"
+                value={`±${regularity.bedtimeStdMin} мин`}
+                color={regularity.bedtimeStdMin <= 30 ? '#34d399' : regularity.bedtimeStdMin <= 60 ? '#fbbf24' : '#f87171'}
+                hint={regularity.bedtimeStdMin <= 30 ? 'стабильно' : regularity.bedtimeStdMin <= 60 ? 'плавает' : 'нестабильно'}
+              />
+              <StatCard
+                icon="⏰"
+                label="Разброс подъёма (σ)"
+                value={`±${regularity.wakeStdMin} мин`}
+                color={regularity.wakeStdMin <= 30 ? '#34d399' : regularity.wakeStdMin <= 60 ? '#fbbf24' : '#f87171'}
+                hint={regularity.wakeStdMin <= 30 ? 'стабильно' : regularity.wakeStdMin <= 60 ? 'плавает' : 'нестабильно'}
+              />
+              {regularity.jetlagMin !== null && (
+                <StatCard
+                  icon="✈️"
+                  label="Джетлаг выходных"
+                  value={`${regularity.jetlagMin} мин`}
+                  color={regularity.jetlagMin <= 30 ? '#34d399' : regularity.jetlagMin <= 60 ? '#fbbf24' : '#f87171'}
+                  hint="сдвиг середины сна в выходные"
+                />
+              )}
+              <StatCard icon="📊" label="Записей" value={`${regularity.samples}`} color={colors.textMuted} hint="в окне 14 дней" />
+            </div>
+          </section>
+        )}
 
         {/* Балл сна */}
         {score && (
@@ -1367,7 +1440,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
           <table className="sleep-table">
             <thead>
               <tr>
-                {['Дата', 'Часы', 'Качество', 'Пробуждений', 'Латентность', 'Стресс', 'Алкоголь', 'Заметки'].map((h) => (
+                {['Дата', 'Часы', 'Качество', 'Пробуждений', 'Латентность', 'Кофеин до', 'Экран', 'Стресс', 'Алкоголь', 'Заметки'].map((h) => (
                   <th key={h} onClick={() => changeSort(h === 'Дата' ? 'date' : h)}>
                     {h}
                   </th>
@@ -1388,6 +1461,14 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                     <td style={{ fontWeight: 700, color: qColor }}>{r.quality}/5</td>
                     <td>{r.awakenings}</td>
                     <td>{r.latency ?? '—'} мин</td>
+                    <td style={{ whiteSpace: 'nowrap', color: colors.textMuted }}>
+                      {r.caffeineCutoff ? (
+                        <span style={{ color: r.caffeineCutoff > '12:00' ? '#fbbf24' : '#34d399', fontWeight: 700 }}>{r.caffeineCutoff}</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ color: colors.textMuted }}>{r.screenTime !== undefined ? `${r.screenTime} мин` : '—'}</td>
                     <td>
                       <span
                         style={{

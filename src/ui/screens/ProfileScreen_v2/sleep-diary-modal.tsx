@@ -64,7 +64,7 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
     return {
       date: todayIso(),
       hours: last && typeof last.hours === 'number' ? String(last.hours) : '7.5',
-      quality: '4',
+      quality: last && typeof last.quality === 'number' ? String(last.quality) : '4',
       awakenings: last && typeof last.awakenings === 'number' ? String(last.awakenings) : '1',
       bedtime: last?.bedtime || '23:00',
       wakeTime: last?.wakeTime || '07:00',

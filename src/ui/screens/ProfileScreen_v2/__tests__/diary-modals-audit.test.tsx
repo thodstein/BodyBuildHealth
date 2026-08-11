@@ -310,6 +310,13 @@ describe('AddSleepModal — секция «Факторы» (паритет с �
     expect(screen.getByRole('button', { name: /✓ Алкоголь/ })).toBeTruthy();
   });
 
+  it('качество наследуется из последней записи (не дефолт 4)', () => {
+    localStorage.setItem('he_sleep_diary', JSON.stringify([{ date: '2026-08-01', hours: 7, quality: 2 }]));
+    render(<AddSleepModal open onClose={noop} onSave={noop} />);
+    expect(screen.getByRole('radio', { name: '😞' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: '🙂' })).toHaveAttribute('aria-checked', 'false');
+  });
+
   it('факторы попадают в onSave: латентность, кофеин, экран, алкоголь, стресс', () => {
     let saved: Record<string, unknown> | null = null;
     render(<AddSleepModal open onClose={noop} onSave={(e: any) => { saved = e; }} />);

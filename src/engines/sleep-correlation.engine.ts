@@ -80,6 +80,25 @@ export function analyzeSleepTrainingCorrelation(
 }
 
 /**
+ * Выбирает единую метрику для группы: латентность (если заполнена у всех),
+ * иначе качество (если заполнено у всех). Никогда не смешивает минуты и баллы.
+ */
+const groupMetric = (entries: SleepEntry[]): { kind: 'latency' | 'quality'; vals: number[] } | null => {
+  const lat = entries.map((e) => e.latency).filter((v): v is number => Number.isFinite(v));
+  if (lat.length === entries.length && entries.length > 0) return { kind: 'latency', vals: lat };
+  const q = entries.map((e) => e.quality).filter((v): v is number => Number.isFinite(v));
+  if (q.length === entries.length && entries.length > 0) return { kind: 'quality', vals: q };
+  return null;
+};
+
+const groupMean = (entries: SleepEntry[], kind: 'latency' | 'quality'): number | null => {
+  const vals = entries
+    .map((e) => (kind === 'latency' ? e.latency : e.quality))
+    .filter((v): v is number => Number.isFinite(v));
+  return vals.length === entries.length && entries.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+};
+
+/**
  * Анализирует влияние кофеина на сон
  */
 export function analyzeCaffeineCorrelation(sleepDiary: SleepEntry[]): CorrelationResult | null {
@@ -88,18 +107,26 @@ export function analyzeCaffeineCorrelation(sleepDiary: SleepEntry[]): Correlatio
 
   if (entriesWithCaffeine.length < 2 || entriesWithoutLateCaffeine.length < 2) return null;
 
-  const metric = (e: SleepEntry) => Number.isFinite(e.latency) ? e.latency! : e.quality;
-  const avgLatencyWithCaffeine = entriesWithCaffeine.reduce((sum, e) => sum + metric(e), 0) / entriesWithCaffeine.length;
-  const avgLatencyWithoutCaffeine = entriesWithoutLateCaffeine.reduce((sum, e) => sum + metric(e), 0) / entriesWithoutLateCaffeine.length;
+  const withMetric = groupMetric(entriesWithCaffeine);
+  const withoutMetric = groupMetric(entriesWithoutLateCaffeine);
+  if (!withMetric || !withoutMetric || withMetric.kind !== withoutMetric.kind) return null;
+  const kind = withMetric.kind;
 
-  const latencyDiff = avgLatencyWithCaffeine - avgLatencyWithoutCaffeine;
+  const avgWith = groupMean(entriesWithCaffeine, kind);
+  const avgWithout = groupMean(entriesWithoutLateCaffeine, kind);
+  if (avgWith === null || avgWithout === null) return null;
+
+  const diff = avgWith - avgWithout;
+  const unit = kind === 'latency' ? 'мин' : '/5';
+  const thresholds = kind === 'latency' ? [15, 8] : [1.5, 0.8];
+  const strength = Math.abs(diff) > thresholds[0] ? 'strong' : Math.abs(diff) > thresholds[1] ? 'moderate' : 'weak';
 
   return {
     factor: 'Кофеин после 12:00',
-    correlation: Math.round(latencyDiff * 10) / 10,
-    strength: Math.abs(latencyDiff) > 15 ? 'strong' : Math.abs(latencyDiff) > 8 ? 'moderate' : 'weak',
-    direction: latencyDiff > 0 ? 'negative' : 'positive',
-    description: `При позднем кофеине латентность ${avgLatencyWithCaffeine.toFixed(0)} мин, при раннем ${avgLatencyWithoutCaffeine.toFixed(0)} мин`,
+    correlation: Math.round(diff * 10) / 10,
+    strength,
+    direction: diff > 0 ? 'negative' : 'positive',
+    description: `При позднем кофеине ${kind === 'latency' ? 'латентность' : 'качество'} ${avgWith.toFixed(kind === 'latency' ? 0 : 1)} ${unit}, при раннем ${avgWithout.toFixed(kind === 'latency' ? 0 : 1)} ${unit}`,
     sampleSize: entriesWithCaffeine.length
   };
 }
@@ -140,19 +167,100 @@ export function analyzeScreenTimeCorrelation(sleepDiary: SleepEntry[]): Correlat
 
   if (entriesWithScreenTime.length < 2 || entriesWithLowScreenTime.length < 2) return null;
 
-  const metric = (e: SleepEntry) => Number.isFinite(e.latency) ? e.latency! : e.quality;
-  const avgLatencyHighScreen = entriesWithScreenTime.reduce((sum, e) => sum + metric(e), 0) / entriesWithScreenTime.length;
-  const avgLatencyLowScreen = entriesWithLowScreenTime.reduce((sum, e) => sum + metric(e), 0) / entriesWithLowScreenTime.length;
+  const withMetric = groupMetric(entriesWithScreenTime);
+  const lowMetric = groupMetric(entriesWithLowScreenTime);
+  if (!withMetric || !lowMetric || withMetric.kind !== lowMetric.kind) return null;
+  const kind = withMetric.kind;
 
-  const latencyDiff = avgLatencyHighScreen - avgLatencyLowScreen;
+  const avgHigh = groupMean(entriesWithScreenTime, kind);
+  const avgLow = groupMean(entriesWithLowScreenTime, kind);
+  if (avgHigh === null || avgLow === null) return null;
+
+  const diff = avgHigh - avgLow;
+  const unit = kind === 'latency' ? 'мин' : '/5';
+  const thresholds = kind === 'latency' ? [10, 5] : [1.0, 0.5];
+  const strength = Math.abs(diff) > thresholds[0] ? 'strong' : Math.abs(diff) > thresholds[1] ? 'moderate' : 'weak';
 
   return {
     factor: 'Экран > 60 мин перед сном',
-    correlation: Math.round(latencyDiff * 10) / 10,
-    strength: Math.abs(latencyDiff) > 10 ? 'strong' : Math.abs(latencyDiff) > 5 ? 'moderate' : 'weak',
-    direction: latencyDiff > 0 ? 'negative' : 'positive',
-    description: `При долгом экране латентность ${avgLatencyHighScreen.toFixed(0)} мин, при коротком ${avgLatencyLowScreen.toFixed(0)} мин`,
+    correlation: Math.round(diff * 10) / 10,
+    strength,
+    direction: diff > 0 ? 'negative' : 'positive',
+    description: `При долгом экране ${kind === 'latency' ? 'латентность' : 'качество'} ${avgHigh.toFixed(kind === 'latency' ? 0 : 1)} ${unit}, при коротком ${avgLow.toFixed(kind === 'latency' ? 0 : 1)} ${unit}`,
     sampleSize: entriesWithScreenTime.length
+  };
+}
+
+/**
+ * Анализирует влияние стресса (оценка за день 1-10) на сон.
+ * Группы: высокий стресс (≥7) против низкого (≤3).
+ */
+export function analyzeStressCorrelation(sleepDiary: SleepEntry[]): CorrelationResult | null {
+  const highStress = sleepDiary.filter(e => Number.isFinite(e.stressLevel) && e.stressLevel! >= 7);
+  const lowStress = sleepDiary.filter(e => Number.isFinite(e.stressLevel) && e.stressLevel! <= 3);
+
+  if (highStress.length < 2 || lowStress.length < 2) return null;
+
+  const highMetric = groupMetric(highStress);
+  const lowMetric = groupMetric(lowStress);
+  if (!highMetric || !lowMetric || highMetric.kind !== lowMetric.kind) return null;
+  const kind = highMetric.kind;
+
+  const avgHigh = groupMean(highStress, kind);
+  const avgLow = groupMean(lowStress, kind);
+  if (avgHigh === null || avgLow === null) return null;
+
+  const diff = avgHigh - avgLow;
+  const unit = kind === 'latency' ? 'мин' : '/5';
+  const thresholds = kind === 'latency' ? [15, 8] : [1.2, 0.7];
+  const strength = Math.abs(diff) > thresholds[0] ? 'strong' : Math.abs(diff) > thresholds[1] ? 'moderate' : 'weak';
+
+  return {
+    factor: 'Стресс (≥7 vs ≤3)',
+    correlation: Math.round(diff * 10) / 10,
+    strength,
+    direction: diff > 0 ? 'negative' : 'positive',
+    description: `В дни высокого стресса ${kind === 'latency' ? 'латентность' : 'качество'} ${avgHigh.toFixed(kind === 'latency' ? 0 : 1)} ${unit}, в спокойные ${avgLow.toFixed(kind === 'latency' ? 0 : 1)} ${unit}`,
+    sampleSize: highStress.length
+  };
+}
+
+/**
+ * Анализирует связь качества сна с динамикой веса:
+ * дельта веса между соседними замерами в дни хорошего (≥4) против плохого (≤2) сна.
+ */
+export function analyzeWeightCorrelation(
+  sleepDiary: SleepEntry[],
+  weightData: { date: string; weight: number }[],
+): CorrelationResult | null {
+  if (sleepDiary.length < 4 || weightData.length < 3) return null;
+  const sorted = [...weightData].sort((a, b) => a.date.localeCompare(b.date));
+
+  const byDate = new Map<string, SleepEntry>();
+  for (const e of sleepDiary) byDate.set(e.date, e);
+
+  let goodDays: number[] = [];
+  let badDays: number[] = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const e = byDate.get(sorted[i].date);
+    if (!e || !Number.isFinite(e.quality)) continue;
+    const delta = sorted[i + 1].weight - sorted[i].weight;
+    if (e.quality >= 4) goodDays.push(delta);
+    else if (e.quality <= 2) badDays.push(delta);
+  }
+
+  if (goodDays.length < 2 || badDays.length < 2) return null;
+  const avgGood = goodDays.reduce((s, v) => s + v, 0) / goodDays.length;
+  const avgBad = badDays.reduce((s, v) => s + v, 0) / badDays.length;
+  const diff = avgBad - avgGood;
+
+  return {
+    factor: 'Сон и вес',
+    correlation: Math.round(diff * 100) / 100,
+    strength: Math.abs(diff) > 0.5 ? 'strong' : Math.abs(diff) > 0.2 ? 'moderate' : 'weak',
+    direction: diff > 0 ? 'negative' : 'positive',
+    description: `После хорошего сна (≥4/5) вес в среднем ${avgGood >= 0 ? '+' : ''}${avgGood.toFixed(2)} кг/день, после плохого (≤2/5) ${avgBad >= 0 ? '+' : ''}${avgBad.toFixed(2)} кг/день`,
+    sampleSize: badDays.length
   };
 }
 
@@ -180,6 +288,16 @@ export function analyzeAllSleepCorrelations(input: SleepCorrelationInput): Corre
   const screenCorr = analyzeScreenTimeCorrelation(input.sleepDiary);
   if (screenCorr) results.push(screenCorr);
 
+  // Корреляция со стрессом
+  const stressCorr = analyzeStressCorrelation(input.sleepDiary);
+  if (stressCorr) results.push(stressCorr);
+
+  // Корреляция с динамикой веса
+  if (input.weightData && input.weightData.length > 0) {
+    const weightCorr = analyzeWeightCorrelation(input.sleepDiary, input.weightData);
+    if (weightCorr) results.push(weightCorr);
+  }
+
   return results;
 }
 
@@ -199,6 +317,12 @@ export function generateCorrelationRecommendations(correlations: CorrelationResu
       }
       if (corr.factor.includes('Экран') && corr.direction === 'negative') {
         recommendations.push('📱 Длительный экран перед сном мешает засыпанию. Используйте режим "Ночь" или читайте бумажные книги');
+      }
+      if (corr.factor.includes('Стресс') && corr.direction === 'negative') {
+        recommendations.push('🧘 Высокий стресс ухудшает сон. Добавьте вечерние практики: дыхание 4-7-8, магний, прогулка');
+      }
+      if (corr.factor.includes('Сон и вес') && corr.direction === 'negative') {
+        recommendations.push('⚖️ Плохой сон связан с набором веса — приоритизируйте сон для контроля веса');
       }
       if (corr.factor.includes('Тренировки') && corr.direction === 'positive') {
         recommendations.push('💪 Тренировки положительно влияют на сон. Продолжайте в том же духе!');

@@ -7,6 +7,8 @@ import {
   analyzeCaffeineCorrelation,
   analyzeAlcoholCorrelation,
   analyzeScreenTimeCorrelation,
+  analyzeStressCorrelation,
+  analyzeWeightCorrelation,
   analyzeAllSleepCorrelations,
   generateCorrelationRecommendations,
   type SleepEntry
@@ -187,6 +189,173 @@ describe('sleep-correlation.engine', () => {
       const recommendations = generateCorrelationRecommendations(correlations);
 
       expect(recommendations.length).toBe(0);
+    });
+  });
+
+  describe('analyzeStressCorrelation', () => {
+    it('обнаруживает ухудшение сна в дни высокого стресса (латентность)', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { stressLevel: 8, latency: 40, quality: 2 }),
+        createSleepEntry('2024-01-02', { stressLevel: 9, latency: 45, quality: 2 }),
+        createSleepEntry('2024-01-03', { stressLevel: 7, latency: 38, quality: 3 }),
+        createSleepEntry('2024-01-04', { stressLevel: 2, latency: 12, quality: 4 }),
+        createSleepEntry('2024-01-05', { stressLevel: 1, latency: 10, quality: 5 }),
+        createSleepEntry('2024-01-06', { stressLevel: 3, latency: 14, quality: 4 }),
+      ];
+
+      const result = analyzeStressCorrelation(diary);
+
+      expect(result).not.toBeNull();
+      expect(result?.factor).toBe('Стресс (≥7 vs ≤3)');
+      expect(result?.direction).toBe('negative');
+      expect(result?.sampleSize).toBe(3);
+    });
+
+    it('не смешивает минуты и баллы: смешанное заполнение → null', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { stressLevel: 8, latency: 40 }),
+        createSleepEntry('2024-01-02', { stressLevel: 8, latency: 45 }),
+        createSleepEntry('2024-01-03', { stressLevel: 1, latency: 10 }),
+        createSleepEntry('2024-01-04', { stressLevel: 2 }),
+        createSleepEntry('2024-01-05', { stressLevel: 1 }),
+      ];
+
+      expect(analyzeStressCorrelation(diary)).toBeNull();
+    });
+
+    it('возвращает null при недостаточных данных', () => {
+      const diary: SleepEntry[] = [createSleepEntry('2024-01-01', { stressLevel: 8 }), createSleepEntry('2024-01-02', { stressLevel: 2 })];
+      expect(analyzeStressCorrelation(diary)).toBeNull();
+    });
+  });
+
+  describe('analyzeWeightCorrelation', () => {
+    it('плохой сон → набор веса (positive delta)', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { quality: 2 }),
+        createSleepEntry('2024-01-02', { quality: 2 }),
+        createSleepEntry('2024-01-03', { quality: 1 }),
+        createSleepEntry('2024-01-04', { quality: 5 }),
+        createSleepEntry('2024-01-05', { quality: 4 }),
+        createSleepEntry('2024-01-06', { quality: 4 }),
+      ];
+      const weights = [
+        { date: '2024-01-01', weight: 80 },
+        { date: '2024-01-02', weight: 80.6 },
+        { date: '2024-01-03', weight: 81.1 },
+        { date: '2024-01-04', weight: 81.4 },
+        { date: '2024-01-05', weight: 81.0 },
+        { date: '2024-01-06', weight: 80.5 },
+      ];
+
+      const result = analyzeWeightCorrelation(diary, weights);
+
+      expect(result).not.toBeNull();
+      expect(result?.factor).toBe('Сон и вес');
+      expect(result?.direction).toBe('negative');
+    });
+
+    it('возвращает null при недостаточных данных', () => {
+      const diary: SleepEntry[] = [createSleepEntry('2024-01-01', { quality: 2 }), createSleepEntry('2024-01-02', { quality: 5 })];
+      const weights = [{ date: '2024-01-01', weight: 80 }, { date: '2024-01-02', weight: 80.2 }];
+      expect(analyzeWeightCorrelation(diary, weights)).toBeNull();
+    });
+  });
+
+  describe('чистые метрики кофеина/экрана', () => {
+    it('кофеин: при заполненной латентности не подмешивает качество', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { caffeineCutoff: '16:00', latency: 35, quality: 4 }),
+        createSleepEntry('2024-01-02', { caffeineCutoff: '18:00', latency: 40, quality: 5 }),
+        createSleepEntry('2024-01-03', { caffeineCutoff: '10:00', latency: 15, quality: 3 }),
+        createSleepEntry('2024-01-04', { caffeineCutoff: '09:00', latency: 12, quality: 2 }),
+      ];
+
+      const result = analyzeCaffeineCorrelation(diary);
+
+      expect(result).not.toBeNull();
+      expect(result?.description).toContain('мин');
+      expect(result?.description).not.toContain('/5');
+    });
+
+    it('экран: без латентности использует качество единообразно (описание в /5)', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { screenTime: 120, quality: 2 }),
+        createSleepEntry('2024-01-02', { screenTime: 90, quality: 3 }),
+        createSleepEntry('2024-01-03', { screenTime: 30, quality: 4 }),
+        createSleepEntry('2024-01-04', { screenTime: 20, quality: 5 }),
+      ];
+
+      const result = analyzeScreenTimeCorrelation(diary);
+
+      expect(result).not.toBeNull();
+      expect(result?.description).toContain('/5');
+    });
+  });
+
+  describe('стресс в анализе всех корреляций и рекомендациях', () => {
+    it('analyzeAllSleepCorrelations включает стресс при наличии данных', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { stressLevel: 8, latency: 40 }),
+        createSleepEntry('2024-01-02', { stressLevel: 9, latency: 45 }),
+        createSleepEntry('2024-01-03', { stressLevel: 7, latency: 38 }),
+        createSleepEntry('2024-01-04', { stressLevel: 2, latency: 12 }),
+        createSleepEntry('2024-01-05', { stressLevel: 1, latency: 10 }),
+        createSleepEntry('2024-01-06', { stressLevel: 3, latency: 14 }),
+      ];
+
+      const results = analyzeAllSleepCorrelations({ sleepDiary: diary });
+
+      expect(results.some((r) => r.factor.includes('Стресс'))).toBe(true);
+    });
+
+    it('анализ веса подключается при передаче weightData', () => {
+      const diary: SleepEntry[] = [
+        createSleepEntry('2024-01-01', { quality: 2 }),
+        createSleepEntry('2024-01-02', { quality: 2 }),
+        createSleepEntry('2024-01-03', { quality: 1 }),
+        createSleepEntry('2024-01-04', { quality: 5 }),
+        createSleepEntry('2024-01-05', { quality: 4 }),
+        createSleepEntry('2024-01-06', { quality: 4 }),
+      ];
+      const weights = [
+        { date: '2024-01-01', weight: 80 },
+        { date: '2024-01-02', weight: 80.6 },
+        { date: '2024-01-03', weight: 81.1 },
+        { date: '2024-01-04', weight: 81.4 },
+        { date: '2024-01-05', weight: 81.0 },
+        { date: '2024-01-06', weight: 80.5 },
+      ];
+
+      const results = analyzeAllSleepCorrelations({ sleepDiary: diary, weightData: weights });
+
+      expect(results.some((r) => r.factor.includes('Сон и вес'))).toBe(true);
+    });
+
+    it('рекомендации для стресса и веса', () => {
+      const correlations = [
+        {
+          factor: 'Стресс (≥7 vs ≤3)',
+          correlation: 20,
+          strength: 'strong' as const,
+          direction: 'negative' as const,
+          description: 'Test',
+          sampleSize: 5
+        },
+        {
+          factor: 'Сон и вес',
+          correlation: 0.6,
+          strength: 'strong' as const,
+          direction: 'negative' as const,
+          description: 'Test',
+          sampleSize: 5
+        }
+      ];
+
+      const recommendations = generateCorrelationRecommendations(correlations);
+
+      expect(recommendations.some((r) => r.includes('стресс'))).toBe(true);
+      expect(recommendations.some((r) => r.includes('вес'))).toBe(true);
     });
   });
 });
