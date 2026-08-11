@@ -202,7 +202,7 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
       if (exercise.muscle !== 'back') continue;
       const tagged = annotateBackExercise(exercise);
       if (tagged.movementPattern !== 'vertical_pull') continue;
-      const profile = verticalPullProfile(exercise.name);
+      const profile = verticalPullProfile(exercise.name) || 'cable_vertical';
       const shouldKeep = !sessionHasKeptVertical && (!keptProfiles.has(profile) || verticalSessionsSeen < maxVerticalSessions);
       if (shouldKeep) {
         sessionHasKeptVertical = true;
@@ -218,7 +218,9 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
         if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
         const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
-        return next.movementPattern === 'vertical_pull' && verticalPullProfile(candidate.name) !== profile;
+        if (next.movementPattern !== 'vertical_pull') return false;
+        const candidateProfile = verticalPullProfile(candidate.name);
+        return candidateProfile !== null && candidateProfile !== profile;
       }) || EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;

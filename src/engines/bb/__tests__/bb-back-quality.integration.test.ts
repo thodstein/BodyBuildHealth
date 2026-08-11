@@ -24,7 +24,7 @@ describe('experienced enhanced back prescription', () => {
       const back = session.exercises.filter(e => e.muscle === 'back');
       expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(18);
       expect(new Set(back.map(e => classifyBackExercise(e.name).pattern)).size).toBeGreaterThanOrEqual(3);
-      const verticalProfiles = back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').map(e => verticalPullProfile(e.name));
+      const verticalProfiles = back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').map(e => verticalPullProfile(e.name)).filter((p): p is string => p !== null);
       expect(new Set(verticalProfiles).size).toBe(verticalProfiles.length);
     }
   }, 30000);
@@ -110,12 +110,13 @@ describe('experienced enhanced back prescription', () => {
   it('keeps distinct vertical profiles as valid specialization choices', () => {
     expect(verticalPullProfile('Тяга верхнего блока широким хватом')).toBe('wide');
     expect(verticalPullProfile('Тяга верхнего блока хаммерным хватом')).toBe('neutral_hammer');
-    expect(verticalPullProfile('Подтягивания нейтральным хватом')).toBe('pullup');
+    expect(verticalPullProfile('Подтягивания нейтральным хватом')).toBe('neutral_hammer');
+    expect(verticalPullProfile('Подтягивания (прямой хват)')).toBe('pullup');
     expect(verticalPullProfile('Тяга верхнего блока обратным хватом')).toBe('underhand');
     expect(new Set([
       verticalPullProfile('Тяга верхнего блока широким хватом'),
       verticalPullProfile('Тяга верхнего блока хаммерным хватом'),
-      verticalPullProfile('Подтягивания нейтральным хватом'),
+      verticalPullProfile('Подтягивания (прямой хват)'),
     ]).size).toBe(3);
   });
 
