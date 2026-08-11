@@ -4,7 +4,7 @@
  * dual-спарклайн (систола/диастола), PP/MAP, симптомы, рука/позиция,
  * валидация кризов, 3/7-дневные средние, тренд.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import {
@@ -71,7 +71,7 @@ interface BPDraft {
   notes: string;
 }
 
-const SYMPTOM_OPTIONS = [
+const SYMPTOM_OPTIONS: { id: string; label: string }[] = [
   { id: 'headache', label: '🤕 Головная боль' },
   { id: 'dizziness', label: '💫 Головокружение' },
   { id: 'chest_pain', label: '🫀 Боль в груди' },
@@ -80,18 +80,18 @@ const SYMPTOM_OPTIONS = [
   { id: 'visual_disturbance', label: '👁 Нарушения зрения' },
   { id: 'palpitations', label: '💓 Учащенное сердцебиение' },
   { id: 'fatigue', label: '😴 Сильная усталость' },
-] as const;
+];
 
-const ARM_OPTIONS = [
+const ARM_OPTIONS: { id: 'left' | 'right'; label: string }[] = [
   { id: 'left', label: '👈 Левая' },
   { id: 'right', label: '👉 Правая' },
-] as const;
+];
 
-const POSITION_OPTIONS = [
+const POSITION_OPTIONS: { id: 'sitting' | 'lying' | 'standing'; label: string }[] = [
   { id: 'sitting', label: '🪑 Сидя' },
   { id: 'lying', label: '🛌 Лежа' },
   { id: 'standing', label: '🧍 Стоя' },
-] as const;
+];
 
 export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({
   open,
@@ -186,8 +186,11 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
   };
 
   const spark = useMemo(
-    () => systolicHistory,
-    [systolicHistory],
+    () => ({
+      sys: systolicHistory,
+      dia: diastolicHistory,
+    }),
+    [systolicHistory, diastolicHistory],
   );
 
   return (
@@ -199,7 +202,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       color="#ef4444"
       subtitle="Систола, диастола и пульс в покое"
       onSubmit={save}
-      spark={{ data: spark, color: '#f87171' }}
+      spark={spark.sys.length > 1 ? { data: spark.sys, color: '#f87171' } : undefined}
       stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
       fill={{ current: (sInvalid ? 0 : 1) + (dInvalid ? 0 : 1) + (pInvalid ? 0 : 1), total: 3 }}
     >
@@ -210,8 +213,8 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
         <TodayChip date={draft.date} onToday={() => set('date', todayIso())} />
       </div>
 
-      <SectionCard icon="🕐" title="Время измерения" color="#ef4444">
-        <div style={{ display: 'flex', gap: 6 }}>
+      <SectionCard icon="🕐" title="Время и условия" color="#ef4444">
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
           {([['morning', '🌅 Утро'], ['evening', '🌙 Вечер']] as const).map(([k, l]) => (
             <button
               key={k}
@@ -236,6 +239,54 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
             </button>
           ))}
         </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          {ARM_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => set('arm', o.id)}
+              style={{
+                flex: 1,
+                minHeight: 40,
+                padding: '8px 10px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+                border: `1px solid ${draft.arm === o.id ? '#ef4444' : colors.border}`,
+                background: draft.arm === o.id ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
+                color: draft.arm === o.id ? '#f87171' : colors.textMuted,
+                transition: 'all 0.15s',
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {POSITION_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => set('position', o.id)}
+              style={{
+                flex: 1,
+                minHeight: 40,
+                padding: '8px 10px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+                border: `1px solid ${draft.position === o.id ? '#ef4444' : colors.border}`,
+                background: draft.position === o.id ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
+                color: draft.position === o.id ? '#f87171' : colors.textMuted,
+                transition: 'all 0.15s',
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
       </SectionCard>
 
       {dge && <FormBanner tone="error">Диастола не может быть ≥ систолы ({d} ≥ {s}) — проверьте значения</FormBanner>}
@@ -243,16 +294,112 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
         <FormBanner tone="error">Значения вне диапазона: систола 50–250, диастола 30–180, пульс 20–250</FormBanner>
       )}
       {valid && !dge && s >= 180 && <FormBanner tone="error">Систола ≥ 180 — гипертонический криз, обратитесь к врачу</FormBanner>}
+      {ppWarn && <FormBanner tone="warning">{pp! > 60 ? `Пульсовое давление ${pp} мм — расширено (>60), риск ССЗ` : `Пульсовое давление ${pp} мм — сужено (<30), проверьте измерение`}</FormBanner>}
+      {mapWarn && <FormBanner tone="warning">{map! > 110 ? `СРД ${map} мм — высокое (>110), нагрузка на сердце` : `СРД ${map} мм — низкое (<60), риск гипоперфузии`}</FormBanner>}
 
-      <SectionCard icon="🫀" title="Показатели" color="#ef4444" badge={cat.label}>
+      <SectionCard icon="🫀" title="Показатели" color="#ef4444" badge={`${cat.label} ${trend}`}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           <TextField label="Систола" value={draft.systolic} onChange={(v) => set('systolic', v)} type="number" min={50} max={250} unit="мм" accent="#ef4444" invalid={sInvalid} />
           <TextField label="Диастола" value={draft.diastolic} onChange={(v) => set('diastolic', v)} type="number" min={30} max={180} unit="мм" accent="#ef4444" invalid={dInvalid} />
           <TextField label="Пульс" value={draft.pulse} onChange={(v) => set('pulse', v)} type="number" min={20} max={250} unit="уд/мин" invalid={pInvalid} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
-          <LiveBadge color={cat.color} icon="🩺">{cat.label}</LiveBadge>
+
+        {/* PP / MAP row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 10 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: `rgba(239,68,68,${ppWarn ? '0.18' : '0.08'})`, border: `1px solid ${ppWarn ? '#ef444466' : '#ef444433'}`, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>Пульсовое давление (PP)</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: ppWarn ? '#ef4444' : '#f87171', marginTop: 2 }}>{pp !== null ? `${pp} мм` : '—'}</div>
+            <div style={{ fontSize: 9, color: ppWarn ? '#ef4444' : colors.textSubtle, marginTop: 2 }}>{ppWarn ? (pp! > 60 ? '⚠ Расширено' : '⚠ Сужено') : 'Норма 30–60'}</div>
+          </div>
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: `rgba(167,139,250,${mapWarn ? '0.18' : '0.08'})`, border: `1px solid ${mapWarn ? '#a78bfa66' : '#a78bfa33'}`, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>СРД (MAP)</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: mapWarn ? '#a78bfa' : '#c4b5fd', marginTop: 2 }}>{map !== null ? `${map} мм` : '—'}</div>
+            <div style={{ fontSize: 9, color: mapWarn ? '#a78bfa' : colors.textSubtle, marginTop: 2 }}>{mapWarn ? (map! > 110 ? '⚠ Высокое' : '⚠ Низкое') : 'Норма 70–110'}</div>
+          </div>
         </div>
+
+        {/* Dual mini sparkline */}
+        {(spark.sys.length > 1 || spark.dia.length > 1) && (
+          <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase' }}>Динамика 7 дн</span>
+              <span style={{ display: 'inline-flex', width: 12, height: 3, borderRadius: 2, background: '#f87171' }}></span>
+              <span style={{ fontSize: 10, color: '#f87171' }}>Систола</span>
+              <span style={{ display: 'inline-flex', width: 12, height: 3, borderRadius: 2, background: '#60a5fa' }}></span>
+              <span style={{ fontSize: 10, color: '#60a5fa' }}>Диастола</span>
+            </div>
+            <div style={{ height: 36 }}>
+              <svg width="100%" height="36" viewBox="0 0 200 36" style={{ overflow: 'visible' }} aria-hidden="true">
+                {spark.sys.length > 1 && (() => {
+                  const pts = spark.sys.filter((d): d is number => typeof d === 'number' && Number.isFinite(d)).slice(-7);
+                  const allVals = [...pts, ...spark.dia.filter((d): d is number => typeof d === 'number' && Number.isFinite(d)).slice(-7)];
+                  const min = Math.min(...allVals);
+                  const max = Math.max(...allVals);
+                  const range = max - min || 1;
+                  const x = (i: number) => ((i * 190) / (pts.length - 1) + 5).toFixed(1);
+                  const y = (v: number) => (32 - ((v - min) / range) * 28).toFixed(1);
+                  const path = pts.map((v: number, i: number) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`).join(' ');
+                  return <path d={path} fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />;
+                })()}
+                {spark.dia.length > 1 && (() => {
+                  const pts = spark.dia.filter((d): d is number => typeof d === 'number' && Number.isFinite(d)).slice(-7);
+                  const allVals = [...pts, ...spark.sys.filter((d): d is number => typeof d === 'number' && Number.isFinite(d)).slice(-7)];
+                  const min = Math.min(...allVals);
+                  const max = Math.max(...allVals);
+                  const range = max - min || 1;
+                  const x = (i: number) => ((i * 190) / (pts.length - 1) + 5).toFixed(1);
+                  const y = (v: number) => (32 - ((v - min) / range) * 28).toFixed(1);
+                  const path = pts.map((v: number, i: number) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`).join(' ');
+                  return <path d={path} fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" strokeDasharray="4,3" />;
+                })()}
+              </svg>
+            </div>
+          </div>
+        )}
+
+        {/* Averages */}
+        {(avg3 || avg7) && (
+          <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {avg3 && (
+              <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', fontSize: 11 }}>
+                <span style={{ color: '#22c55e', fontWeight: 700 }}>Ср. за 3 дня: </span>
+                <span style={{ color: '#4ade80' }}>{avg3.sys}/{avg3.dia}</span>
+              </div>
+            )}
+            {avg7 && (
+              <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', fontSize: 11 }}>
+                <span style={{ color: '#60a5fa', fontWeight: 700 }}>Ср. за 7 дней: </span>
+                <span style={{ color: '#93c5fd' }}>{avg7.sys}/{avg7.dia}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+          <LiveBadge color={cat.color} icon="🩺">{cat.label} {trend}</LiveBadge>
+        </div>
+      </SectionCard>
+
+      <SectionCard icon="🤒" title="Симптомы" color="#ef4444" hint="Отметьте, что беспокоило во время измерения">
+        <ChipGroup
+          options={SYMPTOM_OPTIONS}
+          selected={draft.symptoms}
+          onChange={(ids) => set('symptoms', ids)}
+          color="#ef4444"
+          columns={2}
+        />
+      </SectionCard>
+
+      <SectionCard icon="💊" title="Лекарства" color="#ef4444">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 12, background: draft.medTaken ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${draft.medTaken ? '#ef444444' : colors.border}` }}>
+          <input
+            type="checkbox"
+            checked={draft.medTaken}
+            onChange={(e) => set('medTaken', e.target.checked)}
+            style={{ width: 20, height: 20, accentColor: '#ef4444', cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 600, color: draft.medTaken ? '#f87171' : colors.text }}>Приём гипотензивных препаратов перед замером</span>
+        </label>
       </SectionCard>
 
       <SectionCard icon="📝" title="Заметка" color="#ef4444">
@@ -260,7 +407,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
           value={draft.notes}
           onChange={(e) => set('notes', e.target.value)}
           style={{ ...fieldInput, minHeight: 52, resize: 'vertical' }}
-          placeholder="Заметка (самочувствие, лекарства…)"
+          placeholder="Заметка (самочувствие, лекарства, обстоятельства…)"
         />
       </SectionCard>
 
