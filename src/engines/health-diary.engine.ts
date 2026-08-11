@@ -5,6 +5,7 @@
  */
 
 import { PAIN_ZONE_LIST } from '../ui/screens/ProfileScreen_v2/diary-helpers';
+import { findSymptomById } from './symptom-solver.engine';
 
 const LEGACY_KEYS = [
   'he_pain_diary',
@@ -12,10 +13,12 @@ const LEGACY_KEYS = [
   'he_neuro_diary',
   'he_acne_diary',
   'he_hemato_diary',
+  'he_symptom_diary',
 ];
 
 const UNIFIED_KEY = 'he_health_diary';
 const MIGRATION_FLAG = 'he_health_diary_migrated_v1';
+const SYMPTOMS_MERGED_FLAG = 'he_health_diary_symptoms_merged_v1';
 
 export interface UnifiedHealthEntry {
   id: string;
@@ -216,9 +219,56 @@ function migrateLegacyEntries(): UnifiedHealthEntry[] {
     });
   }
 
+  // he_symptom_diary (SymptomDiaryDay[]: { date, entries: [{ symptomId, severity 0-10, note }] })
+  const symptomDays: Array<{ date?: string; entries?: Array<{ symptomId?: string; severity?: number }> }> = safeParse('he_symptom_diary', []);
+  for (const day of symptomDays) {
+    if (!day || typeof day.date !== 'string' || !Array.isArray(day.entries)) continue;
+    const syms = day.entries;
+    upsert(day.date, (e) => {
+      for (const s of syms) {
+        if (!s || typeof s.symptomId !== 'string' || !(Number(s.severity) > 0)) continue;
+        const sev = Math.max(1, Math.min(5, Math.round(Number(s.severity) / 2))) as 1 | 2 | 3 | 4 | 5;
+        const name = findSymptomById(s.symptomId)?.symptom || s.symptomId;
+        if (e.symptoms.some(x => x.name.toLowerCase() === name.toLowerCase())) continue;
+        e.symptoms.push({ id: generateId(), name, severity: sev });
+      }
+    });
+  }
+
   entries.push(...byDate.values());
   entries.sort((a, b) => b.date.localeCompare(a.date));
   return entries;
+}
+
+/** Однократно слить legacy he_symptom_diary в существующий unified-дневник (для уже мигрировавших). */
+function mergeSymptomDiary(entries: UnifiedHealthEntry[]): UnifiedHealthEntry[] {
+  const symptomDays: Array<{ date?: string; entries?: Array<{ symptomId?: string; severity?: number }> }> = safeParse('he_symptom_diary', []);
+  if (symptomDays.length === 0) return entries;
+  const byDate = new Map<string, UnifiedHealthEntry>(entries.map(e => [e.date, e]));
+  let changed = false;
+  for (const day of symptomDays) {
+    if (!day || typeof day.date !== 'string' || !Array.isArray(day.entries) || day.entries.length === 0) continue;
+    let entry = byDate.get(day.date);
+    if (!entry) {
+      entry = {
+        id: generateId(), date: day.date, pain: null, symptoms: [],
+        neuro: null, acne: null, hemato: null, notes: '',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      byDate.set(day.date, entry);
+      changed = true;
+    }
+    for (const s of day.entries) {
+      if (!s || typeof s.symptomId !== 'string' || !(Number(s.severity) > 0)) continue;
+      const sev = Math.max(1, Math.min(5, Math.round(Number(s.severity) / 2))) as 1 | 2 | 3 | 4 | 5;
+      const name = findSymptomById(s.symptomId)?.symptom || s.symptomId;
+      if (entry.symptoms.some(x => x.name.toLowerCase() === name.toLowerCase())) continue;
+      entry.symptoms.push({ id: generateId(), name, severity: sev });
+      changed = true;
+    }
+  }
+  if (!changed) return entries;
+  return Array.from(byDate.values()).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export function getUnifiedHealthEntries(): UnifiedHealthEntry[] {
@@ -233,7 +283,17 @@ export function getUnifiedHealthEntries(): UnifiedHealthEntry[] {
     markMigrated();
     return migrated;
   }
-  return safeParse(UNIFIED_KEY, []);
+  let entries: UnifiedHealthEntry[] = safeParse(UNIFIED_KEY, []);
+  if (localStorage.getItem(SYMPTOMS_MERGED_FLAG) !== '1') {
+    const before = JSON.stringify(entries);
+    const merged = mergeSymptomDiary(entries);
+    if (JSON.stringify(merged) !== before) {
+      saveUnifiedHealthEntries(merged);
+    }
+    try { localStorage.setItem(SYMPTOMS_MERGED_FLAG, '1'); } catch {}
+    entries = merged;
+  }
+  return entries;
 }
 
 export function saveUnifiedHealthEntries(entries: UnifiedHealthEntry[]): void {
@@ -338,6 +398,7 @@ export function resetUnifiedHealthDiary(): void {
   try {
     localStorage.removeItem(UNIFIED_KEY);
     localStorage.removeItem(MIGRATION_FLAG);
+    localStorage.removeItem(SYMPTOMS_MERGED_FLAG);
   } catch {}
 }
 
@@ -346,14 +407,16 @@ export function resetUnifiedHealthDiary(): void {
 export function getUnifiedPainStats(entries: UnifiedHealthEntry[]) {
   const painEntries = entries.filter(e => e.pain && e.pain.totalScore > 0);
   if (painEntries.length === 0) return null;
-  
-  const scores = painEntries.map(e => e.pain!.totalScore);
+  // Нормализуем к возрастанию даты: "последнее" значение = самая свежая запись.
+  const sorted = [...painEntries].sort((a, b) => a.date.localeCompare(b.date));
+
+  const scores = sorted.map(e => e.pain!.totalScore);
   const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
   const max = scores.length > 0 ? Math.max(...scores) : 0;
-  
+
   const zoneValues: Record<string, number[]> = {};
   for (const z of PAIN_ZONE_LIST) zoneValues[z.id] = [];
-  for (const e of painEntries) {
+  for (const e of sorted) {
     for (const z of PAIN_ZONE_LIST) {
       const v = e.pain!.zones[z.id];
       if (Number.isFinite(v)) zoneValues[z.id].push(v);

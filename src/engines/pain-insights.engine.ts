@@ -43,8 +43,17 @@ export interface PainAnalysis {
 
 const MAX_ENTRIES = 90;
 
+/** Локальная дата (YYYY-MM-DD) без UTC-сдвига. */
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function analyzePainEntries(entries: PainEntry[]): PainAnalysis {
-  const recent = entries.slice(-MAX_ENTRIES);
+  // Вход может быть отсортирован по убыванию даты — нормализуем к возрастанию,
+  // чтобы slice(-MAX_ENTRIES) брал ПОСЛЕДНИЕ записи, а .at(-1) = самую свежую.
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const recent = sorted.slice(-MAX_ENTRIES);
   const zoneStats = computeZoneBreakdown(recent);
   const worstZone = getMostPainfulZone(recent);
   const streak = computePainImprovementStreak(recent);
@@ -107,7 +116,7 @@ interface InsightContext {
 
 function generateInsights(ctx: InsightContext): PainInsight[] {
   const result: PainInsight[] = [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const daysSinceLast = ctx.lastEntryDate
     ? Math.floor((Date.now() - new Date(ctx.lastEntryDate).getTime()) / 86400000)
     : 999;
@@ -261,7 +270,7 @@ export function getPainAlerts(entries: PainEntry[]): PainInsight[] {
 }
 
 export function getTodayPainStatus(entries: PainEntry[]): { status: 'ok' | 'watch' | 'alert'; message: string; color: string } | null {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const todayEntry = entries.find(e => e.date === today);
   if (!todayEntry) return null;
 

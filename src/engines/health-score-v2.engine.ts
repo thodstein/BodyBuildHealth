@@ -79,8 +79,9 @@ function scoreTraining(consistency: number): { score: number; message: string } 
   return { score: 15, message: 'Нерегулярные тренировки' };
 }
 
-function scoreRecovery(sleep: number, hrv: number, stress: number): { score: number; message: string } {
-  const avg = sleep * 0.35 + hrv * 0.35 + (100 - stress * 20) * 0.30;
+function scoreRecovery(sleep: number, hrv: number, stress: number, energy: number): { score: number; message: string } {
+  const energyScore = Math.max(20, Math.min(100, energy * 20)); // 1-5 → 20-100
+  const avg = sleep * 0.30 + hrv * 0.30 + (100 - stress * 20) * 0.25 + energyScore * 0.15;
   if (avg >= 75) return { score: 85, message: 'Отличное восстановление' };
   if (avg >= 55) return { score: 60, message: 'Нормальное восстановление' };
   if (avg >= 35) return { score: 35, message: 'Недостаточное восстановление' };
@@ -104,7 +105,7 @@ export function computeHealthScore(input: HealthScoreInput): HealthScoreOutput {
   const labs = scoreLabs(input.weeksSinceLab);
   const nutrition = scoreNutrition(input.nutritionAdherence);
   const training = scoreTraining(input.trainingConsistency);
-  const recovery = scoreRecovery(input.sleepScore, input.hrvScore, input.subjectiveStress);
+  const recovery = scoreRecovery(input.sleepScore, input.hrvScore, input.subjectiveStress, input.subjectiveEnergy);
   const bodyComp = scoreBodyComp(input.weightTrend);
 
   const components = [

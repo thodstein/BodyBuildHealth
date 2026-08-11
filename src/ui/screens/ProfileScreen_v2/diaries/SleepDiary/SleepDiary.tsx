@@ -564,7 +564,13 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         const raw = JSON.parse(localStorage.getItem(key) || '[]');
         return Array.isArray(raw)
           ? raw
-              .map((entry) => ({ date: String(entry.date || ''), value: Number(entry[valueKey]) }))
+              .map((entry) => {
+                // UnifiedHealthEntry хранит боль вложенно (pain.totalScore), legacy — на корне
+                const value = key === 'he_health_diary'
+                  ? Number((entry as any)?.pain?.totalScore ?? (entry as any)?.totalScore)
+                  : Number(entry[valueKey]);
+                return { date: String(entry.date || ''), value };
+              })
               .filter((p) => p.date && Number.isFinite(p.value))
           : [];
       } catch {

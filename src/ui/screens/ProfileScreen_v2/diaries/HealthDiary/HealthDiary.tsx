@@ -28,8 +28,15 @@ import {
   type UnifiedHealthEntry,
 } from '../../../../../engines/health-diary.engine';
 import { analyzePainEntries } from '../../../../../engines/pain-insights.engine';
-import { getSymptomDiaryStats, getSymptomDiarySummary } from '../../../../../engines/symptom-diary.engine';
-import { computeHealthScore } from '../../../../../engines/health-score-v2.engine';
+import { getSymptomDiarySummary } from '../../../../../engines/symptom-diary.engine';
+import { computeHealthScore, type HealthScoreOutput } from '../../../../../engines/health-score-v2.engine';
+import {
+  analyzeHealthProfile,
+  generateHealthPlan,
+  exportHealthPlanText,
+  loadPlanDone,
+  savePlanDone,
+} from '../../../../../engines/health-improvement-plan.engine';
 import {
   buildWeeklyHistogram,
   compareWithLastWeek,
@@ -49,10 +56,15 @@ import {
   type DiaryEntryLike,
   type SortState,
 } from '../../diary-helpers';
-import { PAIN_ZONES, NEURO_SYMPTOMS, ACNE_AREAS, HEMATO_SYMPTOMS, painZoneColor } from '../../diary-modals';
+import { PAIN_ZONES, NEURO_SYMPTOMS, ACNE_AREAS, HEMATO_SYMPTOMS, painZoneColor, readDiaryEntries } from '../../diary-modals';
+import { getProfile } from '../../../../../core/profile-manager';
+import { calculateRiskScore } from '../../../../../engines/risk-calculator.engine';
+import { getLabDiary } from '../../../../../engines/lab-diary.engine';
+import { loadSessions } from '../../../../../engines/workout-logger.engine';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const ACCENT = '#ec4899';
+const EDIT_DRAFT_KEY = 'he_draft_health_edit';
 
 const button: React.CSSProperties = { ...btnBase(ACCENT) };
 const card: React.CSSProperties = { ...glassSection };
@@ -117,6 +129,76 @@ function downloadText(name: string, text: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
+/** Индекс здоровья из реальных данных (профиль v2, дневники, labs, тренировки) с безопасными фолбэками. */
+function computeRealHealthScore(): HealthScoreOutput {
+  let pharmaRisk = 0;
+  try {
+    const settings = getProfile().settings;
+    const ids = (settings.pharma?.currentSubstances || []).map((s) => s.id).filter(Boolean);
+    if (ids.length > 0) {
+      const r = calculateRiskScore(ids);
+      pharmaRisk = Math.min(100, Math.max(0, 100 - r.score));
+    }
+  } catch { pharmaRisk = 0; }
+
+  let weeksSinceLab = 52;
+  try {
+    const dates = getLabDiary().map((d) => Date.parse(d.date)).filter(Number.isFinite);
+    if (dates.length > 0) weeksSinceLab = Math.max(0, (Date.now() - Math.max(...dates)) / (7 * 86400000));
+  } catch { weeksSinceLab = 52; }
+
+  let sleepScore = 70;
+  try {
+    const hours = readDiaryEntries<{ hours?: number }>('he_sleep_diary')
+      .map((r) => Number(r.hours)).filter((v) => Number.isFinite(v) && v > 0);
+    if (hours.length > 0) sleepScore = Math.round(Math.min(100, ((hours.reduce((s, v) => s + v, 0) / hours.length) / 8) * 100));
+  } catch {}
+
+  let hrvScore = 50;
+  let subjectiveStress = 5;
+  try {
+    const s = getProfile().settings;
+    const hrv = Number(s.lifestyle?.morningHRV) || 0;
+    if (hrv > 0) hrvScore = Math.round(Math.min(100, (hrv / 65) * 100));
+    const stressRaw = Number(s.lifestyle?.stressLevel);
+    if (Number.isFinite(stressRaw) && stressRaw > 0) subjectiveStress = Math.max(1, Math.min(5, Math.round(stressRaw / 2)));
+  } catch {}
+
+  let weightTrend = 0;
+  try {
+    const ws = readDiaryEntries<{ date?: string; weight?: number }>('he_weight_log')
+      .map((r) => ({ date: r.date || '', weight: Number(r.weight) }))
+      .filter((x) => x.date && Number.isFinite(x.weight) && x.weight > 0)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (ws.length >= 2) {
+      const days = (Date.parse(ws[ws.length - 1].date) - Date.parse(ws[0].date)) / 86400000;
+      if (days > 0) weightTrend = ((ws[ws.length - 1].weight - ws[0].weight) / days) * 7;
+    }
+  } catch {}
+
+  let trainingConsistency = 0;
+  try {
+    const cutoff = Date.now() - 28 * 86400000;
+    const recent = loadSessions().filter((s) => {
+      const t = Date.parse(s.date || '');
+      return Number.isFinite(t) && t >= cutoff;
+    }).length;
+    trainingConsistency = Math.min(100, Math.round((recent / (4 * 3.5)) * 100));
+  } catch {}
+
+  return computeHealthScore({
+    pharmaRisk,
+    weeksSinceLab,
+    nutritionAdherence: 70,
+    trainingConsistency,
+    sleepScore,
+    hrvScore,
+    weightTrend,
+    subjectiveEnergy: 3,
+    subjectiveStress,
+  });
+}
+
 const FieldGroup: React.FC<{ title: string; color?: string; children: React.ReactNode }> = ({
   title,
   color = colors.primary,
@@ -160,20 +242,31 @@ const ToggleGrid: React.FC<{
 );
 
 const PainBodyMap: React.FC<{ zones: Record<string, number>; onChange?: (zones: Record<string, number>) => void }> = ({ zones, onChange }) => {
-  const zonePositions: Record<string, { x: number; y: number; r: number; label: string }> = {
-    shoulders: { x: 100, y: 45, r: 18, label: 'Плечи' },
-    elbows: { x: 55, y: 95, r: 14, label: 'Локти' },
-    wrists: { x: 35, y: 140, r: 12, label: 'Запястья' },
+  const zonePositions: Record<string, { x: number; y: number; r: number; label: string; mirror?: boolean }> = {
+    shoulders: { x: 100, y: 45, r: 18, label: 'Плечи', mirror: true },
+    elbows: { x: 55, y: 95, r: 14, label: 'Локти', mirror: true },
+    wrists: { x: 35, y: 140, r: 12, label: 'Запястья', mirror: true },
     lower_back: { x: 150, y: 90, r: 16, label: 'Поясница' },
-    hips: { x: 150, y: 130, r: 16, label: 'ТБС' },
-    knees: { x: 130, y: 180, r: 14, label: 'Колени' },
-    ankles: { x: 130, y: 220, r: 12, label: 'Голеностоп' },
+    hips: { x: 150, y: 130, r: 16, label: 'ТБС', mirror: true },
+    knees: { x: 130, y: 180, r: 14, label: 'Колени', mirror: true },
+    ankles: { x: 130, y: 220, r: 12, label: 'Голеностоп', mirror: true },
   };
   const handleZoneClick = (id: string) => {
     if (!onChange) return;
     const current = zones[id] || 0;
     const next = current >= 10 ? 0 : current + 1;
     onChange({ ...zones, [id]: next });
+  };
+  const renderZone = (id: string, pos: { x: number; y: number; r: number; label: string }, x: number) => {
+    const v = zones[id] || 0;
+    const c = painZoneColor(v);
+    return (
+      <g key={`${id}-${x}`} onClick={() => handleZoneClick(id)} style={{ cursor: onChange ? 'pointer' : 'default' }}>
+        <circle cx={x} cy={pos.y} r={pos.r} fill={v > 0 ? `${c}44` : 'rgba(255,255,255,0.03)'} stroke={v > 0 ? c : '#3f3f46'} strokeWidth={v > 0 ? 2 : 1} />
+        <text x={x} y={pos.y + 1} textAnchor="middle" dominantBaseline="middle" fill={v > 0 ? '#fff' : '#71717a'} fontSize="9" fontWeight={700}>{v}</text>
+        <title>{pos.label}: {v}/10</title>
+      </g>
+    );
   };
   return (
     <svg viewBox="0 0 300 260" width="100%" height="260" style={{ maxWidth: 320, margin: '0 auto', display: 'block' }} role="img" aria-label="Карта зон боли">
@@ -184,14 +277,12 @@ const PainBodyMap: React.FC<{ zones: Record<string, number>; onChange?: (zones: 
       <line x1="110" y1="90" x2="190" y2="90" stroke="#52525b" strokeDasharray="3 3" />
       {PAIN_ZONES.map((z) => {
         const pos = zonePositions[z.id];
-        const v = zones[z.id] || 0;
-        const c = painZoneColor(v);
+        const mirrored = pos.mirror && pos.x !== 150 ? 300 - pos.x : null;
         return (
-          <g key={z.id} onClick={() => handleZoneClick(z.id)} style={{ cursor: onChange ? 'pointer' : 'default' }}>
-            <circle cx={pos.x} cy={pos.y} r={pos.r} fill={v > 0 ? `${c}44` : 'rgba(255,255,255,0.03)'} stroke={v > 0 ? c : '#3f3f46'} strokeWidth={v > 0 ? 2 : 1} />
-            <text x={pos.x} y={pos.y + 1} textAnchor="middle" dominantBaseline="middle" fill={v > 0 ? '#fff' : '#71717a'} fontSize="9" fontWeight={700}>{v}</text>
-            <title>{pos.label}: {v}/10</title>
-          </g>
+          <>
+            {renderZone(z.id, pos, pos.x)}
+            {mirrored !== null && renderZone(z.id, pos, mirrored)}
+          </>
         );
       })}
     </svg>
@@ -219,6 +310,21 @@ const EntryEditor: React.FC<{
   const [symptomName, setSymptomName] = useState('');
   const [symptomSeverity, setSymptomSeverity] = useState<1 | 2 | 3 | 4 | 5>(2);
   const [symptomDuration, setSymptomDuration] = useState('');
+  // Черновик редактирования (переживает случайное закрытие)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(EDIT_DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as EntryDraft;
+      if (d && typeof d.date === 'string') setDraft(d);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem(EDIT_DRAFT_KEY, JSON.stringify(draft)); } catch {}
+  }, [draft]);
+  const clearEditDraft = () => {
+    try { sessionStorage.removeItem(EDIT_DRAFT_KEY); } catch {}
+  };
   const painZones = draft.pain?.zones || {};
   const neuroValues = draft.neuro?.symptoms || {};
   const acneAreas = draft.acne?.areas || {};
@@ -486,7 +592,7 @@ const EntryEditor: React.FC<{
           <div style={{ marginTop: 7, fontSize: 11 }}>Отмечено: {score(hematoValues)}/8</div>
         </FieldGroup>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button style={{ ...button, flex: 1 }} onClick={onCancel}>
+          <button style={{ ...button, flex: 1 }} onClick={() => { clearEditDraft(); onCancel(); }}>
             Отмена
           </button>
           <button
@@ -497,7 +603,7 @@ const EntryEditor: React.FC<{
               background: valid ? colors.primary : 'rgba(255,255,255,0.08)',
               color: valid ? '#07130d' : '#aaa',
             }}
-            onClick={() => valid && onSave(draft)}
+            onClick={() => { if (valid) { clearEditDraft(); onSave(draft); } }}
           >
             Сохранить
           </button>
@@ -528,7 +634,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     onDataChange?.();
   };
   const saveNew = (entry: UnifiedHealthEntry) => {
-    commit(addUnifiedHealthEntry(entry as EntryDraft), false);
+    commit(addUnifiedHealthEntry(entry as EntryDraft), true);
     setAddOpen(false);
   };
   const saveEdit = (draft: EntryDraft) => {
@@ -554,10 +660,6 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     return sortEntries(result, sort);
   }, [fields, range, query, sort]);
   const pageData = paginate(visible, page, 8);
-  const points = useMemo(
-    () => visible.map((e) => ({ date: e.date, value: Number(e.fields[0]?.value) || 0 })).reverse(),
-    [visible],
-  );
   const visibleDateSet = useMemo(() => new Set(visible.map((v) => v.date)), [visible]);
   const allPoints = useMemo(
     () =>
@@ -571,7 +673,6 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const painRows = rows.filter((e) => e.pain).map((e) => ({ ...e.pain!, date: e.date }));
   const painInsights = analyzePainEntries(painRows);
   const symptomStats = getUnifiedSymptomsStats(rows);
-  const symptomEngine = getSymptomDiaryStats();
   const symptomSummary = getSymptomDiarySummary(30);
   const stats = {
     pain: getUnifiedPainStats(rows),
@@ -580,6 +681,18 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     hemato: getUnifiedHematoStats(rows),
   };
   const status = getUnifiedTodayStatus(rows);
+  const [planDone, setPlanDone] = useState<string[]>(() => {
+    try { return loadPlanDone(); } catch { return []; }
+  });
+  const healthPlan = useMemo(() => generateHealthPlan(analyzeHealthProfile(rows)), [rows]);
+  const togglePlanItem = (id: string) => {
+    const next = planDone.includes(id) ? planDone.filter((x) => x !== id) : [...planDone, id];
+    setPlanDone(next);
+    savePlanDone(next);
+  };
+  const exportPlan = () => {
+    downloadText(`health-plan-${todayIso()}.txt`, exportHealthPlanText(healthPlan, analyzeHealthProfile(rows)), 'text/plain;charset=utf-8');
+  };
   const weekly = buildWeeklyHistogram(allPoints);
   const compare = compareWithLastWeek(allPoints);
   const anomalies = detectAnomalies('pain', fields);
@@ -590,59 +703,61 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     .map((p, i) => `${20 + (i * 560) / Math.max(1, allPoints.length - 1)},${180 - Math.min(160, p.value * 2.25)}`)
     .join(' ');
   const exportCsv = () => {
-    const header = ['Дата', 'Боль', 'Нейро', 'Акне', 'Гемат', 'Симптомы', 'Заметка'];
-    const body = rows.map((e) =>
-      [
+    const zoneLabels = PAIN_ZONES.map((z) => z.label);
+    const header = ['Дата', 'Боль', ...zoneLabels, 'Симптомы', 'Нейро', 'Акне', 'Гемат', 'Заметка'];
+    const body = rows.map((e) => {
+      const zones = PAIN_ZONES.map((z) => e.pain?.zones[z.id] || 0);
+      const symptoms = e.symptoms.map((s) => `${s.name} ${s.severity}/5${s.duration ? ` (${s.duration})` : ''}`).join('; ');
+      return [
         e.date,
         e.pain?.totalScore || 0,
+        ...zones,
+        symptoms,
         e.neuro?.totalScore || 0,
         e.acne?.totalScore || 0,
         e.hemato?.totalScore || 0,
-        e.symptoms.length,
         e.notes || '',
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(','),
-    );
+        .join(',');
+    });
     downloadText(`health-${todayIso()}.csv`, `\ufeff${header.join(',')}\n${body.join('\n')}`, 'text/csv;charset=utf-8');
   };
   const printPdf = () => {
     const escape = (s: string) =>
       s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+    const zoneCols = PAIN_ZONES.map((z) => `<th>${escape(z.label)}</th>`).join('');
+    const rowsHtml = rows.map((e) => {
+      const zones = PAIN_ZONES.map((z) => `<td>${e.pain?.zones[z.id] || 0}</td>`).join('');
+      const symptoms = e.symptoms.map((s) => `${escape(s.name)} ${s.severity}/5`).join('<br>');
+      return `<tr><td>${escape(e.date)}</td><td>${e.pain?.totalScore || 0}/70</td>${zones}<td>${symptoms}</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${escape(e.notes || '')}</td></tr>`;
+    }).join('');
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(
-      `<!doctype html><html><head><meta charset="utf-8"><title>Дневник здоровья</title><style>body{font:12px Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:5px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>Дневник здоровья</h1><p>Сформирован ${new Date().toLocaleString('ru-RU')}</p><table><tr><th>Дата</th><th>Боль</th><th>Нейро</th><th>Акне</th><th>Гемат</th><th>Симптомы</th><th>Заметка</th></tr>${rows.map((e) => `<tr><td>${escape(e.date)}</td><td>${e.pain?.totalScore || 0}/70</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${e.symptoms.length}</td><td>${escape(e.notes || '')}</td></tr>`).join('')}</table></body></html>`,
+      `<!doctype html><html><head><meta charset="utf-8"><title>Дневник здоровья</title><style>body{font:12px Arial;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:5px;text-align:left}th{background:#eee}@media print{button{display:none}}</style></head><body><h1>Дневник здоровья</h1><p>Сформирован ${new Date().toLocaleString('ru-RU')}</p><table><tr><th>Дата</th><th>Боль</th>${zoneCols}<th>Симптомы</th><th>Нейро</th><th>Акне</th><th>Гемат</th><th>Заметка</th></tr>${rowsHtml}</table></body></html>`,
     );
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 250);
   };
-  const correlation = crossCorrelation(
-    allPoints,
-    rows.map((e) => ({ date: e.date, value: e.symptoms.reduce((s, x) => s + x.severity, 0) })),
+  const symptomSeries = useMemo(
+    () =>
+      rows
+        .filter((e) => visibleDateSet.has(e.date))
+        .map((e) => ({ date: e.date, value: e.symptoms.reduce((s, x) => s + x.severity, 0) })),
+    [rows, visibleDateSet],
   );
-  const healthLagCorrelation = laggedCorrelation(
-    allPoints,
-    rows.map((e) => ({ date: e.date, value: e.symptoms.reduce((s, x) => s + x.severity, 0) })),
-    1,
-  );
+  const correlation = crossCorrelation(allPoints, symptomSeries);
+  const healthLagCorrelation = laggedCorrelation(allPoints, symptomSeries, 1);
   const recent30 = rows.slice(0, 30);
   const avgPain30 = recent30.length ? recent30.reduce((s, e) => s + (e.pain?.totalScore || 0), 0) / recent30.length : 0;
   const avgNeuro30 = recent30.filter((e) => e.neuro).length ? recent30.filter((e) => e.neuro).reduce((s, e) => s + e.neuro!.totalScore, 0) / recent30.filter((e) => e.neuro).length : 0;
   const avgAcne30 = recent30.filter((e) => e.acne).length ? recent30.filter((e) => e.acne).reduce((s, e) => s + e.acne!.totalScore, 0) / recent30.filter((e) => e.acne).length : 0;
   const avgHemato30 = recent30.filter((e) => e.hemato).length ? recent30.filter((e) => e.hemato).reduce((s, e) => s + e.hemato!.totalScore, 0) / recent30.filter((e) => e.hemato).length : 0;
-  const healthScore = computeHealthScore({
-    pharmaRisk: 50,
-    weeksSinceLab: 4,
-    nutritionAdherence: 70,
-    trainingConsistency: 70,
-    sleepScore: 70,
-    hrvScore: 70,
-    weightTrend: 0,
-    subjectiveEnergy: 3,
-    subjectiveStress: 5,
-  });
+  const healthScore = useMemo(computeRealHealthScore, [rows]);
+  const scoreColor = healthScore.overallScore >= 70 ? colors.green : healthScore.overallScore >= 45 ? colors.warning : colors.danger;
+  const scoreDim = healthScore.overallScore >= 70 ? colors.greenDim : healthScore.overallScore >= 45 ? colors.warningDim : colors.dangerDim;
   const diaryScore = Math.round(Math.max(0, 100 - (avgPain30 / 70) * 100 - (avgNeuro30 / 10) * 20 - (avgAcne30 / 12) * 15 - (avgHemato30 / 8) * 15));
   if (!open) return null;
   return (
@@ -680,14 +795,14 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           <div style={{
             padding: '4px 10px',
             borderRadius: 8,
-            background: `${healthScore.breakdown.recovery.score > 60 ? colors.greenDim : colors.warningDim}`,
-            border: `1px solid ${healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning}`,
-            color: healthScore.breakdown.recovery.score > 60 ? colors.green : colors.warning,
+            background: scoreDim,
+            border: `1px solid ${scoreColor}`,
+            color: scoreColor,
             fontSize: 12,
             fontWeight: 700,
             whiteSpace: 'nowrap',
-          }} title={`Индекс здоровья: ${diaryScore}/100`}>
-            💚 {diaryScore}
+          }} title={`${healthScore.label}: ${healthScore.overallScore}/100 · Дневник ${diaryScore}/100${healthScore.topIssues.length ? ' · ' + healthScore.topIssues.join(', ') : ''}`}>
+            💚 {healthScore.overallScore}
           </div>
         }
         exportActions={[
@@ -703,6 +818,51 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           <div role="status" style={{ ...card, marginBottom: 10, color: status.color, borderColor: status.color }}>
             ⚠ {status.message}
           </div>
+        )}
+        {rows.length > 0 && (
+          <section style={{ ...card, marginBottom: 12, borderColor: '#8b5cf655' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+              <b>🧭 План улучшений</b>
+              <span style={{ color: colors.textMuted, fontSize: 11 }}>{healthPlan.summary.verdict}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+              {(
+                [
+                  ['critical', '🔴', '#ef4444'],
+                  ['high', '🟠', '#f97316'],
+                  ['medium', '🟡', '#f59e0b'],
+                  ['low', '🟢', '#22c55e'],
+                ] as const
+              ).map(([label, icon, c]) => (
+                <span key={label} style={{ fontSize: 10, fontWeight: 800, color: c, background: `${c}1f`, borderRadius: 999, padding: '2px 8px' }}>
+                  {icon} {healthPlan.summary[label]}
+                </span>
+              ))}
+              <button style={button} onClick={exportPlan}>📄 Экспорт плана</button>
+            </div>
+            {healthPlan.recommendations.length === 0 ? (
+              <p style={{ color: colors.textMuted, fontSize: 12 }}>Данных недостаточно — добавьте записи в дневник.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {healthPlan.recommendations.map((r) => {
+                  const done = planDone.includes(r.id);
+                  const c = r.priority === 'critical' ? '#ef4444' : r.priority === 'high' ? '#f97316' : r.priority === 'medium' ? '#f59e0b' : '#22c55e';
+                  return (
+                    <div key={r.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${c}44`, opacity: done ? 0.55 : 1 }}>
+                      <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontSize: 12 }}>
+                        <input type="checkbox" checked={done} onChange={() => togglePlanItem(r.id)} style={{ marginTop: 2, accentColor: c }} aria-label={`Выполнено: ${r.title}`} />
+                        <span style={{ flex: 1 }}>
+                          <b style={{ color: c }}>{r.title}</b>
+                          <div style={{ color: colors.textMuted, marginTop: 2 }}>{r.rationale}</div>
+                          <div style={{ color: colors.text, marginTop: 2 }}>→ {r.action}</div>
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         )}
         <section
           style={{
