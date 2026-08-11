@@ -6,6 +6,7 @@ import { PharmaScreen } from './ui/screens/PharmaScreen';
 import { SupportScreen } from './ui/screens/SupportScreen';
 import { TrainingScreen } from './ui/screens/TrainingScreen';
 import { LabsScreen } from './ui/screens/LabsScreen';
+import { InfoErrorBoundary } from './ui/screens/SupportScreen_parts/SupportScreenData';
 import { RiskScreen } from './ui/screens/RiskScreen';
 import { NutritionScreen } from './ui/screens/NutritionScreen';
 import { ProfileScreen_v2 } from './ui/screens/ProfileScreen_v2/ProfileScreen_v2';
@@ -175,7 +176,7 @@ export default function App() {
       case 'pharma': return <PharmaScreen key={key} initialSubTab={subTab || undefined} />;
       case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
       case 'training': return <TrainingScreen key={key} initialSubTab={subTab || undefined} />;
-      case 'labs': return <LabsScreen key={key} initialSubTab={subTab || undefined} />;
+      case 'labs': return <InfoErrorBoundary label="Лаборатория"><LabsScreen key={key} initialSubTab={subTab || undefined} /></InfoErrorBoundary>;
       case 'risks': return <RiskScreen key={key} />;
       case 'nutrition': return <NutritionScreen key={key} initialSubTab={subTab || undefined} />;
       case 'marketplace': return <MarketplaceScreen key={key} />;

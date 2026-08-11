@@ -2076,8 +2076,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       return <span style={{ fontSize:8, color, fontWeight:600, marginLeft:4 }}>{arrow} {existing.value} → {lab.value} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
                     })() : null;
                     return (
-                      <>
-                        <button key={lab.code} onClick={() => toggleLabSelection(lab.code)} style={{
+                      <React.Fragment key={lab.code}>
+                        <button onClick={() => toggleLabSelection(lab.code)} style={{
                           display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 10px', marginBottom: 4, borderRadius: 8, cursor: 'pointer',
                           background: isSelected ? 'rgba(0,230,138,0.1)' : 'var(--bg-secondary)',
                           border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
@@ -2093,10 +2093,10 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         </button>
                         {lab.raw && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(lab.raw.trim()) && (
                           <div style={{ margin: '-2px 4px 6px', fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
-                            {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–{lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
+                            {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–${lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
                           </div>
                         )}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                   <button onClick={confirmOcrLabs} disabled={selectedLabs.size === 0} style={{

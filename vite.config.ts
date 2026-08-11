@@ -57,6 +57,10 @@ export default defineConfig(({ command }) => ({
       '~': path.resolve(__dirname, 'public')
     }
   },
+  optimizeDeps: {
+    include: ['tesseract.js', 'pdfjs-dist'],
+    exclude: [],
+  },
   server: {
     port: 3000,
     open: true

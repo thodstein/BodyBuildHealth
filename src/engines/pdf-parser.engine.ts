@@ -840,27 +840,43 @@ export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<Parsed
 
 /** OCR pages of a scanned PDF that has no usable text layer. */
 export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<string> {
-  const pdfjsLib = await import('pdfjs-dist');
-  const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
-  const workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-  const Tesseract = await import('tesseract.js') as any;
-  const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
-  const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
-  const texts: string[] = [];
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-    const page = await pdf.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 2 });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    const context = canvas.getContext('2d');
-    if (!context) continue;
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
-    const text = await recognizeOcrCanvas(Tesseract, canvas);
-    if (text) texts.push(text);
+  let pdfjsLib: any;
+  let Tesseract: any;
+  try {
+    pdfjsLib = await import('pdfjs-dist');
+    Tesseract = await import('tesseract.js') as any;
+  } catch (initError: any) {
+    console.error('ocrScannedPdf init failed:', initError);
+    return '';
   }
-  return texts.join('\n');
+  try {
+    const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
+    const workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
+    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
+    const MAX_PAGE_PX = 8000000;
+    const texts: string[] = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const vp = page.getViewport({ scale: 1 });
+      const srcPx = vp.width * vp.height * 4; // 2x scale → 4x pixels
+      const effectiveScale = srcPx > MAX_PAGE_PX ? Math.sqrt(MAX_PAGE_PX / (vp.width * vp.height)) : 2;
+      const viewport = page.getViewport({ scale: effectiveScale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext('2d');
+      if (!context) continue;
+      await page.render({ canvas, canvasContext: context, viewport }).promise;
+      const text = await recognizeOcrCanvas(Tesseract, canvas);
+      if (text) texts.push(text);
+    }
+    return texts.join('\n');
+  } catch (err: any) {
+    console.warn('ocrScannedPdf failed:', err);
+    return '';
+  }
 }
 
 export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promise<ParsedLabResult> {
@@ -876,23 +892,32 @@ export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promi
 }
 
 async function extractTextFromImage(file: File): Promise<string> {
-  const Tesseract = await import('tesseract.js') as any;
-  const { resolveTesseractOptions } = await import('./ocr-assets');
-  const opts = await resolveTesseractOptions();
-  const workerOptions = {
-    workerPath: opts.workerPath,
-    corePath: opts.corePath,
-    langPath: opts.langPath,
-  };
+  let Tesseract: any;
+  let workerOptions: { workerPath: string; corePath: string; langPath: string };
+  try {
+    Tesseract = await import('tesseract.js') as any;
+    const { resolveTesseractOptions } = await import('./ocr-assets');
+    const opts = await resolveTesseractOptions();
+    workerOptions = {
+      workerPath: opts.workerPath,
+      corePath: opts.corePath,
+      langPath: opts.langPath,
+    };
+  } catch (initError: any) {
+    console.error('Tesseract.js init failed:', initError);
+    throw new Error(`OCR engine unavailable: ${initError?.message || String(initError)}`);
+  }
   try {
     if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable');
     const bitmap = await createImageBitmap(file);
-    const scale = 3;
+    const MAX_CANVAS_PX = 8000000; // ~8MP, safe upper bound for browser memory
+    const srcPx = bitmap.width * bitmap.height;
+    const scale = srcPx > MAX_CANVAS_PX ? Math.sqrt(MAX_CANVAS_PX / srcPx) : 3;
     const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width * scale;
-    canvas.height = bitmap.height * scale;
+    canvas.width = Math.ceil(bitmap.width * scale);
+    canvas.height = Math.ceil(bitmap.height * scale);
     const context = canvas.getContext('2d');
-    if (!context) return '';
+    if (!context) { bitmap.close(); return ''; }
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const enhanced = enhanceOcrCanvas(canvas);
