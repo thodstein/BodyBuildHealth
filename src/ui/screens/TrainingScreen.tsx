@@ -501,7 +501,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         <h2 style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
       )}
 
-      {zone && zone !== 'planner' && zone !== 'calculators' && zone !== 'diary' && (() => {
+      {zone && zone !== 'planner' && zone !== 'calculators' && (() => {
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
