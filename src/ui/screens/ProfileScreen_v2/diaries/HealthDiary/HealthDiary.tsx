@@ -34,6 +34,7 @@ import {
   analyzeHealthProfile,
   generateHealthPlan,
   exportHealthPlanText,
+  exportHealthReportText,
   loadPlanDone,
   savePlanDone,
   saveHealthPlan,
@@ -51,9 +52,11 @@ import {
   detectAnomalies,
   exportSvgAsFile,
   exportSvgAsPng,
+  fitLinearTrend,
   getNormalRange,
   laggedCorrelation,
   paginate,
+  projectToDate,
   sortEntries,
   todayIso,
   type DiaryEntryLike,
@@ -669,7 +672,7 @@ const EntryEditor: React.FC<{
   );
 };
 
-export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataChange }) => {
+export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataChange, onNavigate }) => {
   const [rows, setRows] = useState<UnifiedHealthEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [edit, setEdit] = useState<UnifiedHealthEntry | null>(null);
@@ -779,6 +782,25 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     downloadText(`health-plan-${todayIso()}.txt`, exportHealthPlanText(plan, analyzeHealthProfile(rows, planCtx)), 'text/plain;charset=utf-8');
     (window as any).showToast?.('📄 План улучшений экспортирован');
   };
+  const exportReport = () => {
+    downloadText(`health-report-${todayIso()}.txt`, exportHealthReportText(analyzeHealthProfile(rows, planCtx), plan), 'text/plain;charset=utf-8');
+    (window as any).showToast?.('📄 Отчёт по здоровью сохранён');
+  };
+  const doneCount = plan.recommendations.filter((r) => planDone.includes(r.id)).length;
+  const planProgressPct = plan.recommendations.length ? Math.round((doneCount / plan.recommendations.length) * 100) : 0;
+  const painForecast = useMemo(() => {
+    if (allPoints.length < 4) return null;
+    const fit = fitLinearTrend(allPoints);
+    if (!fit) return null;
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    const target = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return {
+      value: Math.max(0, Math.round(projectToDate(fit, target))),
+      rising: fit.slopePerDay > 0.05,
+      r2: fit.r2,
+    };
+  }, [allPoints]);
   const weekly = buildWeeklyHistogram(allPoints);
   const compare = compareWithLastWeek(allPoints);
   const anomalies = detectAnomalies('pain', rangeFields);
@@ -893,6 +915,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         exportActions={[
           { label: '📥 CSV-файл', onClick: exportCsv },
           { label: '🖨 Печать / PDF', onClick: printPdf },
+          { label: '📄 Отчёт TXT', onClick: exportReport },
           { label: '📈 График SVG', onClick: () => { if (svgRef.current) exportSvgAsFile(svgRef.current, `health-${todayIso()}.svg`); (window as any).showToast?.('📈 График SVG сохранён'); } },
           { label: '🖼 График PNG', onClick: () => { if (svgRef.current) exportSvgAsPng(svgRef.current, `health-${todayIso()}.png`); (window as any).showToast?.('🖼 График PNG сохранён'); } },
           { label: '🗑 Очистить дневник', onClick: () => { if (confirm('Очистить единый дневник здоровья?')) { commit([]); (window as any).showToast?.('🗑 Дневник очищен (можно отменить)'); } }, danger: true },
@@ -910,6 +933,17 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
               <b>🧭 План улучшений · {new Date(plan.generatedAt).toLocaleDateString('ru-RU')}</b>
               <span style={{ color: colors.textMuted, fontSize: 11 }}>{plan.summary.verdict}</span>
             </div>
+            {plan.recommendations.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: colors.textMuted, marginBottom: 3 }}>
+                  <span>✅ Выполнено: {doneCount} из {plan.recommendations.length}</span>
+                  <span>{planProgressPct}%</span>
+                </div>
+                <div style={{ height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${planProgressPct}%`, background: '#8b5cf6', borderRadius: 999, transition: 'width 0.3s' }} />
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
               {(
                 [
@@ -933,6 +967,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 {plan.recommendations.map((r) => {
                   const done = planDone.includes(r.id);
                   const c = r.priority === 'critical' ? '#ef4444' : r.priority === 'high' ? '#f97316' : r.priority === 'medium' ? '#f59e0b' : '#22c55e';
+                  const supportable = onNavigate && (r.domain === 'pain' || r.domain === 'neuro' || r.domain === 'hemato' || r.domain === 'acne');
                   return (
                     <div key={r.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${c}44`, opacity: done ? 0.55 : 1 }}>
                       <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontSize: 12 }}>
@@ -943,6 +978,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                           <div style={{ color: colors.text, marginTop: 2 }}>→ {r.action}</div>
                         </span>
                       </label>
+                      {supportable && (
+                        <div style={{ marginTop: 6, paddingLeft: 26 }}>
+                          <button style={button} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1054,6 +1094,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
               </circle>
             ))}
           </svg>
+          {painForecast && (
+            <div style={{ marginTop: 4, fontSize: 11, color: painForecast.rising ? colors.warning : colors.green }}>
+              🔮 Прогноз боли через 7 дней: {painForecast.value}/70 ({painForecast.rising ? '↑ рост' : 'стабильно/↓ снижение'}, r²={painForecast.r2.toFixed(2)})
+            </div>
+          )}
         </section>
         {(() => {
           const renderMiniChart = (title: string, color: string, maxVal: number, points: { date: string; value: number }[], normalHigh?: number) => {

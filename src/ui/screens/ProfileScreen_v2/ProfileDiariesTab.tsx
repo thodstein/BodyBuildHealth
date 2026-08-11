@@ -1696,9 +1696,9 @@ export const ProfileDiariesTab: React.FC<{
           {activeDiary === 'injection' && (
             <InjectionDiary open onClose={() => setActiveDiary(null)} diaryKey="injection" goals={goals} onDataChange={refresh} />
           )}
-          {activeDiary === 'health' && (
-            <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} onDataChange={refresh} diaryKey="health" />
-          )}
+            {activeDiary === 'health' && (
+              <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="health" onDataChange={refresh} onNavigate={onNavigate} />
+            )}
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
           <AddSleepModal

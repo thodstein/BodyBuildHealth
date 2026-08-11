@@ -7,6 +7,7 @@ import {
   generateHealthPlan,
   summarizeHealthPlan,
   exportHealthPlanText,
+  exportHealthReportText,
   saveHealthPlan,
   loadHealthPlan,
   savePlanDone,
@@ -380,5 +381,29 @@ describe('generateHealthPlan — стабильные id', () => {
     for (const r of plan.recommendations) {
       expect(r.id).toMatch(/^[a-z]+_[a-z0-9]+$/);
     }
+  });
+});
+
+describe('exportHealthReportText', () => {
+  it('содержит все разделы: боль, симптомы, контекст и план', () => {
+    const entries = [
+      painEntry(2, { shoulders: 3 }),
+      painEntry(0, { shoulders: 9, knees: 5 }, { pain: { zones: { shoulders: 9, knees: 5 }, totalScore: 14, triggers: ['Физ. нагрузка'] } as any }),
+      withSymptoms(0, [{ name: 'Головная боль', severity: 4 }]),
+    ];
+    const analysis = analyzeHealthProfile(entries, { sleepAvg7: 5.5, bpSystolicLast: 150, bpDiastolicLast: 95, onCycle: true });
+    const plan = generateHealthPlan(analysis);
+    const text = exportHealthReportText(analysis, plan);
+    expect(text).toContain('ОТЧЁТ ПО ДНЕВНИКУ ЗДОРОВЬЯ');
+    expect(text).toContain('— Боль —');
+    expect(text).toContain('Худшая зона');
+    expect(text).toContain('— Симптомы —');
+    expect(text).toContain('Головная боль');
+    expect(text).toContain('— Контекст —');
+    expect(text).toContain('5.5 ч');
+    expect(text).toContain('150/95');
+    expect(text).toContain('активен');
+    expect(text).toContain('ПЛАН УЛУЧШЕНИЙ ЗДОРОВЬЯ');
+    expect(text).toContain(plan.summary.verdict);
   });
 });

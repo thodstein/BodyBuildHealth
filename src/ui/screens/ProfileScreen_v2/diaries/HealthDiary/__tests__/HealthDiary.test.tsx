@@ -2,7 +2,7 @@
  * HealthDiary.test.tsx — компонентные тесты UI дневника здоровья (Aug 11 2026):
  * план улучшений, чекбоксы выполнения, индекс здоровья, пустое состояние.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { HealthDiary } from '../HealthDiary';
 import { defaultGoals } from '../../../diary-helpers';
@@ -77,5 +77,23 @@ describe('HealthDiary UI', () => {
     renderDiary();
     expect(screen.queryByText(/План улучшений/)).toBeNull();
     expect(screen.getByText('Нет записей')).toBeTruthy();
+  });
+
+  it('кнопка «Протокол поддержки» вызывает onNavigate("support")', () => {
+    seedTwoDays();
+    const spy = vi.fn();
+    render(<HealthDiary open onClose={() => {}} diaryKey="health" goals={defaultGoals()} onDataChange={() => {}} onNavigate={spy} />);
+    const btn = screen.getAllByText('🛡 Протокол поддержки');
+    expect(btn.length).toBeGreaterThan(0);
+    fireEvent.click(btn[0]);
+    expect(spy).toHaveBeenCalledWith('support');
+  });
+
+  it('прогресс выполнения плана обновляется после отметки', () => {
+    seedTwoDays();
+    renderDiary();
+    expect(screen.getByText(/Выполнено: 0 из \d+/)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    expect(screen.getByText(/Выполнено: 1 из \d+/)).toBeTruthy();
   });
 });

@@ -516,6 +516,40 @@ export function exportHealthPlanText(plan: HealthPlan, analysis: HealthProfileAn
   return lines.join('\n');
 }
 
+/** Сводный текстовый отчёт по дневнику здоровья: статистика + контекст + план. */
+export function exportHealthReportText(analysis: HealthProfileAnalysis, plan: HealthPlan): string {
+  const lines: string[] = [];
+  const p = analysis.pain;
+  const a = analysis.adherence;
+  lines.push('ОТЧЁТ ПО ДНЕВНИКУ ЗДОРОВЬЯ');
+  lines.push(`Сформирован: ${new Date(plan.generatedAt).toLocaleString('ru-RU')}`);
+  lines.push(`Записей: ${analysis.totalEntries} · период: ${analysis.firstDate || '—'} — ${analysis.lastDate || '—'} · заполнено ${a.entriesLast14}/14 дней (${a.pct}%)`);
+  lines.push('');
+  lines.push('— Боль —');
+  lines.push(`Средняя: ${p.avg7 ?? 0}/70 за 7 дней, ${p.avg30 ?? 0}/70 за 30 дней · макс ${p.max}/70`);
+  if (p.worstZone) lines.push(`Худшая зона: ${p.worstZone.label} (ср. ${p.worstZone.avg}/10)`);
+  if (p.worseningZones.length > 0) lines.push(`Ухудшающиеся зоны: ${p.worseningZones.map((z) => `${z.label} ${z.last}/10`).join(', ')}`);
+  if (p.topTriggers.length > 0) lines.push(`Частые триггеры: ${p.topTriggers.slice(0, 3).map((t) => `${t.trigger} (${t.count})`).join(', ')}`);
+  if (p.timeOfDayPeak) lines.push(`Пик боли: ${p.timeOfDayPeak.label} (${p.timeOfDayPeak.avgScore}/10)`);
+  if (analysis.trend.deltaPct !== null) lines.push(`Неделя к неделе: ${analysis.trend.prevWeekMean}/70 → ${analysis.trend.weekMean}/70 (${analysis.trend.deltaPct > 0 ? '+' : ''}${analysis.trend.deltaPct}%)`);
+  lines.push('');
+  lines.push('— Симптомы —');
+  lines.push(analysis.symptoms.length > 0
+    ? analysis.symptoms.slice(0, 5).map((s) => `${s.name} (${s.count}×, ср. ${s.avgSeverity}/5)`).join('; ')
+    : 'не зафиксированы');
+  lines.push('');
+  lines.push('— Нейро / Акне / Гемато —');
+  lines.push(`Нейро: ${analysis.neuro.lastTotal}/10 · Акне: ${analysis.acne.lastTotal}/12 · Гемато: ${analysis.hemato.lastTotal}/8`);
+  lines.push('');
+  lines.push('— Контекст —');
+  lines.push(`Сон: ${analysis.ctx.sleepAvg7 !== null && analysis.ctx.sleepAvg7 !== undefined ? `${analysis.ctx.sleepAvg7} ч` : 'нет данных'}`);
+  lines.push(`АД: ${analysis.ctx.bpSystolicLast !== null && analysis.ctx.bpSystolicLast !== undefined ? `${Math.round(analysis.ctx.bpSystolicLast)}/${Math.round(analysis.ctx.bpDiastolicLast || 0)}` : 'нет данных'}`);
+  lines.push(`Курс: ${analysis.ctx.onCycle ? 'активен' : 'не активен'} · Вес: ${analysis.ctx.weightTrendKgWeek !== null && analysis.ctx.weightTrendKgWeek !== undefined ? `${analysis.ctx.weightTrendKgWeek > 0 ? '+' : ''}${analysis.ctx.weightTrendKgWeek} кг/нед` : 'нет данных'}`);
+  lines.push('');
+  lines.push(exportHealthPlanText(plan, analysis));
+  return lines.join('\n');
+}
+
 export function saveHealthPlan(plan: HealthPlan): void {
   try { localStorage.setItem(PLAN_KEY, JSON.stringify(plan)); } catch {}
 }
