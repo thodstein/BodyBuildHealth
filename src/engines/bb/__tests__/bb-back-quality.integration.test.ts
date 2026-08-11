@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
 import { classifyBackExercise } from '../bb-back-quality.engine';
+import { convertCycleToBBPlan } from '../cycle-to-plan';
+import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 
 const WM = {
   chest: 100, back: 120, shoulders: 60, quads: 140, hamstrings: 100,
@@ -20,7 +22,7 @@ describe('experienced enhanced back prescription', () => {
       const back = session.exercises.filter(e => e.muscle === 'back');
       expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(18);
       expect(new Set(back.map(e => classifyBackExercise(e.name).pattern)).size).toBeGreaterThanOrEqual(3);
-      expect(back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull')).toHaveLength(1);
+      expect(back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').length).toBeLessThanOrEqual(1);
     }
   }, 30000);
 
@@ -75,5 +77,31 @@ describe('experienced enhanced back prescription', () => {
       expect(biceps).toBeLessThanOrEqual(12);
       expect(triceps).toBeLessThanOrEqual(12);
     }
+  }, 30000);
+
+  it('adaptive Generic does not use vertical pull in every back session', () => {
+    const plan = buildBBPlan({
+      patternId: 'ppl_6', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      weakPoints: ['back'], focusGroup: 'back', specialization: true,
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const pulls = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Pull');
+    const verticalSessions = pulls.filter(s => s.exercises.some(e => classifyBackExercise(e.name).pattern === 'vertical_pull'));
+    expect(verticalSessions.length).toBeGreaterThanOrEqual(1);
+    expect(verticalSessions.length).toBeLessThan(pulls.length);
+  }, 30000);
+
+  it('adaptive PROF cycle applies the same weekly pull-pattern repair', () => {
+    const plan = convertCycleToBBPlan({
+      cycle: CYCLE_01,
+      workMax: { ...WM, legs: 140 },
+      level: 'enhanced', trainingYears: 6,
+      peds: ['AAS'], pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+      mode: 'adapt', weakPoints: ['back'], focusGroup: 'back', specialization: true,
+      equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+    } as any);
+    const verticalSessions = plan.weeks[0].sessions.filter(s => s.exercises.some(e => classifyBackExercise(e.name).pattern === 'vertical_pull'));
+    expect(verticalSessions.length).toBeLessThan(plan.weeks[0].sessions.length);
   }, 30000);
 });

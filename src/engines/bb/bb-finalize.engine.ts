@@ -174,6 +174,52 @@ function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions)
   });
 }
 
+/**
+ * Weekly back-pattern repair for adaptive/generic plans.
+ * Volume specialization must not mean repeating pull-ups/vertical pulls in
+ * every session. Keep a limited number of vertical slots and replace excess
+ * slots with real catalog rows/lat work, preserving the prescribed sets.
+ */
+function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const backSessionCount = week.sessions.filter((session: any) => session.exercises.some((e: any) => e.muscle === 'back')).length;
+  // Vertical pull is a weekly slot, not a per-session entitlement. At two
+  // back sessions/week only one gets a vertical pull; with 3+ sessions allow
+  // two, still preventing daily pull-ups in specialization blocks.
+  const maxVertical = backSessionCount >= 3 ? 2 : 1;
+  let verticalSeen = 0;
+  const sessions = [...week.sessions].sort((a: any, b: any) => a.day - b.day);
+  let verticalSessionKept = 0;
+  for (const session of sessions) {
+    const usedPatterns = new Set(session.exercises.filter((e: any) => e.muscle === 'back').map((e: any) => annotateBackExercise(e).movementPattern));
+    for (const exercise of session.exercises) {
+      if (exercise.muscle !== 'back') continue;
+      const tagged = annotateBackExercise(exercise);
+      if (tagged.movementPattern !== 'vertical_pull') continue;
+      verticalSeen += 1;
+      if (verticalSeen <= maxVertical && verticalSessionKept === 0) {
+        verticalSessionKept = 1;
+        continue;
+      }
+      const replacement = EXERCISE_CATALOG.find((candidate: any) => {
+        if (trueMuscleOf(candidate) !== 'back') return false;
+        if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
+        if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
+        const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
+        return next.movementPattern !== 'vertical_pull';
+      });
+      if (!replacement) continue;
+      const next = annotateBackExercise({ ...exercise, name: replacement.name, exerciseName: replacement.name } as any);
+      exercise.name = replacement.name;
+      exercise.exerciseName = replacement.name;
+      exercise.movementPattern = next.movementPattern;
+      exercise.backSubgroup = next.backSubgroup;
+      exercise.rationale = `${exercise.rationale || ''} Адаптация частоты: избыток vertical pull заменён на ${next.movementPattern}.`;
+      usedPatterns.add(next.movementPattern);
+    }
+  }
+}
+
 
 
 export interface BBFinalizeOptions {
@@ -498,6 +544,9 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     allocateExperiencedBackSession(session, options);
     allocateExperiencedArmSession(session, options);
   }
+  // Последний adaptive-проход: после rotation/fatigue/taper никакой поздний
+  // pass не должен снова вернуть ежедневные подтягивания/vertical pull.
+  for (const week of next.weeks) repairBackFrequency(week, options);
   // Аналогично для ног: если после всех проходов glutes/quads отсутствуют
   // в Lower-сессии опытного enhanced — добавляем из каталога.
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
