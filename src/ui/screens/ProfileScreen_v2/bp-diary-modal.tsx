@@ -7,7 +7,7 @@
 import React, { useMemo } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
-import { BP_SYMPTOMS } from '../../../core/bp-hr-data';
+import { BP_SYMPTOMS, classifyBP } from '../../../core/bp-hr-data';
 import {
   DiaryModalShell,
   SectionCard,
@@ -37,11 +37,12 @@ const BP_TONE: Record<string, { label: string; color: string }> = {
 
 export const bpCategory = (s: number, d: number): { label: string; color: string } => {
   if (!Number.isFinite(s) || !Number.isFinite(d) || s <= 0 || d <= 0) return { label: 'Введите показатели', color: colors.textMuted };
-  if (s >= 180 || d >= 120) return BP_TONE.h3;
-  if (s >= 160 || d >= 100) return BP_TONE.h2;
-  if (s >= 140 || d >= 90) return BP_TONE.h1;
-  if (s >= 130 || d >= 80) return BP_TONE.high;
-  if (s >= 120 && d < 80) return BP_TONE.elevated;
+  // Пороги берём из единого ядра classifyBP (bp-hr-data.ts), детализация лейблов — своя.
+  const cls = classifyBP(s, d);
+  if (cls === 'crisis') return BP_TONE.h3;
+  if (cls === 'stage2') return s >= 160 || d >= 100 ? BP_TONE.h2 : BP_TONE.h1;
+  if (cls === 'stage1') return BP_TONE.high;
+  if (cls === 'elevated') return BP_TONE.elevated;
   return BP_TONE.normal;
 };
 
