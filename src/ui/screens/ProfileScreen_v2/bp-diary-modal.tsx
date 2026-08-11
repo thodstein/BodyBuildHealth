@@ -7,6 +7,7 @@
 import React, { useMemo } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
+import { BP_SYMPTOMS } from '../../../core/bp-hr-data';
 import {
   DiaryModalShell,
   SectionCard,
@@ -54,7 +55,7 @@ type BpRec = {
   arm?: 'left' | 'right';
   position?: 'sitting' | 'lying' | 'standing';
   symptoms?: string[];
-  medTaken?: boolean;
+  medicationTaken?: boolean;
   notes?: string;
 };
 
@@ -63,24 +64,26 @@ interface BPDraft {
   systolic: string;
   diastolic: string;
   pulse: string;
-  timeOfDay: 'morning' | 'evening';
+  timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
   arm: 'left' | 'right';
   position: 'sitting' | 'lying' | 'standing';
   symptoms: string[];
-  medTaken: boolean;
+  medicationTaken: boolean;
   notes: string;
 }
 
-const SYMPTOM_OPTIONS: { id: string; label: string }[] = [
-  { id: 'headache', label: '🤕 Головная боль' },
-  { id: 'dizziness', label: '💫 Головокружение' },
-  { id: 'chest_pain', label: '🫀 Боль в груди' },
-  { id: 'shortness_breath', label: '🫁 Одышка' },
-  { id: 'nausea', label: '🤢 Тошнота' },
-  { id: 'visual_disturbance', label: '👁 Нарушения зрения' },
-  { id: 'palpitations', label: '💓 Учащенное сердцебиение' },
-  { id: 'fatigue', label: '😴 Сильная усталость' },
-];
+const SYMPTOM_ICONS: Record<string, string> = {
+  'Головная боль': '🤕', 'Головокружение': '💫', 'Шум в ушах': '👂',
+  'Боль в груди': '🫀', 'Одышка': '🫁', 'Тошнота': '🤢', 'Мелькание мушек': '✨',
+  'Слабость': '😴', 'Отёки': '🦵', 'Потливость': '💦',
+  'Учащённое сердцебиение': '💓', 'Нарушение зрения': '👁', 'Боль в спине': '🔙',
+  'Чувство тревоги': '😰',
+};
+
+const SYMPTOM_OPTIONS: { id: string; label: string }[] = BP_SYMPTOMS.map((s) => ({
+  id: s,
+  label: `${SYMPTOM_ICONS[s] ?? '•'} ${s}`,
+}));
 
 const ARM_OPTIONS: { id: 'left' | 'right'; label: string }[] = [
   { id: 'left', label: '👈 Левая' },
@@ -106,11 +109,14 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       systolic: last?.systolic ? String(last.systolic) : '120',
       diastolic: last?.diastolic ? String(last.diastolic) : '80',
       pulse: lastPulse && lastPulse > 0 ? String(lastPulse) : '70',
-      timeOfDay: last?.timeOfDay === 'evening' ? 'evening' : 'morning',
+      timeOfDay:
+        last?.timeOfDay === 'afternoon' || last?.timeOfDay === 'evening' || last?.timeOfDay === 'night'
+          ? (last.timeOfDay as BPDraft['timeOfDay'])
+          : 'morning',
       arm: last?.arm ?? 'left',
       position: last?.position ?? 'sitting',
       symptoms: [],
-      medTaken: false,
+      medicationTaken: false,
       notes: '',
     };
   };
@@ -178,7 +184,7 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       arm: draft.arm,
       position: draft.position,
       symptoms: draft.symptoms,
-      medTaken: draft.medTaken,
+      medicationTaken: draft.medicationTaken,
       notes: draft.notes.trim() || undefined,
     });
     resetDraft();
@@ -214,8 +220,8 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       </div>
 
       <SectionCard icon="🕐" title="Время и условия" color="#ef4444">
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          {([['morning', '🌅 Утро'], ['evening', '🌙 Вечер']] as const).map(([k, l]) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
+          {([['morning', '🌅 Утро'], ['afternoon', '☀️ День'], ['evening', '🌆 Вечер'], ['night', '🌙 Ночь']] as const).map(([k, l]) => (
             <button
               key={k}
               type="button"
@@ -391,14 +397,14 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       </SectionCard>
 
       <SectionCard icon="💊" title="Лекарства" color="#ef4444">
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 12, background: draft.medTaken ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${draft.medTaken ? '#ef444444' : colors.border}` }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 12, background: draft.medicationTaken ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${draft.medicationTaken ? '#ef444444' : colors.border}` }}>
           <input
             type="checkbox"
-            checked={draft.medTaken}
-            onChange={(e) => set('medTaken', e.target.checked)}
+            checked={draft.medicationTaken}
+            onChange={(e) => set('medicationTaken', e.target.checked)}
             style={{ width: 20, height: 20, accentColor: '#ef4444', cursor: 'pointer' }}
           />
-          <span style={{ fontSize: 13, fontWeight: 600, color: draft.medTaken ? '#f87171' : colors.text }}>Приём гипотензивных препаратов перед замером</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: draft.medicationTaken ? '#f87171' : colors.text }}>Приём гипотензивных препаратов перед замером</span>
         </label>
       </SectionCard>
 

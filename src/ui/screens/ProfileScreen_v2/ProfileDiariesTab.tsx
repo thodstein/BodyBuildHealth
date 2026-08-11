@@ -1721,6 +1721,10 @@ export const ProfileDiariesTab: React.FC<{
                 diastolic: Number(e.diastolic),
                 hr: Number(e.hr ?? e.pulse),
                 timeOfDay: e.timeOfDay,
+                arm: e.arm,
+                position: e.position,
+                symptoms: Array.isArray(e.symptoms) ? e.symptoms : undefined,
+                medicationTaken: !!e.medicationTaken,
                 notes: e.notes,
               };
               const prev = getBpEntries();

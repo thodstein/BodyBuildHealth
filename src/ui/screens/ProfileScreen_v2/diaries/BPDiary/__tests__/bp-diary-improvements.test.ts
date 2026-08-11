@@ -214,6 +214,31 @@ describe('BP Diary Improvements', () => {
       const raw = { date: '2024-01-01', systolic: 120, diastolic: 80, pulse: 75 } as any;
       expect(normalizeBpEntry(raw).hr).toBe(75);
     });
+
+    it('should preserve context fields from quick-add modal (arm, position, symptoms, medicationTaken)', () => {
+      const raw = {
+        date: '2024-01-01',
+        systolic: 125,
+        diastolic: 82,
+        hr: 68,
+        timeOfDay: 'night' as const,
+        arm: 'right' as const,
+        position: 'standing' as const,
+        symptoms: ['Головная боль', 'Головокружение'],
+        medicationTaken: true,
+      };
+      const entry = normalizeBpEntry(raw);
+      expect(entry.arm).toBe('right');
+      expect(entry.position).toBe('standing');
+      expect(entry.symptoms).toEqual(['Головная боль', 'Головокружение']);
+      expect(entry.medicationTaken).toBe(true);
+      expect(entry.timeOfDay).toBe('night');
+    });
+
+    it('should not inherit medicationTaken when modal sends medicationTaken:false', () => {
+      const raw = { date: '2024-01-01', systolic: 120, diastolic: 80, hr: 70, medicationTaken: false };
+      expect(normalizeBpEntry(raw).medicationTaken).toBe(false);
+    });
   });
 
   describe('commitBpEntries', () => {
