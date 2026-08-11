@@ -243,23 +243,27 @@ export const SliderInput: React.FC<{
 }> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color }) => {
   const c = color || colors.primary;
   const value = (rawValue !== undefined && rawValue !== null && !isNaN(rawValue)) ? rawValue : min;
-  const pct = ((value - min) / (max - min)) * 100;
+  const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
   return (
     <div>
       {label && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600 }}>{label}</span>
-          <span style={{ fontSize: 12, color: c, fontWeight: 700 }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}>{label}</span>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: c,
+            background: `${c}1a`, border: `1px solid ${c}33`,
+            padding: '1px 8px', borderRadius: 8, minWidth: 36, textAlign: 'center',
+          }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
         </div>
       )}
-      <div style={{ position: 'relative', height: 24, display: 'flex', alignItems: 'center' }}>
+      <div style={{ position: 'relative', height: 26, display: 'flex', alignItems: 'center' }}>
         <div style={{
           position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2,
           background: 'rgba(255,255,255,0.08)',
         }} />
         <div style={{
           position: 'absolute', left: 0, width: `${pct}%`, height: 4, borderRadius: 2,
-          background: c,
+          background: `linear-gradient(90deg, ${c}55, ${c})`,
         }} />
         <input
           type="range"
@@ -268,14 +272,18 @@ export const SliderInput: React.FC<{
           max={max}
           step={step}
           onChange={e => onChange(Number(e.target.value))}
+          aria-label={label}
           style={{
-            position: 'relative', width: '100%', height: 24, opacity: 0, cursor: 'pointer', margin: 0,
+            position: 'relative', width: '100%', height: 26, opacity: 0, cursor: 'pointer', margin: 0,
           }}
         />
         <div style={{
-          position: 'absolute', left: `calc(${pct}% - 8px)`,
-          width: 16, height: 16, borderRadius: '50%', background: c,
-          boxShadow: `0 0 0 4px ${c}33`, pointerEvents: 'none',
+          position: 'absolute', left: `calc(${pct}% - 9px)`,
+          width: 18, height: 18, borderRadius: '50%',
+          background: `radial-gradient(circle at 35% 30%, ${c}, ${c}cc)`,
+          border: `2px solid ${c}`,
+          boxShadow: `0 0 0 4px ${c}2e, 0 2px 8px ${c}55`,
+          pointerEvents: 'none',
           transition: 'left 0.1s',
         }} />
       </div>
@@ -361,7 +369,7 @@ export const AccordionSection: React.FC<{
         }}>▾</span>
       </button>
       {open && (
-        <div style={{
+        <div className="profile-section-body" style={{
           padding: '0 16px 16px 16px',
           borderTop: `1px solid ${colors.border}`,
           paddingTop: 16,
@@ -390,7 +398,7 @@ export const Field: React.FC<{
 );
 
 export const FieldRow: React.FC<{ children: React.ReactNode; cols?: number; gap?: number; style?: React.CSSProperties }> = ({ children, cols = 2, gap = 12, style }) => (
-  <div style={{
+  <div className="profile-fieldrow" style={{
     display: 'grid',
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
     gap,
@@ -513,74 +521,93 @@ export const PopupValueEditor: React.FC<{
             style={{
               ...glassCard,
               width: 'min(360px, 90vw)',
-              padding: 20,
+              padding: 0,
+              overflow: 'hidden',
               border: `1px solid ${c}44`,
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 14, fontWeight: 700, color: c, marginBottom: 16 }}>{label}</div>
-
-            {type === 'select' && options ? (
-              <select
-                value={local}
-                onChange={e => setLocal(e.target.value)}
-                style={{ ...selectStyle, marginBottom: 16 }}
-                autoFocus
-              >
-                {placeholder && <option value="">{placeholder}</option>}
-                {options.map(o => (
-                  <option key={o.id} value={o.id}>{o.label}</option>
-                ))}
-              </select>
-            ) : type === 'number' ? (
-              <input
-                type="number"
-                value={local}
-                onChange={e => setLocal(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
-                min={min}
-                max={max}
-                step={step}
-                placeholder={placeholder}
-                autoFocus
-                style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
-                inputMode="decimal"
-              />
-            ) : (
-              <input
-                type="text"
-                value={local}
-                onChange={e => setLocal(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
-                placeholder={placeholder}
-                autoFocus
-                style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
-              />
-            )}
-
-            {unit && type === 'number' && (
-              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>
-                Единица измерения: {unit}
-                {min !== undefined && max !== undefined && ` · Диапазон: ${min}–${max}`}
+            <div aria-hidden="true" style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${c}22 70%, transparent)` }} />
+            <div style={{ padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span aria-hidden="true" style={{
+                  width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: `${c}22`, border: `1px solid ${c}44`, fontSize: 14,
+                }}>✎</span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: c, letterSpacing: -0.2 }}>{label}</div>
+                  <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 1 }}>
+                    {type === 'select' ? 'Выберите значение' : 'Введите значение'}
+                  </div>
+                </div>
               </div>
-            )}
 
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setOpen(false)}
-                style={{
-                  ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
-                  cursor: 'pointer', minHeight: 36, padding: '8px 16px',
-                }}
-              >Отмена</button>
-              <button
-                onClick={commit}
-                style={{
-                  ...inputBase, background: c, border: `1px solid ${c}`,
-                  color: '#000', cursor: 'pointer', fontWeight: 700,
-                  minHeight: 36, padding: '8px 16px',
-                }}
-              >Сохранить</button>
+              {type === 'select' && options ? (
+                <select
+                  value={local}
+                  onChange={e => setLocal(e.target.value)}
+                  style={{ ...selectStyle, marginBottom: 16 }}
+                  autoFocus
+                >
+                  {placeholder && <option value="">{placeholder}</option>}
+                  {options.map(o => (
+                    <option key={o.id} value={o.id}>{o.label}</option>
+                  ))}
+                </select>
+              ) : type === 'number' ? (
+                <input
+                  type="number"
+                  value={local}
+                  onChange={e => setLocal(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+                  min={min}
+                  max={max}
+                  step={step}
+                  placeholder={placeholder}
+                  autoFocus
+                  style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
+                  inputMode="decimal"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={local}
+                  onChange={e => setLocal(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+                  placeholder={placeholder}
+                  autoFocus
+                  style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
+                />
+              )}
+
+              {unit && type === 'number' && (
+                <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>
+                  Единица измерения: {unit}
+                  {min !== undefined && max !== undefined && ` · Диапазон: ${min}–${max}`}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: colors.textSubtle, marginRight: 'auto' }}>
+                  Enter — сохранить · Esc — отмена
+                </span>
+                <button
+                  onClick={() => setOpen(false)}
+                  style={{
+                    ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
+                    cursor: 'pointer', minHeight: 36, padding: '8px 16px',
+                  }}
+                >Отмена</button>
+                <button
+                  onClick={commit}
+                  style={{
+                    ...inputBase, background: c, border: `1px solid ${c}`,
+                    color: '#000', cursor: 'pointer', fontWeight: 700,
+                    minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 10px ${c}44`,
+                  }}
+                >Сохранить</button>
+              </div>
             </div>
           </div>
         </div>

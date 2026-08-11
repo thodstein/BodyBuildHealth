@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, FieldRow, PopupValueEditor, colors } from '../ui';
+import { AccordionSection, FieldRow, PopupValueEditor, GroupHeader, colors } from '../ui';
 
 const WORK_MAX_GROUPS = [
   { id: 'chest', label: 'Грудь' },
@@ -41,9 +41,7 @@ export const TrainingPMSection: React.FC = () => {
       icon="🏆"
       color={colors.orange}
     >
-      <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, marginBottom: 8 }}>
-        Главные лифты (1RM)
-      </div>
+      <GroupHeader icon="🏋️" title="Главные лифты (1RM)" color={colors.orange} />
       <FieldRow cols={3}>
         <PopupValueEditor
           label="Присед"
@@ -74,9 +72,7 @@ export const TrainingPMSection: React.FC = () => {
         />
       </FieldRow>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, margin: '12px 0 8px' }}>
-        Рабочие максимумы (workMax) по группам мышц
-      </div>
+      <GroupHeader icon="📈" title="Рабочие максимумы (workMax) по группам мышц" color={colors.orange} style={{ marginTop: 12 }} />
       <FieldRow cols={3}>
         {WORK_MAX_GROUPS.map(g => (
           <PopupValueEditor

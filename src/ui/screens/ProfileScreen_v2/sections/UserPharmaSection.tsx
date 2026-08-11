@@ -34,6 +34,15 @@ const TIME_SINCE = [
   { id: '1y+', label: '>1 года' },
 ];
 
+const PHASE_META: Record<string, { icon: string; color: string; note: string }> = {
+  baseline: { icon: '🌱', color: colors.primary, note: 'Естественный уровень — бустеры поддержки не принуждаются' },
+  course: { icon: '⚡', color: colors.warning, note: 'Активен курс — PED-риски учтены в калькуляторе поддержки' },
+  bridge: { icon: '🔁', color: colors.blue, note: 'Бридж между курсами' },
+  pct: { icon: '🧪', color: colors.danger, note: 'ПКТ — восстановление оси тестостерона' },
+  post_pct: { icon: '🔄', color: colors.green, note: 'После ПКТ — контроль гормонов' },
+  fertility: { icon: '🤰', color: colors.pink, note: 'Фертильность — принудительные бустеры отключены' },
+};
+
 export const UserPharmaSection: React.FC = () => {
   const [pharma, updatePharma] = useSectionState('pharma');
 
@@ -46,6 +55,29 @@ export const UserPharmaSection: React.FC = () => {
       color={colors.warning}
       badge={pharma.phase === 'course' ? 'КУРС' : ''}
     >
+      {pharma.phase && PHASE_META[pharma.phase] && (
+        <div style={{
+          marginBottom: 14, padding: '10px 12px', borderRadius: 12,
+          background: `${PHASE_META[pharma.phase].color}14`,
+          border: `1px solid ${PHASE_META[pharma.phase].color}44`,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span aria-hidden="true" style={{
+            width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, background: `${PHASE_META[pharma.phase].color}22`,
+            border: `1px solid ${PHASE_META[pharma.phase].color}44`,
+          }}>{PHASE_META[pharma.phase].icon}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: 12, fontWeight: 800, color: PHASE_META[pharma.phase].color, letterSpacing: -0.1,
+            }}>
+              Фаза: {PHASES.find(p => p.id === pharma.phase)?.label || pharma.phase}
+            </div>
+            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>{PHASE_META[pharma.phase].note}</div>
+          </div>
+        </div>
+      )}
       <FieldRow cols={3}>
         <PopupValueEditor
           label="Фаза"

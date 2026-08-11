@@ -45,6 +45,11 @@ const LIFE_STAGES = [
 export const UserGoalsSection: React.FC = () => {
   const [goals, updateGoals] = useSectionState('goals');
   const [training, updateTraining] = useProfileSection('training');
+  const [personal] = useProfileSection('personal');
+
+  const delta = goals.targetWeight && personal.weight && personal.weight > 0
+    ? Math.round((goals.targetWeight - personal.weight) * 10) / 10
+    : null;
 
   return (
     <AccordionSection
@@ -134,6 +139,25 @@ export const UserGoalsSection: React.FC = () => {
           placeholder="YYYY-MM-DD (peak week)"
         />
       </FieldRow>
+
+      {delta !== null && delta !== 0 && (
+        <div style={{
+          marginTop: 14, padding: 12, borderRadius: 12,
+          background: `linear-gradient(135deg, ${delta > 0 ? 'rgba(0,230,138,0.12)' : 'rgba(245,158,11,0.12)'}, transparent)`,
+          border: `1px solid ${delta > 0 ? colors.primaryDim : colors.warningDim}`,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span aria-hidden="true" style={{ fontSize: 18 }}>{delta > 0 ? '⬆' : '⬇'}</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: colors.text }}>
+              {delta > 0 ? `До цели: набрать ${delta} кг` : `До цели: сбросить ${Math.abs(delta)} кг`}
+            </div>
+            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>
+              Текущий вес: {personal.weight} кг → цель: {goals.targetWeight} кг
+            </div>
+          </div>
+        </div>
+      )}
     </AccordionSection>
   );
 };

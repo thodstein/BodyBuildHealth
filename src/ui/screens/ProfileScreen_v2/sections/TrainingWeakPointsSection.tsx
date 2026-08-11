@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
-import { AccordionSection, BoolChip, colors } from '../ui';
+import { AccordionSection, BoolChip, GroupHeader, colors } from '../ui';
 
 const WEAK_GROUPS = [
   { id: 'chest', label: 'Грудь' },
@@ -46,9 +46,7 @@ export const TrainingWeakPointsSection: React.FC = () => {
       icon="🎯"
       color={colors.pink}
     >
-      <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>
-        Слабые группы мышц
-      </div>
+      <GroupHeader icon="📉" title="Слабые группы мышц" color={colors.pink} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
         {WEAK_GROUPS.map(g => (
           <BoolChip
@@ -61,9 +59,7 @@ export const TrainingWeakPointsSection: React.FC = () => {
         ))}
       </div>
 
-      <div style={{ fontSize: 12, fontWeight: 700, color: colors.text, marginBottom: 8 }}>
-        Доступное оборудование
-      </div>
+      <GroupHeader icon="🏋️" title="Доступное оборудование" color={colors.primary} style={{ marginTop: 12 }} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {EQUIPMENT.map(e => (
           <BoolChip

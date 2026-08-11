@@ -182,18 +182,9 @@ export const UserHealthSection: React.FC = () => {
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(139,92,246,0.05)', border: `1px solid ${colors.purpleDim}` }}>
         <GroupHeader icon="🧠" title="Неврология" color={colors.purple} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Дофамин (1-5)</div>
-            <SliderInput value={health.dopamineScore} onChange={v => updateHealth({ dopamineScore: v })} min={1} max={5} color={colors.purple} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Серотонин (1-5)</div>
-            <SliderInput value={health.serotoninScore} onChange={v => updateHealth({ serotoninScore: v })} min={1} max={5} color={colors.purple} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Агрессия (1-5)</div>
-            <SliderInput value={health.aggressionScore} onChange={v => updateHealth({ aggressionScore: v })} min={1} max={5} color={colors.purple} />
-          </div>
+          <SliderInput label="Дофамин (1-5)" value={health.dopamineScore} onChange={v => updateHealth({ dopamineScore: v })} min={1} max={5} color={colors.purple} />
+          <SliderInput label="Серотонин (1-5)" value={health.serotoninScore} onChange={v => updateHealth({ serotoninScore: v })} min={1} max={5} color={colors.purple} />
+          <SliderInput label="Агрессия (1-5)" value={health.aggressionScore} onChange={v => updateHealth({ aggressionScore: v })} min={1} max={5} color={colors.purple} />
         </FieldRow>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           {[
@@ -242,18 +233,9 @@ export const UserHealthSection: React.FC = () => {
       <div style={{ marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(236,72,153,0.05)', border: `1px solid ${colors.pinkDim}` }}>
         <GroupHeader icon="💭" title="Психология" color={colors.pink} style={{ marginBottom: 10 }} />
         <FieldRow cols={3}>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Страх потери (1-5)</div>
-            <SliderInput value={health.fearOfLoss} onChange={v => updateHealth({ fearOfLoss: v })} min={1} max={5} color={colors.pink} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Одержимость зеркалом (1-5)</div>
-            <SliderInput value={health.mirrorObsession} onChange={v => updateHealth({ mirrorObsession: v })} min={1} max={5} color={colors.pink} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Апатия off-cycle (1-5)</div>
-            <SliderInput value={health.apathyOffCycle} onChange={v => updateHealth({ apathyOffCycle: v })} min={1} max={5} color={colors.pink} />
-          </div>
+          <SliderInput label="Страх потери (1-5)" value={health.fearOfLoss} onChange={v => updateHealth({ fearOfLoss: v })} min={1} max={5} color={colors.pink} />
+          <SliderInput label="Одержимость зеркалом (1-5)" value={health.mirrorObsession} onChange={v => updateHealth({ mirrorObsession: v })} min={1} max={5} color={colors.pink} />
+          <SliderInput label="Апатия off-cycle (1-5)" value={health.apathyOffCycle} onChange={v => updateHealth({ apathyOffCycle: v })} min={1} max={5} color={colors.pink} />
         </FieldRow>
       </div>
 

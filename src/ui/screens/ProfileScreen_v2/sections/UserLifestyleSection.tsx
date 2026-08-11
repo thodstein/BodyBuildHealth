@@ -81,18 +81,9 @@ export const UserLifestyleSection: React.FC = () => {
       <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
 
       <FieldRow cols={2}>
-        <div>
-          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Стресс (1-10, 10 = максимум)</div>
-          <SliderInput value={lifestyle.stressLevel} onChange={v => updateLifestyle({ stressLevel: v })} min={1} max={10} color={colors.danger} />
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Усталость (1-10, 10 = полное истощение)</div>
-          <SliderInput value={lifestyle.fatigueLevel} onChange={v => updateLifestyle({ fatigueLevel: v })} min={1} max={10} color={colors.warning} />
-        </div>
-        <div>
-          <div style={{ fontSize: 11, color: colors.textMuted, fontWeight: 600, marginBottom: 4 }}>Активность (1-10, 10 = очень активный)</div>
-          <SliderInput value={lifestyle.activityLevel} onChange={v => updateLifestyle({ activityLevel: v })} min={1} max={10} color={colors.primary} />
-        </div>
+        <SliderInput label="Стресс (1-10)" value={lifestyle.stressLevel} onChange={v => updateLifestyle({ stressLevel: v })} min={1} max={10} color={colors.danger} />
+        <SliderInput label="Усталость (1-10)" value={lifestyle.fatigueLevel} onChange={v => updateLifestyle({ fatigueLevel: v })} min={1} max={10} color={colors.warning} />
+        <SliderInput label="Активность (1-10)" value={lifestyle.activityLevel} onChange={v => updateLifestyle({ activityLevel: v })} min={1} max={10} color={colors.primary} />
         <PopupValueEditor
           label="Базовый HRV (коэф.)"
           value={lifestyle.baselineHrvRatio}

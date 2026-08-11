@@ -1519,6 +1519,22 @@ main::-webkit-scrollbar-thumb { background:var(--accent-dim); border-radius:2px;
 .btn-read-more:hover { border-color:var(--accent); color: var(--text); }
 
 /* === PROFILE SCREEN === */
+/* ProfileScreen_v2 — вкладка «Пользователь»: адаптивные сетки полей + анимация секций */
+.profile-fieldrow { min-width: 0; }
+.profile-fieldrow > * { min-width: 0; }
+.profile-fieldrow > div, .profile-fieldrow > button { max-width: 100%; }
+.profile-section-body { animation: profile-section-fade 0.22s ease-out; }
+@keyframes profile-section-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 560px) {
+  .profile-fieldrow[style*="repeat(3,"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 380px) {
+  .profile-fieldrow[style*="repeat(2,"],
+  .profile-fieldrow[style*="repeat(3,"] { grid-template-columns: minmax(0, 1fr) !important; }
+}
 .profile-header { display:flex; align-items:center; gap:16px; margin-bottom:20px; }
 .profile-avatar {
   width:56px; height:56px; border-radius:50%; background:var(--accent);
