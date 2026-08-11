@@ -612,13 +612,13 @@ function collapseKey(muscle: string): string {
  *  Возвращает {group, repKey}: group = collapseKey (ключ для volumeRotation/output),
  *  repKey = первый PRO-ключ группы (для workMax/FORCE_HEAVY.pool). */
 interface MuscleGroupPlan { group: string; repKey: string; }
-function dedupeMuscles(tag: string | undefined, excluded: Set<string>, focusGroup?: string): MuscleGroupPlan[] {
+function dedupeMuscles(tag: string | undefined, excluded: Set<string>, focusGroup?: string, allowFocusInjection = true): MuscleGroupPlan[] {
   const out: MuscleGroupPlan[] = [];
   const seen = new Set<string>();
   const muscles = [...musclesForTag(tag)];
   // FIX-A4: если focusGroup задан и его нет в списке мышц тега — добавить.
   // Это гарантирует что мышца специализации (например glutes в FullBody) получит упражнения.
-  if (focusGroup && !muscles.includes(focusGroup) && !excluded.has(focusGroup)) {
+  if (allowFocusInjection && focusGroup && !muscles.includes(focusGroup) && !excluded.has(focusGroup)) {
     muscles.push(focusGroup);
   }
   for (const m of muscles) {
@@ -1055,7 +1055,8 @@ function buildSession(
   bodyweightCapability?: BBBuilderInput['bodyweightCapability'],
 ): BBSession {
   const character = sched.character as DayCharacter;
-  const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup);
+   const tagHasFocus = !!focusGroup && musclesForTag(sched.sessionTag).some(m => collapseKey(m) === collapseKey(focusGroup));
+   const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup, tagHasFocus);
   const exercises: BBExercise[] = [];
 
   // BUG-B11: leadMuscle для orderSessionExercises — основная мышца дня (первый compound).

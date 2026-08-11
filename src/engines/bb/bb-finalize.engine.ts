@@ -33,9 +33,14 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
       : derivePattern(item.exercise);
     const key = `${muscle}:${pattern}`;
     const highVolumeBack = muscle === 'back' && optionsHighVolumeBack;
-    const cap = highVolumeBack ? 4 : (SMALL_MUSCLES.has(muscle) ? 1 : 2);
+    const cap = highVolumeBack
+      ? (pattern === 'vertical_pull' ? 1 : pattern === 'heavy_row' ? 2 : 1)
+      : (SMALL_MUSCLES.has(muscle) ? 1 : 2);
     const count = counts.get(key) || 0;
-    if (count >= cap && item.exercise.role !== 'primary') continue;
+    // Back specialization is not a license for repeated primary rows. Keep
+    // the pattern cap even for primary exercises; volume is distributed into
+    // distinct patterns/sets instead of duplicating the same row every day.
+    if (count >= cap && (item.exercise.role !== 'primary' || (optionsHighVolumeBack && muscle === 'back'))) continue;
     counts.set(key, count + 1);
     keep.add(item.exercise);
   }
@@ -216,6 +221,32 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
       exercise.backSubgroup = next.backSubgroup;
       exercise.rationale = `${exercise.rationale || ''} Адаптация частоты: избыток vertical pull заменён на ${next.movementPattern}.`;
       usedPatterns.add(next.movementPattern);
+    }
+  }
+}
+
+/** Ограничивает specialization/weak-point additions по частоте. */
+function capAdaptiveSpecializationFrequency(week: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || !options.priorityMuscles?.length) return;
+  const priorities = new Set(options.priorityMuscles.map(m => String(m)));
+  const maxSessions = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 3 : 2;
+  const sessionsByMuscle = new Map<string, any[]>();
+  for (const session of week.sessions) {
+    for (const exercise of session.exercises) {
+      const marked = /Weak pump-finisher|Фидер-сет|Auto-MEV-feeder|specialization|специализац|отстающ/i.test(`${exercise.comment || ''} ${exercise.rationale || ''}`);
+      if (!marked || !priorities.has(exercise.muscle)) continue;
+      const list = sessionsByMuscle.get(exercise.muscle) || [];
+      if (!list.includes(session)) list.push(session);
+      sessionsByMuscle.set(exercise.muscle, list);
+    }
+  }
+  for (const [muscle, sessions] of sessionsByMuscle) {
+    if (sessions.length <= maxSessions) continue;
+    for (const session of sessions.slice(maxSessions)) {
+      session.exercises = session.exercises.filter((exercise: any) => {
+        const marked = /Weak pump-finisher|Фидер-сет|Auto-MEV-feeder|specialization|специализац|отстающ/i.test(`${exercise.comment || ''} ${exercise.rationale || ''}`);
+        return !(marked && exercise.muscle === muscle);
+      });
     }
   }
 }
@@ -547,6 +578,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // Последний adaptive-проход: после rotation/fatigue/taper никакой поздний
   // pass не должен снова вернуть ежедневные подтягивания/vertical pull.
   for (const week of next.weeks) repairBackFrequency(week, options);
+  for (const week of next.weeks) capAdaptiveSpecializationFrequency(week, options);
   // Аналогично для ног: если после всех проходов glutes/quads отсутствуют
   // в Lower-сессии опытного enhanced — добавляем из каталога.
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
