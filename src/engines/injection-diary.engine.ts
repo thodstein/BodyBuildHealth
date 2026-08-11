@@ -50,6 +50,8 @@ export interface InjectionEntry {
   redness: boolean;
   lump: boolean;
   bruise: boolean;
+  /** Повышенная температура после инъекции (признак инфекции). */
+  fever?: boolean;
   notes?: string;
 }
 
@@ -79,6 +81,7 @@ export interface InjectionAnomaly {
   severity: 'warn' | 'danger';
   message: string;
   category: 'pip' | 'swelling' | 'pain' | 'infection' | 'rotation' | 'frequency';
+  zone: string;
 }
 
 /* ── localStorage helpers ── */
@@ -155,6 +158,13 @@ export function clearInjectionDiary(): InjectionEntry[] {
   return [];
 }
 
+/** Полная замена дневника с сохранением id (используется для undo/импорта). */
+export function replaceInjectionDiary(entries: InjectionEntry[]): InjectionEntry[] {
+  const valid = entries.filter((e): e is InjectionEntry => !!e?.date && !!e?.substance && !!e?.zone);
+  writeStorage(valid);
+  return valid;
+}
+
 /* ── Helpers ── */
 
 export function todayLocalStr(): string {
@@ -218,6 +228,70 @@ export function getSuggestedZone(currentEntries: InjectionEntry[]): string {
     .map(z => ({ zone: z.id, days: getDaysSinceLastInjection(z.id, currentEntries, today) ?? -1 }))
     .sort((a, b) => b.days - a.days);
   return sortedByRest[0]?.zone || INJECTION_ZONES[0].id;
+}
+
+const ZONE_SAFETY_RANK = (zoneId: string): number => {
+  const risk = ZONE_TECHNIQUE[zoneId]?.risk || 'Средний';
+  return risk === 'Низкий' ? 0 : risk === 'Средний' ? 1 : risk === 'Высокий' ? 2 : 3;
+};
+
+/** Рекомендация пары «зона + сторона»: приоритет безопасным отдохнувшим зонам,
+ *  неиспользованные — в конце очереди (не предлагаем бицепс/икры новичку). */
+export function getSuggestedZoneSide(
+  entries: InjectionEntry[],
+): { zone: string; side: 'left' | 'right'; days: number } | null {
+  const today = todayLocalStr();
+  const usedToday = new Set(entries.filter(e => e.date === today).map(e => `${e.zone}_${e.side}`));
+  const daysFor = (zoneId: string, side: 'left' | 'right'): number | null => {
+    const pair = entries.filter(e => e.zone === zoneId && e.side === side);
+    if (pair.length === 0) return null;
+    const last = [...pair].sort((a, b) => b.date.localeCompare(a.date))[0];
+    if (last.date > today) return 0;
+    return Math.max(0, Math.floor((Date.parse(`${today}T00:00:00`) - Date.parse(`${last.date}T00:00:00`)) / 86400000));
+  };
+  const sidesOf = (zone: (typeof INJECTION_ZONES)[number]): ('left' | 'right')[] =>
+    zone.side === 'any' ? ['left', 'right'] : [zone.side];
+
+  for (const zone of INJECTION_ZONES) {
+    for (const side of sidesOf(zone)) {
+      const key = `${zone.id}_${side}`;
+      if (usedToday.has(key)) continue;
+      const days = daysFor(zone.id, side);
+      if (days === null || days >= 7) return { zone: zone.id, side, days: days ?? -1 };
+    }
+  }
+
+  let best: { zone: string; side: 'left' | 'right'; days: number } | null = null;
+  for (const zone of INJECTION_ZONES) {
+    for (const side of sidesOf(zone)) {
+      const key = `${zone.id}_${side}`;
+      if (usedToday.has(key)) continue;
+      const days = daysFor(zone.id, side);
+      const d = days ?? -1;
+      if (!best || d > best.days || (d === best.days && ZONE_SAFETY_RANK(zone.id) < ZONE_SAFETY_RANK(best.zone))) {
+        best = { zone: zone.id, side, days: d };
+      }
+    }
+  }
+  return best;
+}
+
+/** Проверки совместимости зоны с техникой и объёмом (по справочнику ZONE_TECHNIQUE). */
+export function getZoneCompatibilityIssues(zoneId: string, technique: string, volumeMl: number): string[] {
+  const issues: string[] = [];
+  const advice = getZoneTechniqueAdvice(zoneId);
+  if (!advice) return issues;
+  const zoneName = advice.zoneId === zoneId ? zoneLabel(zoneId) : zoneId;
+  if (advice.solutionType === 'водный' && (technique === 'im' || technique === 'subq_oil')) {
+    issues.push(`Зона «${zoneName}» — только водные растворы, масляный в/м не рекомендуется`);
+  }
+  if (volumeMl > 0 && volumeMl > advice.maxVolumeMl) {
+    issues.push(`Объём ${volumeMl} мл превышает максимум ${advice.maxVolumeMl} мл для зоны «${zoneName}»`);
+  }
+  if (advice.risk === 'Очень высокий' && technique === 'im') {
+    issues.push(`Зона «${zoneName}» — очень высокий риск, только для опытных (малый объём, водные препараты)`);
+  }
+  return issues;
 }
 
 /* ── Statistics ── */
@@ -301,29 +375,35 @@ export function detectInjectionAnomalies(entries: InjectionEntry[]): InjectionAn
 
   for (const e of entries) {
     if (e.pipLevel >= 7) {
-      issues.push({ date: e.date, severity: 'danger', message: `PIP ${e.pipLevel}/10 в зоне ${zoneLabel(e.zone)} (тяжёлый)`, category: 'pip' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'danger', message: `PIP ${e.pipLevel}/10 в зоне ${zoneLabel(e.zone)} (тяжёлый)`, category: 'pip' });
     } else if (e.pipLevel >= 4) {
-      issues.push({ date: e.date, severity: 'warn', message: `PIP ${e.pipLevel}/10 в зоне ${zoneLabel(e.zone)}`, category: 'pip' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'warn', message: `PIP ${e.pipLevel}/10 в зоне ${zoneLabel(e.zone)}`, category: 'pip' });
     }
 
     if (e.swelling >= 7) {
-      issues.push({ date: e.date, severity: 'danger', message: `Отёк ${e.swelling}/10 в зоне ${zoneLabel(e.zone)}`, category: 'swelling' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'danger', message: `Отёк ${e.swelling}/10 в зоне ${zoneLabel(e.zone)}`, category: 'swelling' });
     } else if (e.swelling >= 4) {
-      issues.push({ date: e.date, severity: 'warn', message: `Отёк ${e.swelling}/10 в зоне ${zoneLabel(e.zone)}`, category: 'swelling' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'warn', message: `Отёк ${e.swelling}/10 в зоне ${zoneLabel(e.zone)}`, category: 'swelling' });
     }
 
     if (e.painLevel >= 7) {
-      issues.push({ date: e.date, severity: 'danger', message: `Боль при введении ${e.painLevel}/10`, category: 'pain' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'danger', message: `Боль при введении ${e.painLevel}/10`, category: 'pain' });
     } else if (e.painLevel >= 4) {
-      issues.push({ date: e.date, severity: 'warn', message: `Боль при введении ${e.painLevel}/10`, category: 'pain' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'warn', message: `Боль при введении ${e.painLevel}/10`, category: 'pain' });
+    }
+
+    if (e.fever && (e.redness || e.lump)) {
+      issues.push({ date: e.date, zone: e.zone, severity: 'danger', message: `Температура + ${e.redness && e.lump ? 'покраснение и уплотнение' : e.redness ? 'покраснение' : 'уплотнение'} в ${zoneLabel(e.zone)} — высокая вероятность инфицирования`, category: 'infection' });
+    } else if (e.fever) {
+      issues.push({ date: e.date, zone: e.zone, severity: 'warn', message: `Отмечена повышенная температура после инъекции в ${zoneLabel(e.zone)} — следите за симптомами`, category: 'infection' });
     }
 
     if (e.redness && e.lump) {
-      issues.push({ date: e.date, severity: 'danger', message: `Покраснение + уплотнение в ${zoneLabel(e.zone)} — возможно инфицирование`, category: 'infection' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'danger', message: `Покраснение + уплотнение в ${zoneLabel(e.zone)} — возможно инфицирование`, category: 'infection' });
     } else if (e.redness && e.bruise) {
-      issues.push({ date: e.date, severity: 'warn', message: `Покраснение + гематома в ${zoneLabel(e.zone)}`, category: 'infection' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'warn', message: `Покраснение + гематома в ${zoneLabel(e.zone)}`, category: 'infection' });
     } else if (e.lump && e.pipLevel >= 4) {
-      issues.push({ date: e.date, severity: 'warn', message: `Уплотнение + PIP ≥4 в ${zoneLabel(e.zone)}`, category: 'infection' });
+      issues.push({ date: e.date, zone: e.zone, severity: 'warn', message: `Уплотнение + PIP ≥4 в ${zoneLabel(e.zone)}`, category: 'infection' });
     }
   }
 
@@ -331,6 +411,7 @@ export function detectInjectionAnomalies(entries: InjectionEntry[]): InjectionAn
     if (warning.severity === 'danger') {
       issues.push({
         date: warning.lastDate,
+        zone: warning.zone,
         severity: 'danger',
         message: `Зона ${zoneLabel(warning.zone)} не использовалась ${warning.daysSince} дней — риск фиброза/липома`,
         category: 'rotation',
@@ -347,6 +428,7 @@ export function detectInjectionAnomalies(entries: InjectionEntry[]): InjectionAn
     if (count >= 3) {
       issues.push({
         date: today,
+        zone,
         severity: 'warn',
         message: `Зона ${zoneLabel(zone)}: ${count} инъекций за 7 дней — рекомендуется ротация`,
         category: 'frequency',
@@ -405,6 +487,39 @@ export function parseDose(doseStr: string): { value: number; unit: string } | nu
         ? 'IU'
         : '';
   return { value: Math.round(value * 100) / 100, unit };
+}
+
+export interface DoseSummaryRow {
+  substance: string;
+  unit: string;
+  total: number;
+  count: number;
+  avg: number | null;
+}
+
+/** Суммарные дозы по препаратам за период (для контроля недельной нагрузки). */
+export function getDoseSummary(entries: InjectionEntry[], days: number = 7): DoseSummaryRow[] {
+  const cutoff = localDateDaysAgo(days);
+  const map = new Map<string, { name: string; total: number; count: number; unit: string }>();
+  for (const e of entries) {
+    if (e.date < cutoff) continue;
+    const parsed = parseDose(e.dose);
+    if (!parsed) continue;
+    const key = `${e.substance.trim().toLowerCase()}::${parsed.unit}`;
+    const cur = map.get(key) || { name: e.substance.trim(), total: 0, count: 0, unit: parsed.unit };
+    cur.total += parsed.value;
+    cur.count += 1;
+    map.set(key, cur);
+  }
+  return [...map.entries()]
+    .map(([, d]) => ({
+      substance: d.name,
+      unit: d.unit,
+      total: Math.round(d.total * 100) / 100,
+      count: d.count,
+      avg: d.count > 0 ? +(d.total / d.count).toFixed(1) : null,
+    }))
+    .sort((a, b) => b.total - a.total);
 }
 
 export interface InjectionTrend {
@@ -619,7 +734,7 @@ export function getInjectionRecommendations(entries: InjectionEntry[]): Injectio
   }
 
   for (const a of anomalies) {
-    if (a.category === 'infection') infectionZones.add(a.date);
+    if (a.category === 'infection') infectionZones.add(a.zone);
     if (a.category === 'pip' && a.severity === 'danger') highPipZones.add('general');
   }
 
@@ -711,6 +826,7 @@ export function migrateLegacyEntry(legacy: { date: string; substance: string; do
     redness: false,
     lump: false,
     bruise: false,
+    fever: false,
     notes: legacy.notes,
   };
 }

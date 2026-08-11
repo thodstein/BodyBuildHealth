@@ -258,13 +258,20 @@ describe('Round 4 — баннер «запись уже есть» (замен�
     render(<AddBodyMeasurementsModal open onClose={noop} onSave={noop} />);
     expect(screen.queryByText(/уже есть/)).toBeNull();
   });
-  it('инъекция: баннер с названием препарата', () => {
+  it('инъекция: баннер с названием препарата (тот же препарат за дату)', () => {
     localStorage.setItem('he_injection_diary', JSON.stringify([{ date: today, substance: 'Тестостерон энантат', dose: '250 мг' }]));
     render(<AddInjectionModal open onClose={noop} onSave={noop} />);
+    fireEvent.change(screen.getByLabelText(/Препарат/), { target: { value: 'Тестостерон энантат' } });
     const banner = screen.getByRole('status');
     expect(banner.textContent).toMatch(new RegExp('Запись за ' + today + ' уже есть'));
     expect(banner.textContent).toMatch(/Тестостерон энантат/);
     expect(banner.textContent).toMatch(/250 мг/);
+  });
+  it('инъекция: другой препарат за ту же дату НЕ даёт баннер (2 укола в день допустимы)', () => {
+    localStorage.setItem('he_injection_diary', JSON.stringify([{ date: today, substance: 'Тестостерон энантат', dose: '250 мг' }]));
+    render(<AddInjectionModal open onClose={noop} onSave={noop} />);
+    fireEvent.change(screen.getByLabelText(/Препарат/), { target: { value: 'Нандролон' } });
+    expect(screen.queryByText(/уже есть/)).toBeNull();
   });
   it('здоровье: баннер при существующей записи за дату', () => {
     localStorage.setItem('he_health_diary', JSON.stringify([{ date: today, pain: { totalScore: 5 } }]));

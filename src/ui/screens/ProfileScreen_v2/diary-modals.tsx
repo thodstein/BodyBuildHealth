@@ -131,6 +131,19 @@ export function findByDate<T extends { date?: string }>(entries: T[], date: stri
   return entries.find((e) => e.date === date);
 }
 
+/** Запись за дату с тем же препаратом (инъекции: несколько уколов в день допустимы). */
+export function findByDateAndSubstance<T extends { date?: string; substance?: string | number }>(
+  entries: T[],
+  date: string,
+  substance: string,
+): T | undefined {
+  const sub = String(substance || '').trim().toLowerCase();
+  if (!sub) return undefined;
+  return entries.find(
+    (e) => e.date === date && String(e.substance ?? '').trim().toLowerCase() === sub,
+  );
+}
+
 /** Черновик модалки в sessionStorage: переживает переключение вкладок профиля.
  *  Третий элемент — reset(next?): очищает storage и сбрасывает состояние,
  *  следующая запись persist пропускается (guard от мусорной перезаписи свежим дефолтом). */

@@ -9,6 +9,41 @@
 
 ---
 
+## Injection Diary Audit Round (Aug 11 2026, uncommitted)
+
+Полный аудит дневника инъекций: 6 багов + 5 доработок. Без интеграции с калькулятором поддержки (работа другого агента не тронута).
+
+### Багфиксы
+1. **P1: `infectionZones.add(a.date)` вместо зоны** — `injection-diary.engine.ts` — рекомендация показывала «Признаки инфицирования в 2026-08-05». `InjectionAnomaly` += `zone: string` (проставляется во всех категориях: pip/swelling/pain/infection/rotation/frequency), рекомендации используют `a.zone`.
+2. **P1: дедуп быстрой модалки по дате целиком терял 2-й укол за день** — новый `findByDateAndSubstance` (diary-modals.tsx), баннер и `ProfileDiariesTab.onSave` матчатся по (дата + препарат, регистронезависимо). Тест «другой препарат за ту же дату НЕ даёт баннер».
+3. **P2: дублированная ротация в модалке** — `getSuggestedZoneSide()` в движке (зона+сторона, приоритет отдохнувшим использованным, неиспользованные — в конец, tie-break по безопасности зоны); модалка теперь использует движок (не предлагает бицепс/икры новичку).
+4. **P2: нет валидации «объём/техника vs зона»** — `getZoneCompatibilityIssues(zone, technique, volumeMl)` (водные-only зоны + масляный в/м, превышение maxVolumeMl, «очень высокий риск»). Баннеры в модалке и полном редакторе.
+5. **P2: undo `restore()` перегенерировал id** — `replaceInjectionDiary(entries)` сохраняет id как есть.
+6. **P3: `substanceAdvice` привязан к последней записи** — селектор препарата в карточке «Техника инъекций».
+
+### Доработки
+- **🌡 Fever (температура)**: новое поле `fever?` в `InjectionEntry` (миграция legacy → false), чипы в обеих формах, колонка CSV/печать/флаги журнала, аномалии: fever+покраснение/уплотнение → danger infection, fever alone → warn.
+- **📅 Расписание инъекций** — NEW `src/engines/injection-schedule.engine.ts` (`he_injection_schedule`): CRUD (add/update/remove/save), дни недели Пн=0…Вс=6, `computeScheduleAdherence` (planned/actual/pct за N недель), `getDueToday`, `getNextScheduledDate`, `getMissedInjections` (пропущенные за 7 дней), `getScheduleSummary`. UI в InjectionDiary: баннер «Сегодня по плану» + «✍ Записать» (префилл редактора), «⏭ Пропущено», список с чипами дней и прогресс-баром соблюдения, редактор пункта.
+- **💊 Суммарные дозы** — `getDoseSummary(entries, days)` (по препарату+единице: total/count/avg, окно 7/30) + карточка в статистике.
+- **➕ Пакетный ввод** — «💾 Сохранить и ещё» в модалке (footer кастомный, сохраняет и продолжает) и «➕ Сохранить и ещё» в полном редакторе (сбрасывает только боль/реакции).
+
+### Tests
+- NEW `src/engines/__tests__/injection-diary-improvements.test.ts` — **23 теста**: anomaly zone (4), fever (4), рекомендации-инфекция по зонам (1), getSuggestedZoneSide (5), getZoneCompatibilityIssues (4), getDoseSummary (2), replaceInjectionDiary (3).
+- NEW `src/engines/__tests__/injection-schedule.test.ts` — **26 тестов**: дни недели (5), CRUD (5), getDueToday (2), getNextScheduledDate (3), adherence (6), missed (3), summary (2).
+- MOD `diary-modals-audit.test.tsx` — тест баннера инъекции переведён на ввод препарата + новый тест «другой препарат — без баннера».
+- Verification: tsc — мои файлы чисты (2 ошибки в worktree — параллельная работа другого агента: `health-improvement-plan.engine.ts` ctx, `HealthDiary.tsx` visibleDateSet), vitest ProfileScreen_v2 + 4 инъекционных файла **455/455**, `vite build` OK.
+
+### Files
+- MOD: `src/engines/injection-diary.engine.ts` (anomaly zone, fever, getSuggestedZoneSide, getZoneCompatibilityIssues, getDoseSummary, replaceInjectionDiary)
+- NEW: `src/engines/injection-schedule.engine.ts`
+- MOD: `src/ui/screens/ProfileScreen_v2/diary-modals.tsx` (findByDateAndSubstance)
+- MOD: `src/ui/screens/ProfileScreen_v2/injection-diary-modal.tsx` (движок-ротация, баннеры совместимости, fever, дедуп, «Сохранить и ещё»)
+- MOD: `src/ui/screens/ProfileScreen_v2/ProfileDiariesTab.tsx` (дедуп по дате+препарату)
+- MOD: `src/ui/screens/ProfileScreen_v2/diaries/InjectionDiary/InjectionDiary.tsx` (fever, restore ids, advice-селектор, дозы, расписание, save-more)
+- NEW: 2 test files (49 тестов)
+
+---
+
 ## Diary Modals Round 3 — Reset-guard, stale-чипы, умные дефолты (Aug 10 2026, uncommitted)
 
 Третья ротация дневниковых модалок Профиля v2 (поверх коммита 95e5593d6, незакоммичено — 11 файлов + 25 новых тестов).

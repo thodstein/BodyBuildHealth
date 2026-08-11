@@ -12,6 +12,7 @@ import {
   deleteInjection,
   detectInjectionAnomalies,
   getDaysSinceLastInjection,
+  getDoseSummary,
   getInjectionDiary,
   getInjectionTrend,
   getLastInjection,
@@ -20,10 +21,12 @@ import {
   getSubstanceInjectionAdvice,
   getSuggestedZone,
   getWeeklyFrequency,
+  getZoneCompatibilityIssues,
   getZoneTechniqueMatrix,
   getZoneTechniqueAdvice,
   migrateAllLegacyEntries,
   parseDose,
+  replaceInjectionDiary,
   suggestBetterTechnique,
   techniqueLabel,
   todayLocalStr,
@@ -37,6 +40,18 @@ import {
   getInjectionDiaryForRiskEngine,
   getInjectionDiarySummary,
 } from '../../../../../engines/injection-diary-integration';
+import {
+  SCHEDULE_WEEKDAYS,
+  addScheduleItem,
+  computeScheduleAdherence,
+  getDueToday,
+  getInjectionSchedule,
+  getMissedInjections,
+  removeScheduleItem,
+  saveInjectionSchedule,
+  updateScheduleItem,
+  type InjectionScheduleItem,
+} from '../../../../../engines/injection-schedule.engine';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 type Draft = Omit<InjectionEntry, 'id'>;
@@ -59,6 +74,7 @@ const emptyDraft = (zone = 'glute_dorsal'): Draft => ({
   redness: false,
   lump: false,
   bruise: false,
+  fever: false,
   notes: '',
 });
 
@@ -176,7 +192,8 @@ const InjectionEditor: React.FC<{
   editing: boolean;
   onClose: () => void;
   onSave: (draft: Draft) => void;
-}> = ({ open, initial, suggestedZone, editing, onClose, onSave }) => {
+  onSaveMore?: (draft: Draft) => void;
+}> = ({ open, initial, suggestedZone, editing, onClose, onSave, onSaveMore }) => {
   const [draft, setDraft] = useState<Draft>(initial);
 
   useEffect(() => {
@@ -190,15 +207,33 @@ const InjectionEditor: React.FC<{
   const setNumber = (key: 'volumeMl' | 'painLevel' | 'pipLevel' | 'swelling', value: string) => {
     set(key, key === 'volumeMl' ? Math.max(0, Number(value) || 0) : clamp10(Number(value)));
   };
+  const clean = (value: Draft): Draft => ({
+    ...value,
+    substance: value.substance.trim(),
+    dose: value.dose.trim(),
+    notes: value.notes?.trim() || undefined,
+  });
+  const valid = () => !!draft.date && !!draft.substance.trim() && !!draft.dose.trim();
   const save = () => {
-    if (!draft.date || !draft.substance.trim() || !draft.dose.trim()) return;
-    onSave({
-      ...draft,
-      substance: draft.substance.trim(),
-      dose: draft.dose.trim(),
-      notes: draft.notes?.trim() || undefined,
-    });
+    if (!valid()) return;
+    onSave(clean(draft));
   };
+  const saveAndMore = () => {
+    if (!valid() || !onSaveMore) return;
+    onSaveMore(clean(draft));
+    setDraft((current) => ({
+      ...current,
+      painLevel: 0,
+      pipLevel: 0,
+      swelling: 0,
+      redness: false,
+      lump: false,
+      bruise: false,
+      fever: false,
+      notes: '',
+    }));
+  };
+  const compatIssues = getZoneCompatibilityIssues(draft.zone, draft.technique, draft.volumeMl);
 
   return (
     <div
@@ -337,13 +372,32 @@ const InjectionEditor: React.FC<{
               ['redness', '🔴 Покраснение'],
               ['lump', '🟤 Уплотнение'],
               ['bruise', '🟣 Гематома'],
+              ['fever', '🌡 Температура'],
             ] as const
           ).map(([key, text]) => (
             <label key={key} style={{ fontSize: 13 }}>
-              <input type="checkbox" checked={draft[key]} onChange={(e) => set(key, e.target.checked)} /> {text}
+              <input type="checkbox" checked={!!draft[key]} onChange={(e) => set(key, e.target.checked)} /> {text}
             </label>
           ))}
         </div>
+        {compatIssues.length > 0 && (
+          <div
+            role="status"
+            style={{
+              margin: '0 0 12px',
+              padding: '8px 10px',
+              borderRadius: 8,
+              fontSize: 12,
+              color: '#fcd34d',
+              background: 'rgba(245,158,11,0.10)',
+              border: '1px solid rgba(245,158,11,0.3)',
+            }}
+          >
+            {compatIssues.slice(0, 2).map((issue) => (
+              <div key={issue}>⚠ {issue}</div>
+            ))}
+          </div>
+        )}
         <Field label="Заметки">
           <textarea
             value={draft.notes || ''}
@@ -357,6 +411,15 @@ const InjectionEditor: React.FC<{
           <button style={button} onClick={onClose}>
             Отмена
           </button>
+          {onSaveMore && (
+            <button
+              style={{ ...button, background: colors.primaryDim, color: colors.primary }}
+              onClick={saveAndMore}
+              disabled={!draft.date || !draft.substance.trim() || !draft.dose.trim()}
+            >
+              ➕ Сохранить и ещё
+            </button>
+          )}
           <button
             style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800 }}
             onClick={save}
@@ -365,6 +428,114 @@ const InjectionEditor: React.FC<{
             💾 Сохранить
           </button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const ScheduleItemEditor: React.FC<{
+  initial?: InjectionScheduleItem;
+  onClose: () => void;
+  onSave: (item: InjectionScheduleItem) => void;
+}> = ({ initial, onClose, onSave }) => {
+  const [item, setItem] = useState<InjectionScheduleItem>(() =>
+    initial
+      ? { ...initial }
+      : {
+          id: '',
+          substance: '',
+          dose: '',
+          daysOfWeek: [],
+          zone: 'glute_dorsal',
+          side: 'left',
+          technique: 'im',
+          needleGauge: '23G',
+          volumeMl: 1,
+          active: true,
+        },
+  );
+  const toggleDay = (day: number) => {
+    setItem((current) => ({
+      ...current,
+      daysOfWeek: current.daysOfWeek.includes(day)
+        ? current.daysOfWeek.filter((d) => d !== day)
+        : [...current.daysOfWeek, day].sort((a, b) => a - b),
+    }));
+  };
+  const valid = () => !!item.substance.trim() && !!item.dose.trim() && item.daysOfWeek.length > 0;
+  return (
+    <div style={{ ...card, marginBottom: 12, borderColor: 'rgba(245,158,11,.35)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 14 }}>
+          {initial ? '✎ Редактировать пункт расписания' : '➕ Новый пункт расписания'}
+        </h3>
+        <button style={{ ...button, minHeight: 32, padding: '4px 10px' }} onClick={onClose}>
+          ✕
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 8, marginBottom: 8 }}>
+        <Field label="Препарат">
+          <input value={item.substance} onChange={(e) => setItem((c) => ({ ...c, substance: e.target.value }))} placeholder="Тестостерон энантат" style={inputStyle} />
+        </Field>
+        <Field label="Доза">
+          <input value={item.dose} onChange={(e) => setItem((c) => ({ ...c, dose: e.target.value }))} placeholder="250 мг" style={inputStyle} />
+        </Field>
+        <Field label="Зона">
+          <select value={item.zone || 'glute_dorsal'} onChange={(e) => setItem((c) => ({ ...c, zone: e.target.value }))} style={selectStyle}>
+            {INJECTION_ZONES.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Техника">
+          <select value={item.technique || 'im'} onChange={(e) => setItem((c) => ({ ...c, technique: e.target.value }))} style={selectStyle}>
+            {TECHNIQUES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, color: colors.textMuted }}>Дни недели:</span>
+        {SCHEDULE_WEEKDAYS.map((label, day) => {
+          const on = item.daysOfWeek.includes(day);
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => toggleDay(day)}
+              style={{
+                minHeight: 36,
+                minWidth: 40,
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+                border: `1px solid ${on ? 'rgba(245,158,11,.55)' : colors.border}`,
+                background: on ? 'rgba(245,158,11,.18)' : 'rgba(255,255,255,.03)',
+                color: on ? '#fbbf24' : colors.textMuted,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button style={button} onClick={onClose}>
+          Отмена
+        </button>
+        <button
+          style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800 }}
+          onClick={() => valid() && onSave(item)}
+          disabled={!valid()}
+        >
+          💾 Сохранить
+        </button>
       </div>
     </div>
   );
@@ -385,6 +556,10 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const [pageSize, setPageSize] = useState(10);
   const [chartMetric, setChartMetric] = useState<'pain' | 'pip'>('pain');
   const [trendDays, setTrendDays] = useState(7);
+  const [doseRangeDays, setDoseRangeDays] = useState(7);
+  const [schedule, setSchedule] = useState<InjectionScheduleItem[]>([]);
+  const [scheduleEditor, setScheduleEditor] = useState<{ open: boolean; item?: InjectionScheduleItem }>({ open: false });
+  const [adviceSubstance, setAdviceSubstance] = useState('');
   const chartRef = useRef<SVGSVGElement>(null);
 
   const today = todayLocalStr();
@@ -395,6 +570,8 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
     setEntries(migrated.length ? migrated : getInjectionDiary());
     setPage(1);
     setMode('journal');
+    setSchedule(getInjectionSchedule());
+    setScheduleEditor({ open: false });
   }, [open]);
 
   const stats = useMemo(() => computeInjectionStats(entries), [entries]);
@@ -410,10 +587,19 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const zoneTechniqueMatrix = useMemo(() => getZoneTechniqueMatrix(entries), [entries]);
   const repeatLast = useMemo(() => getLastInjection(entries), [entries]);
   const zoneAdvice = useMemo(() => getZoneTechniqueAdvice(selectedZone), [selectedZone]);
+  const uniqueSubstances = useMemo(() => [...new Set(entries.map((e) => e.substance.trim()).filter(Boolean))], [entries]);
+  useEffect(() => {
+    if (!adviceSubstance && uniqueSubstances.length) setAdviceSubstance(uniqueSubstances[0]);
+  }, [uniqueSubstances, adviceSubstance]);
   const substanceAdvice = useMemo(() => {
-    if (!repeatLast) return null;
-    return getSubstanceInjectionAdvice(repeatLast.substance);
-  }, [repeatLast]);
+    const substance = adviceSubstance || repeatLast?.substance || '';
+    if (!substance) return null;
+    return getSubstanceInjectionAdvice(substance);
+  }, [adviceSubstance, repeatLast]);
+  const doseSummary = useMemo(() => getDoseSummary(entries, doseRangeDays), [entries, doseRangeDays]);
+  const dueToday = useMemo(() => getDueToday(schedule), [schedule]);
+  const missed = useMemo(() => getMissedInjections(entries, schedule), [entries, schedule]);
+  const adherence = useMemo(() => computeScheduleAdherence(entries, schedule), [entries, schedule]);
 
   const localDateDaysAgo = (days: number): string => {
     const d = new Date();
@@ -480,12 +666,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   };
   const restore = () => {
     if (!undo) return;
-    clearInjectionDiary();
-    let restored: InjectionEntry[] = [];
-    undo.forEach(({ id: _id, ...entry }) => {
-      restored = addInjection(entry);
-    });
-    setEntries(restored);
+    setEntries(replaceInjectionDiary(undo));
     setUndo(null);
     onDataChange?.();
   };
@@ -506,6 +687,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
       'Покраснение',
       'Уплотнение',
       'Гематома',
+      'Температура',
       'Заметки',
     ];
     const cell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -525,6 +707,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
         entry.redness ? 'да' : '',
         entry.lump ? 'да' : '',
         entry.bruise ? 'да' : '',
+        entry.fever ? 'да' : '',
         entry.notes || '',
       ]
         .map(cell)
@@ -543,7 +726,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
     const popup = window.open('', '_blank');
     if (!popup) return;
     popup.document.write(
-      `<html><head><title>Дневник инъекций</title><style>body{font:12px Arial;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:5px}h1{color:#111}</style></head><body><h1>Дневник инъекций</h1><p>Всего: ${stats.totalInjections}; средняя боль: ${stats.avgPain ?? '—'}; PIP: ${stats.avgPip ?? '—'}</p><table><tr><th>Дата</th><th>Препарат</th><th>Доза</th><th>Зона</th><th>PIP</th><th>Боль</th><th>Осложнения</th></tr>${entries.map((entry) => `<tr><td>${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.substance)}</td><td>${escapeHtml(entry.dose)}</td><td>${escapeHtml(zoneLabel(entry.zone))}</td><td>${entry.pipLevel}/10</td><td>${entry.painLevel}/10</td><td>${escapeHtml([entry.redness && 'краснота', entry.lump && 'уплотнение', entry.bruise && 'гематома'].filter(Boolean).join(', ') || '—')}</td></tr>`).join('')}</table></body></html>`,
+      `<html><head><title>Дневник инъекций</title><style>body{font:12px Arial;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:5px}h1{color:#111}</style></head><body><h1>Дневник инъекций</h1><p>Всего: ${stats.totalInjections}; средняя боль: ${stats.avgPain ?? '—'}; PIP: ${stats.avgPip ?? '—'}</p><table><tr><th>Дата</th><th>Препарат</th><th>Доза</th><th>Зона</th><th>PIP</th><th>Боль</th><th>Осложнения</th></tr>${entries.map((entry) => `<tr><td>${escapeHtml(entry.date)}</td><td>${escapeHtml(entry.substance)}</td><td>${escapeHtml(entry.dose)}</td><td>${escapeHtml(zoneLabel(entry.zone))}</td><td>${entry.pipLevel}/10</td><td>${entry.painLevel}/10</td><td>${escapeHtml([entry.redness && 'краснота', entry.lump && 'уплотнение', entry.bruise && 'гематома', entry.fever && 'температура'].filter(Boolean).join(', ') || '—')}</td></tr>`).join('')}</table></body></html>`,
     );
     popup.document.close();
     popup.print();
@@ -825,7 +1008,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                           color: entry.redness || entry.lump || entry.bruise ? colors.warning : colors.textMuted,
                         }}
                       >
-                        {[entry.redness && 'краснота', entry.lump && 'уплотнение', entry.bruise && 'гематома']
+                        {[entry.redness && 'краснота', entry.lump && 'уплотнение', entry.bruise && 'гематома', entry.fever && 'температура']
                           .filter(Boolean)
                           .join(', ') || '—'}
                       </td>
@@ -931,6 +1114,49 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                 </div>
               </div>
             )}
+            <div style={{ ...card, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0 }}>💊 Суммарные дозы</h3>
+                <select
+                  value={doseRangeDays}
+                  onChange={(e) => setDoseRangeDays(Number(e.target.value))}
+                  style={{ ...selectStyle, width: 110, fontSize: 12 }}
+                >
+                  <option value="7">7 дней</option>
+                  <option value="30">30 дней</option>
+                </select>
+              </div>
+              {doseSummary.length > 0 ? (
+                <div style={{ marginTop: 8 }}>
+                  {doseSummary.map((row) => (
+                    <div
+                      key={`${row.substance}-${row.unit}`}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '7px 0',
+                        borderBottom: `1px solid ${colors.border}`,
+                      }}
+                    >
+                      <span>
+                        {row.substance}
+                        <small style={{ display: 'block', color: colors.textMuted }}>
+                          {row.count}× · средняя {row.avg ?? '—'} {row.unit}
+                        </small>
+                      </span>
+                      <strong>
+                        {row.total} {row.unit}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ color: colors.textMuted, marginTop: 6, fontSize: 12 }}>
+                  Нет доз с распознаваемыми единицами (мг/мл/IU) за выбранный период
+                </div>
+              )}
+            </div>
             {trend && (
               <div style={{ ...card, marginTop: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -1137,6 +1363,173 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           </section>
         )}
 
+        <section style={{ ...card, marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            <h3 style={{ margin: 0 }}>📅 Расписание инъекций</h3>
+            <button
+              style={{ ...button, background: colors.primaryDim, color: colors.primary }}
+              onClick={() => setScheduleEditor({ open: true })}
+            >
+              ➕ Добавить
+            </button>
+          </div>
+          {dueToday.length > 0 && (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: '9px 12px',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexWrap: 'wrap',
+                background: 'rgba(245,158,11,0.10)',
+                border: '1px solid rgba(245,158,11,0.3)',
+              }}
+            >
+              <span style={{ fontSize: 15 }}>📌</span>
+              <div style={{ flex: 1, minWidth: 160, fontSize: 12.5 }}>
+                <b style={{ color: '#fbbf24' }}>Сегодня по плану:</b>{' '}
+                {dueToday.map((s) => `${s.substance} ${s.dose}`).join(' · ')}
+              </div>
+              <button
+                style={{ ...button, minHeight: 32, padding: '5px 12px', background: 'rgba(245,158,11,.2)', color: '#fbbf24' }}
+                onClick={() => {
+                  const item = dueToday[0];
+                  setRepeatDraft({
+                    date: todayLocalStr(),
+                    substance: item.substance,
+                    dose: item.dose,
+                    zone: item.zone || 'glute_dorsal',
+                    side: item.side || 'left',
+                    volumeMl: item.volumeMl ?? 1,
+                    needleGauge: item.needleGauge || '23G',
+                    technique: item.technique || 'im',
+                    painLevel: 0,
+                    pipLevel: 0,
+                    swelling: 0,
+                    redness: false,
+                    lump: false,
+                    bruise: false,
+                    fever: false,
+                    notes: '',
+                  });
+                  setEditor({ open: true });
+                }}
+              >
+                ✍ Записать
+              </button>
+            </div>
+          )}
+          {missed.length > 0 && (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: '9px 12px',
+                borderRadius: 10,
+                fontSize: 12,
+                color: '#fca5a5',
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.25)',
+              }}
+            >
+              ⏭ Пропущено за 7 дней: {missed.map((m) => `${m.item.substance} (${m.date})`).join(', ')}
+            </div>
+          )}
+          {adherence.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+              {adherence.map((row) => (
+                <div key={row.item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>
+                      {row.item.substance}{' '}
+                      <span style={{ color: colors.textMuted, fontWeight: 400 }}>{row.item.dose}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
+                      {SCHEDULE_WEEKDAYS.map((label, day) => (
+                        <span
+                          key={label}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: '2px 6px',
+                            borderRadius: 6,
+                            color: row.item.daysOfWeek.includes(day) ? '#fbbf24' : colors.textMuted,
+                            background: row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.03)',
+                          }}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>
+                      <span>Соблюдение · {row.planned} по плану</span>
+                      <b style={{ color: row.pct !== null && row.pct < 60 ? colors.danger : row.pct !== null && row.pct < 85 ? colors.warning : colors.green }}>
+                        {row.pct !== null ? `${row.pct}%` : '—'}
+                      </b>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${row.pct ?? 0}%`,
+                          borderRadius: 999,
+                          background:
+                            row.pct !== null && row.pct < 60
+                              ? colors.danger
+                              : row.pct !== null && row.pct < 85
+                                ? colors.warning
+                                : colors.green,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      style={{ ...button, minHeight: 32, padding: '4px 10px' }}
+                      onClick={() => setScheduleEditor({ open: true, item: row.item })}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      style={{ ...dangerButton, minHeight: 32, padding: '4px 10px' }}
+                      onClick={() => {
+                        if (window.confirm(`Удалить пункт расписания «${row.item.substance}»?`)) {
+                          setSchedule(removeScheduleItem(row.item.id));
+                        }
+                      }}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {adherence.length === 0 && !scheduleEditor.open && (
+            <div style={{ color: colors.textMuted, fontSize: 12 }}>
+              Нет активного расписания. Добавьте план (препарат + дни недели) — будет считаться соблюдение и
+              напоминания о пропущенных инъекциях.
+            </div>
+          )}
+          {scheduleEditor.open && (
+            <ScheduleItemEditor
+              initial={scheduleEditor.item}
+              onClose={() => setScheduleEditor({ open: false })}
+              onSave={(item) => {
+                if (item.id) {
+                  setSchedule(updateScheduleItem(item.id, item));
+                } else {
+                  setSchedule(addScheduleItem(item));
+                }
+                setScheduleEditor({ open: false });
+              }}
+            />
+          )}
+        </section>
+
         <section
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 12, marginTop: 12 }}
         >
@@ -1225,7 +1618,20 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
             )}
             {substanceAdvice && (
               <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', marginBottom: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: colors.blue, marginBottom: 2 }}>Рекомендации для: {repeatLast?.substance}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: colors.blue }}>Рекомендации для препарата</div>
+                  <select
+                    value={adviceSubstance}
+                    onChange={(e) => setAdviceSubstance(e.target.value)}
+                    style={{ ...selectStyle, width: '100%', fontSize: 12, flex: '1 1 200px' }}
+                  >
+                    {uniqueSubstances.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div style={{ fontSize: 12, color: colors.text }}><b>Техника:</b> {substanceAdvice.technique}</div>
                 <div style={{ fontSize: 12, color: colors.text }}><b>Игла:</b> {substanceAdvice.needle}</div>
                 <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{substanceAdvice.notes}</div>
@@ -1276,6 +1682,9 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           save(draft, editor.entry?.id);
           setEditor({ open: false });
           setRepeatDraft(null);
+        }}
+        onSaveMore={(draft) => {
+          save(draft, editor.entry?.id);
         }}
       />
       <style>{`

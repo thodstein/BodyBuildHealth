@@ -6,17 +6,25 @@
 import React, { useMemo } from 'react';
 import { colors, BoolChip } from './ui';
 import { todayIso } from './diary-helpers';
-import { INJECTION_ZONES, NEEDLE_GAUGES, TECHNIQUES } from '../../../engines/injection-diary.engine';
+import {
+  INJECTION_ZONES,
+  NEEDLE_GAUGES,
+  TECHNIQUES,
+  getSuggestedZoneSide,
+  getZoneCompatibilityIssues,
+} from '../../../engines/injection-diary.engine';
 import {
   DiaryModalShell,
   SectionCard,
   ScalePicker,
   TextField,
   FormBanner,
+  btnGhost,
+  btnPrimary,
   fieldInput,
   readDiaryEntries,
   lastEntryOf,
-  findByDate,
+  findByDateAndSubstance,
   useDiaryDraft,
   TodayChip,
   RepeatLastChip,
@@ -38,8 +46,13 @@ const COMMON_INJECTIONS = [
   'IGF-1',
 ];
 
-const REACTION_KEYS = ['redness', 'lump', 'bruise'] as const;
-const REACTION_LABELS: Record<string, string> = { redness: 'Покраснение', lump: 'Уплотнение', bruise: 'Синяк' };
+const REACTION_KEYS = ['redness', 'lump', 'bruise', 'fever'] as const;
+const REACTION_LABELS: Record<string, string> = {
+  redness: 'Покраснение',
+  lump: 'Уплотнение',
+  bruise: 'Синяк',
+  fever: 'Температура',
+};
 
 type InjRec = { date?: string; zone?: string; side?: string; substance?: string; dose?: string | number; [k: string]: unknown };
 interface InjectionDraft {
@@ -78,7 +91,7 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       painLevel: '0',
       pipLevel: '0',
       swelling: '0',
-      reactions: { redness: false, lump: false, bruise: false },
+      reactions: { redness: false, lump: false, bruise: false, fever: false },
       notes: '',
     };
   };
@@ -96,30 +109,15 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
   }, [allInjections]);
   const lastRec = useMemo(() => lastEntryOf(allInjections), [allInjections]);
 
-  const rotation = useMemo(() => {
-    const used = new Map<string, { date?: string }>();
-    for (const e of allInjections) {
-      if (!e?.zone) continue;
-      const k = `${e.zone}_${e.side}`;
-      if (!used.has(k)) used.set(k, e);
-    }
-    let best: { zone: string; side: 'left' | 'right'; days: number } | null = null;
-    let bestDays = -1;
-    const now = Date.now();
-    for (const z of INJECTION_ZONES) {
-      for (const side of ['left', 'right'] as const) {
-        const last = used.get(`${z.id}_${side}`);
-        const days = last?.date
-          ? Math.max(0, Math.floor((now - new Date(String(last.date)).getTime()) / 86400000))
-          : 999;
-        if (days > bestDays) {
-          bestDays = days;
-          best = { zone: z.id, side, days: last?.date ? days : -1 };
-        }
-      }
-    }
-    return best;
-  }, [allInjections]);
+  const rotation = useMemo(
+    () => getSuggestedZoneSide(allInjections as any[]),
+    [allInjections],
+  );
+
+  const compatIssues = useMemo(
+    () => getZoneCompatibilityIssues(draft.zone, draft.technique, Number(draft.volumeMl) || 0),
+    [draft.zone, draft.technique, draft.volumeMl],
+  );
 
   const lastDoseFor = (sub: string): string => {
     const e = lastEntryOf(allInjections.filter((x) => String(x?.substance || '').toLowerCase() === sub.toLowerCase()));
@@ -166,10 +164,34 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       redness: !!draft.reactions.redness,
       lump: !!draft.reactions.lump,
       bruise: !!draft.reactions.bruise,
+      fever: !!draft.reactions.fever,
       notes: draft.notes.trim() || undefined,
     });
     resetDraft();
     onClose();
+  };
+
+  const saveAndContinue = () => {
+    if (!draft.date || substanceInvalid || doseInvalid) return;
+    onSave({
+      date: draft.date,
+      substance: draft.substance.trim(),
+      dose: draft.dose.trim(),
+      zone: draft.zone,
+      side: draft.side,
+      volumeMl: Number(draft.volumeMl) || 0,
+      needleGauge: draft.needleGauge,
+      technique: draft.technique,
+      painLevel: Number(draft.painLevel) || 0,
+      pipLevel: Number(draft.pipLevel) || 0,
+      swelling: Number(draft.swelling) || 0,
+      redness: !!draft.reactions.redness,
+      lump: !!draft.reactions.lump,
+      bruise: !!draft.reactions.bruise,
+      fever: !!draft.reactions.fever,
+      notes: draft.notes.trim() || undefined,
+    });
+    resetDraft();
   };
 
   const setScale = (key: 'painLevel' | 'pipLevel' | 'swelling') => (v: number) =>
@@ -178,8 +200,8 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
   const zoneLabel = (id: string) => INJECTION_ZONES.find((z) => z.id === id)?.label || id;
 
   const existing = useMemo(
-    () => findByDate<InjRec>(readDiaryEntries<InjRec>('he_injection_diary'), draft.date),
-    [open, draft.date],
+    () => findByDateAndSubstance<InjRec>(readDiaryEntries<InjRec>('he_injection_diary'), draft.date, draft.substance),
+    [open, draft.date, draft.substance],
   );
 
   const spark = useMemo(
@@ -200,6 +222,44 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
       fill={{ current: 5 + (substanceInvalid ? 0 : 1) + (doseInvalid ? 0 : 1), total: 7 }}
       spark={{ data: spark, color: '#fbbf24' }}
       stale={lastRec ? { days: daysSince(lastRec.date) ?? 0 } : null}
+      footer={
+        <div style={{ display: 'flex', gap: 10, padding: '16px 20px 20px', borderTop: '1px solid rgba(245,158,11,0.14)', flexShrink: 0, background: 'rgba(0,0,0,0.2)' }}>
+          <div
+            title={`Заполнено ${5 + (substanceInvalid ? 0 : 1) + (doseInvalid ? 0 : 1)}/7`}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0, marginRight: 4 }}
+          >
+            <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  width: `${Math.min(100, ((5 + (substanceInvalid ? 0 : 1) + (doseInvalid ? 0 : 1)) / 7) * 100)}%`,
+                  borderRadius: 999,
+                  background: 'linear-gradient(90deg, rgba(245,158,11,0.53), #f59e0b)',
+                  transition: 'width 0.35s cubic-bezier(0.32, 0.72, 0.28, 1)',
+                }}
+              />
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 800, color: colors.textMuted, whiteSpace: 'nowrap' }}>
+              {5 + (substanceInvalid ? 0 : 1) + (doseInvalid ? 0 : 1)}/7
+            </span>
+          </div>
+          <button type="button" className="dm-ghost-btn" onClick={onClose} style={btnGhost}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="dm-ghost-btn"
+            onClick={saveAndContinue}
+            disabled={substanceInvalid || doseInvalid || !draft.date}
+            style={{ ...btnGhost, flex: 1.2, opacity: substanceInvalid || doseInvalid || !draft.date ? 0.5 : 1 }}
+          >
+            💾 Сохранить и ещё
+          </button>
+          <button type="submit" className="dm-primary-btn" style={btnPrimary('#f59e0b')}>
+            Сохранить →
+          </button>
+        </div>
+      }
     >
       <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
         <div style={{ flex: 1 }}>
@@ -215,6 +275,12 @@ export const AddInjectionModal: React.FC<{ open: boolean; onClose: () => void; o
           Запись за {existing.date} уже есть: {typeof existing.substance === 'string' && existing.substance ? existing.substance : 'инъекция'}{typeof existing.dose === 'string' && existing.dose ? ` ${existing.dose}` : typeof existing.dose === 'number' ? ` ${existing.dose}` : ''} — при сохранении будет заменена
         </FormBanner>
       )}
+
+      {compatIssues.slice(0, 2).map((issue) => (
+        <FormBanner key={issue} tone="warning">
+          {issue}
+        </FormBanner>
+      ))}
 
       {rotation && (
         <button

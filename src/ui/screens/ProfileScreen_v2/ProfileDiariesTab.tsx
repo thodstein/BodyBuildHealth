@@ -1778,8 +1778,9 @@ export const ProfileDiariesTab: React.FC<{
             onClose={() => setAddInjectionOpen(false)}
             onSave={(e) => {
               const prev = injectionEntries;
-              const replaced = prev.some((x) => x.date === e.date);
-              const updated = [...injectionEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
+              const sub = (x: { substance?: unknown }) => String(x.substance ?? '').trim().toLowerCase();
+              const replaced = prev.some((x) => x.date === e.date && sub(x) === sub(e));
+              const updated = [...injectionEntries.filter((x) => !(x.date === e.date && sub(x) === sub(e))), e].sort((a, b) =>
                 a.date.localeCompare(b.date),
               );
               saveDiary(INJECTION_DIARY_KEY, updated);
