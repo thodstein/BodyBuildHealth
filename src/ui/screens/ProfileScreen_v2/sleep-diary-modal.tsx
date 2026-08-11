@@ -3,8 +3,8 @@
  * Умные дефолты из последней записи, черновик в sessionStorage,
  * спарклайн последних 7 дней, живая валидация.
  */
-import React, { useMemo } from 'react';
-import { colors } from './ui';
+import React, { useMemo, useState } from 'react';
+import { colors, BoolChip } from './ui';
 import { todayIso } from './diary-helpers';
 import {
   DiaryModalShell,
@@ -26,7 +26,19 @@ import {
 const SLEEP_QUALITY_EMOJI = ['😖', '😞', '😐', '🙂', '😴'];
 const SLEEP_QUALITY_LABEL = ['Плохо', 'Тяжело', 'Средне', 'Хорошо', 'Отлично'];
 
-type SleepRec = { date?: string; bedtime?: string; wakeTime?: string; hours?: number; awakenings?: number; quality?: number };
+type SleepRec = {
+  date?: string;
+  bedtime?: string;
+  wakeTime?: string;
+  hours?: number;
+  awakenings?: number;
+  quality?: number;
+  latency?: number;
+  caffeineCutoff?: string;
+  alcohol?: boolean;
+  screenTime?: number;
+  stressLevel?: number;
+};
 interface SleepDraft {
   date: string;
   hours: string;
@@ -35,6 +47,11 @@ interface SleepDraft {
   bedtime: string;
   wakeTime: string;
   notes: string;
+  latency: string;
+  caffeineCutoff: string;
+  alcohol: boolean;
+  screenTime: string;
+  stressLevel: string;
 }
 
 export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({
@@ -52,9 +69,15 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       bedtime: last?.bedtime || '23:00',
       wakeTime: last?.wakeTime || '07:00',
       notes: '',
+      latency: last && typeof last.latency === 'number' ? String(last.latency) : '',
+      caffeineCutoff: last?.caffeineCutoff || '',
+      alcohol: last?.alcohol ?? false,
+      screenTime: last && typeof last.screenTime === 'number' ? String(last.screenTime) : '',
+      stressLevel: last && typeof last.stressLevel === 'number' ? String(last.stressLevel) : '',
     };
   };
   const [draft, setDraft, resetDraft] = useDiaryDraft<SleepDraft>('he_draft_sleep', initial);
+  const [factorsOpen, setFactorsOpen] = useState(false);
   const lastRec = useMemo(() => lastEntryOf(readDiaryEntries<SleepRec>('he_sleep_diary')), [open]);
   const existing = useMemo(
     () => findByDate(readDiaryEntries<SleepRec>('he_sleep_diary'), draft.date),
@@ -69,9 +92,21 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
   const aw = Number(draft.awakenings);
   const awakeningsInvalid = draft.awakenings.trim() !== '' && (!Number.isFinite(aw) || aw < 0 || aw > 20);
   const coherenceWarn = !hoursInvalid && !qualityInvalid && h >= 8 && q <= 2;
+  const lat = Number(draft.latency);
+  const latencyInvalid = draft.latency.trim() !== '' && (!Number.isFinite(lat) || lat < 0 || lat > 300);
+  const screen = Number(draft.screenTime);
+  const screenInvalid = draft.screenTime.trim() !== '' && (!Number.isFinite(screen) || screen < 0 || screen > 1440);
+  const stress = Number(draft.stressLevel);
+  const stressInvalid = draft.stressLevel.trim() !== '' && (!Number.isFinite(stress) || stress < 1 || stress > 10);
+  const factorCount =
+    (draft.latency.trim() !== '' ? 1 : 0) +
+    (draft.caffeineCutoff.trim() !== '' ? 1 : 0) +
+    (draft.screenTime.trim() !== '' ? 1 : 0) +
+    (draft.alcohol ? 1 : 0) +
+    (draft.stressLevel.trim() !== '' ? 1 : 0);
 
   const save = () => {
-    if (!draft.date || hoursInvalid || qualityInvalid) return;
+    if (!draft.date || hoursInvalid || qualityInvalid || latencyInvalid || screenInvalid || stressInvalid) return;
     onSave({
       date: draft.date,
       hours: h,
@@ -80,6 +115,11 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
       bedtime: draft.bedtime,
       wakeTime: draft.wakeTime,
       notes: draft.notes.trim() || undefined,
+      latency: draft.latency.trim() !== '' && Number.isFinite(lat) ? lat : undefined,
+      caffeineCutoff: draft.caffeineCutoff.trim() || undefined,
+      alcohol: draft.alcohol,
+      screenTime: draft.screenTime.trim() !== '' && Number.isFinite(screen) ? screen : undefined,
+      stressLevel: draft.stressLevel.trim() !== '' && Number.isFinite(stress) ? stress : undefined,
     });
     resetDraft();
     onClose();
@@ -123,6 +163,116 @@ export const AddSleepModal: React.FC<{ open: boolean; onClose: () => void; onSav
           Запись за {existing.date} уже есть: {typeof existing.hours === 'number' ? `${existing.hours} ч` : 'данные'}
           {typeof existing.quality === 'number' ? ` · качество ${SLEEP_QUALITY_LABEL[existing.quality - 1] || '—'}` : ''} — при сохранении будет заменена
         </FormBanner>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <button
+          type="button"
+          aria-expanded={factorsOpen}
+          aria-controls="sleep-factors-card"
+          onClick={() => setFactorsOpen((o) => !o)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '8px 13px',
+            borderRadius: 12,
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            color: factorsOpen ? '#a78bfa' : colors.textMuted,
+            border: `1px solid ${factorsOpen ? 'rgba(167,139,250,0.5)' : colors.border}`,
+            background: factorsOpen ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)',
+            minHeight: 40,
+            transition: 'all 0.15s',
+          }}
+        >
+          🧪 Факторы {factorsOpen ? '▾' : '▸'}
+        </button>
+        {factorCount > 0 && !factorsOpen && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#a78bfa',
+              background: 'rgba(167,139,250,0.1)',
+              border: '1px solid rgba(167,139,250,0.3)',
+              borderRadius: 999,
+              padding: '4px 10px',
+            }}
+          >
+            заполнено: {factorCount}
+          </span>
+        )}
+      </div>
+
+      {factorsOpen && (
+        <SectionCard
+          icon="🧪"
+          title="Факторы"
+          color="#a78bfa"
+          hint="Данные для аналитики: гигиена сна, корреляции с тренировками и добавками"
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <TextField
+              label="Засыпание, мин"
+              value={draft.latency}
+              onChange={(v) => set('latency', v)}
+              type="number"
+              min={0}
+              max={300}
+              invalid={latencyInvalid}
+              unit="мин"
+            />
+            <TextField
+              label="Кофеин до"
+              value={draft.caffeineCutoff}
+              onChange={(v) => set('caffeineCutoff', v)}
+              type="time"
+            />
+            <TextField
+              label="Экран перед сном, мин"
+              value={draft.screenTime}
+              onChange={(v) => set('screenTime', v)}
+              type="number"
+              min={0}
+              max={1440}
+              invalid={screenInvalid}
+              unit="мин"
+            />
+            <div style={{ display: 'flex', alignItems: 'flex-end', minHeight: 40 }}>
+              <BoolChip
+                checked={draft.alcohol}
+                onChange={(v) => setDraft((p) => ({ ...p, alcohol: v }))}
+                label="Алкоголь"
+                color="#f87171"
+              />
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.textMuted, fontWeight: 700, marginBottom: 6 }}>
+              <span>Стресс за день</span>
+              <span>{stress >= 1 && stress <= 10 ? `${stress}/10` : '—'}</span>
+            </div>
+            <ScalePicker
+              value={stress >= 1 && stress <= 10 ? stress : 5}
+              onChange={(v) => set('stressLevel', String(v))}
+              min={1}
+              max={10}
+              dense
+              labels={(v) => String(v)}
+              toneFn={(v) => (v <= 3 ? '#22c55e' : v <= 6 ? '#f59e0b' : v <= 8 ? '#f97316' : '#ef4444')}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+              <span style={{ fontSize: 10.5, color: colors.textSubtle }}>1 — спокойный день</span>
+              <span style={{ fontSize: 10.5, color: colors.textSubtle }}>10 — сильный стресс</span>
+            </div>
+          </div>
+          {latencyInvalid && <FormBanner tone="error">Засыпание: число минут от 0 до 300</FormBanner>}
+          {!latencyInvalid && screenInvalid && <FormBanner tone="error">Экран: минуты от 0 до 1440</FormBanner>}
+          {!latencyInvalid && !screenInvalid && stressInvalid && <FormBanner tone="error">Стресс: оценка от 1 до 10</FormBanner>}
+        </SectionCard>
       )}
 
       <SectionCard icon="⏰" title="Продолжительность" color="#a78bfa">

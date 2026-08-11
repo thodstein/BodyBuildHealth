@@ -4,7 +4,7 @@
  * stale-чип в шапке модалки, findByDate + баннеры замены записи (Round 4).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook, act, waitFor, render, screen } from '@testing-library/react';
+import { renderHook, act, waitFor, render, screen, fireEvent, within } from '@testing-library/react';
 import {
   bpCategory,
   daysAgoLabel,
@@ -270,5 +270,66 @@ describe('Round 4 — баннер «запись уже есть» (замен�
     localStorage.setItem('he_health_diary', JSON.stringify([{ date: today, pain: { totalScore: 5 } }]));
     render(<AddHealthModal open onClose={noop} onSave={noop} />);
     expect(screen.getByText(new RegExp('Запись здоровья за ' + today + ' уже есть'))).toBeTruthy();
+  });
+});
+
+describe('AddSleepModal — секция «Факторы» (паритет с полной формой)', () => {
+  const noop = () => {};
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('секция свёрнута по умолчанию: тумблер есть, полей нет', () => {
+    render(<AddSleepModal open onClose={noop} onSave={noop} />);
+    expect(screen.getByRole('button', { name: /Факторы/ })).toBeTruthy();
+    expect(screen.queryByLabelText(/Засыпание, мин/)).toBeNull();
+    expect(screen.queryByLabelText(/Экран перед сном/)).toBeNull();
+  });
+
+  it('клик по тумблеру раскрывает все поля факторов', () => {
+    render(<AddSleepModal open onClose={noop} onSave={noop} />);
+    fireEvent.click(screen.getByRole('button', { name: /Факторы/ }));
+    expect(screen.getByLabelText(/Засыпание, мин/)).toBeTruthy();
+    expect(screen.getByLabelText(/Кофеин до/)).toBeTruthy();
+    expect(screen.getByLabelText(/Экран перед сном/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Алкоголь' })).toBeTruthy();
+    expect(screen.getByText('Стресс за день')).toBeTruthy();
+  });
+
+  it('факторы наследуются из последней записи (дефолт черновика)', () => {
+    localStorage.setItem(
+      'he_sleep_diary',
+      JSON.stringify([{ date: '2026-08-01', hours: 7, quality: 4, latency: 18, screenTime: 40, caffeineCutoff: '13:00', stressLevel: 6, alcohol: true }]),
+    );
+    render(<AddSleepModal open onClose={noop} onSave={noop} />);
+    fireEvent.click(screen.getByRole('button', { name: /Факторы/ }));
+    expect((screen.getByLabelText(/Засыпание, мин/) as HTMLInputElement).value).toBe('18');
+    expect((screen.getByLabelText(/Экран перед сном/) as HTMLInputElement).value).toBe('40');
+    expect((screen.getByLabelText(/Кофеин до/) as HTMLInputElement).value).toBe('13:00');
+    expect(screen.getByRole('button', { name: /✓ Алкоголь/ })).toBeTruthy();
+  });
+
+  it('факторы попадают в onSave: латентность, кофеин, экран, алкоголь, стресс', () => {
+    let saved: Record<string, unknown> | null = null;
+    render(<AddSleepModal open onClose={noop} onSave={(e: any) => { saved = e; }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Факторы/ }));
+    fireEvent.change(screen.getByLabelText(/Засыпание, мин/), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText(/Кофеин до/), { target: { value: '15:00' } });
+    fireEvent.change(screen.getByLabelText(/Экран перед сном/), { target: { value: '45' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Алкоголь' }));
+    fireEvent.click(screen.getByRole('radio', { name: '6' }));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(saved).toMatchObject({ latency: 25, caffeineCutoff: '15:00', screenTime: 45, alcohol: true, stressLevel: 6 });
+  });
+
+  it('невалидная латентность: error-баннер + сохранение заблокировано', () => {
+    let saved = false;
+    render(<AddSleepModal open onClose={noop} onSave={() => { saved = true; }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Факторы/ }));
+    fireEvent.change(screen.getByLabelText(/Засыпание, мин/), { target: { value: '999' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    expect(screen.getByRole('alert').textContent).toMatch(/0 до 300/);
+    expect(saved).toBe(false);
   });
 });
