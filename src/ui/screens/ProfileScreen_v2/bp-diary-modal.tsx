@@ -1,9 +1,10 @@
 /**
  * bp-diary-modal.tsx — модалка добавления записи давления.
  * Умные дефолты из последней записи, живая классификация АД,
- * спарклайн последних 7 записей, валидация кризов.
+ * dual-спарклайн (систола/диастола), PP/MAP, симптомы, рука/позиция,
+ * валидация кризов, 3/7-дневные средние, тренд.
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import {
@@ -12,6 +13,7 @@ import {
   TextField,
   FormBanner,
   LiveBadge,
+  ChipGroup,
   fieldInput,
   readDiaryEntries,
   lastEntryOf,
@@ -42,15 +44,54 @@ export const bpCategory = (s: number, d: number): { label: string; color: string
   return BP_TONE.normal;
 };
 
-type BpRec = { date?: string; systolic?: number; diastolic?: number; pulse?: number; hr?: number; timeOfDay?: string };
+type BpRec = {
+  date?: string;
+  systolic?: number;
+  diastolic?: number;
+  pulse?: number;
+  hr?: number;
+  timeOfDay?: string;
+  arm?: 'left' | 'right';
+  position?: 'sitting' | 'lying' | 'standing';
+  symptoms?: string[];
+  medTaken?: boolean;
+  notes?: string;
+};
+
 interface BPDraft {
   date: string;
   systolic: string;
   diastolic: string;
   pulse: string;
   timeOfDay: 'morning' | 'evening';
+  arm: 'left' | 'right';
+  position: 'sitting' | 'lying' | 'standing';
+  symptoms: string[];
+  medTaken: boolean;
   notes: string;
 }
+
+const SYMPTOM_OPTIONS = [
+  { id: 'headache', label: '🤕 Головная боль' },
+  { id: 'dizziness', label: '💫 Головокружение' },
+  { id: 'chest_pain', label: '🫀 Боль в груди' },
+  { id: 'shortness_breath', label: '🫁 Одышка' },
+  { id: 'nausea', label: '🤢 Тошнота' },
+  { id: 'visual_disturbance', label: '👁 Нарушения зрения' },
+  { id: 'palpitations', label: '💓 Учащенное сердцебиение' },
+  { id: 'fatigue', label: '😴 Сильная усталость' },
+] as const;
+
+const ARM_OPTIONS = [
+  { id: 'left', label: '👈 Левая' },
+  { id: 'right', label: '👉 Правая' },
+] as const;
+
+const POSITION_OPTIONS = [
+  { id: 'sitting', label: '🪑 Сидя' },
+  { id: 'lying', label: '🛌 Лежа' },
+  { id: 'standing', label: '🧍 Стоя' },
+] as const;
 
 export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({
   open,
@@ -66,12 +107,16 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
       diastolic: last?.diastolic ? String(last.diastolic) : '80',
       pulse: lastPulse && lastPulse > 0 ? String(lastPulse) : '70',
       timeOfDay: last?.timeOfDay === 'evening' ? 'evening' : 'morning',
+      arm: last?.arm ?? 'left',
+      position: last?.position ?? 'sitting',
+      symptoms: [],
+      medTaken: false,
       notes: '',
     };
   };
   const [draft, setDraft, resetDraft] = useDiaryDraft<BPDraft>('he_draft_bp', initial);
   const lastRec = useMemo(() => lastEntryOf(readDiaryEntries<BpRec>('he_bp_diary')), [open]);
-  const set = (key: keyof BPDraft, val: string) => setDraft((p) => ({ ...p, [key]: val }));
+  const set = (key: keyof BPDraft, val: string | string[] | boolean) => setDraft((p) => ({ ...p, [key]: val }));
 
   const s = Number(draft.systolic);
   const d = Number(draft.diastolic);
@@ -83,16 +128,66 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
   const dge = Number.isFinite(s) && Number.isFinite(d) && d >= s;
   const cat = bpCategory(s, d);
 
+  /* ── Расчётные показатели ── */
+  const pp = Number.isFinite(s) && Number.isFinite(d) ? s - d : null; // Pulse Pressure
+  const map = Number.isFinite(s) && Number.isFinite(d) ? Math.round((2 * d + s) / 3) : null; // MAP
+  const ppWarn = pp !== null && (pp > 60 || pp < 30);
+  const mapWarn = map !== null && (map > 110 || map < 60);
+
+  /* ── Тренд и средние ── */
+  const history = useMemo(
+    () => readDiaryEntries<BpRec>('he_bp_diary').slice(-7),
+    [open],
+  );
+  const systolicHistory = history.map((e) => (typeof e?.systolic === 'number' ? e.systolic : null));
+  const diastolicHistory = history.map((e) => (typeof e?.diastolic === 'number' ? e.diastolic : null));
+  const avg3 = useMemo(() => {
+    const vals = history.slice(-3).filter((e) => typeof e.systolic === 'number' && typeof e.diastolic === 'number');
+    if (!vals.length) return null;
+    return {
+      sys: Math.round(vals.reduce((a, e) => a + (e.systolic || 0), 0) / vals.length),
+      dia: Math.round(vals.reduce((a, e) => a + (e.diastolic || 0), 0) / vals.length),
+    };
+  }, [history]);
+  const avg7 = useMemo(() => {
+    const vals = history.filter((e) => typeof e.systolic === 'number' && typeof e.diastolic === 'number');
+    if (!vals.length) return null;
+    return {
+      sys: Math.round(vals.reduce((a, e) => a + (e.systolic || 0), 0) / vals.length),
+      dia: Math.round(vals.reduce((a, e) => a + (e.diastolic || 0), 0) / vals.length),
+    };
+  }, [history]);
+  const trend = useMemo(() => {
+    if (history.length < 2) return '→';
+    const last = history[history.length - 1];
+    const prev = history[history.length - 2];
+    if (!last.systolic || !prev.systolic) return '→';
+    const diff = last.systolic - prev.systolic;
+    return diff > 2 ? '↑' : diff < -2 ? '↓' : '→';
+  }, [history]);
+
   const save = () => {
     if (!draft.date || !valid || dge) return;
-    onSave({ date: draft.date, systolic: s, diastolic: d, hr: p, pulse: p, timeOfDay: draft.timeOfDay, notes: draft.notes.trim() || undefined });
+    onSave({
+      date: draft.date,
+      systolic: s,
+      diastolic: d,
+      hr: p,
+      pulse: p,
+      timeOfDay: draft.timeOfDay,
+      arm: draft.arm,
+      position: draft.position,
+      symptoms: draft.symptoms,
+      medTaken: draft.medTaken,
+      notes: draft.notes.trim() || undefined,
+    });
     resetDraft();
     onClose();
   };
 
   const spark = useMemo(
-    () => readDiaryEntries<{ systolic?: number }>('he_bp_diary').slice(-7).map((e) => (typeof e?.systolic === 'number' ? e.systolic : null)),
-    [open],
+    () => systolicHistory,
+    [systolicHistory],
   );
 
   return (
