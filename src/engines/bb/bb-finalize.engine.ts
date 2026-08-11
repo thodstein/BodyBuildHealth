@@ -12,7 +12,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
-import { annotateBackExercise, backQualityIssues } from './bb-back-quality.engine';
+import { annotateBackExercise, backQualityIssues, verticalPullProfile } from './bb-back-quality.engine';
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
 
@@ -191,22 +191,35 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
   // Vertical pull is a weekly slot, not a per-session entitlement. At two
   // back sessions/week only one gets a vertical pull; with 3+ sessions allow
   // two, still preventing daily pull-ups in specialization blocks.
-  const maxVertical = backSessionCount >= 3 ? 2 : 1;
-  let verticalSeen = 0;
+  const maxVerticalSessions = backSessionCount >= 3 ? 3 : backSessionCount;
+  const keptProfiles = new Set<string>();
+  let verticalSessionsSeen = 0;
   const sessions = [...week.sessions].sort((a: any, b: any) => a.day - b.day);
-  let verticalSessionKept = 0;
   for (const session of sessions) {
     const usedPatterns = new Set(session.exercises.filter((e: any) => e.muscle === 'back').map((e: any) => annotateBackExercise(e).movementPattern));
+    let sessionHasKeptVertical = false;
     for (const exercise of session.exercises) {
       if (exercise.muscle !== 'back') continue;
       const tagged = annotateBackExercise(exercise);
       if (tagged.movementPattern !== 'vertical_pull') continue;
-      verticalSeen += 1;
-      if (verticalSeen <= maxVertical && verticalSessionKept === 0) {
-        verticalSessionKept = 1;
+      const profile = verticalPullProfile(exercise.name);
+      const shouldKeep = !sessionHasKeptVertical && (!keptProfiles.has(profile) || verticalSessionsSeen < maxVerticalSessions);
+      if (shouldKeep) {
+        sessionHasKeptVertical = true;
+        keptProfiles.add(profile);
+        verticalSessionsSeen += 1;
         continue;
       }
+      // Сначала ищем другой вертикальный профиль (wide ↔ hammer/neutral ↔
+      // underhand). Хорошая вертикальная тяга не должна исчезать только
+      // потому, что она вертикальная.
       const replacement = EXERCISE_CATALOG.find((candidate: any) => {
+        if (trueMuscleOf(candidate) !== 'back') return false;
+        if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
+        if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
+        const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
+        return next.movementPattern === 'vertical_pull' && verticalPullProfile(candidate.name) !== profile;
+      }) || EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
         if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;

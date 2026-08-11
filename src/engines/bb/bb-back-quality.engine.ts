@@ -4,6 +4,18 @@ export type BackPattern = 'vertical_pull' | 'heavy_row' | 'supported_row' | 'uni
 export type LegPattern = 'compound_squat' | 'lunge' | 'sissy_lengthened' | 'leg_extension' | 'belt_stepup' | 'leg_curl' | 'rdl_hinge' | 'hip_thrust' | 'glute_accessory' | 'calf' | 'other';
 export type ArmPattern = 'biceps_lengthened' | 'biceps_shortened' | 'biceps_hammer' | 'triceps_overhead' | 'triceps_pushdown' | 'triceps_compound' | 'forearm' | 'other';
 
+/** Разные вертикальные профили нельзя сводить в один дубль: wide-grip,
+ * neutral/hammer, underhand и pull-up дают разные линии локтя/профили нагрузки. */
+export function verticalPullProfile(name: string): string {
+  const n = String(name || '').toLowerCase();
+  if (/подтяг|pull.?up|chin.?up/i.test(n)) return 'pullup';
+  if (/хаммер|hammer|нейтрал|neutral|parallel|параллел|узк.*нейтр/i.test(n)) return 'neutral_hammer';
+  if (/обратн|underhand|supinat|нижн.*хват/i.test(n)) return 'underhand';
+  if (/широк|wide|широким|за голов/i.test(n)) return 'wide';
+  if (/машин|тренаж|machine/i.test(n)) return 'machine_vertical';
+  return 'cable_vertical';
+}
+
 export function classifyBackExercise(name: string): { pattern: BackPattern; subgroup: BBExercise['backSubgroup'] } {
   const n = String(name || '').toLowerCase();
   if (/подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун|vertical/i.test(n)) return { pattern: 'vertical_pull', subgroup: 'back_width' };

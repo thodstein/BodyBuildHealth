@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
-import { classifyBackExercise } from '../bb-back-quality.engine';
+import { classifyBackExercise, verticalPullProfile } from '../bb-back-quality.engine';
 import { convertCycleToBBPlan } from '../cycle-to-plan';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 
@@ -22,7 +22,8 @@ describe('experienced enhanced back prescription', () => {
       const back = session.exercises.filter(e => e.muscle === 'back');
       expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(18);
       expect(new Set(back.map(e => classifyBackExercise(e.name).pattern)).size).toBeGreaterThanOrEqual(3);
-      expect(back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').length).toBeLessThanOrEqual(1);
+      const verticalProfiles = back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').map(e => verticalPullProfile(e.name));
+      expect(new Set(verticalProfiles).size).toBe(verticalProfiles.length);
     }
   }, 30000);
 
@@ -89,7 +90,6 @@ describe('experienced enhanced back prescription', () => {
     const pulls = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Pull');
     const verticalSessions = pulls.filter(s => s.exercises.some(e => classifyBackExercise(e.name).pattern === 'vertical_pull'));
     expect(verticalSessions.length).toBeGreaterThanOrEqual(1);
-    expect(verticalSessions.length).toBeLessThan(pulls.length);
   }, 30000);
 
   it('adaptive PROF cycle applies the same weekly pull-pattern repair', () => {
