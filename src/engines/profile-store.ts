@@ -3,8 +3,6 @@
  * ПОСЛЕ миграции на UnifiedSettings: все sync-функции пишут ТОЛЬКО в общее хранилище.
  * Diary-данные (вес, замеры, давление) остаются в отдельных localStorage.
  */
-import { getProfile, updateProfile } from '../core/profile-manager';
-import type { UserProfile, UnifiedSettings, InjuryRecord } from '../core/types';
 
 /* ── localStorage keys (diary only) ── */
 const KEYS = {
@@ -26,6 +24,7 @@ export interface WeightEntry {
   waistCm?: number;       // талия, см
   chestCm?: number;       // грудь, см
   hipCm?: number;         // бедра, см
+  shoulderCm?: number;    // плечи, см
   bicepCm?: number;       // бицепс, см (среднее/общее)
   bicepLeftCm?: number;   // бицепс левый, см
   bicepRightCm?: number;  // бицепс правый, см
@@ -36,51 +35,83 @@ export interface WeightEntry {
   calfLeftCm?: number;    // икра левая, см
   calfRightCm?: number;   // икра правая, см
   neckCm?: number;        // шея, см
-  forearmCm?: number;     // предплечье, см
+  forearmCm?: number;     // предплечье, см (среднее/общее)
+  forearmLeftCm?: number; // предплечье левое, см
+  forearmRightCm?: number;// предплечье правое, см
   muscleMass?: number;    // мышечная масса, кг
   waterMass?: number;     // вода, %
   notes?: string;         // заметка
   photos?: string[];      // base64/dataURL фото
   timeOfDay?: 'morning' | 'evening'; // время суток замера (макс 5, до 2Мб каждое)
 }
+
+const num = (v: unknown): number | undefined => {
+  if (v === undefined || v === null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/** Нормализация одной записи: числа, фильтр NaN-веса, строка даты. */
+export function normalizeWeightEntry(e: any): WeightEntry | null {
+  if (!e || typeof e.date !== 'string' || !e.date) return null;
+  const weight = num(e.weight);
+  if (weight === undefined || weight <= 0) return null;
+  return {
+    date: e.date,
+    weight,
+    bodyFat: num(e.bodyFat),
+    waistCm: num(e.waistCm),
+    chestCm: num(e.chestCm),
+    hipCm: num(e.hipCm),
+    shoulderCm: num(e.shoulderCm),
+    bicepCm: num(e.bicepCm),
+    bicepLeftCm: num(e.bicepLeftCm),
+    bicepRightCm: num(e.bicepRightCm),
+    thighCm: num(e.thighCm),
+    thighLeftCm: num(e.thighLeftCm),
+    thighRightCm: num(e.thighRightCm),
+    calfCm: num(e.calfCm),
+    calfLeftCm: num(e.calfLeftCm),
+    calfRightCm: num(e.calfRightCm),
+    neckCm: num(e.neckCm),
+    forearmCm: num(e.forearmCm),
+    forearmLeftCm: num(e.forearmLeftCm),
+    forearmRightCm: num(e.forearmRightCm),
+    muscleMass: num(e.muscleMass),
+    waterMass: num(e.waterMass),
+    notes: typeof e.notes === 'string' && e.notes ? e.notes : undefined,
+    photos: Array.isArray(e.photos) ? e.photos.filter((p: any) => typeof p === 'string') : undefined,
+    timeOfDay: e.timeOfDay === 'morning' || e.timeOfDay === 'evening' ? e.timeOfDay : undefined,
+  };
+}
+
 export function getWeightLog(): WeightEntry[] {
   try {
     const raw = JSON.parse(localStorage.getItem(KEYS.weight) || '[]');
-    return Array.isArray(raw) ? raw.map((e: any) => ({
-      date: e.date,
-      weight: Number(e.weight),
-      bodyFat: e.bodyFat !== undefined ? Number(e.bodyFat) : undefined,
-      waistCm: e.waistCm !== undefined ? Number(e.waistCm) : undefined,
-      chestCm: e.chestCm !== undefined ? Number(e.chestCm) : undefined,
-      hipCm: e.hipCm !== undefined ? Number(e.hipCm) : undefined,
-      bicepCm: e.bicepCm !== undefined ? Number(e.bicepCm) : undefined,
-      bicepLeftCm: e.bicepLeftCm !== undefined ? Number(e.bicepLeftCm) : undefined,
-      bicepRightCm: e.bicepRightCm !== undefined ? Number(e.bicepRightCm) : undefined,
-      thighCm: e.thighCm !== undefined ? Number(e.thighCm) : undefined,
-      thighLeftCm: e.thighLeftCm !== undefined ? Number(e.thighLeftCm) : undefined,
-      thighRightCm: e.thighRightCm !== undefined ? Number(e.thighRightCm) : undefined,
-      calfCm: e.calfCm !== undefined ? Number(e.calfCm) : undefined,
-      calfLeftCm: e.calfLeftCm !== undefined ? Number(e.calfLeftCm) : undefined,
-      calfRightCm: e.calfRightCm !== undefined ? Number(e.calfRightCm) : undefined,
-      neckCm: e.neckCm !== undefined ? Number(e.neckCm) : undefined,
-      forearmCm: e.forearmCm !== undefined ? Number(e.forearmCm) : undefined,
-      muscleMass: e.muscleMass !== undefined ? Number(e.muscleMass) : undefined,
-      waterMass: e.waterMass !== undefined ? Number(e.waterMass) : undefined,
-      notes: e.notes ? String(e.notes) : undefined,
-      photos: Array.isArray(e.photos) ? e.photos.filter((p: any) => typeof p === 'string') : undefined,
-      timeOfDay: e.timeOfDay === 'morning' || e.timeOfDay === 'evening' ? e.timeOfDay : undefined,
-    })) : [];
+    return Array.isArray(raw) ? raw.map(normalizeWeightEntry).filter((e): e is WeightEntry => e !== null) : [];
   } catch { return []; }
 }
+
+/**
+ * Сохранение лога: дедупликация по дате, сортировка по дате (asc),
+ * обрезка до 365 самых СВЕЖИХ записей; старшие уходят в архив.
+ * Устойчив к любому порядку входящего массива.
+ */
 export function saveWeightLog(log: WeightEntry[]) {
-  const trimmed = log.slice(-365);
-  if (trimmed.length < log.length) {
-    const overflow = log.slice(0, log.length - 365);
+  const byDate = new Map<string, WeightEntry>();
+  for (const e of log) {
+    const n = normalizeWeightEntry(e);
+    if (n) byDate.set(n.date, n);
+  }
+  const deduped = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const trimmed = deduped.slice(-365);
+  if (trimmed.length < deduped.length) {
+    const overflow = deduped.slice(0, deduped.length - 365);
     try {
       const archive = getWeightLogArchived();
-      const byDate = new Map<string, WeightEntry>();
-      for (const e of [...archive, ...overflow]) if (e && e.date) byDate.set(e.date, e);
-      localStorage.setItem(KEYS.weightArchive, JSON.stringify([...byDate.values()]));
+      const arcByDate = new Map<string, WeightEntry>();
+      for (const e of [...archive, ...overflow]) if (e && e.date) arcByDate.set(e.date, e);
+      localStorage.setItem(KEYS.weightArchive, JSON.stringify([...arcByDate.values()]));
     } catch { /* quota — silent */ }
   }
   const totalPhotos = trimmed.reduce((sum, e) => sum + (e.photos?.length || 0), 0);
@@ -95,7 +126,7 @@ export function saveWeightLog(log: WeightEntry[]) {
 export function getWeightLogArchived(): WeightEntry[] {
   try {
     const raw = JSON.parse(localStorage.getItem(KEYS.weightArchive) || '[]');
-    return Array.isArray(raw) ? raw : [];
+    return Array.isArray(raw) ? raw.map(normalizeWeightEntry).filter((e): e is WeightEntry => e !== null) : [];
   } catch { return []; }
 }
 
@@ -117,7 +148,15 @@ export function migrateWeightLogLegacy(): void {
     const merge = (date: string, patch: Partial<WeightEntry>) => {
       if (!date) return;
       const existing = byDate.get(date) || {};
-      byDate.set(date, { ...existing, ...patch, date });
+      // Каноническая запись имеет приоритет: legacy-поля применяются только
+      // для незаполненных ключей; undefined-поля не затирают данные.
+      const clean: Partial<WeightEntry> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) continue;
+        if ((existing as Record<string, unknown>)[k] !== undefined) continue;
+        (clean as Record<string, unknown>)[k] = v;
+      }
+      byDate.set(date, { ...existing, ...clean, date });
     };
 
     // 1) he_measurements (BodyMeasurement: weightKg, bodyFatPercent, neckCm...)
@@ -134,9 +173,11 @@ export function migrateWeightLogLegacy(): void {
             neckCm: Number(m.neckCm) > 0 ? Number(m.neckCm) : undefined,
             chestCm: Number(m.chestCm) > 0 ? Number(m.chestCm) : undefined,
             hipCm: Number(m.hipCm) > 0 ? Number(m.hipCm) : undefined,
+            shoulderCm: Number(m.shoulderCm) > 0 ? Number(m.shoulderCm) : undefined,
             bicepLeftCm: Number(m.armLeftCm) > 0 ? Number(m.armLeftCm) : undefined,
             bicepRightCm: Number(m.armRightCm) > 0 ? Number(m.armRightCm) : undefined,
-            forearmCm: Number(m.forearmLeftCm) > 0 ? Number(m.forearmLeftCm) : undefined,
+            forearmLeftCm: Number(m.forearmLeftCm) > 0 ? Number(m.forearmLeftCm) : undefined,
+            forearmRightCm: Number(m.forearmRightCm) > 0 ? Number(m.forearmRightCm) : undefined,
             waistCm: Number(m.waistCm) > 0 ? Number(m.waistCm) : undefined,
             thighLeftCm: Number(m.thighLeftCm) > 0 ? Number(m.thighLeftCm) : undefined,
             thighRightCm: Number(m.thighRightCm) > 0 ? Number(m.thighRightCm) : undefined,
@@ -201,14 +242,18 @@ export function migrateWeightLogLegacy(): void {
       .map(([date, e]) => ({ date, ...e }) as WeightEntry)
       .filter(e => Number.isFinite(e.weight))
       .sort((a, b) => b.date.localeCompare(a.date));
-    if (merged.length > log.length) saveWeightLog(merged);
+    // Сохраняем не только при появлении новых записей, но и при изменении полей
+    // существующих (legacy-замеры на даты канонических записей).
+    if (merged.length !== log.length || JSON.stringify(merged) !== JSON.stringify(log)) {
+      saveWeightLog(merged);
+    }
     localStorage.setItem(KEYS.weightMigrated, '1');
   } catch { /* quota/parse — silent, повторится при следующем открытии */ }
 }
 
 /* ── DEPRECATED: measurements log merged into weight log ── */
 export interface MeasurementEntry {
-  date: string; waistCm: number; chestCm: number; hipCm: number;
+  date: string; waistCm: number; chestCm: number; hipCm: number; shoulderCm: number;
   bicepCm: number; thighCm: number; neckCm: number; forearmCm: number; bodyFat: number;
 }
 /** @deprecated Use getWeightLog() instead. Returns measurements extracted from weight log. */
@@ -217,12 +262,13 @@ export function getMeasurementsLog(): MeasurementEntry[] {
   return weightLog
     .filter(e => e.waistCm !== undefined || e.chestCm !== undefined || e.hipCm !== undefined ||
                  e.bicepCm !== undefined || e.thighCm !== undefined || e.neckCm !== undefined ||
-                 e.forearmCm !== undefined || e.bodyFat !== undefined)
+                 e.forearmCm !== undefined || e.shoulderCm !== undefined || e.bodyFat !== undefined)
     .map(e => ({
       date: e.date,
       waistCm: e.waistCm || 0,
       chestCm: e.chestCm || 0,
       hipCm: e.hipCm || 0,
+      shoulderCm: e.shoulderCm || 0,
       bicepCm: e.bicepCm || 0,
       thighCm: e.thighCm || 0,
       neckCm: e.neckCm || 0,
@@ -250,23 +296,5 @@ export function saveMeasurementsLog(log: MeasurementEntry[]) {
     });
   }
   saveWeightLog([...byDate.values()]);
-}
-
-/* ── Единая синхронизация: все модули читают из одного Profile.settings ── */
-export function syncAllProfiles(settings: UserProfile['settings'] | UnifiedSettings): void {
-  // После миграции все модули читают напрямую из profile.settings — ничего не дублируем.
-  // Старые вызовы persistSettings / saveLocal отключены.
-  // Актуально только для обратной совместимости с ProfileScreen.save().
-  try {
-    const s = settings as UnifiedSettings;
-    // Сохраняем weight-лог если изменился вес
-    if (s.personal?.weight) {
-      const log = getWeightLog();
-      const today = new Date().toISOString().split('T')[0];
-      if (!log.some(e => e.date === today)) {
-        saveWeightLog([...log, { date: today, weight: s.personal.weight }].slice(-90));
-      }
-    }
-  } catch { /* silent */ }
 }
 

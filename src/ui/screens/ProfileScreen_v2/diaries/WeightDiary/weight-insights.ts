@@ -101,3 +101,20 @@ export function goalDirection(start: number, cur: number, goal: number): 1 | -1 
   if (goal <= 0 || Math.abs(goal - start) < 0.01) return 0;
   return goal > start ? 1 : -1;
 }
+
+/**
+ * Записи для расчёта тренда: утренние взвешивания, когда их достаточно
+ * (≥3 записей и ≥60% всех), иначе — все записи. Утренние меньше зашумлены
+ * едой/водой, тренд по ним честнее.
+ */
+export function preferMorning<T extends { timeOfDay?: 'morning' | 'evening' }>(rows: T[]): T[] {
+  if (rows.length === 0) return rows;
+  const morning = rows.filter((r) => r.timeOfDay === 'morning');
+  return morning.length >= 3 && morning.length >= rows.length * 0.6 ? morning : rows;
+}
+
+/** RFC 4180 escape для CSV: поле с разделителем/кавычками/переносами оборачивается в кавычки. */
+export function csvEscape(value: unknown): string {
+  const s = value === undefined || value === null ? '' : String(value);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}

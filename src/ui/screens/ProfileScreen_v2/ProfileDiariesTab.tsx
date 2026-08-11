@@ -1289,7 +1289,7 @@ export const ProfileDiariesTab: React.FC<{
                 </div>
                 <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}>
                   {completionKeys.map((k) => {
-                    const filled = k.hasEntry && k.lastDate === new Date().toISOString().slice(0, 10);
+                    const filled = k.hasEntry && k.lastDate === todayIso();
                     return (
                       <div
                         key={k.key}

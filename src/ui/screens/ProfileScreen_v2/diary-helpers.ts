@@ -151,13 +151,15 @@ const extractValue = (
     return Number.isFinite(v) ? v : null;
   }
   if (key === 'pain' || key === 'acne') {
-    const f = e.fields.find(x => x.label === 'Суммарно');
+    // HealthDiary v2 использует label «Боль»/«Акне», legacy — «Суммарно»
+    const f = e.fields.find(x => x.label === 'Суммарно' || x.label === 'Боль' || x.label === 'Акне');
     if (!f) return null;
     const v = parseFloat(f.value);
     return Number.isFinite(v) ? v : null;
   }
   if (key === 'neuro' || key === 'hemato') {
-    const f = e.fields.find(x => x.label === 'Симптомов');
+    // HealthDiary v2 использует label «Нейро»/«Гемат», legacy — «Симптомов»
+    const f = e.fields.find(x => x.label === 'Симптомов' || x.label === 'Нейро' || x.label === 'Гемат');
     if (!f) return null;
     const v = parseFloat(f.value);
     return Number.isFinite(v) ? v : null;
@@ -414,6 +416,36 @@ export const detectAnomalies = (
 ): { date: string; severity: 'warn' | 'danger'; message: string }[] => {
   const issues: { date: string; severity: 'warn' | 'danger'; message: string }[] = [];
   if (entries.length === 0) return issues;
+  if (key === 'weight') {
+    // Скачки веса между соседними днями (в пределах 2 дней) и нереалистичные значения
+    const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+    const vals: { date: string; w: number }[] = [];
+    for (const e of sorted) {
+      const w = extractValue('weight', e);
+      if (w !== null && Number.isFinite(w)) vals.push({ date: e.date, w });
+    }
+    for (let i = 1; i < vals.length; i++) {
+      const prevMs = Date.parse(vals[i - 1].date);
+      const curMs = Date.parse(vals[i].date);
+      if (!Number.isFinite(prevMs) || !Number.isFinite(curMs)) continue;
+      const dayDiff = (curMs - prevMs) / 86400000;
+      if (dayDiff <= 0 || dayDiff > 2) continue; // пропуски в ведении не считаем скачком
+      const delta = vals[i].w - vals[i - 1].w;
+      const pct = vals[i - 1].w > 0 ? (Math.abs(delta) / vals[i - 1].w) * 100 : 0;
+      if (pct >= 5 || Math.abs(delta) >= 5) {
+        issues.push({ date: vals[i].date, severity: 'danger', message: `Скачок веса ${delta > 0 ? '+' : ''}${delta.toFixed(1)} кг за день` });
+      } else if (pct >= 2 || Math.abs(delta) >= 2) {
+        issues.push({ date: vals[i].date, severity: 'warn', message: `Скачок веса ${delta > 0 ? '+' : ''}${delta.toFixed(1)} кг за день` });
+      }
+    }
+    for (const e of sorted) {
+      const w = extractValue('weight', e);
+      if (w !== null && (w < 25 || w > 350)) {
+        issues.push({ date: e.date, severity: 'warn', message: `Вес ${w.toFixed(1)} кг вне правдоподобного диапазона (25–350)` });
+      }
+    }
+    return issues;
+  }
   for (const e of entries) {
     if (key === 'bp') {
       const sys = parseFloat(e.fields.find(x => x.label === 'Систола')?.value || 'NaN');
@@ -438,20 +470,20 @@ export const detectAnomalies = (
       if (alcohol && Number.isFinite(quality) && quality <= 2)
         issues.push({ date: e.date, severity: 'warn', message: 'Алкоголь + плохое качество сна' });
     } else if (key === 'pain') {
-      const total = parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
-      if (Number.isFinite(total) && total >= 60) issues.push({ date: e.date, severity: 'danger', message: `Боль Σ=${total.toFixed(0)}/70 (критично)` });
-      else if (Number.isFinite(total) && total >= 40) issues.push({ date: e.date, severity: 'warn', message: `Боль Σ=${total.toFixed(0)}/70 (выражено)` });
+      const total = extractValue('pain', e);
+      if (total !== null && total >= 60) issues.push({ date: e.date, severity: 'danger', message: `Боль Σ=${total.toFixed(0)}/70 (критично)` });
+      else if (total !== null && total >= 40) issues.push({ date: e.date, severity: 'warn', message: `Боль Σ=${total.toFixed(0)}/70 (выражено)` });
     } else if (key === 'neuro') {
-      const sc = parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
-      if (Number.isFinite(sc) && sc >= 6) issues.push({ date: e.date, severity: 'danger', message: `Нейро Σ=${sc}/10 (тяжёлое)` });
-      else if (Number.isFinite(sc) && sc >= 4) issues.push({ date: e.date, severity: 'warn', message: `Нейро Σ=${sc}/10 (умеренно)` });
+      const sc = extractValue('neuro', e);
+      if (sc !== null && sc >= 6) issues.push({ date: e.date, severity: 'danger', message: `Нейро Σ=${sc.toFixed(0)}/10 (тяжёлое)` });
+      else if (sc !== null && sc >= 4) issues.push({ date: e.date, severity: 'warn', message: `Нейро Σ=${sc.toFixed(0)}/10 (умеренно)` });
     } else if (key === 'acne') {
-      const total = parseFloat(e.fields.find(x => x.label === 'Суммарно')?.value || 'NaN');
-      if (Number.isFinite(total) && total >= 9) issues.push({ date: e.date, severity: 'danger', message: `Акне Σ=${total.toFixed(0)}/12 (тяжёлое)` });
-      else if (Number.isFinite(total) && total >= 7) issues.push({ date: e.date, severity: 'warn', message: `Акне Σ=${total.toFixed(0)}/12 (выражено)` });
+      const total = extractValue('acne', e);
+      if (total !== null && total >= 9) issues.push({ date: e.date, severity: 'danger', message: `Акне Σ=${total.toFixed(0)}/12 (тяжёлое)` });
+      else if (total !== null && total >= 7) issues.push({ date: e.date, severity: 'warn', message: `Акне Σ=${total.toFixed(0)}/12 (выражено)` });
     } else if (key === 'hemato') {
-      const sc = parseFloat(e.fields.find(x => x.label === 'Симптомов')?.value || 'NaN');
-      if (Number.isFinite(sc) && sc >= 3) issues.push({ date: e.date, severity: 'danger', message: `Гемат Σ=${sc}/8 (требуется ОАК)` });
+      const sc = extractValue('hemato', e);
+      if (sc !== null && sc >= 3) issues.push({ date: e.date, severity: 'danger', message: `Гемат Σ=${sc.toFixed(0)}/8 (требуется ОАК)` });
     }
   }
   return issues;

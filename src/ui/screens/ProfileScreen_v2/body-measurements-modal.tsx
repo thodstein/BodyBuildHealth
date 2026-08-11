@@ -33,6 +33,7 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
       { key: 'waistCm', label: 'Талия', unit: 'см' },
       { key: 'chestCm', label: 'Грудь', unit: 'см' },
       { key: 'hipCm', label: 'Бёдра', unit: 'см' },
+      { key: 'shoulderCm', label: 'Плечи', unit: 'см' },
       { key: 'neckCm', label: 'Шея', unit: 'см' },
     ],
   },
@@ -42,7 +43,8 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
     fields: [
       { key: 'bicepLeftCm', label: 'Бицепс L', unit: 'см' },
       { key: 'bicepRightCm', label: 'Бицепс R', unit: 'см' },
-      { key: 'forearmCm', label: 'Предплечье', unit: 'см' },
+      { key: 'forearmLeftCm', label: 'Предплечье L', unit: 'см' },
+      { key: 'forearmRightCm', label: 'Предплечье R', unit: 'см' },
     ],
   },
   {
@@ -71,6 +73,7 @@ interface WeightDraft {
   values: Record<string, string>;
   notes: string;
   photos: string[];
+  timeOfDay?: 'morning' | 'evening';
 }
 
 export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({
@@ -80,11 +83,21 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
 }) => {
   const initial = (): WeightDraft => {
     const last = lastEntryOf(getWeightLog() as { date?: string }[]);
+    let fallbackWeight = '80';
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      if (raw) {
+        const profile = JSON.parse(raw);
+        const pw = Number(profile?.personal?.weight);
+        if (Number.isFinite(pw) && pw > 0) fallbackWeight = String(pw);
+      }
+    } catch { /* ignore */ }
     return {
       date: todayIso(),
-      values: { weight: last && typeof (last as Record<string, unknown>).weight === 'number' ? String((last as Record<string, unknown>).weight) : '80' },
+      values: { weight: last && typeof (last as Record<string, unknown>).weight === 'number' ? String((last as Record<string, unknown>).weight) : fallbackWeight },
       notes: '',
       photos: [],
+      timeOfDay: 'morning',
     };
   };
   const [draft, setDraft, resetDraft] = useDiaryDraft<WeightDraft>('he_draft_weight', initial);
@@ -158,7 +171,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
 
   const save = () => {
     if (!draft.date || weightInvalid) return;
-    const entry: Record<string, unknown> = { date: draft.date, notes: draft.notes.trim() || undefined, photos: draft.photos.length ? draft.photos : undefined };
+    const entry: Record<string, unknown> = { date: draft.date, notes: draft.notes.trim() || undefined, photos: draft.photos.length ? draft.photos : undefined, timeOfDay: draft.timeOfDay };
     for (const group of MEASURE_GROUPS) {
       for (const f of group.fields) {
         const v = draft.values[f.key];
@@ -202,6 +215,32 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
           <TextField label="Дата" value={draft.date} onChange={(v) => setDraft((p) => ({ ...p, date: v }))} type="date" />
         </div>
         <TodayChip date={draft.date} onToday={() => setDraft((p) => ({ ...p, date: todayIso() }))} />
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <span style={{ ...fieldLabel, marginBottom: 4 }}>Время</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['morning', 'evening'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setDraft((p) => ({ ...p, timeOfDay: t }))}
+                aria-pressed={draft.timeOfDay === t}
+                style={{
+                  border: `1px solid ${draft.timeOfDay === t ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
+                  background: draft.timeOfDay === t ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
+                  color: draft.timeOfDay === t ? '#4ade80' : '#d4d4d8',
+                  borderRadius: 10,
+                  padding: '7px 9px',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  lineHeight: 1,
+                  fontWeight: 700,
+                }}
+              >
+                {t === 'morning' ? '🌅 Утро' : '🌙 Вечер'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {weightInvalid && <FormBanner tone="error">Вес обязателен — введите число больше 0</FormBanner>}

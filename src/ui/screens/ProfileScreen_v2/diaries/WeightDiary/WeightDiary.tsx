@@ -62,6 +62,8 @@ import {
   fmtSigned,
   goalProgressSafe,
   goalDirection,
+  preferMorning,
+  csvEscape,
   type RangeKey,
 } from './weight-insights';
 
@@ -148,6 +150,7 @@ const FIELDS = [
   'waistCm',
   'chestCm',
   'hipCm',
+  'shoulderCm',
   'bicepCm',
   'bicepLeftCm',
   'bicepRightCm',
@@ -159,6 +162,8 @@ const FIELDS = [
   'calfRightCm',
   'neckCm',
   'forearmCm',
+  'forearmLeftCm',
+  'forearmRightCm',
   'bodyFat',
   'muscleMass',
   'waterMass',
@@ -169,6 +174,7 @@ const LABELS: Record<Field, string> = {
   waistCm: 'Талия',
   chestCm: 'Грудь',
   hipCm: 'Бёдра',
+  shoulderCm: 'Плечи',
   bicepCm: 'Бицепс',
   bicepLeftCm: 'Бицепс L',
   bicepRightCm: 'Бицепс R',
@@ -180,6 +186,8 @@ const LABELS: Record<Field, string> = {
   calfRightCm: 'Икра R',
   neckCm: 'Шея',
   forearmCm: 'Предплечье',
+  forearmLeftCm: 'Предплечье L',
+  forearmRightCm: 'Предплечье R',
   bodyFat: '% жира',
   muscleMass: 'Мышечная масса',
   waterMass: 'Вода',
@@ -189,6 +197,7 @@ const UNIT: Record<Field, string> = {
   waistCm: 'см',
   chestCm: 'см',
   hipCm: 'см',
+  shoulderCm: 'см',
   bicepCm: 'см',
   bicepLeftCm: 'см',
   bicepRightCm: 'см',
@@ -200,6 +209,8 @@ const UNIT: Record<Field, string> = {
   calfRightCm: 'см',
   neckCm: 'см',
   forearmCm: 'см',
+  forearmLeftCm: 'см',
+  forearmRightCm: 'см',
   bodyFat: '%',
   muscleMass: 'кг',
   waterMass: '%',
@@ -311,6 +322,21 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     } catch { /* ignore */ }
     return [...DEFAULT_VISIBLE];
   });
+  const [units, setUnits] = useState<'kg' | 'lbs'>(() => {
+    try { return localStorage.getItem('he_wd_units_v1') === 'lbs' ? 'lbs' : 'kg'; } catch { return 'kg'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('he_wd_units_v1', units); } catch { /* ignore */ }
+  }, [units]);
+  const KG_IN_LB = 0.45359237;
+  const isLbs = units === 'lbs';
+  const dispW = (kg: number | undefined | null): number | null =>
+    kg === undefined || kg === null || !Number.isFinite(kg) ? null : (isLbs ? kg / KG_IN_LB : kg);
+  const wUnit = isLbs ? 'lbs' : 'кг';
+  const fmtW = (kg: number | undefined | null, digits = 1): string => {
+    const v = dispW(kg);
+    return v === null ? '—' : `${v.toFixed(digits)} ${wUnit}`;
+  };
   useEffect(() => {
     try { localStorage.setItem('he_wd_cols_v1', JSON.stringify(visibleCols)); } catch { /* ignore */ }
   }, [visibleCols]);
@@ -375,16 +401,21 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     };
   }, [open]);
   const commit = (next: WeightEntry[], remember = true) => {
-    const ordered = [...next].sort((a, b) => b.date.localeCompare(a.date));
+    // Дедупликация по дате: последняя запись на дату выигрывает
+    const byDate = new Map<string, WeightEntry>();
+    for (const e of next) if (e && e.date) byDate.set(e.date, e);
+    const ordered = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
     if (remember) setUndo(rows);
     saveWeightLog(ordered);
     setRows(ordered);
     onDataChange?.();
   };
   const quickAdd = () => {
-    const w = Number(quickW);
-    if (!Number.isFinite(w) || w <= 0 || w > 400) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const raw = Number(quickW);
+    const maxRaw = isLbs ? 880 : 400;
+    if (!Number.isFinite(raw) || raw <= 0 || raw > maxRaw) return;
+    const w = isLbs ? raw * KG_IN_LB : raw;
+    const today = todayIso();
     const next = rows.some((r) => r.date === today)
       ? rows.map((r) => (r.date === today ? { ...r, weight: w, timeOfDay: quickTod } : r))
       : [{ date: today, weight: w, timeOfDay: quickTod }, ...rows];
@@ -450,7 +481,11 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const last = withPhotos[0];
     return { before: first, after: last, beforeDates: withPhotos.map(r => r.date) };
   }, [rows]);
-  const weightFit = useMemo(() => fitLinearTrend(pointsFor(rows, 'weight')), [rows]);
+  /* Тренд/цель считаются по утренним замерам, когда их достаточно
+     (≥60% записей и ≥3) — меньше шума от «еда и вода» вечером. */
+  const trendRows = useMemo(() => preferMorning(rows), [rows]);
+  const trendNormalized = trendRows !== rows;
+  const weightFit = useMemo(() => fitLinearTrend(pointsFor(trendRows, 'weight')), [trendRows]);
   const chartProjection = useMemo(() => {
     if (goal <= 0 || !weightFit) return [] as OverlayChartProps['projections'];
     const out: OverlayChartProps['projections'] = [];
@@ -472,15 +507,15 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     return { days, weeks: Math.round((days / 7) * 10) / 10 };
   }, [goal, weightFit]);
   const goalProgress = useMemo(() => {
-    const pts = pointsFor(rows, 'weight').sort((a, b) => a.date.localeCompare(b.date));
+    const pts = pointsFor(trendRows, 'weight').sort((a, b) => a.date.localeCompare(b.date));
     if (pts.length === 0 || goal <= 0) return null;
     return goalProgressSafe(pts[0].value, pts[pts.length - 1].value, goal);
-  }, [rows, goal]);
+  }, [trendRows, goal]);
   const goalDir = useMemo(() => {
-    const pts = pointsFor(rows, 'weight').sort((a, b) => a.date.localeCompare(b.date));
+    const pts = pointsFor(trendRows, 'weight').sort((a, b) => a.date.localeCompare(b.date));
     if (pts.length === 0) return 0 as 1 | -1 | 0;
     return goalDirection(pts[0].value, pts[pts.length - 1].value, goal);
-  }, [rows, goal]);
+  }, [trendRows, goal]);
   const deltaMap = useMemo(() => deltaVsPrev(rows), [rows]);
   const todInsight = useMemo(() => timeOfDayBreakdown(rows), [rows]);
   const chartNotes = useMemo(() => chartRows.filter(r => r.notes).map(r => ({ date: r.date, text: r.notes! })), [chartRows]);
@@ -613,7 +648,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const cols = ['date', ...FIELDS, 'timeOfDay', 'notes'];
     const csv =
       '\ufeff' +
-      [cols.join(','), ...rows.map((r) => cols.map((c) => JSON.stringify((r as any)[c] ?? '')).join(','))].join('\n');
+      [cols.join(','), ...rows.map((r) => cols.map((c) => csvEscape((r as any)[c])).join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
@@ -623,7 +658,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   };
   const exportArchiveCsv = () => {
     const cols = ['date', 'weight', 'bodyFat', 'notes'];
-    const csv = '\ufeff' + [cols.join(','), ...archiveRows.map((r) => cols.map((c) => JSON.stringify((r as any)[c] ?? '')).join(','))].join('\n');
+    const csv = '\ufeff' + [cols.join(','), ...archiveRows.map((r) => cols.map((c) => csvEscape((r as any)[c])).join(','))].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
@@ -647,9 +682,16 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   };
   const saveEdit = () => {
     if (!editing || !draft.weight || !Number.isFinite(Number(draft.weight))) return;
-    commit(
-      rows.map((r) => (r.date === editing ? ({ ...r, ...draft, weight: Number(draft.weight) } as WeightEntry) : r)),
-    );
+    const newDate = typeof draft.date === 'string' && draft.date ? draft.date : editing;
+    // При смене даты на занятую — мерджим в существующую запись, дубликат не создаётся
+    const target = rows.find((r) => r.date === newDate);
+    const merged: WeightEntry = {
+      ...target,
+      ...draft,
+      date: newDate,
+      weight: Number(draft.weight),
+    } as WeightEntry;
+    commit(rows.filter((r) => r.date !== editing && r.date !== newDate).concat([merged]));
     setEditing(null);
   };
   const badgeFor = (field: Field, value: number | undefined, row: WeightEntry): React.ReactNode => {
@@ -692,9 +734,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         const g = goal;
         if (!g || g <= 0) return null;
         const d = value - g;
+        const dd = dispW(d) ?? 0;
         if (Math.abs(d) <= 1) return <span style={badge('green')}>✓ Goal</span>;
-        if (d > 0) return <span style={badge('orange')}>▲ +{d.toFixed(1)}</span>;
-        return <span style={badge('blue')}>▼ {d.toFixed(1)}</span>;
+        if (d > 0) return <span style={badge('orange')}>▲ +{dd.toFixed(1)}</span>;
+        return <span style={badge('blue')}>▼ {dd.toFixed(1)}</span>;
       }
       case 'bicepCm':
       case 'thighCm':
@@ -733,12 +776,24 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         style={{ ...input, minWidth: 70, padding: 5 }}
         type="number"
         step="0.1"
-        value={draft[field] ?? ''}
-        onChange={(e) => setDraft({ ...draft, [field]: e.target.value === '' ? undefined : Number(e.target.value) })}
+        value={field === 'weight' && draft.weight !== undefined ? (dispW(draft.weight) as number).toFixed(1) : draft[field] ?? ''}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (field === 'weight') {
+            const n = Number(v);
+            setDraft({ ...draft, weight: v === '' ? undefined : (isLbs ? n * KG_IN_LB : n) });
+          } else {
+            setDraft({ ...draft, [field]: v === '' ? undefined : Number(v) });
+          }
+        }}
       />
     ) : (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <span style={tnum}>{row[field] ?? '—'}</span>
+        <span style={tnum}>
+          {field === 'weight' && row.weight !== undefined
+            ? (dispW(row.weight) as number).toFixed(1)
+            : row[field] ?? '—'}
+        </span>
         {badgeFor(field, row[field] as number | undefined, row)}
       </span>
     );
@@ -748,11 +803,12 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   if (!open) return null;
 
   const deltaTone = (d: number | undefined): { color: string; text: string } => {
-    if (d === undefined) return { color: c.text3, text: '—' };
-    if (Math.abs(d) < 0.05) return { color: c.text3, text: '±0.0' };
+    const dv = dispW(d);
+    if (d === undefined || dv === null) return { color: c.text3, text: '—' };
+    if (Math.abs(dv) < 0.05) return { color: c.text3, text: '±0.0' };
     const good = goalDir === 0 ? null : d > 0 === (goalDir > 0);
     const color = good === null ? c.text2 : good ? c.green : c.red;
-    return { color, text: fmtSigned(d) };
+    return { color, text: fmtSigned(dv) };
   };
   const bmiLabel = body?.bmi == null ? '' : body.bmi >= 30 ? 'Ожирение' : body.bmi >= 25 ? 'Избыточный вес' : body.bmi < 18.5 ? 'Дефицит' : 'Норма';
   const bmiColor = body?.bmi == null ? undefined : body.bmi >= 30 ? c.red : body.bmi >= 25 ? c.orange : body.bmi < 18.5 ? c.orange : c.green;
@@ -826,7 +882,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   {archiveRows.slice(0, 100).map((r) => (
                     <tr key={r.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <td style={{ padding: 6 }}>{r.date}</td>
-                      <td style={{ padding: 6 }}>{r.weight ? r.weight.toFixed(1) : '—'}</td>
+                      <td style={{ padding: 6 }}>{fmtW(r.weight)}</td>
                       <td style={{ padding: 6 }}>{r.bodyFat !== undefined ? r.bodyFat + '%' : '—'}</td>
                       <td style={{ padding: 6 }}>{r.notes || '—'}</td>
                     </tr>
@@ -837,7 +893,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           </details>
         )}
 
-        {/* ── Инструменты: диапазон · поиск · цель ── */}
+        {/* ── Инструменты: диапазон · поиск · цель · единицы ── */}
         <section style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '14px 0 2px' }}>
           <div style={segWrap}>
             {(['all', '7', '30', '90'] as const).map((r) => (
@@ -857,16 +913,32 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             aria-label="Поиск по дате и полям"
           />
+          <div style={segWrap} role="radiogroup" aria-label="Единицы измерения">
+            {(['kg', 'lbs'] as const).map((u) => (
+              <button
+                key={u}
+                style={segBtn(units === u)}
+                onClick={() => setUnits(u)}
+                aria-pressed={units === u}
+                title={u === 'kg' ? 'Килограммы' : 'Фунты'}
+              >
+                {u === 'kg' ? 'кг' : 'lbs'}
+              </button>
+            ))}
+          </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: c.text3, whiteSpace: 'nowrap' }}>
             Цель
             <input
               style={{ ...input, width: 74 }}
               type="number" step="0.1" min={0}
-              value={goal || ''}
-              onChange={(e) => setGoal(Number(e.target.value) || 0)}
-              aria-label="Целевой вес, кг"
+              value={goal > 0 ? (dispW(goal) as number).toFixed(1) : ''}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setGoal(Number.isFinite(v) && v > 0 ? (isLbs ? v * KG_IN_LB : v) : 0);
+              }}
+              aria-label="Целевой вес"
             />
-            кг
+            {wUnit}
           </label>
         </section>
 
@@ -876,8 +948,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             <span style={{ ...metricLabel, marginBottom: 0 }}>Быстрый ввод</span>
             <input
               style={{ ...input, width: 96 }}
-              type="number" step="0.1" min={20} max={400}
-              placeholder="Вес, кг"
+              type="number" step="0.1" min={isLbs ? 44 : 20} max={isLbs ? 880 : 400}
+              placeholder={`Вес, ${wUnit}`}
               value={quickW}
               onChange={(e) => setQuickW(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(); }}
@@ -895,11 +967,11 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             <button
               style={{ ...btnPrimary, minHeight: 36 }}
               onClick={quickAdd}
-              disabled={!(Number(quickW) > 0 && Number(quickW) <= 400)}
+              disabled={!(Number(quickW) > 0 && Number(quickW) <= (isLbs ? 880 : 400))}
             >
               + Записать
             </button>
-            {rows.some((r) => r.date === new Date().toISOString().slice(0, 10)) && (
+            {rows.some((r) => r.date === todayIso()) && (
               <small style={{ color: c.orange, fontSize: 11 }}>Сегодня уже есть запись — будет обновлена</small>
             )}
           </div>
@@ -913,15 +985,16 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 <span style={metricLabel}>Текущий вес</span>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                   <AnimatedCounter
-                    value={body.latest.weight}
+                    value={dispW(body.latest.weight) || 0}
                     decimals={1}
                     duration={400}
-                    suffix=" кг"
+                    suffix={` ${wUnit}`}
                     style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.8px', fontVariantNumeric: 'tabular-nums', color: c.text, fontFamily: FONT, lineHeight: 1.1 }}
                   />
                 </div>
                 <div style={metricDelta}>
-                  Δ {fmtSigned(body.weightDelta)} кг · {interpretWeight(body.weightDelta, goal)}
+                  Δ {fmtSigned(dispW(body.weightDelta) || 0)} {wUnit} · {interpretWeight(body.weightDelta, goal)}
+                  {trendNormalized && <span style={{ color: c.blue, marginLeft: 6 }}>· тренд по утренним ☀</span>}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -932,11 +1005,11 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginTop: 14 }}>
               {[
-                ['Δ вес', body.weightDelta, 'кг', interpretWeight(body.weightDelta, goal)],
+                ['Δ вес', dispW(body.weightDelta), wUnit, interpretWeight(body.weightDelta, goal)],
                 ['% жира', body.latest.bodyFat, '%', interpretFat(body.fatDelta)],
                 ['Δ жира', body.fatDelta, '%', interpretFat(body.fatDelta)],
-                ['Мышцы', body.latest.muscleMass, 'кг', interpretMuscle(body.leanDelta)],
-                ['Δ мышц', body.leanDelta, 'кг', interpretMuscle(body.leanDelta)],
+                ['Мышцы', dispW(body.latest.muscleMass), wUnit, interpretMuscle(body.leanDelta)],
+                ['Δ мышц', dispW(body.leanDelta), wUnit, interpretMuscle(body.leanDelta)],
                 ['Δ талии', body.waistDelta, 'см', interpretWaist(body.waistDelta)],
               ].map(([k, val, unit, insight]) => {
                 const numVal = typeof val === 'number' && Number.isFinite(val) ? val : null;
@@ -964,18 +1037,18 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '0.5px solid rgba(255,255,255,0.07)' }}>
               {[
-                ['Среднее', distribution?.mean, 'кг'],
-                ['Медиана', distribution?.median, 'кг'],
-                ['Мин/макс', extremes.min && extremes.max ? [extremes.min.value, extremes.max.value] : null, ''],
+                ['Среднее', dispW(distribution?.mean), wUnit],
+                ['Медиана', dispW(distribution?.median), wUnit],
+                ['Мин/макс', extremes.min && extremes.max ? [dispW(extremes.min.value), dispW(extremes.max.value)] : null, ''],
                 ['Серия', streak.current, 'дн'],
-                ['Δ нед.', comparison.delta, 'кг'],
-                ['Δ 30д', body.delta30 ?? null, 'кг'],
-                ['Δ 90д', body.delta90 ?? null, 'кг'],
+                ['Δ нед.', dispW(comparison.delta), wUnit],
+                ['Δ 30д', dispW(body.delta30 ?? null), wUnit],
+                ['Δ 90д', dispW(body.delta90 ?? null), wUnit],
                 ['Аномалии', anomalies.length, ''],
               ].map(([k, v, u]) => {
                 let content: React.ReactNode = '—';
                 if (Array.isArray(v)) {
-                  content = <b style={tnum}>{v[0].toFixed(1)}/{v[1].toFixed(1)}</b>;
+                  content = <b style={tnum}>{v[0] !== null ? v[0].toFixed(1) : '—'}/{v[1] !== null ? v[1].toFixed(1) : '—'}</b>;
                 } else if (typeof v === 'number' && Number.isFinite(v)) {
                   const decimals = u === 'дн' ? 0 : 1;
                   const isDelta = String(k).startsWith('Δ');
@@ -1000,7 +1073,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         {goalProgress && (
           <section style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <b style={{ fontSize: 14, letterSpacing: '-0.2px' }}>Цель {goal} кг</b>
+              <b style={{ fontSize: 14, letterSpacing: '-0.2px' }}>Цель {fmtW(goal, 1)}</b>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 <label style={{ fontSize: 11, color: c.text3 }}>
                   К дате
@@ -1013,14 +1086,14 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 </label>
                 {eta ? (
                   <small style={{ color: c.orange, fontSize: 11 }}>
-                    {(weightFit ? (weightFit.slopePerDay * 7 >= 0 ? '+' : '') + (weightFit.slopePerDay * 7).toFixed(2) : '')} кг/нед · ETA ≈ {eta.weeks} нед
+                    {(weightFit ? (weightFit.slopePerDay * 7 >= 0 ? '+' : '') + (dispW(weightFit.slopePerDay * 7) as number).toFixed(2) : '')} {wUnit}/нед · ETA ≈ {eta.weeks} нед
                   </small>
                 ) : (
                   <small style={{ color: c.text3, fontSize: 11 }}>Тренд не направлен к цели</small>
                 )}
                 {pace && (
                   <small style={{ color: Math.abs(pace.kgPerWeek) >= 0.25 ? c.orange : c.green, fontSize: 11 }}>
-                    Нужно {pace.kgPerWeek > 0 ? '+' : ''}{pace.kgPerWeek.toFixed(2)} кг/нед · {pace.days} дн.
+                    Нужно {pace.kgPerWeek > 0 ? '+' : ''}{(dispW(pace.kgPerWeek) as number).toFixed(2)} {wUnit}/нед · {pace.days} дн.
                   </small>
                 )}
               </div>
@@ -1037,8 +1110,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               />
             </div>
             <small style={{ display: 'block', marginTop: 6, color: c.text3, fontSize: 11 }}>
-              {goalProgress.start.toFixed(1)} → {goalProgress.cur.toFixed(1)} кг · прогресс {goalProgress.pct === null ? '—' : goalProgress.pct + '%'}
-              {!goalProgress.done && ` · осталось ${Math.abs(goal - goalProgress.cur).toFixed(1)} кг`}
+              {fmtW(goalProgress.start)} → {fmtW(goalProgress.cur)} · прогресс {goalProgress.pct === null ? '—' : goalProgress.pct + '%'}
+              {!goalProgress.done && ` · осталось ${fmtW(Math.abs(goal - goalProgress.cur))}`}
             </small>
           </section>
         )}
@@ -1097,7 +1170,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               ].map(([k, v, n]) => (
                 <div key={String(k)} style={tile}>
                   <span style={metricLabel}>{k}</span>
-                  <div style={metricValue}>{typeof v === 'number' ? v.toFixed(1) + ' кг' : '—'}</div>
+                  <div style={metricValue}>{typeof v === 'number' ? (dispW(v) as number).toFixed(1) + ' ' + wUnit : '—'}</div>
                   {typeof n === 'number' && <span style={metricDelta}>{n} записей</span>}
                 </div>
               ))}
@@ -1105,11 +1178,11 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 <div style={tile}>
                   <span style={metricLabel}>Разброс</span>
                   <div style={{ ...metricValue, fontSize: 15, color: Math.abs(todInsight.swing) >= 0.3 ? c.blue : c.text3 }}>
-                    {fmtSigned(todInsight.swing)} кг
+                    {fmtSigned(dispW(todInsight.swing) || 0)} {wUnit}
                   </div>
                   <span style={metricDelta}>
                     {Math.abs(todInsight.swing) >= 0.3
-                      ? `вечер в среднем ${todInsight.swing > 0 ? 'выше' : 'ниже'} на ${Math.abs(todInsight.swing).toFixed(1)} кг`
+                      ? `вечер в среднем ${todInsight.swing > 0 ? 'выше' : 'ниже'} на ${Math.abs(dispW(todInsight.swing) || 0).toFixed(1)} ${wUnit}`
                       : 'утро ≈ вечер'}
                   </span>
                 </div>
@@ -1178,10 +1251,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                 cell ? (
                   <div
                     key={i}
-                    title={`${cell.date}: ${cell.value.toFixed(1)} кг`}
+                    title={`${cell.date}: ${fmtW(cell.value)}`}
                     style={{ aspectRatio: '1', borderRadius: 6, background: `rgba(48,209,88,${(0.12 + cell.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <small style={{ fontSize: 8, color: '#d4d4d8' }}>{cell.value.toFixed(0)}</small>
+                    <small style={{ fontSize: 8, color: '#d4d4d8' }}>{(dispW(cell.value) as number).toFixed(0)}</small>
                   </div>
                 ) : (
                   <div key={i} style={{ aspectRatio: '1', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.06)' }} />
@@ -1189,7 +1262,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               )}
             </div>
             <small style={{ display: 'block', marginTop: 6, color: c.text3, fontSize: 10 }}>
-              Мин {heatmap.min.toFixed(1)} кг · Макс {heatmap.max.toFixed(1)} кг
+              Мин {fmtW(heatmap.min)} · Макс {fmtW(heatmap.max)}
             </small>
           </details>
         )}
@@ -1215,9 +1288,9 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         <tr key={w.weekStart} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                           <td style={{ padding: 6 }}>{w.weekStart}</td>
                           <td style={{ padding: 6 }}>{w.count}</td>
-                          <td style={{ padding: 6 }}>{w.mean.toFixed(1)}</td>
+                          <td style={{ padding: 6 }}>{(dispW(w.mean) as number).toFixed(1)} {wUnit}</td>
                           <td style={{ padding: 6, color: w.delta === null ? c.text3 : w.delta < 0 ? c.green : c.red }}>
-                            {w.delta === null ? '—' : (w.delta > 0 ? '+' : '') + w.delta.toFixed(1)}
+                            {w.delta === null ? '—' : (w.delta > 0 ? '+' : '') + (dispW(w.delta) as number).toFixed(1)}
                           </td>
                         </tr>
                       ))}
@@ -1241,9 +1314,9 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         <tr key={m.month} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                           <td style={{ padding: 6 }}>{m.month}</td>
                           <td style={{ padding: 6 }}>{m.count}</td>
-                          <td style={{ padding: 6 }}>{m.mean.toFixed(1)}</td>
+                          <td style={{ padding: 6 }}>{(dispW(m.mean) as number).toFixed(1)} {wUnit}</td>
                           <td style={{ padding: 6, color: m.delta === null ? c.text3 : m.delta < 0 ? c.green : c.red }}>
-                            {m.delta === null ? '—' : (m.delta > 0 ? '+' : '') + m.delta.toFixed(1)}
+                            {m.delta === null ? '—' : (m.delta > 0 ? '+' : '') + (dispW(m.delta) as number).toFixed(1)}
                           </td>
                         </tr>
                       ))}
