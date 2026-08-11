@@ -39,7 +39,7 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'HCT', names: ['гематокрит', 'Hematocrit', 'HCT', 'Ht'], unitPatterns: ['%', '%'] },
   { code: 'MCV', names: ['MCV', 'средний объем эритроцита'], unitPatterns: ['фл', 'fl', 'мкм³'] },
   { code: 'MCH', names: ['MCH', 'среднее содержание Hb в эр'], unitPatterns: ['пг', 'pg'] },
-  { code: 'MCHC', names: ['MCHC', 'средняя конц. Hb в эр'], unitPatterns: ['г/л', 'g/L'] },
+  { code: 'MCHC', names: ['MCHC', 'средняя конц. Hb в эр', 'средняя концентрация Hb', 'средняя концентрация гемоглобина', 'ср. конц. Hb'], unitPatterns: ['г/л', 'g/L'] },
   { code: 'NEUT', names: ['нейтрофилы', 'NEUT', 'Neutrophils'], unitPatterns: ['%', '10^9/л'] },
   { code: 'LYMPH', names: ['лимфоциты', 'LYMPH', 'Lymphocytes'], unitPatterns: ['%', '10^9/л'] },
   { code: 'MONO', names: ['моноциты', 'MONO', 'Monocytes'], unitPatterns: ['%', '10^9/л'] },
@@ -325,6 +325,17 @@ function extractResultNumber(text: string): number | null {
 }
 
 function extractRefRange(text: string): { low?: number; high?: number } {
+  // Handle "<N" and ">N" reference bounds common in Invitro/Gemotest formats
+  const ltMatch = text.match(/<\s*(\d+[\.,]?\d*)/);
+  const gtMatch = text.match(/>\s*(\d+[\.,]?\d*)/);
+  if (ltMatch) {
+    const high = parseFloat(ltMatch[1].replace(',', '.'));
+    if (Number.isFinite(high) && high > 0 && high < 100000) return { high };
+  }
+  if (gtMatch) {
+    const low = parseFloat(gtMatch[1].replace(',', '.'));
+    if (Number.isFinite(low) && low >= 0 && low < 100000) return { low };
+  }
   const patterns = [
     /(?:ref|референс|норма|от|до)\s*[:\-]?\s*(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/i,
     /(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)\s*(?:единиц|ед\.?|unit|u\/l|mmol|umol|mg|ng|pg|g|мг\/дл|мкмоль|ммоль|нг\/мл|пг\/мл|г\/л|%|сек)/i,
@@ -691,6 +702,18 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
     let val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
     if (val === null) {
       val = extractResultNumber(valueText);
+    }
+    // When the marker name contains digits (e.g. "Витамин D 25-OH"), the
+    // generic sanitize→extractNumber path may pick the name-suffix number
+    // instead of the actual result column. For tab-separated lines, scan
+    // individual cells to find the first non-name numeric value.
+    if (line.includes('\t') && val !== null) {
+      const cols = line.split('\t').map(c => c.trim()).filter(Boolean);
+      for (const cell of cols) {
+        if (labDef.names.some(n => containsLabName(cell, n))) continue;
+        const cellNum = extractResultNumber(cell);
+        if (cellNum !== null && cellNum > 0) { val = cellNum; break; }
+      }
     }
     // Для urine-маркёров где 0 — норма (отсутствие клеток/вещества),
     // разрешаем 0 как валидное значение.
