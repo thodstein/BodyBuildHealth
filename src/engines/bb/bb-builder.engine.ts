@@ -1206,6 +1206,14 @@ function buildSession(
     if (muscle === 'shoulders' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Push|Pull/.test(sched.sessionTag || '') && phase !== 'deload') {
       sets = Math.max(sets, 6);
     }
+    // Руки в Push/Pull: опытный enhanced должен получать минимум работы
+    // на biceps в Pull и triceps в Push в каждой сессии.
+    if (muscle === 'biceps' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Pull|Upper|Arms/.test(sched.sessionTag || '') && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
+    }
+    if (muscle === 'triceps' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Push|Upper|Arms/.test(sched.sessionTag || '') && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
+    }
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
@@ -1285,7 +1293,7 @@ function buildSession(
     let exerciseCount = role === 'primary'
       ? (isMultiDay ? 4 : (isSingleFreq ? (onPED ? 4 : 3) : (onPED ? 5 : 4)))
       : (isMultiDay
-          ? (isArm && onPED && (muscle === 'biceps' || muscle === 'triceps') ? 2 : 1)
+          ? (isArm && onPED && (muscle === 'biceps' || muscle === 'triceps') ? (level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 1 : 2) : 1)
           : (isArm && onPED ? 4 : (isArm ? 2 : (isBigMuscle ? 2 : 1))));
     // P3: Level-based exerciseCount (Schoenfeld 2022: advanced → more exercises for detail)
     if (levelBase <= 1 && exerciseCount > 2) exerciseCount = Math.max(2, exerciseCount - 1);
@@ -1843,6 +1851,7 @@ function buildSession(
     const highVolumeBack = pl.muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const highVolumeLegs = ['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const highVolumeTorso = ['chest', 'shoulders'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
+    const highVolumeArms = ['biceps', 'triceps'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = highVolumeBack
       ? Math.max(muscleBudget, pl.sets * 10)
@@ -1850,7 +1859,9 @@ function buildSession(
         ? Math.max(muscleBudget, pl.sets * 8)
         : highVolumeTorso
           ? Math.max(muscleBudget, pl.sets * 6)
-          : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
+          : highVolumeArms
+            ? Math.max(muscleBudget, 30) // минимум 6 сетов × 5 fatigue
+            : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
     // High-volume legs: fatigue budget не должен резать ноги до остатка.
     // Минимум — целевые сеты × fatigueCost, а не пропорция от общего бюджета.
     if (highVolumeLegs && remainingBudget < pl.sets * 5) {
@@ -1880,7 +1891,11 @@ function buildSession(
        const setCap = (pl.muscle === 'back' && trainingYears !== undefined) ? 10
          : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && trainingYears !== undefined) ? 8
          : 5;
-       const exSets = Math.max(2, Math.min(setCap, Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct)));
+       const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
+       // Минимум 3 сета на упражнение для enhanced 3+ — 2 сета недостаточно
+       // для гипертрофии опытного атлета.
+       const exMin = level === 'enhanced' && (trainingYears ?? 0) >= 3 ? 3 : 2;
+       const exSets = Math.max(exMin, Math.min(setCap, exSetsRaw));
       const exWeight = (exData as any)._effWeight ?? pl.weight;
       const finalRir = isSubstituted ? Math.min(pl.rir + 1, 4) : ((exData as any)._deltRir ?? pl.rir);
       const cost = ((exData as any)?.fatigueCost || 5) * exSets;

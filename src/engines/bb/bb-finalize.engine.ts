@@ -125,6 +125,55 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
   }
 }
 
+/** Гарантирует direct arm-блок после indirect overlap и поздних cap-pass. */
+function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  const tag = session.sessionTag || '';
+  const targetMuscle = /Pull|Back|Upper|Arms/.test(tag) ? 'biceps' : /Push|Chest|Upper|Arms/.test(tag) ? 'triceps' : '';
+  if (!targetMuscle) return;
+  const existing = session.exercises.filter((e: any) => e.muscle === targetMuscle);
+  const targetSets = (options.trainingYears ?? 0) >= 6 ? 6 : 5;
+  let total = existing.reduce((sum: number, e: any) => sum + (e.sets || 0), 0);
+  // В Upper одновременно доступны оба бюджета; в Pull/Push — соответствующий.
+  if (total < targetSets && existing.length) {
+    const exercise = existing[0];
+    while (total < targetSets && exercise.sets < 8) {
+      const sample = exercise.workSets?.[exercise.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+      exercise.sets += 1;
+      exercise.workSets.push({ ...sample });
+      total += 1;
+    }
+  }
+  if (total >= targetSets) return;
+  const candidates = EXERCISE_CATALOG.filter((candidate: any) => {
+    if (trueMuscleOf(candidate) !== targetMuscle) return false;
+    if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
+    if (options.equipment?.length) {
+      const eq = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
+      if (eq.length && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+    }
+    return true;
+  });
+  const candidate = candidates.find((e: any) => !session.exercises.some((x: any) => x.name === e.name));
+  if (!candidate) return;
+  const baseWeight = options.workMax?.[targetMuscle] || 40;
+  const sets = targetSets - total;
+  session.exercises.push({
+    muscle: targetMuscle,
+    name: candidate.name,
+    exerciseName: candidate.name,
+    role: 'accessory',
+    character: 'памп',
+    sets,
+    repsRange: [10, 15],
+    rir: 3,
+    workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: Math.round(baseWeight * 0.35 * 10) / 10, restSeconds: 75 })),
+    restSeconds: 75,
+    warmupSets: [],
+    rationale: `Experienced enhanced: ${targetMuscle} direct residual volume after indirect overlap`,
+  });
+}
+
 
 
 export interface BBFinalizeOptions {
@@ -447,6 +496,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // проверяем фактические финальные сеты, а не промежуточный план.
   for (const week of next.weeks) for (const session of week.sessions) {
     allocateExperiencedBackSession(session, options);
+    allocateExperiencedArmSession(session, options);
   }
   // Аналогично для ног: если после всех проходов glutes/quads отсутствуют
   // в Lower-сессии опытного enhanced — добавляем из каталога.
