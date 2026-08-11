@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { computeDelta, assignStatus, generateComprehensiveReport } from '../comprehensive-report.engine';
+import { getBpEntries } from '../../core/bp-hr-data';
 
 // Мокаем все хранилища
 vi.mock('../../core/profile-manager', () => ({
@@ -153,5 +154,24 @@ describe('generateComprehensiveReport', () => {
     expect(report.meta.age).toBe(30);
     expect(report.meta.sex).toBe('male');
     expect(report.meta.period).toBe('mass');
+  });
+
+  it('blood pressure: splits morning/evening by timeOfDay, not by pulse', async () => {
+    (getBpEntries as any).mockReturnValue([
+      // morning запись с высоким пульсом — раньше ошибочно уходила бы в «вечер»
+      { date: '2026-08-01', systolic: 120, diastolic: 80, hr: 92, timeOfDay: 'morning' },
+      { date: '2026-08-02', systolic: 140, diastolic: 90, hr: 60, timeOfDay: 'evening' },
+    ]);
+    const report = await generateComprehensiveReport({ type: 'weekly', dateFrom: '2026-07-26', dateTo: '2026-08-02' });
+    const bp = report.sections.find(s => s.id === 'blood_pressure');
+    expect(bp).toBeDefined();
+    const labels = bp!.metrics.map(m => m.label);
+    expect(labels).toContain('Утро: систолическое');
+    expect(labels).toContain('Вечер: систолическое');
+    expect(labels.some(l => l.includes('ЧСС<70'))).toBe(false);
+    const morning = bp!.metrics.find(m => m.label === 'Утро: систолическое');
+    const evening = bp!.metrics.find(m => m.label === 'Вечер: систолическое');
+    expect(morning!.current).toBe(120);
+    expect(evening!.current).toBe(140);
   });
 });

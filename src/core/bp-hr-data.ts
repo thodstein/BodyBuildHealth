@@ -1,5 +1,13 @@
 const STORAGE_KEY = 'he_bp_diary';
 
+/** Локальная дата YYYY-MM-DD (в записях используется локальная, не UTC). */
+function localIso(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export interface BPEntry {
   id?: string;
   date: string;
@@ -210,7 +218,10 @@ export function getLatestBp(): { systolic: number; diastolic: number; hr: number
 export function getAvgBp(days: number = 7): { systolic: number; diastolic: number; hr: number } | null {
   const entries = getBpEntries();
   if (entries.length === 0) return null;
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().split('T')[0];
+  const cutoffDate = new Date();
+  cutoffDate.setHours(0, 0, 0, 0);
+  cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
+  const cutoff = localIso(cutoffDate);
   const recent = entries.filter(e => e.date >= cutoff);
   if (recent.length === 0) return null;
   return {

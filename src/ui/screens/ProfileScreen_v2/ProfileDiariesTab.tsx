@@ -69,6 +69,11 @@ interface BPEntry {
   diastolic: number;
   hr?: number;
   pulse?: number;
+  timeOfDay?: string;
+  arm?: 'left' | 'right' | string;
+  position?: 'sitting' | 'lying' | 'standing' | string;
+  symptoms?: string[];
+  medicationTaken?: boolean;
   notes?: string;
 }
 const INJECTION_DIARY_KEY = 'he_injection_diary';
@@ -739,6 +744,11 @@ export const ProfileDiariesTab: React.FC<{
         diastolic: entry.diastolic,
         hr: entry.hr,
         pulse: entry.hr,
+        timeOfDay: entry.timeOfDay,
+        arm: entry.arm,
+        position: entry.position,
+        symptoms: entry.symptoms,
+        medicationTaken: entry.medicationTaken,
         notes: entry.notes,
       })));
     } catch {}

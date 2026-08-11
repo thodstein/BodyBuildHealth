@@ -19,6 +19,9 @@ import {
   normalizeBpEntry,
   exportBPData,
   importBPData,
+  getAvgBp,
+  getBpEntries,
+  commitBpEntries,
 } from '../bp-hr-data';
 
 describe('bp-hr-data', () => {
@@ -359,6 +362,36 @@ describe('bp-hr-data', () => {
       // Without IndexedDB, it will fail on db.put - but we can check the validation passes
       // In a real test environment with IndexedDB mock, this would succeed
       expect(result.importedCount).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('getAvgBp', () => {
+    beforeEach(() => { localStorage.clear(); });
+    afterEach(() => { localStorage.clear(); });
+
+    it('uses local-date cutoff (includes today and recent days)', () => {
+      const today = new Date();
+      const iso = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      const dToday = iso(today);
+      const dYesterday = iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1));
+      const dWeekAgo = iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7));
+      const dTwoWeeks = iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 14));
+      commitBpEntries([
+        { id: 'a', date: dToday, systolic: 120, diastolic: 80, hr: 70 },
+        { id: 'b', date: dYesterday, systolic: 130, diastolic: 85, hr: 72 },
+        { id: 'c', date: dWeekAgo, systolic: 140, diastolic: 90, hr: 74 },
+        { id: 'd', date: dTwoWeeks, systolic: 150, diastolic: 95, hr: 76 },
+      ]);
+      const avg = getAvgBp(7);
+      expect(avg).not.toBeNull();
+      // 7-дневное окно = сегодня + 6 предыдущих дней → записи a и b (c за 7 дней до — вне окна)
+      expect(avg!.systolic).toBe(Math.round((120 + 130) / 2));
+      expect(avg!.diastolic).toBe(Math.round((80 + 85) / 2));
     });
   });
 });

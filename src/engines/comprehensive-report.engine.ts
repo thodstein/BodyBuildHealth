@@ -467,9 +467,10 @@ function gatherBloodPressure(dateFrom: string, dateTo: string): ReportSection {
   const entries = getBpEntries();
   const recent = entries.filter(e => e.date >= dateFrom && e.date <= dateTo);
 
-  const morning = recent.filter(e => e.hr && e.hr < 70);
-  const evening = recent.filter(e => e.hr && e.hr >= 70);
-  const unclassified = recent.filter(e => !e.hr);
+  // Утро/вечер — по явному полю timeOfDay, а не по пульсу (пульс не определяет время суток).
+  const morning = recent.filter(e => e.timeOfDay === 'morning');
+  const evening = recent.filter(e => e.timeOfDay === 'evening');
+  const unclassified = recent.filter(e => e.timeOfDay !== 'morning' && e.timeOfDay !== 'evening');
   const allForAvg = [...morning, ...evening, ...unclassified];
 
   const avgSys = allForAvg.length > 0 ? Math.round(allForAvg.reduce((s, e) => s + e.systolic, 0) / allForAvg.length) : undefined;
@@ -492,12 +493,12 @@ function gatherBloodPressure(dateFrom: string, dateTo: string): ReportSection {
   ];
 
   if (morning.length > 0) {
-    metrics.push({ label: 'Утро (ЧСС<70): систолическое', unit: 'мм рт.ст.', current: avgMorningSys });
-    metrics.push({ label: 'Утро (ЧСС<70): диастолическое', unit: 'мм рт.ст.', current: avgMorningDia });
+    metrics.push({ label: 'Утро: систолическое', unit: 'мм рт.ст.', current: avgMorningSys });
+    metrics.push({ label: 'Утро: диастолическое', unit: 'мм рт.ст.', current: avgMorningDia });
   }
   if (evening.length > 0) {
-    metrics.push({ label: 'Вечер (ЧСС≥70): систолическое', unit: 'мм рт.ст.', current: avgEveningSys });
-    metrics.push({ label: 'Вечер (ЧСС≥70): диастолическое', unit: 'мм рт.ст.', current: avgEveningDia });
+    metrics.push({ label: 'Вечер: систолическое', unit: 'мм рт.ст.', current: avgEveningSys });
+    metrics.push({ label: 'Вечер: диастолическое', unit: 'мм рт.ст.', current: avgEveningDia });
   }
   metrics.push({ label: 'Макс. систолическое', unit: 'мм рт.ст.', current: maxSys ?? 'Нет данных', status: bpSysStatus });
   metrics.push({ label: 'Макс. диастолическое', unit: 'мм рт.ст.', current: maxDia ?? 'Нет данных', status: bpDiaStatus });
