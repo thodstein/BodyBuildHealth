@@ -314,3 +314,71 @@ describe('generateHealthPlan — сортировка, сводка, экспо�
     expect(loadPlanDone()).toEqual([]);
   });
 });
+
+describe('generateHealthPlan — контекст других дневников (ctx)', () => {
+  const base = () => [withSymptoms(0, [])];
+
+  it('сон < 6 ч → medium', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { sleepAvg7: 5.2 }));
+    expect(plan.recommendations.some((r) => r.priority === 'medium' && r.title.includes('Недостаток сна'))).toBe(true);
+  });
+
+  it('сон ≥ 6 ч → без рекомендации о сне', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { sleepAvg7: 7.5 }));
+    expect(plan.recommendations.some((r) => r.title.includes('Недостаток сна'))).toBe(false);
+  });
+
+  it('систола ≥160 → critical', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { bpSystolicLast: 172, bpDiastolicLast: 104 }));
+    expect(plan.recommendations.some((r) => r.priority === 'critical' && r.title.includes('Высокое АД'))).toBe(true);
+  });
+
+  it('систола 140-159 → high', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { bpSystolicLast: 148, bpDiastolicLast: 92 }));
+    expect(plan.recommendations.some((r) => r.priority === 'high' && r.title.includes('Повышенное АД'))).toBe(true);
+  });
+
+  it('АД в норме → без рекомендации об АД', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { bpSystolicLast: 118, bpDiastolicLast: 76 }));
+    expect(plan.recommendations.some((r) => r.title.includes('АД'))).toBe(false);
+  });
+
+  it('активный курс → medium мониторинг', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { onCycle: true }));
+    expect(plan.recommendations.some((r) => r.priority === 'medium' && r.title.includes('Мониторинг на курсе'))).toBe(true);
+  });
+
+  it('быстрый набор веса ≥0.5 кг/нед → medium', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base(), { weightTrendKgWeek: 0.8 }));
+    expect(plan.recommendations.some((r) => r.priority === 'medium' && r.title.includes('Быстрый набор веса'))).toBe(true);
+  });
+
+  it('ctx по умолчанию не даёт ложных срабатываний', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile(base()));
+    expect(plan.recommendations.some((r) => r.title.includes('Недостаток сна'))).toBe(false);
+    expect(plan.recommendations.some((r) => r.title.includes('АД'))).toBe(false);
+    expect(plan.recommendations.some((r) => r.title.includes('Быстрый набор веса'))).toBe(false);
+  });
+});
+
+describe('generateHealthPlan — стабильные id', () => {
+  it('повторная генерация даёт те же id (чекбоксы не «плывут»)', () => {
+    const entries = [
+      painEntry(2, { shoulders: 3 }),
+      painEntry(0, { shoulders: 9 }),
+      ...Array.from({ length: 3 }, (_, i) => withSymptoms(i, [{ name: 'Головная боль', severity: 4 }])),
+    ];
+    const a = analyzeHealthProfile(entries);
+    const p1 = generateHealthPlan(a);
+    const p2 = generateHealthPlan(analyzeHealthProfile(entries));
+    expect(p1.recommendations.map((r) => r.id)).toEqual(p2.recommendations.map((r) => r.id));
+    expect(new Set(p1.recommendations.map((r) => r.id)).size).toBe(p1.recommendations.length);
+  });
+
+  it('id не зависит от порядка правил и не содержит индексов', () => {
+    const plan = generateHealthPlan(analyzeHealthProfile([painEntry(0, { shoulders: 9 })]));
+    for (const r of plan.recommendations) {
+      expect(r.id).toMatch(/^[a-z]+_[a-z0-9]+$/);
+    }
+  });
+});

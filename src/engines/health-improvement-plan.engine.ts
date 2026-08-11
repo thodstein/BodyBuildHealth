@@ -30,11 +30,20 @@ export interface ZoneTrend {
   trend: 'up' | 'down' | 'same';
 }
 
+export interface HealthPlanCtx {
+  sleepAvg7?: number | null;        // средние часы сна за 7 дней
+  bpSystolicLast?: number | null;   // последняя систола АД
+  bpDiastolicLast?: number | null;  // последняя диастола АД
+  weightTrendKgWeek?: number | null; // тренд веса, кг/нед
+  onCycle?: boolean;                 // активная фарма/курс
+}
+
 export interface HealthProfileAnalysis {
   totalEntries: number;
   firstDate: string | null;
   lastDate: string | null;
   daysCovered: number;
+  ctx: HealthPlanCtx;
   pain: {
     avg7: number | null;
     avg30: number | null;
@@ -88,7 +97,7 @@ function round1(v: number): number {
 
 // ─── Анализ профиля ──────────────────────────────────────────────────────────
 
-export function analyzeHealthProfile(entries: UnifiedHealthEntry[]): HealthProfileAnalysis {
+export function analyzeHealthProfile(entries: UnifiedHealthEntry[], ctx: HealthPlanCtx = {}): HealthProfileAnalysis {
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
   const today = todayLocal();
   const lastDate = sorted.length ? sorted[sorted.length - 1].date : null;
@@ -204,6 +213,7 @@ export function analyzeHealthProfile(entries: UnifiedHealthEntry[]): HealthProfi
     firstDate,
     lastDate,
     daysCovered,
+    ctx,
     pain: {
       avg7: windowAvg(7),
       avg30: windowAvg(30),
@@ -227,11 +237,19 @@ export function analyzeHealthProfile(entries: UnifiedHealthEntry[]): HealthProfi
 
 const PRIORITY_ORDER: HealthPriority[] = ['critical', 'high', 'medium', 'low'];
 
+/** Детерминированный hash (djb2) для стабильного id рекомендации: чекбоксы не «плывут» при регенерации. */
+function hashId(seed: string): string {
+  let h = 5381;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) + h + seed.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 export function generateHealthPlan(analysis: HealthProfileAnalysis): HealthPlan {
   const recs: HealthRecommendation[] = [];
   const p = analysis.pain;
+  const ctx = analysis.ctx;
   const push = (r: Omit<HealthRecommendation, 'id'>) =>
-    recs.push({ ...r, id: `${r.domain}-${r.priority}-${recs.length}` });
+    recs.push({ ...r, id: `${r.domain}_${hashId(`${r.priority}|${r.title}`)}` });
 
   // CRITICAL
   if (analysis.hemato.lastTotal >= 2) {
@@ -369,6 +387,48 @@ export function generateHealthPlan(analysis: HealthProfileAnalysis): HealthPlan 
       title: `Симптом повторяется: ${midSymptom.name}`,
       rationale: `${midSymptom.name} отмечен ${midSymptom.count} раза, средняя тяжесть ${midSymptom.avgSeverity}/5.`,
       action: `Записывать контекст (сон, питание, нагрузка) при появлении ${midSymptom.name.toLowerCase()}.`,
+    });
+  }
+
+  // ── Контекст других дневников (сон / АД / курс / вес-тренд) ──────────────
+  if (ctx.sleepAvg7 !== null && ctx.sleepAvg7 !== undefined && ctx.sleepAvg7 < 6) {
+    push({
+      domain: 'adherence', priority: 'medium',
+      title: `Недостаток сна (ср. ${ctx.sleepAvg7.toFixed(1)} ч)`,
+      rationale: `Сон < 6 ч снижает восстановление и усиливает болевой синдром.`,
+      action: 'Ложиться на 30-60 мин раньше, убрать кофеин после 14:00, экраны за час до сна.',
+    });
+  }
+  const sys = ctx.bpSystolicLast;
+  if (sys !== null && sys !== undefined && sys >= 160) {
+    push({
+      domain: 'symptoms', priority: 'critical',
+      title: `Высокое АД (${Math.round(sys)} мм рт.ст.)`,
+      rationale: 'Систола ≥160 — риск гипертонического криза, особенно на фоне курса.',
+      action: 'Измерить АД повторно утром и вечером, ограничить стимуляторы и натрий, при сохранении — врач.',
+    });
+  } else if (sys !== null && sys !== undefined && sys >= 140) {
+    push({
+      domain: 'symptoms', priority: 'high',
+      title: `Повышенное АД (${Math.round(sys)} мм рт.ст.)`,
+      rationale: 'Систола 140-159 — выше целевого уровня 120-130.',
+      action: 'Ежедневный контроль АД, снизить кофеин/стимуляторы, проверить электролиты.',
+    });
+  }
+  if (ctx.onCycle) {
+    push({
+      domain: 'symptoms', priority: 'medium',
+      title: 'Мониторинг на курсе',
+      rationale: 'Активная фарма требует контроля анализов (ОАК, печень, липиды, гормоны) и симптомов.',
+      action: 'Сдавать лабораторную панель каждые 4-6 недель курса, вести дневник симптомов.',
+    });
+  }
+  if (ctx.weightTrendKgWeek !== null && ctx.weightTrendKgWeek !== undefined && ctx.weightTrendKgWeek >= 0.5) {
+    push({
+      domain: 'adherence', priority: 'medium',
+      title: `Быстрый набор веса (+${ctx.weightTrendKgWeek.toFixed(1)} кг/нед)`,
+      rationale: 'Набор >0.5 кг/нед нагружает суставы и сердечно-сосудистую систему.',
+      action: 'Умеренный профицит (+200-300 ккал), контроль АД и объёма суставов.',
     });
   }
 

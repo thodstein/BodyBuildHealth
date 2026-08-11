@@ -22,13 +22,13 @@ import {
   getUnifiedNeuroStats,
   getUnifiedPainStats,
   getUnifiedSymptomsStats,
+  getUnifiedSymptomSummary,
   getUnifiedTodayStatus,
   saveUnifiedHealthEntries,
   updateUnifiedHealthEntry,
   type UnifiedHealthEntry,
 } from '../../../../../engines/health-diary.engine';
 import { analyzePainEntries } from '../../../../../engines/pain-insights.engine';
-import { getSymptomDiarySummary } from '../../../../../engines/symptom-diary.engine';
 import { computeHealthScore, type HealthScoreOutput } from '../../../../../engines/health-score-v2.engine';
 import {
   analyzeHealthProfile,
@@ -36,6 +36,10 @@ import {
   exportHealthPlanText,
   loadPlanDone,
   savePlanDone,
+  saveHealthPlan,
+  loadHealthPlan,
+  type HealthPlanCtx,
+  type HealthPlan as HealthPlanType,
 } from '../../../../../engines/health-improvement-plan.engine';
 import {
   buildWeeklyHistogram,
@@ -47,7 +51,6 @@ import {
   detectAnomalies,
   exportSvgAsFile,
   exportSvgAsPng,
-  filterByRange,
   getNormalRange,
   laggedCorrelation,
   paginate,
@@ -58,6 +61,7 @@ import {
 } from '../../diary-helpers';
 import { PAIN_ZONES, NEURO_SYMPTOMS, ACNE_AREAS, HEMATO_SYMPTOMS, painZoneColor, readDiaryEntries } from '../../diary-modals';
 import { getProfile } from '../../../../../core/profile-manager';
+import type { UnifiedSettings } from '../../../../../core/types';
 import { calculateRiskScore } from '../../../../../engines/risk-calculator.engine';
 import { getLabDiary } from '../../../../../engines/lab-diary.engine';
 import { loadSessions } from '../../../../../engines/workout-logger.engine';
@@ -131,10 +135,12 @@ function downloadText(name: string, text: string, type: string) {
 
 /** Индекс здоровья из реальных данных (профиль v2, дневники, labs, тренировки) с безопасными фолбэками. */
 function computeRealHealthScore(): HealthScoreOutput {
+  let settings: UnifiedSettings | null = null;
+  try { settings = getProfile().settings; } catch { settings = null; }
+
   let pharmaRisk = 0;
   try {
-    const settings = getProfile().settings;
-    const ids = (settings.pharma?.currentSubstances || []).map((s) => s.id).filter(Boolean);
+    const ids = (settings?.pharma?.currentSubstances || []).map((s) => s.id).filter(Boolean);
     if (ids.length > 0) {
       const r = calculateRiskScore(ids);
       pharmaRisk = Math.min(100, Math.max(0, 100 - r.score));
@@ -156,12 +162,14 @@ function computeRealHealthScore(): HealthScoreOutput {
 
   let hrvScore = 50;
   let subjectiveStress = 5;
+  let subjectiveEnergy = 3;
   try {
-    const s = getProfile().settings;
-    const hrv = Number(s.lifestyle?.morningHRV) || 0;
+    const hrv = Number(settings?.lifestyle?.morningHRV) || 0;
     if (hrv > 0) hrvScore = Math.round(Math.min(100, (hrv / 65) * 100));
-    const stressRaw = Number(s.lifestyle?.stressLevel);
+    const stressRaw = Number(settings?.lifestyle?.stressLevel);
     if (Number.isFinite(stressRaw) && stressRaw > 0) subjectiveStress = Math.max(1, Math.min(5, Math.round(stressRaw / 2)));
+    const fatigueRaw = Number(settings?.lifestyle?.fatigueLevel);
+    if (Number.isFinite(fatigueRaw) && fatigueRaw > 0) subjectiveEnergy = Math.max(1, Math.min(5, 6 - Math.round(fatigueRaw / 2)));
   } catch {}
 
   let weightTrend = 0;
@@ -194,9 +202,57 @@ function computeRealHealthScore(): HealthScoreOutput {
     sleepScore,
     hrvScore,
     weightTrend,
-    subjectiveEnergy: 3,
+    subjectiveEnergy,
     subjectiveStress,
   });
+}
+
+/** Контекст для плана улучшений: сон / АД / курс / вес-тренд из соседних дневников и профиля. */
+function buildPlanCtx(): HealthPlanCtx {
+  let sleepAvg7: number | null = null;
+  try {
+    const cutoff = Date.now() - 7 * 86400000;
+    const hours = readDiaryEntries<{ date?: string; hours?: number }>('he_sleep_diary')
+      .filter((r) => {
+        const t = Date.parse(r.date || '');
+        return Number.isFinite(t) && t >= cutoff;
+      })
+      .map((r) => Number(r.hours))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    if (hours.length > 0) sleepAvg7 = Math.round((hours.reduce((s, v) => s + v, 0) / hours.length) * 10) / 10;
+  } catch {}
+
+  let bpSystolicLast: number | null = null;
+  let bpDiastolicLast: number | null = null;
+  try {
+    const bpRows = readDiaryEntries<{ date?: string; systolic?: number; diastolic?: number }>('he_bp_diary')
+      .filter((r) => Number.isFinite(Number(r.systolic)) && Number.isFinite(Number(r.diastolic)))
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const last = bpRows[bpRows.length - 1];
+    if (last) {
+      bpSystolicLast = Number(last.systolic);
+      bpDiastolicLast = Number(last.diastolic);
+    }
+  } catch {}
+
+  let onCycle = false;
+  try {
+    onCycle = (getProfile().settings.pharma?.currentSubstances || []).length > 0;
+  } catch {}
+
+  let weightTrendKgWeek: number | null = null;
+  try {
+    const ws = readDiaryEntries<{ date?: string; weight?: number }>('he_weight_log')
+      .map((r) => ({ date: r.date || '', weight: Number(r.weight) }))
+      .filter((x) => x.date && Number.isFinite(x.weight) && x.weight > 0)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (ws.length >= 2) {
+      const days = (Date.parse(ws[ws.length - 1].date) - Date.parse(ws[0].date)) / 86400000;
+      if (days > 0) weightTrendKgWeek = Math.round(((ws[ws.length - 1].weight - ws[0].weight) / days) * 7 * 10) / 10;
+    }
+  } catch {}
+
+  return { sleepAvg7, bpSystolicLast, bpDiastolicLast, weightTrendKgWeek, onCycle };
 }
 
 const FieldGroup: React.FC<{ title: string; color?: string; children: React.ReactNode }> = ({
@@ -279,10 +335,10 @@ const PainBodyMap: React.FC<{ zones: Record<string, number>; onChange?: (zones: 
         const pos = zonePositions[z.id];
         const mirrored = pos.mirror && pos.x !== 150 ? 300 - pos.x : null;
         return (
-          <>
+          <React.Fragment key={z.id}>
             {renderZone(z.id, pos, pos.x)}
             {mirrored !== null && renderZone(z.id, pos, mirrored)}
-          </>
+          </React.Fragment>
         );
       })}
     </svg>
@@ -636,6 +692,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const saveNew = (entry: UnifiedHealthEntry) => {
     commit(addUnifiedHealthEntry(entry as EntryDraft), true);
     setAddOpen(false);
+    (window as any).showToast?.('✅ Запись здоровья добавлена');
   };
   const saveEdit = (draft: EntryDraft) => {
     const result = updateUnifiedHealthEntry(edit!.date, (current) =>
@@ -647,10 +704,21 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     );
     commit(result);
     setEdit(null);
+    (window as any).showToast?.('✅ Запись здоровья обновлена');
   };
   const fields = useMemo(() => rows.map(entryFields), [rows]);
+  // Диапазон (7/30/90) для статов, диаграмм и инсайтов; поиск влияет только на таблицу
+  const rangeFields = useMemo(() => {
+    if (range === 'all') return fields;
+    const cutoff = Date.now() - Number(range) * 86400000;
+    return fields.filter((e) => {
+      const d = Date.parse(e.date);
+      if (Number.isNaN(d)) return true;
+      return d >= cutoff;
+    });
+  }, [fields, range]);
   const visible = useMemo(() => {
-    let result = filterByRange(fields, range);
+    let result = rangeFields;
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       result = result.filter(
@@ -658,46 +726,64 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       );
     }
     return sortEntries(result, sort);
-  }, [fields, range, query, sort]);
+  }, [rangeFields, query, sort]);
   const pageData = paginate(visible, page, 8);
-  const visibleDateSet = useMemo(() => new Set(visible.map((v) => v.date)), [visible]);
+  const rangeDateSet = useMemo(() => new Set(rangeFields.map((v) => v.date)), [rangeFields]);
+  const rangeRows = useMemo(() => rows.filter((e) => rangeDateSet.has(e.date)), [rows, rangeDateSet]);
   const allPoints = useMemo(
     () =>
-      rows
-        .filter((e) => visibleDateSet.has(e.date))
+      rangeRows
         .map((e) => ({ date: e.date, value: e.pain?.totalScore || 0 }))
         .sort((a, b) => a.date.localeCompare(b.date)),
-    [rows, visibleDateSet],
+    [rangeRows],
   );
   const distribution = computeDistribution(allPoints.map((x) => x.value));
-  const painRows = rows.filter((e) => e.pain).map((e) => ({ ...e.pain!, date: e.date }));
+  const painRows = rangeRows.filter((e) => e.pain).map((e) => ({ ...e.pain!, date: e.date }));
   const painInsights = analyzePainEntries(painRows);
-  const symptomStats = getUnifiedSymptomsStats(rows);
-  const symptomSummary = getSymptomDiarySummary(30);
+  const symptomStats = getUnifiedSymptomsStats(rangeRows);
+  const symptomSummary = getUnifiedSymptomSummary(rangeRows, 30);
   const stats = {
-    pain: getUnifiedPainStats(rows),
-    neuro: getUnifiedNeuroStats(rows),
-    acne: getUnifiedAcneStats(rows),
-    hemato: getUnifiedHematoStats(rows),
+    pain: getUnifiedPainStats(rangeRows),
+    neuro: getUnifiedNeuroStats(rangeRows),
+    acne: getUnifiedAcneStats(rangeRows),
+    hemato: getUnifiedHematoStats(rangeRows),
   };
   const status = getUnifiedTodayStatus(rows);
+  const planCtx = useMemo(buildPlanCtx, []);
+  const [plan, setPlan] = useState<HealthPlanType>(() => loadHealthPlan() ?? generateHealthPlan(analyzeHealthProfile(rows, planCtx)));
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const fresh = generateHealthPlan(analyzeHealthProfile(rows, planCtx));
+    setPlan((prev) => {
+      const prevKey = prev.recommendations.map((r) => r.id).join('|');
+      const nextKey = fresh.recommendations.map((r) => r.id).join('|');
+      if (prevKey === nextKey) return prev;
+      saveHealthPlan(fresh);
+      return fresh;
+    });
+  }, [rows, planCtx]);
   const [planDone, setPlanDone] = useState<string[]>(() => {
     try { return loadPlanDone(); } catch { return []; }
   });
-  const healthPlan = useMemo(() => generateHealthPlan(analyzeHealthProfile(rows)), [rows]);
   const togglePlanItem = (id: string) => {
     const next = planDone.includes(id) ? planDone.filter((x) => x !== id) : [...planDone, id];
     setPlanDone(next);
     savePlanDone(next);
   };
+  const regeneratePlan = () => {
+    const fresh = generateHealthPlan(analyzeHealthProfile(rows, planCtx));
+    setPlan(fresh);
+    saveHealthPlan(fresh);
+  };
   const exportPlan = () => {
-    downloadText(`health-plan-${todayIso()}.txt`, exportHealthPlanText(healthPlan, analyzeHealthProfile(rows)), 'text/plain;charset=utf-8');
+    downloadText(`health-plan-${todayIso()}.txt`, exportHealthPlanText(plan, analyzeHealthProfile(rows, planCtx)), 'text/plain;charset=utf-8');
+    (window as any).showToast?.('📄 План улучшений экспортирован');
   };
   const weekly = buildWeeklyHistogram(allPoints);
   const compare = compareWithLastWeek(allPoints);
-  const anomalies = detectAnomalies('pain', fields);
-  const extremes = computeExtremes('pain', fields);
-  const streak = computeStreak(fields);
+  const anomalies = detectAnomalies('pain', rangeFields);
+  const extremes = computeExtremes('pain', rangeFields);
+  const streak = computeStreak(rangeFields);
   const normal = getNormalRange('pain');
   const line = allPoints
     .map((p, i) => `${20 + (i * 560) / Math.max(1, allPoints.length - 1)},${180 - Math.min(160, p.value * 2.25)}`)
@@ -722,6 +808,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         .join(',');
     });
     downloadText(`health-${todayIso()}.csv`, `\ufeff${header.join(',')}\n${body.join('\n')}`, 'text/csv;charset=utf-8');
+    (window as any).showToast?.('📥 CSV экспортирован');
   };
   const printPdf = () => {
     const escape = (s: string) =>
@@ -743,10 +830,8 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   };
   const symptomSeries = useMemo(
     () =>
-      rows
-        .filter((e) => visibleDateSet.has(e.date))
-        .map((e) => ({ date: e.date, value: e.symptoms.reduce((s, x) => s + x.severity, 0) })),
-    [rows, visibleDateSet],
+      rangeRows.map((e) => ({ date: e.date, value: e.symptoms.reduce((s, x) => s + x.severity, 0) })),
+    [rangeRows],
   );
   const correlation = crossCorrelation(allPoints, symptomSeries);
   const healthLagCorrelation = laggedCorrelation(allPoints, symptomSeries, 1);
@@ -808,9 +893,9 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         exportActions={[
           { label: '📥 CSV-файл', onClick: exportCsv },
           { label: '🖨 Печать / PDF', onClick: printPdf },
-          { label: '📈 График SVG', onClick: () => { if (svgRef.current) exportSvgAsFile(svgRef.current, `health-${todayIso()}.svg`); } },
-          { label: '🖼 График PNG', onClick: () => { if (svgRef.current) exportSvgAsPng(svgRef.current, `health-${todayIso()}.png`); } },
-          { label: '🗑 Очистить дневник', onClick: () => { if (confirm('Очистить единый дневник здоровья?')) commit([]); }, danger: true },
+          { label: '📈 График SVG', onClick: () => { if (svgRef.current) exportSvgAsFile(svgRef.current, `health-${todayIso()}.svg`); (window as any).showToast?.('📈 График SVG сохранён'); } },
+          { label: '🖼 График PNG', onClick: () => { if (svgRef.current) exportSvgAsPng(svgRef.current, `health-${todayIso()}.png`); (window as any).showToast?.('🖼 График PNG сохранён'); } },
+          { label: '🗑 Очистить дневник', onClick: () => { if (confirm('Очистить единый дневник здоровья?')) { commit([]); (window as any).showToast?.('🗑 Дневник очищен (можно отменить)'); } }, danger: true },
         ]}
       />
       <main style={{ ...pageMain, maxWidth: 1150 }}>
@@ -822,8 +907,8 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         {rows.length > 0 && (
           <section style={{ ...card, marginBottom: 12, borderColor: '#8b5cf655' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
-              <b>🧭 План улучшений</b>
-              <span style={{ color: colors.textMuted, fontSize: 11 }}>{healthPlan.summary.verdict}</span>
+              <b>🧭 План улучшений · {new Date(plan.generatedAt).toLocaleDateString('ru-RU')}</b>
+              <span style={{ color: colors.textMuted, fontSize: 11 }}>{plan.summary.verdict}</span>
             </div>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
               {(
@@ -835,16 +920,17 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 ] as const
               ).map(([label, icon, c]) => (
                 <span key={label} style={{ fontSize: 10, fontWeight: 800, color: c, background: `${c}1f`, borderRadius: 999, padding: '2px 8px' }}>
-                  {icon} {healthPlan.summary[label]}
+                  {icon} {plan.summary[label]}
                 </span>
               ))}
               <button style={button} onClick={exportPlan}>📄 Экспорт плана</button>
+              <button style={button} onClick={regeneratePlan}>🔄 Перегенерировать</button>
             </div>
-            {healthPlan.recommendations.length === 0 ? (
+            {plan.recommendations.length === 0 ? (
               <p style={{ color: colors.textMuted, fontSize: 12 }}>Данных недостаточно — добавьте записи в дневник.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {healthPlan.recommendations.map((r) => {
+                {plan.recommendations.map((r) => {
                   const done = planDone.includes(r.id);
                   const c = r.priority === 'critical' ? '#ef4444' : r.priority === 'high' ? '#f97316' : r.priority === 'medium' ? '#f59e0b' : '#22c55e';
                   return (
@@ -886,6 +972,25 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
               <strong style={{ display: 'block', color: String(color), fontSize: 20, fontWeight: 800 }}>{value}</strong>
             </div>
           ))}
+        </section>
+        <section style={{ ...card, marginBottom: 12, padding: '8px 12px' }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', fontSize: 10 }}>
+            <b style={{ color: colors.textMuted, marginRight: 2 }}>🧬 Индекс здоровья: {healthScore.overallScore}/100 · {healthScore.label}</b>
+            {(
+              [
+                ['Фарма', healthScore.breakdown.pharma.score],
+                ['Лабы', healthScore.breakdown.labs.score],
+                ['Питание', healthScore.breakdown.nutrition.score],
+                ['Тренировки', healthScore.breakdown.training.score],
+                ['Восст.', healthScore.breakdown.recovery.score],
+                ['Композ.', healthScore.breakdown.bodyComp.score],
+              ] as const
+            ).map(([label, v]) => (
+              <span key={label} title={label} style={{ fontWeight: 700, color: v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444', background: 'rgba(255,255,255,0.05)', borderRadius: 999, padding: '2px 8px' }}>
+                {label} {v}
+              </span>
+            ))}
+          </div>
         </section>
         <section style={{ ...card, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -952,7 +1057,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         </section>
         {(() => {
           const renderMiniChart = (title: string, color: string, maxVal: number, points: { date: string; value: number }[], normalHigh?: number) => {
-            const visiblePoints = points.filter((p) => visibleDateSet.has(p.date));
+            const visiblePoints = points.filter((p) => rangeDateSet.has(p.date));
             if (visiblePoints.length === 0) return null;
             const sorted = visiblePoints.sort((a, b) => a.date.localeCompare(b.date));
             const line = sorted.map((p, i) => `${20 + (i * 560) / Math.max(1, sorted.length - 1)},${190 - Math.min(160, p.value * (180 / maxVal))}`).join(' ');
@@ -1031,6 +1136,14 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 {distribution.p75.toFixed(1)}
                 <br />
                 Мин/макс {distribution.min.toFixed(0)}/{distribution.max.toFixed(0)}
+                {extremes.min && extremes.max && (
+                  <>
+                    <br />
+                    <span style={{ color: colors.textMuted, fontSize: 11 }}>
+                      Мин {extremes.min.date}: {extremes.min.value}/70 · Макс {extremes.max.date}: {extremes.max.value}/70
+                    </span>
+                  </>
+                )}
               </div>
             ) : (
               <p style={{ color: colors.textMuted }}>Нужно минимум 2 записи</p>
@@ -1080,7 +1193,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           <b>💡 Инсайты и аномалии</b>
           {[
             ...painInsights.insights.map((x) => `${x.title}: ${x.description}`),
-            ...symptomSummary.slice(0, 5).map((x) => `${x.symptomName}: ${x.currentSeverity}/10 (${x.trend})`),
+            ...symptomSummary.slice(0, 5).map((x) => `${x.symptomName}: ${x.currentSeverity}/5 (${x.trend})`),
             ...anomalies.map((x) => x.message),
           ]
             .slice(0, 12)
@@ -1164,7 +1277,10 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                       <button
                         style={{ ...button, minHeight: 32, padding: '3px 7px', color: '#ef4444' }}
                         onClick={() => {
-                          if (confirm(`Удалить запись ${row.date}?`)) commit(deleteUnifiedHealthEntry(row.date));
+                          if (confirm(`Удалить запись ${row.date}?`)) {
+                            commit(deleteUnifiedHealthEntry(row.date));
+                            (window as any).showToast?.('🗑 Запись удалена');
+                          }
                         }}
                       >
                         🗑

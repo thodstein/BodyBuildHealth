@@ -59,10 +59,11 @@ function scorePharma(risk: number): { score: number; message: string } {
 }
 
 function scoreLabs(weeksSinceLab: number): { score: number; message: string } {
+  if (weeksSinceLab >= 52) return { score: 50, message: 'Анализов нет — запланируйте базовую панель' };
   if (weeksSinceLab <= 4) return { score: 90, message: 'Анализы актуальны' };
   if (weeksSinceLab <= 8) return { score: 65, message: 'Анализы просрочены' };
   if (weeksSinceLab <= 12) return { score: 35, message: 'Анализы сильно просрочены' };
-  return { score: 10, message: 'Анализов нет / критическая просрочка' };
+  return { score: 10, message: 'Критическая просрочка анализов' };
 }
 
 function scoreNutrition(adherence: number): { score: number; message: string } {

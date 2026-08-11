@@ -461,6 +461,54 @@ export function getUnifiedSymptomsStats(entries: UnifiedHealthEntry[]) {
   };
 }
 
+export interface UnifiedSymptomSummaryRow {
+  symptomName: string;
+  count: number;
+  currentSeverity: number;
+  avgSeverity: number;
+  trend: 'improving' | 'stable' | 'worsening' | 'resolved';
+}
+
+/** Сводка симптомов из unified-дневника (замена legacy getSymptomDiarySummary): тренд = последняя vs средняя предыдущих 3. */
+export function getUnifiedSymptomSummary(entries: UnifiedHealthEntry[], days = 30): UnifiedSymptomSummaryRow[] {
+  const cutoffMs = Date.now() - days * 86400000;
+  const sorted = [...entries]
+    .filter((e) => {
+      const t = Date.parse(e.date);
+      return Number.isFinite(t) && t >= cutoffMs;
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const byName = new Map<string, number[]>();
+  for (const e of sorted) {
+    for (const s of e.symptoms) {
+      const cur = byName.get(s.name) || [];
+      cur.push(s.severity);
+      byName.set(s.name, cur);
+    }
+  }
+
+  const result: UnifiedSymptomSummaryRow[] = [];
+  for (const [name, severities] of byName) {
+    const last = severities[severities.length - 1];
+    const prev = severities.slice(0, -1).slice(-3);
+    let trend: UnifiedSymptomSummaryRow['trend'] = 'stable';
+    if (prev.length > 0) {
+      const avgPrev = prev.reduce((s, v) => s + v, 0) / prev.length;
+      if (last < avgPrev - 1) trend = 'improving';
+      else if (last > avgPrev + 1) trend = 'worsening';
+    }
+    result.push({
+      symptomName: name,
+      count: severities.length,
+      currentSeverity: last,
+      avgSeverity: Math.round((severities.reduce((s, v) => s + v, 0) / severities.length) * 10) / 10,
+      trend,
+    });
+  }
+  return result.sort((a, b) => b.currentSeverity - a.currentSeverity);
+}
+
 export function getUnifiedNeuroStats(entries: UnifiedHealthEntry[]) {
   const neuroEntries = entries.filter(e => e.neuro && e.neuro.totalScore > 0);
   if (neuroEntries.length === 0) return null;
