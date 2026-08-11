@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
 import { classifyBackExercise, verticalPullProfile } from '../bb-back-quality.engine';
 import { convertCycleToBBPlan } from '../cycle-to-plan';
+import { programToBBPlan } from '../cycle-to-plan';
+import { FULL_PROGRAM_LIBRARY } from '../../complete-program-library.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 
 const WM = {
@@ -103,5 +105,40 @@ describe('experienced enhanced back prescription', () => {
     } as any);
     const verticalSessions = plan.weeks[0].sessions.filter(s => s.exercises.some(e => classifyBackExercise(e.name).pattern === 'vertical_pull'));
     expect(verticalSessions.length).toBeLessThan(plan.weeks[0].sessions.length);
+  }, 30000);
+
+  it('keeps distinct vertical profiles as valid specialization choices', () => {
+    expect(verticalPullProfile('Тяга верхнего блока широким хватом')).toBe('wide');
+    expect(verticalPullProfile('Тяга верхнего блока хаммерным хватом')).toBe('neutral_hammer');
+    expect(verticalPullProfile('Подтягивания нейтральным хватом')).toBe('pullup');
+    expect(verticalPullProfile('Тяга верхнего блока обратным хватом')).toBe('underhand');
+    expect(new Set([
+      verticalPullProfile('Тяга верхнего блока широким хватом'),
+      verticalPullProfile('Тяга верхнего блока хаммерным хватом'),
+      verticalPullProfile('Подтягивания нейтральным хватом'),
+    ]).size).toBe(3);
+  });
+
+  it('adaptive library output uses the shared back quality pass', () => {
+    const source = FULL_PROGRAM_LIBRARY.find(program => program.weeks?.some(week => week.days.some(day => day.exercises.some(ex => /подтяг|pull.?up|верхн.*блок|row|тяга/i.test(ex.name)))));
+    if (!source) return;
+    const plan = programToBBPlan(source, {
+      workMax: WM,
+      level: 'enhanced', trainingYears: 6,
+      peds: ['AAS'], pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+      mode: 'adapt', weakPoints: ['back'], focusGroup: 'back', specialization: true,
+      equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+    } as any);
+    const backExercises = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).filter(e => e.muscle === 'back');
+    expect(backExercises.length).toBeGreaterThan(0);
+    expect(plan.rationale.some(item => item.includes('Спина по паттернам'))).toBe(true);
+  }, 30000);
+
+  it('faithful library mode does not run adaptive pull-pattern repair', () => {
+    const source = FULL_PROGRAM_LIBRARY.find(program => program.weeks?.some(week => week.days.some(day => day.exercises.some(ex => /подтяг|pull.?up|верхн.*блок|row|тяга/i.test(ex.name)))));
+    if (!source) return;
+    const plan = programToBBPlan(source, { workMax: WM, level: 'enhanced', trainingYears: 6, mode: 'faithful' } as any);
+    expect(plan.rationale.some(item => item.includes('Спина по паттернам'))).toBe(true);
+    expect(plan.rationale.some(item => item.includes('Адаптация частоты'))).toBe(false);
   }, 30000);
 });
