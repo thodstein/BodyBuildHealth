@@ -312,7 +312,44 @@ export const ExerciseSubstitutionCard: React.FC = () => {
   );
 };
 
-/* ─── WarmupRampCard — разминочная рампа ─── */
+/* ─── SectionHeader — разделитель секций ─── */
+
+export const SectionHeader: React.FC<{ icon: string; title: string; hint?: string }> = ({ icon, title, hint }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 2px 6px' }}>
+    <span style={{ fontSize: 13 }}>{icon}</span>
+    <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.2px' }}>{title}</span>
+    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+    {hint && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{hint}</span>}
+  </div>
+);
+
+/* ─── DiaryEmptyState — единое пустое состояние ─── */
+
+export const DiaryEmptyState: React.FC<{
+  icon: string;
+  title: string;
+  description: string;
+  onRecord?: () => void;
+  onRefresh?: () => void;
+}> = ({ icon, title, description, onRecord, onRefresh }) => (
+  <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
+    <div style={{ fontSize: 36, marginBottom: 8 }}>{icon}</div>
+    <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{title}</div>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, lineHeight: 1.5 }}>{description}</div>
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+      {onRecord && (
+        <button onClick={onRecord} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+          📝 Записать тренировку
+        </button>
+      )}
+      {onRefresh && (
+        <button onClick={onRefresh} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: 10, cursor: 'pointer' }}>
+          🔄 Обновить
+        </button>
+      )}
+    </div>
+  </div>
+);
 
 export const WarmupRampCard: React.FC = () => {
   const [wuWeight, setWuWeight] = useState(100);
