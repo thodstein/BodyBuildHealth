@@ -859,7 +859,20 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     if (!finalRec || finalRec.subs.length === 0) return null;
     try {
       const inp = buildTzInput(state, finalRec.subs.map(s => s.substanceId));
-      return inp ? calculateTzSpecRisk(inp) : null;
+      if (!inp) return null;
+      const result = calculateTzSpecRisk(inp);
+      // Единый вход для вкладки «Риски» (механизм-модель): snapshot полного TzSpecInput,
+      // чтобы цифры калькулятора и вкладки «Риски» были ИДЕНТИЧНЫ до механизма.
+      try {
+        localStorage.setItem('he_calc_tz_input', JSON.stringify({ input: inp, ts: Date.now() }));
+        localStorage.setItem('he_support_risk', JSON.stringify({
+          subs: finalRec.subs.map(s => s.substanceId),
+          riskBeforeSupport: result.overallRaw,
+          riskAfterSupport: result.overallAfter,
+          timestamp: Date.now(),
+        }));
+      } catch {}
+      return result;
     } catch {
       return null;
     }

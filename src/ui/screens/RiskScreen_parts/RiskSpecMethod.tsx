@@ -2,6 +2,7 @@
 // Данные курса → из linked.course (Фарма), анализы → из linked.labs, поддержка → из калькулятора
 import React, { useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
+import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { TZRisk3DModel } from './TZRisk3DModel';
@@ -118,11 +119,7 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     return { drugClass, avgDose, totalWeeks: Math.max(1, totalWeeks), form, combos: drugClasses.length, count: course.length, classes: drugClasses };
   }, [course]);
 
-  const labMap = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const l of labs) { const code = (l.code || l.name || '').toUpperCase(); if (code && l.value) m[code] = l.value; }
-    return m;
-  }, [labs]);
+  const labMap = useMemo(() => normalizeFlatLabs(labs), [labs]);
   const labCount = Object.keys(labMap).length;
   const REQUIRED_LAB_CODES = ['LDL','HDL','TG','HCT','ALT','AST','GGT','CREATININE','eGFR','GLU','LH','FSH','TT','E2','K','Na'];
   const presentCount = REQUIRED_LAB_CODES.filter(c => labMap[c] !== undefined).length;
@@ -130,7 +127,20 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   const dCov = forceNoLabs ? 0.1 : Math.max(0.1, rawDcov);
 
   // ── Авто-расчёт (useMemo) — результат вычисляется при изменении любых входных данных ──
+  // ЕДИНЫЙ строитель входа (buildTzInputCore) с калькулятором поддержки: та же
+  // нормализация анализов, тот же phase-множитель, те же nutrition/training.
+  // Если калькулятор открыт — его snapshot (he_calc_tz_input) даёт полную идентичность.
+  const calcSnapshot = useMemo<TzSpecInput | null>(() => {
+    try {
+      const raw = localStorage.getItem('he_calc_tz_input');
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (!d?.input || Date.now() - (d.ts || 0) > 24 * 60 * 60 * 1000) return null;
+      return d.input as TzSpecInput;
+    } catch { return null; }
+  }, []);
   const buildInputs = useMemo((): TzSpecInput | null => {
+    if (calcSnapshot) return calcSnapshot;
     if (!courseSummary) return null;
     const drugs = course.length > 0 ? course.map(c => {
       const id = (c.substanceId || '').toLowerCase();
@@ -140,16 +150,36 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
         drugName: id || 'unknown',
         dose: c.doseValue || 250,
         form: (id.includes('oxand') || id.includes('stan') || id.includes('meth') ? 'oral' : 'inject') as 'inject' | 'oral',
+        startWeek: c.startWeek,
+        endWeek: c.endWeek,
       };
-    }) : undefined;
-    return {
-      drugClass: courseSummary.drugClass, drugName: 'course',
-      dose: courseSummary.avgDose, duration: courseSummary.totalWeeks,
-      form: courseSummary.form, combinations: courseSummary.combos,
-      labCoverage: dCov, labValues: forceNoLabs ? {} : labMap,
-      supportSubstances: supportIds, drugs,
-    };
-  }, [courseSummary, course, dCov, forceNoLabs, labMap, supportIds]);
+    }) : [];
+    if (drugs.length === 0) return null;
+    const prof: any = linked.profile?.settings || {};
+    const training = prof?.lifestyle ? {
+      hasHIIT: (prof.lifestyle.workoutsPerWeek || 3) >= 4,
+      weeklyMinutes: (prof.lifestyle.workoutsPerWeek || 3) * (prof.lifestyle.avgWorkoutMinutes || 60),
+      volumeTonnes: 8000,
+      lissMinutesPerWeek: 60,
+    } : undefined;
+    const nutrition = prof?.nutrition ? {
+      proteinPerKg: prof.nutrition.proteinGPerKg || 1.8,
+      fiberG: prof.nutrition.fiberG || 25,
+      omega3G: prof.nutrition.omega3 ? 1.5 : 0.5,
+      sodiumG: (prof.nutrition.sodiumMg || 3000) / 1000,
+      potassiumG: (prof.nutrition.potassiumMg || 3000) / 1000,
+      waterL: prof.nutrition.waterL || 2,
+      calories: prof.nutrition.calories || 2500,
+    } : undefined;
+    return buildTzInputCore({
+      drugs,
+      duration: courseSummary.totalWeeks,
+      labs: forceNoLabs ? {} : labMap,
+      phaseKey: 'course',
+      training,
+      nutrition,
+    }, supportIds);
+  }, [courseSummary, course, dCov, forceNoLabs, labMap, supportIds, calcSnapshot, linked.profile]);
 
   const result = useMemo<TzSpecResult | null>(() => {
     if (!buildInputs) return null;
@@ -245,6 +275,11 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
             R = Σ(w × m × E × U × Π(1−k*))
           </div>
+          {calcSnapshot && (
+            <div style={{ marginTop: 6, fontSize: 8, color: '#22c55e', fontWeight: 600 }}>
+              ⚡ Цифры идентичны калькулятору поддержки (единый вход: поддержка, фаза, анализы, питание)
+            </div>
+          )}
         </div>
 
         {result && (

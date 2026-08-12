@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { calculateTzSpecRisk } from '../risk-engine-tz-spec';
+import { buildTzInput, buildTzInputCore } from '../support-plan/engine-helpers';
+import { DEFAULT_STATE } from '../../ui/screens/Calculator/Calc.types';
 
 function input(overrides: Partial<Parameters<typeof calculateTzSpecRisk>[0]> = {}) {
   return {
@@ -93,5 +95,42 @@ describe('TZ mechanism risk invariants', () => {
     const hemaSingle = single.organs.find(o => o.id === 'hematologic')!;
     const hemaTrio = trio.organs.find(o => o.id === 'hematologic')!;
     expect(hemaTrio.afterPercent).toBeLessThanOrEqual(hemaSingle.afterPercent);
+  });
+
+  it('калькулятор и вкладка «Риски»: единый builder — идентичные цифры до механизма', () => {
+    const state: any = {
+      ...DEFAULT_STATE,
+      pharma: {
+        ...DEFAULT_STATE.pharma,
+        phase: 'course',
+        aas: [
+          { id: 'test_enan', doseMgWeek: 500, weeks: 12, form: 'inject' },
+          { id: 'tren_enan', doseMgWeek: 300, weeks: 10, form: 'inject' },
+        ],
+      },
+      labs: { ...DEFAULT_STATE.labs, fullPanel: { date: '2026-01-01', panelHematology: { HCT: '52' }, panelLipid: { LDL: '4.2', HDL: '0.8', Triglycerides: '2.1' } } as any },
+    };
+    const subs = ['hydration', 'cardio_aerobic', 'electrolyte_balance', 'nac', 'tudca', 'omega3', 'nattokinase', 'serrapeptase', 'bromelain'];
+
+    const viaState = buildTzInput(state, subs);
+    expect(viaState).not.toBeNull();
+    const viaCore = buildTzInputCore({
+      drugs: viaState!.drugs || [],
+      duration: viaState!.duration,
+      labs: viaState!.labValues,
+      phaseKey: 'course',
+      courseWeek: viaState!.courseWeek,
+      genetics: viaState!.genetics,
+      nutrition: viaState!.nutrition,
+      training: viaState!.training,
+    }, subs);
+
+    const a = calculateTzSpecRisk(viaState!);
+    const b = calculateTzSpecRisk(viaCore);
+    expect(b.overallRaw).toBe(a.overallRaw);
+    expect(b.overallAfter).toBe(a.overallAfter);
+    expect(b.organs.map(o => o.rawPercent)).toEqual(a.organs.map(o => o.rawPercent));
+    expect(b.organs.map(o => o.afterPercent)).toEqual(a.organs.map(o => o.afterPercent));
+    expect(b.organs.flatMap(o => o.mechanisms.map(m => m.rawPercent))).toEqual(a.organs.flatMap(o => o.mechanisms.map(m => m.rawPercent)));
   });
 });

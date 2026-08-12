@@ -1060,6 +1060,49 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
   };
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ЕДИНЫЙ строитель TzSpecInput — используется и калькулятором поддержки,
+//  и вкладкой «Риски» (механизм-модель), чтобы цифры были ИДЕНТИЧНЫ
+//  до механизма. Модель рисков (органы/механизмы) не меняется —
+//  меняется только влияние поддержки/образа жизни через одни и те же входы.
+// ════════════════════════════════════════════════════════════════════
+export interface TzInputCoreParams {
+  drugs: DrugInput[];
+  duration: number;
+  labs: Record<string, number>;
+  phaseKey?: PhaseKey;
+  courseWeek?: number;
+  genetics?: TzSpecInput['genetics'];
+  nutrition?: TzSpecInput['nutrition'];
+  training?: TzSpecInput['training'];
+}
+
+export function buildTzInputCore(params: TzInputCoreParams, supportSubs: string[]): TzSpecInput {
+  const firstDrug = params.drugs[0];
+  return {
+    drugClass: firstDrug.drugClass, drugName: firstDrug.drugName,
+    dose: firstDrug.dose, duration: params.duration,
+    form: firstDrug.form,
+    combinations: Math.max(1, params.drugs.length),
+    labCoverage: Math.min(1.0, 0.3 + Object.keys(params.labs).length * 0.04),
+    labValues: params.labs, supportSubstances: supportSubs, drugs: params.drugs,
+    genetics: params.genetics, nutrition: params.nutrition, training: params.training,
+    courseWeek: params.courseWeek,
+    phaseDoseMultiplier: params.phaseKey ? PHASE_PROTOCOL[params.phaseKey].doseTier : 1,
+  };
+}
+
+/** Нормализация плоского списка анализов (linked.labs) — та же логика, что extractLabValues. */
+export function normalizeFlatLabs(labs: Array<{ code?: string; name?: string; value?: number }>): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const l of labs) {
+    const code = (l.code || l.name || '').toUpperCase();
+    if (!code || l.value == null || isNaN(l.value)) continue;
+    m[code] = normalizeLabValue(code, l.value);
+  }
+  return m;
+}
+
 export function tzToScores(tzResult: TzSpecResult, oldScores: Record<RiskSystemId, number>): Record<RiskSystemId, number> {
   const scores: Record<string, number> = {
     cardio: 0, hepatic: 0, renal: 0, neuro: 0,
