@@ -1059,6 +1059,85 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
 }
 
 
+/**
+ * Реальное применение тапера к ДЕЙСТВУЮЩЕМУ циклу: добавляет N тапер-недель
+ * в конец готового плана (LMSBuildOutput). В отличие от applyPLTaper (который
+ * только модифицирует последние 2 недели при сборке), эта функция именно
+ * РАСШИРЯЕТ план: новая неделя N-1 → объём ×0.65 + RIR+1, неделя N → ×0.45 + RIR+2
+ * (Bosquet 2005), интенсивность (вес) сохранена. Добавленные недели помечаются
+ * sourcePhase='peak' + macroPhase='competition' для корректного отображения.
+ */
+export function appendPLTaperWeeks(plan: LMSBuildOutput, taperWeeks: number): LMSBuildOutput {
+  if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
+  const last = plan.weeks[plan.weeks.length - 1];
+  const nextWeekNum = last.week + 1;
+  const lastPhase = mesocyclePhaseForWeek(last.week, plan.weeks.length);
+  const refVolume = (() => {
+    // Эталон объёма: последняя НЕ-deload неделя (иначе делод станет базой тапера).
+    for (let i = plan.weeks.length - 1; i >= 0; i--) {
+      const wk = plan.weeks[i];
+      if (mesocyclePhaseForWeek(wk.week, plan.weeks.length) === 'deload') continue;
+      let v = 0;
+      for (const d of wk.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
+      if (v > 0) return v;
+    }
+    return 0;
+  })();
+
+  const buildTaperWeek = (idx: number, volumeMult: number, rirAdd: number): LMSPlanWeek => {
+    const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
+    const days = last.days.map(d => {
+      const exercises = d.exercises.map(e => ({
+        ...e,
+        rir: e.rir + rirAdd,
+        workSets: e.workSets.map(ws => ({
+          ...ws,
+          sets: Math.max(1, Math.round(ws.sets * volumeMult)),
+          rir: ws.rir + rirAdd,
+        })),
+      }));
+      const metricsEx: SRExercise[] = exercises.map(pe => ({
+        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
+        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      }));
+      return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
+    });
+    return {
+      week: nextWeekNum + idx,
+      pmRow: last.pmRow,
+      days,
+      sourcePhase: 'peak' as MesocyclePhase,
+      sourcePhaseOrigin: 'inferred' as const,
+      macroPhase: 'competition' as const,
+    };
+  };
+
+  const extra: LMSPlanWeek[] = [];
+  for (let i = 0; i < taperWeeks; i++) {
+    // Строго убывающая кривая объёма от 0.9 → 0.45; последняя неделя RIR+2,
+    // остальные RIR+1. Для 2 нед: ×0.675/×0.45 ≈ классические ×0.65/×0.45.
+    const volumeMult = Math.max(0.4, 0.9 - ((i + 1) / taperWeeks) * 0.45);
+    const rirAdd = i === taperWeeks - 1 ? 2 : 1;
+    extra.push(buildTaperWeek(i, volumeMult, rirAdd));
+  }
+
+  const weeks = [...plan.weeks, ...extra];
+  const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({
+    name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
+    sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+  } as SRExercise))));
+  const cycleMetrics = calcCycleMetricsAggregate(allSessions, weeks.length);
+
+  return {
+    ...plan,
+    weeks,
+    cycleMetrics,
+    progressionRationale: plan.progressionRationale +
+      ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet 2005).` +
+      (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),
+  };
+}
+
 function calcCycleMetricsAggregate(sessions: SRExercise[][], weeksCount: number): SRCycleMetrics {
   const perSession = sessions.map(s => calcSessionMetrics(s));
   let tonnage = 0, kpsh = 0, relIntWeighted = 0, intFB = 0, uoiNum = 0;

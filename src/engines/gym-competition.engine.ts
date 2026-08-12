@@ -268,6 +268,79 @@ export function selectWeightClass(
   return { weightClass: bodyWeight, cuttingRequired: false, cuttingAmount: 0, recommendation: 'Нет подходящей категории.' };
 }
 
+export interface WeightCutRecommendation {
+  /** Текущий вес тела, кг. */
+  currentWeight: number;
+  /** Целевой вес (категория), кг. */
+  targetWeight: number;
+  /** Сколько нужно сбросить, кг. */
+  toCut: number;
+  /** Безопасный темп, кг/нед (0.5–1.0% массы тела). */
+  safeWeeklyRate: number;
+  /** Минимальное число недель при безопасном темпе. */
+  weeksNeeded: number;
+  /** Есть ли время на безопасный сброс до соревнования. */
+  feasible: boolean;
+  /** Недельный дефицит калорий, ккал (≈7700 ккал/кг жира). */
+  weeklyDeficitKcal: number;
+  /** Дневной дефицит, ккал. */
+  dailyDeficitKcal: number;
+  /** Понедельный план снижения веса. */
+  timeline: { week: number; weight: number; note: string }[];
+  /** Рекомендации текстом. */
+  recommendations: string[];
+}
+
+/**
+ * Рекомендации по сбросу веса перед соревнованием.
+ * Безопасный темп: 0.5–1.0% массы тела в неделю (Helms 2018, NSCA).
+ * 1 кг жира ≈ 7700 ккал. Последняя неделя — водная/углеводная манипуляция (не дефицит).
+ */
+export function recommendWeightCut(currentWeight: number, targetWeight: number, weeksToMeet: number): WeightCutRecommendation {
+  const toCut = Math.max(0, currentWeight - targetWeight);
+  const safeWeeklyRate = currentWeight > 0 ? Math.max(0.25, Math.round(currentWeight * 0.0075 * 10) / 10) : 0.5;
+  const weeksNeeded = safeWeeklyRate > 0 ? Math.ceil(toCut / safeWeeklyRate) : 0;
+  const feasible = toCut === 0 || weeksNeeded <= weeksToMeet;
+  const weeklyLoss = weeksToMeet > 0 ? toCut / weeksToMeet : 0;
+  const weeklyDeficitKcal = Math.round(weeklyLoss * 7700);
+  const dailyDeficitKcal = Math.round(weeklyDeficitKcal / 7);
+  const timeline: WeightCutRecommendation['timeline'] = [];
+  for (let w = 1; w <= weeksToMeet; w++) {
+    const weight = Math.max(targetWeight, Math.round((currentWeight - weeklyLoss * w) * 10) / 10);
+    const note = w === weeksToMeet
+      ? 'Взвешивание. Вода/углеводы: не вносить дефицит за 24-48ч до.'
+      : w >= weeksToMeet - 1 && toCut >= 2
+        ? 'Водная манипуляция: ±соль/вода (при необходимости).'
+        : weeklyLoss > 0 ? `−${weeklyLoss.toFixed(1)} кг/нед` : 'поддержание';
+    timeline.push({ week: w, weight, note });
+  }
+  const recommendations: string[] = [];
+  if (toCut <= 0) {
+    recommendations.push(`✓ Вы уже в категории до ${targetWeight} кг — сброс не требуется. Сфокусируйтесь на пике формы.`);
+  } else {
+    recommendations.push(`Сброс: ${toCut.toFixed(1)} кг за ${weeksToMeet} нед → темп ${weeklyLoss.toFixed(2)} кг/нед.`);
+    if (feasible) {
+      recommendations.push(`✅ Безопасный темп (${safeWeeklyRate.toFixed(1)} кг/нед при 0.75% массы тела) — успеваете. Дефицит ≈${dailyDeficitKcal} ккал/день.`);
+      if (weeklyLoss > safeWeeklyRate) {
+        recommendations.push(`⚠ Темп ${weeklyLoss.toFixed(2)} кг/нед выше безопасного ${safeWeeklyRate.toFixed(1)} — усильте шаги/кардио или начните сброс раньше.`);
+      }
+    } else {
+      recommendations.push(`❌ За ${weeksToMeet} нед безопасно сбросить только ${(safeWeeklyRate * weeksToMeet).toFixed(1)} кг (нужно ${toCut.toFixed(1)}). Рассмотрите категорию выше или водную манипуляцию (макс. ~2-3 кг).`);
+    }
+    if (toCut >= 4) {
+      recommendations.push('Белок 2.2–2.6 г/кг, дефицит не более 20-25% от TDEE, силовая интенсивность сохраняется (Helms 2018).');
+    }
+    if (weeksToMeet <= 3 && toCut <= 3) {
+      recommendations.push('Лёгкая сушка ≤3 кг за 3 нед: умеренный дефицит + контроль натрия/воды в последнюю неделю.');
+    }
+  }
+  recommendations.push('Взвешивание в федерации обычно утром — взвесьтесь за 2-3 дня до, чтобы учесть запас.');
+  return {
+    currentWeight, targetWeight, toCut, safeWeeklyRate, weeksNeeded, feasible,
+    weeklyDeficitKcal, dailyDeficitKcal, timeline, recommendations,
+  };
+}
+
 export function generateAttemptStrategy(squat: number, bench: number, deadlift: number): CompetitionStrategy['attemptStrategy'] {
   const lifts = [
     { name: 'Squat', max: squat },

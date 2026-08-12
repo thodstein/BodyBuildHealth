@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, originalCycleWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -48,6 +48,7 @@ import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { competitionAttempts } from '../../engines/lms/competition-attempts';
+import { recommendWeightCut } from '../../engines/gym-competition.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 
@@ -197,6 +198,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return saved || 'cycle-01';
   });
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
+  // 🏁 Соревнование + тапер: целевой вес (категория), недель до соревнования, тапер-недель к активному циклу.
+  const [targetBw, setTargetBw] = useState<number>(_plSaved?.plTargetBw ?? bw);
+  const [weeksToMeet, setWeeksToMeet] = useState<number>(_plSaved?.plWeeksToMeet ?? 8);
+  const [taperWeeksToAdd, setTaperWeeksToAdd] = useState<number>(_plSaved?.plTaperWeeksToAdd ?? 2);
+  const [taperNote, setTaperNote] = useState<string>(_plSaved?.plTaperNote ?? '');
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
     if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
     if (!plan.weeks.every((week: any) => week && Number.isFinite(week.week) && Array.isArray(week.days))) return null;
@@ -210,7 +216,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
@@ -1199,6 +1205,92 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             )}
           </div>
            <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
+          {/* 🏁 Соревнование + тапер: вес → рекомендации по сбросу, тапер-недели к активному циклу, новый цикл на выбор */}
+          {(() => {
+            const rec = recommendWeightCut(bw, targetBw, weeksToMeet);
+            return (
+              <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>🏁 Соревнование + тапер</div>
+                  {builtSrc && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
+                  <PopupNumber label="Вес сейчас" value={bw} min={40} max={250} suffix=" кг" onChange={v => setBw(v)} />
+                  <PopupNumber label="Целевой вес (категория)" value={targetBw} min={40} max={250} suffix=" кг" onChange={v => setTargetBw(v)} />
+                  <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={26} suffix=" нед" onChange={v => setWeeksToMeet(v)} />
+                  <PopupNumber label="Тапер-недель к циклу" value={taperWeeksToAdd} min={1} max={4} suffix="" hint="Сколько недель снижения объёма добавить в конец активного плана" onChange={v => setTaperWeeksToAdd(v)} />
+                </div>
+                {/* Рекомендации по сбросу */}
+                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
+                    ⚖️ Сброс: {rec.toCut > 0 ? `${rec.toCut.toFixed(1)} кг · темп ${(rec.toCut / Math.max(1, weeksToMeet)).toFixed(2)} кг/нед · дефицит ≈${rec.dailyDeficitKcal} ккал/день` : 'уже в категории'}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
+                    {rec.recommendations.map((r, i) => (
+                      <div key={i} style={{ fontSize: 10, color: r.startsWith('❌') ? '#f87171' : r.startsWith('⚠') ? '#fbbf24' : r.startsWith('✅') ? '#4ade80' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{r}</div>
+                    ))}
+                  </div>
+                  {rec.timeline.length > 0 && (
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      {rec.timeline.map(t => (
+                        <div key={t.week} title={t.note} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 9, background: t.week === weeksToMeet ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${t.week === weeksToMeet ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                          <b style={{ color: t.week === weeksToMeet ? '#f59e0b' : 'rgba(255,255,255,0.8)' }}>Н{t.week}</b> {t.weight.toFixed(1)} кг
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Действия: тапер к активному циклу + авто-новый цикл */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  <button
+                    disabled={!builtSrc}
+                    onClick={() => {
+                      if (!builtSrc) return;
+                      const next = appendPLTaperWeeks(builtSrc, taperWeeksToAdd);
+                      setBuiltSrc(next);
+                      setTaperNote(`+${taperWeeksToAdd} нед (объём ×0.65/×0.45, RIR +1/+2)`);
+                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet 2005).`);
+                    }}
+                    style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
+                    title={builtSrc ? `Добавить ${taperWeeksToAdd} тапер-недели в конец плана` : 'Сначала сгенерируйте план'}
+                  >📉 Добавить тапер к плану ({taperWeeksToAdd} нед)</button>
+                  <button
+                    disabled={!builtSrc}
+                    onClick={() => {
+                      if (!builtSrc) return;
+                      if (taperNote) {
+                        setBuiltSrc(builtSrc);
+                        setTaperNote('');
+                        setMethodNote('↺ Тапер уже в плане — сгенерируйте план заново, чтобы убрать.');
+                      }
+                    }}
+                    style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', display: taperNote ? 'inline-flex' : 'none' }}
+                    title="Тапер уже добавлен — пересоберите план, чтобы начать заново"
+                  >ℹ️ в плане</button>
+                </div>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 4 }}>🔄 Авто-генерация нового цикла на выбор:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                    <PopupSelect
+                      label="Новый цикл" value={selectedCycleId}
+                      options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string, string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.weeks} нед` }))}
+                      onChange={v => setSelectedCycleId(v)}
+                    />
+                    <button
+                      onClick={() => {
+                        try {
+                          buildSrc(selectedCycleId);
+                          setSrcWeek(1);
+                          setMethodNote(`🔄 Новый цикл собран: ${getCycleById(selectedCycleId)?.meta.title ?? selectedCycleId} (${originalCycleWeeks(getCycleById(selectedCycleId)!)} нед)${taperWeeksToAdd > 0 ? `. Тапер: нажмите «Добавить тапер к плану» для +${taperWeeksToAdd} нед` : ''}`);
+                        } catch (error) { setMethodNote(`⚠ Не удалось собрать цикл: ${(error as Error).message}`); }
+                      }}
+                      style={{ ...BTN, minHeight: 44, fontSize: 12, background: 'linear-gradient(135deg,var(--accent),#00c853)', color: '#000' }}
+                    >🔄 Собрать новый цикл</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           {builtSrc && (() => {
              const W = builtSrc.weeks;
              const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
