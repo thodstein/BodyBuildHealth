@@ -79,7 +79,7 @@ export function assignVertexZones(positions: Float32Array, anchors: ZoneAnchor[]
   return out;
 }
 
-const BASE_HEX = new THREE.Color('#1e2733');
+const BASE_HEX = new THREE.Color('#aebfd8');
 const BLACK = new THREE.Color('#000000');
 const WHITE = new THREE.Color('#ffffff');
 
@@ -153,14 +153,17 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     controls.target.set(0, 0.25, 0);
     controls.update();
 
-    const ambient = new THREE.AmbientLight('#8899bb', 1.1);
+    const ambient = new THREE.AmbientLight('#aabbdd', 1.6);
     scene.add(ambient);
-    const key = new THREE.DirectionalLight('#ffffff', 1.6);
+    const key = new THREE.DirectionalLight('#ffffff', 2.4);
     key.position.set(2.5, 4, 4);
     scene.add(key);
-    const fill = new THREE.DirectionalLight('#667799', 0.6);
+    const fill = new THREE.DirectionalLight('#99aacc', 1.1);
     fill.position.set(-2.5, 0.5, -2);
     scene.add(fill);
+    const rim = new THREE.DirectionalLight('#dde6ff', 0.8);
+    rim.position.set(0, 0, 3);
+    scene.add(rim);
 
     const group = new THREE.Group();
     scene.add(group);
@@ -209,14 +212,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         group.add(model);
         model.updateMatrixWorld(true);
 
-        // Материал тела: исходный (текстура Hulk), тёмный «дисклеймер»-стиль
+        // Материал тела: исходный (текстура Hulk) — светлый, чтобы модель была видна
         model.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             const mat = child.material as THREE.MeshStandardMaterial;
             if (mat) {
               mat.vertexColors = false;
-              mat.color = new THREE.Color('#2b3442');
-              mat.roughness = 0.75;
+              mat.color = new THREE.Color('#8a97ab');
+              mat.roughness = 0.6;
               mat.metalness = 0.05;
             }
           }
@@ -261,10 +264,10 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
       for (let i = 0; i < zoneIdx.length; i++) {
         const ai = zoneIdx[i];
         if (ai < 0) {
-          // тело — тёмная подложка
-          arr[i * 3] = BASE_HEX.r * 0.22;
-          arr[i * 3 + 1] = BASE_HEX.g * 0.22;
-          arr[i * 3 + 2] = BASE_HEX.b * 0.22;
+          // тело — светлая подложка
+          arr[i * 3] = BASE_HEX.r * 0.5;
+          arr[i * 3 + 1] = BASE_HEX.g * 0.5;
+          arr[i * 3 + 2] = BASE_HEX.b * 0.5;
           continue;
         }
         const zoneId = anchorToZone[ai];
@@ -274,18 +277,18 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           zoneColor.setRGB(r, g, b);
           if (hover === zoneId) {
             lerp.copy(zoneColor).lerp(WHITE, 0.35);
-            arr[i * 3] = lerp.r * 1.5;
-            arr[i * 3 + 1] = lerp.g * 1.5;
-            arr[i * 3 + 2] = lerp.b * 1.5;
+            arr[i * 3] = lerp.r * 1.6;
+            arr[i * 3 + 1] = lerp.g * 1.6;
+            arr[i * 3 + 2] = lerp.b * 1.6;
           } else {
-            arr[i * 3] = zoneColor.r * 1.15;
-            arr[i * 3 + 1] = zoneColor.g * 1.15;
-            arr[i * 3 + 2] = zoneColor.b * 1.15;
+            arr[i * 3] = zoneColor.r * 1.3;
+            arr[i * 3 + 1] = zoneColor.g * 1.3;
+            arr[i * 3 + 2] = zoneColor.b * 1.3;
           }
         } else {
-          arr[i * 3] = BASE_HEX.r * 0.28;
-          arr[i * 3 + 1] = BASE_HEX.g * 0.28;
-          arr[i * 3 + 2] = BASE_HEX.b * 0.28;
+          arr[i * 3] = BASE_HEX.r * 0.6;
+          arr[i * 3 + 1] = BASE_HEX.g * 0.6;
+          arr[i * 3 + 2] = BASE_HEX.b * 0.6;
         }
       }
       colorAttr.needsUpdate = true;
@@ -427,7 +430,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           borderRadius: 16,
           overflow: 'hidden',
           background:
-            'radial-gradient(600px 300px at 50% 0%, rgba(236,72,153,0.07), transparent 65%), rgba(10,10,13,0.6)',
+            'radial-gradient(600px 300px at 50% 0%, rgba(236,72,153,0.10), transparent 65%), rgba(28,32,42,0.55)',
           border: '1px solid rgba(255,255,255,0.08)',
           position: 'relative',
           cursor: 'grab',
