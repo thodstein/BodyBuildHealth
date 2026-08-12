@@ -10,6 +10,7 @@ import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 
 // ── справочник русских названий ──
 const FALLBACK_NAMES: Record<string, string> = {
+  hydration:'Гидратация', cardio_aerobic:'Кардио (аэробная)', electrolyte_balance:'Электролиты Na/K/Mg',
   niacin:'Ниацин', phosphatidylserine:'Фосфатидилсерин', glycine:'Глицин',
   theanine:'L-Теанин', quercetin:'Кверцетин', garlic:'Чеснок', beetroot:'Beetroot',
   lecithin:'Лецитин', iron_bisglycinate:'Железо', tadalafil:'Тадалафил',

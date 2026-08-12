@@ -79,6 +79,14 @@ const SUBSTANCE_REASONS: Record<string, string> = {
   glutathione: 'Антиоксидант: прямое восполнение GSH',
 };
 
+const FOUNDATION_ITEMS: Record<string, { name: string; dose: string; timing: string; reason: string; kind: 'lifestyle' | 'mineral' }> = {
+  hydration: { name: 'Гидратация', dose: '40–45 мл/кг/сут', timing: 'в течение дня', reason: 'Поддержка объёма плазмы и снижение гемоконцентрации', kind: 'lifestyle' },
+  cardio_aerobic: { name: 'Кардио (аэробная нагрузка)', dose: '30–45 мин, 5×/нед', timing: 'отдельно от силовой', reason: 'Эндотелиальная и реологическая поддержка', kind: 'lifestyle' },
+  electrolyte_balance: { name: 'Электролиты Na/K/Mg', dose: 'по рациону и анализам', timing: 'с водой/едой', reason: 'Водно-электролитный баланс; K⁺ только с учётом eGFR/лекарств', kind: 'mineral' },
+};
+
+export const NON_PILL_SUPPORT_IDS = new Set(Object.keys(FOUNDATION_ITEMS));
+
 /**
  * Преобразует список id веществ в PlanSubstance[] (с dedup по canonId).
  * Берёт display-инфо из каталога SUPPORT_CATALOG_DATA, дозировки из DEFAULT_DOSAGES.
@@ -104,30 +112,32 @@ export function buildSubstances(
     const e = catalogEntry(id);
     const def = DEFAULT_DOSAGES[id];
     // Weight-based dosing
-    let doseMg = def?.mg ?? e?.dosage?.mg ?? 500;
+    let doseMg = def?.mg ?? e?.dosage?.mg ?? (FOUNDATION_ITEMS[cid] ? 0 : 500);
     const wbd = WEIGHT_BASED_DOSING[cid];
     if (wbd && weight && weight > 0) {
       doseMg = Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)));
     }
-    const doseDisplay = doseMg >= 1000
+    const foundation = FOUNDATION_ITEMS[cid];
+    const doseDisplay = foundation?.dose || (doseMg >= 1000
       ? `${(doseMg / 1000).toFixed(1)} г`
-      : `${doseMg} мг`;
+      : `${doseMg} мг`);
     const entry = {
       id,
-      name: e?.nameRu || e?.name || id,
+      name: foundation?.name || e?.nameRu || e?.name || id,
       doseMg,
-      doseDisplay: (def && !wbd) || !e?.dosage?.mg
+      doseDisplay: foundation?.dose || ((def && !wbd) || !e?.dosage?.mg
         ? doseDisplay
-        : (e.dosage.mg > 0 ? doseDisplay : 'по инструкции'),
-      timing: def?.timing || e?.dosage?.timing || e?.forms?.[0]?.dose || 'с едой',
-      category: e?.category || [],
+        : (e.dosage.mg > 0 ? doseDisplay : 'по инструкции')),
+      timing: foundation?.timing || def?.timing || e?.dosage?.timing || e?.forms?.[0]?.dose || 'с едой',
+      category: foundation ? [foundation.kind] : (e?.category || []),
       tier: e?.tier || 'standard',
       targetSystems: e?.systems || [],
       comment: e?.description || '',
-      mechanismReason: SUBSTANCE_REASONS[cid] || e?.mechanismOfAction || e?.mechanisms?.[0] || '',
+      mechanismReason: foundation?.reason || SUBSTANCE_REASONS[cid] || e?.mechanismOfAction || e?.mechanisms?.[0] || '',
       fromJoint: jointSet.has(id),
       fromBoost: boostSet.has(id),
       fromNeuro: neuroSet.has(id),
+      kind: foundation?.kind || (e?.category?.includes('pharma') ? 'medicine' : 'supplement'),
     } as PlanSubstance;
     const brand = getBrandName(id);
     if (brand) entry.brandName = brand;
@@ -182,6 +192,11 @@ export function buildSchedule(
     seenCanon.add(cid);
     const e = catalogEntry(id);
     const def = DEFAULT_DOSAGES[id];
+    const foundation = FOUNDATION_ITEMS[cid];
+    if (foundation) {
+      blocks.morning.push({ id, name: foundation.name, dose: foundation.dose, instructions: foundation.timing });
+      continue;
+    }
     const name = e?.nameRu || e?.name || id;
     const dose = def
       ? (def.mg >= 1000 ? `${(def.mg / 1000).toFixed(1)} г` : `${def.mg} мг`)

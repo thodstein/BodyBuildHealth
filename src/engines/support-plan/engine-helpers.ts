@@ -21,6 +21,7 @@ import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue } from '../../core/constants';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
+import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 
 //  НУТРИЦИОЛОГИЧЕСКИЕ ФУНКЦИИ (body-weight dosing, depletion, UL, t½)
 // ═══════════════════════════════════════════════════════════════
@@ -1036,6 +1037,10 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
   } : undefined;
   // Training
   const p = state.profile;
+  const phaseMap: Record<string, PhaseKey> = {
+    course: 'course', bridge: 'bridge', pct: 'pct', fertility: 'fertility', trt: 'trt', base: 'trt',
+  };
+  const phaseKey = phaseMap[state.pharma?.phase || 'course'] || 'course';
   const training = p ? {
     hasHIIT: (p.workoutsPerWeek || 3) >= 4,
     weeklyMinutes: (p.workoutsPerWeek || 3) * (p.avgWorkoutMinutes || 60),
@@ -1051,6 +1056,7 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
     labValues, supportSubstances: supportSubs, drugs,
     genetics, nutrition, training,
     courseWeek: state.courseWeek,
+    phaseDoseMultiplier: PHASE_PROTOCOL[phaseKey].doseTier,
   };
 }
 

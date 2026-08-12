@@ -9,16 +9,16 @@ import type { PhaseContext, PhaseKey } from '../../../engines/tz-bridge-phase';
 import type { BoosterTriggerCtx } from '../../../engines/tz-bridge-boosters';
 import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
 import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
-import { assessPedRisk, computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
+import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
+import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { CalcSafetyLayer } from './CalcSafetyLayer';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
-import { classifyPed } from '../../../data/ped-potency-table';
 import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { getTitrationProtocol, type TitrationProtocol } from '../../../data/titration-protocols';
-import { CONTRAINDICATIONS, getContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
+import { CONTRAINDICATIONS, getContraindications, checkContraindications, type ContraindicationRule } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
 import { CalcSubstanceDetail, buildStackSynergyDescription } from './CalcSubstanceDetail';
 import { CalcPEDCard } from './CalcPEDCard';
@@ -76,6 +76,67 @@ const JOINT_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
 ];
 const JOINT_RECOMMENDED_HIGH: Set<string> = new Set(['glucosamine','chondroitin','collagen','vitamin_c','msm']);
 const JOINT_RECOMMENDED_MEDIUM: Set<string> = new Set(['omega3','hyaluronic_acid','curcumin','boswellia']);
+
+type GenericEnhancementConfig = {
+  label: string; icon: string; color: string; markers: string[]; domains: string[];
+  core: string[]; lv2: string[]; lv3: string[]; notes: string;
+  presets: { id: string; label: string; level: 1 | 2 | 3; ids: string[] }[];
+};
+type SpecializedDomain = { id: string; label: string; icon: string; markers: string[]; ids: string[]; trigger?: (labs: Record<string, number>, state: CalculatorState) => boolean };
+const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
+  cardio: [
+    { id:'bp', label:'АД/объём', icon:'🩺', markers:['BP_SYSTOLIC','BP_DIASTOLIC'], ids:['hydration','cardio_aerobic','electrolyte_balance','telmisartan'], trigger:(l)=> (l.BP_SYSTOLIC ?? 0)>130 || (l.BP_DIASTOLIC ?? 0)>85 },
+    { id:'lipids', label:'Липиды', icon:'🫀', markers:['LDL','HDL','TRIGLYCERIDES','APOB'], ids:['omega3','bergamot','coq10'], trigger:(l)=> (l.LDL ?? 0)>3 || (l.TRIGLYCERIDES ?? 0)>1.7 || (l.HDL ?? 9)<1 },
+    { id:'rhythm', label:'Ритм/ЧСС', icon:'💓', markers:['HR','K','MG'], ids:['magnesium','taurine','nebivolol'], trigger:(l)=> (l.HR ?? 0)>80 || (l.K ?? 9)<3.5 },
+    { id:'endothelium', label:'Эндотелий/тромбоз', icon:'🩸', markers:['HCT','D_DIMER','FIBRINOGEN'], ids:['hydration','cardio_aerobic','nattokinase','serrapeptase','bromelain'], trigger:(l)=> (l.HCT ?? 0)>48 || (l.D_DIMER ?? 0)>.5 || (l.FIBRINOGEN ?? 0)>4 },
+  ],
+  hepatic: [
+    { id:'cytolysis', label:'Цитолиз', icon:'🧫', markers:['ALT','AST'], ids:['nac','milk_thistle','alpha_lipoic'], trigger:(l)=>(l.ALT??0)>40||(l.AST??0)>40 },
+    { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l)=>(l.GGT??0)>55||(l.ALP??0)>120||(l.BILIRUBIN??0)>21 },
+    { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l)=>(l.CRP??0)>5||(l.FERRITIN??0)>300 },
+  ],
+  renal: [
+    { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','eGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l)=>(l.CREATININE??0)>105||(l.eGFR??200)<90||(l.CYSTATIN_C??0)>1 },
+    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>30||(l.PROTEIN_URINE??0)>.15 },
+    { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<3.5||(l.K??4)>5||(l.MG??1)<.75 },
+  ],
+  endocrine: [
+    { id:'e2', label:'Ароматизация/E2', icon:'⚖️', markers:['E2','SHBG'], ids:['anastrozole','zinc','vitamin_d3'], trigger:(l)=>(l.E2??0)>40 },
+    { id:'prl', label:'Пролактин', icon:'🧪', markers:['PRL'], ids:['agmatine','vitex','p5p','cabergoline'], trigger:(l)=>(l.PRL??0)>25 },
+    { id:'hpta', label:'HPTA', icon:'🧬', markers:['LH','FSH','TT','FT'], ids:['hcg','enclomiphene','tamoxifen','clomiphene'], trigger:(l)=>(l.LH??9)<1.7||(l.FSH??9)<1.5 },
+    { id:'stress', label:'Кортизол', icon:'🧠', markers:['CORTISOL'], ids:['magnesium_l_threonate','phosphatidylserine','ashwagandha','theanine'], trigger:(l)=>(l.CORTISOL??0)>535 },
+  ],
+  reproductive: [
+    { id:'gonadotropins', label:'LH/FSH', icon:'🧬', markers:['LH','FSH'], ids:['hcg','enclomiphene','clomiphene'], trigger:(l)=>(l.LH??9)<1.7||(l.FSH??9)<1.5 },
+    { id:'androgens', label:'TT/FT/SHBG', icon:'⚙️', markers:['TT','FT','SHBG'], ids:['zinc','boron','coq10'], trigger:(l)=>(l.FT??9)<8||(l.SHBG??0)>60 },
+    { id:'fertility', label:'Сперматогенез', icon:'🔬', markers:['LH','FSH'], ids:['hcg','nac','zinc','folate','vitamin_b12'], trigger:(_l,s)=>String(s.pharma.phase)==='fertility' },
+  ],
+  musculoskeletal: [
+    { id:'cartilage', label:'Хрящ', icon:'🦴', markers:['CRP'], ids:['collagen','glucosamine','chondroitin','msm'], trigger:(_l,s)=>s.oda.jointPain!=='none' },
+    { id:'tendon', label:'Сухожилия/связки', icon:'🔗', markers:['CK','CRP'], ids:['collagen','vitamin_c','msm','bpc157','tb500'], trigger:(_l,s)=>s.oda.ligamentIssues||s.oda.injuries.length>0 },
+    { id:'inflammation', label:'Воспаление', icon:'🔥', markers:['CRP','CK'], ids:['omega3','curcumin','boswellia'], trigger:(l)=>(l.CRP??0)>3 },
+  ],
+  metabolic: [
+    { id:'glucose', label:'Глюкоза/IR', icon:'🍬', markers:['GLU','INS','HBA1C','HOMAIR'], ids:['berberine','alpha_lipoic','magnesium','cardio_aerobic'], trigger:(l)=>(l.GLU??0)>5.6||(l.HOMAIR??0)>2.5 },
+    { id:'hypo', label:'Гипогликемия', icon:'⚠️', markers:['GLU','K','MG'], ids:['taurine','electrolyte_balance','magnesium'], trigger:(l)=>(l.GLU??9)<3.9 },
+    { id:'lipidmet', label:'ТГ/липиды', icon:'🫀', markers:['TRIGLYCERIDES','HDL','LDL'], ids:['omega3','berberine','cardio_aerobic'], trigger:(l)=>(l.TRIGLYCERIDES??0)>1.7||(l.HDL??9)<1 },
+  ],
+};
+const makePresets = (core: string[], lv2: string[], lv3: string[]) => [
+  { id:'base', label:'База', level:1 as const, ids:core },
+  { id:'enhanced', label:'Усиление', level:2 as const, ids:[...core, ...lv2] },
+  { id:'max', label:'Максимум', level:3 as const, ids:[...core, ...lv2, ...lv3] },
+];
+const rawGenericConfigs: Record<string, Omit<GenericEnhancementConfig, 'presets'>> = {
+  cardio: { label:'ССС', icon:'❤️', color:'#ef4444', markers:['BP_SYSTOLIC','BP_DIASTOLIC','HR','LDL','HDL','TRIGLYCERIDES','APOB','NT_PROBNP'], domains:['АД/объём','Липиды','Эндотелий/тромбоз','Ремоделирование','Ритм'], core:['hydration','cardio_aerobic','electrolyte_balance','omega3','coq10','magnesium','taurine'], lv2:['telmisartan','tadalafil','nebivolol','citrulline','pycnogenol','bergamot'], lv3:['atorvastatin','rosuvastatin'], notes:'Кардио-кандидаты выбираются по АД, ЧСС, липидам и фармакологии курса.' },
+  hepatic: { label:'Печень', icon:'🫁', color:'#f59e0b', markers:['ALT','AST','GGT','ALP','BILIRUBIN'], domains:['Цитолиз','Холестаз','Желчеотток','Оксидативный стресс','Фиброзный риск'], core:['nac','milk_thistle','glycine','selenium'], lv2:['tudca','alpha_lipoic','phosphatidylcholine'], lv3:['udca','heptral'], notes:'Для оральных 17α-алкилов приоритет печени повышается независимо от наличия текущих анализов.' },
+  renal: { label:'Почки', icon:'🫘', color:'#60a5fa', markers:['CREATININE','eGFR','CYSTATIN_C','UACR','UREA','K','NA','MG'], domains:['Гемодинамика','Гиперфильтрация','Протеинурия','Тубулярный стресс','Электролиты'], core:['hydration','electrolyte_balance','nac','astragalus','cordyceps','taurine'], lv2:['omega3','coq10','magnesium','telmisartan'], lv3:['potassium','celery_extract'], notes:'Калий и усиление ARB требуют K⁺/eGFR; при отсутствии анализа показывается warning, но базовая поддержка не исчезает.' },
+  endocrine: { label:'Эндокринная', icon:'🧪', color:'#ec4899', markers:['E2','PRL','TT','FT','LH','FSH','SHBG','CORTISOL','TSH'], domains:['Ароматизация/E2','PRL','HPTA','Кортизол','Щитовидная ось'], core:['hcg','magnesium','vitamin_d3','zinc','agmatine'], lv2:['anastrozole','ashwagandha','phosphatidylserine','magnesium_l_threonate'], lv3:['cabergoline','tamoxifen','enclomiphene'], notes:'Анастрозол — контроль E2; каберголин — только подтверждённый PRL и назначение врача.' },
+  reproductive: { label:'Репродуктивная', icon:'🧬', color:'#f472b6', markers:['TT','FT','LH','FSH','E2','PRL','SHBG'], domains:['LH/FSH','Интратестикулярный T','Сперматогенез','E2','ПКТ'], core:['hcg','zinc','magnesium','vitamin_d3','omega3'], lv2:['coq10','nac','ashwagandha','boron'], lv3:['tamoxifen','clomiphene','enclomiphene'], notes:'Состав зависит от course/bridge/pct/fertility; SERM и hCG не смешиваются без фазовой логики.' },
+  musculoskeletal: { label:'ОДА', icon:'🦴', color:'#4ade80', markers:['CRP','CK','CALCIUM','VITD','MG'], domains:['Хрящ','Сухожилия/связки','Кость','Воспаление','Травма'], core:['collagen','vitamin_c','magnesium','omega3'], lv2:['glucosamine','chondroitin','msm','curcumin','boswellia','vitamin_d3'], lv3:['bpc157','tb500','ghk_cu'], notes:'LV3 и пептиды — только отдельный врачебный/исследовательский статус; не обычная база.' },
+  metabolic: { label:'Метаболизм', icon:'🍬', color:'#fb923c', markers:['GLU','INS','HBA1C','HOMAIR','TRIGLYCERIDES','K','MG'], domains:['Глюкоза','Инсулинорезистентность','Гипогликемия','Липиды','Электролиты'], core:['cardio_aerobic','omega3','magnesium','taurine'], lv2:['berberine','alpha_lipoic','chromium'], lv3:['metformin'], notes:'При insulin/GH берберин/ALA/хром требуют отдельного контроля гипогликемии.' },
+};
+const GENERIC_ENHANCEMENT_CONFIG = Object.fromEntries(Object.entries(rawGenericConfigs).map(([id, cfg]) => [id, { ...cfg, presets: makePresets(cfg.core, cfg.lv2, cfg.lv3) }])) as Record<string, GenericEnhancementConfig>;
 
 // ── Конфигурация нейропротекторного модуля ──────────────────────────────────
 interface NeuroPreset {
@@ -394,9 +455,9 @@ function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]
                     border: on ? `1px solid ${d.color}66` : '1px solid rgba(255,255,255,0.06)',
                     color: on ? d.color : 'rgba(255,255,255,0.5)' }}>
                   {on ? '✓ ' : ''}{sym.label}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
           </div>
         </div>
       ))}
@@ -424,6 +485,7 @@ function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]
 // ── Утилиты отображения вещества ─────────────────────────────────────────────
 const SUB_NAME_CACHE: Record<string, string> = {};
 const FALLBACK_NAMES: Record<string, string> = {
+  hydration: 'Гидратация', cardio_aerobic: 'Кардио (аэробная)', electrolyte_balance: 'Электролиты Na/K/Mg',
   niacin: 'Ниацин (B3)', phosphatidylserine: 'Фосфатидилсерин', glycine: 'Глицин',
   theanine: 'L-Теанин', quercetin: 'Кверцетин', garlic: 'Чеснок (экстракт)',
   beetroot: 'Beetroot (экстракт)', lecithin: 'Лецитин (ФХ)',
@@ -458,6 +520,13 @@ const FALLBACK_NAMES: Record<string, string> = {
   ashwagandha: 'Ашваганда', rhodiola: 'Родиола', bacopa: 'Бакопа',
   lions_mane: 'Ежовик',
 };
+const NON_DRUG_IDS = new Set(['hydration', 'cardio_aerobic', 'electrolyte_balance']);
+function planItemKind(id: string): 'База' | 'Минерал' | 'БАД' | 'Препарат' {
+  if (id === 'hydration' || id === 'cardio_aerobic') return 'База';
+  if (id === 'electrolyte_balance') return 'Минерал';
+  if (['telmisartan','tadalafil','nebivolol','anastrozole','hcg','aspirin','cabergoline','metformin'].includes(id)) return 'Препарат';
+  return 'БАД';
+}
 function subNameRu(id: string): string {
   if (SUB_NAME_CACHE[id]) return SUB_NAME_CACHE[id];
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
@@ -483,125 +552,6 @@ function mechToOrganLabel(mechId: string): string {
     : mechId.startsWith('rep') ? 'reproductive'
     : 'hematologic';
   return organId;
-}
-
-const PANEL_KEYS = [
-  'panelBiochem', 'panelSex', 'panelHematology', 'panelThyroid',
-  'panelLipid', 'panelIron', 'panelVitamin', 'panelCardiac',
-  'panelCoagulation', 'panelInflammatory', 'panelAdrenal',
-  'panelMineral', 'panelTumor', 'panelUrinalysis',
-] as const;
-
-const MARKER_RENAME: Record<string, string> = {
-  'Total T': 'TESTOSTERONE', 'Free T': 'FREE_TESTOSTERONE', 'E2': 'ESTRADIOL',
-  'Bilirubin': 'BILIRUBIN', 'Uric acid': 'URIC_ACID', 'HCT': 'HEMATOCRIT',
-  'Hemoglobin': 'HEMOGLOBIN', 'Total Cholesterol': 'TOTAL_CHOLESTEROL',
-  'Triglycerides': 'TRIGLYCERIDES', 'T3 free': 'T3_FREE', 'T4 free': 'T4_FREE',
-  'Anti-TPO': 'ANTI_TPO', 'Anti-TG': 'ANTI_TG', 'Vitamin D (25-OH)': 'VITAMIN_D',
-  'Transferrin Sat': 'TRANSFERRIN_SAT', 'CK-MB': 'CK_MB', 'D-dimer': 'D_DIMER',
-  'IL-6': 'IL_6', 'TNF-alpha': 'TNF_ALPHA', 'DHEA-S': 'DHEA_S', '3a-ADG': '3A_ADG',
-  'PSA total': 'PSA_TOTAL', 'PSA free': 'PSA_FREE', 'CA-125': 'CA_125', 'Lp(a)': 'LP_A',
-};
-
-function labSliceToValues(fp: LabSlice | null): Record<string, number> {
-  if (!fp) return {};
-  const out: Record<string, number> = {};
-  for (const pk of PANEL_KEYS) {
-    const panel = (fp as any)[pk] as Record<string, string> | undefined;
-    if (!panel) continue;
-    for (const [marker, val] of Object.entries(panel)) {
-      if (!val) continue;
-      const num = parseFloat(val);
-      if (isNaN(num)) continue;
-      const rename = MARKER_RENAME[marker] || marker.toUpperCase().replace(/\s+/g, '_');
-      out[rename] = num;
-    }
-  }
-  return out;
-}
-
-export function buildMapperCtx(
-  state: CalculatorState,
-  level: SupportLevel,
-  manualChoices?: { addSubs?: string[]; removeSubs?: string[]; explicitCategories?: any[] },
-  stackTriggers?: string[],
-): MapperCtx {
-  const phaseKey = (state.pharma.phase === 'bridge' ? 'bridge'
-    : state.pharma.phase === 'pct' ? 'pct'
-    : state.pharma.phase === 'base' ? 'trt'
-    : 'course') as PhaseKey;
-  const phaseCtx: PhaseContext = {
-    usingAAS: state.pharma.aas.length > 0,
-    usingBridgeAAS: state.pharma.aas.length > 0 && state.pharma.phase === 'bridge',
-    explicitPhase: phaseKey,
-    onPCTDrug: state.pharma.phase === 'pct',
-    inFertilityProgram: false,
-  };
-  const labs = labSliceToValues(state.labs.fullPanel);
-  const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
-    .filter((a: any) => a && a.id)
-    .map((a: any) => ({
-      id: (a.id as string).toLowerCase(),
-      pClass: classifyPed(a.id),
-       mgPerWeek: Number(a.mgPerWeek ?? a.dosePerWeek ?? a.doseMgWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500)) || 0,
-      form: (a.form === 'oral' || a.route === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
-    }));
-  const ghIU = state.pharma.ghIU || 0;
-  if (ghIU > 0) pedDoses.push({ id: 'somatropin', pClass: 'gh', iuPerDay: ghIU, form: 'subq' } as any);
-  const insulinIU = state.pharma.insulinIU || 0;
-  if (insulinIU > 0) pedDoses.push({ id: 'insulin_rapid', pClass: 'insulin', iuPerDay: insulinIU, form: 'subq' } as any);
-  const igfMcg = state.pharma.igfMcg || 0;
-  if (igfMcg > 0) pedDoses.push({ id: 'igf1_lr3', pClass: 'igf', mcgPerDay: igfMcg, form: 'subq' } as any);
-  const clenMcg = state.pharma.clenMcg || 0;
-  if (clenMcg > 0) pedDoses.push({ id: 'clenbuterol', pClass: 'clenbut', mcgPerDay: clenMcg, form: 'oral' } as any);
-  const t3Mcg = state.pharma.t3Mcg || 0;
-  if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
-
-  // ── PED-risk assessment (Фаза 1: нейро/суставы по стеку PED) ──
-  const pedRisk = assessPedRisk(pedDoses, level);
-  const symptomsList = state.symptoms || [];
-
-  const boosterCtx: BoosterTriggerCtx = {
-    anxietyScore: state.neuro.aggressionScore,
-    sleepHours: state.profile.sleepHours,
-    stressScore: state.profile.stressLevel,
-    cortisolHigh: false,
-    irritability: state.neuro.aggressionScore > 6,
-    jointPainScore: state.oda.jointPain === 'severe' ? 8 : state.oda.jointPain === 'moderate' ? 5 : state.oda.jointPain === 'mild' ? 3 : 0,
-    crpLevel: labs['CRP'] || labs['HSCRP'],
-    // hemato labs (для computeHematoTier)
-    hematocrit: labs['HEMATOCRIT'] || labs['HCT'],
-    hemoglobin: labs['HEMOGLOBIN'] || labs['HGB'],
-    plt: labs['PLT'],
-    fibrinogen: labs['FIBRINOGEN'],
-    dDimer: labs['D_DIMER'],
-    triggeredStackIds: stackTriggers || [],
-    // Фаза 1: symptom-кнопки + force на max + PED-risk tiers
-    symptomJoints: symptomsList.includes('joint_pain'),
-    symptomNeuro: symptomsList.some(s => ['insomnia','anxiety','mood_swings'].includes(s)),
-    symptomHemato: symptomsList.some(s => ['hyperviscosity','headache','plethora','tinnitus'].includes(s)) || (labs['HEMATOCRIT'] != null && labs['HEMATOCRIT'] > 50),
-    forceNeuro: level === 'max',
-    forceJoints: level === 'max',
-    forceHemato: level === 'max',
-    pedNeuroTier: pedRisk.neuroBoosterTier,
-    pedJointsTier: pedRisk.jointsBoosterTier,
-    pedHematoTier: pedRisk.hematoBoosterTier,
-    pedRiskReasons: pedRisk.triggeredBy,
-  };
-  return {
-    labs, phaseCtx, boosterCtx, level, manualChoices,
-     onCourse: (Array.isArray(state.pharma?.aas) ? state.pharma.aas.length : 0) > 0 || pedDoses.length > 0,
-    e2Level: labs['ESTRADIOL'], hemoglobin: labs['HEMOGLOBIN'], hematocrit: labs['HEMATOCRIT'],
-    hasHCG: state.pharma.hasHCG, hasAI: state.pharma.hasAI,
-    hasCabergoline: state.pharma.hasCaber || false,
-     aasIds: (Array.isArray(state.pharma?.aas) ? state.pharma.aas : []).map((a: any) => a.id || '').filter(Boolean),
-    pedDoses, libidoLow: symptomsList.includes('low_libido'),
-    bpSystolic: state.cardio.bpStage === 'high' ? 150 : state.cardio.bpStage === 'normal' ? 120 : 135,
-    lipidLdl: labs['LDL'],
-    symptoms: symptomsList,
-    healthConditions: state.healthConditions || [],
-    pedRisk,
-  };
 }
 
 // ── Анализ контекста для доп. модулей (суставы/нейро/усиление) ──────────────────
@@ -765,9 +715,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
   const [showInteractions, setShowInteractions] = useState(false);
-  const [showSynergyCard, setShowSynergyCard] = useState(false);
   const [showEnhancementPopup, setShowEnhancementPopup] = useState(false);
   const [enhancementSearch, setEnhancementSearch] = useState('');
+  const [enhancementSystem, setEnhancementSystem] = useState<string>('all');
+  const [genericEnhancementPopup, setGenericEnhancementPopup] = useState<string | null>(null);
+  const [genericEnhancementSelected, setGenericEnhancementSelected] = useState<Set<string>>(new Set());
   const [showMegaPopup, setShowMegaPopup] = useState(false);
   const [megaSelected, setMegaSelected] = useState<Set<string>>(new Set());
 
@@ -789,18 +741,46 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const finalRec = useMemo(() => {
     if (!rec) return null;
     if (removedSubs.length === 0 && addedSubs.length === 0) return rec;
-    const next = {
+    const maxByLevel: Record<SupportLevel, number> = { base: 28, medium: 40, max: 48, manual: 99 };
+    const removed = new Set(removedSubs.map(r => canonIdLocal(r)));
+    const seen = new Set<string>();
+    const merged = [
+      ...rec.subs.filter(s => !removed.has(canonIdLocal(s.substanceId))),
+      ...addedSubs.map(id => ({
+        substanceId: id, category: 'other' as any, k: 0.5, q: 'B' as const,
+        reason: 'Добавлен вручную', mechsCovered: [], priority: 4 as const,
+      })),
+    ].filter(s => {
+      const key = canonIdLocal(s.substanceId);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const limit = maxByLevel[level];
+    const kept = merged.slice(0, limit);
+    const dropped = merged.length - kept.length;
+    const interactionIds = kept.map(s => s.substanceId);
+    const mappedConditions: string[] = [...(state.healthConditions || [])];
+    if (state.contraindications.hasCVD || state.cardio.previousCVD) mappedConditions.push('ihd');
+    if (state.contraindications.hasThrombophilia) mappedConditions.push('thrombophilia');
+    if (state.contraindications.hasGI) mappedConditions.push('peptic_ulcer');
+    if (state.contraindications.hasKidneyDisease) mappedConditions.push('ckd_stage3', 'ckd_stage4_5');
+    const safetyContra = checkContraindications(interactionIds, mappedConditions);
+    const nextWarnings = [
+      ...(rec.protocolWarnings || []),
+      ...(dropped > 0 ? [`⚠ Лимит уровня ${level}: ${dropped} добавленных элементов не вошли в финальный план.`] : []),
+    ];
+    return {
       ...rec,
-      subs: [
-        ...rec.subs.filter(s => !removedSubs.some(r => r.toLowerCase() === s.substanceId.toLowerCase())),
-        ...addedSubs.map(id => ({
-          substanceId: id, category: 'pharma' as any, k: 0.5, q: 'B' as const,
-          reason: 'Добавлен вручную', mechsCovered: [], priority: 4 as const,
-        })),
-      ],
+      subs: kept,
+      conflicts: checkInteractions(interactionIds).map(i => ({
+        a: i.a, b: i.b, reason: `${i.reason} — ${i.action}`, level: i.severity === 'block' ? 'block' as const : 'warn' as const,
+      })),
+      contraindications: safetyContra,
+      protocolWarnings: nextWarnings,
+      summary: `${rec.summary} После ручной корректировки: ${kept.length} элементов${dropped > 0 ? `, исключено по лимиту: ${dropped}` : ''}.`,
     };
-    return next;
-  }, [rec, removedSubs, addedSubs]);
+  }, [rec, removedSubs, addedSubs, level, state]);
 
   // ── RESIDUAL RISK — пересчёт риска с учётом выбранных веществ ──
   // Gross risk (из PED доз) → Net risk (после митигации). Показывает gross→net в баннере.
@@ -867,6 +847,36 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   }, [finalRec]);
 
   const synergyDesc = finalRec ? buildStackSynergyDescription(finalRec) : [];
+
+  const pairSynergies = useMemo(() => {
+    if (!finalRec || finalRec.subs.length <= 1) return [] as { a: string; b: string; effect: string; mechanism: string; severity: string; score: number }[];
+    const idSet = new Set(finalRec.subs.map((s: any) => (s.substanceId || '').toLowerCase()));
+    const synergies: { a: string; b: string; effect: string; mechanism: string; severity: string; score: number }[] = [];
+    const seenSyn = new Set<string>();
+    for (const entry of SYNERGY_NETWORK) {
+      if (entry.type !== 'synergy') continue;
+      const members = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g]
+        .filter(Boolean)
+        .concat(entry.substances || [])
+        .map(s => s!.toLowerCase());
+      const inStack = members.filter(m => idSet.has(m));
+      if (inStack.length >= 2) {
+        for (let i = 0; i < inStack.length; i++) {
+          for (let j = i + 1; j < inStack.length; j++) {
+            const k = [inStack[i], inStack[j]].sort().join('|');
+            if (seenSyn.has(k)) continue;
+            seenSyn.add(k);
+            synergies.push({
+              a: inStack[i], b: inStack[j],
+              effect: entry.effect, mechanism: entry.mechanism,
+              severity: entry.severity, score: entry.score,
+            });
+          }
+        }
+      }
+    }
+    return synergies.sort((a, b) => b.score - a.score);
+  }, [finalRec]);
 
   // РУЧНОЙ РЕЖИМ: план строится НАПРЯМУЮ из выбранных стеков (независимо от движка).
   // Это гарантирует, что выбранные стеки всегда видны, даже если resolvePlan упадёт.
@@ -1337,48 +1347,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.3px' }}>Усиление ({ALL_STACKS.length} стеков)</span>
             <button onClick={() => setShowEnhancementPopup(true)} style={{ fontSize:11, fontWeight:700, cursor:'pointer', padding:'5px 10px', borderRadius:6, background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)', color:'#f87171' }}>📋 Все стеки</button>
           </div>
-          <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-            {([
-              ['articular_stack', '🦴', 'Суставы', '#4ade80'],
-              ['neuroprotection_stack', '🧠', 'Нейро', '#818cf8'],
-              ['hemato_stack', '🩸', 'Кровь', '#14b8a6'],
-              ['mega_total_support_35', '🚀', 'Мега', '#f87171'],
-            ] as const).map(([id, icon, label, col]) => {
-              const active = selectedStacks.includes(id) || (id === 'mega_total_support_35' && megaSelected.size > 0);
-              // PED-risk AUTO badge — используем net tier (finalRecWithResidual)
-              const netPedRisk = finalRecWithResidual?.pedRisk;
-              const pedAuto = id === 'articular_stack' ? (netPedRisk?.jointsBoosterTier ?? 0) : id === 'neuroprotection_stack' ? (netPedRisk?.neuroBoosterTier ?? 0) : id === 'hemato_stack' ? (netPedRisk?.hematoBoosterTier ?? 0) : 0;
-              return (
-                <button key={id} onClick={() => {
-                  if (id === 'mega_total_support_35') {
-                    setMegaSelected(new Set());
-                    setShowMegaPopup(true);
-                  } else if (id === 'hemato_stack') {
-                    setStackModulePopup('hemato_stack');
-                    setHematoPreset(null); setHematoSelected(new Set()); setHematoConfirm(false);
-                    setHematoSymptoms(buildHematoSymptomsFromState(state));
-                  } else {
-                    setStackModulePopup(id);
-                    if (id === 'articular_stack') { setArticularPreset(null); setArticularSelected(new Set()); setArticularConfirm(false); setJointSymptoms(buildJointSymptomsFromState(state)); }
-                    if (id === 'neuroprotection_stack') { setNeuroPreset(null); setNeuroSelected(new Set()); setNeuroConfirm(false); setNeuroSymptoms(buildNeuroSymptomsFromState(state)); }
-                  }
-                }}
-                  style={{ flex:1, padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:1, position:'relative',
-                    background: active ? `linear-gradient(135deg,rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : col === '#14b8a6' ? '20,184,166' : '239,68,68'},0.2),rgba(${col === '#4ade80' ? '34,197,94' : col === '#818cf8' ? '99,102,241' : col === '#14b8a6' ? '20,184,166' : '239,68,68'},0.1))` : pedAuto > 0 ? `${col}10` : 'rgba(255,255,255,0.03)',
-                    border: active ? `1.5px solid ${col}55` : pedAuto > 0 ? `1.5px solid ${col}40` : '1px solid rgba(255,255,255,0.06)',
-                    color: active ? col : pedAuto > 0 ? col : 'rgba(255,255,255,0.5)' }}>
-                  <span style={{fontSize:13}}>{icon}</span>
-                  <span>{label}</span>
-                  {active && <span style={{fontSize:6,fontWeight:700,color:col,marginTop:1}}>✓</span>}
-                  {pedAuto > 0 && !active && (
-                    <span style={{ position:'absolute', top:-4, right:-4, fontSize:6, fontWeight:800, padding:'1px 4px', borderRadius:4, background: col, color:'#000', lineHeight:1.2 }}>
-                      AUTO LV{pedAuto}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+           <button onClick={() => setShowEnhancementPopup(true)} style={{ width:'100%', padding:'10px 12px', borderRadius:9, fontSize:11, fontWeight:800, cursor:'pointer', background:'linear-gradient(135deg,rgba(248,113,113,0.16),rgba(99,102,241,0.12))', border:'1px solid rgba(248,113,113,0.28)', color:'#fff', textAlign:'left' }}>
+             🚀 Усиление <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:500 }}>— системы, нейро, кровь, суставы и дополнительные стеки</span>
+           </button>
           {selectedStacks.filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id)).length > 0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4 }}>
               {selectedStacks.filter(id => !['articular_stack','neuroprotection_stack','mega_total_support_35'].includes(id)).map(sid => (
@@ -1402,9 +1373,33 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                  <span style={{ fontSize:13, fontWeight:800, color:'#f87171' }}>🚀 Усиление: все стеки ({ALL_STACKS.length})</span>
                 <button onClick={() => setShowEnhancementPopup(false)} style={{ padding:'5px 12px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:12, fontWeight:600 }}>✕</button>
               </div>
-              <input value={enhancementSearch} onChange={e => setEnhancementSearch(e.target.value)} placeholder="🔍 Поиск стека по названию, системе или проблеме..." style={{
-                width:'100%', padding:'9px 11px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'#26262b', color:'#ffffff', fontSize:13, boxSizing:'border-box', marginBottom:8,
-              }} />
+             <input value={enhancementSearch} onChange={e => setEnhancementSearch(e.target.value)} placeholder="🔍 Поиск стека по названию, системе или проблеме..." style={{
+                 width:'100%', padding:'9px 11px', borderRadius:8, border:'1px solid rgba(255,255,255,0.12)', background:'#26262b', color:'#ffffff', fontSize:13, boxSizing:'border-box', marginBottom:8,
+               }} />
+             <div style={{ fontSize:9, fontWeight:800, color:'#fff', margin:'4px 0' }}>Системы</div>
+             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4, marginBottom:6 }}>
+                {(['all', 'cardio', 'hepatic', 'renal', 'hematologic', 'neuro', 'endocrine', 'reproductive', 'musculoskeletal', 'metabolic'] as const).map(system => {
+                 const meta: Record<string, [string, string]> = {
+                   all: ['🧩 Все', '#f87171'], cardio: ['❤️ ССС', '#ef4444'], hepatic: ['🫁 Печень', '#f59e0b'],
+                   renal: ['🫘 Почки', '#60a5fa'], hematologic: ['🩸 Кровь', '#14b8a6'], neuro: ['🧠 ЦНС', '#818cf8'],
+                   endocrine: ['🧪 Эндокринная', '#ec4899'], reproductive: ['🧬 Репродукт.', '#f472b6'],
+                   musculoskeletal: ['🦴 ОДА', '#4ade80'], metabolic: ['🍬 Метаболизм', '#fb923c'],
+                 };
+                 const [label, color] = meta[system];
+                 const active = enhancementSystem === system;
+                  return (
+                    <button key={system} onClick={() => {
+                      setEnhancementSystem(system);
+                      if (system !== 'all' && GENERIC_ENHANCEMENT_CONFIG[system]) {
+                        setGenericEnhancementPopup(system);
+                        setGenericEnhancementSelected(new Set());
+                      }
+                    }} style={{ padding:'7px 4px', borderRadius:7, border:`1px solid ${color}${active ? 'aa' : '55'}`, background:active ? `${color}28` : `${color}12`, color:'#fff', fontSize:8, fontWeight:700, cursor:'pointer', whiteSpace:'normal', lineHeight:1.2 }}>
+                      {label}
+                    </button>
+                  );
+               })}
+             </div>
             </div>
 
             {/* ── Автоподбор под недостающие механизмы ТЗ ── */}
@@ -1446,15 +1441,27 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
             <div style={{ flex:1, overflowY:'auto', padding:'0 14px 14px' }}>
               {(ALL_STACKS as any[])
-                .filter((st: any) => {
-                  if (!enhancementSearch) return true;
+                 .filter((st: any) => {
+                   if (enhancementSystem !== 'all') {
+                     const systems = [st.system, ...(st.anatomicalMapping?.organSystems || []), ...(st.systems || [])]
+                       .filter(Boolean).map((x: any) => String(x).toLowerCase());
+                     const text = JSON.stringify(st).toLowerCase();
+                     const aliases: Record<string, string[]> = {
+                       cardio: ['cardio','heart','ссс','серд'], hepatic: ['hepatic','liver','печен'], renal: ['renal','kidney','почек'],
+                       hematologic: ['hemat','blood','кров'], neuro: ['neuro','cns','цнс'], endocrine: ['endocrine','гормон'],
+                       reproductive: ['reproductive','hormonal','репродукт'], musculoskeletal: ['musculo','joint','bone','сустав','ода'], metabolic: ['metabolic','glycemic','метабол'],
+                     };
+                     const terms = aliases[enhancementSystem] || [enhancementSystem];
+                     if (!terms.some(term => systems.some(s => s.includes(term)) || text.includes(term))) return false;
+                   }
+                   if (!enhancementSearch) return true;
                   const q = enhancementSearch.toLowerCase();
                   const name = (st.name||'').toLowerCase();
                   const sys = (st.system||'').toLowerCase();
                   const prob = (st.problem||'').toLowerCase();
                   const sid = (st.id||'').toLowerCase();
                   return name.includes(q) || sys.includes(q) || prob.includes(q) || sid.includes(q);
-                })
+                 })
                 .map((st: any) => {
                   const active = selectedStacks.includes(st.id);
                   const subCount = (st.substances||[]).length;
@@ -1547,7 +1554,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап Мега-усиления (умный подбор по gaps + синергии) ── */}
       {showMegaPopup && ReactDOM.createPortal(
          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowMegaPopup(false)}>
-           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'88vh', display:'flex', flexDirection:'column', color:'#fff' }}>
              <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
              <div style={{ padding:'14px 14px 10px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -1636,6 +1643,86 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
         </div>
       , document.body)}
+
+      {/* ── Универсальные системные popup-ы: тот же каркас, что у Нейро/Кровь/Суставы ── */}
+      {genericEnhancementPopup && GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup] && ReactDOM.createPortal((() => {
+        const cfg = GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup];
+        const labs = labSliceToValues(state.labs.fullPanel);
+        const domains = SPECIALIZED_DOMAINS[genericEnhancementPopup] || [];
+        const activeDomains = domains.filter(d => d.trigger?.(labs, state));
+        const activeMarkers = cfg.markers.filter(m => labs[m] != null);
+        const selected = genericEnhancementSelected;
+        const activePreset = cfg.presets.find(p => p.ids.every(id => selected.has(id)))?.id || null;
+        const autoIds = Array.from(new Set(activeDomains.flatMap(d => d.ids)));
+        const systemWarnings: string[] = [];
+        if (genericEnhancementPopup === 'cardio' && (selected.has('telmisartan') || selected.has('tadalafil') || selected.has('nebivolol'))) systemWarnings.push('Кардио-комбинации требуют контроля АД и ЧСС; при головокружении/брадикардии не повышать дозы.');
+        if (genericEnhancementPopup === 'renal' && (selected.has('electrolyte_balance') || selected.has('potassium') || selected.has('telmisartan'))) systemWarnings.push('K⁺/eGFR/креатинин обязательны; не добавлять калий при гиперкалиемии или ХБП без врача.');
+        if (genericEnhancementPopup === 'endocrine' && selected.has('cabergoline')) systemWarnings.push('Каберголин: только подтверждённый PRL, повторный анализ/макропролактин и обязательное назначение врача.');
+        if (genericEnhancementPopup === 'metabolic' && (state.pharma.hasInsulin || state.pharma.hasGH) && (selected.has('berberine') || selected.has('alpha_lipoic') || selected.has('chromium'))) systemWarnings.push('GH/инсулин + метаболические усилители требуют контроля глюкозы и риска гипогликемии.');
+        if (genericEnhancementPopup === 'musculoskeletal' && (selected.has('bpc157') || selected.has('tb500') || selected.has('ghk_cu'))) systemWarnings.push('Пептидный LV3-блок имеет исследовательский статус и не является обычной БАД-поддержкой.');
+        const toggle = (id: string) => setGenericEnhancementSelected(prev => {
+          const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next;
+        });
+        const renderGroup = (title: string, ids: string[], color: string) => (
+          <div style={{ marginBottom:8 }}>
+            <div style={{ fontSize:9, fontWeight:800, color, marginBottom:4 }}>{title}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3 }}>
+              {ids.map(id => {
+                const inPlan = (finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(id));
+                const checked = selected.has(id) || inPlan;
+                return <button key={id} disabled={inPlan} onClick={() => toggle(id)} style={{ padding:'6px 7px', borderRadius:7, textAlign:'left', cursor:inPlan ? 'default' : 'pointer', background:checked ? `${color}20` : 'rgba(255,255,255,0.03)', border:`1px solid ${checked ? color+'66' : 'rgba(255,255,255,0.08)'}`, color:'#fff', opacity:inPlan ? 0.55 : 1, minWidth:0 }}>
+                  <div style={{ fontSize:8, fontWeight:700, overflowWrap:'anywhere' }}>{checked ? '✓ ' : '○ '}{subNameRu(id)}</div>
+                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.3 }}>механизм: {cfg.domains.slice(0,2).join(', ')}</div>
+                </button>;
+              })}
+            </div>
+          </div>
+        );
+        return <div style={{ position:'fixed', inset:0, zIndex:310, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.82)', padding:12 }} onClick={() => setGenericEnhancementPopup(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'94%', maxWidth:420, maxHeight:'90vh', overflow:'hidden', display:'flex', flexDirection:'column', borderRadius:18, background:'#16161a', border:`1px solid ${cfg.color}55`, color:'#fff' }}>
+            <div style={{ padding:'13px 14px 9px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}><span style={{ fontSize:13, fontWeight:800, color:cfg.color }}>{cfg.icon} {cfg.label} — усиление</span><button onClick={() => setGenericEnhancementPopup(null)} style={{ color:'#fff', background:'transparent', border:'1px solid rgba(255,255,255,0.2)', borderRadius:6, padding:'3px 8px', cursor:'pointer' }}>✕</button></div>
+              <div style={{ fontSize:8, color:'#fff', opacity:.7, lineHeight:1.4, marginTop:5, overflowWrap:'anywhere' }}>{cfg.notes}</div>
+            </div>
+            <div style={{ overflowY:'auto', padding:'10px 14px', minHeight:0 }}>
+              <div style={{ padding:'7px 8px', marginBottom:8, borderRadius:8, background:`${cfg.color}12`, border:`1px solid ${cfg.color}30`, fontSize:8, lineHeight:1.5 }}>
+                <b>Риск системы:</b> {planResult?.systems?.[genericEnhancementPopup]?.raw ?? '—'}% → {planResult?.systems?.[genericEnhancementPopup]?.net ?? '—'}%<br/>
+                <b>Механизмы:</b> {cfg.domains.join(' · ')}<br/>
+                <b>Анализы:</b> {activeMarkers.length ? activeMarkers.map(m => `${m} ${labs[m]}`).join(', ') : 'нет данных — поддержка по фармакологии курса, нужен контроль'}
+              </div>
+              {activeDomains.length > 0 && <button onClick={() => setGenericEnhancementSelected(new Set(autoIds))} style={{ width:'100%', padding:'8px', marginBottom:8, borderRadius:8, border:`1px solid ${cfg.color}66`, background:`${cfg.color}18`, color:'#fff', fontSize:8, fontWeight:800, cursor:'pointer', textAlign:'left' }}>⚡ AUTO по данным: {activeDomains.map(d => d.label).join(' · ')} ({autoIds.length} кандидатов)</button>}
+              <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:5 }}>📊 Контрольные маркеры</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:9 }}>{cfg.markers.map(m => <span key={m} style={{ fontSize:7, padding:'2px 5px', borderRadius:4, background:labs[m] != null ? `${cfg.color}25` : 'rgba(255,255,255,0.05)', color:'#fff' }}>{m}{labs[m] != null ? `: ${labs[m]}` : ' · нет'}</span>)}</div>
+              <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:4 }}>⚡ Быстрые протоколы</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:9 }}>
+                {cfg.presets.map(p => <button key={p.id} onClick={() => setGenericEnhancementSelected(new Set(p.ids))} style={{ padding:'7px 4px', borderRadius:7, border:`1px solid ${activePreset === p.id ? cfg.color+'aa' : 'rgba(255,255,255,0.12)'}`, background:activePreset === p.id ? `${cfg.color}25` : 'rgba(255,255,255,0.03)', color:'#fff', fontSize:8, fontWeight:700, cursor:'pointer' }}>LV{p.level} {p.label}</button>)}
+              </div>
+              <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:4 }}>🧬 Специализированные домены системы</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:9 }}>
+                {domains.map(d => {
+                  const active = activeDomains.some(x => x.id === d.id);
+                  return <button key={d.id} onClick={() => setGenericEnhancementSelected(prev => {
+                    const next = new Set(prev); d.ids.forEach(id => next.add(id)); return next;
+                  })} style={{ padding:'7px', borderRadius:7, textAlign:'left', cursor:'pointer', background:active ? `${cfg.color}20` : 'rgba(255,255,255,0.03)', border:`1px solid ${active ? cfg.color+'77' : 'rgba(255,255,255,0.1)'}`, color:'#fff', minWidth:0 }}>
+                    <div style={{ fontSize:8, fontWeight:800 }}>{d.icon} {d.label}</div>
+                    <div style={{ fontSize:6, color:'rgba(255,255,255,0.58)', marginTop:2, lineHeight:1.3 }}>{d.markers.map(m => `${m}${labs[m] != null ? `=${labs[m]}` : ''}`).join(' · ')}</div>
+                    {active && <div style={{ fontSize:6, color:cfg.color, marginTop:2 }}>⚡ активен по данным</div>}
+                  </button>;
+                })}
+              </div>
+              {renderGroup('LV1 · базовая поддержка', cfg.core, cfg.color)}
+              {renderGroup('LV2 · усиление по системе/симптомам', cfg.lv2, '#fbbf24')}
+              {renderGroup('LV3 · только при показаниях/под контролем', cfg.lv3, '#f87171')}
+              {systemWarnings.length > 0 && <div style={{ marginTop:8, padding:'7px 8px', borderRadius:7, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.26)', color:'#fff', fontSize:7, lineHeight:1.45, overflowWrap:'anywhere' }}>{systemWarnings.map((w, i) => <div key={i}>⚠ {w}</div>)}</div>}
+              <div style={{ padding:'6px 8px', borderRadius:7, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', color:'#fff', fontSize:7, lineHeight:1.45, overflowWrap:'anywhere' }}>⚠ Выбранные элементы проходят дедупликацию, safety-проверку и лимит текущего уровня перед добавлением.</div>
+            </div>
+            <div style={{ display:'flex', gap:6, padding:'9px 14px', borderTop:'1px solid rgba(255,255,255,0.08)', background:'#16161a' }}>
+              <button onClick={() => setGenericEnhancementPopup(null)} style={{ flex:1, padding:9, borderRadius:8, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.14)', cursor:'pointer' }}>Отмена</button>
+              <button onClick={() => { const add = Array.from(selected).filter(id => !(finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(id))); setAddedSubs(prev => [...new Set([...prev, ...add])]); setGenericEnhancementPopup(null); }} style={{ flex:2, padding:9, borderRadius:8, color:'#000', background:cfg.color, border:'none', fontWeight:800, cursor:'pointer' }}>Добавить ({selected.size})</button>
+            </div>
+          </div>
+        </div>;
+      })(), document.body)}
 
       {/* ── Попап анализа доп. модуля (ПОРТАЛ — экранирует backdrop-filter предка) ── */}
       {stackModulePopup && ReactDOM.createPortal((() => {
@@ -2050,14 +2137,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const pedAutoActive = pedAutoIds.length > 0 && pedAutoIds.every(id => hematoSelected.has(id));
           return ReactDOM.createPortal(
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setStackModulePopup(null)}>
-              <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(20,184,166,0.2)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(20,184,166,0.2)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column', color:'#fff' }}>
                 <div style={{ height:3, background:'linear-gradient(90deg,#14b8a6,#14b8a688)' }} />
                 <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                     <span style={{ fontSize:13, fontWeight:800, color:'#14b8a6' }}>🩸 Кровь — гемато-защита</span>
                     <button onClick={() => setStackModulePopup(null)} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'rgba(255,255,255,0.55)', cursor:'pointer', fontSize:11, fontWeight:600 }}>✕</button>
                   </div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginBottom:8 }}>Профилактика эритроцитоза, фибринолиз, антиагрегант, реология. Синергийные группы: натто+сера+бромелайн = 3 pathway фибринолиза.</div>
+                   <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, marginBottom:8, overflowWrap:'anywhere', wordBreak:'break-word' }}>Профилактика эритроцитоза, фибринолиз, антиагрегант, реология. Синергийные группы: натто+серра+бромелайн = 3 pathway фибринолиза.</div>
 
                   {/* Контекст / risk score */}
                   <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:8, background:`${riskColor}10`, border:`1px solid ${riskColor}22` }}>
@@ -2126,7 +2213,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginTop:2, lineHeight:1.4 }}>
                         • <b>Эритроцитаферез</b> — первая линия (1 процедура = 3-4 кровопускания)<br/>
                         • Флеботомия 400-500 мл — fallback (если аферез недоступен)<br/>
-                        • Эноксапарин 40 мг при D-димер&gt;500<br/>
+                        • При D-димер&gt;500 или симптомах ТГВ/ТЭЛА — <b>срочная медицинская оценка</b>; антикоагулянт только по назначению врача<br/>
                         • <b>STOP AAS</b> — критично<br/>
                         • Срочная консультация гематолога
                       </div>
@@ -2524,7 +2611,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         <div>
           <div onClick={() => setShowPrescription(!showPrescription)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', marginBottom:4 }}>
             <span style={{ fontSize:11, fontWeight:700, color:'#ffffff', display:'flex', alignItems:'center', gap:4 }}>
-              💊 Назначено {finalRec.subs.length} препаратов
+              💊 План поддержки: {finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).length} препаратов
+              <span style={{ fontSize:7, color:'rgba(255,255,255,0.45)', fontWeight:500 }}>
+                · база {finalRec.subs.filter(s => planItemKind(s.substanceId) === 'База').length}
+                · минералы {finalRec.subs.filter(s => planItemKind(s.substanceId) === 'Минерал').length}
+              </span>
               {finalRec.titrationFactors && finalRec.titrationFactors.size > 0 && (
                 <span style={{ fontSize:8, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.15)' }}>↑{finalRec.titrationFactors.size}</span>
               )}
@@ -2536,7 +2627,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <>
               {/* Краткий список препаратов (compact summary) */}
               <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.length})</div>
+                <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.length}) · база и минералы не являются препаратами</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                   {finalRec.subs.map((s, i) => {
                     const doseInfo = subDosage(s.substanceId);
@@ -2550,7 +2641,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         border: isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)',
                         color: isTitr ? '#fbbf24' : '#a5b4fc',
                       }}>
-                        {subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
+                         {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
                         {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
                       </span>
                     );
@@ -2619,16 +2710,40 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
-      {/* ===== СИНЕРГИЯ СТЕКА ===== */}
-      {finalRec && synergyDesc.length > 0 && (
+      {/* ===== СИНЕРГИИ И ВЗАИМОДЕЙСТВИЯ ПЛАНА (объединено) ===== */}
+      {finalRec && (synergyDesc.length > 0 || pairSynergies.length > 0) && (
         <div style={{ marginTop:8 }}>
-          <div onClick={() => setShowSynergy(!showSynergy)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', marginBottom:4 }}>
-            <span style={{ fontSize:10, fontWeight:700, color:'#a78bfa' }}>🧬 Синергия стека поддержки</span>
-            <span style={{ fontSize:7, color:'rgba(255,255,255,0.55)' }}>{showSynergy ? '▲' : '▼'}</span>
+          <div onClick={() => setShowSynergy(!showSynergy)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showSynergy ? '8px 8px 0 0' : 8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.14)' }}>
+            <span style={{ fontSize:10, fontWeight:700, color:'#a78bfa', display:'flex', alignItems:'center', gap:5 }}>
+              🧬 Синергии и взаимодействия плана
+              {pairSynergies.length > 0 && <span style={{ fontSize:7, fontWeight:600, color:'rgba(167,139,250,0.6)', padding:'1px 5px', borderRadius:4, background:'rgba(168,85,247,0.1)' }}>{pairSynergies.length} пар</span>}
+            </span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSynergy ? '▲ скрыть' : '▼ показать'}</span>
           </div>
           {showSynergy && (
-            <div style={{ padding:'6px 10px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
-              {synergyDesc.map((s, i) => <div key={i} style={{ fontSize:8, color:'#c4b5fd', marginBottom:3, lineHeight:1.5 }}>{s}</div>)}
+            <div style={{ padding:'6px 10px', borderRadius:'0 0 8px 8px', background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.1)', borderTop:'none' }}>
+              {synergyDesc.map((s, i) => <div key={`desc-${i}`} style={{ fontSize:8, color:'#c4b5fd', marginBottom:3, lineHeight:1.5 }}>{s}</div>)}
+              {pairSynergies.length > 0 && (
+                <>
+                  <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.5)', margin:'6px 0 4px', textTransform:'uppercase', letterSpacing:'0.3px' }}>Парные синергии (SYNERGY_NETWORK)</div>
+                  {pairSynergies.slice(0, 20).map((syn, i) => {
+                    const sevColor = syn.severity === 'HIGH' ? '#22c55e' : syn.severity === 'MEDIUM' ? '#f59e0b' : 'rgba(255,255,255,0.5)';
+                    const sevBg = syn.severity === 'HIGH' ? 'rgba(34,197,94,0.06)' : syn.severity === 'MEDIUM' ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.03)';
+                    return (
+                      <div key={`pair-${i}`} style={{ padding:'4px 7px', borderRadius:5, background:sevBg, border:`1px solid ${sevColor}15`, marginBottom:3 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                          <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.a)}</span>
+                          <span style={{ fontSize:7, color:sevColor, fontWeight:700 }}>+{syn.score}</span>
+                          <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.b)}</span>
+                          <span style={{ marginLeft:'auto', fontSize:7, fontWeight:700, color:sevColor, padding:'1px 5px', borderRadius:3, background:`${sevColor}15` }}>{syn.severity}</span>
+                        </div>
+                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:1 }}>{syn.effect}</div>
+                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', lineHeight:1.3 }}>{syn.mechanism}</div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -2685,7 +2800,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       ))}
                     </div>
                   </div>
-                );
+                  );
               })}
             </div>
           )}
@@ -2920,76 +3035,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           </div>
                         </div>
                       ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Синергии веществ (из SYNERGY_NETWORK) */}
-      {finalRec && finalRec.subs.length > 1 && (() => {
-        const idSet = new Set(finalRec.subs.map((s: any) => (s.substanceId || '').toLowerCase()));
-        const synergies: { a: string; b: string; effect: string; mechanism: string; severity: string; score: number }[] = [];
-        const seenSyn = new Set<string>();
-
-        for (const entry of SYNERGY_NETWORK) {
-          if (entry.type !== 'synergy') continue;
-          const members = [entry.a, entry.b, entry.c, entry.d, entry.e, entry.f, entry.g]
-            .filter(Boolean)
-            .concat(entry.substances || [])
-            .map(s => s!.toLowerCase());
-          const inStack = members.filter(m => idSet.has(m));
-          if (inStack.length >= 2) {
-            for (let i = 0; i < inStack.length; i++) {
-              for (let j = i + 1; j < inStack.length; j++) {
-                const k = [inStack[i], inStack[j]].sort().join('|');
-                if (seenSyn.has(k)) continue;
-                seenSyn.add(k);
-                synergies.push({
-                  a: inStack[i], b: inStack[j],
-                  effect: entry.effect, mechanism: entry.mechanism,
-                  severity: entry.severity, score: entry.score,
-                });
-              }
-            }
-          }
-        }
-        synergies.sort((a, b) => b.score - a.score);
-
-        if (synergies.length === 0) return null;
-        const totalSyn = synergies.reduce((s, x) => s + x.score, 0);
-        const highCount = synergies.filter(s => s.severity === 'HIGH').length;
-
-        return (
-          <div style={{ marginTop:6 }}>
-            <div onClick={() => setShowSynergyCard(!showSynergyCard)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showSynergyCard ? '8px 8px 0 0' : 8, background: highCount > 2 ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.05)', border:'1px solid ' + (highCount > 2 ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.12)') }}>
-              <span style={{ fontSize:10, fontWeight:700, color:'#22c55e', display:'flex', alignItems:'center', gap:5 }}>
-                🧬 Синергии веществ ({synergies.length})
-                <span style={{ fontSize:7, fontWeight:600, color:'rgba(34,197,94,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(34,197,94,0.1)' }}>Σ score: {totalSyn}</span>
-              </span>
-              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showSynergyCard ? '▲ скрыть' : '▼ показать'}</span>
-            </div>
-            {showSynergyCard && (
-              <div style={{ padding:'6px 9px', background:'rgba(34,197,94,0.03)', border:'1px solid rgba(34,197,94,0.08)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
-                  Найдено {synergies.length} синергических пар среди {finalRec.subs.length} веществ назначения. Синергии усиливают взаимный эффект препаратов.
-                </div>
-                {synergies.slice(0, 20).map((syn, i) => {
-                  const sevColor = syn.severity === 'HIGH' ? '#22c55e' : syn.severity === 'MEDIUM' ? '#f59e0b' : 'rgba(255,255,255,0.5)';
-                  const sevBg = syn.severity === 'HIGH' ? 'rgba(34,197,94,0.06)' : syn.severity === 'MEDIUM' ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.03)';
-                  return (
-                    <div key={i} style={{ padding:'4px 7px', borderRadius:5, background:sevBg, border:`1px solid ${sevColor}15`, marginBottom:3 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
-                        <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.a)}</span>
-                        <span style={{ fontSize:7, color:sevColor, fontWeight:700 }}>+{syn.score}</span>
-                        <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.b)}</span>
-                        <span style={{ marginLeft:'auto', fontSize:7, fontWeight:700, color:sevColor, padding:'1px 5px', borderRadius:3, background:`${sevColor}15` }}>{syn.severity}</span>
-                      </div>
-                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:1 }}>{syn.effect}</div>
-                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', lineHeight:1.3 }}>{syn.mechanism}</div>
                     </div>
                   );
                 })}
@@ -3399,14 +3444,26 @@ function buildPlanText(rec: SupportRecommendation): string {
   lines.push(`Фаза: ${rec.phaseLabel}`);
   lines.push(`Веществ: ${rec.subs.length}`);
   lines.push('');
-  lines.push('НАЗНАЧЕНИЯ:');
-  for (const s of rec.subs) {
-    const name = subNameRu(s.substanceId);
-    const dose = subDosage(s.substanceId);
-    const doseStr = dose ? ` · ${dose.mg} мг (${dose.timing})` : '';
-    lines.push(`• ${name}${doseStr} — ${s.reason}`);
-    if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
-    lines.push(`  k=${s.k.toFixed(2)} · док.уровень: ${s.q}`);
+  lines.push('НАЗНАЧЕНИЯ (по категориям):');
+  const kindLabels: Array<['База' | 'Минералы' | 'БАДы' | 'Препараты', string]> = [
+    ['База', 'БАЗА КУРСА (не препараты):'],
+    ['Минералы', 'МИНЕРАЛЬНАЯ ПОДДЕРЖКА:'],
+    ['Препараты', 'ПРЕПАРАТЫ:'],
+    ['БАДы', 'БАДЫ И ДОБАВКИ:'],
+  ];
+  for (const [kind, label] of kindLabels) {
+    const items = rec.subs.filter(s => planItemKind(s.substanceId) === kind);
+    if (items.length === 0) continue;
+    lines.push('');
+    lines.push(label);
+    for (const s of items) {
+      const name = subNameRu(s.substanceId);
+      const dose = subDosage(s.substanceId);
+      const doseStr = dose ? ` · ${dose.mg} мг (${dose.timing})` : '';
+      lines.push(`• ${name}${doseStr} — ${s.reason}`);
+      if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
+      lines.push(`  k=${s.k.toFixed(2)} · док.уровень: ${s.q}`);
+    }
   }
   if (rec.suppression.length > 0) {
     lines.push('');
@@ -3427,6 +3484,16 @@ function buildPlanText(rec: SupportRecommendation): string {
     lines.push('');
     lines.push('GUARDRAILS:');
     for (const g of rec.guardrails) lines.push(`• [${g.level}] ${g.substanceId || 'Общее'}: ${g.reason}`);
+  }
+  if (rec.procedures && rec.procedures.length > 0) {
+    lines.push('');
+    lines.push('МЕДИЦИНСКАЯ ЭСКАЛАЦИЯ:');
+    for (const p of rec.procedures) lines.push(`• ${p.label} — ${p.reason} (${p.trigger}). Только врач.`);
+  }
+  if (rec.assayWarnings && rec.assayWarnings.length > 0) {
+    lines.push('');
+    lines.push('ИНТЕРПРЕТАЦИЯ АНАЛИЗОВ:');
+    for (const warning of rec.assayWarnings) lines.push(`• ${warning}`);
   }
   if (rec.boosters.length > 0) {
     lines.push('');
@@ -3453,17 +3520,29 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
   lines.push(`Уровень поддержки: ${rec.level}`);
   lines.push(`Фаза определения: ${rec.phase} → ${rec.phaseLabel}`);
   lines.push('');
-  lines.push('НАЗНАЧЕНИЯ (по k × breadth, с учётом фазы и guardrails):');
-  for (const s of rec.subs) {
-    const name = subNameRu(s.substanceId);
-    const dose = subDosage(s.substanceId);
-    const doseStr = dose ? `, ${dose.mg} мг (${dose.timing})` : '';
-    lines.push(`- ${name}${doseStr}`);
-    const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';
-    lines.push(`  Категория: ${s.category}, система: ${organGuess}`);
-    lines.push(`  Механизмы покрытия: ${s.mechsCovered.join(', ')}`);
-    lines.push(`  Сила (k): ${s.k.toFixed(2)}, уровень доказательности: ${s.q}`);
-    lines.push(`  Обоснование: ${s.reason}`);
+  lines.push('НАЗНАЧЕНИЯ (по категориям, с учётом фазы и guardrails):');
+  const doctorKinds: Array<['База' | 'Минералы' | 'Препараты' | 'БАДы', string]> = [
+    ['База', 'БАЗА КУРСА (не препараты):'],
+    ['Минералы', 'МИНЕРАЛЬНАЯ ПОДДЕРЖКА:'],
+    ['Препараты', 'ПРЕПАРАТЫ:'],
+    ['БАДы', 'БАДЫ И ДОБАВКИ:'],
+  ];
+  for (const [kind, label] of doctorKinds) {
+    const items = rec.subs.filter(s => planItemKind(s.substanceId) === kind);
+    if (items.length === 0) continue;
+    lines.push('');
+    lines.push(label);
+    for (const s of items) {
+      const name = subNameRu(s.substanceId);
+      const dose = subDosage(s.substanceId);
+      const doseStr = dose ? `, ${dose.mg} мг (${dose.timing})` : '';
+      lines.push(`- ${name}${doseStr}`);
+      const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';
+      lines.push(`  Категория: ${s.category}, система: ${organGuess}`);
+      lines.push(`  Механизмы покрытия: ${s.mechsCovered.join(', ')}`);
+      lines.push(`  Сила (k): ${s.k.toFixed(2)}, уровень доказательности: ${s.q}`);
+      lines.push(`  Обоснование: ${s.reason}`);
+    }
   }
   if (rec.suppression.length > 0) {
     lines.push('');
@@ -3474,6 +3553,16 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
     lines.push('');
     lines.push('GUARDRAILS (ограничения безопасности):');
     for (const g of rec.guardrails) lines.push(`- [${g.level.toUpperCase()}] ${g.substanceId || 'Общее'}: ${g.reason}`);
+  }
+  if (rec.procedures && rec.procedures.length > 0) {
+    lines.push('');
+    lines.push('МЕДИЦИНСКАЯ ЭСКАЛАЦИЯ:');
+    for (const p of rec.procedures) lines.push(`- ${p.label} [только врач]: ${p.reason} Триггер: ${p.trigger}. Контроль: ${p.monitoring.join(', ')}`);
+  }
+  if (rec.assayWarnings && rec.assayWarnings.length > 0) {
+    lines.push('');
+    lines.push('ПРЕДУПРЕЖДЕНИЯ ПО ИНТЕРПРЕТАЦИИ АНАЛИЗОВ:');
+    for (const warning of rec.assayWarnings) lines.push(`- ${warning}`);
   }
   if (rec.conflicts.length > 0) {
     lines.push('');

@@ -3,6 +3,26 @@ import type { TzSupportEntry } from './types';
 export * from './types';
 
 export const SUPPLEMENTS_DB: Record<string, TzSupportEntry[]> = {
+  // ── БАЗА КУРСА: немедикаментозные/минеральные модификаторы риска ──
+  // Эти ID участвуют в механизме-ориентированном расчёте, но не являются таблетками.
+  hydration: [
+    {organId:'cardio',mechId:'cv3',k:0.10,q:'B',source:'Объём плазмы и снижение гемоконцентрации при достаточной гидратации'},
+    {organId:'cardio',mechId:'cv4',k:0.08,q:'C',source:'Снижение гемоконцентрации/реологическая поддержка'},
+    {organId:'renal',mechId:'ren1',k:0.10,q:'C',source:'Поддержка почечной гемодинамики при отсутствии перегрузки объёмом'},
+    {organId:'hematologic',mechId:'hem1',k:0.12,q:'C',source:'Гемодилюция относительного эритроцитоза'},
+    {organId:'hematologic',mechId:'hem5',k:0.10,q:'C',source:'Поддержка водно-электролитного баланса'},
+  ],
+  cardio_aerobic: [
+    {organId:'cardio',mechId:'cv1',k:0.08,q:'B',source:'Аэробная адаптация и эндотелиальная функция'},
+    {organId:'cardio',mechId:'cv4',k:0.10,q:'B',source:'Реологическая/эндотелиальная поддержка при регулярной аэробной нагрузке'},
+    {organId:'hematologic',mechId:'hem1',k:0.10,q:'C',source:'Постепенное увеличение объёма плазмы и деформируемости эритроцитов'},
+  ],
+  electrolyte_balance: [
+    {organId:'cardio',mechId:'cv5',k:0.10,q:'C',source:'Поддержка электролит-зависимого ритма'},
+    {organId:'cardio',mechId:'cv3',k:0.05,q:'C',source:'Водно-натриевый баланс при лабораторном контроле'},
+    {organId:'renal',mechId:'ren4',k:0.12,q:'C',source:'Коррекция электролитного компонента только по Na/K/Mg'},
+    {organId:'hematologic',mechId:'hem5',k:0.15,q:'B',source:'Баланс Na/K/Mg как часть плазменной поддержки'},
+  ],
   nac: [{organId:'hepatic',mechId:'liv1',k:0.40,q:'B',source:'NAC ↑GSH, ↓АЛТ/АСТ при ААС'},{organId:'hepatic',mechId:'liv3',k:0.15,q:'C',source:'Антиоксидант, ↓окислительного повреждения ДНК'},{organId:'cns',mechId:'cns2',k:0.20,q:'C',source:'Антиоксидант ЦНС'},{organId:'cns',mechId:'cns3',k:0.15,q:'C',source:'↑GSH предотвращает апоптоз нейронов'},{organId:'renal',mechId:'ren3',k:0.15,q:'C',source:'↓окислительного стресса клубочков'},{organId:'cardio',mechId:'cv4',k:0.10,q:'C',source:'↓агрегации тромбоцитов'}],
   tudca: [{organId:'hepatic',mechId:'liv1',k:0.35,q:'B',source:'TUDCA ↓ER-стресс, ↓цитолиза'},{organId:'hepatic',mechId:'liv2',k:0.45,q:'B',source:'TUDCA ↑BSEP, ↓ГГТ/ЩФ'},{organId:'hepatic',mechId:'liv3',k:0.10,q:'C',source:'↓холестаза ↓пренеопластический риск'}],
   udca: [{organId:'hepatic',mechId:'liv2',k:0.30,q:'B',source:'Холат, ↓ГГТ/ЩФ'},{organId:'hepatic',mechId:'liv3',k:0.10,q:'C',source:'Улучшение желчеоттока'}],

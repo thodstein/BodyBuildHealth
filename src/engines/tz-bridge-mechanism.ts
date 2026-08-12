@@ -282,8 +282,10 @@ export const CATEGORY_LIMITS: Record<SupportLevel, Record<TzCategory, number>> =
 };
 
 // Общее максимальное число веществ на уровень
+// Синхронизировано с бюджетом calculateSupportTZ: базовый профиль курса
+// (кардио/renal/neuro/гемато/венотоник) должен помещаться целиком.
 export const TOTAL_LIMIT: Record<SupportLevel, number> = {
-  base: 12, medium: 20, max: 32, manual: 99,
+  base: 28, medium: 40, max: 48, manual: 99,
 };
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -37,4 +37,21 @@ if (typeof navigator === 'undefined') {
   (global as any).navigator = {};
 }
 
+// Mock matchMedia (DiaryRecordingForm и др. проверяют touch/hover через matchMedia)
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 export {};

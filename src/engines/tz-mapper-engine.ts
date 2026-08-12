@@ -120,6 +120,15 @@ export interface PhaseAssignedDrug {
   category: TzCategory;
 }
 
+export interface MedicalProcedureRecommendation {
+  id: 'erythrocytapheresis' | 'phlebotomy' | 'urgent_thrombosis_evaluation' | 'hematology_review';
+  label: string;
+  reason: string;
+  trigger: string;
+  doctorOnly: true;
+  monitoring: string[];
+}
+
 export interface SupportRecommendation {
   level: SupportLevel;
   phase: PhaseKey;
@@ -144,6 +153,8 @@ export interface SupportRecommendation {
   pedFlags?: PEDFlags;  // v5: warnings for UI (multi-oral, GH+ins, winny+oxy)
   contraindications?: import('../data/substance-contraindications').ContraAlert[];
   protocolWarnings?: string[];   // H3/H4: клинические предупреждения (гипотония, кровотечение)
+  procedures?: MedicalProcedureRecommendation[];
+  assayWarnings?: string[];
   monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга
   pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
 }
@@ -214,6 +225,80 @@ function buildGuardrailCtx(ctx: MapperCtx): GuardrailContext {
     libidoLow: ctx.libidoLow,
     lipidLdl: ctx.lipidLdl,
   };
+}
+
+function buildProcedureRecommendations(ctx: MapperCtx): MedicalProcedureRecommendation[] {
+  const hct = ctx.labs['HEMATOCRIT'] ?? ctx.labs['HCT'];
+  const hgb = ctx.labs['HEMOGLOBIN'] ?? ctx.labs['HGB'];
+  const dDimer = ctx.labs['D_DIMER'];
+  const out: MedicalProcedureRecommendation[] = [];
+  const bloodMonitoring = ['HCT', 'HGB', 'RBC', 'PLT', 'fibrinogen', 'INR', 'APTT'];
+
+  if ((hct != null && hct >= 52) || (hgb != null && hgb >= 185)) {
+    out.push({
+      id: 'erythrocytapheresis',
+      label: 'Эритроцитаферез',
+      reason: `Выраженный эритроцитоз: ${hct != null ? `HCT ${hct}%` : `HGB ${hgb} г/л`}.`,
+      trigger: 'HCT ≥52% или HGB ≥185 г/л',
+      doctorOnly: true,
+      monitoring: bloodMonitoring,
+    });
+    out.push({
+      id: 'phlebotomy',
+      label: 'Терапевтическая флеботомия',
+      reason: 'Альтернативная процедурная коррекция эритроцитарной массы, если определена врачом.',
+      trigger: 'Эритроцитоз подтверждён повторным ОАК',
+      doctorOnly: true,
+      monitoring: ['HCT', 'HGB', 'RBC', 'ferritin', 'iron'],
+    });
+  } else if ((hct != null && hct >= 48) || (hgb != null && hgb >= 175)) {
+    out.push({
+      id: 'hematology_review',
+      label: 'Оценка гематолога',
+      reason: 'Пограничное повышение эритроцитарных показателей требует повторного ОАК и оценки причин гемоконцентрации/эритропоэза.',
+      trigger: 'HCT ≥48% или HGB ≥175 г/л',
+      doctorOnly: true,
+      monitoring: ['HCT', 'HGB', 'RBC', 'PLT', 'ferritin'],
+    });
+  }
+
+  if (dDimer != null && dDimer > 0.5) {
+    out.push({
+      id: 'urgent_thrombosis_evaluation',
+      label: 'Срочная оценка тромботического риска',
+      reason: `D-димер ${dDimer} выше референса. Самостоятельно добавлять антикоагулянт нельзя.`,
+      trigger: 'D-димер >0.5',
+      doctorOnly: true,
+      monitoring: ['D_DIMER', 'fibrinogen', 'PLT', 'INR', 'APTT'],
+    });
+  }
+  return out;
+}
+
+function buildAssayWarnings(substanceIds: string[], ctx: MapperCtx): string[] {
+  const ids = new Set(substanceIds.map(id => id.toLowerCase()));
+  const warnings: string[] = [];
+  const hasAny = (...values: string[]) => values.some(value => ids.has(value));
+
+  if (hasAny('biotin', 'vitamin_b7')) {
+    warnings.push('Биотин может искажать иммунохимические тесты (ТТГ/FT4/FT3, тропонин). Сообщить лаборатории и соблюдать её протокол подготовки.');
+  }
+  if (hasAny('creatine', 'creatine_monohydrate')) {
+    warnings.push('Креатин может повышать сывороточный креатинин без пропорционального падения функции почек. Интерпретировать вместе с eGFR, цистатином-C и UACR.');
+  }
+  if (hasAny('hydration', 'electrolyte_balance')) {
+    warnings.push('Гидратация и электролиты меняют концентрационные показатели. Для сравнения HCT/HGB/мочевины/Na сдавать анализы в сопоставимом состоянии гидратации.');
+  }
+  if (ids.has('cardio_aerobic')) {
+    warnings.push('Интенсивная тренировка может временно повышать CK, AST, CRP и иногда тропонин. Учитывать время последней нагрузки при интерпретации.');
+  }
+  if (hasAny('nattokinase', 'serrapeptase', 'bromelain', 'lumbrokinase', 'aspirin', 'warfarin', 'enoxaparin', 'apixaban', 'rivaroxaban', 'dabigatran', 'ginkgo', 'garlic')) {
+    warnings.push('Фибринолитики/антиагреганты/антикоагулянты необходимо указывать врачу перед коагулограммой, инвазивными процедурами и операцией: меняется гемостатический риск.');
+  }
+  if (ctx.aasIds?.length || ctx.pedDoses?.length) {
+    warnings.push('TT/FT/E2/LH/FSH/SHBG/PRL/HCT и липиды интерпретируются на фоне PED и не являются естественным baseline. В отчёте указывать все препараты и дозы.');
+  }
+  return Array.from(new Set(warnings));
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -698,9 +783,15 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     const tudcaDose = doseByIntensity(500, 1000, intensity) * (flags.hasOral17 ? 2 : 1);
     const nacDose = doseByIntensity(1200, 1800, intensity) * (flags.hasOral17 ? 1.5 : 1);
     const omegaDose = doseByIntensity(2, 4, intensity);
+    add('hydration', 'Гидратация — базовая поддержка объёма плазмы и гемоконцентрации', 'Любой активный PED-курс', 'other');
+    add('cardio_aerobic', 'Кардио — базовая эндотелиальная и реологическая поддержка', 'Любой активный PED-курс', 'other');
+    add('electrolyte_balance', 'Электролиты Na/K/Mg — базовая поддержка водно-электролитного баланса; контроль K⁺/Na⁺/Mg²⁺ обязателен', 'Любой активный PED-курс', 'mineral');
     add('tadalafil', `Tadalafil 5 мг/день — PDE5i → вазодилатация, эндотелий/АД`, 'PED в курсе', 'pharma');
     add('telmisartan', `Telmisartan ${telDose} мг — ARB + PPAR-γ (АД, инсулин-чувствительность)`, 'PED в курсе', 'pharma');
-    add('agmatine', 'Agmatine 1 г 2р/день — eNOS → NO, инсулин-сенситайзер', 'PED в курсе', 'pharma');
+    add('agmatine', flags.hasNandrolone
+      ? 'Agmatine 1 г 2р/день — обязательный компонент профиля нандролона: NMDA/NO-модуляция, поддержка дофаминергического и эндотелиального контуров'
+      : 'Agmatine 1 г 2р/день — eNOS → NO, инсулин-сенситайзер',
+      flags.hasNandrolone ? 'Нандролон/19-nor в курсе' : 'PED в курсе', 'pharma');
     add('tudca', `TUDCA ${tudcaDose} мг — BSEP-зависимый желчеотток${flags.hasOral17 ? ' (×2 орал)' : ''}`, 'PED в курсе', 'hepatoprotector');
     add('nac', `NAC ${nacDose} мг — глутатион (фаза II детокс)${flags.hasOral17 ? ' (×1.5 орал)' : ''}`, 'PED в курсе', 'hepatoprotector');
     add('omega3', `Omega-3 ${omegaDose} г — ↓ ТГ, ↑ HDL, мембраны, эндотелий`, 'PED в курсе', 'cardioprotector');
@@ -709,6 +800,9 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('taurine', 'Taurine 1000 мг — осмолит, кардиопротектор', 'PED в курсе', 'amino');
     const hcgDose = totalAAS <= 500 ? '500 МЕ 2р/нед' : totalAAS <= 1000 ? '750 МЕ 2р/нед' : '1000 МЕ 2-3р/нед';
     add('hcg', `hCG ${hcgDose} — клетки Лейдига (HPTA), поддержка ${totalAAS} мг/нед AAS`, 'AAS в курсе', 'hormonal');
+    if (totalAAS >= 500 || flags.hasTren || flags.hasNandrolone || flags.hasBold) {
+      add('nebivolol', 'Nebivolol 2.5 мг — минимальный старт; СТРОГО ПОД КОНТРОЛЕМ АД И ЧСС', 'Высокая суммарная PED/кардио-нагрузка', 'pharma');
+    }
   }
 
   // ─── ТЕСТОСТЕРОН-СПЕЦИФИКА (dose-aware anastrozole) ───
@@ -743,13 +837,8 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
 
   // ─── НАНДРОЛОН — особый профиль (progestagen, объём, либидо↓) ───
   if (flags.hasNandrolone) {
-    const np = peds.find(p => p.pClass === 'aas_nandrolone');
-    const nMg = np?.mgPerWeek ?? 300;
-    let caberDose = '0.25 мг 2р/нед';
-    if (nMg <= 200) caberDose = 'только при пролактине >15';
-    else if (nMg <= 400) caberDose = '0.25 мг 2р/нед';
-    else caberDose = '0.5 мг 2р/нед';
-    add('cabergoline', `Cabergoline ${caberDose} — ⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ [nandrolone ${nMg} мг]`, `Нандролон ${nMg} мг/нед`, 'pharma');
+    // Каберголин не добавляем в назначенный план автоматически.
+    // Наличие нандролона само по себе не подтверждает гиперпролактинемию.
     add('nebivolol', 'Nebivolol 2.5 мг — ⚠ Под контролем ЧСС и АД (β1+NO, объём+HR↓)', `Нандролон (объём + HR)`, 'pharma');
     add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник (объём, отёки)', 'Нандролон (отёки)', 'cardioprotector');
     add('dandelion', 'Dandelion 500 мг 2р/день — K⁺-сберегающий диуретик', 'Нандролон (задержка)', 'pharma');
@@ -763,7 +852,7 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     const tMg = tp?.mgPerWeek ?? 200;
     const trenIntens = (tMg / 500) * 3.0; // внешний scale 3.0
     const tudcaTren = Math.round(500 * (1 + trenIntens * 0.5));
-    add('cabergoline', `Cabergoline ${tMg > 400 ? '0.5 мг' : '0.25 мг'} 2р/нед — ⚠ ПОД КОНТРОЛЕМ АНАЛИЗОВ (пролактин)`, `Тренболон ${tMg} мг`, 'pharma');
+    // Каберголин остаётся lab-gated: только при подтверждённом PRL и назначении врача.
     add('nebivolol', 'Nebivolol 2.5-5 мг — ⚠ Под контролем ЧСС и АД', 'Тренболон', 'pharma');
     add('astragalus', `Astragalus ${Math.round(500 * (1 + trenIntens * 0.5))} мг — клубочки (трен-нефротокс)`, 'Тренболон', 'nephroprotector');
     add('cordyceps', `Cordyceps ${Math.round(1000 * (1 + trenIntens * 0.3))} мг — BUN/креатинин`, 'Тренболон', 'nephroprotector');
@@ -772,6 +861,11 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('berberine', 'Berberine 1500 мг — AMPK (инсулинорезистентность)', 'Тренболон', 'pharma');
     add('dandelion', 'Dandelion 500 мг 2р/день — отёки', 'Тренболон', 'pharma');
     add('hesperidin', 'Hesperidin 500 + Diosmin 450 — венотоник', 'Тренболон', 'cardioprotector');
+    // Нейротоксичность 19-nor: берём профиль из NEURO_BOOST/нейро-лабораторной матрицы,
+    // а не только симптоматические теанин и глицин.
+    add('magnesium_l_threonate', 'Magnesium L-треонат 2000 мг (≈144 мг элементарного Mg) — нейронагрузка 19-nor, NMDA/GABA и сон', 'Тренболон (ЦНС)', 'mineral');
+    add('phosphatidylserine', 'Фосфатидилсерин 300-400 мг — стресс/HPA-контур и кортизольная нагрузка 19-nor', 'Тренболон (ЦНС)', 'neuroprotector');
+    add('vitamin_b12', 'Витамин B12 1000 мкг — нейрометаболическая поддержка по профилю нейротоксичности ААС', 'Тренболон (ЦНС)', 'vitamin');
     add('theanine', 'L-Theanine 200 мг — нейропротекция (трен-нейротокс) + сон', 'Тренболон (ЦНС)', 'amino');
     add('glycine', 'Glycine 3 г — сон, нейропротекция (mTOR)', 'Тренболон (ЦНС)', 'amino');
   }
@@ -895,6 +989,9 @@ function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeo
   const ids = protocolIds.map(s => s.toLowerCase());
   const has = (x: string) => ids.includes(x);
   const w: string[] = [];
+  if (flags?.hasNandrolone || flags?.hasTren || flags?.hasBold) {
+    w.push('⚠ КАБЕРГОЛИН НЕ НАЗНАЧЕН: при 19-nor нужен PRL, повторное подтверждение/макропролактин и обязательное назначение врача. Не принимать профилактически.');
+  }
   if (has('tadalafil') && has('telmisartan') && has('nebivolol')) {
     w.push('⚠ ГИПОТОНИЯ: tadalafil + telmisartan + nebivolol одновременно — ежедневный контроль АД (цель систолическое >100 мм рт.ст.); при головокружении/слабости снизить дозу telmisartan или nebivolol');
   }
@@ -932,6 +1029,9 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
   const onPED = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
   if (!onPED) return '';
   const lines: string[] = [];
+  if (Object.keys(ctx.labs || {}).length === 0) {
+    lines.push('⚠ Анализы отсутствуют: базовая поддержка рассчитана по фармакологии и фазе, но фактический уровень рисков не подтверждён.');
+  }
   lines.push('• 0 нед (исходно): ОАК+БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, эстрадиол, пролактин, ТТГ, глюкоза/HbA1c, креатинин/eGFR, АД, ЧСС, PSA (мужчины >40л или при наличии ААС)');
   if (flags.hasOral17) lines.push('• каждые 2 нед: АЛТ/АСТ (орал 17α — гепатотоксичность). При ALT>2×ULN — снизить/отменить орал');
   else lines.push('• 4 нед: АД, ЧСС, HCT/гемоглобин, АЛТ/АСТ');
@@ -943,6 +1043,12 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
   if (flags.hasIGF) lines.push('• при IGF-1: глюкоза 3р/сут в первую неделю (риск гипогликемии), далее натощак каждую нед');
   if (flags.hasClenbut) lines.push('• при кленбутероле: K+, Na+, магний, креатинин каждые 2 нед (электролитный дисбаланс), ЧСС/АД ежедневно');
   if (flags.hasT3 || flags.hasT4) lines.push('• при T3/T4: ТТГ, своб.T3, своб.T4 каждые 4 нед, кальций/PTH/вит.D (костная защита), ЧСС/АД');
+  if (flags.hasTren) lines.push('• при тренболоне: ЧСС/АД ежедневно, сон/тревога/раздражительность ежедневно, креатинин/eGFR/UACR/K/Na/Mg каждые 2-4 нед, PRL/E2 каждые 4 нед; ЭКГ при тахикардии/боли/одышке');
+  if (flags.hasNandrolone) lines.push('• при нандролоне: PRL с повторным подтверждением при отклонении, E2/TT/FT/LH/FSH/SHBG каждые 4 нед; либидо/эректильная функция и симптомы гинекомастии в дневнике');
+  if (flags.hasBold) lines.push('• при болденоне/DHB: ОАК (HCT/HGB/RBC/PLT) каждые 2-4 нед, ferritin/iron/transferrin saturation; при HCT↑ — обсуждение эритроцитафереза/флеботомии только с врачом');
+  if (phase === 'bridge') lines.push('• мост: повтор липидов, ОАК, АЛТ/АСТ, АД/ЧСС каждые 6 нед; сохранять контроль HCT и E2');
+  if (phase === 'fertility') lines.push('• фертильность: спермограмма + LH/FSH/TT/E2/PRL каждые 6-8 нед; hCG/FSH-схема только под врачом');
+  if (phase === 'trt') lines.push('• TRT: ОАК/HCT, PSA, E2, TT/FT/SHBG, липиды и АД каждые 8-12 нед после стабилизации, чаще при отклонениях');
   lines.push('• внепланово при симптомах: головная боль, желтуха, отёки, гинекомастия, боль в груди, одышка, тахикардия >100, АД >160/100');
   return lines.join('\n');
 }
@@ -1312,6 +1418,15 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     summary += ` ⚠ PED-риск: ${ctx.boosterCtx.pedRiskReasons.join('; ')}.`;
   }
   const rationale = phaseProto.algorithm;
+  const procedures = buildProcedureRecommendations(ctx);
+  const assayWarnings = buildAssayWarnings(subs.map(s => s.substanceId), ctx);
+
+  // Если каберголин фактически назначен (lab-gated по PRL), убираем
+  // противоречащее предупреждение «НЕ НАЗНАЧЕН».
+  const cabergolineAssigned = subs.some(s => canonId(s.substanceId) === 'cabergoline');
+  const finalProtocolWarnings = cabergolineAssigned
+    ? protocolWarnings.filter(w => !w.includes('КАБЕРГОЛИН НЕ НАЗНАЧЕН'))
+    : protocolWarnings;
 
   // ── Отсеивание block-конфликтов ПЕРЕД возвратом ──
   const blockPairs = checkInteractions(subs.map(s => s.substanceId)).filter(i => i.severity === 'block');
@@ -1400,7 +1515,9 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     nutritionTips: tierAdj.nutrition,
     pedFlags,
     contraindications: checkContraindications(subs.map(s => s.substanceId), ctx.healthConditions),
-    protocolWarnings,
+    protocolWarnings: finalProtocolWarnings,
+    procedures,
+    assayWarnings,
     monitoringPlan,
     pedRisk: ctx.pedRisk,
   };

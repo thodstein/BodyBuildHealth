@@ -19,6 +19,20 @@ import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { getPrioritySubstances, getSubstancePriority, type SeverityLevel } from '../../data/lab-priority-map';
 import { checkContraindications } from '../../data/substance-contraindications';
 import { checkInteractions } from '../../data/drug-interactions';
+import { resolvePlan } from '../tz-mapper-engine';
+import type { SupportLevel } from '../tz-bridge-mechanism';
+import { buildMapperCtx } from './mapper-ctx';
+
+const AUTO_DOCTOR_ONLY = new Set([
+  'warfarin', 'enoxaparin', 'sulodexide', 'lumbrokinase',
+  'dipyridamole', 'pentoxifylline',
+]);
+const AUTO_PLAN_LIMIT: Record<string, number> = { basic: 28, mid: 40, max: 48, boost: 56 };
+const COURSE_FOUNDATION = ['hydration', 'cardio_aerobic', 'electrolyte_balance'];
+
+function isAutoDoctorOnly(id: string): boolean {
+  return AUTO_DOCTOR_ONLY.has(canonId(id));
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  ЕДИНСТВЕННЫЙ движок поддержки — calculateSupportTZ
@@ -45,6 +59,15 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     };
     const isUsed = (id: string): boolean => used.has(id) || usedCanon.has(canonId(id));
     for (const b of blacklist) { used.add(b); usedCanon.add(canonId(b)); }
+    // Каберголин — только lab-gated. Не позволяем breadth/targeted подбору
+    // автоматически протащить его в план при отсутствии подтверждённого PRL.
+    const prlRaw = state.labs?.fullPanel?.panelSex?.Prolactin;
+    const prlValue = prlRaw != null ? Number.parseFloat(String(prlRaw)) : NaN;
+    const hasConfirmedPrl = Number.isFinite(prlValue) && prlValue > 25;
+    if (!hasConfirmedPrl && !state.pharma.hasCaber) {
+      used.add('cabergoline');
+      usedCanon.add(canonId('cabergoline'));
+    }
     // Phase-блэклист: Т-бустеры на курсе, AI на ПКТ и т.д.
     const phaseKey = state.pharma?.phase || 'course';
     const phaseBlocked = PHASE_BLOCKLIST[phaseKey];
@@ -56,23 +79,60 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       id: string;
       reason: string;
       trigger: string;
-      category: 'hcg' | 'ai' | 'cabergoline' | 'renal_protection' | 'hepatic_protection';
+      category: string;
     };
     const phaseAssignedDrugs: PhaseDrug[] = [];
+    const protocolWarnings: string[] = [];
 
-    // ── 1. Обязательные препараты на курсе ААС (mandatory logic) ──
-    if (state.pharma.aas.length > 0) {
+    // ── 1. ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ: resolvePlan (тот же путь, что у CalcMapper) ──
+    // Фармакологический протокол, фаза, база курса, PED-бустеры и lab-назначения
+    // строятся ОДИН раз в tz-mapper-engine; calculateSupportTZ использует его же.
+    let unifiedRec: ReturnType<typeof resolvePlan> | null = null;
+    try {
+      const unifiedLevel: SupportLevel = state.powerLevel === 'boost' ? 'max'
+        : state.powerLevel === 'basic' ? 'base'
+        : state.powerLevel === 'max' ? 'max' : 'medium';
+      unifiedRec = resolvePlan(buildMapperCtx(state, unifiedLevel));
+    } catch { unifiedRec = null; }
+    const useLegacyMandatory = !unifiedRec || unifiedRec.subs.length === 0;
+    if (unifiedRec) {
+      for (const s of unifiedRec.subs) {
+        if (!isUsed(s.substanceId)) { substances.push(s.substanceId); markUsed(s.substanceId); }
+      }
+      for (const pd of unifiedRec.phaseAssignedDrugs || []) {
+        if (!phaseAssignedDrugs.some(x => x.id === pd.substanceId)) {
+          phaseAssignedDrugs.push({ id: pd.substanceId, reason: pd.reason, trigger: pd.trigger, category: pd.category });
+        }
+      }
+      if (unifiedRec.protocolWarnings?.length) protocolWarnings.push(...unifiedRec.protocolWarnings);
+    }
+
+    // ── 1a. Обязательные препараты на курсе ААС (legacy fallback) ──
+    if (useLegacyMandatory && state.pharma.aas.length > 0) {
       const aasIds = state.pharma.aas.map((a: any) => (a.id||'').toLowerCase());
       const hasTest = aasIds.some(id => id.includes('test'));
       const hasTren = aasIds.some(id => id.includes('tren'));
       const hasNandrolone = aasIds.some(id => ['nandrolone','deca','npp'].some(x => id.includes(x)));
       const hasBoldenone = aasIds.some(id => id.includes('bold') || id.includes('equipoise'));
+      const totalAasDose = state.pharma.aas.reduce((sum: number, a: any) => sum + (Number(a.doseMgWeek) || 0), 0);
+      const highHematologicLoad = totalAasDose >= 500 || hasTren || hasNandrolone || hasBoldenone;
       const hasOral = state.pharma.aas.some((a: any) =>
         a.form === 'oral' ||
         ['oxandrolone','anavar','stanozolol','winstrol','methandienone','dianabol',
          'fluoxymesterone','halotestin','oxymetholone','anadrol','turinabol',
          'oral_turinabol','methyltestosterone','cheque_drops']
-          .some(x => (a.id||'').toLowerCase().includes(x)));
+           .some(x => (a.id||'').toLowerCase().includes(x)));
+      const prlRaw = state.labs?.fullPanel?.panelSex?.Prolactin;
+      const prl = prlRaw != null ? Number.parseFloat(String(prlRaw)) : NaN;
+      if ((hasTren || hasNandrolone || hasBoldenone) && (!Number.isFinite(prl) || prl <= 25)) {
+        protocolWarnings.push('⚠ КАБЕРГОЛИН НЕ НАЗНАЧЕН: для 19-nor нужен PRL, повторное подтверждение/макропролактин и обязательное назначение врача. Не принимать профилактически.');
+      }
+
+      // База активного курса: всегда присутствует в расчёте риска.
+      // Это не препараты и не должна учитываться как pill burden.
+      for (const foundationId of ['hydration', 'cardio_aerobic', 'electrolyte_balance']) {
+        if (!isUsed(foundationId)) { substances.push(foundationId); markUsed(foundationId); }
+      }
 
       // hCG при любом AAS
       if (!state.pharma.hasHCG && !isUsed('hcg')) {
@@ -83,6 +143,27 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           trigger: 'AAS в курсе + отсутствует в плане (hasHCG=false)',
           category: 'hcg',
         });
+      }
+
+      // Кардио-контур высокой PED-нагрузки: минимальный старт с обязательным
+      // контролем АД/ЧСС. Safety/contraindications остаются отдельным слоем.
+      if (totalAasDose >= 500 || hasTren || hasNandrolone || hasBoldenone) {
+        if (!isUsed('tadalafil')) { substances.push('tadalafil'); markUsed('tadalafil'); }
+        if (!isUsed('telmisartan')) { substances.push('telmisartan'); markUsed('telmisartan'); }
+        if (!isUsed('nebivolol')) { substances.push('nebivolol'); markUsed('nebivolol'); }
+      }
+
+      if (highHematologicLoad) {
+        for (const id of ['nattokinase', 'serrapeptase', 'bromelain']) {
+          if (!isUsed(id)) { substances.push(id); markUsed(id); }
+        }
+        for (const id of ['hesperidin', 'pycnogenol', 'citrulline']) {
+          if (!isUsed(id)) { substances.push(id); markUsed(id); }
+        }
+      }
+      if (hasTest && !isUsed('bergamot')) { substances.push('bergamot'); markUsed('bergamot'); }
+      for (const id of ['tmg', 'astaxanthin']) {
+        if (!isUsed(id)) { substances.push(id); markUsed(id); }
       }
 
       // Антиароматаза при тестостероне/метилтестостероне
@@ -96,14 +177,14 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         });
       }
 
-      // Каберголин при прогестагенных (трен, нандрон, болденон)
-      if ((hasTren || hasNandrolone || hasBoldenone) && !state.pharma.hasCaber && !isUsed('cabergoline')) {
-        substances.push('cabergoline'); markUsed('cabergoline');
+      // Нандролон: обязательный нейро/NO-модулятор профиля 19-nor.
+      if (hasNandrolone && !isUsed('agmatine')) {
+        substances.push('agmatine'); markUsed('agmatine');
         phaseAssignedDrugs.push({
-          id: 'cabergoline',
-          reason: 'Каберголин 0.25-0.5 мг 2р/нед. D2-агонист → подавление пролактина, который повышается при прогестагенных ААС (трен/нандролон/болденон).',
-          trigger: 'Прогестагенный AAS (трен/нандролон/болденон) в курсе + нет каберголина',
-          category: 'cabergoline',
+          id: 'agmatine',
+          reason: 'Агматин 1 г 2р/день — обязательный компонент поддержки нандролона: NMDA/NO-модуляция и дофаминергический/эндотелиальный контур.',
+          trigger: 'Нандролон/NPP/Deca в курсе',
+          category: 'neuro_protection',
         });
       }
 
@@ -135,6 +216,12 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
             trigger: 'Тренболон в курсе (нефропротекция)',
             category: 'renal_protection',
           });
+        }
+        for (const id of ['magnesium_l_threonate', 'phosphatidylserine', 'vitamin_b12', 'theanine', 'glycine']) {
+          if (!isUsed(id)) { substances.push(id); markUsed(id); }
+        }
+        for (const id of ['alpha_lipoic', 'curcumin', 'berberine', 'dandelion', 'hesperidin']) {
+          if (!isUsed(id)) { substances.push(id); markUsed(id); }
         }
       }
 
@@ -181,10 +268,12 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const allowedSeverity = recSeverityByLevel[state.powerLevel] ?? recSeverityByLevel.mid;
     const resultPre: any = { selectedSubstances: substances, schedule: [], synergyIdsUsed: synergyIds, overallRiskBefore: 0, overallRiskAfter: 0 };
     const recommendations = evaluateRecommendations(state, resultPre);
-    const filteredRecs = recommendations.filter(r => allowedSeverity.has(r.severity));
+    // При наличии единого плана (resolvePlan) старые рекомендации не дублируются:
+    // resolvePlan уже покрывает lab-driven назначения через tier/lab-подбор.
+    const filteredRecs = useLegacyMandatory ? recommendations.filter(r => allowedSeverity.has(r.severity)) : [];
     for (const rec of filteredRecs)
       for (const sub of rec.substances)
-        if (!isUsed(sub.id)) { substances.push(sub.id); markUsed(sub.id); }
+        if (!isAutoDoctorOnly(sub.id) && !isUsed(sub.id)) { substances.push(sub.id); markUsed(sub.id); }
 
     // 2a. Отмечаем какие системы уже покрыты рекомендациями
     const recCoveredSystems = new Set<string>();
@@ -231,7 +320,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const tzResultPre = tzInputPre ? calculateTzSpecRisk(tzInputPre) : null;
     const scoresPre = tzResultPre ? tzToScores(tzResultPre, oldScores) : oldScores;
 
-    if (Object.keys(allDb).length > 0) {
+    if (useLegacyMandatory && Object.keys(allDb).length > 0) {
       const baseRange = levelTargets[state.powerLevel] ?? [40, 50];
       const targetMax = Math.max(5, baseRange[1] - (state.boostEnabled ? 5 : 0));
       const targetMin = Math.max(5, baseRange[0] - (state.boostEnabled ? 5 : 0));
@@ -310,7 +399,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       if (systemsNeedingCoverage.length > 0) {
         const scored: [string, number, number, number][] = [];
         for (const [id, entries] of Object.entries(allDb)) {
-          if (isUsed(id) || !entries.length) continue;
+           if (isAutoDoctorOnly(id) || isUsed(id) || !entries.length) continue;
           if (tBoosterBlacklist.has(id)) continue;
           if (TZ_AUTO_BLACKLIST.has(id)) continue;
           let matchCount = 0; let totalK = 0;
@@ -338,7 +427,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         while (currentCount < maxPerSys) {
           let best: [string, number, number] | null = null;
           for (const [id, entries] of Object.entries(allDb)) {
-            if (isUsed(id)) continue;
+            if (isAutoDoctorOnly(id) || isUsed(id)) continue;
             if (tBoosterBlacklist.has(id)) continue;
             if (TZ_AUTO_BLACKLIST.has(id)) continue;
             if (conflictScoreWithPlan(id, substances) > 0) continue;
@@ -382,7 +471,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           if (currentCount >= maxPerSys + 1) continue;
           let bestBoost: [string, number, number] | null = null;
           for (const [id, entries] of Object.entries(allDb)) {
-            if (isUsed(id)) continue;
+            if (isAutoDoctorOnly(id) || isUsed(id)) continue;
             if (tBoosterBlacklist.has(id)) continue;
             if (TZ_AUTO_BLACKLIST.has(id)) continue;
             if (conflictScoreWithPlan(id, substances) > 0) continue;
@@ -441,6 +530,29 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       }
     }
 
+    // Финальный budget после всех автоматических веток. Раньше broad/lab/
+    // symptom-рекомендации добавлялись без общего cap и раздували mid-план
+    // десятками веществ. Mandatory course profile сохраняется, optional tail
+    // обрезается до уровня пользователя.
+    const mandatoryIds = new Set<string>(COURSE_FOUNDATION);
+      if (state.pharma.aas.length > 0) {
+      const hasTestForBudget = state.pharma.aas.some((a: any) => String(a.id || '').toLowerCase().includes('test'));
+      ['hcg', 'tadalafil', 'telmisartan', 'nebivolol', 'anastrozole', 'agmatine', 'nac', 'omega3', 'coq10', 'tmg', 'taurine', 'hesperidin', 'pycnogenol', 'citrulline', 'astaxanthin'].forEach(id => mandatoryIds.add(canonId(id)));
+      const hasTren = state.pharma.aas.some((a: any) => String(a.id || '').toLowerCase().includes('tren'));
+      const hasNand = state.pharma.aas.some((a: any) => ['nandrolone', 'deca', 'npp'].some(x => String(a.id || '').toLowerCase().includes(x)));
+      const hasOral = state.pharma.aas.some((a: any) => a.form === 'oral' || /oxandrolone|anavar|stanozolol|winstrol|methandienone|dianabol|oxymetholone|anadrol|turinabol|halotestin|superdrol/i.test(String(a.id || '')));
+      if (hasTren) ['astragalus', 'cordyceps', 'magnesium_l_threonate', 'phosphatidylserine', 'vitamin_b12', 'theanine', 'glycine', 'alpha_lipoic', 'curcumin', 'berberine', 'dandelion'].forEach(id => mandatoryIds.add(canonId(id)));
+      if (hasNand) mandatoryIds.add(canonId('agmatine'));
+      if (hasOral) ['tudca', 'milk_thistle'].forEach(id => mandatoryIds.add(canonId(id)));
+      if (hasTren || hasNand || state.pharma.aas.some((a: any) => /bold|equipoise|dhb/i.test(String(a.id || '')))) ['nattokinase', 'serrapeptase', 'bromelain'].forEach(id => mandatoryIds.add(canonId(id)));
+      if (hasTestForBudget) mandatoryIds.add(canonId('bergamot'));
+    }
+    const planLimit = Math.max(AUTO_PLAN_LIMIT[state.powerLevel] ?? AUTO_PLAN_LIMIT.mid, mandatoryIds.size);
+    const prioritized = substances.filter(id => mandatoryIds.has(canonId(id)));
+    const optional = substances.filter(id => !mandatoryIds.has(canonId(id)) && !isAutoDoctorOnly(id));
+    const finalSubstances = [...new Set([...prioritized, ...optional])].slice(0, planLimit);
+    substances.splice(0, substances.length, ...finalSubstances);
+
     // ── 6a. Синергетические пары (комплексный выбор) ──
     // Если выбран один из пары — добавить партнёра автоматически
     const SYNERGY_PAIRS: Record<string, string[]> = {
@@ -463,6 +575,12 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         }
       }
     }
+
+    const finalAfterSynergy = [...new Set([
+      ...substances.filter(id => mandatoryIds.has(canonId(id))),
+      ...substances.filter(id => !mandatoryIds.has(canonId(id)) && !isAutoDoctorOnly(id)),
+    ])].slice(0, planLimit);
+    substances.splice(0, substances.length, ...finalAfterSynergy);
 
     // ── 7. Финальный расчёт риска С поддержкой (включая ВСЕ вещества) ──
     const titration = applyTitration(substances, state);
@@ -524,6 +642,27 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
             const tzSys = sys === 'neuro' ? 'cns' : sys;
             const peakVal = peak.organPercents[tzSys];
             if (peakVal !== undefined) finalScores[sys as RiskSystemId] = peakVal;
+          }
+          // Timeline peak is the authoritative display point. Previously the
+          // overall values were replaced with peak values while tzResultFinal
+          // still contained the current-week organ percentages, producing
+          // inconsistent overall-vs-system cards.
+          if (tzResultFinal) {
+            for (const organ of tzResultFinal.organs) {
+              const peakRaw = peak.organPercents[organ.id];
+              const peakAfter = peak.organAfterPercents[organ.id];
+              if (peakRaw !== undefined) {
+                organ.rawPercent = Math.max(0, Math.min(100, peakRaw));
+                organ.rawScore = organ.maxRaw * organ.rawPercent / 100;
+              }
+              if (peakAfter !== undefined) {
+                organ.afterPercent = Math.max(0, Math.min(100, peakAfter));
+                organ.afterScore = organ.maxRaw * organ.afterPercent / 100;
+                organ.k_protect = organ.rawPercent > 0
+                  ? Math.round((1 - organ.afterPercent / organ.rawPercent) * 100)
+                  : 0;
+              }
+            }
           }
         }
       } catch {}
@@ -627,6 +766,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       ulWarnings: ulWarnings.length > 0 ? ulWarnings : undefined,
       dailyLoad: Object.keys(dailyLoad).length > 0 ? dailyLoad : undefined,
       phaseAssignedDrugs: phaseAssignedDrugs.length > 0 ? phaseAssignedDrugs : undefined,
+      protocolWarnings: protocolWarnings.length > 0 ? protocolWarnings : undefined,
       tzSpecResult: tzResultFinal,
     };
     result.risk.systems = tzResultFinal

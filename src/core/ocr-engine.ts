@@ -66,7 +66,7 @@ export interface ParsedLabValue {
  */
 function mergeParsedResults(
   pdfResults: ParsedLabValue[],
-  providerResults: { marker: string; value: number; unit: string; confidence: number }[],
+  providerResults: { marker: string; value: number; unit: string; confidence: number; refLow?: number; refHigh?: number }[],
   provider: string | undefined
 ): { labs: ParsedLabValue[]; warnings: string[] } {
   const warnings: string[] = [];

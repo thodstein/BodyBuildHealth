@@ -37,12 +37,22 @@ export const CalcSafetyLayer: React.FC<{ rec: SupportRecommendation; planResult?
   const depletionWarnings = planResult?.depletionWarnings || [];
   const cumulativeLoad = planResult?.cumulativeLoad || [];
   const pillBurden = planResult?.pillBurden;
+  const protocolWarnings = rec.protocolWarnings || [];
+  const procedures = rec.procedures || [];
+  const assayWarnings = rec.assayWarnings || [];
+  const planConflicts = (planResult?.conflicts && planResult.conflicts.length > 0)
+    ? planResult.conflicts
+    : (rec.conflicts || []).map((c: any) => ({
+        a: c.a, b: c.b, aName: c.a, bName: c.b,
+        effect: c.reason, severity: c.level === 'block' ? 'HIGH' : 'MEDIUM',
+      }));
+  const safetyConflictRows = planConflicts.filter((c: any) => c.severity && c.severity !== 'LOW');
 
   const hasInjectable = subs.some(s => INJECTABLE_AAS.some(id => (s.substanceId || '').toLowerCase().includes(id)));
   const hasPctDrug = subs.some(s => ['hcg', 'tamoxifen', 'clomiphene', 'enclomiphene', 'nolvadex'].includes((s.substanceId || '').toLowerCase()));
   const isPct = rec.phase === 'pct';
 
-  if (alerts.length === 0 && guardrails.length === 0 && contra.length === 0 && gaps.length === 0 && !hasInjectable && !hasPctDrug && !isPct && labFindings.length === 0 && depletionWarnings.length === 0 && cumulativeLoad.length === 0 && !pillBurden) {
+  if (alerts.length === 0 && guardrails.length === 0 && contra.length === 0 && gaps.length === 0 && protocolWarnings.length === 0 && safetyConflictRows.length === 0 && procedures.length === 0 && assayWarnings.length === 0 && !hasInjectable && !hasPctDrug && !isPct && labFindings.length === 0 && depletionWarnings.length === 0 && cumulativeLoad.length === 0 && !pillBurden) {
     return null;
   }
 
@@ -74,6 +84,54 @@ export const CalcSafetyLayer: React.FC<{ rec: SupportRecommendation; planResult?
                 {a.marker} = {a.value} {a.tier >= 3 ? '· ⛔ СТОП КУРС' : a.tier === 2 ? '· лечение' : '· граница'}
               </div>
               <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>{a.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {protocolWarnings.length > 0 && (
+        <div style={{ marginBottom: 7 }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>⚠️ Фармакологические ограничения</div>
+          {protocolWarnings.map((warning, i) => (
+            <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.24)', color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+              {warning}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {safetyConflictRows.length > 0 && (
+        <div style={{ marginBottom: 7 }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>⚠️ Взаимодействия текущего плана</div>
+          {safetyConflictRows.slice(0, 12).map((c: any, i: number) => (
+            <div key={`${c.a}-${c.b}-${i}`} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: c.severity === 'HIGH' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.08)', border: `1px solid ${c.severity === 'HIGH' ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.24)'}`, color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+              <b>{c.aName || c.a} + {c.bName || c.b}</b>: {c.effect || c.mechanism || 'требует проверки'}
+              {c.separationAdvice && <div style={{ color: '#fbbf24', marginTop: 2 }}>{c.separationAdvice}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {procedures.length > 0 && (
+        <div style={{ marginBottom: 7 }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: '#f87171', marginBottom: 3 }}>🩸 Медицинская эскалация</div>
+          {procedures.map((p, i) => (
+            <div key={`${p.id}-${i}`} style={{ padding: '6px 8px', borderRadius: 7, marginBottom: 3, background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.26)', color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+              <div style={{ fontSize: 8, fontWeight: 800, color: '#fca5a5' }}>🩺 {p.label} · только врач</div>
+              <div>{p.reason}</div>
+              <div style={{ color: '#fbbf24', marginTop: 2 }}>Триггер: {p.trigger}</div>
+              <div style={{ color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>Контроль: {p.monitoring.join(', ')}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {assayWarnings.length > 0 && (
+        <div style={{ marginBottom: 7 }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: '#60a5fa', marginBottom: 3 }}>🧪 Интерпретация анализов</div>
+          {assayWarnings.map((warning, i) => (
+            <div key={i} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 3, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.22)', color: '#fff', fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+              {warning}
             </div>
           ))}
         </div>

@@ -161,6 +161,7 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     cumulativeLoad: cumulativeLoad.length > 0 ? cumulativeLoad : undefined,
     pillBurden,
     phaseAssignedDrugs: tzRes.phaseAssignedDrugs,
+    protocolWarnings: tzRes.protocolWarnings,
   };
 }
 

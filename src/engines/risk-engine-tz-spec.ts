@@ -82,6 +82,7 @@ export interface TzSpecInput {
   nutrition?: { proteinPerKg: number; fiberG: number; omega3G: number; sodiumG: number; potassiumG: number; waterL: number; calories: number; };
   training?: { hasHIIT: boolean; weeklyMinutes: number; volumeTonnes: number; lissMinutesPerWeek: number; };
   courseWeek?: number;
+  phaseDoseMultiplier?: number;
 }
 export interface TzSpecMechanismResult {
   id: string; name: string; weight: number; m_i: number;
@@ -531,6 +532,9 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   const genetics=input.genetics||{};
   const nutrition=input.nutrition;
   const training=input.training;
+  const phaseDoseMultiplier = Number.isFinite(input.phaseDoseMultiplier)
+    ? Math.max(0, Math.min(1.25, input.phaseDoseMultiplier as number))
+    : 1;
 
   // Генетические множители: повышают m_i для конкретных механизмов
   const geneticBoost: Record<string, number> = {};
@@ -593,7 +597,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         const drugEntry=DRUG_DB[drug.drugName.toLowerCase()]||DRUG_DB[drug.drugName];
         const mechWeight=drugEntry?.mechanismWeights?.[mech.id]||0;
         if(mechWeight===0) continue; // Drug doesn't target this mechanism — skip
-        const D_i=getDoseFactor(drug.dose,drug.drugClass)*(drugEntry?.doseModifier||1.0);
+        const D_i=getDoseFactor(drug.dose,drug.drugClass)*(drugEntry?.doseModifier||1.0)*phaseDoseMultiplier;
         // Per-drug duration (timeline: drug B started week 6, now week 8 → 2 weeks, not 8)
         const drugDuration = drug.effDuration ?? duration;
         const T_drug=getDurationFactor(drugDuration);
@@ -731,4 +735,3 @@ export function pickSupport(riskResult: TzSpecResult, drugClass: string, form: s
 
   return [...ids];
 }
-

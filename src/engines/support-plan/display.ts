@@ -8,6 +8,7 @@ import { ALL_INTERACTIONS, SUPPORT_CATALOG_DATA } from '../../data/support-datab
 import { evaluateRecommendations } from '../recommendation-engine';
 import type { CalculatorState, CalculatorResult, LabFinding } from './types';
 import { catalogEntry, NUTRIENT_UL, MINERAL_SEPARATION_HOURS, halfLifeMultiplicity } from './types';
+import { NON_PILL_SUPPORT_IDS } from './substances';
 
 /** Клинические механизмы для распространённых конфликтов (используется
  *  когда ALL_INTERACTIONS не содержит mechanism). */
@@ -378,17 +379,19 @@ export function buildPillBurden(
   const schedule = tzRes.schedule || [];
   let morningCount = 0, afternoonCount = 0, eveningCount = 0;
   for (const s of schedule) {
+    if (NON_PILL_SUPPORT_IDS.has(s.substanceId)) continue;
     if (s.timeBlock === 'morning') morningCount++;
     else if (s.timeBlock === 'afternoon') afternoonCount++;
     else eveningCount++;
   }
   // Учитываем half-life multiplicity: +1 таблетка для 2×/day, +2 для 3×/day
   let estimatedTotal = 0;
-  for (const subId of substances) {
+  const pillSubstances = substances.filter(subId => !NON_PILL_SUPPORT_IDS.has(subId));
+  for (const subId of pillSubstances) {
     const mult = halfLifeMultiplicity(subId);
     estimatedTotal += mult;
   }
-  const total = substances.length;
+  const total = pillSubstances.length;
   let feasibility: 'optimal' | 'acceptable' | 'high' | 'excessive' = 'optimal';
   let message = '';
   if (total <= 6) {

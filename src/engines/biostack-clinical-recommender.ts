@@ -610,6 +610,7 @@ export function buildClinicalStack(
     const gateSet = new Set(gate.ids.map(id => id.toLowerCase()));
     const hardStopSet = new Set(gate.hardStops.map(h => h.substanceId));
     const drugExclSet = new Set(gate.drugExclusions.map(e => e.substanceId));
+    const avoidIdsSet = new Set((profile.avoidIds || []).map((id: string) => id.toLowerCase()));
     const allCatalogIds = Object.keys(SUPPORT_CATALOG_DATA);
 
     // Pre-compute mechanisms of already selected substances for redundancy check
@@ -627,6 +628,7 @@ export function buildClinicalStack(
     for (const candId of allCatalogIds) {
       const candLower = candId.toLowerCase();
       if (gateSet.has(candLower)) continue;
+      if (avoidIdsSet.has(candLower)) continue;
       if (hardStopSet.has(candId)) continue;
       if (drugExclSet.has(candId)) continue;
       if (TZ_AUTO_BLACKLIST.has(candId)) continue;

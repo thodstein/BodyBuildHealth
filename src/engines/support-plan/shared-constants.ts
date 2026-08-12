@@ -156,7 +156,10 @@ export const SUB_ALIAS: Record<string, string> = {
 };
 
 /** Канонизирует ID вещества через SUB_ALIAS. */
-export function canonId(id: string): string { return SUB_ALIAS[id] || id; }
+export function canonId(id: string): string {
+  const key = String(id || '').trim().toLowerCase();
+  return SUB_ALIAS[key] || key;
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  Блэклист: вещества, НЕ назначаемые автоматически
@@ -190,6 +193,9 @@ export const TZ_AUTO_BLACKLIST = new Set<string>([
   'antipsychotic_drugs', 'antithyroid_drugs', 'anxiolytic_drugs', 'arb_drugs',
   'beta_blocker_drugs', 'ccb_drugs', 'corticosteroid_drugs', 'diuretic_drugs',
   'immunosuppressant_drugs', 'nsaid_drugs', 'ppi_drugs', 'statin_drugs', 'thyroid_drugs',
+  // Рецептурная/процедурная эскалация: не добавлять автоматически без
+  // явного врачебного режима и подтверждённого показания.
+  'warfarin', 'enoxaparin', 'sulodexide', 'lumbrokinase', 'dipyridamole', 'pentoxifylline',
 ]);
 
 // ═══════════════════════════════════════════════════════════════

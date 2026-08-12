@@ -284,8 +284,9 @@ export interface CalculatorResult {
     id: string;
     reason: string;
     trigger: string;
-    category: 'hcg' | 'ai' | 'cabergoline' | 'renal_protection' | 'hepatic_protection';
+    category: string;
   }>;
+  protocolWarnings?: string[];
 }
 
 export interface TimelineWeekData {
@@ -349,6 +350,7 @@ export interface PlanSubstance {
   category: string[]; tier: string; targetSystems: string[];
   comment: string; mechanismReason: string;
   fromJoint: boolean; fromBoost: boolean; fromNeuro: boolean;
+  kind?: 'lifestyle' | 'mineral' | 'supplement' | 'medicine' | 'doctor_only';
   priority?: number;
   brandName?: string;
 }
@@ -384,6 +386,7 @@ export interface PlanResult {
   pillBurden?: { totalSubstances: number; estimatedPillsPerDay: number; morningPills: number; afternoonPills: number; eveningPills: number; feasibility: string; message: string };
   /** Mandatory-назначения (hCG, AI, caber, TUDCA, NAC и т.д.) */
   phaseAssignedDrugs?: Array<{ id: string; reason: string; trigger: string; category: string }>;
+  protocolWarnings?: string[];
 }
 
 export interface LabFindingSub {
