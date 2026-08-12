@@ -1915,7 +1915,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     reorder: mode !== 'faithful',
     priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
     methodology: opts.methodology,
-    level: levelForLandmarks,
+    level: opts.level ?? levelForLandmarks,
     volumeGoal: opts.volumeGoal,
     phaseSafety: true,
     controlledRotation: mode !== 'faithful',
