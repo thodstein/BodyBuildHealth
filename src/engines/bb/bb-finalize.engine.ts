@@ -230,6 +230,62 @@ function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions)
   }
 }
 
+/** Гарантирует в Push/Chest-дне грудь с разными углами, а не 4 одинаковых жима.
+ *  Также не допускает rear delt в Push-днях (rear delt — Pull-работа). */
+function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (!/^(Push|Chest|ChestBack|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) return;
+  // Rear delt в Push/Chest — ошибка: задняя дельта тренируется в Pull.
+  const rearDelt = session.exercises.find((e: any) => e.muscle === 'shoulders' && /обратн|rear|задн.*дельт|задн.*пуч/i.test(e.name));
+  if (rearDelt) {
+    const lateral = EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== 'shoulders') return false;
+      if (!/мах|lateral|raise|отведен|разведен/i.test(x.name)) return false;
+      if (/наклон|задн|rear|обратн/i.test(x.name)) return false;
+      if (session.exercises.some((e: any) => e.name === x.name)) return false;
+      return true;
+    });
+    if (lateral) {
+      const sample = rearDelt.workSets?.[0] || { reps: 12, rir: 3, weight: 0 };
+      rearDelt.name = lateral.name;
+      rearDelt.exerciseName = lateral.name;
+      rearDelt.workSets = rearDelt.workSets.map((set: any) => ({ ...set }));
+      rearDelt.rationale = `${rearDelt.rationale || ''} Адаптация: rear delt заменена на lateral raise в Push-дне.`;
+    }
+  }
+  const chest = session.exercises.filter((e: any) => e.muscle === 'chest');
+  if (chest.length < 3) return;
+  const isPress = (name: string) => /жим|press|брус|dip|отжим/i.test(name);
+  const presses = chest.filter((e: any) => isPress(e.name));
+  const fly = chest.find((e: any) => /развод|fly|crossover|кроссовер|сведен|пек.?дек|бабоч|сведение/i.test(e.name));
+  // >3 жимов без fly/cable — заменяем последний жим на изоляцию.
+  if (presses.length > 3 && !fly) {
+    const candidate = EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== 'chest') return false;
+      if (!/развод|fly|crossover|кроссовер|сведен|пек.?дек|бабоч|сведение/i.test(x.name)) return false;
+      if (session.exercises.some((e: any) => e.name === x.name)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      return true;
+    });
+    if (candidate) {
+      const target = presses[presses.length - 1];
+      const base: any = target;
+      const sample = base.workSets?.[0] || { reps: 12, rir: 3, weight: 0 };
+      const added: any = structuredClone(base);
+      added.name = candidate.name;
+      added.exerciseName = candidate.name;
+      added.role = 'accessory';
+      added.character = 'памп';
+      added.sets = 3;
+      added.repsRange = [12, 18];
+      added.rir = 3;
+      added.workSets = Array.from({ length: 3 }, () => ({ ...sample, reps: 15, rir: 3 }));
+      added.rationale = 'Experienced enhanced: chest fly/cable diversity вместо 4-го жима';
+      session.exercises.splice(session.exercises.indexOf(target), 1, added);
+    }
+  }
+}
+
 /**
  * Weekly back-pattern repair for adaptive/generic plans.
  * Volume specialization must not mean repeating pull-ups/vertical pulls in
@@ -678,6 +734,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     allocateExperiencedBackSession(session, options);
     allocateExperiencedArmSession(session, options);
     allocateExperiencedLegSession(session, options);
+    diversifyExperiencedChestSession(session, options);
   }
   // FullBody/Lower: после всех проходов добираем отсутствующие группы
   // (fbUsedIds может вытеснить мышцы между FullBody-сессиями).
