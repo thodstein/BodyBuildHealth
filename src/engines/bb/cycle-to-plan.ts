@@ -368,6 +368,15 @@ export interface CycleToPlanInput {
   level?: string;
   /** Реальный тренировочный стаж; ограничивает enhanced-объём. */
   trainingYears?: number;
+  /** Способность к bodyweight-упражнениям (подтягивания при отсутствии → pulldown). */
+  bodyweightCapability?: {
+    pullUpsStrict?: number;
+    chinUpsStrict?: number;
+    dipsStrict?: number;
+    pushUpsStrict?: number;
+    weightedPullUpLoad?: number;
+    assistedPullUpLoad?: number;
+  };
   /** Доступное оборудование — фильтр отбора упражнений. */
   equipment?: string[];
   /** Режим адаптации: 'faithful' = цикл дословно (только safety-фильтры), 'adapt' = + слабые группы/фокус/пост-фаза. */
@@ -1193,6 +1202,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     checkOrder: mode !== 'faithful',
     preserveSource: mode === 'faithful',
     trainingYears: input.trainingYears,
+    bodyweightCapability: input.bodyweightCapability,
   });
 }
 
@@ -1222,6 +1232,15 @@ export interface ProgramToBBPlanOpts {
   courseIntensity?: CourseIntensity;
   level?: string;
   trainingYears?: number;
+  /** Способность к bodyweight-упражнениям (подтягивания при отсутствии → pulldown). */
+  bodyweightCapability?: {
+    pullUpsStrict?: number;
+    chinUpsStrict?: number;
+    dipsStrict?: number;
+    pushUpsStrict?: number;
+    weightedPullUpLoad?: number;
+    assistedPullUpLoad?: number;
+  };
   volumeGoal?: BBVolumeGoal;
   specialization?: boolean;
   /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
@@ -1929,6 +1948,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     checkOrder: mode !== 'faithful',
     preserveSource: mode === 'faithful',
     trainingYears: opts.trainingYears,
+    bodyweightCapability: opts.bodyweightCapability,
   });
 }
 

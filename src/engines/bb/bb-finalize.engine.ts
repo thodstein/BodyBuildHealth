@@ -90,6 +90,13 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
     if (trueMuscleOf(candidate) !== 'back') return false;
     if (usedNames.has(candidate.name)) return false;
     if (options.avoidAxialLoad && isAxialLoadExercise(candidate)) return false;
+    // Bodyweight capability: без подтверждённой способности подтягивания не
+    // выбираются как primary — берём pulldown/машину вместо.
+    if (/подтяг|pull.?up|chin/i.test(candidate.name || '')) {
+      const cap = options.bodyweightCapability;
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      if (!canPullUp) return false;
+    }
     if (options.equipment?.length) {
       const eq = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
       if (eq.length && !eq.some((x: string) => options.equipment!.includes(x))) return false;
@@ -319,8 +326,14 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
       // Сначала ищем другой вертикальный профиль (wide ↔ hammer/neutral ↔
       // underhand). Хорошая вертикальная тяга не должна исчезать только
       // потому, что она вертикальная.
+      const capAllowed = (candidate: any) => {
+        if (!/подтяг|pull.?up|chin/i.test(candidate.name || '')) return true;
+        const cap = options.bodyweightCapability;
+        return !!(cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0));
+      };
       const replacement = EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
+        if (!capAllowed(candidate)) return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
         if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
         const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
@@ -329,6 +342,7 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
         return candidateProfile !== null && candidateProfile !== profile && !keptProfiles.has(candidateProfile);
       }) || EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
+        if (!capAllowed(candidate)) return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
         if (options.excludedExercises?.includes(candidate.id) || options.excludedExercises?.includes(candidate.name)) return false;
         const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
@@ -396,6 +410,15 @@ export interface BBFinalizeOptions {
   maxWorkingSets?: number;
   maxExercises?: number;
   trainingYears?: number;
+  /** Способность к bodyweight-упражнениям — фильтр подтягиваний при allocation. */
+  bodyweightCapability?: {
+    pullUpsStrict?: number;
+    chinUpsStrict?: number;
+    dipsStrict?: number;
+    pushUpsStrict?: number;
+    weightedPullUpLoad?: number;
+    assistedPullUpLoad?: number;
+  };
 }
 
 function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {

@@ -1362,9 +1362,9 @@ function buildSession(
       if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
       if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
       if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
-      // Bodyweight capability: подтягивания не ставятся как primary тяжёлое
-      // движение без подтверждённой способности. Для accessory — допустимо.
-      if (role === 'primary' && /подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
+      // Bodyweight capability: подтягивания не ставятся без подтверждённой
+      // способности ни в какую роль — заменяются pulldown/машиной.
+      if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
         const cap = bodyweightCapability;
         const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
         if (!canPullUp) return false;
@@ -1411,6 +1411,12 @@ function buildSession(
       }
       // B5: avAxial — даже в fallback НЕ берём осевые упражнения
       if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;
+      // Bodyweight capability — и в fallback не берём подтягивания без способности.
+      if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
+        const cap = bodyweightCapability;
+        const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+        if (!canPullUp) return false;
+      }
       return true;
     });
 
@@ -3048,6 +3054,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : 24,
     maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : 10,
     trainingYears: input.trainingYears,
+    bodyweightCapability: input.bodyweightCapability,
   });
 }
 
