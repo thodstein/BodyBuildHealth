@@ -12,7 +12,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
-import { annotateBackExercise, backQualityIssues, verticalPullProfile } from './bb-back-quality.engine';
+import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise } from './bb-back-quality.engine';
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
 
@@ -224,15 +224,20 @@ function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions)
     }
     if (total >= target) continue;
     const used = new Set(items.map(e => e.name));
+    const usedPatterns = new Set(items.map((e: any) => classifyLegExercise(e.name).pattern));
     for (const candidate of EXERCISE_CATALOG) {
       if (total >= target || trueMuscleOf(candidate) !== muscle || used.has(candidate.name)) continue;
+      // Не дублируем функциональный паттерн: два hip thrust в одну тренировку
+      // для glutes — это ошибка (нужен hip thrust + kickback/abduction).
+      const candidatePattern = classifyLegExercise(candidate.name).pattern;
+      if (usedPatterns.has(candidatePattern)) continue;
       const base: any = items[0];
       const added: any = structuredClone(base);
       added.name = candidate.name; added.exerciseName = candidate.name; added.role = 'accessory';
       added.sets = Math.min(4, target - total);
       const sample = base.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
       added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
-      session.exercises.push(added); items.push(added); used.add(candidate.name); total += added.sets;
+      session.exercises.push(added); items.push(added); used.add(candidate.name); usedPatterns.add(candidatePattern); total += added.sets;
     }
   }
 }

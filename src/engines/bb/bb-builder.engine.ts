@@ -371,17 +371,20 @@ const ARM_MUSCLES_SET = new Set(['biceps', 'triceps', 'forearms']);
 // из-за чего буст +50 никогда не срабатывал — реальный каталог использует
 // row_bar/row_tbar/pulldown/ohp/lateral_raise/curl_bar/curl_db/tricep_pushdown_*/bench_bar/incline_bar/...
 const PREFERRED_BB_EXERCISES = new Set([
-  // Грудь — наклонные приоритет (верх груди растёт хуже, чем средняя/нижняя)
+  // Грудь — наклонные приоритет (верх груди растёт хуже, чем средняя/нижняя).
+  // Брусья НЕ приоритет: для растяжки/изоляции приоритетны разводки и кроссовер.
   'incline_bar', 'incline_db', 'bench_bar', 'bench_db',
-  'dips_chest', 'machine_chest_press', 'machine_incline_press',
+  'machine_chest_press', 'machine_incline_press',
+  'fly_cable', 'fly_db', 'fly_incline_db', 'crossover_cable', 'pec_deck', 'butterfly',
   // Спина — тяжёлые compound-тяги приоритет (king of back: barbell row + T-bar + pulldown)
   'row_bar', 'row_tbar', 'row_db', 'row_chest_supported', 'row_seal', 'row_pendlay', 'yates_row',
   'pulldown', 'pulldown_wide', 'pullup', 'chinup', 'pullup_wide', 'pulldown_vbar',
   // Ноги — гакк/Смит/лег-пресс приоритет (безопасность поясницы, изоляция)
   'hack_squat', 'squat_smith', 'leg_press', 'bulgarian_split_squat', 'walking_lunge', 'walking_lunge_db',
   'rdl', 'deadlift_romanian', 'leg_curl', 'leg_ext',
-  // Плечи
-  'ohp', 'ohp_seated', 'ohp_seated_bar', 'ohp_seated_db', 'arnold_press', 'db_press',
+  // Плечи — классические жимы перед собой приоритет (не армейский жим стоя):
+  // Smith press перед собой, широкий хват в Smith, жимы гантелей.
+  'ohp_seated_bar', 'ohp_seated_db', 'db_press', 'smith_shoulder_press',
   'lateral_raise', 'lateral_raise_cable', 'lateral_raise_machine',
   // Руки
   'tricep_pushdown_rope', 'tricep_pushdown_bar', 'curl_bar', 'curl_db', 'hammer_curl',
@@ -1455,6 +1458,17 @@ function buildSession(
       // Редкие/специфичные вариации (не для массонабора)
       if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
       if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
+      // Односторонние варианты (румынская на одной ноге, тяга одной рукой) —
+      // менее приоритетны для мужчин/массы: классические двусторонние
+      // дают больше механического натяжения и стабильной прогрессии.
+      if (/на одной ног|одной ногой|single.?leg|one.?leg/i.test(n)) score -= 20;
+      if (/одной рук|одной рукой|one.?arm|single.?arm/i.test(n) && !muscle.includes('back')) score -= 10;
+      // Брусья — не приоритет груди (трицепс-доминантны, перегружают плечо);
+      // для растяжки приоритетны разводки и кроссовер.
+      if (muscle === 'chest' && /брус|dip/i.test(n)) score -= 20;
+      // Армейский жим стоя — ПЛ-движение: предпочтительны классические жимы
+      // перед собой (Smith широким хватом, жимы гантелей).
+      if (/армейск|жим.*стоя|standing.*press|military/i.test(n)) score -= 25;
       return { ...ex, _score: score };
     }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
 
@@ -1471,7 +1485,14 @@ function buildSession(
         const n = (ex.name || '').toLowerCase();
         const isBlacklisted = Array.from(BLACKLIST_GENERIC).some(bid =>
           id.includes(bid) || n.includes(bid.replace(/_/g, ' ')));
-        return !isBlacklisted;
+        if (isBlacklisted) return false;
+        // Грудь: брусья не приоритет (трицепс-доминантны, перегружают плечо).
+        // Для растяжки приоритетны разводки и кроссовер.
+        if (muscle === 'chest' && /брус|dip/i.test(n)) return false;
+        // Бицепс бедра: классическая румынская тяга двумя ногами приоритетна;
+        // односторонний вариант — специфичная вариация, не для generic-массы.
+        if (muscle === 'hamstrings' && /на одной ног|одной ногой|single.?leg|one.?leg/i.test(n)) return false;
+        return true;
       });
     }
 

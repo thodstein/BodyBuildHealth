@@ -178,4 +178,28 @@ describe('experienced enhanced back prescription', () => {
       .filter(e => /подтяг|pull.?up|chin/i.test(e.name));
     expect(pullups.length).toBeGreaterThanOrEqual(0);
   }, 30000);
+
+  it('excludes dips from chest, unilateral RDL and double hip thrust for men', () => {
+    const plan = buildBBPlan({
+      patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const all = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises);
+    // 1. Брусья не в приоритете груди
+    expect(all.some(e => e.muscle === 'chest' && /брус|dip/i.test(e.name))).toBe(false);
+    // 2. Румынская на одной ноге не для мужчин/массы
+    expect(all.some(e => /румын|rdl/i.test(e.name) && /на одной ног|одной ногой|single.?leg/i.test(e.name))).toBe(false);
+    // 3. Армейский жим стоя не в приоритете плеч
+    expect(all.some(e => e.muscle === 'shoulders' && /армейск|жим.*стоя|military/i.test(e.name))).toBe(false);
+    // 4. Нет двух одинаковых ягодичных мостов в одной Lower-сессии
+    for (const session of plan.weeks[0].sessions.filter(s => s.sessionTag === 'Lower')) {
+      const gluteNames = session.exercises.filter(e => e.muscle === 'glutes').map(e => e.name);
+      expect(new Set(gluteNames).size).toBe(gluteNames.length);
+    }
+    // 5. Back-отчёт не содержит traps/rear delt как back-паттернов
+    const backReport = plan.rationale.find(r => r.includes('Спина по паттернам'));
+    expect(backReport).toBeDefined();
+    expect(/shrug|rear_delt|traps/.test(backReport || '')).toBe(false);
+  }, 30000);
 });
