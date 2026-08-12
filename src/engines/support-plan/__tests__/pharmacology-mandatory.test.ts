@@ -122,6 +122,31 @@ describe('course pharmacology mandatory rules', () => {
     expect(result.pillBurden?.totalSubstances).toBeLessThan(result.substances.length);
   });
 
+  it('структурированный мониторинг: периоды по курсу и фазе', () => {
+    const state = stateWithAas(['test_enan', 'tren_enan']);
+    const rec = resolvePlan(buildMapperCtx(state, 'medium'));
+    const sched = rec.monitoringSchedule || [];
+    const ids = sched.map(s => s.id);
+    expect(ids).toContain('baseline');
+    expect(ids).toContain('daily');
+    expect(ids).toContain('week2');
+    expect(ids).toContain('week4');
+    expect(ids).toContain('week8');
+    expect(ids).toContain('urgent');
+    const week4 = sched.find(s => s.id === 'week4')!;
+    expect(week4.items.some(i => i.marker.includes('PRL'))).toBe(true);
+    const daily = sched.find(s => s.id === 'daily')!;
+    expect(daily.items.some(i => i.marker.includes('АД'))).toBe(true);
+
+    const pctState = stateWithAas(['test_enan']);
+    pctState.pharma.phase = 'pct';
+    const pctRec = resolvePlan(buildMapperCtx(pctState, 'medium'));
+    const pctIds = (pctRec.monitoringSchedule || []).map(s => s.id);
+    expect(pctIds).toContain('post');
+    expect(pctIds).not.toContain('week4');
+    expect(pctRec.monitoringSchedule?.find(s => s.id === 'post')?.items.some(i => i.marker.includes('LH'))).toBe(true);
+  });
+
   it('процедурная эскалация по HCT', () => {
     const labs = (hct: string) => ({
       ...DEFAULT_STATE.labs,

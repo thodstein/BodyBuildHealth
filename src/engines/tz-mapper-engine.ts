@@ -155,7 +155,8 @@ export interface SupportRecommendation {
   protocolWarnings?: string[];   // H3/H4: клинические предупреждения (гипотония, кровотечение)
   procedures?: MedicalProcedureRecommendation[];
   assayWarnings?: string[];
-  monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга
+  monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга (строка, legacy)
+  monitoringSchedule?: MonitoringSection[]; // H6: структурированный мониторинг (до курса → экстренно)
   pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
 }
 
@@ -1056,6 +1057,142 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
   return lines.join('\n');
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  СТРУКТУРИРОВАННЫЙ МОНИТОРИНГ — единая графа «Мониторинг и анализы»
+//  baseline (до курса) → daily → week2 → week4 → week8 → post → urgent.
+//  Учитывает фазу, препараты (PED-флаги) и целевые диапазоны.
+// ════════════════════════════════════════════════════════════════════════════
+export interface MonitoringItemLine {
+  marker: string;
+  reason: string;
+  target?: string;
+  drug?: string;
+  escalation?: string;
+}
+
+export interface MonitoringSection {
+  id: 'baseline' | 'daily' | 'week2' | 'week4' | 'week8' | 'post' | 'urgent';
+  label: string;
+  period: string;
+  icon: string;
+  items: MonitoringItemLine[];
+}
+
+export function buildMonitoringSchedule(
+  ctx: MapperCtx,
+  flags: ReturnType<typeof derivePEDFlags>,
+  phase: PhaseKey,
+): MonitoringSection[] {
+  const sections: MonitoringSection[] = [];
+  const add = (id: MonitoringSection['id'], label: string, period: string, icon: string, items: MonitoringItemLine[]) => {
+    if (items.length === 0) return;
+    sections.push({ id, label, period, icon, items });
+  };
+  const onPED = flags.hasAAS || flags.hasSarm || flags.hasGH || flags.hasInsulin || flags.hasIGF;
+
+  const baseline: MonitoringItemLine[] = [];
+  baseline.push({
+    marker: 'ОАК + БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, E2, PRL, ТТГ, глюкоза/HbA1c, креатинин/eGFR',
+    reason: 'Исходная точка рисков до начала курса; сравнение во время/после',
+    target: 'АЛТ<40, АСТ<40, HCT<50%, LDL<3.0, E2 20-40 пг/мл',
+  });
+  baseline.push({ marker: 'АД, ЧСС', reason: 'Базовое артериальное давление и пульс', target: 'АД<130/85, ЧСС 60-90' });
+  baseline.push({ marker: 'PSA', reason: 'Мужчины >40 лет или при наличии ААС в анамнезе', target: 'PSA<4 нг/мл', drug: 'aas' });
+  if (phase === 'fertility') {
+    baseline.push({ marker: 'Спермограмма + LH/FSH/TT/E2/PRL', reason: 'Исходный фертильный профиль', drug: 'fertility' });
+  }
+  if (phase === 'trt') {
+    baseline.push({ marker: 'TT/FT/SHBG + ОАК/HCT', reason: 'Базовый гормональный профиль TRT', target: 'TT 15-30 нмоль/л, HCT<50%' });
+  }
+  add('baseline', 'До курса (исходно)', '0 нед — перед началом', '📋', baseline);
+
+  const daily: MonitoringItemLine[] = [];
+  if (flags.hasTren || flags.hasNandrolone || flags.hasBold || (ctx.pedDoses || []).some(p => (p.mgPerWeek || 0) >= 500) || flags.hasClenbut) {
+    daily.push({ marker: 'АД, ЧСС', reason: 'Высокая PED/кардио-нагрузка или кленбутерол', target: 'АД<130/85, ЧСС 60-90', escalation: 'ЧСС покоя >100 или АД>160/100 — STOP и врач' });
+  }
+  if (flags.hasTren) {
+    daily.push({ marker: 'Сон, тревога, раздражительность', reason: 'Нейротоксичность 19-nor', escalation: 'ЭКГ при тахикардии/боли/одышке' });
+  }
+  if (flags.hasNandrolone) {
+    daily.push({ marker: 'Либидо, эректильная функция, гинекомастия', reason: 'Профиль нандролона — вести дневник', escalation: 'PRL при отклонении — повторное подтверждение' });
+  }
+  if (flags.hasInsulin) {
+    daily.push({ marker: 'Глюкоза 3р/сут (1-я неделя)', reason: 'Риск гипогликемии при инсулине', target: '3.9-7.8 ммоль/л', escalation: 'Гипогликемия — срочно пересмотреть дозу' });
+  }
+  add('daily', 'Ежедневно', 'каждый день', '🌡', daily);
+
+  if (phase !== 'pct') {
+  const week2: MonitoringItemLine[] = [];
+  if (flags.hasOral17) {
+    week2.push({ marker: 'АЛТ/АСТ', reason: 'Оралы 17α — гепатотоксичность', target: 'АЛТ<40, АСТ<40', drug: 'oral17', escalation: 'ALT>2×ULN — снизить/отменить орал' });
+  }
+  if (flags.hasClenbut) {
+    week2.push({ marker: 'K⁺, Na⁺, Mg, креатинин', reason: 'Электролитный дисбаланс на кленбутероле', target: 'K 3.5-5.0, Na 135-145, Mg 0.75-1.0' });
+  }
+  if (flags.hasTren) {
+    week2.push({ marker: 'Креатинин, eGFR, UACR, K/Na/Mg', reason: 'Трен-нефротоксичность', target: 'eGFR>60, UACR<30' });
+  }
+  add('week2', 'Через 2 недели', 'каждые 2 нед', '🧪', week2);
+
+  const week4: MonitoringItemLine[] = [];
+  week4.push({ marker: 'АД, ЧСС, HCT/HGB, АЛТ/АСТ', reason: 'Базовый контроль на курсе', target: 'HCT<50%, HGB<170 г/л' });
+  week4.push({ marker: 'HCT, ферритин', reason: 'Управление эритроцитозом', target: 'HCT<50%, ферритин 30-300' });
+  week4.push({ marker: 'E2 (титрация AI), PRL', reason: 'Гормональный контроль', target: 'E2 20-40 пг/мл, PRL<25' });
+  if (flags.hasTren) {
+    week4.push({ marker: 'PRL, E2', reason: '19-nor: пролактин и ароматизация', target: 'PRL<25, E2 20-40' });
+  }
+  if (flags.hasNandrolone) {
+    week4.push({ marker: 'E2/TT/FT/LH/FSH/SHBG', reason: 'HPTA и эстрогеновый профиль нандролона', target: 'LH/FSH в норме на фоне поддержки hCG' });
+  }
+  if (flags.hasBold) {
+    week4.push({ marker: 'ОАК (HCT/HGB/RBC/PLT), ferritin/iron/TSAT', reason: 'Эритроцитоз болденона/DHB', target: 'HCT<52%, TSAT 20-45%', escalation: 'HCT↑ — эритроцитаферез/флеботомия ТОЛЬКО с врачом' });
+  }
+  if (flags.hasGH) {
+    week4.push({ marker: 'Глюкоза натощак + HbA1c; IGF-1 каждые 6-8 нед', reason: 'Метаболический контроль GH', target: 'HbA1c<5.7%', drug: 'gh' });
+  }
+  if (flags.hasT3 || flags.hasT4) {
+    week4.push({ marker: 'ТТГ, своб.T3/T4, кальций/PTH/вит.D', reason: 'Костная защита и щитовидная ось', drug: 't3' });
+  }
+  add('week4', 'Через 4 недели', 'каждые 4 нед', '🩸', week4);
+  }
+
+  if (phase !== 'pct') {
+  const week8: MonitoringItemLine[] = [];
+  week8.push({ marker: 'ОАК + БХ + липидограмма, E2, PRL, ТТГ', reason: 'Полный пересмотр на курсе', target: 'LDL<3.0, HDL>1.0, ТГ<1.7' });
+  week8.push({ marker: 'УЗИ печени (при ААС), D-димер (при HCT>52%)', reason: 'Органный контроль', escalation: 'D-димер>0.5 — срочная оценка тромботического риска' });
+  if (phase === 'bridge') {
+    week8.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, АД/ЧСС', reason: 'Контроль моста (каждые 6 нед)' });
+  }
+  if (phase === 'fertility') {
+    week8.push({ marker: 'Спермограмма + LH/FSH/TT/E2/PRL', reason: 'Динамика фертильности (каждые 6-8 нед)' });
+  }
+  if (phase === 'trt') {
+    week8.push({ marker: 'ОАК/HCT, PSA, E2, TT/FT/SHBG, липиды, АД', reason: 'Стабильный TRT-контроль (каждые 8-12 нед)' });
+  }
+  add('week8', 'Через 8 недель', 'каждые 8 нед', '🩺', week8);
+  }
+
+  const post: MonitoringItemLine[] = [];
+  if (phase === 'pct') {
+    post.push({ marker: 'LH, FSH, TT, E2, PRL', reason: 'Нед 2 после отмены — старт восстановления HPTA', drug: 'pct' });
+    post.push({ marker: 'LH, FSH, TT, E2', reason: 'Нед 6 после отмены — динамика', escalation: 'Не восстановление >6 нед (LH/FSH <50% нормы) — эндокринолог' });
+  } else {
+    post.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, HCT', reason: 'Контроль после курса', target: 'HCT<50%, АЛТ<40' });
+  }
+  add('post', 'После курса (ПКТ/выход)', 'нед 2 и 6 после отмены', '🎯', post);
+
+  const urgent: MonitoringItemLine[] = [];
+  urgent.push({ marker: 'Боль в груди, одышка, тахикардия >100, АД >160/100', reason: 'Кардио-симптомы на фоне PED', escalation: 'STOP AAS + срочный врач' });
+  urgent.push({ marker: 'Желтуха, отёки, гинекомастия, головная боль', reason: 'Симптомы печень/объём/гормоны', escalation: 'БХ + врач' });
+  urgent.push({ marker: 'D-димер >0.5 или симптомы ТГВ/ТЭЛА', reason: 'Тромботический риск', escalation: 'Срочная медицинская оценка; антикоагулянт ТОЛЬКО по назначению' });
+  if (flags.hasOral17) {
+    urgent.push({ marker: 'ALT >2×ULN', reason: 'Гепатотоксичность оралов', escalation: 'Снизить/отменить орал, врач' });
+  }
+  add('urgent', 'Экстренно при симптомах', 'немедленно', '🚨', urgent);
+
+  return sections;
+}
+
 // ──────────────────────────────────────────────────────────────────
 //  СИМПТОМ-ЗАВИСИМЫЕ ПРЕПАРАТЫ (работают БЕЗ PED — отдельная функция)
 //  Вызывается из buildRecommendation, а не из computeProtocol,
@@ -1151,6 +1288,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   const protocolIds = protocolAll.map(pd => pd.substanceId);
   const protocolWarnings = computeProtocolWarnings(protocolIds, pedFlags);
   const monitoringPlan = buildMonitoringPlan(ctx, pedFlags, phase);
+  const monitoringSchedule = buildMonitoringSchedule(ctx, pedFlags, phase);
   const subs: RecommendedSub[] = [];
   const phaseDrugs: PhaseAssignedDrug[] = [];
   for (const pd of protocolAll) {
@@ -1571,6 +1709,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     procedures,
     assayWarnings,
     monitoringPlan,
+    monitoringSchedule,
     pedRisk: ctx.pedRisk,
   };
 }

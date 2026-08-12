@@ -712,7 +712,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [applyFlash, setApplyFlash] = useState(false);
   const [showContraindications, setShowContraindications] = useState(false);
   const [showMonitoring, setShowMonitoring] = useState(false);
-  const [showMonitoringPlan, setShowMonitoringPlan] = useState(false);
   const [showRebound, setShowRebound] = useState(false);
   const [showSymptoms, setShowSymptoms] = useState(true);
   const [showNutrition, setShowNutrition] = useState(false);
@@ -2862,29 +2861,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* Динамический график мониторинга (из движка по PED/фазе) */}
-      {finalRec && finalRec.monitoringPlan && (
-        <div style={{ marginTop:6 }}>
-          <div onClick={() => setShowMonitoringPlan(!showMonitoringPlan)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showMonitoringPlan ? '8px 8px 0 0' : 8, background:'rgba(96,165,250,0.07)', border:'1px solid rgba(96,165,250,0.18)' }}>
-            <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa', display:'flex', alignItems:'center', gap:5 }}>
-              🩻 График мониторинга анализов
-              <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>по вашему курсу</span>
-            </span>
-            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showMonitoringPlan ? '▲ скрыть' : '▼ показать'}</span>
-          </div>
-          {showMonitoringPlan && (
-            <div style={{ padding:'8px 9px', background:'rgba(96,165,250,0.03)', border:'1px solid rgba(96,165,250,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
-                Персональный график лабораторного контроля, сформированный по вашим препаратам и фазе курса.
-              </div>
-              {finalRec.monitoringPlan.split('\n').filter(Boolean).map((line, i) => (
-                <div key={i} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', lineHeight:1.5, marginBottom:3, paddingLeft:8, borderLeft:'2px solid rgba(96,165,250,0.3)' }}>{line}</div>
-              ))}
-</div>
-      )}
-    </div>
-  )}
-
       {/* Прогноз ребаунда гормонов после отмены */}
       {finalRec && (() => {
         // Build ReboundInput from context
@@ -3248,6 +3224,44 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <div style={{ marginBottom:7 }}>
                   <div style={{ fontSize:8, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>🧪 Лабораторный мониторинг</div>
 
+                  {/* Текущие показатели из анализов пользователя */}
+                  {(() => {
+                    const labsValues = labSliceToValues(state.labs.fullPanel);
+                    const hasLabs = Object.keys(labsValues).length > 0;
+                    if (hasLabs) {
+                      return (
+                        <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.12)', marginBottom:4 }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>🔬 Текущие показатели ({Object.keys(labsValues).length})</div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+                            {Object.entries(labsValues).sort((a, b) => a[0].localeCompare(b[0])).map(([mk, val]) => (
+                              <span key={mk} style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.2)', color:'#fff' }}>{mk}: {val}</span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', marginBottom:4, fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.5 }}>
+                        ⚠ Анализы не введены: график построен по фармакологии и фазе, но фактический уровень рисков не подтверждён. Введите анализы для персональной оценки.
+                      </div>
+                    );
+                  })()}
+
+                  {/* Полный структурированный график: до курса → ежедневно → 2/4/8 нед → после → экстренно */}
+                  {(finalRec.monitoringSchedule || []).map(sec => (
+                    <div key={sec.id} style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.1)', marginBottom:4 }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>{sec.icon} {sec.label} <span style={{ color:'#60a5fa', fontWeight:600 }}>· {sec.period}</span></div>
+                      {sec.items.map((it, i) => (
+                        <div key={i} style={{ fontSize:6, color:'rgba(255,255,255,0.65)', lineHeight:1.55, paddingLeft:6, borderLeft:'2px solid rgba(96,165,250,0.25)', marginBottom:3 }}>
+                          <b style={{ color:'#e2e8f0' }}>{it.marker}</b> — {it.reason}
+                          {it.target && <span style={{ color:'#4ade80' }}> · 🎯 {it.target}</span>}
+                          {it.drug && <span style={{ color:'rgba(255,255,255,0.5)' }}> · 💊 {subNameRu(it.drug)}</span>}
+                          {it.escalation && <div style={{ color: '#fca5a5' }}>⚠ {it.escalation}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+
                   {/* Персональный список маркеров (привязка к веществам плана) */}
                   <div style={{ padding:'6px 7px', borderRadius:6, background:'rgba(96,165,250,0.10)', border:'1px solid rgba(96,165,250,0.18)', marginBottom:4 }}>
                     <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>🎯 Персональные маркеры ({personalMarkers.length}) — по вашему плану из {subs.length} веществ</div>
@@ -3271,19 +3285,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       ))}
                     </div>
                   </div>
-
-                  <div style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.12)', marginBottom:4 }}>
-                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>⏱️ Периодичность сдачи</div>
-                    <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)', lineHeight:1.5 }}>
-                      <span style={{ color:'#60a5fa', fontWeight:600 }}>До курса:</span> полная базовая панель (все маркеры ниже)<br/>
-                      <span style={{ color:'#fbbf24', fontWeight:600 }}>На курсе:</span> каждые <b>4 недели</b> (общий + биохимия + гормоны)<br/>
-                      <span style={{ color:'#4ade80', fontWeight:600 }}>ПКТ:</span> каждые <b>2–4 недели</b> (гормональная панель + печень)<br/>
-                      <span style={{ color:'#a78bfa', fontWeight:600 }}>После ПКТ:</span> через <b>8–12 недель</b> (контроль восстановления)
-                    </div>
                   </div>
-                </div>
 
-                {/* ── Панели по системам (с привязкой к веществам) ── */}
+                  {/* ── Панели по системам (с привязкой к веществам) ── */}
                 <div style={{ marginBottom:7 }}>
                   <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане)</div>
 
