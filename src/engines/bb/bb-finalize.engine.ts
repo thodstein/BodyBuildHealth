@@ -242,7 +242,6 @@ function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions)
 function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
   if (!/^(Push|Chest|ChestBack|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) return;
-  // Rear delt в Push/Chest — ошибка: задняя дельта тренируется в Pull.
   const rearDelt = session.exercises.find((e: any) => e.muscle === 'shoulders' && /обратн|rear|задн.*дельт|задн.*пуч/i.test(e.name));
   if (rearDelt) {
     const lateral = EXERCISE_CATALOG.find((x: any) => {
@@ -291,6 +290,37 @@ function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptio
       session.exercises.splice(session.exercises.indexOf(target), 1, added);
     }
   }
+}
+
+/** Гарантирует rear delt работу в Pull-дне (задняя дельта — тяговая мышца). */
+function ensureRearDeltInPull(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (!/^(Pull|Back|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) return;
+  const hasRear = session.exercises.some((e: any) => e.muscle === 'shoulders' && /обратн|rear|задн.*дельт|задн.*пуч|лиц.*тяга|face.?pull/i.test(e.name));
+  if (hasRear) return;
+  const candidate = EXERCISE_CATALOG.find((x: any) => {
+    if (trueMuscleOf(x) !== 'shoulders') return false;
+    if (!/обратн|rear|задн.*дельт|задн.*пуч|лиц.*тяга|face.?pull/i.test(x.name)) return false;
+    if (session.exercises.some((e: any) => e.name === x.name)) return false;
+    if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    return true;
+  });
+  if (!candidate) return;
+  const baseWeight = options.workMax?.shoulders || 60;
+  session.exercises.push({
+    muscle: 'shoulders',
+    name: candidate.name,
+    exerciseName: candidate.name,
+    role: 'accessory',
+    character: 'памп',
+    sets: 3,
+    repsRange: [12, 18],
+    rir: 3,
+    workSets: Array.from({ length: 3 }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.35 * 10) / 10, restSeconds: 60 })),
+    restSeconds: 60,
+    warmupSets: [],
+    rationale: 'Experienced enhanced: rear delt (Pull-работа)',
+  });
 }
 
 /**
@@ -758,6 +788,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     allocateExperiencedArmSession(session, options);
     allocateExperiencedLegSession(session, options);
     diversifyExperiencedChestSession(session, options);
+    ensureRearDeltInPull(session, options);
   }
   // FullBody/Lower: после всех проходов добираем отсутствующие группы
   // (fbUsedIds может вытеснить мышцы между FullBody-сессиями).

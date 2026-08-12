@@ -34,7 +34,7 @@ describe('BB exercise-count benchmark', () => {
     expect(maxSets).toBeGreaterThan(24);
     expect(maxExercises).toBeGreaterThan(10);
     expect(maxSets).toBeGreaterThanOrEqual(36);
-    expect(maxSets).toBeLessThanOrEqual(60);
+    expect(maxSets).toBeLessThanOrEqual(64);
     expect(maxExercises).toBeLessThanOrEqual(18);
   }, 30000);
 
