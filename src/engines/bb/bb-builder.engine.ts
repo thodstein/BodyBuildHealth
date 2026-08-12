@@ -264,6 +264,10 @@ export interface BBPlan {
   report?: BBPlanReport;
   balanceReport?: import('./bb-balance.engine').BBBalanceReport;
   validation?: BBPlanValidationResult;
+  /** Фактический per-muscle MRV-кап после всех множителей (PED/recovery/lab/стаж).
+   *  Используется валидатором вместо landmarks.mrv, который не учитывает
+   *  enhanced/стажевые множители. */
+  mrvByMuscle?: Record<string, number>;
   safetyConstraints?: {
     equipment?: string[];
     excludedExercises?: string[];
@@ -1236,6 +1240,18 @@ function buildSession(
     }
     if (muscle === 'triceps' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Push|Upper|Arms/.test(sched.sessionTag || '') && phase !== 'deload') {
       sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
+    }
+    // Indirect overlap: если тяг/жимов много, прямые сеты рук снижаются —
+    // косвенный объём уже закрывает часть target (иначе MRV-overflow).
+    if (muscle === 'biceps') {
+      const pullSets = muscleVolumeRotation['back'] || 0;
+      if (pullSets >= 40) sets = Math.min(sets, Math.round(pullSets * 0.15));
+      else if (pullSets >= 24) sets = Math.min(sets, Math.round(pullSets * 0.2));
+    }
+    if (muscle === 'triceps') {
+      const pushSets = (muscleVolumeRotation['chest'] || 0) + (muscleVolumeRotation['shoulders'] || 0);
+      if (pushSets >= 40) sets = Math.min(sets, Math.round(pushSets * 0.15));
+      else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.2));
     }
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
@@ -2320,6 +2336,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
       let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1) * (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined ? legProfile.capMult : 1) * (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined ? torsoProfile.capMult : 1));
+      // Руки/ягодицы/плечи: при больших тягах/жимах/приседаниях косвенный
+      // объём закрывает часть target, но потолок тоже должен расти со стажем
+      // (иначе ложный MRV-overflow на enhanced-планах).
+      if (['biceps', 'triceps', 'glutes', 'shoulders'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
+        capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.6 : input.trainingYears >= 6 ? 1.4 : 1.2));
+      }
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
@@ -3061,7 +3083,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Exercise cap is enforced by the shared finalizer's priority-aware
   // fatigue budget. Do not truncate the array here: raw tail deletion can
   // remove the only exercise for a muscle or a protected primary.
-  const output = { ...finalPlan, level, volumeLandmarks, muscleFrequency, volumeTargets };
+  const output = { ...finalPlan, level, volumeLandmarks, muscleFrequency, volumeTargets, mrvByMuscle };
   syncBBPlanSetShape(output);
   const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears });
   const validationWarnings = validation.issues

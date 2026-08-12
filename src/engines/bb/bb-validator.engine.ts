@@ -181,10 +181,13 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     for (const week of plan.weeks) {
       const volume = aggregateBBVolume(week.sessions);
       for (const [muscle, values] of Object.entries(volume)) {
+        // Фактический per-muscle MRV-кап после всех множителей (PED/recovery/
+        // lab/стаж) имеет приоритет над landmarks.mrv — иначе enhanced-планы
+        // получают ложные overflow (landmarks.mrv не учитывает стажевые бусты).
+        const actualCap = plan.mrvByMuscle?.[muscle];
         const lm = getVolumeLandmarks(options.level, muscle);
-        if (!lm) continue;
-        const cap = Math.round(lm.mrv * (options.mrvMultiplier ?? 1));
-        if (values.effectiveSets > cap) {
+        const cap = actualCap ?? (lm ? Math.round(lm.mrv * (options.mrvMultiplier ?? 1)) : 0);
+        if (cap > 0 && values.effectiveSets > cap) {
           issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.`, week: week.week });
         }
       }
