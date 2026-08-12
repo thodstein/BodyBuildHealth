@@ -389,7 +389,14 @@ export const BbAutoConstructor: React.FC = () => {
     };
   }, [linked.readiness, linked.profile?.settings]);
 
-  const ranked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, weakPoints: weakPoints.length > 0 ? weakPoints : undefined }), [bbLevel, bbGoal, bbDays, weakPoints]);
+  const ranked = useMemo(() => rankBBSplits({
+    level: bbLevel,
+    goal: bbGoal as any,
+    daysPerWeek: bbDays,
+    weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
+    sex: linked.profile?.settings?.personal?.sex,
+    focusGroup: bbFocus || undefined,
+  }), [bbLevel, bbGoal, bbDays, weakPoints, bbFocus, linked.profile?.settings?.personal?.sex]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
