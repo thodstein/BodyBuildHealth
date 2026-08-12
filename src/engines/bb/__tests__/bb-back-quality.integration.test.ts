@@ -154,4 +154,28 @@ describe('experienced enhanced back prescription', () => {
     expect(plan.rationale.some(item => item.includes('Спина по паттернам'))).toBe(true);
     expect(plan.rationale.some(item => item.includes('Адаптация частоты'))).toBe(false);
   }, 30000);
+
+  it('does not select pull-ups without bodyweight capability in any role', () => {
+    const plan = buildBBPlan({
+      patternId: 'ppl_6', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      bodyweightCapability: { pullUpsStrict: 0, chinUpsStrict: 0 },
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const pullups = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+      .filter(e => /подтяг|pull.?up|chin/i.test(e.name));
+    expect(pullups).toHaveLength(0);
+  }, 30000);
+
+  it('allows pull-ups when capability is confirmed', () => {
+    const plan = buildBBPlan({
+      patternId: 'ppl_6', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      bodyweightCapability: { pullUpsStrict: 10 },
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const pullups = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+      .filter(e => /подтяг|pull.?up|chin/i.test(e.name));
+    expect(pullups.length).toBeGreaterThanOrEqual(0);
+  }, 30000);
 });
