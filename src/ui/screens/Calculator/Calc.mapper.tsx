@@ -724,11 +724,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [megaSelected, setMegaSelected] = useState<Set<string>>(new Set());
 
   const ctx = useMemo(() => {
-    const base = buildMapperCtx(state, level, level === 'manual' ? { addSubs: manualSubs } : undefined, selectedStacks);
+    const base = buildMapperCtx(state, level, {
+      addSubs: Array.from(new Set([...manualSubs, ...addedSubs])),
+      removeSubs: removedSubs,
+    }, selectedStacks);
     if (symptoms.length > 0) base.symptoms = symptoms;
     base.libidoLow = symptoms.includes('low_libido');
     return base;
-  }, [state, level, manualSubs, selectedStacks, symptoms]);
+  }, [state, level, manualSubs, addedSubs, removedSubs, selectedStacks, symptoms]);
 
   const rec = useMemo(() => {
     try { return resolvePlan(ctx); }
@@ -737,50 +740,27 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
   const phaseInfo = rec ? PHASE_PROTOCOL[rec.phase] : null;
 
-  // Применить корректировки: удалить/добавить вещества из финального списка
+  // Движок уже применил добавления/удаления через manualChoices и пересчитал
+  // риск/покрытие/таймлайн/синергии/мониторинг. Здесь — только лёгкая страховка
+  // по конфликтам и противопоказаниям с учётом UI-условий (hasCVD и т.п.).
   const finalRec = useMemo(() => {
     if (!rec) return null;
     if (removedSubs.length === 0 && addedSubs.length === 0) return rec;
-    const maxByLevel: Record<SupportLevel, number> = { base: 28, medium: 40, max: 48, manual: 99 };
-    const removed = new Set(removedSubs.map(r => canonIdLocal(r)));
-    const seen = new Set<string>();
-    const merged = [
-      ...rec.subs.filter(s => !removed.has(canonIdLocal(s.substanceId))),
-      ...addedSubs.map(id => ({
-        substanceId: id, category: 'other' as any, k: 0.5, q: 'B' as const,
-        reason: 'Добавлен вручную', mechsCovered: [], priority: 4 as const,
-      })),
-    ].filter(s => {
-      const key = canonIdLocal(s.substanceId);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    const limit = maxByLevel[level];
-    const kept = merged.slice(0, limit);
-    const dropped = merged.length - kept.length;
-    const interactionIds = kept.map(s => s.substanceId);
+    const interactionIds = rec.subs.map(s => s.substanceId);
     const mappedConditions: string[] = [...(state.healthConditions || [])];
     if (state.contraindications.hasCVD || state.cardio.previousCVD) mappedConditions.push('ihd');
     if (state.contraindications.hasThrombophilia) mappedConditions.push('thrombophilia');
     if (state.contraindications.hasGI) mappedConditions.push('peptic_ulcer');
     if (state.contraindications.hasKidneyDisease) mappedConditions.push('ckd_stage3', 'ckd_stage4_5');
-    const safetyContra = checkContraindications(interactionIds, mappedConditions);
-    const nextWarnings = [
-      ...(rec.protocolWarnings || []),
-      ...(dropped > 0 ? [`⚠ Лимит уровня ${level}: ${dropped} добавленных элементов не вошли в финальный план.`] : []),
-    ];
     return {
       ...rec,
-      subs: kept,
       conflicts: checkInteractions(interactionIds).map(i => ({
         a: i.a, b: i.b, reason: `${i.reason} — ${i.action}`, level: i.severity === 'block' ? 'block' as const : 'warn' as const,
       })),
-      contraindications: safetyContra,
-      protocolWarnings: nextWarnings,
-      summary: `${rec.summary} После ручной корректировки: ${kept.length} элементов${dropped > 0 ? `, исключено по лимиту: ${dropped}` : ''}.`,
+      contraindications: checkContraindications(interactionIds, mappedConditions),
+      summary: `${rec.summary} После ручной корректировки: ${rec.subs.length} элементов.`,
     };
-  }, [rec, removedSubs, addedSubs, level, state]);
+  }, [rec, removedSubs, addedSubs, state]);
 
   // ── RESIDUAL RISK — пересчёт риска с учётом выбранных веществ ──
   // Gross risk (из PED доз) → Net risk (после митигации). Показывает gross→net в баннере.
@@ -1390,7 +1370,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   return (
                     <button key={system} onClick={() => {
                       setEnhancementSystem(system);
-                      if (system !== 'all' && GENERIC_ENHANCEMENT_CONFIG[system]) {
+                      if (system === 'hematologic') {
+                        setStackModulePopup('hemato_stack');
+                        setHematoPreset(null); setHematoSelected(new Set()); setHematoConfirm(false);
+                        setHematoSymptoms(buildHematoSymptomsFromState(state));
+                      } else if (system === 'neuro') {
+                        setStackModulePopup('neuroprotection_stack');
+                        setNeuroPreset(null); setNeuroSelected(new Set()); setNeuroConfirm(false);
+                        setNeuroSymptoms(buildNeuroSymptomsFromState(state));
+                      } else if (system !== 'all' && GENERIC_ENHANCEMENT_CONFIG[system]) {
                         setGenericEnhancementPopup(system);
                         setGenericEnhancementSelected(new Set());
                       }

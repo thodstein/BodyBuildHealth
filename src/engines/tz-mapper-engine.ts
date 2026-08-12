@@ -1392,6 +1392,55 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       }
     }
   }
+  // ── 4a. Пользовательские добавки/удаления (попап) — финальное применение ─
+  // Применяем ПОСЛЕ всей сборки (протокол/симптомы/витамины/лабы/синергии/
+  // бустеры), чтобы guardrails, конфликты, покрытие и риск пересчитывались
+  // по итоговому составу — это полноценный пересчёт вместо локального merge.
+  const manualAddIds = ctx.manualChoices?.addSubs || [];
+  const manualRemoveSet = new Set((ctx.manualChoices?.removeSubs || []).map(s => s.toLowerCase()));
+  if (manualAddIds.length > 0) {
+    for (const sid of manualAddIds) {
+      const canon = canonId(sid);
+      if (manualRemoveSet.has(sid.toLowerCase()) || manualRemoveSet.has(canon)) continue;
+      if (subs.some(s => canonId(s.substanceId) === canon)) continue;
+      const mechsCovered: TzMechId[] = [];
+      let bestK = 0;
+      let bestQ: 'A'|'B'|'C' = 'C';
+      let bestCat: TzCategory = 'other';
+      let triggeredBy: TzMechId | undefined = undefined;
+      for (const mechId of ALL_TZ_MECH_IDS) {
+        const found = TZ_MECH_TO_SUBS[mechId].substances.find(s => s.substanceId.toLowerCase() === sid.toLowerCase());
+        if (found) {
+          mechsCovered.push(mechId);
+          if (found.k > bestK) {
+            bestK = found.k;
+            bestQ = found.q;
+            bestCat = found.category;
+            triggeredBy = mechId;
+          }
+        }
+      }
+      subs.push({
+        substanceId: canon,
+        category: bestCat,
+        k: bestK || 0.5,
+        q: bestQ,
+        reason: 'Добавлено пользователем (попап)',
+        mechsCovered,
+        triggeredByMech: triggeredBy,
+        priority: 1,
+      });
+    }
+  }
+  if (manualRemoveSet.size > 0) {
+    for (let i = subs.length - 1; i >= 0; i--) {
+      const id = subs[i].substanceId;
+      if (manualRemoveSet.has(id.toLowerCase()) || manualRemoveSet.has(canonId(id))) {
+        suppression.push({ substanceId: id, category: subs[i].category, reason: 'Исключено пользователем (попап)' });
+        subs.splice(i, 1);
+      }
+    }
+  }
   // ── 5. guardrails (теперь покрывают ВСЕ subs, включая booster и manual) ─
   const gCtx = buildGuardrailCtx(ctx);
   gCtx.hasTBooster = subs.some(s => isTBoosterById(s.substanceId));

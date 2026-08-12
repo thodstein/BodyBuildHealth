@@ -93,6 +93,19 @@ describe('course pharmacology mandatory rules', () => {
     expect(recNormal.protocolWarnings?.some(w => w.includes('КАБЕРГОЛИН НЕ НАЗНАЧЕН'))).toBe(true);
   });
 
+  it('popup добавления/удаления проходят через движок (manualChoices на любом уровне)', () => {
+    const state = stateWithAas(['test_enan']);
+    const baseRec = resolvePlan(buildMapperCtx(state, 'medium'));
+    expect(baseRec.subs.some(s => canonId(s.substanceId) === 'hcg')).toBe(true);
+
+    const addedRec = resolvePlan(buildMapperCtx(state, 'medium', { addSubs: ['hydration'] }));
+    expect(addedRec.subs.some(s => canonId(s.substanceId) === 'hydration')).toBe(true);
+
+    const removedRec = resolvePlan(buildMapperCtx(state, 'medium', { removeSubs: ['hcg'] }));
+    expect(removedRec.subs.some(s => canonId(s.substanceId) === 'hcg')).toBe(false);
+    expect(removedRec.suppression?.some(s => s.substanceId === 'hcg')).toBe(true);
+  });
+
   it('процедурная эскалация по HCT', () => {
     const labs = (hct: string) => ({
       ...DEFAULT_STATE.labs,
