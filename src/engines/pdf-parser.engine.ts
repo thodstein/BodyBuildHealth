@@ -941,7 +941,7 @@ async function extractTextFromImage(file: File): Promise<string> {
     const bitmap = await createImageBitmap(file);
     const MAX_CANVAS_PX = 8000000; // ~8MP, safe upper bound for browser memory
     const srcPx = bitmap.width * bitmap.height;
-    const scale = srcPx > MAX_CANVAS_PX ? Math.sqrt(MAX_CANVAS_PX / srcPx) : 3;
+    const scale = Math.min(3, Math.sqrt(MAX_CANVAS_PX / Math.max(1, srcPx)));
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(bitmap.width * scale);
     canvas.height = Math.ceil(bitmap.height * scale);
