@@ -931,6 +931,7 @@ export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promi
 async function extractTextFromImage(file: File): Promise<string> {
   let Tesseract: any;
   let workerOptions: { workerPath: string; corePath: string; langPath: string };
+  const errors: string[] = [];
   try {
     Tesseract = await import('tesseract.js') as any;
     const { resolveTesseractOptions } = await import('./ocr-assets');
@@ -941,64 +942,75 @@ async function extractTextFromImage(file: File): Promise<string> {
       langPath: opts.langPath,
     };
   } catch (initError: any) {
-    console.error('Tesseract.js init failed:', initError);
-    throw new Error(`OCR engine unavailable: ${initError?.message || String(initError)}`);
+    throw new Error(`OCR engine not available: ${initError?.message || String(initError)}. Check internet connection or reinstall the app.`);
   }
   try {
-    if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap is unavailable');
+    if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap not supported in this browser');
     const bitmap = await createImageBitmap(file);
-    const MAX_CANVAS_PX = 8000000; // ~8MP, safe upper bound for browser memory
+    const MAX_CANVAS_PX = 8000000;
     const srcPx = bitmap.width * bitmap.height;
     const scale = Math.min(3, Math.sqrt(MAX_CANVAS_PX / Math.max(1, srcPx)));
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(bitmap.width * scale);
     canvas.height = Math.ceil(bitmap.height * scale);
     const context = canvas.getContext('2d');
-    if (!context) { bitmap.close(); return ''; }
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const enhanced = enhanceOcrCanvas(canvas);
-    try {
-      const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+    if (!context) { bitmap.close(); errors.push('Canvas 2D context unavailable'); }
+    else {
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const enhanced = enhanceOcrCanvas(canvas);
       try {
-        const { data } = await worker.recognize(enhanced);
-        return data.text || '';
-      } finally {
-        await worker.terminate();
-      }
-    } catch (ocrError: any) {
-      console.warn('Image OCR (rus+eng) failed, retrying in English only:', ocrError);
-      const worker = await Tesseract.createWorker('eng', 1, workerOptions);
-      try {
-        const { data } = await worker.recognize(enhanced);
-        return data.text || '';
-      } finally {
-        await worker.terminate();
+        const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+        try {
+          const { data } = await worker.recognize(enhanced);
+          if (data.text?.trim()) return data.text;
+          errors.push('OCR completed but produced no text (image may be blank)');
+        } finally {
+          await worker.terminate();
+        }
+      } catch (ocrError: any) {
+        errors.push(`rus+eng OCR failed: ${ocrError?.message || String(ocrError)}`);
+        try {
+          const worker = await Tesseract.createWorker('eng', 1, workerOptions);
+          try {
+            const { data } = await worker.recognize(enhanced);
+            if (data.text?.trim()) return data.text;
+            errors.push('English OCR produced no text');
+          } finally {
+            await worker.terminate();
+          }
+        } catch (engError: any) {
+          errors.push(`English OCR also failed: ${engError?.message || String(engError)}`);
+        }
       }
     }
-  } catch (imageProcessingError) {
-    console.warn('Enhanced image preprocessing failed, using direct OCR:', imageProcessingError);
+  } catch (imageProcessingError: any) {
+    errors.push(`Image preprocessing failed: ${imageProcessingError?.message || String(imageProcessingError)}`);
+  }
+  // All enhanced paths exhausted — try direct OCR as last resort
+  try {
+    const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
     try {
-      const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+      const { data } = await worker.recognize(file);
+      if (data.text?.trim()) return data.text;
+      errors.push('Direct OCR produced no text');
+    } finally {
+      await worker.terminate();
+    }
+  } catch (directOcrError: any) {
+    errors.push(`Direct rus+eng OCR failed: ${directOcrError?.message || String(directOcrError)}`);
+    try {
+      const worker = await Tesseract.createWorker('eng', 1, workerOptions);
       try {
         const { data } = await worker.recognize(file);
         return data.text || '';
       } finally {
         await worker.terminate();
       }
-    } catch (directOcrError: any) {
-      console.warn('Direct rus+eng OCR failed, retrying in English:', directOcrError);
-      try {
-        const worker = await Tesseract.createWorker('eng', 1, workerOptions);
-        try {
-          const { data } = await worker.recognize(file);
-          return data.text || '';
-        } finally {
-          await worker.terminate();
-        }
-      } catch {
-        return '';
-      }
+    } catch (finalError: any) {
+      errors.push(`All OCR attempts exhausted: ${finalError?.message || String(finalError)}`);
     }
   }
+  // If we get here, all 4 tiers failed — report what happened
+  throw new Error(`OCR failed after all attempts. Details: ${errors.join('; ')}`);
 }

@@ -330,9 +330,7 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
       const imageResult = await parseLabFile(file);
       rawText = imageResult.rawText || '';
       const originalText = imageResult.originalText || rawText;
-      if (!rawText.trim()) warnings.push('Не удалось обработать изображение через улучшенный режим, использован прямой OCR.');
       
-      // Short food labels such as "рис 150 г" are valid OCR input too.
       if (rawText.trim().length > 2) {
         const parsedAll = parseLabTextAllWays(rawText, 'tesseract.js');
         labs = finalizeLabCandidates(parsedAll.labs);
@@ -346,14 +344,19 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
 
         confidence = (labs.length > 0 || meals.length > 0) ? 0.75 : 0.3;
         if (labs.length === 0 && meals.length === 0) {
-          warnings.push('Текст распознан, но данные не найдены. Проверьте формат изображения.');
+          if (rawText.trim().length > 20) {
+            warnings.push(`Текст распознан (${rawText.trim().length} символов), но показатели не найдены. Возможно, это не бланк анализов.`);
+          } else {
+            warnings.push('Текст распознан, но данных недостаточно. Попробуйте более чёткое фото.');
+          }
         }
       } else {
-        warnings.push('Не удалось распознать текст на изображении. Попробуйте более чёткое фото.');
+        warnings.push('Не удалось распознать текст на изображении. Попробуйте более чёткое фото при хорошем освещении.');
       }
     } catch (err: any) {
-      warnings.push('Ошибка OCR: ' + (err?.message || String(err)) + '. Проверьте, что файл является корректным изображением.');
-      // Fallback silently
+      const msg = err?.message || String(err);
+      warnings.push(`Ошибка обработки изображения: ${msg}`);
+      rawText = '';
     }
   } else if (isText) {
     source = 'text';
