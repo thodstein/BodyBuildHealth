@@ -5,8 +5,9 @@
  * НЕ путать со слабыми точками СРЦ-движений (plWeakPoints) — те в pl-auto-key-tests.
  */
 import { describe, expect, it } from 'vitest';
-import { buildLMSPlan, type LMSBuildOutput } from '../lms-builder.engine';
+import { buildLMSPlan, getPLWeakGroupExerciseCandidates, PL_WEAK_GROUP_ALLOWED_PATTERNS, type LMSBuildOutput } from '../lms-builder.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
+import { derivePattern } from '../../movement-pattern';
 
 const pmMap = { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 };
 
@@ -42,11 +43,11 @@ describe('слабые группы мышц — протокол из раск�
   it('аксессуар слабой группы получает %ПМ как у аксессуаров дня цикла (не выдуманный)', () => {
     const p = buildWithWeak(12, ['chest']);
     const ex = weakEx(p, 0, 'chest')!;
-    // В cycle-01 день с Жим лежа (тяжёлый) имеет аксессуары ~0.45-0.55% — протокол должен быть в этом диапазоне.
-    expect(ex.pct).toBeGreaterThanOrEqual(0.3);
-    expect(ex.pct).toBeLessThanOrEqual(0.7);
-    expect(ex.reps).toBeGreaterThanOrEqual(2);
-    expect(ex.sets).toBeGreaterThanOrEqual(1);
+    // В cycle-01 выбранный день имеет Жим лежа 3×6 @48% — новый PL-ассистент
+    // наследует именно этот set-блок, а не универсальную BB-схему.
+    expect(ex.pct).toBeCloseTo(0.48, 2);
+    expect(ex.reps).toBe(6);
+    expect(ex.sets).toBe(3);
   });
 
   it('протокол меняется по неделям цикла (как меняется раскладка цикла)', () => {
@@ -65,7 +66,7 @@ describe('слабые группы мышц — протокол из раск�
     expect(ex.rir).toBeLessThanOrEqual(5);
   });
 
-  it('лёгкий день цикла → лёгкий протокол (изоляция, RIR выше)', () => {
+  it('слабая группа добавляется минимум в один день плана', () => {
     const p = buildWithWeak(12, ['arms']);
     const all: { name: string; pct: number; reps: number; rir: number; load: string }[] = [];
     for (const wk of p.weeks.slice(0, 2)) {
@@ -75,28 +76,52 @@ describe('слабые группы мышц — протокол из раск�
         }
       }
     }
-    expect(all.length).toBeGreaterThanOrEqual(2);
+    expect(all.length).toBeGreaterThanOrEqual(1);
+    if (all.length >= 2) expect(new Set(all.map(item => item.name)).size).toBeGreaterThanOrEqual(2);
+    expect(all.every(item => !/кист|запяст|жим леж|bench/i.test(item.name))).toBe(true);
   });
 });
 
 describe('слабые группы мышц — упражнения под конкретный цикл', () => {
-  it('для cycle-01 (троеборье) слабая группа chest получает вариацию жима из цикла', () => {
+  it('для всех шести weak muscle groups есть отдельный PL-assistance пул', () => {
+    for (const group of ['chest', 'back', 'legs', 'shoulders', 'arms', 'core']) {
+      const candidates = getPLWeakGroupExerciseCandidates(CYCLE_01, group);
+      expect(candidates.length, group).toBeGreaterThan(0);
+      for (const candidate of candidates.slice(0, 5)) {
+        expect(PL_WEAK_GROUP_ALLOWED_PATTERNS[group]).toContain(candidate.movementPattern || derivePattern(candidate));
+      }
+    }
+  });
+
+  it('генерация добавляет отдельный ассистент для каждой выбранной группы', () => {
+    const groups = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
+    const p = buildWithWeak(12, groups);
+    for (const group of groups) {
+      expect(p.weeks[0].days.some(day => day.exercises.some(ex => ex.group === group)), group).toBe(true);
+    }
+  });
+
+  it('chest НЕ получает дубль жима лёжа (горизонтальный паттерн исключён) — берёт вариацию', () => {
     const p = buildWithWeak(12, ['chest']);
     const ex = weakEx(p, 0, 'chest')!;
-    // В cycle-01 есть Жим лежа/Жим гантелей — вариация жима должна быть приоритетной.
-    expect(ex.name.toLowerCase()).toContain('жим');
+    expect(ex.name.toLowerCase()).not.toMatch(/жим штанги лёжа|жим лёжа|жим гантелей лёжа/);
+    // Валидные варианты для груди в cycle-01 (жим лёжа уже есть как основной лифт):
+    expect(ex.name.toLowerCase()).toMatch(/наклон|брусья|развод|кроссовер|отжиман|гантел|смит/);
   });
 
-  it('слабая группа legs для cycle-01 получает присед-вариацию', () => {
-    const p = buildWithWeak(12, ['legs']);
-    const ex = weakEx(p, 0, 'legs')!;
-    expect(ex.name.toLowerCase()).toMatch(/присед|жим ногами|выпад|разгибание|сгибание/);
-  });
-
-  it('слабая группа back для cycle-01 получает тягу/становую вариацию', () => {
+  it('back НЕ получает становую тягу (hinge исключён) — берёт тягу', () => {
     const p = buildWithWeak(12, ['back']);
     const ex = weakEx(p, 0, 'back')!;
-    expect(ex.name.toLowerCase()).toMatch(/тяга|становая|подтягив|наклон|пуловер/);
+    expect(ex.name.toLowerCase()).not.toMatch(/становая|румынская/);
+    expect(ex.name.toLowerCase()).toMatch(/тяга|подтягив|пуловер/);
+  });
+
+  it('legs НЕ получает присед со штангой/жим ногами/гакк (squat-паттерн исключён) — берёт вспомогательное', () => {
+    const p = buildWithWeak(12, ['legs']);
+    const ex = weakEx(p, 0, 'legs')!;
+    // Запрещены дубли основных движений цикла: присед со штангой, жим ногами, гакк.
+    // Выпады/болгарские сплиты (lunge-паттерн) допустимы — это вспомогательные.
+    expect(ex.name.toLowerCase()).not.toMatch(/жим ногами|гакк|приседания со штангой|присед на груди|фронтальные приседания/);
   });
 
   it('без слабых групп аксессуары не добавляются (регрессия)', () => {

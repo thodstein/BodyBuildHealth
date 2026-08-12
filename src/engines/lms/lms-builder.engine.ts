@@ -6,7 +6,7 @@
  * с PM, растущим на correctionPct каждую неделю. Вес подхода = PM_нед × pct × mnosz.
  */
 
-import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec } from '../../data/lms-cycles/lms-types';
+import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec } from '../../data/lms-cycles/lms-types';
 import { pmProgression, pmForWeek, workWeight, progressionRationale, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
@@ -15,10 +15,11 @@ import { selectExercisesSmart } from '../exercise-selector.engine';
 import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhase } from '../rir-matrix.engine';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
 import { diagnoseLift } from '../pro/lift-diagnostics.engine';
+import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 
 import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
-import { trueMuscleOf } from '../movement-pattern';
+import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
@@ -328,6 +329,127 @@ function groupOfExercise(name: string, fallback: string): string {
   });
   if (fx) return trueMuscleOf(fx) ?? (fx.group as string) ?? fallback;
   return fallback;
+}
+
+/**
+ * PL-specific assistance patterns for weak MUSCLE GROUPS.
+ *
+ * Competition lifts are deliberately absent here. A weak chest does not get
+ * another flat bench, a weak back does not get another deadlift, and weak legs
+ * do not get another squat. Those lifts are already workload in the PL cycle.
+ */
+export const PL_WEAK_GROUP_ALLOWED_PATTERNS: Record<string, readonly string[]> = {
+  chest: ['incline_push', 'dip_push', 'decline_push', 'isolation_chest'],
+  back: ['horizontal_pull', 'vertical_pull', 'isolation_back', 'isolation_shoulders'],
+  legs: ['lunge', 'isolation_legs_quad', 'isolation_legs_ham', 'glute_squat', 'isolation_calves'],
+  shoulders: ['isolation_shoulders'],
+  arms: ['isolation_arms'],
+  core: ['core', 'anti_rotation', 'rotation'],
+};
+
+const PL_WEAK_GROUP_PATTERN_PRIORITY: Record<string, readonly string[]> = {
+  chest: ['incline_push', 'dip_push', 'decline_push', 'isolation_chest'],
+  back: ['horizontal_pull', 'vertical_pull', 'isolation_back', 'isolation_shoulders'],
+  legs: ['lunge', 'glute_squat', 'isolation_legs_quad', 'isolation_legs_ham', 'isolation_calves'],
+  shoulders: ['isolation_shoulders'],
+  arms: ['isolation_arms'],
+  core: ['anti_rotation', 'core', 'rotation'],
+};
+
+const PL_WEAK_GROUP_TARGET_RE: Record<string, RegExp> = {
+  chest: /груд|chest|pectoral|жим|развод|сведен|брусь/i,
+  back: /спин|широч|ромбовид|трапец|lat|back|тяга|pull/i,
+  legs: /квадриц|ягод|бедр|икронож|голен|quad|ham|glute|calf|выпад|lunge/i,
+  shoulders: /дельт|плеч|трапец|shoulder|delt/i,
+  arms: /бицепс|трицепс|рук|curl|tricep|brach|молот|француз/i,
+  core: /кор|пресс|abs|анти.?рот|ротац|планк|скруч/i,
+};
+
+function isPLWeakGroupTarget(exercise: Exercise, group: string): boolean {
+  const hay = `${exercise.name} ${exercise.targetMuscle || ''}`;
+  if (group === 'shoulders' && /размин|мобил|ротац|дислокац|растяж/i.test(hay)) return false;
+  if (group === 'arms' && (/кист|запяст|предплеч/i.test(hay) || /жим леж|bench|дожим|пауза/i.test(hay))) return false;
+  if (group === 'core' && /мобил|растяж|размин/i.test(hay)) return false;
+  return PL_WEAK_GROUP_TARGET_RE[group]?.test(hay) ?? true;
+}
+
+function catalogPattern(exercise: Exercise): string {
+  return exercise.movementPattern || derivePattern(exercise);
+}
+
+function plCatalogUses(name: string): number {
+  const normalized = norm(name);
+  const row = LMS_EXERCISES.find(item => {
+    const itemName = norm(item.name);
+    return itemName === normalized || itemName.includes(normalized) || normalized.includes(itemName);
+  });
+  return row?.uses ?? 0;
+}
+
+function sourcePattern(spec: SRExerciseSpec): string {
+  const catalog = findCatalogExerciseByLabel(spec.name);
+  return catalog ? catalogPattern(catalog) : derivePattern({ name: spec.name, group: spec.group });
+}
+
+/**
+ * Return only PL-appropriate assistance for a weak muscle group, ranked by the
+ * selected cycle's own exercise families. This is shared by the builder and
+ * the UI so the displayed choices cannot diverge from generated choices.
+ */
+export function getPLWeakGroupExerciseCandidates(template: SRCycleTemplate, group: string): Exercise[] {
+  const allowed = new Set(PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? []);
+  if (allowed.size === 0) return [];
+
+  const layouts = template.weeks && template.weeks.length > 0 ? template.weeks : [template.week1];
+  const cycleNames = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises.map(spec => norm(spec.name)))));
+  const cyclePatterns = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises.map(sourcePattern))));
+  const cycleSubstitutionGroups = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
+    .map(spec => findCatalogExerciseByLabel(spec.name)?.substitutionGroup)
+    .filter((group): group is string => Boolean(group)))));
+  const cyclePrimaryPatterns = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
+    .filter(spec => spec.load === 'Тяжелая' || (spec.coef ?? 0) >= 1)
+    .map(sourcePattern))));
+
+  return getExercisesByGroup(group)
+    .filter(exercise => allowed.has(catalogPattern(exercise)))
+    .filter(exercise => !cyclePrimaryPatterns.has(catalogPattern(exercise)))
+    .filter(exercise => !exercise.substitutionGroup || !cycleSubstitutionGroups.has(exercise.substitutionGroup))
+    .filter(exercise => isPLWeakGroupTarget(exercise, group))
+    .sort((a, b) => {
+      const aName = norm(a.name), bName = norm(b.name);
+      const aInCycle = cycleNames.has(aName), bInCycle = cycleNames.has(bName);
+      if (aInCycle !== bInCycle) return aInCycle ? -1 : 1;
+
+      const aPatternInCycle = cyclePatterns.has(catalogPattern(a));
+      const bPatternInCycle = cyclePatterns.has(catalogPattern(b));
+      if (aPatternInCycle !== bPatternInCycle) return aPatternInCycle ? -1 : 1;
+
+      const aUses = plCatalogUses(a.name), bUses = plCatalogUses(b.name);
+      if (aUses !== bUses) return bUses - aUses;
+
+      const priority = PL_WEAK_GROUP_PATTERN_PRIORITY[group] ?? [];
+      const aPriority = priority.indexOf(catalogPattern(a));
+      const bPriority = priority.indexOf(catalogPattern(b));
+      if (aPriority !== bPriority) return (aPriority < 0 ? 99 : aPriority) - (bPriority < 0 ? 99 : bPriority);
+      // Для груди/спины/ног сначала реальное силовое вспомогательное движение,
+      // затем резина/предреабилитация. Для плеч/рук/кора разрешённый isolation
+      // остаётся приоритетным по самой карте паттернов.
+      const preferCompound = group === 'chest' || group === 'back' || group === 'legs';
+      if (preferCompound) {
+        const aCompound = a.type === 'compound' || a.movementType === 'compound';
+        const bCompound = b.type === 'compound' || b.movementType === 'compound';
+        if (aCompound !== bCompound) return aCompound ? -1 : 1;
+      }
+      const equipmentRank = (exercise: Exercise): number => {
+        const equipment = String(exercise.equipment || '').toLowerCase();
+        if (/band|резин|other/.test(equipment)) return 2;
+        if (/bodyweight|suspension/.test(equipment)) return 1;
+        return 0;
+      };
+      const aEquipment = equipmentRank(a), bEquipment = equipmentRank(b);
+      if (aEquipment !== bEquipment) return aEquipment - bEquipment;
+      return (a.fatigueCost || 0) - (b.fatigueCost || 0);
+    });
 }
 
 function weeklyMuscleSets(days: LMSPlanDay[], group: string): number {
@@ -842,24 +964,28 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80);
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
-    // Тренерская логика:
-    //  - Малые группы (biceps, triceps, forearms, calves, abs, delt_rear/delt_mid): 2×/нед → тяжёлый день (3×8 @RIR 2) + памп-день (3×12 @RIR 3)
-    //  - Крупные группы (chest, back, quads, hamstrings, glutes, shoulders): 1×/нед → памп-добивка в synergist/антагонист-день (3×10 @RIR 3)
-    //  - Уважается MRV soft-cap мышцы, day cap (упражнения ≤ 8 в день).
-     //  - Пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based. Если не задано — авто.
+    // PL-логика:
+    //  - число дней остаётся 1×/2× по размеру группы и weakGroupDayMap;
+    //  - каждый добавленный ассистент получает set-блоки конкретного аксессуара
+    //    выбранного дня/недели цикла, а не универсальную BB-схему;
+    //  - основные паттерны цикла (жим/присед/становая и primary-варианты) исключены;
+    //  - пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based.
       if (input.weakPoints && input.weakPoints.length) {
-        const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid', 'arms']);
+       const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid', 'arms']);
       const userDayMap = input.weakGroupDayMap;
       const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
+      const allWeekSubstitutionGroups = new Set(days.flatMap(d => d.exercises
+        .map(e => findCatalogExerciseByLabel(e.name)?.substitutionGroup)
+        .filter((group): group is string => Boolean(group))));
       const fallbackPm = input.fallbackPm ?? 80;
 
-       for (const wg of input.weakPoints) {
-         const allCandidates = getExercisesByGroup(wg);
-        const selectedExercises = input.weakGroupExerciseMap?.[wg];
-        const candidates = allCandidates
-          .filter(ex => !selectedExercises || selectedExercises.length === 0 || selectedExercises.includes(ex.name))
-          .filter(ex => !input.orthopedicBlockedPatterns?.includes(ex.movementPattern || ''))
-          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)));
+        for (const wg of input.weakPoints) {
+          const selectedExercises = input.weakGroupExerciseMap?.[wg];
+          const candidates = getPLWeakGroupExerciseCandidates(template, wg)
+            .filter(ex => !selectedExercises || selectedExercises.length === 0 || selectedExercises.includes(ex.name))
+            .filter(ex => !input.orthopedicBlockedPatterns?.includes(ex.movementPattern || derivePattern(ex)))
+            .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)))
+            .filter((ex: Exercise) => !ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup));
           if (candidates.length === 0) continue;
 
         // Определить число дней для добивки
@@ -906,47 +1032,41 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         }
 
         // ПРОТОКОЛ СЛАБОЙ ГРУППЫ — ИЗ РАСКЛАДКИ ЦИКЛА (не выдуманный):
-        // берём протокол РЕАЛЬНОГО аксессуарного упражнения этого дня недели цикла
-        // (weekLayout уже содержит свои %ПМ/повторы/подходы по неделям).
-        // RIR — из RIR_MATRIX (goal×level×phase, rirBase уже вычислен для недели).
+        // берём ВСЕ set-блоки реального аксессуара этого дня недели цикла.
+        // Так сохраняются волны %ПМ, повторов и подходов конкретной недели.
+        // RIR берётся из самого set-блока, если источник его задаёт, иначе из RIR_MATRIX.
         const accSpecsOfDay = (dayIdx: number): SRExerciseSpec[] => {
           const day = weekLayout[dayIdx];
           if (!day) return [];
           return day.exercises.filter((s: SRExerciseSpec) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0);
         };
-        // Первый аксессуар дня (или всей недели), лучше — с совпадением по мышце слабой группы.
-        const dayProtocol = (dayIdx: number, wg: string): { pct: number; reps: number; sets: number; load: string } => {
+        const dayProtocol = (dayIdx: number, wg: string): { sets: SRSetSpec[]; load: string } => {
           const daySpecs = accSpecsOfDay(dayIdx);
-          const pool = daySpecs.length > 0 ? daySpecs : weekLayout.flatMap((d: SRDaySpec) => d.exercises).filter((s: SRExerciseSpec) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0);
-          // Приоритет аксессуару, чья группа совпадает со слабой (грудь→жим-аксессуары и т.п.).
-          const match = pool.find((s: SRExerciseSpec) => exEnGroup(s.group) === wg);
-          const spec = (match ?? pool[0]) as SRExerciseSpec | undefined;
-          const first = spec?.sets?.[0];
-          const daySpec = weekLayout[dayIdx];
-          const hasLight = daySpec?.exercises.some(s => s.load === 'Легкая');
+          const weekSpecs = weekLayout.flatMap((d: SRDaySpec) => d.exercises)
+            .filter((s: SRExerciseSpec) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0);
+          // Сначала берём аксессуар на ту же мышечную группу, затем самый лёгкий
+          // неосновной протокол недели. Если в выбранном дне нет такой группы,
+          // ищем её аксессуар в другой тренировке этого же микроцикла, а не
+          // подменяем его случайным жимом/основным движением.
+          const sourceGroup = (s: SRExerciseSpec): string => groupOfExercise(s.name, exEnGroup(s.group) || '');
+          const sameDay = daySpecs.filter(s => sourceGroup(s) === wg);
+          const sameWeek = weekSpecs.filter(s => sourceGroup(s) === wg);
+          const pool = sameDay.length > 0 ? sameDay : sameWeek.length > 0 ? sameWeek : daySpecs.length > 0 ? daySpecs : weekSpecs;
+          const rankedPool = [...pool].sort((a, b) => {
+            const aGroup = sourceGroup(a) === wg ? 0 : 1;
+            const bGroup = sourceGroup(b) === wg ? 0 : 1;
+            if (aGroup !== bGroup) return aGroup - bGroup;
+            const aLight = a.load === 'Легкая' ? 0 : 1;
+            const bLight = b.load === 'Легкая' ? 0 : 1;
+            if (aLight !== bLight) return aLight - bLight;
+            return (a.coef || 0) - (b.coef || 0);
+          });
+          const spec = rankedPool[0] as SRExerciseSpec | undefined;
+          const sets = spec?.sets?.length ? spec.sets.map(s => ({ ...s })) : [{ pct: 0.6, reps: 8, sets: 3 }];
           return {
-            pct: first?.pct ?? 0.6,
-            reps: Math.max(2, first?.reps ?? 8),
-            sets: Math.max(1, first?.sets ?? 3),
-            load: hasLight ? 'Легкая' : 'Средняя',
+            sets,
+            load: spec?.load === 'Легкая' ? 'Легкая' : 'Средняя',
           };
-        };
-
-        // Упражнения ПОД КОНКРЕТНЫЙ ЦИКЛ: приоритет вариациям движений, которые
-        // уже есть в этом цикле (названия из шаблона), затем каталог группы.
-        const cycleExNames = new Set(extractExercises(template).map(norm));
-        const STOP = new Set(['лежа', 'стоя', 'сидя', 'штанги', 'гантелей', 'гантели', 'блока', 'на', 'в', 'с', 'и', 'из']);
-        const cycleTokens = new Set<string>();
-        for (const cn of cycleExNames) {
-          for (const tok of cn.split(/[\s,]+/)) {
-            if (tok.length >= 3 && !STOP.has(tok)) cycleTokens.add(tok);
-          }
-        }
-        const rankForCycle = (ex: Exercise): number => {
-          const n = norm(ex.name);
-          if (cycleExNames.has(n)) return 0;              // 0: точно в цикле
-          for (const tok of cycleTokens) if (n.includes(tok)) return 1; // 1: вариация движения цикла
-          return 2;                                       // 2: просто каталог группы
         };
 
         // Для каждого выбранного дня — добавить accessory упражнение с протоколом ЭТОГО дня цикла.
@@ -955,25 +1075,35 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           if (dayIdx < 0 || dayIdx >= days.length) continue;
           const targetDay = days[dayIdx];
           const proto = dayProtocol(dayIdx, wg);
-          // Выбрать упражнение: приоритет — вариации движений цикла.
-          const poolFiltered = candidates.filter(ex => !targetDay.exercises.some(e => norm(e.name) === norm(ex.name)));
+          // Кандидаты уже отфильтрованы и отсортированы общим PL-пулом.
+          const poolFiltered = candidates.filter(ex =>
+            !allWeekNames.has(norm(ex.name)) &&
+            (!ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup)) &&
+            !targetDay.exercises.some(e => norm(e.name) === norm(ex.name))
+          );
           if (poolFiltered.length === 0) continue;
-          const pick = [...poolFiltered].sort((a, b) => {
-            const rc = rankForCycle(a) - rankForCycle(b);
-            if (rc !== 0) return rc;
-            const ac = a.type === 'compound' || a.movementType === 'compound' ? 0 : 1;
-            const bc = b.type === 'compound' || b.movementType === 'compound' ? 0 : 1;
-            if (proto.load === 'Легкая') return bc - ac; // лёгкий день → изоляция
-            return ac - bc;                               // иначе → compound
-          })[0] as Exercise;
+          const pick = poolFiltered[0] as Exercise;
 
-          // RIR: аксессуар = база фазы + 1 (лёгкий день +2).
-          const rir = Math.max(0, rirBase + (proto.load === 'Легкая' ? 2 : 1));
+          // RIR: источник цикла имеет приоритет; если RIR не задан — база фазы
+          // с запасом для аксессуара (легкий протокол +2, средний +1).
+          const wPm = pmFor(pick.name, pmRow, fallbackPm);
+          const workSets = proto.sets.map(set => {
+            const setRir = Number.isFinite(set.rir)
+              ? Math.max(0, set.rir as number)
+              : Math.max(0, rirBase + (proto.load === 'Легкая' ? 2 : 1));
+            return {
+              pct: set.pct,
+              reps: Math.max(1, set.reps),
+              sets: Math.max(1, set.sets),
+              weight: workWeight(wPm, set.pct),
+              rir: setRir,
+            };
+          });
+          const rir = workSets[0]?.rir ?? Math.max(0, rirBase + 1);
           // User explicitly selected these weak groups — always add, no MRV cap.
           // Day cap: упражнений ≤ 10 (raised from 8 to allow user-selected additions)
           if (targetDay.exercises.length >= 10) continue;
 
-           const wPm = pmRow[pick.name] ?? fallbackPm;
           // P2: coef by catalog type — compound ~0.7, isolation ~0.3, fallback 0.5
           const accCoef = pick?.type === 'compound' ? 0.7 : pick?.type === 'isolation' ? 0.3 : 0.5;
           targetDay.exercises.push({
@@ -984,10 +1114,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             load: proto.load,
             pm: wPm,
             rir,
-            workSets: [{ pct: proto.pct, reps: proto.reps, sets: proto.sets, weight: workWeight(wPm, proto.pct), rir }],
+            workSets,
           });
           allWeekNames.add(norm(pick.name));
-          weakNotes.push(`🔥 Слабая группа ${wg} — добивка в день ${dayIdx + 1} (${phase}, ${proto.load}): ${pick.name} ${proto.sets}×${proto.reps} @${Math.round(proto.pct * 100)}% (${Math.round(workWeight(wPm, proto.pct))}кг) RIR ${rir}${rankForCycle(pick) <= 1 ? ' · вариация цикла' : ''}.`);
+          if (pick.substitutionGroup) allWeekSubstitutionGroups.add(pick.substitutionGroup);
+          weakNotes.push(`🔥 Слабая группа ${wg} — PL-ассистент в день ${dayIdx + 1} (${proto.load}): ${pick.name} ${workSets.map(set => `${set.sets}×${set.reps} @${Math.round(set.pct * 100)}%`).join(' + ')} (${Math.round(workSets[0]?.weight || 0)}кг) RIR ${rir}.`);
         }
       }
     }

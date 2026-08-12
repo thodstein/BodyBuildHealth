@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -1048,7 +1048,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           })()}
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ПЛ + ББ-акцент, сохраняются в профиль)</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
-            💪 Accessory-упражнения добавляются по раскладке самого цикла: %ПМ/повторы/подходы — как у аксессуаров этого дня недели цикла, RIR — из матрицы по фазе, упражнения — вариации движений этого цикла.
+            💪 PL-ассистенты добавляются по раскладке самого цикла: %ПМ/повторы/подходы — как у аксессуара этой недели, RIR — из матрицы по фазе. Основные жим/присед/становая и их дубли исключены; для каждой группы свой PL-пул.
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           {/* 📅 Выбор дней для слабых групп — авто-распределение если не выбрано */}
@@ -1071,7 +1071,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                          })}
                        </div>
                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {getExercisesByGroup(wg).map(ex => {
+                            {(tpl ? getPLWeakGroupExerciseCandidates(tpl, wg) : []).map(ex => {
                            const selected = (weakGroupExerciseMap[wg] || []).includes(ex.name);
                            return <button key={ex.id} onClick={() => toggleExerciseInMap(wg, ex.name, 'wg')} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: selected ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: selected ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: selected ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{ex.name}{selected ? ' ✓' : ''}</button>;
                          })}
