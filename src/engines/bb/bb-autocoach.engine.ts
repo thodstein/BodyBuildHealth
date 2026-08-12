@@ -9,6 +9,7 @@ import { defaultWorkMax } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { PHASE_CONFIGS, distributePhases } from '../periodization';
 import { PCT_FOR_RIR } from '../rir-table';
+import { classifyBackExercise } from './bb-back-quality.engine';
 
 /* ──────────── BB phase ──────────── */
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -444,10 +445,12 @@ export interface GarbageVolume {
  */
 export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[]): GarbageVolume[] {
   const garbage: GarbageVolume[] = [];
-  const seenPatterns: Set<string> = new Set();
   for (const w of weeks) {
+    const seenPatterns: Set<string> = new Set();
     for (const s of w.sessions) {
+      // Разминочные упражнения — не мусор (не входят в объём).
       for (const e of s.exercises) {
+        if ((e as any).warmupActivator) continue;
         // Упражнение вне тега сессии (кроме рук и дельт — они работают во многих)
         const tagRelevant = s.sessionTag
           ? (() => {
@@ -463,13 +466,27 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[]): Garb
         if (!tagRelevant) {
           garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Мышца ${e.muscle} не входит в тег сессии ${s.sessionTag}` });
         }
-        // Дублирование механического паттерна: два жима в одной сессии (кроме слабых групп)
-        const catalogEx = EXERCISE_CATALOG.find(x => x.name === e.name);
-        const pattern = catalogEx?.movementPattern;
-        if (pattern && pattern !== 'other' as any) {
-          const key = `${s.day}-${pattern}`;
+        // Дублирование механического паттерна: два жима/тяги в одной сессии (кроме слабых групп).
+        // Для спины используем нашу функциональную классификацию (vertical_pull объединяет
+        // подтягивания/верхний блок), для остальных — movementPattern каталога.
+        let pattern: string | null = null;
+        if (e.muscle === 'back') {
+          pattern = classifyBackExercise(e.name).pattern;
+        } else {
+          const catalogEx = EXERCISE_CATALOG.find(x => x.name === e.name);
+          pattern = (catalogEx?.movementPattern as string) || null;
+        }
+        // Compound-паттерны (horizontal_push, heavy_row, squat...) НЕ считаются
+        // мусором: разные углы/снаряды одного compound — это нормальная ББ-практика
+        // (жим лёжа + жим гантелей). Дубль-сигнал важен только для изоляций/финишей
+        // (isolation_*, pump) и повторяющихся back-паттернов вертикальной тяги.
+        const isCompoundPattern = pattern !== null && pattern !== 'other' &&
+          /push|row|squat|hinge|deadlift|press|pull\b|vertical|horizontal|compound|press_.*(squat|bench)/i.test(pattern);
+        if (pattern && pattern !== 'other' && !isCompoundPattern) {
+          // Ключ включает мышцу: forearms-изоляция не конфликтует с biceps-изоляцией.
+          const key = `${s.day}-${e.muscle}-${pattern}`;
           if (seenPatterns.has(key) && !weakPoints.includes(e.muscle)) {
-            garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Дублирование паттерна ${pattern} — одно движение на сессию` });
+            garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Дублирование паттерна ${pattern} для ${e.muscle} — одна изоляция на сессию` });
           }
           seenPatterns.add(key);
         }

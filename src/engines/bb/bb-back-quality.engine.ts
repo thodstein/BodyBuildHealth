@@ -24,7 +24,7 @@ export function classifyBackExercise(name: string): { pattern: BackPattern; subg
   if (/подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун|vertical/i.test(n)) return { pattern: 'vertical_pull', subgroup: 'back_width' };
   if (/пуловер|прям.*рук|straight.?arm/i.test(n)) return { pattern: 'lat_isolation', subgroup: 'back_width' };
   if (/тяга.*одной|one.?arm|single.?arm|одноруч|гантел.*наклон/i.test(n)) return { pattern: 'unilateral_row', subgroup: 'back_thickness' };
-  if (/тяга.*груд.*упор|chest.?supported|seal|тяга.*тренаж|machine.*row/i.test(n)) return { pattern: 'supported_row', subgroup: 'back_thickness' };
+  if (/тяга.*груд.*упор|chest.?supported|seal|тяга.*тренаж|machine.*row|гребн/i.test(n)) return { pattern: 'supported_row', subgroup: 'back_thickness' };
   if (/тяга.*лиц|face.?pull|задн.*дельт|rear.?delt|обратн.*бабоч/i.test(n)) return { pattern: 'rear_delt', subgroup: 'rear_delts' };
   if (/шраг|shrug/i.test(n)) return { pattern: 'shrug', subgroup: 'traps' };
   if (/гиперэкстенз|back.?extension|good.?morning|гудморнинг|станов|deadlift|румын|rdl/i.test(n)) return { pattern: 'erector', subgroup: 'erectors' };

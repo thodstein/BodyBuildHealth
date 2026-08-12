@@ -31,6 +31,16 @@ export interface BBPlanValidationOptions {
   avoidAxialLoad?: boolean;
   checkOrder?: boolean;
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  /** Опыт в годах — для enhanced-лимитов сессии (60/18 вместо 24/10). */
+  trainingYears?: number;
+}
+
+/** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18. */
+export function sessionLimitsFor(options: BBPlanValidationOptions): { maxExercises: number; maxWorkingSets: number } {
+  const enhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
+  return enhanced
+    ? { maxExercises: 18, maxWorkingSets: 60 }
+    : { maxExercises: 10, maxWorkingSets: 24 };
 }
 
 /** Синхронизирует агрегированное число sets с фактическими рабочими сетами. */
@@ -60,8 +70,9 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
   const issues: BBPlanValidationIssue[] = [];
   // Разминочное упражнение не входит в лимит рабочих упражнений.
   const workingCount = session.exercises.filter(exercise => !(exercise as any).warmupActivator).length;
-  if (workingCount > 10) {
-    issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${workingCount} рабочих упражнений (максимум 10).`, week, session: sessionIndex });
+  const { maxExercises } = sessionLimitsFor(options);
+  if (workingCount > maxExercises) {
+    issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${workingCount} рабочих упражнений (максимум ${maxExercises}).`, week, session: sessionIndex });
   }
   const cost = estimateBBSessionCost(session);
   if (options.checkOrder) {
@@ -91,7 +102,12 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
       issues.push({ level: 'warning', code: 'single_work_set', message: `${exercise.name}: только ${sets} рабочий сет.`, week, session: sessionIndex, exercise: exercise.name });
     }
     const canonical = trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any);
-    if (canonical && canonical !== exercise.muscle && !(canonical === 'shoulders' && /^delt_/.test(exercise.muscle))) {
+    // Каталог определяет «основную» мышцу compound-движения; для изоляций
+    // (французский жим, махи, разгибания на блоке) target-мышца из плана
+    // точнее. Не выдаём false-positive предупреждения для изоляций.
+    const name = (exercise.name || '').toLowerCase();
+    const isIsolation = /сгибан|разгибан|мах|raise|fly|развод|француз|french|curl|extension|kickback|шраг|кроссовер|pushdown|скручив|crunch|подъём|подъем|сведен/i.test(name);
+    if (canonical && canonical !== exercise.muscle && !(canonical === 'shoulders' && /^delt_/.test(exercise.muscle)) && !isIsolation) {
       issues.push({ level: 'warning', code: 'muscle_attribution', message: `${exercise.name}: muscle=${exercise.muscle}, каталог определяет ${canonical}.`, week, session: sessionIndex, exercise: exercise.name });
     }
     if (exercise.workSets.some(ws => ws.weight < 0 || ws.reps <= 0 || ws.rir < 0 || ws.rir > 5)) {
@@ -129,8 +145,9 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     const sessionSets = session.exercises
       .filter(exercise => !(exercise as any).warmupActivator)
       .reduce((sum, exercise) => sum + exercise.sets, 0);
-    if (sessionSets > 24) {
-      issues.push({ level: 'warning', code: 'session_working_set_cap', message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен 24.`, week: week.week || wi + 1, session: si + 1 });
+    const { maxWorkingSets } = sessionLimitsFor(options);
+    if (sessionSets > maxWorkingSets) {
+      issues.push({ level: 'warning', code: 'session_working_set_cap', message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен ${maxWorkingSets}.`, week: week.week || wi + 1, session: si + 1 });
     }
   }));
   for (let index = 1; index < plan.weeks.length; index++) {

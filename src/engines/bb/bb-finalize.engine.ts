@@ -1,6 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { tidySessionExercises } from './bb-session-order.engine';
+import { tidySessionExercises, orderSessionExercises } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions } from './bb-volume.engine';
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
@@ -899,6 +899,23 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       }
     }
   }
+  // Повторный tidy ПОСЛЕ allocation/дозаполнения: добавленные упражнения
+  // должны встать в правильные группы (иначе quads → hamstrings → quads).
+  // Только сортировка — НЕ capExercisesPerMuscle (это срезало бы добавленный
+  // allocation back-объём до 4 упражнений).
+  if (!options.preserveSource) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      session.exercises = orderSessionExercises(
+        session.exercises,
+        {
+          sessionTag: session.sessionTag,
+          methodology: options.methodology,
+          priorityMuscles: options.priorityMuscles,
+        },
+      );
+    }
+    syncBBPlanSetShape(next);
+  }
   // Последний adaptive-проход: после дозаполнения и всех поздних проходов
   // ремонтируем weekly back frequency (повтор одного vertical профиля).
   for (const week of next.weeks) repairBackFrequency(week, options);
@@ -945,8 +962,15 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .slice(0, 20)
     .map(issue => `⚠ Ротация: ${issue.message}`);
   if (rotationWarnings.length) next.rationale = [...next.rationale, ...rotationWarnings];
+  // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
+  // фактический объём, а не пустой/устаревший объект.
+  next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
+    week.week,
+    aggregateBBVolume(week.sessions),
+  ]));
   const validation = validateBBPlan(next, {
     level: options.level,
+    trainingYears: options.trainingYears,
     equipment: options.equipment,
     excludedExercises: options.excludedExercises,
     excludedMuscles: options.excludedMuscles,
@@ -959,10 +983,6 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     week: week.week,
     sessions: week.sessions.map(session => estimateBBSessionCost(session)),
   }));
-    next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
-    week.week,
-    aggregateBBVolume(week.sessions),
-  ]));
   if (options.level && next.weeks.length > 0) {
     const peak = next.weeks.reduce((best, week) => {
       const total = week.sessions.reduce((sum, session) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0);

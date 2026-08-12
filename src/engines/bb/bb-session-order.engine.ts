@@ -147,9 +147,10 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
  * Кортеж приоритета (лексикографический):
  *  [0] isPrimaryFlag:  0 = мышца дня (primaryMuscle) — ВСЕГДА первая
  *  [1] muscleGroup:     упражнения ОДНОЙ мышцы строго вместе (MUSCLE_ORDER)
- *  [2] tier:            0 = основное тяжёлое, 1 = compound, 2 = изоляция, 3 = финишь
- *  [3] subOrder:         для compound — pressPosition; для изоляции — stretchRank; ПЛ-специфика +50
- *  [4] load:             тяжелее / меньше RIR — раньше
+ *  [2] priorityFlag:    weak/focus мышца внутри своей группы — раньше изоляций
+ *  [3] tier:            0 = основное тяжёлое, 1 = compound, 2 = изоляция, 3 = финишь
+ *  [4] subOrder:         для compound — pressPosition; для изоляции — stretchRank; ПЛ-специфика +50
+ *  [5] load:             тяжелее / меньше RIR — раньше
  */
 
 /** Порядок мышц в сессии: большие compound-мышцы → малые изолирующие → финишные.
@@ -185,7 +186,10 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   // isPrimaryFlag: мышца дня ВСЕГДА первая (0), остальные после (1)
   const isPrimaryFlag = isPrimaryMuscle ? 0 : 1;
   const priorityFlag = priorityMuscles.has(exMuscle) ? 0 : 1;
-  // muscleGroup: внутри primary/не-primary — группировка по мышце
+  // muscleGroup: внутри primary/не-primary — группировка по мышце.
+  // ВАЖНО: muscleGroup идёт ДО priorityFlag — все упражнения одной мышцы
+  // должны идти ПОДРЯД. Если priorityFlag раньше, weak-упражнение другой
+  // мышцы вклинивается между группами (ноги-спина-ноги), ломая сессию.
   const muscleGroup = MUSCLE_ORDER[exMuscle] ?? 12;
 
   let subOrder: number;
@@ -195,7 +199,7 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   if (plSpec) subOrder += 50;
 
   const load = loadRank(ex);
-  return [isPrimaryFlag, priorityFlag, muscleGroup, tier, subOrder, load];
+  return [isPrimaryFlag, muscleGroup, priorityFlag, tier, subOrder, load];
 }
 
 function collapseMuscle(m: string): string {

@@ -3063,9 +3063,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // remove the only exercise for a muscle or a protected primary.
   const output = { ...finalPlan, level, volumeLandmarks, muscleFrequency, volumeTargets };
   syncBBPlanSetShape(output);
-  const validation = validateBBPlan(output, { level });
+  const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears });
   const validationWarnings = validation.issues
     .filter(issue => issue.level === 'warning')
+    // Ложный deficit на этой стадии: weeklyVolume пересчитывается в finalize
+    // после allocation/taper. Финальная валидация даёт корректные значения.
+    .filter(issue => issue.code !== 'target_volume_deficit')
     .slice(0, 20)
     .map(issue => `⚠ Валидация: ${issue.message}`);
   if (validationWarnings.length > 0) output.rationale.push(...validationWarnings);
