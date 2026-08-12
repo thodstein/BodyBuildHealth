@@ -68,24 +68,30 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Запуск построенного плана ПЛ/ББ */}
-          {plRuntime && plRuntime.days.length > 0 && !plRunOpen && !runtimeStarted && (
-            <div className="card" style={{ padding: '12px', border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)' }}>
-              <h3 style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--accent)' }}>▶ Запустить построенный план ({plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'})</h3>
-              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px' }}>Неделя {plRuntime.week} · {plRuntime.days.length} дн. · фокус: {plRuntime.focus}. Выполнение записывается в дневник тренировок.</p>
-              <button onClick={() => setPlRunOpen(true)} style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14 }}>▶ Начать выполнение</button>
-            </div>
-          )}
-          {plRunOpen && plRuntime && plRuntime.days.length > 0 && (
-            <div className="card" style={{ padding: '12px' }}>
+          {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
+              SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
+          {plRuntime && plRuntime.days.length > 0 && (
+            <div className="card" style={{ padding: '12px', border: plRunOpen ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.08)', background: plRunOpen ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>▶ Выполнение плана · {plRuntime.focus}</h3>
-                <button onClick={() => setPlRunOpen(false)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}>✕ Закрыть</button>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>
+                    {plRunOpen ? '▶ Выполнение плана' : '⏸ Сессия свёрнута'} · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
+                  </h3>
+                  <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>
+                    Неделя {plRuntime.week} · {plRuntime.days.length} дн. {plRunOpen ? '· выполнение записывается в дневник' : '· прогресс сохранён, нажмите «Возобновить»'}
+                  </p>
+                </div>
+                <button onClick={() => setPlRunOpen(!plRunOpen)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', cursor: 'pointer', fontSize: 11 }}>
+                  {plRunOpen ? '⏸ Свернуть' : '▶ Возобновить'}
+                </button>
               </div>
-              <SessionPlayer days={plRuntime.days} weekNumber={plRuntime.week} focus={plRuntime.focus} />
+              <div style={{ display: plRunOpen ? 'block' : 'none' }}>
+                <SessionPlayer days={plRuntime.days} weekNumber={plRuntime.week} focus={plRuntime.focus} onSaved={loadDiaryStats} />
+              </div>
             </div>
           )}
-          {!runtimeStarted ? (
+          {/* Универсальная запись из сгенерированного плана — показывается только если нет активного ПЛ/ББ плана */}
+          {plRuntime && plRuntime.days.length > 0 ? null : !runtimeStarted ? (
             <div className="card" style={{ padding: '12px' }}>
               <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>🏃 Начать тренировку</h3>
               <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px' }}>

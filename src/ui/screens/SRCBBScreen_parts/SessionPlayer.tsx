@@ -94,14 +94,18 @@ export interface SessionPlayerProps {
   days: PlayerDay[];
   weekNumber: number;
   focus: string;
+  /** Вызывается после успешного сохранения сессии в дневник (обновление внешних данных). */
+  onSaved?: () => void;
 }
 
-export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus }) => {
+export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus, onSaved }) => {
   const [profile] = useTrainingProfile();
   const [dayIdx, setDayIdx] = useState(0);
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
+  // Защита от двойного сохранения (finish вызывается из «Завершить» и из exitSession)
+  const savedRef = useRef(false);
   const [warmupBlocks, setWarmupBlocks] = useState<WarmupBlock[]>([]);
   const [cooldownBlocks, setCooldownBlocks] = useState<CooldownBlock[]>([]);
   const [warmupDone, setWarmupDone] = useState<Record<string, boolean>>({});
@@ -405,17 +409,20 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
      } else {
        setActual({});
      }
-     setExDone({});
-     setRestHistory([]);
-     // старт таймера сессии
-     setSessionTimerSec(0);
-     setSessionTimerRunning(true);
-   };
+      setExDone({});
+      setRestHistory([]);
+      savedRef.current = false;
+      // старт таймера сессии
+      setSessionTimerSec(0);
+      setSessionTimerRunning(true);
+    };
 
   const finish = () => {
     if (!session || !day || !Array.isArray(day.exercises)) return;
     hapticNotify('success');
     const finished = finishSession(session, `${focus} — ${day?.label}`);
+    savedRef.current = true;
+    try { onSaved?.(); } catch { /* ignore */ }
 
     const finishRiskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {
@@ -471,8 +478,13 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   };
 
   const exitSession = () => {
-     setPhase('done');
-   };
+    // «Завершить и выйти» должно СОХРАНЯТЬ тренировку: если есть подходы и ещё не сохранено — сохраняем.
+    if (session && session.exercises.some(e => (e.sets || []).length > 0) && !savedRef.current) {
+      finish();
+      return;
+    }
+    setPhase('done');
+  };
 
    // горячие клавиши для быстрого логирования
    useEffect(() => {
@@ -1249,7 +1261,15 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
                 hapticNotify('success');
               }).catch(() => {});
             }}>📋 Копировать сводку</button>
-            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setPhase('ready'); }}>← Новая тренировка</button>
+            <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; setPhase('ready'); }}>← Новая тренировка</button>
+            {days.length > 1 && dayIdx < days.length - 1 && (
+              <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
+                setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;
+                setPhase('ready'); setDayIdx(dayIdx + 1);
+              }}>
+                ➡ Следующий день: {days[dayIdx + 1]?.label} ({dayIdx + 2}/{days.length})
+              </button>
+            )}
          </div>
        )}
 
