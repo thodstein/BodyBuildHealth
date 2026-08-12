@@ -44,14 +44,14 @@ function parseVerticalNutrientLine(line: string): { key: string; value: number; 
   if (!trimmed || trimmed.length < 2) return null;
 
   for (const [labelPattern, key, defaultUnit] of VERTICAL_NUTRIENT_LABELS) {
-    const labelMatch = trimmed.match(new RegExp(`(${labelPattern.source})\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?`, 'i'));
+    const labelMatch = trimmed.match(new RegExp(`(${labelPattern.source})\\s*(?:\\([^)]+\\))?\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?`, 'i'));
     if (labelMatch) {
       const value = numberFrom(labelMatch[2], 0);
       const unit = (labelMatch[3] || defaultUnit).toLowerCase();
       return { key, value, unit };
     }
 
-    const reversedMatch = trimmed.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?\\s*[:\\-]?\\s*(${labelPattern.source})`, 'i'));
+    const reversedMatch = trimmed.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?\\s*(?:\\([^)]+\\))?\\s*[:\\-]?\\s*(${labelPattern.source})`, 'i'));
     if (reversedMatch) {
       const value = numberFrom(reversedMatch[1], 0);
       const unit = (reversedMatch[2] || defaultUnit).toLowerCase();
@@ -130,6 +130,7 @@ export function parseMicroLine(line: string): NutritionMicros {
     result[key] = Math.round((unit === 'г' || unit === 'g' ? value * 1000 : value) * 100) / 100;
   }
   for (const [label, key, defaultUnit] of MICRO_LABELS) {
+    if (result[key] !== undefined) continue; // skip: already set by prefix/vitamin loops
     const match = line.match(new RegExp(`(?:${label.source})\\s*[:\\-]?\\s*(\\d+(?:[.,]\\d+)?)\\s*(мг|mg|мкг|mcg|г|g)?`, 'i'));
     if (!match) continue;
     const value = numberFrom(match[1], 0);
@@ -230,8 +231,9 @@ function editDistance(a: string, b: string): number {
   return row[b.length];
 }
 
-/** Matches OCR names to the local food database, including partial word matches. */
-export function findFood(name: string): FoodItem | undefined {
+/** Matches OCR names to the local food database, including partial word matches.
+ * Pass `extraCatalog` for USDA/external foods as a secondary fallback. */
+export function findFood(name: string, extraCatalog?: FoodItem[]): FoodItem | undefined {
   const query = normalizeFoodText(name);
   if (!query) return undefined;
   const directId = matchRussianFood(name);
@@ -240,7 +242,7 @@ export function findFood(name: string): FoodItem | undefined {
     if (byId) return byId;
   }
   const words = query.split(/\s+/).filter(word => word.length > 2);
-  return FOOD_DB
+  const dbResult = FOOD_DB
     .map(food => {
       const foodWords = normalizeFoodText(food.name).split(/\s+/);
       const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || (candidate.length >= 3 && word.includes(candidate)) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
@@ -248,6 +250,19 @@ export function findFood(name: string): FoodItem | undefined {
     })
     .filter(result => result.score > 0)
     .sort((a, b) => b.score - a.score || a.food.name.length - b.food.name.length)[0]?.food;
+  if (dbResult) return dbResult;
+  // Fallback: search extra catalog (USDA_FOODS, etc.)
+  if (extraCatalog && extraCatalog.length > 0) {
+    return extraCatalog
+      .map(food => {
+        const foodWords = normalizeFoodText(food.name).split(/\s+/);
+        const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.toLowerCase().includes(word) || (candidate.length >= 3 && word.includes(candidate.toLowerCase())) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
+        return { food, score };
+      })
+      .filter(result => result.score > 0)
+      .sort((a, b) => b.score - a.score || a.food.name.length - b.food.name.length)[0]?.food;
+  }
+  return undefined;
 }
 
 function numberFrom(text: string | undefined, fallback: number): number {
@@ -533,7 +548,7 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
   let currentDate = new Date().toISOString().slice(0, 10);
 
   for (const line of lines) {
-    const totalCheck = /итого|всего|total|дневной|сумма|итог|daily\s*total/i.test(line);
+    const totalCheck = /итого|всего|total|дневн(?:ой|ая)|сумма|итог|daily\s*total/i.test(line);
     if (totalCheck) continue;
 
     const dateMatch = line.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);

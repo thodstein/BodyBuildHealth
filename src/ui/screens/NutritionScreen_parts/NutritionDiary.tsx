@@ -144,6 +144,36 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     } catch { return null; }
   }, [dayMeals, refreshKey]);
 
+  // Per-product usefulness from bb_quality_score stored in diary entries
+  const dayQuality = useMemo(() => {
+    try {
+      const items = Object.values(dayMeals).flat().filter((i: any) => i && typeof i === 'object') as any[];
+      if (items.length === 0) return null;
+      let totalScore = 0;
+      let scoredCount = 0;
+      const perProduct: Array<{ name: string; score?: number; label: string; color: string }> = [];
+      items.forEach((item: any) => {
+        let score: number | undefined = item.qualityScore;
+        if (score == null && item.foodId) {
+          const food = FOOD_DB.find(f => f.id === item.foodId);
+          score = food?.bb_quality_score;
+        }
+        if (score == null && item.name) {
+          const food = FOOD_DB.find(f => f.name.toLowerCase() === (item.name || '').toLowerCase());
+          score = food?.bb_quality_score;
+        }
+        if (score != null && Number.isFinite(score)) {
+          totalScore += score;
+          scoredCount++;
+          const { label, color } = getQualityLabel(score * 10); // scale 1-10 → 0-100
+          perProduct.push({ name: item.name, score, label, color });
+        }
+      });
+      const avg = scoredCount > 0 ? Math.round(totalScore / scoredCount * 10) / 10 : null;
+      return { avg, scoredCount, total: items.length, perProduct };
+    } catch { return null; }
+  }, [dayMeals, refreshKey]);
+
   const favoriteFoods = useMemo(() => { 
     try { 
       const favs: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); 
@@ -169,12 +199,26 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     setParsedItems(prev => [...prev, { name: item.name, kcal: item.kcal, p: item.protein, f: item.fat, c: item.carbs, qty: 100 }]); 
   }, []);
 
-  const convertOCRItems = useCallback((meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string; foodId?: string; micros?: Record<string, number> }> }[]) => {
+  const convertOCRItems = useCallback((meals: { mealType: string; items: Array<{ name: string; qty: string; qtyGrams?: number; kcal: number; p: number; f: number; c: number; category?: string; foodId?: string; micros?: Record<string, number> }> }[], usdaFallback?: FoodItemLike[]) => {
     return meals.flatMap(m => m.items.map(item => {
       const qtyMatch = item.qty?.match(/[\d]+(?:[.,]\d+)?/);
       const parsedQty = qtyMatch ? Number.parseFloat(qtyMatch[0].replace(',', '.')) : 100;
       const qty = Math.max(10, Math.round(item.qtyGrams ?? parsedQty));
-      return { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category, foodId: item.foodId, micros: item.micros };
+      let result: DiaryItem = { name: item.name || m.mealType || 'Блюдо', kcal: Math.round(item.kcal) || 0, p: Math.round((item.p || 0) * 10) / 10, f: Math.round((item.f || 0) * 10) / 10, c: Math.round((item.c || 0) * 10) / 10, qty, category: item.category, foodId: item.foodId, micros: item.micros };
+      // USDA fallback: if food not in FOOD_DB, try external catalog
+      if (!result.foodId && usdaFallback?.length) {
+        const usdaMatch = findFood(item.name, usdaFallback as any);
+        if (usdaMatch) {
+          result.foodId = (usdaMatch as any).id || result.foodId;
+          result.category = (usdaMatch as any).category || result.category;
+          // Enrich with USDA kcal/macros if parsed data is sparse
+          if (result.kcal === 0 && (usdaMatch as any).kcal) result.kcal = (usdaMatch as any).kcal;
+          if (result.p === 0 && (usdaMatch as any).protein) result.p = (usdaMatch as any).protein;
+          if (result.f === 0 && (usdaMatch as any).fat) result.f = (usdaMatch as any).fat;
+          if (result.c === 0 && (usdaMatch as any).carbs) result.c = (usdaMatch as any).carbs;
+        }
+      }
+      return result;
     }));
   }, []);
 
@@ -197,11 +241,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     setOcrFileLoading(true); setOcrError(''); 
     try { 
       const result = await processUploadedFile(file); 
-      if (result.meals.length > 0) setParsedItems(prev => [...prev, ...convertOCRItems(result.meals)]); 
+      if (result.meals.length > 0) setParsedItems(prev => [...prev, ...convertOCRItems(result.meals, usdaFoods)]); 
       if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); 
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
     finally { setOcrFileLoading(false); } 
-  }, [convertOCRItems]);
+  }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => { 
     if (!ocrText.trim()) return; 
@@ -228,10 +272,17 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     items.forEach(item => {
       const q = Number(item.qty) || 100;
       if (q <= 0) return;
+      // Pull bb_quality_score from FOOD_DB for usefulness tracking
+      let qualityScore: number | undefined;
+      const food = item.foodId
+        ? FOOD_DB.find(f => f.id === item.foodId)
+        : FOOD_DB.find(f => f.name.toLowerCase() === (item.name || '').toLowerCase());
+      if (food?.bb_quality_score != null) qualityScore = food.bb_quality_score;
       data[selectedDate].meals[mt].push({
         name: item.name, qty: `${q} г`, kcal: Math.round(item.kcal * q / 100),
         p: Math.round((item.p * q / 100) * 10) / 10, f: Math.round((item.f * q / 100) * 10) / 10, c: Math.round((item.c * q / 100) * 10) / 10,
         category: item.category, foodId: item.foodId, micros: item.micros,
+        qualityScore,
       });
     });
     saveDiary(data);
@@ -494,6 +545,32 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {tab === 'day' && (
         <>
+          {/* Product usefulness summary */}
+          {dayQuality && dayQuality.scoredCount > 0 && (
+            <div style={{ padding: '10px 14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.06))', border: '1px solid rgba(139,92,246,0.15)', marginBottom: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa' }}>⭐ Полезность продуктов</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                  {dayQuality.scoredCount}/{dayQuality.total} оценено · средний {dayQuality.avg}/10
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {dayQuality.perProduct.slice(0, 12).map((p, i) => (
+                  <span key={i} title={`${p.name}: ${p.score}/10`} style={{
+                    padding: '3px 8px', borderRadius: 6, fontSize: 9, fontWeight: 600,
+                    background: `${p.color}18`, border: `1px solid ${p.color}30`,
+                    color: p.color, whiteSpace: 'nowrap',
+                  }}>{p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name} {p.score}</span>
+                ))}
+                {dayQuality.perProduct.length > 12 && (
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', padding: '3px 6px' }}>
+                    +{dayQuality.perProduct.length - 12} ещё
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {Object.keys(dayMicros).length > 0 && <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', marginBottom: 6 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#86efac' }}>🧪 Микронутриенты за день</div><button onClick={() => { const txt = Object.entries(dayMicros).filter(([k]) => microLabels[k]).map(([k, v]) => { const info = microLabels[k]; return `${info.name}: ${Math.round(v * 10) / 10} ${info.unit} (${Math.round(v / info.target * 100)}%)`; }).join('\n'); try { void navigator.clipboard?.writeText(`Микро ${selectedDate}\n${txt}`); showToast('📋 Микро скопированы'); } catch { showToast('❌ Не удалось скопировать'); } }} aria-label="Копировать микронутриенты" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: 600, cursor: 'pointer', minHeight: 28 }}>📋</button></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{Object.entries(dayMicros).filter(([key]) => microLabels[key]).map(([key, value]) => { const info = microLabels[key]; const pct = Math.round(value / info.target * 100); return <div key={key} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.04)' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8 }}><span style={{ color: 'rgba(255,255,255,0.75)' }}>{info.name}</span><span style={{ color: pct >= 80 ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(value * 10) / 10} {info.unit}</span></div><div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 2, background: pct >= 80 ? '#22c55e' : '#f59e0b' }} /></div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{pct}% от ориентира</div></div>; })}</div></div>}
           <DayMealsList
             dayMeals={dayMeals}
