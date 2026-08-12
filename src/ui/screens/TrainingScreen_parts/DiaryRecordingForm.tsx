@@ -89,7 +89,6 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
     setExercises(prev);
     setCurrentExIdx(Math.min(currentExIdx, prev.length - 1));
   }, [currentExIdx]);
-  const redo = useCallback(() => {}, []);
 
   // Auto-save draft to localStorage
   const DRAFT_KEY = 'he_diary_draft';
@@ -244,20 +243,27 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
     setCurrentSetIdx(exercises[currentExIdx].sets.length);
   }, [currentExIdx, exercises, pushUndo]);
 
-  // Keyboard shortcut: Enter = add set to current exercise
+  // Keyboard shortcut: Enter = add set to current exercise (только в полях подходов),
+  // в поиске — выбрать первый результат
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-          e.preventDefault();
-          addSet();
-        }
+      if (e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
+      if (target?.dataset?.setInput === '1') {
+        e.preventDefault();
+        addSet();
+        return;
+      }
+      if (target?.dataset?.exSearch === '1') {
+        e.preventDefault();
+        if (searchResults.length > 0) addExercise(searchResults[0]);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [addSet]);
+  }, [addSet, addExercise, searchResults]);
 
   const updateSet = useCallback((exIdx: number, setIdx: number, patch: Partial<SetRecord>) => {
     setExercises(prev => {
@@ -295,15 +301,16 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       const exList: StrengthLogEntry[] = exercises.map((e, i) => {
       const cat = EXERCISE_CATALOG.find(x => x.id === e.exerciseId);
       const completedSets = e.sets.filter(s => s.completed || (s.weight > 0 && s.reps > 0));
-      const supersetNote = e.isSuperset && e.supersetGroup ? ` [superset:${e.supersetGroup}]` : '';
-      const exNote = e.notes ? ` [note:${e.notes}]` : '';
+      // Суперсеты и заметки хранятся структурно, а не в имени упражнения
       return {
         id: `${wid}_${i}`, date: logDate, exerciseId: e.exerciseId,
-        exerciseName: (cat?.name || e.exerciseId) + supersetNote + exNote,
+        exerciseName: cat?.name || e.exerciseId,
         sets: completedSets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, notes: s.notes || undefined })),
         totalVolume: completedSets.reduce((s, st) => s + st.weight * st.reps, 0),
         estimated1RM: Math.max(...completedSets.map(s => epley1RM(s.weight, s.reps)), 0),
         isCompound: cat?.type === 'compound', weekNumber: selectedWeek,
+        supersetGroup: e.isSuperset && e.supersetGroup ? e.supersetGroup : undefined,
+        note: e.notes || undefined,
       };
     }).filter(e => e.sets.length > 0);
     if (exList.length === 0) return;
@@ -467,6 +474,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
           onChange={e => setSearchQuery(e.target.value)}
           onBlur={() => setTimeout(() => setSearchResults([]), 200)}
           placeholder="🔍 Поиск упражнения..."
+          data-ex-search="1"
           style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, boxSizing: 'border-box' as any }}
         />
         {searchResults.length > 0 && (
@@ -634,26 +642,34 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                   </div>
                 )}
 
-                {/* Set header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 24px', gap: 3, marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', paddingLeft: 2 }}>
+      {/* Set header */}
+                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 24px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', paddingLeft: 2 }}>
                   <span>#</span><span style={{ textAlign: 'center' }}>кг</span><span style={{ textAlign: 'center' }}>повт</span><span style={{ textAlign: 'center' }}>RPE</span><span style={{ textAlign: 'center' }}>RIR</span><span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
                   <React.Fragment key={setIdx}>
                     <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 24px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: ACCENT, textAlign: 'center' }}>{setIdx + 1}</span>
-                      <input type="number" value={set.weight} disabled={isBWExercise({ name: ex.exerciseName })}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textAlign: 'center' }}>{setIdx + 1}</span>
+                      <input type="number" value={set.weight} disabled={isBWExercise({ name: ex.exerciseName })} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { weight: parseFloat(e.target.value) || 0 })}
-                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, textAlign: 'center', minHeight: 32 }} />
-                      <input type="number" value={set.reps}
+                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
+                      <input type="number" value={set.reps} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { reps: parseInt(e.target.value) || 0 })}
-                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, textAlign: 'center', minHeight: 32 }} />
-                      <input type="number" min={1} max={10} value={set.rpe}
+                        onBlur={e => {
+                          // Авто-старт таймера отдыха после ввода повторов последнего подхода
+                          const repsVal = parseInt(e.currentTarget.value) || 0;
+                          const lastSet = exercises[currentExIdx]?.sets;
+                          if (lastSet && setIdx === lastSet.length - 1 && set.weight > 0 && repsVal > 0) {
+                            setRestTimer(restTarget);
+                          }
+                        }}
+                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
+                      <input type="number" min={1} max={10} value={set.rpe} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { rpe: parseInt(e.target.value) || 5 })}
-                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, textAlign: 'center', minHeight: 32 }} />
-                      <input type="number" min={0} max={5} value={set.rir}
+                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
+                      <input type="number" min={0} max={5} value={set.rir} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { rir: parseInt(e.target.value) || 0 })}
-                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, textAlign: 'center', minHeight: 32 }} />
+                        style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
                       <div style={{ display: 'flex', gap: 2 }}>
                         <button onClick={() => {
                           const updated = [...exercises];

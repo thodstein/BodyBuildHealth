@@ -96,6 +96,8 @@ export function workoutLogToStrengthLogEntries(log: WorkoutLog): StrengthLogEntr
     estimated1RM: ex.estimated1RM,
     isCompound: ex.isCompound,
     notes: ex.notes || '',
+    supersetGroup: ex.supersetGroup,
+    note: ex.note,
   }));
 }
 
@@ -130,10 +132,11 @@ export interface UnifiedDiaryEntry {
 export function mergeDiaryEntries(idbLogs: WorkoutLog[], lsSessions: WorkoutSession[]): UnifiedDiaryEntry[] {
   const seen = new Map<string, UnifiedDiaryEntry>();
 
-  for (const log of idbLogs) {
+  const put = (log: WorkoutLog, source: 'idb' | 'localStorage') => {
     for (const ex of log.exercises || []) {
       for (const [index, set] of (ex.sets || []).entries()) {
-        const key = workoutSetKey(log.date, ex.exerciseName, index + 1);
+        const key = workoutSetKey(log.date, ex.exerciseName, index + 1) + `|${set.weight}|${set.reps}`;
+        if (seen.has(key)) continue;
         seen.set(key, {
           id: ex.id || key,
           date: log.date,
@@ -146,36 +149,14 @@ export function mergeDiaryEntries(idbLogs: WorkoutLog[], lsSessions: WorkoutSess
           totalVolume: set.weight * set.reps,
           estimated1RM: epley1RM(set.weight, set.reps),
           isCompound: ex.isCompound,
-          source: 'idb',
+          source,
         });
       }
     }
-  }
+  };
 
-  for (const session of lsSessions) {
-    const log = sessionToWorkoutLog(session);
-    for (const ex of log.exercises || []) {
-      for (const [index, set] of (ex.sets || []).entries()) {
-        const key = workoutSetKey(log.date, ex.exerciseName, index + 1);
-        if (!seen.has(key)) {
-          seen.set(key, {
-            id: ex.id || key,
-            date: log.date,
-            exerciseId: ex.exerciseId,
-            exerciseName: ex.exerciseName,
-            weight: set.weight,
-            reps: set.reps,
-            rir: set.rir,
-            rpe: set.rpe || 5,
-            totalVolume: set.weight * set.reps,
-            estimated1RM: epley1RM(set.weight, set.reps),
-            isCompound: ex.isCompound,
-            source: 'localStorage',
-          });
-        }
-      }
-    }
-  }
+  for (const log of idbLogs) put(log, 'idb');
+  for (const session of lsSessions) put(sessionToWorkoutLog(session), 'localStorage');
 
   return Array.from(seen.values()).sort((a, b) => b.date.localeCompare(a.date));
 }

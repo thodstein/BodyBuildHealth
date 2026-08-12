@@ -10,6 +10,13 @@
 
 import { epley1RM } from './e1rm';
 import { formatDate } from '../core/utils/date-utils';
+import { EXERCISE_CATALOG } from '../core/exercise-catalog';
+
+/** Человекочитаемое имя упражнения по id (bench_press → «Жим штанги лёжа»). */
+export function exerciseDisplayName(exerciseId: string): string {
+  const found = EXERCISE_CATALOG.find(e => e.id === exerciseId);
+  return found?.name || exerciseId;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -233,7 +240,7 @@ export function generateInsights(
       insights.push({
         type: 'positive',
         category: 'strength',
-        message: `💪 ${exId}: +${Math.round(((currentRM - prevRM) / prevRM) * 100)}% 1RM`,
+        message: `💪 ${exerciseDisplayName(exId)}: +${Math.round(((currentRM - prevRM) / prevRM) * 100)}% 1RM`,
         detail: `Прогресс с ${prevRM} кг до ${currentRM} кг`,
         timestamp: new Date().toISOString(),
       });
@@ -242,7 +249,7 @@ export function generateInsights(
       insights.push({
         type: 'warning',
         category: 'strength',
-        message: `⚠️ ${exId}: -${Math.round(((prevRM - currentRM) / prevRM) * 100)}% 1RM`,
+        message: `⚠️ ${exerciseDisplayName(exId)}: -${Math.round(((prevRM - currentRM) / prevRM) * 100)}% 1RM`,
         detail: `Снижение с ${prevRM} кг до ${currentRM} кг. Проверьте восстановление и питание.`,
         timestamp: new Date().toISOString(),
       });

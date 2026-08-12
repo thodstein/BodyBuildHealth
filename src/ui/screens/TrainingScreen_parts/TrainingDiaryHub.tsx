@@ -38,6 +38,11 @@ import MMCTrackingCard from './MMCTrackingCard';
 import { CheckinMetricsCard } from './CheckinMetricsCard';
 import { CsvImportTab } from './CsvImportTab';
 import { useIsMobile } from './useIsMobile';
+import { getStorageTrimWarning, clearStorageTrimWarning, getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logger.engine';
+import type { ProgressionAlert } from '../../../engines/strength-diary.engine';
+import { ACCENT, DIM, GRP_RU, GROUP_COLORS, diaryCard, diaryLabel, diaryInput, diaryBtn } from './diary-tokens';
+import { MiniLineChart, MiniBarChart } from './DiaryChart';
+import { SessionEditorModal } from './SessionEditorModal';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
 const RecordModeSelector: React.FC<{
@@ -69,19 +74,7 @@ const RecordModeSelector: React.FC<{
   );
 };
 
-const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
-
-const GRP_RU: Record<string, string> = {
-  chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки',
-  core: 'Кор', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры',
-  triceps: 'Трицепс', biceps: 'Бицепс', quads: 'Квадрицепсы',
-};
-const GROUP_COLORS: Record<string, string> = {
-  chest: '#00e68a', back: '#60a5fa', legs: '#f59e0b', shoulders: '#a855f7',
-  arms: '#ef4444', core: '#22c55e', hamstrings: '#3b82f6', glutes: '#ec4899',
-  calves: '#eab308', triceps: '#fb923c', biceps: '#f472b6', quads: '#facc15',
-};
+/* Токены дневника (ACCENT/DIM/GRP_RU/GROUP_COLORS) — общие, из diary-tokens.ts */
 
 const WorkoutWeekCard: React.FC<{
   weekLabel: string;
@@ -89,7 +82,12 @@ const WorkoutWeekCard: React.FC<{
   prevWorkouts?: WorkoutLog[];
   expanded: boolean;
   onToggle: () => void;
-}> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle }) => {
+  onEdit?: (w: WorkoutLog) => void;
+  onDelete?: (w: WorkoutLog) => void;
+  confirmDeleteId?: string | null;
+  onConfirmDelete?: (id: string) => void;
+  onCancelDelete?: () => void;
+}> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle, onEdit, onDelete, confirmDeleteId, onConfirmDelete, onCancelDelete }) => {
   const previousByExercise = new Map<string, number>();
   (prevWorkouts || []).forEach(workout => workout.exercises.forEach(exercise => {
     previousByExercise.set(exercise.exerciseId, Math.max(previousByExercise.get(exercise.exerciseId) || 0, exercise.estimated1RM || 0));
@@ -119,6 +117,15 @@ const WorkoutWeekCard: React.FC<{
             <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: '#fff' }}>{workout.split || 'Тренировка'}</span></span>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 10, color: '#fff' }}>{Math.round(workout.exercises.reduce((sum, e) => sum + e.totalVolume, 0)).toLocaleString()} кг</span>
+              <button onClick={e => { e.stopPropagation(); onEdit?.(workout); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Редактировать">✏️</button>
+              {confirmDeleteId === workout.id ? (
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={e => { e.stopPropagation(); onConfirmDelete?.(workout.id); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', color: '#ef4444', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>Удалить?</button>
+                  <button onClick={e => { e.stopPropagation(); onCancelDelete?.(); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 10 }}>✕</button>
+                </span>
+              ) : (
+                <button onClick={e => { e.stopPropagation(); onDelete?.(workout); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Удалить">🗑</button>
+              )}
               <button onClick={e => { e.stopPropagation(); const lines: string[] = [`${new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })} — ${workout.split || 'Тренировка'}`, '']; workout.exercises.forEach(ex => { lines.push(ex.exerciseName); ex.sets.forEach((s, i) => { lines.push(`  ${i+1}. ${s.weight}кг × ${s.reps}${s.rir !== undefined ? ` RIR${s.rir}` : ''}`); }); lines.push(''); }); if (workout.overallRPE) lines.push(`RPE: ${workout.overallRPE}`); if (workout.duration) lines.push(`Длительность: ${workout.duration} мин`); if (workout.notes) lines.push(`Заметки: ${workout.notes}`); navigator.clipboard?.writeText(lines.join('\n')); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Копировать тренировку">📋</button>
             </div>
           </div>
@@ -173,6 +180,43 @@ const style: Record<string, React.CSSProperties> = {
   input: { width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 12, boxSizing: 'border-box' as any, outline: 'none', transition: 'border-color .15s, box-shadow .15s' },
   btn: { width: '100%', padding: 9, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 12 },
 };
+
+/** Разделитель секций аналитики (иерархия вместо сплошной стены карточек). */
+const SectionHeader: React.FC<{ icon: string; title: string; hint?: string }> = ({ icon, title, hint }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 2px 6px' }}>
+    <span style={{ fontSize: 13 }}>{icon}</span>
+    <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.2px' }}>{title}</span>
+    <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+    {hint && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{hint}</span>}
+  </div>
+);
+
+/** Единое пустое состояние для режимов дневника. */
+const DiaryEmptyState: React.FC<{
+  icon: string;
+  title: string;
+  description: string;
+  onRecord?: () => void;
+  onRefresh?: () => void;
+}> = ({ icon, title, description, onRecord, onRefresh }) => (
+  <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
+    <div style={{ fontSize: 36, marginBottom: 8 }}>{icon}</div>
+    <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{title}</div>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, lineHeight: 1.5 }}>{description}</div>
+    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+      {onRecord && (
+        <button onClick={onRecord} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+          📝 Записать тренировку
+        </button>
+      )}
+      {onRefresh && (
+        <button onClick={onRefresh} style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: 10, cursor: 'pointer' }}>
+          🔄 Обновить
+        </button>
+      )}
+    </div>
+  </div>
+);
 
 interface TrainingDiaryHubProps {
   initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc';
@@ -252,7 +296,6 @@ const WeeklyTargetsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histor
 };
 
 const ProgressChartsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
-  const [chartTooltip, setChartTooltip] = useState<{ name: string; value: number; x: number; y: number } | null>(null);
   const byEx: Record<string, { date: string; e1rm: number }[]> = {};
   historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
     const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
@@ -262,15 +305,17 @@ const ProgressChartsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
   }));
   const top = Object.entries(byEx).map(([n, arr]) => ({ n, arr: arr.sort((a, b) => a.date.localeCompare(b.date)) }))
     .sort((a, b) => b.arr.length - a.arr.length).slice(0, 3).filter(x => x.arr.length >= 2);
-  const wkMap: Record<string, number> = {};
-  historyWorkouts.forEach((w: any) => { const wn = w.date.slice(0, 10).slice(0, 7) + '-' + Math.floor(new Date(w.date).getDate() / 7); const vol = (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || (e.sets || []).reduce((ss: number, st: any) => ss + (st.weight || 0) * (st.reps || 0), 0)), 0); wkMap[wn] = (wkMap[wn] || 0) + vol; });
-  const wkArr = Object.entries(wkMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-8);
+  // Группировка по ISO неделе + ISO году (не «неделя месяца»)
+  const wkMap = new Map<string, { label: string; vol: number }>();
+  historyWorkouts.forEach((w: any) => {
+    const wn = `${getISOWeekYear(w.date)}-W${getISOWeekNumber(w.date)}`;
+    const vol = (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || (e.sets || []).reduce((ss: number, st: any) => ss + (st.weight || 0) * (st.reps || 0), 0)), 0);
+    const prev = wkMap.get(wn) || { label: `W${getISOWeekNumber(w.date)}`, vol: 0 };
+    prev.vol += vol;
+    wkMap.set(wn, prev);
+  });
+  const wkArr = Array.from(wkMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).slice(-8);
   const colors = ['#00e68a', '#60a5fa', '#a855f7'];
-  const W = 320, H = 80;
-  const allVals = top.flatMap(t => t.arr.map(a => a.e1rm));
-  const minV = Math.min(...allVals, 0), maxV = Math.max(...allVals, 1);
-  const maxWk = Math.max(1, ...wkArr.map(([, v]) => v));
-  const gridLines = [0.25, 0.5, 0.75];
   return (
     <div className="card" style={{ padding: 10, marginTop: 8 }}>
       <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📈 Прогресс из дневника</h4>
@@ -279,59 +324,32 @@ const ProgressChartsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
       ) : (
         <>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>ПМ (e1RM) по топ-упражнениям:</div>
-          <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
-            {gridLines.map(pct => (
-              <line key={pct} x1={6} x2={W - 6} y1={H - 8 - pct * (H - 16)} y2={H - 8 - pct * (H - 16)}
-                stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {top.map((t, i) => (
+              <div key={t.n}>
+                <div style={{ fontSize: 10, color: colors[i % colors.length], marginBottom: 2 }}>● {t.n}</div>
+                <MiniLineChart
+                  data={t.arr.map(p => p.e1rm)}
+                  labels={t.arr.map(p => p.date)}
+                  color={colors[i % colors.length]}
+                  width={300}
+                  height={50}
+                  ySuffix=" кг"
+                />
+              </div>
             ))}
-            <text x={2} y={H - 8} fontSize={7} fill="rgba(255,255,255,0.3)">{minV}</text>
-            <text x={2} y={12} fontSize={7} fill="rgba(255,255,255,0.3)">{maxV}</text>
-            {top.map((t, i) => {
-              if (t.arr.length < 2) return null;
-              const px = (j: number) => 6 + (j / Math.max(1, t.arr.length - 1)) * (W - 12);
-              const py = (v: number) => H - 8 - ((v - minV) / Math.max(1, maxV - minV)) * (H - 16);
-              const d = t.arr.map((p, j) => `${j === 0 ? 'M' : 'L'}${px(j)},${py(p.e1rm)}`).join(' ');
-              return (
-                <g key={i}>
-                  <path d={d} fill="none" stroke={colors[i % colors.length]} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-                  {t.arr.map((p, j) => (
-                    <circle key={j} cx={px(j)} cy={py(p.e1rm)}
-                      r={j === t.arr.length - 1 ? 3 : 1.8}
-                      fill={j === t.arr.length - 1 ? colors[i % colors.length] : 'rgba(255,255,255,0.3)'}
-                      stroke={j === t.arr.length - 1 ? '#000' : 'none'} strokeWidth={0.5}
-                      style={{ cursor: 'pointer' }}
-                      onMouseEnter={e => setChartTooltip({ name: t.n, value: p.e1rm, x: e.clientX, y: e.clientY })}
-                      onMouseLeave={() => setChartTooltip(null)}
-                    />
-                  ))}
-                </g>
-              );
-            })}
-          </svg>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
-            {top.map((t, i) => <span key={t.n} style={{ fontSize: 10, color: colors[i % colors.length] }}>● {t.n}</span>)}
           </div>
-          {chartTooltip && (
-            <div style={{ position: 'fixed', left: chartTooltip.x + 8, top: chartTooltip.y - 28, background: '#18181b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
-              {chartTooltip.name}: <strong>{chartTooltip.value} кг</strong>
-            </div>
-          )}
         </>
       )}
       {wkArr.length >= 2 && (
         <>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
-            {wkArr.map(([wk, v], i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)', position: 'relative' }}
-                  onMouseEnter={e => setChartTooltip({ name: wk, value: v, x: e.clientX, y: e.clientY })}
-                  onMouseLeave={() => setChartTooltip(null)}
-                />
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span>
-              </div>
-            ))}
-          </div>
+          <MiniBarChart
+            data={wkArr.map(([wk, v]) => ({ value: v.vol, label: v.label, color: '#00e68a' }))}
+            width={300}
+            height={60}
+            valueSuffix=" кг"
+          />
         </>
       )}
     </div>
@@ -497,6 +515,24 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [trainingArchive, setTrainingArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_training_reports') || '[]'); } catch { return []; }
   });
+
+  // Session editing / deletion / progression alerts / storage trim warning
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutLog | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [progressionAlerts, setProgressionAlerts] = useState<ProgressionAlert[]>([]);
+  const [trimWarning, setTrimWarning] = useState(() => getStorageTrimWarning());
+  useEffect(() => {
+    let cancelled = false;
+    diary.checkProgressionAlerts().then(alerts => { if (!cancelled) setProgressionAlerts(alerts); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [diary, historyWorkouts]);
+
+  const handleEditWorkout = (w: WorkoutLog) => { setEditingWorkout(w); };
+  const handleDeleteWorkout = async (id: string) => {
+    setConfirmDeleteId(null);
+    await diary.deleteWorkoutLog(id);
+    onRefresh();
+  };
 
   // History exercise filter
   const [historyExerciseFilter, setHistoryExerciseFilter] = useState('');
@@ -667,7 +703,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertRirStats = useMemo(() => { try { return loadRirCalibrationStats(); } catch { return { bias: 0, stdDev: 1, sessions: 0 }; } }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div key={mode} className="diary-mode-pop" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Program context header */}
       {macrocycle && curPhase && (
         <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
@@ -688,6 +724,46 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Сегодня: план + последняя тренировка */}
+          {(() => {
+            const todayIdx = (new Date().getDay() + 6) % 7;
+            const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
+            const last = historyWorkouts[0];
+            const weekVol = diaryProgress.length > 0 ? diaryProgress[diaryProgress.length - 1].totalVolume : 0;
+            return (
+              <div style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.15)' }}>
+                <div style={{ ...diaryLabel, color: ACCENT }}>📅 Сегодня</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Неделя объём</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{(weekVol / 1000).toFixed(1)}т</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Всего сессий</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{historyWorkouts.length}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Последняя</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{last ? last.date.slice(5).replace('-', '.') : '—'}</div>
+                  </div>
+                </div>
+                {planned && (
+                  <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎯 По плану сегодня: {planned.name}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                      {planned.exercises.slice(0, 6).map(e => e.name).join(' · ')}{planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>~{planned.duration} мин</div>
+                  </div>
+                )}
+                {last && (
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                    Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {last.exercises.length} упр. · {(last.exercises.reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <RecordModeSelector diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onRefresh} />
         </div>
       )}
@@ -704,6 +780,62 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined}
             onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} supportCoverage={linked.supportCoverage}
           />}
+
+          {/* Предупреждение о срезе истории из-за переполнения хранилища */}
+          {trimWarning && (
+            <div style={{ ...style.card, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚠️ История частично обрезана из-за переполнения хранилища</div>
+                <button onClick={() => { clearStorageTrimWarning(); setTrimWarning(null); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
+                Осталось {trimWarning.kept} последних сессий ({new Date(trimWarning.at).toLocaleString('ru-RU')}). Сделайте экспорт CSV/JSON в «Инструментах» и удалите старые записи.
+              </div>
+            </div>
+          )}
+
+          {/* Алгоритмические алерты: плато, перегрузка объёма, делод */}
+          {progressionAlerts.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 4 }}>
+              {progressionAlerts.map((a, i) => (
+                <div key={i} style={{ ...style.card, border: `1px solid ${a.type === 'plateau' ? 'rgba(245,158,11,0.4)' : a.type === 'volume_peak' ? 'rgba(239,68,68,0.4)' : 'rgba(96,165,250,0.4)'}`, background: `${a.type === 'plateau' ? 'rgba(245,158,11,0.06)' : a.type === 'volume_peak' ? 'rgba(239,68,68,0.06)' : 'rgba(96,165,250,0.06)'}`, padding: 10, marginBottom: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: a.type === 'plateau' ? '#f59e0b' : a.type === 'volume_peak' ? '#ef4444' : '#60a5fa' }}>
+                    {a.type === 'plateau' ? '⏸' : a.type === 'volume_peak' ? '📈' : '📉'} {a.message}
+                  </div>
+                  {a.type === 'volume_peak' && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Рекомендуется разгрузочная неделя или снижение объёма.</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Сводка недели для копирования */}
+          {historyWorkouts.length > 0 && (() => {
+            const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+            const lastWeek = historyWorkouts.filter(w => new Date(w.date) >= weekAgo);
+            if (lastWeek.length === 0) return null;
+            const prevWeek = historyWorkouts.filter(w => { const d = new Date(w.date); return d < weekAgo && d >= new Date(weekAgo.getTime() - 7 * 86400000); });
+            const vol = lastWeek.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
+            const sets = lastWeek.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + (e.sets?.length || 0), 0), 0);
+            const prevVol = prevWeek.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
+            const volDelta = prevVol > 0 ? Math.round(((vol - prevVol) / prevVol) * 100) : 0;
+            const best = lastWeek.flatMap(w => w.exercises.map(e => ({ name: e.exerciseName, e1rm: e.estimated1RM || 0 }))).sort((a, b) => b.e1rm - a.e1rm)[0];
+            const summary = [
+              `📅 Неделя: ${lastWeek[0].date.slice(8, 10)}.${lastWeek[0].date.slice(5, 7)} — ${lastWeek[lastWeek.length - 1].date.slice(8, 10)}.${lastWeek[lastWeek.length - 1].date.slice(5, 7)}`,
+              `🏋️ Тренировок: ${lastWeek.length} (${prevWeek.length ? `прошлая: ${prevWeek.length}` : 'прошлая: —'})`,
+              `⚖️ Объём: ${(vol / 1000).toFixed(1)} т (${volDelta >= 0 ? '+' : ''}${volDelta}%) · подходов: ${sets}`,
+              best && best.e1rm > 0 ? `🏆 Лучший e1RM: ${best.name} — ${Math.round(best.e1rm)} кг` : '',
+              lastWeek[0].notes ? `📝 ${lastWeek[0].notes}` : '',
+            ].filter(Boolean).join('\n');
+            return (
+              <div style={style.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ ...style.label, marginBottom: 0 }}>📄 Сводка недели</div>
+                  <button onClick={() => navigator.clipboard?.writeText(summary)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>📋 Копировать</button>
+                </div>
+                <pre style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{summary}</pre>
+              </div>
+            );
+          })()}
           <div style={style.card}>
             <div style={style.label}>📜 История тренировок</div>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -756,14 +888,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   <div style={{ display: 'flex', gap: 3, marginBottom: 2 }}>
                     {weeks.map((_, wi) => {
                       const ml = monthLabels.find(m => m.week === wi);
-                      return <div key={wi} style={{ flex: 1, fontSize: 8, color: ml ? 'rgba(255,255,255,0.45)' : 'transparent', fontWeight: ml ? 600 : 400, textAlign: 'center' }}>{ml?.label || ''}</div>;
+                      return <div key={wi} style={{ flex: 1, fontSize: 9, color: ml ? 'rgba(255,255,255,0.45)' : 'transparent', fontWeight: ml ? 600 : 400, textAlign: 'center' }}>{ml?.label || ''}</div>;
                     })}
                   </div>
                   {/* Day labels + grid */}
                   <div style={{ display: 'flex', gap: 3 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginRight: 2 }}>
                       {['Пн', '', 'Ср', '', 'Пт', '', 'Вс'].map((d, i) => (
-                        <div key={i} style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', height: 12, display: 'flex', alignItems: 'center' }}>{d}</div>
+                        <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', height: 12, display: 'flex', alignItems: 'center' }}>{d}</div>
                       ))}
                     </div>
                     {weeks.map((wk, wi) => (
@@ -812,18 +944,16 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             {/* Volume chart */}
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>📈 Тоннаж по неделям</div>
-              <div style={{ display: 'flex', gap: 2, height: 50, alignItems: 'flex-end' }}>
-                {diaryProgress.slice(-12).map((w, i) => {
-                  const maxVol2 = Math.max(...diaryProgress.map(w2 => w2.totalVolume), 1);
-                  const h = Math.max(4, (w.totalVolume / maxVol2) * 100);
-                  return (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                      <div style={{ width: '70%', height: `${h}%`, background: w.totalVolume === maxVol2 ? 'var(--accent)' : 'rgba(0,230,138,0.3)', borderRadius: '2px 2px 0 0' }} />
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{w.week}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              <MiniBarChart
+                data={diaryProgress.slice(-12).map(w => ({
+                  value: w.totalVolume,
+                  label: `${w.year % 100}.${String(w.week).padStart(2, '0')}`,
+                  color: w.totalVolume === Math.max(...diaryProgress.map(w2 => w2.totalVolume), 1) ? '#00e68a' : 'rgba(0,230,138,0.35)',
+                }))}
+                width={300}
+                height={55}
+                valueSuffix=" кг"
+              />
             </div>
             {/* Exercise progress mini-charts */}
             {historyWorkouts.length >= 2 && (() => {
@@ -1221,13 +1351,22 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               prevWorkouts={wi < filteredHistory.length - 1 ? filteredHistory[wi + 1][1] : undefined}
               expanded={historyExpanded === '__all__' || historyExpanded === week}
               onToggle={() => setHistoryExpanded(prev => prev === week ? null : week)}
+              onEdit={handleEditWorkout}
+              onDelete={w => setConfirmDeleteId(w.id)}
+              confirmDeleteId={confirmDeleteId}
+              onConfirmDelete={handleDeleteWorkout}
+              onCancelDelete={() => setConfirmDeleteId(null)}
             />
           ))}
           {filteredHistory.length === 0 && (
-            <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>📜</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)' }}>{search || historyExerciseFilter ? 'Ничего не найдено' : 'Нет тренировок. Запишите первую во вкладке «Запись».'}</div>
-            </div>
+            <DiaryEmptyState
+              icon="📜"
+              title={search || historyExerciseFilter ? 'Ничего не найдено' : 'Нет тренировок'}
+              description={search || historyExerciseFilter
+                ? 'Попробуйте изменить поиск или сбросить фильтры.'
+                : 'Запишите первую тренировку — она появится здесь.'}
+              onRecord={!search && !historyExerciseFilter ? () => { setMode('record'); onGoRecord?.(); } : undefined}
+            />
           )}
         </div>
       )}
@@ -1264,6 +1403,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 </div>
               </div>
               {/* Bodyweight overlay on volume trend */}
+              <SectionHeader icon="📊" title="Объём и нагрузка" hint="тоннаж · группы · баланс" />
               {measurements.length >= 2 && historyWorkouts.length >= 4 && (() => {
                 const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 const weeklyVol: { week: string; vol: number }[] = [];
@@ -1454,6 +1594,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 );
               })()}
               {/* 1RM */}
+              <SectionHeader icon="💪" title="Сила и рекорды" hint="1RM · PR · прогресс · плато" />
               {Object.keys(analytics.strength.estimated1RM).length > 0 && (
                 <div style={style.card}>
                   <div style={style.label}>🏆 Расчётный 1RM</div>
@@ -1506,6 +1647,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 );
               })()}
               {/* Fatigue metrics */}
+              <SectionHeader icon="⚡" title="Усталость и восстановление" hint="монотонность · ЦНС · делод" />
               <div style={style.card}>
                 <div style={style.label}>Метрики усталости</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
@@ -1744,6 +1886,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 );
               })()}
               {/* Training consistency */}
+              <SectionHeader icon="📅" title="Регулярность и привычки" hint="серии · частота · плотность" />
               {historyWorkouts.length >= 4 && (() => {
                 const weeks = 8;
                 const today = new Date();
@@ -2500,24 +2643,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             </>
           ) : (
-            <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>📊</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>
-                {historyWorkouts.length === 0 ? 'Дневник пуст' : 'Недостаточно данных'}
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, lineHeight: 1.5 }}>
-                {historyWorkouts.length === 0
-                  ? 'Запишите первую тренировку, чтобы увидеть объём, интенсивность и усталость.'
-                  : 'Нужно минимум 2 тренировки для расчёта аналитики.'}
-              </div>
-              {historyWorkouts.length === 0 && (
-                <button onClick={() => { setMode('record'); onGoRecord?.(); }} style={{
-                  padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)',
-                  background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                }}>📝 Записать тренировку</button>
-              )}
-              <button onClick={onRefresh} style={{ marginTop: 8, padding: '6px 14px', borderRadius: 8, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', fontSize: 10, cursor: 'pointer' }}>🔄 Обновить</button>
-            </div>
+            <DiaryEmptyState
+              icon="📊"
+              title={historyWorkouts.length === 0 ? 'Дневник пуст' : 'Недостаточно данных'}
+              description={historyWorkouts.length === 0
+                ? 'Запишите первую тренировку, чтобы увидеть объём, интенсивность и усталость.'
+                : 'Нужно минимум 2 тренировки для расчёта аналитики.'}
+              onRecord={historyWorkouts.length === 0 ? () => { setMode('record'); onGoRecord?.(); } : undefined}
+              onRefresh={onRefresh}
+            />
           )}
         </div>
       )}
@@ -2948,24 +3082,28 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   if (!file) return;
                   const reader = new FileReader();
                   reader.onload = () => {
-                    try {
-                      const data = JSON.parse(reader.result as string);
-                      if (data.version !== 1 || !data.workouts) { alert('Неверный формат бэкапа'); return; }
-                      const existing = historyWorkouts;
-                      const existingIds = new Set(existing.map((w: any) => w.id || w.date));
-                      const newWorkouts = data.workouts.filter((w: any) => !existingIds.has(w.id || w.date));
-                      if (newWorkouts.length === 0) { alert('Все тренировки уже есть в дневнике'); return; }
-                      const merged = [...existing, ...newWorkouts];
-                      try { localStorage.setItem('he_training_sessions', JSON.stringify(merged)); } catch {}
-                      if (data.measurements?.length) {
-                        const existM = loadMeasurements();
-                        const existDates = new Set(existM.map((m: any) => m.date));
-                        const newM = data.measurements.filter((m: any) => !existDates.has(m.date));
-                        if (newM.length) { try { newM.forEach((m: any) => saveMeasurement(m)); } catch {} }
-                      }
-                      alert(`Импортировано: ${newWorkouts.length} тренировок${data.measurements?.length ? `, ${data.measurements.length} замеров` : ''}`);
-                      onRefresh();
-                    } catch { alert('Ошибка чтения файла'); }
+                    (async () => {
+                      try {
+                        const data = JSON.parse(reader.result as string);
+                        if (data.version !== 1 || !data.workouts) { alert('Неверный формат бэкапа'); return; }
+                        const existing = historyWorkouts;
+                        const existingIds = new Set(existing.map((w: any) => w.id || w.date));
+                        const newWorkouts = data.workouts.filter((w: any) => !existingIds.has(w.id || w.date));
+                        if (newWorkouts.length === 0) { alert('Все тренировки уже есть в дневнике'); return; }
+                        // Запись через единый слой: IDB + зеркало в localStorage (he_workout_log_v2)
+                        for (const w of newWorkouts) {
+                          await diary.saveWorkoutLog(w);
+                        }
+                        if (data.measurements?.length) {
+                          const existM = loadMeasurements();
+                          const existDates = new Set(existM.map((m: any) => m.date));
+                          const newM = data.measurements.filter((m: any) => !existDates.has(m.date));
+                          if (newM.length) { try { newM.forEach((m: any) => saveMeasurement(m)); } catch {} }
+                        }
+                        alert(`Импортировано: ${newWorkouts.length} тренировок${data.measurements?.length ? `, ${data.measurements.length} замеров` : ''}`);
+                        onRefresh();
+                      } catch { alert('Ошибка чтения файла'); }
+                    })();
                   };
                   reader.readAsText(file);
                   e.target.value = '';
@@ -2974,6 +3112,19 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Редактор сохранённой тренировки */}
+      {editingWorkout && (
+        <SessionEditorModal
+          workout={editingWorkout}
+          onClose={() => setEditingWorkout(null)}
+          onSave={async (log) => {
+            await diary.updateWorkoutLog(log);
+            setEditingWorkout(null);
+            onRefresh();
+          }}
+        />
       )}
     </div>
   );

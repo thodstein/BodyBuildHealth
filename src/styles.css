@@ -1100,6 +1100,10 @@ details ul { list-style:none; padding:8px 0; }
 @keyframes toastOut { from { opacity:1; transform:translateY(0); } to { opacity:0; transform:translateY(20px); } }
 
 @keyframes fadeInUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+/* Переход между режимами тренировочного дневника */
+.diary-mode-pop { animation: fadeInUp 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .diary-mode-pop { animation: none; } }
 @keyframes pulse { 0% { transform:scale(1); } 50% { transform:scale(1.05); } 100% { transform:scale(1); } }
 @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-5px); } 75% { transform:translateX(5px); } }
 @keyframes glow { 0%,100% { box-shadow:0 0 8px var(--accent-dim); } 50% { box-shadow:0 0 20px var(--accent-glow); } }

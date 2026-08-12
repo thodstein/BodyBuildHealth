@@ -28,9 +28,9 @@ const mkWorkout = (date: string, split: string, weight: number): WorkoutLog => (
 });
 
 const mkProgress = (): WeeklyProgress[] => [
-  { week: 1, totalVolume: 5000, workoutCount: 2, compoundWorkouts: 2, isolationWorkouts: 0, total1RM: 100 },
-  { week: 2, totalVolume: 7000, workoutCount: 3, compoundWorkouts: 3, isolationWorkouts: 0, total1RM: 110 },
-  { week: 3, totalVolume: 9000, workoutCount: 3, compoundWorkouts: 3, isolationWorkouts: 0, total1RM: 115 },
+  { week: 1, year: 2026, totalVolume: 5000, workoutCount: 2, compoundWorkouts: 2, isolationWorkouts: 0, total1RM: 100 },
+  { week: 2, year: 2026, totalVolume: 7000, workoutCount: 3, compoundWorkouts: 3, isolationWorkouts: 0, total1RM: 110 },
+  { week: 3, year: 2026, totalVolume: 9000, workoutCount: 3, compoundWorkouts: 3, isolationWorkouts: 0, total1RM: 115 },
 ];
 
 const baseProps = {

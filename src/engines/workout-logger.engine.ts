@@ -20,6 +20,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { epley1RM } from './e1rm';
+import type { WorkoutLog } from '../core/types';
 
 export interface WorkoutSet {
   setNumber: number;
@@ -73,7 +74,7 @@ export interface WorkoutStats {
   bestLifts: Record<string, { weight: number; reps: number; date: string }>;
   prCount: number;
   streak: number;
-  weeklyVolume: { week: number; volume: number; sessions: number }[];
+  weeklyVolume: { week: number; year?: number; volume: number; sessions: number }[];
   exerciseFrequency: Record<string, number>;
 }
 
@@ -92,6 +93,16 @@ export function getISOWeekNumber(dateStr: string): number {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
+/** ISO-год недели (отличается от календарного года у 1 января: 2021-01-01 → 2020-W53). */
+export function getISOWeekYear(dateStr: string): number {
+  const date = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 0;
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  return d.getUTCFullYear();
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Storage
 // ═══════════════════════════════════════════════════════════════════════════
@@ -99,7 +110,28 @@ export function getISOWeekNumber(dateStr: string): number {
 const LOG_KEY = 'he_workout_log_v2';
 const PROGRESS_CACHE_KEY = 'he_workout_progress_cache';
 const STATS_CACHE_KEY = 'he_workout_stats_cache';
+const TRIM_KEY = 'he_workout_log_trimmed';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+
+export interface StorageTrimWarning { kept: number; at: number; }
+
+/** Запись о принудительном срезе истории (QuotaExceeded) — для уведомления в UI. */
+export function getStorageTrimWarning(): StorageTrimWarning | null {
+  try {
+    const raw = localStorage.getItem(TRIM_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed.kept === 'number' && parsed.at ? parsed : null;
+  } catch { return null; }
+}
+
+export function clearStorageTrimWarning(): void {
+  try { localStorage.removeItem(TRIM_KEY); } catch {}
+}
+
+function markTrimmed(kept: number): void {
+  try { localStorage.setItem(TRIM_KEY, JSON.stringify({ kept, at: Date.now() })); } catch {}
+}
 
 export function loadSessions(): WorkoutSession[] {
   try {
@@ -123,13 +155,12 @@ export function saveSessions(sessions: WorkoutSession[]) {
           return false;
         }
       };
-      if (!trySave(sorted, 'full')) {
-        if (!trySave(sorted.slice(-500), '500')) {
-          if (!trySave(sorted.slice(-100), '100')) {
-            trySave(sorted.slice(-50), '50');
-          }
-        }
-      }
+      let kept: WorkoutSession[] | null = null;
+      if (trySave(sorted, 'full')) { /* ok */ }
+      else if (trySave(sorted.slice(-500), '500')) { kept = sorted.slice(-500); }
+      else if (trySave(sorted.slice(-100), '100')) { kept = sorted.slice(-100); }
+      else if (trySave(sorted.slice(-50), '50')) { kept = sorted.slice(-50); }
+      if (kept) markTrimmed(kept.length);
     }
   }
 }
@@ -186,8 +217,10 @@ export function logSet(
 
   if (weightKg <= 0 || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
 
-  const isPR = previousBestWeight ? weightKg > previousBestWeight : ex.sets.length === 0 || weightKg > Math.max(...ex.sets.map(s => s.weightKg), 0);
   const estimated1RM = epley1RM(weightKg, reps);
+  // PR по расчётному 1RM (а не только по весу): 80кг×5 (e1RM 93) > 82кг×1 (e1RM 85).
+  const sessionBestE1RM = ex.sets.length > 0 ? Math.max(...ex.sets.map(s => epley1RM(s.weightKg, s.reps))) : 0;
+  const isPR = estimated1RM > sessionBestE1RM || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight);
 
   ex.sets = [...ex.sets, { setNumber: set.setNumber, weightKg, reps, rpe, rir, isPR, notes: set.notes || '' }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
@@ -220,6 +253,71 @@ export function finishSession(session: WorkoutSession, notes: string = ''): Work
   return finished;
 }
 
+/** Обновить существующую сессию в localStorage. Возвращает null, если сессия не найдена. */
+export function updateSession(sessionId: string, patch: Partial<WorkoutSession>): WorkoutSession | null {
+  const sessions = loadSessions();
+  const idx = sessions.findIndex(s => s.sessionId === sessionId);
+  if (idx < 0) return null;
+  const updated: WorkoutSession = { ...sessions[idx], ...patch };
+  sessions[idx] = updated;
+  saveSessions(sessions);
+  return updated;
+}
+
+/** Удалить сессию из localStorage. */
+export function deleteSession(sessionId: string): boolean {
+  const sessions = loadSessions();
+  const next = sessions.filter(s => s.sessionId !== sessionId);
+  if (next.length === sessions.length) return false;
+  saveSessions(next);
+  return true;
+}
+
+/** Обратный маппер WorkoutLog → WorkoutSession (для зеркалирования IDB → localStorage).
+ *  Сохраняет id как sessionId, чтобы удаление/обновление работало в обоих слоях. */
+export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
+  const exercises: WorkoutExercise[] = (log.exercises || []).map(ex => {
+    const sets: WorkoutSet[] = (ex.sets || []).map((st, i) => ({
+      setNumber: i + 1,
+      weightKg: st.weight || 0,
+      reps: st.reps || 0,
+      rpe: st.rpe || 0,
+      rir: st.rir ?? 2,
+      velocityMs: undefined,
+      isPR: false,
+      notes: '',
+    }));
+    return {
+      exerciseId: ex.exerciseId,
+      exerciseName: ex.exerciseName,
+      pattern: ex.isCompound ? 'compound' : 'isolation',
+      muscleGroup: '',
+      order: 0,
+      sets,
+      totalVolume: ex.totalVolume || sets.reduce((s, x) => s + x.weightKg * x.reps, 0),
+      best1RM: ex.estimated1RM || Math.max(0, ...sets.map(x => epley1RM(x.weightKg, x.reps))),
+      avgRPE: sets.length > 0 ? Math.round((sets.reduce((s, x) => s + x.rpe, 0) / sets.length) * 10) / 10 : 0,
+    };
+  });
+  return {
+    sessionId: log.id,
+    date: log.date,
+    startTime: '00:00',
+    endTime: '00:00',
+    durationMin: log.duration || 0,
+    focus: log.split || 'Тренировка',
+    exercises,
+    totalVolume: exercises.reduce((s, e) => s + e.totalVolume, 0),
+    totalSets: exercises.reduce((s, e) => s + e.sets.length, 0),
+    totalReps: exercises.reduce((s, e) => s + e.sets.reduce((ss, st) => ss + st.reps, 0), 0),
+    avgIntensity: 0,
+    prCount: 0,
+    notes: log.notes || '',
+    weekNumber: log.weekNumber || 0,
+    mesocycleWeek: 0,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Analytics
 // ═══════════════════════════════════════════════════════════════════════════
@@ -248,12 +346,14 @@ export function getWorkoutStats(): WorkoutStats {
     }
   }
 
-  // Weekly volume (ISO week, parity with strength-diary.engine.ts)
-  const weekMap = new Map<number, { volume: number; sessions: number }>();
+  // Weekly volume (ISO week + ISO year — недели разных лет не схлопываются)
+  const weekMap = new Map<string, { year: number; week: number; volume: number; sessions: number }>();
   for (const sess of sessions) {
     const weekNum = getISOWeekNumber(sess.date);
-    if (!weekMap.has(weekNum)) weekMap.set(weekNum, { volume: 0, sessions: 0 });
-    const w = weekMap.get(weekNum)!;
+    const year = getISOWeekYear(sess.date);
+    const key = `${year}-W${weekNum}`;
+    if (!weekMap.has(key)) weekMap.set(key, { year, week: weekNum, volume: 0, sessions: 0 });
+    const w = weekMap.get(key)!;
     w.volume += sess.totalVolume;
     w.sessions++;
   }
@@ -277,7 +377,7 @@ export function getWorkoutStats(): WorkoutStats {
     bestLifts,
     prCount,
     streak,
-    weeklyVolume: [...weekMap.entries()].sort(([a], [b]) => a - b).map(([w, v]) => ({ week: w, ...v })),
+    weeklyVolume: [...weekMap.values()].sort((a, b) => a.year - b.year || a.week - b.week).map(({ year, week, volume, sessions }) => ({ week, year, volume, sessions })),
     exerciseFrequency: exerciseFreq,
   };
 }
@@ -323,12 +423,35 @@ export function exportToCSV(): WorkoutCSV {
   return { headers, rows };
 }
 
+/** Разбить CSV-строку с учётом кавычек; поддерживает запятую и точку с запятой. */
+export function splitCSVRow(line: string): string[] {
+  const commas = (line.match(/,/g) || []).length;
+  const semis = (line.match(/;/g) || []).length;
+  const sep = semis > commas ? ';' : ',';
+  const out: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === sep) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(s => s.trim());
+}
+
 /**
- * importSessionsFromCSV — импорт тренировок из CSV (формат exportToCSV:
- * Date,Exercise,Set,Weight,Reps,RPE[,RIR][,...]). Группирует по дате → сессии,
- * по упражнению → упражнения, пересчитывает тоталы/1RM/avgRPE, добавляет в he_workout_log_v2.
- * Строки с ошибками пропускаются и возвращаются в errors.
- */
+ * importSessionsFromCSV — импорт тренировок из CSV (форматы exportToCSV и экспорта хаба:
+ * date,exercise,set,weight,reps[,rpe[,rir[,notes]]] и Date,Exercise,Set,Weight,Reps,RPE,RIR,1RM,PR,Focus).
+ * Группирует по дате → сессии, по упражнению → упражнения, пересчитывает тоталы/1RM/avgRPE,
+ * weekNumber = ISO-неделя даты, isPR — по росту e1RM внутри упражнения.
+ * Добавляет в he_workout_log_v2 (зеркалируется в IndexedDB при следующем чтении). */
 export function importSessionsFromCSV(text: string): { importedSessions: number; importedSets: number; errors: string[] } {
   const errors: string[] = [];
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -336,24 +459,27 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
 
   // пропустить заголовок
   let start = 0;
-  if (/^date/i.test(lines[0]) || /^"date"/i.test(lines[0])) start = 1;
+  if (/^date/i.test(lines[0]) || /^"date/i.test(lines[0])) start = 1;
 
-  const byDate: Record<string, { exName: string; setNumber: number; weight: number; reps: number; rpe: number; rir: number }[]> = {};
+  const byDate: Record<string, { exName: string; setNumber: number; weight: number; reps: number; rpe: number; rir: number; notes: string }[]> = {};
   let lineNo = 0;
   for (let i = start; i < lines.length; i++) {
     lineNo = i + 1;
-    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    const cols = splitCSVRow(lines[i]);
     if (cols.length < 5) { errors.push(`Строка ${lineNo}: мало колонок (нужно ≥5: date,exercise,set,weight,reps).`); continue; }
-    const [date, exercise, setStr, weightStr, repsStr, rpeStr, rirStr] = cols;
+    const [date, exercise, setStr, weightStr, repsStr, rpeStr, rirStr, notesCol] = cols;
     if (!/^\d{4}-\d{2}-\d{2}/.test(date)) { errors.push(`Строка ${lineNo}: дата не YYYY-MM-DD («${date}»).`); continue; }
     const set = parseInt(setStr) || 1;
     const weight = parseFloat(weightStr);
     const reps = parseInt(repsStr);
     if (isNaN(weight) || isNaN(reps)) { errors.push(`Строка ${lineNo}: вес/повт не число.`); continue; }
     const rpe = rpeStr ? parseFloat(rpeStr) || 0 : 0;
-    const rir = rirStr ? parseFloat(rirStr) : 2;
+    const rirRaw = rirStr !== undefined && rirStr !== '' ? parseFloat(rirStr) : 2;
+    const rir = isNaN(rirRaw) ? 2 : rirRaw;
+    // 8-я колонка: заметка (в экспорте хаба), либо 1RM/PR/фокус (в экспорте движка) — берём только текст.
+    const notes = notesCol !== undefined && !/^-?\d+(\.\d+)?$/.test(notesCol) ? notesCol : '';
     if (!byDate[date]) byDate[date] = [];
-    byDate[date].push({ exName: exercise || 'Упражнение', setNumber: set, weight, reps, rpe, rir: isNaN(rir as number) ? 2 : rir });
+    byDate[date].push({ exName: exercise || 'Упражнение', setNumber: set, weight, reps, rpe, rir, notes });
   }
 
   const newSessions: WorkoutSession[] = [];
@@ -364,10 +490,17 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
     rows.forEach(r => { if (!byEx[r.exName]) byEx[r.exName] = []; byEx[r.exName].push(r); });
     const exercises: WorkoutExercise[] = Object.keys(byEx).map((exName, oi) => {
       const exRows = byEx[exName].sort((a, b) => a.setNumber - b.setNumber);
-      const sets: WorkoutSet[] = exRows.map((r, si) => ({
-        setNumber: si + 1, weightKg: r.weight, reps: r.reps, rpe: r.rpe, rir: r.rir,
-        isPR: false, notes: '',
-      }));
+      // PR пересчитывается по росту e1RM внутри упражнения
+      let maxE1RM = 0;
+      const sets: WorkoutSet[] = exRows.map((r, si) => {
+        const e1 = epley1RM(r.weight, r.reps);
+        const isPR = e1 > maxE1RM;
+        maxE1RM = Math.max(maxE1RM, e1);
+        return {
+          setNumber: si + 1, weightKg: r.weight, reps: r.reps, rpe: r.rpe, rir: r.rir,
+          isPR, notes: r.notes || '',
+        };
+      });
       const totalVolume = sets.reduce((s, x) => s + x.weightKg * x.reps, 0);
       const best1RM = Math.max(0, ...sets.map(s => epley1RM(s.weightKg, s.reps)));
       const rpes = sets.map(s => s.rpe).filter(r => r > 0);
@@ -378,11 +511,13 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
     const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
     const totalReps = exercises.reduce((s, e) => s + e.sets.reduce((ss: number, x: WorkoutSet) => ss + x.reps, 0), 0);
     importedSets += totalSets;
+    const weekNumber = getISOWeekNumber(date);
+    const prCount = exercises.reduce((s, e) => s + e.sets.filter(x => x.isPR).length, 0);
     newSessions.push({
       sessionId: 'imp_' + date + '_' + Math.random().toString(36).slice(2, 8),
       date, startTime: '00:00', endTime: '00:00', durationMin: 0,
       focus: 'Импорт CSV', exercises, totalVolume, totalSets, totalReps,
-      avgIntensity: 0, prCount: 0, notes: 'Импортировано из CSV', weekNumber: 0, mesocycleWeek: 0,
+      avgIntensity: 0, prCount, notes: 'Импортировано из CSV', weekNumber, mesocycleWeek: weekNumber % 4 || 4,
     });
   });
 
@@ -527,7 +662,8 @@ export function getExerciseProgress(name: string, limit: number = 20): ExerciseP
   const bestWeight = Math.max(...sets.map(s => s.weightKg));
   const bestReps = Math.max(...sets.map(s => s.reps));
   const bestE1RM = Math.max(...sets.map(s => epley1RM(s.weightKg, s.reps)));
-  const avgRPE = sets.filter(s => s.rpe > 0).reduce((a, s) => a + s.rpe, 0) / sets.filter(s => s.rpe > 0).length || 0;
+  const rpeSets = sets.filter(s => s.rpe > 0);
+  const avgRPE = rpeSets.length > 0 ? rpeSets.reduce((a, s) => a + s.rpe, 0) / rpeSets.length : 0;
   const half = Math.floor(sets.length / 2);
   const firstHalf = sets.slice(0, half);
   const secondHalf = sets.slice(-half || sets.length);
@@ -554,7 +690,11 @@ export interface VolumeTrendDay {
 }
 
 export function getVolumeTrend(days: number = 14): VolumeTrendDay[] {
-  const sessions = loadSessions().slice(0, days);
+  // Окно по датам, а не по числу сессий: последние `days` календарных дней.
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const sessions = loadSessions().filter(s => s.date >= cutoffStr);
   const map = new Map<string, { volume: number; sets: number; sessions: number }>();
   for (const sess of sessions) {
     const cur = map.get(sess.date) || { volume: 0, sets: 0, sessions: 0 };
