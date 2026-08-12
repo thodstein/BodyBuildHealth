@@ -629,6 +629,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       ? macroPhaseToLmsPhase(week.macroPhase as Macrocycle['blocks'][number]['phase'])
       : (week.sourcePhase || mesocyclePhaseForWeek(week.week, totalWeeks));
   };
+  /** Суммарный объём (сеты) недели плана — для отображения taper-процентов. */
+  const weekVolumeOf = (week: LMSBuildOutput['weeks'][number]): number => {
+    let v = 0;
+    for (const d of week.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
+    return v;
+  };
 
   const bbRanked = useMemo(() => rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays }), [bbLevel, bbGoal, bbDays]);
   const bbBest = bbRanked[0];
@@ -1315,12 +1321,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                  ? sourceCycle.weeks
                  : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1), sourceCycle.meta.period, sourceCycle.meta.sourcePhases, sourceCycle.meta.sourcePhaseSource ?? 'original')
                : undefined;
+             const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.macroPhase === 'competition' && w.sourcePhase === 'peak';
+             const TAPER_COLOR = '#f59e0b';
              const sourceWeek = sourceCalendar?.[wk.week - 1];
-             const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : PH_COLOR[phase];
-             const calendarTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : PH_COLOR[phase] + '14';
-             const calendarBorderTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : PH_COLOR[phase] + '30';
-             const calendarBadgeTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : PH_COLOR[phase] + '22';
-             const calendarLabel = sourceWeek
+             const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase];
+             const calendarTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : (isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '14';
+             const calendarBorderTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : (isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '30';
+             const calendarBadgeTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : (isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '22';
+             const calendarLabel = isTaperWeek(wk)
+               ? `📉 Тапер · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма`
+               : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]} · ${SOURCE_PHASE_LABEL[sourceWeek.phase]} · ${Math.round(sourceWeek.intensityPct * 100)}% · ${sourceWeek.volumeSets} сетов`
                : PH_RU[phase];
              const calendarDescription = sourceWeek
@@ -1434,17 +1444,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : PH_COLOR[ph]; const tint = original ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{w.week}</button>; })}
+                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : taper ? `📉 Тапер · ${Math.round(weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{taper ? '📉' : w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
-                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
-                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : PH_RU[ph]} />
+                    {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
+                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (taper ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)') : 'transparent', border: active ? (taper ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (taper ? '#f59e0b' : 'var(--accent)') : 'rgba(255,255,255,0.7)', minWidth: 26 }}>{taper ? '📉' : 'Н' + w.week}</span>
+                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                           {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${color}, ${colorFade})` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
                       </div>
