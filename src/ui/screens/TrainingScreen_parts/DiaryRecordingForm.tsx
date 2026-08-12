@@ -40,6 +40,10 @@ interface DiaryRecordingFormProps {
   selectedWeek: number;
   onSave: () => void;
   historyWorkouts?: WorkoutLog[];
+  /** План дня для предзаполнения (кнопка «Записать по плану»). */
+  pendingTemplate?: { exercises: Array<{ name?: string; sets?: number; reps?: string | number; rir?: number }> } | null;
+  templateKey?: number;
+  onTemplateApplied?: () => void;
 }
 
 function getPreviousWorkoutData(historyWorkouts: WorkoutLog[], exerciseName: string): { weight: number; reps: number; rir: number } | null {
@@ -60,7 +64,7 @@ function getPreviousWorkoutData(historyWorkouts: WorkoutLog[], exerciseName: str
   return best ? { weight: best.weight, reps: best.reps, rir: best.rir } : null;
 }
 
-export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, selectedWeek, onSave, historyWorkouts = [] }) => {
+export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, selectedWeek, onSave, historyWorkouts = [], pendingTemplate = null, templateKey = 0, onTemplateApplied }) => {
   const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
   const [logDuration, setLogDuration] = useState(60);
   const [logRPE, setLogRPE] = useState(7);
@@ -166,6 +170,27 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
     window.addEventListener('diary-template-loaded', handler);
     return () => window.removeEventListener('diary-template-loaded', handler);
   }, []);
+
+  // План дня → предзаполнение формы («Записать по плану»)
+  const [planApplied, setPlanApplied] = useState(false);
+  useEffect(() => {
+    if (!pendingTemplate || !templateKey) return;
+    if (!pendingTemplate.exercises || pendingTemplate.exercises.length === 0) return;
+    const exs: ExerciseRecord[] = pendingTemplate.exercises.map((e: any) => {
+      const cat = EXERCISE_CATALOG.find((c: any) => c.name === e.name);
+      const reps = Math.max(1, parseInt(String(e.reps)) || 10);
+      const sets: SetRecord[] = Array.from({ length: Math.max(1, Number(e.sets) || 3) }, () => ({ weight: 0, reps, rir: Number(e.rir) || 2, rpe: 7, completed: false }));
+      return { exerciseId: cat?.id || e.name || 'custom', exerciseName: cat?.name || e.name || 'Упражнение', sets };
+    });
+    if (exs.length === 0) return;
+    pushUndo(exercises);
+    setExercises(exs);
+    setCurrentExIdx(0);
+    setCurrentSetIdx(0);
+    setPlanApplied(true);
+    setTimeout(() => setPlanApplied(false), 5000);
+    onTemplateApplied?.();
+  }, [templateKey]);
 
   // Toggle superset for an exercise (links it with the previous one)
   const toggleSuperset = useCallback((idx: number) => {
@@ -448,6 +473,14 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', marginBottom: 8, fontSize: 10, color: '#60a5fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>📋 Черновик восстановлен ({exercises.length} упр.)</span>
           <button onClick={() => { setExercises([]); clearDraft(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 10 }}>✕ очистить</button>
+        </div>
+      )}
+
+      {/* Plan applied indicator */}
+      {planApplied && exercises.length > 0 && (
+        <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 8, fontSize: 10, color: '#00e68a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>🎯 План загружен: {exercises.length} упр. — заполните веса и повторы</span>
+          <button onClick={() => { setExercises([]); setPlanApplied(false); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 10 }}>✕</button>
         </div>
       )}
 

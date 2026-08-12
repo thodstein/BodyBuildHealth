@@ -53,13 +53,17 @@ const RecordModeSelector: React.FC<{
   historyWorkouts: WorkoutLog[];
   selectedWeek: number;
   onSave: () => void;
-}> = ({ diary, historyWorkouts, selectedWeek, onSave }) => {
-  const [sub, setSub] = useState<'quick' | 'full'>('quick');
+  sub: 'quick' | 'full';
+  onSubChange: (s: 'quick' | 'full') => void;
+  pendingTemplate?: any;
+  templateKey?: number;
+  onTemplateApplied?: () => void;
+}> = ({ diary, historyWorkouts, selectedWeek, onSave, sub, onSubChange, pendingTemplate, templateKey, onTemplateApplied }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 4 }}>
         {([['quick', '⚡ Быстро'], ['full', '📝 Подробно']] as const).map(([k, l]) => (
-          <button key={k} onClick={() => setSub(k)} style={{
+          <button key={k} onClick={() => onSubChange(k)} style={{
             flex: 1, padding: '8px 12px', borderRadius: 8,
             border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
             background: sub === k ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
@@ -71,7 +75,8 @@ const RecordModeSelector: React.FC<{
       {sub === 'quick' ? (
         <QuickEntry diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onSave} />
       ) : (
-        <DiaryRecordingForm diary={diary} selectedWeek={selectedWeek} onSave={onSave} historyWorkouts={historyWorkouts} />
+        <DiaryRecordingForm diary={diary} selectedWeek={selectedWeek} onSave={onSave} historyWorkouts={historyWorkouts}
+          pendingTemplate={pendingTemplate} templateKey={templateKey} onTemplateApplied={onTemplateApplied} />
       )}
     </div>
   );
@@ -161,6 +166,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
   const [hubAnalyticsExpanded, setHubAnalyticsExpanded] = useState(false);
   const [barTooltip, setBarTooltip] = useState<{ group: string; sets: number; week: number; x: number; y: number } | null>(null);
+  // Режим записи (быстро/подробно) + предзаполнение из плана дня
+  const [recordSub, setRecordSub] = useState<'quick' | 'full'>('quick');
+  const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
 
   // Progress state
 
@@ -479,7 +487,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
                       {planned.exercises.slice(0, 6).map(e => e.name).join(' · ')}{planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
                     </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>~{planned.duration} мин</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>~{planned.duration} мин</div>
+                      <button onClick={() => setPlanToRecord({ day: planned, nonce: Date.now() })}
+                        style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
+                        ✍️ Записать по плану
+                      </button>
+                    </div>
                   </div>
                 )}
                 {last && (
@@ -495,7 +509,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             );
           })()}
-          <RecordModeSelector diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onRefresh} />
+          <RecordModeSelector diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
+            sub={recordSub} onSubChange={setRecordSub}
+            pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} />
         </div>
       )}
 
