@@ -75,6 +75,60 @@ function weeksBucket(w: number): string {
 const WEEKS_LABELS: Record<string, string> = { w8: '≤ 8 нед', w12: '9–12 нед', w13: '13+ нед' };
 const PERIOD_LABELS: Record<string, string> = { strength: 'Сила', peak: 'Пик', mass: 'Масса', endurance: 'Выносливость', mixed: 'Смешанный' };
 
+// ── Просмотр раскладки цикла (дни → упражнения → подходы/повторы/%ПМ) ──
+export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle }) => {
+  const explicit = cycle.weeks && cycle.weeks.length > 0 ? cycle.weeks : undefined;
+  const [weekIdx, setWeekIdx] = React.useState(0);
+  React.useEffect(() => { setWeekIdx(0); }, [cycle.meta.id]);
+  const days = explicit
+    ? explicit[Math.min(weekIdx, explicit.length - 1)]
+    : cycle.week1;
+  if (!days || days.length === 0) return <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Раскладка цикла не задана.</div>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {explicit && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Неделя раскладки:</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {explicit.map((_, i) => (
+              <button key={i} onClick={() => setWeekIdx(i)} style={{
+                minWidth: 30, padding: '4px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                border: weekIdx === i ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                background: weekIdx === i ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)',
+                color: weekIdx === i ? 'var(--accent)' : 'rgba(255,255,255,0.7)',
+              }}>Неделя {i + 1}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {!explicit && cycle.meta.weeks > 1 && (
+        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+          Показана неделя 1 из {cycle.meta.weeks}. Недели 2..N генерируются прогрессией (коррекция ПМ {Math.round((cycle.meta.correctionPct || 0) * 1000) / 10}%/нед).
+        </div>
+      )}
+      {days.map((day, di) => (
+        <div key={di} style={{ borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: 0.3, padding: '5px 8px', background: 'rgba(0,230,138,0.06)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            День {di + 1}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '5px 8px' }}>
+            {day.exercises.map((ex, ei) => (
+              <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 4, fontSize: 11, lineHeight: 1.5 }}>
+                <span style={{ color: 'rgba(255,255,255,0.9)' }}>{ex.name}</span>
+                {ex.load && <span style={{ fontSize: 10, color: ex.load === 'Тяжелая' ? '#ef4444' : ex.load === 'Средняя' ? '#eab308' : '#22c55e' }}>{ex.load}</span>}
+                <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>
+                  {(ex.sets || []).map((s, si) => `${s.sets}×${s.reps} @${Math.round(s.pct * 100)}%${s.rir !== undefined ? ` · RIR ${s.rir}` : ''}`).join(' + ')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ── Чип-кнопка (стиль как в nav.ts:504) ──
 function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
@@ -316,6 +370,10 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                         </ul>
                       </div>
                     )}
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', marginBottom: 4 }}>📅 Раскладка тренировок</div>
+                      <CycleLayoutView cycle={c} />
+                    </div>
                   </div>
                 }
               />
