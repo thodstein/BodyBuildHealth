@@ -1191,10 +1191,18 @@ export function appendPLTaperWeeks(
     ? ` 💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}; прогрессия ПМ ${k >= 0 ? '+' : ''}${(k * 100).toFixed(1)}%/нед продолжена в taper-неделях.`
     : '';
 
+  // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
+  // и PED-множителя — иначе peakWeek/статусы остаются от исходного плана.
+  const level = plan.template?.meta?.level as string | undefined;
+  const plVolumeLandmarks = level
+    ? getPLVolumeLandmarks(weeks, level, Math.max(1, pedMrvMult))
+    : plan.plVolumeLandmarks;
+
   return {
     ...plan,
     weeks,
     cycleMetrics,
+    plVolumeLandmarks,
     progressionRationale: plan.progressionRationale +
       ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).` +
       pedNote +

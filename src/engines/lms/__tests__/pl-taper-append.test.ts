@@ -112,6 +112,32 @@ describe('appendPLTaperWeeks', () => {
     expect(next.cycleMetrics.sessions).toBeGreaterThan(plan.cycleMetrics.sessions);
   });
 
+  it('пересчитывает plVolumeLandmarks после добавления taper-недель (отчёт качества)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2);
+    expect(next.plVolumeLandmarks).toBeDefined();
+    expect(next.plVolumeLandmarks!.length).toBeGreaterThan(0);
+    // Тот же объект? Нет — пересчитан (новые недели учтены).
+    expect(next.plVolumeLandmarks).not.toBe(plan.plVolumeLandmarks);
+  });
+
+  it('plVolumeLandmarks с PED-курсом используют MRV × pedMrvMult (отчёт качества)', () => {
+    const plan = buildBase(6);
+    const nat = appendPLTaperWeeks(plan, 2, { mode: 'natural' });
+    const onCourse = appendPLTaperWeeks(plan, 2, {
+      peds: ['AAS'], pedDoses: { AAS: 500 }, courseIntensity: 'moderate', mode: 'on_course',
+    });
+    // По-групповое сравнение: для каждой общей группы курсовой MRV ≥ натурального
+    // (landmarks сортируются по статусу, поэтому сравниваем по ключу group, не по индексу).
+    expect(onCourse.plVolumeLandmarks!.length).toBeGreaterThan(0);
+    let compared = 0;
+    for (const nl of nat.plVolumeLandmarks!) {
+      const ol = onCourse.plVolumeLandmarks!.find(o => o.group === nl.group);
+      if (ol) { expect(ol.mrv).toBeGreaterThanOrEqual(nl.mrv); compared++; }
+    }
+    expect(compared).toBeGreaterThan(0);
+  });
+
   it('добавляет пояснение в progressionRationale', () => {
     const plan = buildBase(6);
     const next = appendPLTaperWeeks(plan, 2);

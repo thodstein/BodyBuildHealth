@@ -1784,7 +1784,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </MetricCard>
               {builtSrc && builtSrc.plVolumeLandmarks && builtSrc.plVolumeLandmarks.length > 0 && (
                 <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
-                  <div style={{ color:'rgba(255,255,255,0.55)', fontSize:11, marginBottom:8 }}>Пиковая неделя: {builtSrc.plVolumeLandmarks[0].peakWeek}</div>
+                  <div style={{ color:'rgba(255,255,255,0.55)', fontSize:11, marginBottom:8 }}>
+                    Пиковая неделя: {builtSrc.plVolumeLandmarks[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, (() => { try { const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv])); return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier; } catch { return 1; } })()).toFixed(2)} (PED)` : ''}
+                  </div>
                   {builtSrc.plVolumeLandmarks.map((lm) => {
                     const c = lm.status === 'over' ? '#ff5252' : lm.status === 'high' ? '#ffb74d' : lm.status === 'optimal' ? '#4caf50' : '#90caf9';
                     const lbl = lm.status === 'over' ? 'ПЕРЕБОР' : lm.status === 'high' ? 'высоко' : lm.status === 'optimal' ? 'оптимум' : 'низко';
