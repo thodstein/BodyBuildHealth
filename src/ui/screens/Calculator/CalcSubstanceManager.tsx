@@ -1,4 +1,4 @@
-// ════════════════════════════════════════════════════════════════════
+﻿// ════════════════════════════════════════════════════════════════════
 //  CalcSubstanceManager — управление препаратами: добавить/удалить/заменить
 //  с детальным логом изменений и финальным подтверждением
 // ════════════════════════════════════════════════════════════════════
@@ -7,6 +7,11 @@ import type { SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
+import { NON_PILL_SUPPORT_IDS } from '../../../engines/support-plan/substances';
+
+// База курса (гидратация/кардио/электролиты/шаги/курение/алкоголь) — не препараты:
+// в менеджере не показываются и не удаляются.
+const BASE_IDS = NON_PILL_SUPPORT_IDS;
 
 // ── справочник русских названий ──
 const FALLBACK_NAMES: Record<string, string> = {
@@ -69,8 +74,9 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
   const [manualRemoves, setManualRemoves] = useState<string[]>([]);
   const [manualReplacements, setManualReplacements] = useState<Record<string, string>>({});
 
-  // текущие ID в плане
-  const currentIds = useMemo(() => finalRec.subs.map(s => s.substanceId), [finalRec]);
+  // текущие ID в плане (без базы курса — её нельзя удалять)
+  const currentIds = useMemo(() => finalRec.subs.filter(s => !BASE_IDS.has(s.substanceId)).map(s => s.substanceId), [finalRec]);
+  const planSubsFiltered = useMemo(() => finalRec.subs.filter(s => !BASE_IDS.has(s.substanceId)), [finalRec]);
 
   // ── выбор из каталога (inline) ──
   const [addSearch, setAddSearch] = useState('');
@@ -412,13 +418,13 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
                 Отметьте препараты для удаления из плана:
               </div>
-              {finalRec.subs.length === 0 ? (
+              {planSubsFiltered.length === 0 ? (
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>
                   Нет препаратов в плане
                 </div>
               ) : (
                 <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 8 }}>
-                  {finalRec.subs.map(s => {
+                  {planSubsFiltered.map(s => {
                     const sid = s.substanceId;
                     const isSelected = selectedForRemove.includes(sid);
                     return (
@@ -477,13 +483,13 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
                 Выберите препарат для замены:
               </div>
-              {finalRec.subs.length === 0 ? (
+              {planSubsFiltered.length === 0 ? (
                 <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>
                   Нет препаратов в плане
                 </div>
               ) : (
                 <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 8 }}>
-                  {finalRec.subs.map(s => {
+                  {planSubsFiltered.map(s => {
                     const sid = s.substanceId;
                     const isSelected = replaceTarget === sid;
                     return (

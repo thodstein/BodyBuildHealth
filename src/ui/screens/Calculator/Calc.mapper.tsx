@@ -14,7 +14,7 @@ import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type Mega
 import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
 import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
-import { CalcSafetyLayer } from './CalcSafetyLayer';
+import { SafetyGuardrails, SafetyAlerts, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyDepletion, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyPctTiming, SafetyInjections } from './CalcSafetyLayer';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
@@ -2695,11 +2695,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
           {showPrescription && (
             <>
-              {/* Краткий список препаратов (compact summary) */}
+              {/* Краткий список препаратов (compact summary) — без базы курса */}
               <div style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background:'rgba(24,24,27,0.3)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.length}) · база и минералы не являются препаратами</div>
+                <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).length}) · база курса — в карточке «Образ жизни»</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                  {finalRec.subs.map((s, i) => {
+                  {finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).map((s, i) => {
                     const doseInfo = subDosage(s.substanceId);
                     const titrF = finalRec.titrationFactors?.get(canonIdLocal(s.substanceId));
                     const mg = doseInfo ? (titrF && titrF > 1 ? Math.round(doseInfo.mg * titrF) : doseInfo.mg) : null;
@@ -2735,8 +2735,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 }}
               />
 
-              {/* Детальные карточки веществ */}
-              {finalRec.subs.map((s, i) => (
+              {/* Таблеточная нагрузка — сводка плана */}
+              <SafetyPillBurden planResult={planResult} />
+
+              {/* Детальные карточки веществ — без базы курса */}
+              {finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).map((s, i) => (
                 <CalcSubstanceDetail
                   key={s.substanceId + i}
                   sub={s}
@@ -2750,34 +2753,6 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               ))}
             </>
           )}
-        </div>
-      )}
-
-      {/* ===== ТОКСИКОЛОГИЧЕСКИЙ КОНТРОЛЬ ДОЗ (UL + титрация) ===== */}
-      {finalRec && toxWarnings.length > 0 && (
-        <div style={{ marginTop:8 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
-            ⚠️ Контроль дозировок ({toxWarnings.length})
-          </div>
-          {toxWarnings.map((w, i) => {
-            const isDanger = w.severity === 'danger';
-            const isTitr = w.severity === 'titrate';
-            const col = isDanger ? '#ef4444' : isTitr ? '#f59e0b' : '#fbbf24';
-            const bg = isDanger ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)';
-            const bd = isDanger ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.2)';
-            const tag = isDanger ? 'ПРЕВЫШЕН UL' : isTitr ? 'ТИТРАЦИЯ' : 'ВНИМАНИЕ';
-            return (
-              <div key={i} style={{ margin:'3px 0', padding:'6px 8px', borderRadius:8, background:bg, border:`1px solid ${bd}` }}>
-                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
-                  <span style={{ fontSize:7, fontWeight:800, color:col, padding:'1px 5px', borderRadius:4, background:bg, border:`1px solid ${bd}` }}>{tag}</span>
-                  <span style={{ fontSize:9, fontWeight:700, color:'#ffffff' }}>{subNameRu(w.substanceId)}</span>
-                </div>
-                <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
-                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
-              </div>
-            );
-          })}
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
         </div>
       )}
 
@@ -2889,374 +2864,66 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   })}
                 </>
               )}
+              {finalRec.subs.length > 1 && (() => {
+                const interactions = checkInteractions(finalRec.subs.map(s => s.substanceId));
+                if (interactions.length === 0) return null;
+                function fmtSub(id: string): string {
+                  if (id.startsWith('@')) {
+                    const classLabels: Record<string, string> = {
+                      '@statin': 'статины', '@raas': 'РААС-препараты (ACEi/ARB)',
+                      '@antidiabetic': 'антидиабетические', '@macrolide': 'макролиды',
+                      '@anticoagulant': 'антикоагулянты', '@cyp3a4_inhibitor': 'CYP3A4-ингибиторы',
+                      '@cyp3a4_substrate': 'CYP3A4-субстраты', '@alpha_blocker': 'α-блокаторы',
+                      '@d2_antagonist': 'D2-антагонисты', '@alcohol': 'алкоголь',
+                      '@nsaid': 'НПВС', '@contrast': 'контрастные вещества',
+                      '@ssri': 'СИОЗС', '@tetracycline': 'тетрациклины',
+                      '@levothyroxine': 'L-тироксин',
+                    };
+                    return classLabels[id] || id;
+                  }
+                  return subNameRu(id);
+                }
+                const groups: Record<string, DrugInteraction[]> = { block: [], warn: [], monitor: [] };
+                for (const intr of interactions) groups[intr.severity].push(intr);
+                const hasBlock = groups.block.length > 0;
+                const sevLabel: Record<string, string> = { block: '⛔ Запрещено', warn: '⚠ Осторожно', monitor: '🔬 Контроль' };
+                const sevColor: Record<string, string> = { block: '#f87171', warn: '#fbbf24', monitor: '#60a5fa' };
+                const sevBg: Record<string, string> = { block: 'rgba(239,68,68,0.09)', warn: 'rgba(245,158,11,0.07)', monitor: 'rgba(96,165,250,0.05)' };
+                return (
+                  <>
+                    <div style={{ fontSize:7, fontWeight:700, color: hasBlock ? '#f87171' : 'rgba(255,255,255,0.5)', margin:'6px 0 4px', textTransform:'uppercase', letterSpacing:'0.3px' }}>
+                      Взаимодействия ({interactions.length}){hasBlock ? ' · есть запрещённые' : ''}
+                    </div>
+                    {(['block', 'warn', 'monitor'] as const).map(sev => {
+                      const items = groups[sev];
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={sev} style={{ padding:'4px 7px', borderRadius:5, background:sevBg[sev], border:`1px solid ${sevColor[sev]}18`, marginBottom:3 }}>
+                          <div style={{ fontSize:7, fontWeight:800, color:sevColor[sev], marginBottom:2 }}>{sevLabel[sev]} ({items.length})</div>
+                          {items.map((intr, i) => (
+                            <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.75)', marginBottom:3, lineHeight:1.4 }}>
+                              <div style={{ fontWeight:700, marginBottom:1 }}>
+                                <span style={{ fontSize:8, marginRight:2 }}>{sev === 'block' ? '⛔' : sev === 'warn' ? '⚠' : '🔬'}</span>
+                                <span style={{ color:'#fff' }}>{fmtSub(intr.a)}</span>
+                                <span style={{ opacity:0.5, margin:'0 3px' }}>+</span>
+                                <span style={{ color:'#fff' }}>{fmtSub(intr.b)}</span>
+                              </div>
+                              <div style={{ opacity:0.75 }}><span style={{ fontWeight:600, opacity:0.6 }}>Механизм: </span>{intr.reason}</div>
+                              <div style={{ fontSize:6, opacity:0.6 }}><span style={{ fontWeight:600 }}>Действие: </span>{intr.action}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+              <SafetyGaps rec={finalRecWithResidual ?? finalRec} />
+              <SafetyConflicts rec={finalRecWithResidual ?? finalRec} planResult={planResult} />
             </div>
           )}
         </div>
       )}
-
-      {/* Нутри-корректировки по анализам */}
-      {finalRec && finalRec.nutritionTips && finalRec.nutritionTips.length > 0 && (() => {
-        const tipsByMarker: Record<string, { action: string; target: string; tier: number }[]> = {};
-        for (const t of finalRec.nutritionTips!) {
-          const m = (t as any).marker || 'общее';
-          if (!tipsByMarker[m]) tipsByMarker[m] = [];
-          tipsByMarker[m].push({ action: t.action, target: t.target, tier: (t as any).tier || 1 });
-        }
-        const markers = Object.keys(tipsByMarker);
-        const total = finalRec.nutritionTips.length;
-        const hasHigh = finalRec.nutritionTips.some((t: any) => t.tier >= 2);
-
-        return (
-        <div style={{ marginTop:6 }}>
-          <div onClick={() => setShowNutrition(!showNutrition)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showNutrition ? '8px 8px 0 0' : 8, background: hasHigh ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.04)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.15)' : 'rgba(0,230,138,0.12)') }}>
-            <span style={{ fontSize:10, fontWeight:700, color: hasHigh ? '#f59e0b' : '#22c55e', display:'flex', alignItems:'center', gap:5 }}>
-              🥗 Питание по анализам ({total})
-              {hasHigh && <span style={{ fontSize:7, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.12)' }}>требует коррекции</span>}
-            </span>
-            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showNutrition ? '▲ скрыть' : '▼ показать'}</span>
-          </div>
-          {showNutrition && (
-            <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.15)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.1)' : 'rgba(0,230,138,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
-                Рекомендации по питанию на основе отклонений лабораторных маркеров. Сгруппированы по показателю.
-              </div>
-              {markers.map(marker => {
-                const tips = tipsByMarker[marker];
-                const maxTier = Math.max(...tips.map(t => t.tier));
-                const tierColor = maxTier >= 3 ? '#ef4444' : maxTier >= 2 ? '#f59e0b' : '#22c55e';
-                const tierBg = maxTier >= 3 ? 'rgba(239,68,68,0.06)' : maxTier >= 2 ? 'rgba(245,158,11,0.05)' : 'rgba(34,197,94,0.04)';
-                const tierBorder = maxTier >= 3 ? 'rgba(239,68,68,0.12)' : maxTier >= 2 ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.08)';
-                const tierLabel = maxTier >= 3 ? '⛔ Критично' : maxTier >= 2 ? '⚠ Требует внимания' : '🟢 Профилактика';
-                return (
-                  <div key={marker} style={{ marginBottom:5, padding:'5px 7px', borderRadius:6, background:tierBg, border:`1px solid ${tierBorder}` }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
-                      <span style={{ fontSize:8, fontWeight:700, color:'#ffffff' }}>{marker.toUpperCase()}</span>
-                      <span style={{ fontSize:7, fontWeight:600, color:tierColor, padding:'1px 4px', borderRadius:3, background:`${tierColor}15` }}>{tierLabel}</span>
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                      {tips.map((t, i) => (
-                        <div key={i} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', lineHeight:1.4, display:'flex', gap:4 }}>
-                          <span style={{ color:tierColor, flexShrink:0, fontWeight:700 }}>{maxTier >= 2 ? '⚠' : '•'}</span>
-                          <span>
-                            <span style={{ fontWeight:600, color:'#ffffff' }}>{t.action}</span>
-                            <span style={{ opacity:0.6, marginLeft:4 }}>→ {t.target}</span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  );
-              })}
-            </div>
-          )}
-        </div>
-        );
-      })()}
-
-      {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
-      {finalRec && (() => {
-        const warnings: string[] = [];
-        const flags = finalRec.pedFlags;
-        if (flags) {
-          if (flags.isMultiOral) warnings.push('⚠ Более 1 орального 17α — резко ↑ гепатотоксичность');
-          if (flags.isGHPlusInsulin) warnings.push('⚠ GH + Инсулин — высокий риск гипогликемии');
-          if (flags.isWinnyPlusOxy) warnings.push('🛑 WINSTROL + ANADROL — критическая комбинация (гепатотоксичность + ↓HDL до 50%). ОБЯЗАТЕЛЬНЫЙ протокол защиты включён. LFT каждые 2 нед, не дольше 4 нед');
-          if (flags.has17AlphaAndGH) warnings.push('⚠ 17α-Орал + GH — синергичная гепатотоксичность');
-        }
-        if (warnings.length === 0) return null;
-        return (
-          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize:9, fontWeight:700, color:'#a855f7', marginBottom:3 }}>Предупреждения о курсе</div>
-            {warnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'#c4b5fd', marginBottom:1, lineHeight:1.4 }}>{w}</div>)}
-          </div>
-        );
-      })()}
-
-      {/* Прогноз ребаунда гормонов после отмены */}
-      {finalRec && (() => {
-        // Build ReboundInput from context
-        const peds = (ctx.pedDoses || ctx.aasIds?.map((id: string) => ({ id, pClass: 'aas_unknown' })) || []);
-        if (!peds.length) return null;
-        
-        const cycleWeeks = state.goals?.cycleWeeks || 12;
-        const pctProtocol = rec?.pedFlags?.hasTest ? 'hcg+clomid' : 'clomid+nolva';
-
-        const fp: any = state.labs?.fullPanel || {};
-        const reboundInput: any = {
-          peds: peds.map((p: any) => ({ id: p.id, pClass: p.pClass, mgPerWeek: p.mgPerWeek, iuPerDay: p.iuPerDay, mcgPerDay: p.mcgPerDay })),
-          cycleWeeks,
-          pctProtocol,
-          pctStartWeek: undefined,
-          userProfile: {
-            age: state.profile?.age || 30,
-            baselineTT: fp.TESTOSTERONE || 650,
-            baselineE2: fp.ESTRADIOL || 28,
-            baselinePRL: fp.PROLACTIN || 14,
-            baselineCortisol: fp.CORTISOL || 450,
-            baselineSHBG: fp.SHBG || 30,
-            baselineLH: fp.LH || 5,
-            baselineFSH: fp.FSH || 4,
-          },
-        };
-        
-        try {
-          const rebound = calculateReboundTrajectory(reboundInput) as any;
-          const summary = getReboundSummary(rebound) as any;
-          
-          return (
-            <div style={{ marginTop:6 }}>
-              <div onClick={() => setShowRebound(!showRebound)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showRebound ? '8px 8px 0 0' : 8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)' }}>
-                <span style={{ fontSize:10, fontWeight:700, color:'#f59e0b', display:'flex', alignItems:'center', gap:5 }}>
-                  📉 Прогноз ребаунда после отмены
-                  <span style={{ fontSize:7, fontWeight:600, color:'rgba(245,158,11,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.1)' }}>по вашему курсу</span>
-                </span>
-                <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showRebound ? '▲ скрыть' : '▼ показать'}</span>
-              </div>
-              {showRebound && (
-                <div style={{ padding:'8px 9px', background:'rgba(245,158,11,0.03)', border:'1px solid rgba(245,158,11,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
-                    Прогноз восстановления гормонов за 24 недели после курса. Основан на ПК-фармакокинетике, ПКТ и клинических базах.
-                  </div>
-                  
-                  {/* Summary cards */}
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:6, marginBottom:8 }}>
-                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'#f59e0b' }}>Восстановление</div>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.overallRecoveryWeek || '?'} нед</div>
-                    </div>
-                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'#22c55e' }}>HPTA (LH+FSH+TT)</div>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.hptaRecoveryWeek || '?'} нед</div>
-                    </div>
-                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'#ef4444' }}>E2 ребаунд</div>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.e2.overshootWeek ? `пик нед ${rebound.e2.overshootWeek}` : 'нет'} / rec {rebound.e2.recoveredWeek || '?'} нед</div>
-                    </div>
-                  </div>
-                  
-                  {/* Per-marker mini cards */}
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                    {['tt','ft','e2','prl','lh','fsh','cortisol','shbg'].map(marker => {
-                      const t = rebound[marker as keyof typeof rebound];
-                      if (!t) return null;
-                      const recColor = t.recoveredWeek && t.recoveredWeek <= 12 ? '#22c55e' : t.recoveredWeek && t.recoveredWeek <= 20 ? '#f59e0b' : '#ef4444';
-                      return (
-                        <div key={marker} style={{ padding:'5px 7px', borderRadius:5, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', minWidth:80 }}>
-                          <div style={{ fontSize:7, fontWeight:700, color:marker === 'e2' ? '#f59e0b' : marker === 'prl' ? '#ec4899' : marker === 'cortisol' ? '#ef4444' : '#fff' }}>
-                            {marker.toUpperCase()}
-                          </div>
-                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
-                            {t.recoveredWeek ? `${t.recoveredWeek} нед` : '—'}
-                            {t.overshootWeek && <span style={{ color:'#f59e0b', marginLeft:2 }}>↑{t.overshootWeek}</span>}
-                          </div>
-                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
-                            баз: {t.baseline.toFixed(1)}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                  {/* Risk flags */}
-                  {rebound.riskFlags.length > 0 && (
-                    <div style={{ marginTop:8, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'#ef4444', marginBottom:3 }}>⚠ Риск-факторы</div>
-                      {rebound.riskFlags.map((rf: string, i: number) => (
-                        <div key={i} style={{ fontSize:8, color:'#fca5a5', marginBottom:2, lineHeight:1.4, paddingLeft:10, borderLeft:'2px solid rgba(239,68,68,0.3)' }}>{rf}</div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Clinical notes */}
-                  <div style={{ marginTop:8, padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.12)' }}>
-                    <div style={{ fontSize:7, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>📋 Клинические заметки</div>
-                    {['tt','ft','e2','prl','lh','fsh','cortisol','shbg'].flatMap(marker => {
-                      const t = rebound[marker as keyof typeof rebound];
-                      return t?.clinicalNotes?.map((note: string, i: number) => (
-                        <div key={`${marker}-${i}`} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', marginBottom:1, lineHeight:1.4, paddingLeft:8, borderLeft:'2px solid rgba(96,165,250,0.3)' }}>{note}</div>
-                      )) || [];
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        } catch {
-          return null;
-        }
-      })()}
-      {finalRec && finalRec.subs.length > 1 && (() => {
-        const interactions = checkInteractions(finalRec.subs.map(s => s.substanceId));
-        if (interactions.length === 0) return null;
-
-        function fmtSub(id: string): string {
-          if (id.startsWith('@')) {
-            const classLabels: Record<string, string> = {
-              '@statin': 'статины', '@raas': 'РААС-препараты (ACEi/ARB)',
-              '@antidiabetic': 'антидиабетические', '@macrolide': 'макролиды',
-              '@anticoagulant': 'антикоагулянты', '@cyp3a4_inhibitor': 'CYP3A4-ингибиторы',
-              '@cyp3a4_substrate': 'CYP3A4-субстраты', '@alpha_blocker': 'α-блокаторы',
-              '@d2_antagonist': 'D2-антагонисты', '@alcohol': 'алкоголь',
-              '@nsaid': 'НПВС', '@contrast': 'контрастные вещества',
-              '@ssri': 'СИОЗС', '@tetracycline': 'тетрациклины',
-              '@levothyroxine': 'L-тироксин',
-            };
-            return classLabels[id] || id;
-          }
-          return subNameRu(id);
-        }
-
-        const groups: Record<string, DrugInteraction[]> = { block: [], warn: [], monitor: [] };
-        for (const intr of interactions) {
-          groups[intr.severity].push(intr);
-        }
-
-        const hasBlock = groups.block.length > 0;
-        const total = interactions.length;
-        const sevLabel: Record<string, string> = { block: '⛔ Запрещено', warn: '⚠ Осторожно', monitor: '🔬 Контроль' };
-        const sevColor: Record<string, string> = { block: '#fca5a5', warn: '#fbbf24', monitor: '#60a5fa' };
-        const sevBg: Record<string, string> = { block: 'rgba(239,68,68,0.08)', warn: 'rgba(245,158,11,0.06)', monitor: 'rgba(96,165,250,0.04)' };
-
-        return (
-          <div style={{ marginTop:6 }}>
-            <div onClick={() => setShowInteractions(!showInteractions)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showInteractions ? '8px 8px 0 0' : 8, background: hasBlock ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.05)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.12)') }}>
-              <span style={{ fontSize:10, fontWeight:700, color: hasBlock ? '#ef4444' : '#f59e0b', display:'flex', alignItems:'center', gap:5 }}>
-                {hasBlock ? '⛔ Взаимодействия' : '⚠ Взаимодействия'} ({total})
-                <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.3)' }}>
-                  {groups.block.length > 0 && `⛔${groups.block.length} `}
-                  {groups.warn.length > 0 && `⚠${groups.warn.length} `}
-                  {groups.monitor.length > 0 && `🔬${groups.monitor.length}`}
-                </span>
-              </span>
-              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showInteractions ? '▲ скрыть' : '▼ показать'}</span>
-            </div>
-            {showInteractions && (
-              <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.12)', border:'1px solid ' + (hasBlock ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
-                  Проверено {finalRec.subs.length} веществ на попарные взаимодействия. Учитываются фармакокинетика (CYP450, транспортёры) и фармакодинамика.
-                </div>
-                {(['block', 'warn', 'monitor'] as const).map(sev => {
-                  const items = groups[sev];
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={sev} style={{ marginBottom:5, padding:'5px 7px', borderRadius:6, background:sevBg[sev], border:`1px solid ${sevColor[sev]}18` }}>
-                      <div style={{ fontSize:8, fontWeight:700, color:sevColor[sev], marginBottom:3 }}>{sevLabel[sev]} ({items.length})</div>
-                      {items.map((intr, i) => (
-                        <div key={i} style={{ fontSize:8, color:sevColor[sev], marginBottom:3, lineHeight:1.4, paddingLeft:2 }}>
-                          <div style={{ fontWeight:700, marginBottom:1 }}>
-                            <span style={{ fontSize:9, marginRight:2 }}>{sev === 'block' ? '⛔' : sev === 'warn' ? '⚠' : '🔬'}</span>
-                            <span style={{ color:'#fff' }}>{fmtSub(intr.a)}</span>
-                            <span style={{ opacity:0.5, margin:'0 3px' }}>+</span>
-                            <span style={{ color:'#fff' }}>{fmtSub(intr.b)}</span>
-                          </div>
-                          <div style={{ opacity:0.8, marginBottom:1 }}>
-                            <span style={{ fontWeight:600, opacity:0.6 }}>Механизм: </span>{intr.reason}
-                          </div>
-                          <div style={{ fontSize:7, opacity:0.6 }}>
-                            <span style={{ fontWeight:600 }}>Действие: </span>{intr.action}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Противопоказания — все (каталог + правила + условия) */}
-      {finalRec && finalRec.subs.length > 0 && (() => {
-        interface FlatContra { substanceId: string; label: string; severity: 'absolute' | 'relative'; source: 'catalog' | 'rule' | 'condition'; }
-        const flat: FlatContra[] = [];
-
-        // 1) из checkContraindications (по healthConditions)
-        if (finalRec.contraindications) {
-          for (const c of finalRec.contraindications) {
-            flat.push({ substanceId: c.substanceId, label: c.message, severity: c.severity, source: 'condition' });
-          }
-        }
-
-        // 2) из SUPPORT_CATALOG_DATA.contraindications
-        for (const s of finalRec.subs) {
-          const e = SUPPORT_CATALOG_DATA[s.substanceId] || SUPPORT_CATALOG_DATA[s.substanceId.toLowerCase()] || SUPPORT_CATALOG_DATA[s.substanceId.toUpperCase()];
-          if (e?.contraindications?.length) {
-            for (const c of e.contraindications) {
-              flat.push({ substanceId: s.substanceId, label: c, severity: 'relative', source: 'catalog' });
-            }
-          }
-        }
-
-        // 3) из CONTRAINDICATIONS general rules (absolute + relative)
-        for (const s of finalRec.subs) {
-          const rule = getContraindications(s.substanceId);
-          if (!rule) continue;
-          for (const abs of rule.absolute) {
-            flat.push({ substanceId: s.substanceId, label: abs, severity: 'absolute', source: 'rule' });
-          }
-          for (const rel of rule.relative) {
-            flat.push({ substanceId: s.substanceId, label: rel, severity: 'relative', source: 'rule' });
-          }
-        }
-
-        if (flat.length === 0) return null;
-
-        // дедупликация по substanceId + label
-        const deduped: FlatContra[] = [];
-        const seen = new Set<string>();
-        for (const f of flat) {
-          const key = f.substanceId.toLowerCase() + '::' + f.label;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          deduped.push(f);
-        }
-
-        // группировка по веществу
-        const grouped: Record<string, { abs: FlatContra[]; rel: FlatContra[] }> = {};
-        for (const f of deduped) {
-          const id = f.substanceId.toLowerCase();
-          if (!grouped[id]) grouped[id] = { abs: [], rel: [] };
-          if (f.severity === 'absolute') grouped[id].abs.push(f);
-          else grouped[id].rel.push(f);
-        }
-
-        const hasAbs = deduped.some(f => f.severity === 'absolute');
-        const total = deduped.length;
-
-        return (
-          <div style={{ marginTop:6 }}>
-            <div onClick={() => setShowContraindications(!showContraindications)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showContraindications ? '8px 8px 0 0' : 8, background: hasAbs ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
-              <span style={{ fontSize:10, fontWeight:700, color: hasAbs ? '#ef4444' : '#f59e0b' }}>
-                {hasAbs ? '⛔ Противопоказания' : '⚠ Противопоказания и осторожности'} ({total})
-              </span>
-              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showContraindications ? '▲ скрыть' : '▼ показать'}</span>
-            </div>
-            {showContraindications && (
-              <div style={{ padding:'6px 9px 8px', background: hasAbs ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.03)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
-                {Object.entries(grouped).map(([id, g]) => {
-                  const all = [...g.abs, ...g.rel];
-                  return (
-                    <div key={id} style={{ marginBottom: all.length > 0 ? 4 : 0 }}>
-                      <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
-                      {g.abs.map((f, i) => (
-                        <div key={i} style={{ fontSize:7, color:'#fca5a5', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
-                          ⛔ {f.label}
-                        </div>
-                      ))}
-                      {g.rel.map((f, i) => (
-                        <div key={i} style={{ fontSize:7, color:'#fbbf24', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
-                          ⚠ {f.label}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* ===== МОНИТОРИНГ АНАЛИЗОВ (врачебный протокол) ===== */}
       {finalRec && finalRec.subs.length > 0 && (() => {
@@ -3500,10 +3167,190 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
                 </div>
 
-                {/* ===== ДИНАМИЧЕСКИЙ СЛОЙ БЕЗОПАСНОСТИ (з движка) ===== */}
-                <CalcSafetyLayer rec={finalRecWithResidual ?? finalRec} planResult={planResult} />
+                {/* Лабораторные находки + интерпретация + тревоги — единый блок анализов */}
+                <SafetyLabFindings planResult={planResult} />
+                <SafetyAssayWarnings rec={finalRecWithResidual ?? finalRec} />
+                <SafetyAlerts rec={finalRecWithResidual ?? finalRec} />
 
-                {/* ===== ОСОБЫЕ УКАЗАНИЯ БУСТЕРОВ (PED-risk + LV3) ===== */}
+                {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
+      {finalRec && (() => {
+        const warnings: string[] = [];
+        const flags = finalRec.pedFlags;
+        if (flags) {
+          if (flags.isMultiOral) warnings.push('⚠ Более 1 орального 17α — резко ↑ гепатотоксичность');
+          if (flags.isGHPlusInsulin) warnings.push('⚠ GH + Инсулин — высокий риск гипогликемии');
+          if (flags.isWinnyPlusOxy) warnings.push('🛑 WINSTROL + ANADROL — критическая комбинация (гепатотоксичность + ↓HDL до 50%). ОБЯЗАТЕЛЬНЫЙ протокол защиты включён. LFT каждые 2 нед, не дольше 4 нед');
+          if (flags.has17AlphaAndGH) warnings.push('⚠ 17α-Орал + GH — синергичная гепатотоксичность');
+        }
+        if (warnings.length === 0) return null;
+        return (
+          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#a855f7', marginBottom:3 }}>Предупреждения о курсе</div>
+            {warnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'#c4b5fd', marginBottom:1, lineHeight:1.4 }}>{w}</div>)}
+            <SafetyGuardrails rec={finalRecWithResidual ?? finalRec} />
+            <SafetyPedEscalation rec={finalRecWithResidual ?? finalRec} />
+          </div>
+        );
+      })()}
+
+      {/* Нутри-корректировки по анализам */}
+      {finalRec && finalRec.nutritionTips && finalRec.nutritionTips.length > 0 && (() => {
+        const tipsByMarker: Record<string, { action: string; target: string; tier: number }[]> = {};
+        for (const t of finalRec.nutritionTips!) {
+          const m = (t as any).marker || 'общее';
+          if (!tipsByMarker[m]) tipsByMarker[m] = [];
+          tipsByMarker[m].push({ action: t.action, target: t.target, tier: (t as any).tier || 1 });
+        }
+        const markers = Object.keys(tipsByMarker);
+        const total = finalRec.nutritionTips.length;
+        const hasHigh = finalRec.nutritionTips.some((t: any) => t.tier >= 2);
+
+        return (
+        <div style={{ marginTop:6 }}>
+          <div onClick={() => setShowNutrition(!showNutrition)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showNutrition ? '8px 8px 0 0' : 8, background: hasHigh ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.04)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.15)' : 'rgba(0,230,138,0.12)') }}>
+            <span style={{ fontSize:10, fontWeight:700, color: hasHigh ? '#f59e0b' : '#22c55e', display:'flex', alignItems:'center', gap:5 }}>
+              🥗 Питание по анализам ({total})
+              {hasHigh && <span style={{ fontSize:7, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.12)' }}>требует коррекции</span>}
+            </span>
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showNutrition ? '▲ скрыть' : '▼ показать'}</span>
+          </div>
+          {showNutrition && (
+            <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.15)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.1)' : 'rgba(0,230,138,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+              <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                Рекомендации по питанию на основе отклонений лабораторных маркеров. Сгруппированы по показателю.
+              </div>
+              {markers.map(marker => {
+                const tips = tipsByMarker[marker];
+                const maxTier = Math.max(...tips.map(t => t.tier));
+                const tierColor = maxTier >= 3 ? '#ef4444' : maxTier >= 2 ? '#f59e0b' : '#22c55e';
+                const tierBg = maxTier >= 3 ? 'rgba(239,68,68,0.06)' : maxTier >= 2 ? 'rgba(245,158,11,0.05)' : 'rgba(34,197,94,0.04)';
+                const tierBorder = maxTier >= 3 ? 'rgba(239,68,68,0.12)' : maxTier >= 2 ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.08)';
+                const tierLabel = maxTier >= 3 ? '⛔ Критично' : maxTier >= 2 ? '⚠ Требует внимания' : '🟢 Профилактика';
+                return (
+                  <div key={marker} style={{ marginBottom:5, padding:'5px 7px', borderRadius:6, background:tierBg, border:`1px solid ${tierBorder}` }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
+                      <span style={{ fontSize:8, fontWeight:700, color:'#ffffff' }}>{marker.toUpperCase()}</span>
+                      <span style={{ fontSize:7, fontWeight:600, color:tierColor, padding:'1px 4px', borderRadius:3, background:`${tierColor}15` }}>{tierLabel}</span>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                      {tips.map((t, i) => (
+                        <div key={i} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', lineHeight:1.4, display:'flex', gap:4 }}>
+                          <span style={{ color:tierColor, flexShrink:0, fontWeight:700 }}>{maxTier >= 2 ? '⚠' : '•'}</span>
+                          <span>
+                            <span style={{ fontWeight:600, color:'#ffffff' }}>{t.action}</span>
+                            <span style={{ opacity:0.6, marginLeft:4 }}>→ {t.target}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  );
+              })}
+            </div>
+          )}
+        </div>
+        );
+      })()}
+
+      {/* Противопоказания — все (каталог + правила + условия) */}
+      {finalRec && finalRec.subs.length > 0 && (() => {
+        interface FlatContra { substanceId: string; label: string; severity: 'absolute' | 'relative'; source: 'catalog' | 'rule' | 'condition'; }
+        const flat: FlatContra[] = [];
+
+        // 1) из checkContraindications (по healthConditions)
+        if (finalRec.contraindications) {
+          for (const c of finalRec.contraindications) {
+            flat.push({ substanceId: c.substanceId, label: c.message, severity: c.severity, source: 'condition' });
+          }
+        }
+
+        // 2) из SUPPORT_CATALOG_DATA.contraindications
+        for (const s of finalRec.subs) {
+          const e = SUPPORT_CATALOG_DATA[s.substanceId] || SUPPORT_CATALOG_DATA[s.substanceId.toLowerCase()] || SUPPORT_CATALOG_DATA[s.substanceId.toUpperCase()];
+          if (e?.contraindications?.length) {
+            for (const c of e.contraindications) {
+              flat.push({ substanceId: s.substanceId, label: c, severity: 'relative', source: 'catalog' });
+            }
+          }
+        }
+
+        // 3) из CONTRAINDICATIONS general rules (absolute + relative)
+        for (const s of finalRec.subs) {
+          const rule = getContraindications(s.substanceId);
+          if (!rule) continue;
+          for (const abs of rule.absolute) {
+            flat.push({ substanceId: s.substanceId, label: abs, severity: 'absolute', source: 'rule' });
+          }
+          for (const rel of rule.relative) {
+            flat.push({ substanceId: s.substanceId, label: rel, severity: 'relative', source: 'rule' });
+          }
+        }
+
+        if (flat.length === 0) return null;
+
+        // дедупликация по substanceId + label
+        const deduped: FlatContra[] = [];
+        const seen = new Set<string>();
+        for (const f of flat) {
+          const key = f.substanceId.toLowerCase() + '::' + f.label;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          deduped.push(f);
+        }
+
+        // группировка по веществу
+        const grouped: Record<string, { abs: FlatContra[]; rel: FlatContra[] }> = {};
+        for (const f of deduped) {
+          const id = f.substanceId.toLowerCase();
+          if (!grouped[id]) grouped[id] = { abs: [], rel: [] };
+          if (f.severity === 'absolute') grouped[id].abs.push(f);
+          else grouped[id].rel.push(f);
+        }
+
+        const hasAbs = deduped.some(f => f.severity === 'absolute');
+        const total = deduped.length;
+
+        return (
+          <div style={{ marginTop:6 }}>
+            <div onClick={() => setShowContraindications(!showContraindications)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showContraindications ? '8px 8px 0 0' : 8, background: hasAbs ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.15)') }}>
+              <span style={{ fontSize:10, fontWeight:700, color: hasAbs ? '#ef4444' : '#f59e0b' }}>
+                {hasAbs ? '⛔ Противопоказания' : '⚠ Противопоказания и осторожности'} ({total})
+              </span>
+              <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showContraindications ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showContraindications && (
+              <div style={{ padding:'6px 9px 8px', background: hasAbs ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.03)', border:'1px solid ' + (hasAbs ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                {Object.entries(grouped).map(([id, g]) => {
+                  const all = [...g.abs, ...g.rel];
+                  return (
+                    <div key={id} style={{ marginBottom: all.length > 0 ? 4 : 0 }}>
+                      <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:2, marginTop:1 }}>{subNameRu(id)}</div>
+                      {g.abs.map((f, i) => (
+                        <div key={i} style={{ fontSize:7, color:'#fca5a5', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
+                          ⛔ {f.label}
+                        </div>
+                      ))}
+                      {g.rel.map((f, i) => (
+                        <div key={i} style={{ fontSize:7, color:'#fbbf24', marginBottom:1, lineHeight:1.4, marginLeft:6 }}>
+                          ⚠ {f.label}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ===== МЕДИЦИНСКАЯ ЭСКАЛАЦИЯ (процедуры, только врач) ===== */}
+      <SafetyProcedures rec={finalRecWithResidual ?? finalRec} />
+
+      {/* ===== ИНЪЕКЦИИ: РОТАЦИЯ И ТЕХНИКА ===== */}
+      <SafetyInjections rec={finalRecWithResidual ?? finalRec} />
+
+      {/* ===== ОСОБЫЕ УКАЗАНИЯ БУСТЕРОВ (PED-risk + LV3) ===== */}
                 {finalRec.boosters && finalRec.boosters.length > 0 && (() => {
                   const boosterInstructions: { booster: string; tier: number; instructions: string[] }[] = [];
                   for (const b of finalRec.boosters) {
@@ -3555,7 +3402,152 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* ===== КНОПКА «ПРИМЕНИТЬ ПЛАН» ===== */}
+      
+{/* ===== ТОКСИКОЛОГИЧЕСКИЙ КОНТРОЛЬ ДОЗ (UL + титрация) ===== */}
+      {finalRec && toxWarnings.length > 0 && (
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
+            ⚠️ Контроль дозировок ({toxWarnings.length})
+          </div>
+          {toxWarnings.map((w, i) => {
+            const isDanger = w.severity === 'danger';
+            const isTitr = w.severity === 'titrate';
+            const col = isDanger ? '#ef4444' : isTitr ? '#f59e0b' : '#fbbf24';
+            const bg = isDanger ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)';
+            const bd = isDanger ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.2)';
+            const tag = isDanger ? 'ПРЕВЫШЕН UL' : isTitr ? 'ТИТРАЦИЯ' : 'ВНИМАНИЕ';
+            return (
+              <div key={i} style={{ margin:'3px 0', padding:'6px 8px', borderRadius:8, background:bg, border:`1px solid ${bd}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
+                  <span style={{ fontSize:7, fontWeight:800, color:col, padding:'1px 5px', borderRadius:4, background:bg, border:`1px solid ${bd}` }}>{tag}</span>
+                  <span style={{ fontSize:9, fontWeight:700, color:'#ffffff' }}>{subNameRu(w.substanceId)}</span>
+                </div>
+                <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
+                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
+              </div>
+            );
+          })}
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
+        </div>
+      )}
+
+      
+
+{/* Прогноз ребаунда гормонов после отмены */}
+      {finalRec && (() => {
+        // Build ReboundInput from context
+        const peds = (ctx.pedDoses || ctx.aasIds?.map((id: string) => ({ id, pClass: 'aas_unknown' })) || []);
+        if (!peds.length) return null;
+        
+        const cycleWeeks = state.goals?.cycleWeeks || 12;
+        const pctProtocol = rec?.pedFlags?.hasTest ? 'hcg+clomid' : 'clomid+nolva';
+
+        const fp: any = state.labs?.fullPanel || {};
+        const reboundInput: any = {
+          peds: peds.map((p: any) => ({ id: p.id, pClass: p.pClass, mgPerWeek: p.mgPerWeek, iuPerDay: p.iuPerDay, mcgPerDay: p.mcgPerDay })),
+          cycleWeeks,
+          pctProtocol,
+          pctStartWeek: undefined,
+          userProfile: {
+            age: state.profile?.age || 30,
+            baselineTT: fp.TESTOSTERONE || 650,
+            baselineE2: fp.ESTRADIOL || 28,
+            baselinePRL: fp.PROLACTIN || 14,
+            baselineCortisol: fp.CORTISOL || 450,
+            baselineSHBG: fp.SHBG || 30,
+            baselineLH: fp.LH || 5,
+            baselineFSH: fp.FSH || 4,
+          },
+        };
+        
+        try {
+          const rebound = calculateReboundTrajectory(reboundInput) as any;
+          const summary = getReboundSummary(rebound) as any;
+          
+          return (
+            <div style={{ marginTop:6 }}>
+              <div onClick={() => setShowRebound(!showRebound)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showRebound ? '8px 8px 0 0' : 8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)' }}>
+                <span style={{ fontSize:10, fontWeight:700, color:'#f59e0b', display:'flex', alignItems:'center', gap:5 }}>
+                  📉 Прогноз ребаунда после отмены
+                  <span style={{ fontSize:7, fontWeight:600, color:'rgba(245,158,11,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.1)' }}>по вашему курсу</span>
+                </span>
+                <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showRebound ? '▲ скрыть' : '▼ показать'}</span>
+              </div>
+              {showRebound && (
+                <div style={{ padding:'8px 9px', background:'rgba(245,158,11,0.03)', border:'1px solid rgba(245,158,11,0.1)', borderTop:'none', borderRadius:'0 0 8px 8px' }}>
+                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
+                    Прогноз восстановления гормонов за 24 недели после курса. Основан на ПК-фармакокинетике, ПКТ и клинических базах.
+                  </div>
+                  
+                  {/* Summary cards */}
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:6, marginBottom:8 }}>
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#f59e0b' }}>Восстановление</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.overallRecoveryWeek || '?'} нед</div>
+                    </div>
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#22c55e' }}>HPTA (LH+FSH+TT)</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.hptaRecoveryWeek || '?'} нед</div>
+                    </div>
+                    <div style={{ padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#ef4444' }}>E2 ребаунд</div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{rebound.e2.overshootWeek ? `пик нед ${rebound.e2.overshootWeek}` : 'нет'} / rec {rebound.e2.recoveredWeek || '?'} нед</div>
+                    </div>
+                  </div>
+                  
+                  {/* Per-marker mini cards */}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                    {['tt','ft','e2','prl','lh','fsh','cortisol','shbg'].map(marker => {
+                      const t = rebound[marker as keyof typeof rebound];
+                      if (!t) return null;
+                      const recColor = t.recoveredWeek && t.recoveredWeek <= 12 ? '#22c55e' : t.recoveredWeek && t.recoveredWeek <= 20 ? '#f59e0b' : '#ef4444';
+                      return (
+                        <div key={marker} style={{ padding:'5px 7px', borderRadius:5, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', minWidth:80 }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:marker === 'e2' ? '#f59e0b' : marker === 'prl' ? '#ec4899' : marker === 'cortisol' ? '#ef4444' : '#fff' }}>
+                            {marker.toUpperCase()}
+                          </div>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>
+                            {t.recoveredWeek ? `${t.recoveredWeek} нед` : '—'}
+                            {t.overshootWeek && <span style={{ color:'#f59e0b', marginLeft:2 }}>↑{t.overshootWeek}</span>}
+                          </div>
+                          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>
+                            баз: {t.baseline.toFixed(1)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Risk flags */}
+                  {rebound.riskFlags.length > 0 && (
+                    <div style={{ marginTop:8, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'#ef4444', marginBottom:3 }}>⚠ Риск-факторы</div>
+                      {rebound.riskFlags.map((rf: string, i: number) => (
+                        <div key={i} style={{ fontSize:8, color:'#fca5a5', marginBottom:2, lineHeight:1.4, paddingLeft:10, borderLeft:'2px solid rgba(239,68,68,0.3)' }}>{rf}</div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Clinical notes */}
+                  <div style={{ marginTop:8, padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.12)' }}>
+                    <div style={{ fontSize:7, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>📋 Клинические заметки</div>
+                    {['tt','ft','e2','prl','lh','fsh','cortisol','shbg'].flatMap(marker => {
+                      const t = rebound[marker as keyof typeof rebound];
+                      return t?.clinicalNotes?.map((note: string, i: number) => (
+                        <div key={`${marker}-${i}`} style={{ fontSize:8, color:'rgba(240,240,245,0.9)', marginBottom:1, lineHeight:1.4, paddingLeft:8, borderLeft:'2px solid rgba(96,165,250,0.3)' }}>{note}</div>
+                      )) || [];
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        } catch {
+          return null;
+        }
+      })()}
+
+{/* ===== КНОПКА «ПРИМЕНИТЬ ПЛАН» ===== */}
       {finalRec && finalRec.subs.length > 0 && onApply && (
         <button onClick={() => { onApply(finalRec); setApplyFlash(true); setTimeout(() => setApplyFlash(false), 1800); }} style={{
           width:'100%', marginTop:10, padding:'12px', borderRadius:12, fontSize:11, fontWeight:800, cursor:'pointer',
