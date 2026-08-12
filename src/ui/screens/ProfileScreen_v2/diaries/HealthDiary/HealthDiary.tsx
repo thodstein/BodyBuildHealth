@@ -63,6 +63,7 @@ import {
   type SortState,
 } from '../../diary-helpers';
 import { PAIN_ZONES, NEURO_SYMPTOMS, ACNE_AREAS, HEMATO_SYMPTOMS, painZoneColor, readDiaryEntries } from '../../diary-modals';
+import { PainZone3D } from './PainZone3D';
 import { getProfile } from '../../../../../core/profile-manager';
 import type { UnifiedSettings } from '../../../../../core/types';
 import { calculateRiskScore } from '../../../../../engines/risk-calculator.engine';
@@ -300,54 +301,6 @@ const ToggleGrid: React.FC<{
   </div>
 );
 
-const PainBodyMap: React.FC<{ zones: Record<string, number>; onChange?: (zones: Record<string, number>) => void }> = ({ zones, onChange }) => {
-  const zonePositions: Record<string, { x: number; y: number; r: number; label: string; mirror?: boolean }> = {
-    shoulders: { x: 100, y: 45, r: 18, label: 'Плечи', mirror: true },
-    elbows: { x: 55, y: 95, r: 14, label: 'Локти', mirror: true },
-    wrists: { x: 35, y: 140, r: 12, label: 'Запястья', mirror: true },
-    lower_back: { x: 150, y: 90, r: 16, label: 'Поясница' },
-    hips: { x: 150, y: 130, r: 16, label: 'ТБС', mirror: true },
-    knees: { x: 130, y: 180, r: 14, label: 'Колени', mirror: true },
-    ankles: { x: 130, y: 220, r: 12, label: 'Голеностоп', mirror: true },
-  };
-  const handleZoneClick = (id: string) => {
-    if (!onChange) return;
-    const current = zones[id] || 0;
-    const next = current >= 10 ? 0 : current + 1;
-    onChange({ ...zones, [id]: next });
-  };
-  const renderZone = (id: string, pos: { x: number; y: number; r: number; label: string }, x: number) => {
-    const v = zones[id] || 0;
-    const c = painZoneColor(v);
-    return (
-      <g key={`${id}-${x}`} onClick={() => handleZoneClick(id)} style={{ cursor: onChange ? 'pointer' : 'default' }}>
-        <circle cx={x} cy={pos.y} r={pos.r} fill={v > 0 ? `${c}44` : 'rgba(255,255,255,0.03)'} stroke={v > 0 ? c : '#3f3f46'} strokeWidth={v > 0 ? 2 : 1} />
-        <text x={x} y={pos.y + 1} textAnchor="middle" dominantBaseline="middle" fill={v > 0 ? '#fff' : '#71717a'} fontSize="9" fontWeight={700}>{v}</text>
-        <title>{pos.label}: {v}/10</title>
-      </g>
-    );
-  };
-  return (
-    <svg viewBox="0 0 300 260" width="100%" height="260" style={{ maxWidth: 320, margin: '0 auto', display: 'block' }} role="img" aria-label="Карта зон боли">
-      <ellipse cx="150" cy="30" rx="25" ry="30" fill="rgba(255,255,255,0.06)" stroke="#52525b" />
-      <rect x="125" y="55" width="50" height="70" rx="10" fill="rgba(255,255,255,0.06)" stroke="#52525b" />
-      <rect x="110" y="120" width="80" height="90" rx="12" fill="rgba(255,255,255,0.06)" stroke="#52525b" />
-      <line x1="150" y1="55" x2="150" y2="210" stroke="#52525b" strokeDasharray="3 3" />
-      <line x1="110" y1="90" x2="190" y2="90" stroke="#52525b" strokeDasharray="3 3" />
-      {PAIN_ZONES.map((z) => {
-        const pos = zonePositions[z.id];
-        const mirrored = pos.mirror && pos.x !== 150 ? 300 - pos.x : null;
-        return (
-          <React.Fragment key={z.id}>
-            {renderZone(z.id, pos, pos.x)}
-            {mirrored !== null && renderZone(z.id, pos, mirrored)}
-          </React.Fragment>
-        );
-      })}
-    </svg>
-  );
-};
-
 const EntryEditor: React.FC<{
   entry?: UnifiedHealthEntry;
   onCancel: () => void;
@@ -504,8 +457,8 @@ const EntryEditor: React.FC<{
             <div style={{ marginTop: 8, fontSize: 11 }}>Σ {score(painZones)}/70</div>
           </FieldGroup>
           <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>Нажмите на зону</div>
-            <PainBodyMap zones={painZones} onChange={(zones) => setPain({ zones, totalScore: score(zones) })} />
+            <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>Нажмите на часть тела — VAS 0–10</div>
+            <PainZone3D zones={painZones} onChange={(zones) => setPain({ zones, totalScore: score(zones) })} height={300} />
           </div>
         </div>
         {draft.pain && (
@@ -681,9 +634,17 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const [sort, setSort] = useState<SortState>({ key: 'date', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [undo, setUndo] = useState<UnifiedHealthEntry[] | null>(null);
+  const [subTab, setSubTab] = useState<'overview' | 'painmap'>('overview');
+  const [mapZones, setMapZones] = useState<Record<string, number>>({});
   const svgRef = useRef<SVGSVGElement>(null);
   useEffect(() => {
     if (open) setRows(getUnifiedHealthEntries());
+  }, [open]);
+  useEffect(() => {
+    if (open) {
+      const last = rows[0]?.pain?.zones || {};
+      setMapZones(prev => (Object.keys(prev).length ? prev : last));
+    }
   }, [open]);
   const commit = (next: UnifiedHealthEntry[], remember = true) => {
     const ordered = [...next].sort((a, b) => b.date.localeCompare(a.date));
@@ -708,6 +669,33 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     commit(result);
     setEdit(null);
     (window as any).showToast?.('✅ Запись здоровья обновлена');
+  };
+  const savePainZones = () => {
+    const today = todayIso();
+    const totalScore = score(mapZones);
+    const existing = rows.find((r) => r.date === today);
+    const draft: EntryDraft = {
+      date: today,
+      pain: { zones: mapZones, totalScore },
+      symptoms: existing?.symptoms || [],
+      neuro: existing?.neuro || null,
+      acne: existing?.acne || null,
+      hemato: existing?.hemato || null,
+      notes: existing?.notes || '',
+    };
+    if (existing) {
+      const result = updateUnifiedHealthEntry(today, (current) =>
+        Object.assign(current, clone(draft), {
+          id: current.id,
+          createdAt: current.createdAt,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+      commit(result);
+    } else {
+      commit(addUnifiedHealthEntry(draft), true);
+    }
+    (window as any).showToast?.('🗺 Зоны боли сохранены в запись за сегодня');
   };
   const fields = useMemo(() => rows.map(entryFields), [rows]);
   // Диапазон (7/30/90) для статов, диаграмм и инсайтов; поиск влияет только на таблицу
@@ -922,6 +910,20 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         ]}
       />
       <main style={{ ...pageMain, maxWidth: 1150 }}>
+        {/* ── Sub-tabs ── */}
+        <div style={{ display: 'flex', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
+          {(
+            [
+              ['overview', '📊 Обзор'],
+              ['painmap', '🗺 Карта зон боли'],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} style={subTab === id ? chipActive(ACCENT) : chip(ACCENT)} onClick={() => setSubTab(id)} aria-pressed={subTab === id}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: subTab === 'painmap' ? 'none' : undefined }}>
         {status && (
           <div role="status" style={{ ...card, marginBottom: 10, color: status.color, borderColor: status.color }}>
             ⚠ {status.message}
@@ -1030,15 +1032,6 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 {label} {v}
               </span>
             ))}
-          </div>
-        </section>
-        <section style={{ ...card, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <b>🗺 Карта зон боли</b>
-            <span style={{ color: colors.textMuted, fontSize: 11 }}>Последняя запись</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <PainBodyMap zones={rows[0]?.pain?.zones || {}} />
           </div>
         </section>
         <section style={{ ...card, marginBottom: 12 }}>
@@ -1368,6 +1361,35 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 {row.neuro?.totalScore || 0}/10
               </div>
             ))}
+          </section>
+        )}
+        </div>
+
+        {/* ── Sub-tab: 3D карта зон боли ── */}
+        {subTab === 'painmap' && (
+          <section style={{ ...card, marginBottom: 12, borderColor: '#ec489955' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+              <b>🗺 Карта зон боли · 3D</b>
+              <span style={{ color: colors.textMuted, fontSize: 11 }}>
+                Клик по части тела — отметить зону · Вращайте модель · Σ {score(mapZones)}/70
+              </span>
+            </div>
+            <PainZone3D zones={mapZones} onChange={setMapZones} height={460} />
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              <button style={{ ...button, background: '#ec4899', borderColor: '#ec4899', color: '#fff' }} onClick={savePainZones}>
+                💾 Сохранить в запись за сегодня
+              </button>
+              <button style={button} onClick={() => {
+                const cleared: Record<string, number> = {};
+                for (const z of PAIN_ZONES) cleared[z.id] = 0;
+                setMapZones(cleared);
+              }}>
+                🧹 Очистить
+              </button>
+              <button style={button} onClick={() => setMapZones(rows[0]?.pain?.zones || {})}>
+                📋 Из последней записи
+              </button>
+            </div>
           </section>
         )}
       </main>
