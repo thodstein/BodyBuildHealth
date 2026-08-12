@@ -2801,8 +2801,29 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* ===== СИНЕРГИИ И ВЗАИМОДЕЙСТВИЯ ПЛАНА (объединено) ===== */}
-      {finalRec && (synergyDesc.length > 0 || pairSynergies.length > 0) && (
+      {/* ===== СИНЕРГИИ И ВЗАИМОДЕЙСТВИЯ ПЛАНА (объединено, единый стиль) ===== */}
+      {finalRec && (() => {
+        const hasSynergy = synergyDesc.length > 0 || pairSynergies.length > 0;
+        const hasRisks = (finalRec.supportRisks || []).length > 0;
+        const hasInteractions = (() => { try { return checkInteractions(finalRec.subs.map(s => s.substanceId)).length > 0; } catch { return false; } })();
+        const hasGaps = (finalRec.gaps || []).length > 0;
+        const hasConflicts = (() => {
+          try {
+            const pc = (planResult?.conflicts && planResult.conflicts.length > 0) ? planResult.conflicts : (finalRec.conflicts || []);
+            return pc.some((c: any) => c.severity && c.severity !== 'LOW');
+          } catch { return false; }
+        })();
+        const hasBleeding = (() => {
+          const FIB = ['nattokinase', 'serrapeptase', 'bromelain', 'lumbrokinase', 'aspirin', 'dipyridamole', 'pentoxifylline', 'warfarin', 'enoxaparin', 'sulodexide', 'ginkgo', 'garlic'];
+          const inPlan = new Set(finalRec.subs.map((s: any) => (s.substanceId || '').toLowerCase()));
+          return FIB.filter(id => inPlan.has(id)).length >= 2;
+        })();
+        if (!hasSynergy && !hasRisks && !hasInteractions && !hasGaps && !hasConflicts && !hasBleeding) return null;
+        // Единая палитра подсекций блока
+        const sevRow = (color: string, bg: string, border: string): React.CSSProperties => ({ padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: bg, border: `1px solid ${border}` });
+        const subHeader: React.CSSProperties = { fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '6px 0 4px', textTransform: 'uppercase', letterSpacing: '0.3px' };
+        const chip = (color: string): React.CSSProperties => ({ fontSize: 6, fontWeight: 800, color, padding: '1px 5px', borderRadius: 3, background: `${color}18` });
+        return (
         <div style={{ marginTop:8 }}>
           <div onClick={() => setShowSynergy(!showSynergy)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showSynergy ? '8px 8px 0 0' : 8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.14)' }}>
             <span style={{ fontSize:10, fontWeight:700, color:'#a78bfa', display:'flex', alignItems:'center', gap:5 }}>
@@ -2820,7 +2841,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 if (hits.length >= 2) {
                   const high = hits.length >= 3;
                   return (
-                    <div style={{ padding: '5px 8px', borderRadius: 6, marginBottom: 5, background: high ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)', border: `1px solid ${high ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.26)'}`, fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+                    <div style={sevRow(high ? '#f87171' : '#fbbf24', high ? 'rgba(239,68,68,0.09)' : 'rgba(245,158,11,0.07)', high ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.22)')}>
                       <b style={{ color: high ? '#f87171' : '#fbbf24' }}>🩸 Фибринолитическая/антиагрегантная нагрузка ({hits.map(id => subNameRu(id)).join(' + ')})</b>
                       <div style={{ color: 'rgba(255,255,255,0.8)', marginTop: 1 }}>Синергия фибринолиза — да, но суммарный риск кровотечения {high ? 'ВЫСОКИЙ' : 'повышен'}: сообщить врачу перед операцией/инвазивными процедурами, не добавлять антикоагулянты самостоятельно.</div>
                     </div>
@@ -2830,10 +2851,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               })()}
               {(finalRec.supportRisks || []).length > 0 && (
                 <div style={{ marginBottom: 5 }}>
-                  <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Риски плана поддержки</div>
+                  <div style={subHeader}>Риски плана поддержки</div>
                   {(finalRec.supportRisks || []).map(r => (
-                    <div key={r.id} style={{ padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: r.level === 'high' ? 'rgba(239,68,68,0.09)' : r.level === 'medium' ? 'rgba(245,158,11,0.07)' : 'rgba(255,255,255,0.03)', border: `1px solid ${r.level === 'high' ? 'rgba(239,68,68,0.28)' : r.level === 'medium' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
-                      <div style={{ fontSize: 8, fontWeight: 800, color: r.level === 'high' ? '#f87171' : r.level === 'medium' ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>⚠ {r.label} {r.level === 'high' ? '(высокий)' : r.level === 'medium' ? '(повышенный)' : ''}</div>
+                    <div key={r.id} style={sevRow(r.level === 'high' ? '#f87171' : r.level === 'medium' ? '#fbbf24' : '#60a5fa', r.level === 'high' ? 'rgba(239,68,68,0.09)' : r.level === 'medium' ? 'rgba(245,158,11,0.07)' : 'rgba(96,165,250,0.06)', r.level === 'high' ? 'rgba(239,68,68,0.28)' : r.level === 'medium' ? 'rgba(245,158,11,0.22)' : 'rgba(96,165,250,0.2)')}>
+                      <div style={{ fontSize: 8, fontWeight: 800, color: r.level === 'high' ? '#f87171' : r.level === 'medium' ? '#fbbf24' : '#60a5fa' }}>⚠ {r.label} {r.level === 'high' ? '(высокий)' : r.level === 'medium' ? '(повышенный)' : '(контроль)'}</div>
                       <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginTop: 1 }}>{r.detail}</div>
                     </div>
                   ))}
@@ -2923,7 +2944,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* ===== МОНИТОРИНГ АНАЛИЗОВ (врачебный протокол) ===== */}
       {finalRec && finalRec.subs.length > 0 && (() => {
