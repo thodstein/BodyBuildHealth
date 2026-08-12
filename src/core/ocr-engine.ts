@@ -142,17 +142,21 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
   for (const marker of regexResults.extractedMarkers) {
     const code = mapToUcumCode(marker.code);
     const normalized = normalizeLabMeasurement(code, marker.value, marker.unit);
-    const refHigh = marker.ec50 > 0 ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value : undefined;
+    // ec50 from biomarker-regex is a statistical bound, NOT a clinical reference.
+    // Only use it as refHigh when UCUM_MAP provides no reference (rare markers).
     const info = UCUM_MAP[code];
+    const refHigh = (marker.ec50 > 0 && !info) 
+      ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value 
+      : undefined;
     const newLab: ParsedLabValue = {
       code,
       name: marker.name,
       value: normalized.value,
       unit: normalized.unit,
       refHigh,
-      isAbnormal: refHigh !== undefined
-        ? normalized.value > refHigh
-        : info ? normalized.value > info.uln || normalized.value < info.lln : undefined,
+      isAbnormal: info
+        ? normalized.value > info.uln || normalized.value < info.lln
+        : refHigh !== undefined ? normalized.value > refHigh : undefined,
       raw: isUsefulRawLine(marker.sourceLine) ? marker.sourceLine : undefined,
     };
     const existing = labsByCode.get(code);

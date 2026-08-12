@@ -707,13 +707,19 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
     // generic sanitize→extractNumber path may pick the name-suffix number
     // instead of the actual result column. For tab-separated lines, scan
     // individual cells to find the first non-name numeric value.
-    if (line.includes('\t') && val !== null) {
+    // Also runs when val is null because all numbers were filtered as range
+    // bounds (e.g. value == upper bound of reference range).
+    if (line.includes('\t')) {
       const cols = line.split('\t').map(c => c.trim()).filter(Boolean);
+      let cellVal: number | null = null;
       for (const cell of cols) {
         if (labDef.names.some(n => containsLabName(cell, n))) continue;
         const cellNum = extractResultNumber(cell);
-        if (cellNum !== null && cellNum > 0) { val = cellNum; break; }
+        if (cellNum !== null && cellNum > 0) { cellVal = cellNum; break; }
       }
+      // Prefer cell-based value when the generic path picked a name-suffix number
+      if (val === null) { val = cellVal; }
+      else if (cellVal !== null && val !== cellVal) { val = cellVal; }
     }
     // Для urine-маркёров где 0 — норма (отсутствие клеток/вещества),
     // разрешаем 0 как валидное значение.
