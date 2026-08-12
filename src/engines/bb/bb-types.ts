@@ -44,6 +44,8 @@ export interface BBExercise {
   /** Функциональная подгруппа/паттерн для quality-aware распределения объёма. */
   backSubgroup?: 'back_width' | 'back_thickness' | 'upper_back' | 'rear_delts' | 'traps' | 'erectors';
   movementPattern?: string;
+  /** Разминочное упражнение на целевую группу (3×10-15 лёгких). Не входит в объём/бюджет. */
+  warmupActivator?: boolean;
 }
 
 export interface BBSession {

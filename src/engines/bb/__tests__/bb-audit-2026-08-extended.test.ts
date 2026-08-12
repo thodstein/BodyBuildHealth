@@ -131,7 +131,7 @@ describe('P0-1: tidySessionExercises — methodology пробрасываетс�
       methodology: 'pre_exhaust',
       level: 'intermediate',
     });
-    const firstEx = finalized.weeks[0].sessions[0].exercises[0];
+    const firstEx = finalized.weeks[0].sessions[0].exercises.find((e: any) => !e.warmupActivator)!;
     // Pre-exhaust: изоляция (разводка) должна быть первой.
     // Имя может быть заменено адаптивным rotation, поэтому проверяем по типу.
     expect(firstEx.role).toBe('accessory');
@@ -147,7 +147,7 @@ describe('P0-1: tidySessionExercises — methodology пробрасываетс�
     ];
     const plan = makePlan(exercises);
     const finalized = finalizeBBPlan(plan, { reorder: true, level: 'intermediate' });
-    const firstEx = finalized.weeks[0].sessions[0].exercises[0];
+    const firstEx = finalized.weeks[0].sessions[0].exercises.find((e: any) => !e.warmupActivator)!;
     // Compound_first: жим (compound) должен быть первым
     const isCompoundFirst = /жим|press|bench/i.test(firstEx.name) && !/развод|fly|мах|raise/i.test(firstEx.name);
     expect(isCompoundFirst).toBe(true);

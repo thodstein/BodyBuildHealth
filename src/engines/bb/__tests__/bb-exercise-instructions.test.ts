@@ -84,7 +84,7 @@ describe('BB exercise instructions from Exercise Lab', () => {
     expect(comments.some(c => c.includes('Техника:'))).toBe(true);
     expect(comments.some(c => c.includes('Порядок:'))).toBe(true);
     expect(comments.some(c => c.includes('Прогрессия:'))).toBe(true);
-    const exercise = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)[0];
+    const exercise = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).find((e: any) => !e.warmupActivator)!;
     expect(exercise.executionProfile?.pattern).toBeTruthy();
     expect(exercise.executionProfile?.order).toBeTruthy();
     expect(exercise.executionProfile?.progression).toBeTruthy();

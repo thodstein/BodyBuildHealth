@@ -170,6 +170,8 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
 }
 
 export function exerciseVolumeContributions(exercise: BBExerciseVolumeLike): BBVolumeContribution[] {
+  // Разминочное упражнение не входит в объём/бюджет.
+  if ((exercise as any).warmupActivator) return [];
   const sets = setCount(exercise);
   if (!sets) return [];
   const direct = normalizeBBMuscle(exercise.muscle || trueMuscleOf(exercise as any));

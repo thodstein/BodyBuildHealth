@@ -58,8 +58,10 @@ export function syncBBPlanSetShape(plan: BBPlan): BBPlan {
 
 function validateSession(session: BBSession, week: number, sessionIndex: number, options: BBPlanValidationOptions = {}): BBPlanValidationIssue[] {
   const issues: BBPlanValidationIssue[] = [];
-  if (session.exercises.length > 10) {
-    issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${session.exercises.length} упражнений (максимум 10).`, week, session: sessionIndex });
+  // Разминочное упражнение не входит в лимит рабочих упражнений.
+  const workingCount = session.exercises.filter(exercise => !(exercise as any).warmupActivator).length;
+  if (workingCount > 10) {
+    issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${workingCount} рабочих упражнений (максимум 10).`, week, session: sessionIndex });
   }
   const cost = estimateBBSessionCost(session);
   if (options.checkOrder) {
@@ -124,7 +126,9 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       const allowed = allowedMuscles.includes(canonical) || (canonical === 'shoulders' && allowedMuscles.some(muscle => /^delt_/.test(muscle)));
       if (!allowed) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
     }
-    const sessionSets = session.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+    const sessionSets = session.exercises
+      .filter(exercise => !(exercise as any).warmupActivator)
+      .reduce((sum, exercise) => sum + exercise.sets, 0);
     if (sessionSets > 24) {
       issues.push({ level: 'warning', code: 'session_working_set_cap', message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен 24.`, week: week.week || wi + 1, session: si + 1 });
     }

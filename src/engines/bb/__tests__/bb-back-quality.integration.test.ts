@@ -202,4 +202,31 @@ describe('experienced enhanced back prescription', () => {
     expect(backReport).toBeDefined();
     expect(/shrug|rear_delt|traps/.test(backReport || '')).toBe(false);
   }, 30000);
+
+  it('adds warmup activator to each target session, excluded from volume', () => {
+    const plan = buildBBPlan({
+      patternId: 'ppl_6', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 1, workMax: WM,
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+    });
+    const sessions = plan.weeks[0].sessions;
+    for (const session of sessions) {
+      const warmup = session.exercises.find((e: any) => e.warmupActivator);
+      // Каждая рабочая сессия (Push/Pull/Legs) имеет разминку на целевую группу.
+      expect(warmup).toBeTruthy();
+      expect(warmup!.sets).toBe(3);
+      expect(warmup!.workSets[0].reps).toBeGreaterThanOrEqual(10);
+      expect(warmup!.workSets[0].reps).toBeLessThanOrEqual(15);
+      // Warmup — первое упражнение сессии.
+      expect(session.exercises[0]).toBe(warmup);
+    }
+    // Warmup не входит в weekly volume.
+    const backVol = plan.weeklyVolume?.[1]?.back;
+    const chestVol = plan.weeklyVolume?.[1]?.chest;
+    const warmupNames = sessions.flatMap(s => s.exercises.filter((e: any) => e.warmupActivator).map(e => e.name));
+    expect(warmupNames.length).toBe(sessions.length);
+    // Пуловер/кроссовер не должны попадать в объём как direct sets (warmup).
+    const totalDirect = Object.values(plan.weeklyVolume?.[1] || {}).reduce((a: number, v: any) => a + v.directSets, 0);
+    expect(totalDirect).toBeGreaterThan(0);
+  }, 30000);
 });

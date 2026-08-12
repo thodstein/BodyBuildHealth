@@ -69,6 +69,8 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
   const muscles = () => new Set(session.exercises.map(exercise => exercise.muscle));
   const exerciseSetCount = (exercise: BBExercise): number => Math.max(0, exercise.sets || exercise.workSets?.length || 0);
   const totalWorkingSets = (): number => session.exercises.reduce((sum, exercise) => sum + exerciseSetCount(exercise), 0);
+  // Разминочное упражнение не входит в лимит упражнений и рабочий бюджет.
+  const workingExercises = (): BBExercise[] => session.exercises.filter(exercise => !(exercise as any).warmupActivator);
   const syncSets = (exercise: BBExercise, sets: number): void => {
     const target = Math.max(minSets, sets);
     exercise.sets = target;
@@ -82,6 +84,8 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     while (exercise.workSets.length < target) exercise.workSets.push({ ...template });
   };
   const removable = (exercise: BBExercise): number => {
+    // Разминочное упражнение не удаляется (не входит в рабочий бюджет).
+    if ((exercise as any).warmupActivator) return -Infinity;
     const cost = estimateBBExerciseCost(exercise);
     const finisher = exercise.character === 'памп' || exercise.repsRange?.[0] >= 15 ? 20 : 0;
     const accessory = exercise.role === 'accessory' ? 10 : 0;
@@ -100,13 +104,16 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
   };
   while (session.exercises.length > 1) {
     const cost = estimateBBSessionCost(session);
-    if (session.exercises.length <= maxExercises && totalWorkingSets() <= maxWorkingSets && cost.timeSeconds <= maxTime && cost.axial <= maxAxial) break;
+    // Лимит упражнений/сетов считает только рабочие упражнения (без warmup).
+    const workingCount = workingExercises().length;
+    const workingSets = workingExercises().reduce((sum, ex) => sum + exerciseSetCount(ex), 0);
+    if (workingCount <= maxExercises && workingSets <= maxWorkingSets && cost.timeSeconds <= maxTime && cost.axial <= maxAxial) break;
     const present = muscles();
     const setCandidates = session.exercises
       .map((exercise, index) => ({ exercise, index, score: reducible(exercise) }))
       .filter(item => Number.isFinite(item.score))
       .sort((a, b) => b.score - a.score);
-    const setCandidate = totalWorkingSets() > maxWorkingSets || session.exercises.length <= maxExercises ? setCandidates[0] : undefined;
+    const setCandidate = workingSets > maxWorkingSets || workingCount <= maxExercises ? setCandidates[0] : undefined;
     if (setCandidate) {
       syncSets(setCandidate.exercise, exerciseSetCount(setCandidate.exercise) - 1);
       continue;

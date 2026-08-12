@@ -226,6 +226,8 @@ export interface BBExercise {
   executionProfile?: import('./bb-exercise-instructions.engine').ExerciseInstructionProfile;
   backSubgroup?: 'back_width' | 'back_thickness' | 'upper_back' | 'rear_delts' | 'traps' | 'erectors';
   movementPattern?: string;
+  /** Разминочное упражнение на целевую группу (3×10-15 лёгких). Не входит в объём/бюджет. */
+  warmupActivator?: boolean;
 }
 
 export interface BBSession {
@@ -755,6 +757,8 @@ function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string,
   const sums: Record<string, { total: number; exs: BBExercise[] }> = {};
   for (const s of weekSessions) {
     for (const ex of s.exercises) {
+      // Разминочное упражнение не участвует в MRV-капах и объёме.
+      if ((ex as any).warmupActivator) continue;
       const info = sums[ex.muscle] || (sums[ex.muscle] = { total: 0, exs: [] });
       info.total += ex.sets;
       info.exs.push(ex);
@@ -2150,6 +2154,7 @@ function buildSession(
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }
 
+/** Разминочное упражнение на целевую группу: 3×10-15 лёгких повторений (~25% workMax). */
 function todayStr(): string {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');

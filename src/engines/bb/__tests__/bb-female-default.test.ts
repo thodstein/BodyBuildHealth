@@ -104,8 +104,8 @@ describe('lengthenedBonus × trainingFocus (P2-4)', () => {
     const strength = buildBBPlan(makeInput({ trainingFocus: 'strength' }));
     const endurance = buildBBPlan(makeInput({ trainingFocus: 'endurance' }));
     // RIR должен отличаться (strength RIR 1-2, endurance RIR 3-4)
-    const strengthRir = strength.weeks[0].sessions[0].exercises[0]?.rir ?? 0;
-    const enduranceRir = endurance.weeks[0].sessions[0].exercises[0]?.rir ?? 0;
+    const strengthRir = strength.weeks[0].sessions[0].exercises.find((e: any) => !e.warmupActivator)?.rir ?? 0;
+    const enduranceRir = endurance.weeks[0].sessions[0].exercises.find((e: any) => !e.warmupActivator)?.rir ?? 0;
     expect(strengthRir).not.toBe(enduranceRir);
   });
 });

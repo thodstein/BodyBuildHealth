@@ -328,6 +328,73 @@ function ensureRearDeltInPull(session: any, options: BBFinalizeOptions): void {
   });
 }
 
+/** Маппинг целевой группы сессии → разминочное лёгкое изолирующее движение. */
+const WARMUP_ACTIVATOR: Record<string, RegExp> = {
+  back: /пуловер.*(блок|канат|cable)|тяга.*прям.*рук|straight.?arm/i,
+  chest: /сведен.*(кроссовер|блок)|кроссовер|crossover|сведен.*тренаж/i,
+  quads: /разгибан.*ног|leg.?extension/i,
+  hamstrings: /сгибан.*ног|leg.?curl/i,
+  glutes: /отведен.*бедр|abduction|kick.?back|ягодичн.*отвед/i,
+  calves: /подъём.*носк|подъем.*носк|calf.?raise/i,
+  shoulders: /мах|raise|lateral|отведен.*рук/i,
+  biceps: /сгибан.*(блок|кабель|cable)|сгибан.*рук.*блок/i,
+  triceps: /разгибан.*блок|pushdown/i,
+  abs: /скручиван|crunch/i,
+  forearms: /сгибан.*запяст|wrist.?curl/i,
+};
+
+/** Разминочное упражнение на целевую группу: 3×10-15 лёгких повторений (~25% workMax).
+ *  Добавляется в начало сессии ПОСЛЕ всех проходов, чтобы его не удалил budget/dedupe.
+ *  Не входит в объём (warmupActivator отсекается в bb-volume). */
+function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  if (session.exercises.some((e: any) => e.warmupActivator)) return;
+  const lead = WARMUP_LEAD[session.sessionTag || ''] || session.exercises.find((e: any) => e.role === 'primary')?.muscle;
+  const pattern = WARMUP_ACTIVATOR[lead];
+  if (!pattern) return;
+  const candidate = EXERCISE_CATALOG.find((x: any) => {
+    const tm = trueMuscleOf(x);
+    if (tm === null || tm !== lead) return false;
+    if (!pattern.test(x.name || '')) return false;
+    // Уважаем equipment-ограничения пользователя.
+    if (options.equipment?.length) {
+      const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+      if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+    }
+    if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    return true;
+  });
+  if (!candidate) return;
+  const base = options.workMax?.[lead] || 50;
+  const weight = Math.max(5, Math.round(base * 0.25 * 10) / 10);
+  session.exercises.unshift({
+    muscle: lead,
+    name: candidate.name,
+    exerciseName: candidate.name,
+    role: 'accessory',
+    character: 'памп',
+    sets: 3,
+    repsRange: [10, 15],
+    rir: 4,
+    workSets: Array.from({ length: 3 }, () => ({ reps: 12, rir: 4, weight, tempo: '3-0-1-0', restSeconds: 45 })),
+    tempoSpec: '3-0-1-0',
+    restSeconds: 45,
+    warmupActivator: true,
+    warmupSets: [],
+    comment: `🌡 Разминка целевой группы ${lead}: ${candidate.name}, 3×12 @ ${weight} кг RIR 4 — активация перед рабочими подходами (не входит в объём).`,
+    rationale: 'Warmup activator: лёгкая активация целевой мышцы перед основным объёмом',
+  });
+}
+
+/** Целевая группа дня (по sessionTag). */
+const WARMUP_LEAD: Record<string, string> = {
+  Chest: 'chest', Back: 'back', Shoulders: 'shoulders', Arms: 'biceps',
+  Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
+  Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
+  Torso: 'chest', Legs: 'quads', Lower: 'quads', LowerPower: 'quads', LowerHyp: 'quads',
+  Glutes: 'glutes', GlutesHams: 'glutes', LegsBiceps: 'quads', Limbs: 'quads',
+};
+
 /**
  * Weekly back-pattern repair for adaptive/generic plans.
  * Volume specialization must not mean repeating pull-ups/vertical pulls in
@@ -929,6 +996,15 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .slice(0, 20)
     .map(issue => `🚫 Валидация: ${issue.message}`);
   if (errors.length) next.rationale = [...next.rationale, ...errors];
+  // Разминочное упражнение на целевую группу — в самом конце, после всех
+  // проходов (budget/dedupe/taper не могут его удалить). Не входит в объём.
+  // Только для реальных генераторных планов (pattern.id задан) и не-faithful.
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      addWarmupActivator(session, options);
+    }
+  }
+  syncBBPlanSetShape(next);
   next.balanceReport = analyzeBBBalance(next);
   next.report = buildBBPlanReport(next);
   return next;
