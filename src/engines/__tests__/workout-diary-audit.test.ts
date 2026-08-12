@@ -18,6 +18,7 @@ import {
   splitCSVRow, importSessionsFromCSV, updateSession, deleteSession, workoutLogToSession,
   logSet, startSession, addExerciseToSession, getVolumeTrend, getISOWeekNumber, getISOWeekYear,
   getStorageTrimWarning, clearStorageTrimWarning, saveSessions, loadSessions, cleanLegacyExerciseName, SET_LIMITS,
+  findDuplicateWorkouts, workoutContentSignature,
 } from '../workout-logger.engine';
 import { StrengthDiary, sessionToWorkoutLog } from '../strength-diary.engine';
 import { db } from '../../core/db';
@@ -214,6 +215,32 @@ describe('валидация лимитов и legacy-чистка имён', ()
     expect(wl.exercises[0].sets[0].techniqueScore).toBe(4);
     const back = workoutLogToSession(wl);
     expect(back.exercises[0].sets[0].techniqueScore).toBe(4);
+  });
+});
+
+describe('findDuplicateWorkouts', () => {
+  it('находит идентичные тренировки (дата + контент) и оставляет keep', () => {
+    const a = mkLog('idb_copy', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    const b = mkLog('ls_copy', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    const dupes = findDuplicateWorkouts([a, b]);
+    expect(dupes.length).toBe(1);
+    expect(dupes[0].keep.id).toBe('ls_copy'); // наибольший id — keep
+    expect(dupes[0].dupes.map(d => d.id)).toEqual(['idb_copy']);
+  });
+  it('не считает дублями разные тренировки за один день', () => {
+    const a = mkLog('a', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    const b = mkLog('b', '2026-08-11', 'Жим', [{ weight: 85, reps: 5, rir: 2, rpe: 8 }]);
+    expect(findDuplicateWorkouts([a, b]).length).toBe(0);
+  });
+  it('не считает дублями разные дни', () => {
+    const a = mkLog('a', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    const b = mkLog('b', '2026-08-12', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    expect(findDuplicateWorkouts([a, b]).length).toBe(0);
+  });
+  it('workoutContentSignature игнорирует порядок упражнений', () => {
+    const a = mkLog('a', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    const b = { ...mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]), exercises: [mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]).exercises[0]] };
+    expect(workoutContentSignature(a)).toBe(workoutContentSignature(b));
   });
 });
 

@@ -289,6 +289,36 @@ export function cleanLegacyExerciseName(name: string): string {
     .trim();
 }
 
+/** Контентная сигнатура тренировки для детекции дублей:
+ *  дата + отсортированные (упражнение, подходы: вес|повт|RIR|RPE). */
+export function workoutContentSignature(log: { date: string; exercises: WorkoutLog['exercises'] }): string {
+  const exParts = (log.exercises || [])
+    .map(ex => `${ex.exerciseName}:${(ex.sets || []).map(s => `${s.weight}|${s.reps}|${s.rir ?? ''}|${s.rpe ?? ''}`).join(';')}`)
+    .sort();
+  return `${log.date}|${exParts.join('~')}`;
+}
+
+/**
+ * Найти дубли тренировок: одинаковые (дата + полный контент упражнений/подходов).
+ * Возвращает пары { keep, dupes } — keep = запись с наибольшим id (детерминированно),
+ * dupes = копии для удаления. Чистая функция (без хранилища).
+ */
+export function findDuplicateWorkouts(logs: WorkoutLog[]): { keep: WorkoutLog; dupes: WorkoutLog[] }[] {
+  const bySig = new Map<string, WorkoutLog[]>();
+  for (const log of logs) {
+    const sig = workoutContentSignature(log);
+    if (!bySig.has(sig)) bySig.set(sig, []);
+    bySig.get(sig)!.push(log);
+  }
+  const out: { keep: WorkoutLog; dupes: WorkoutLog[] }[] = [];
+  for (const group of bySig.values()) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+    out.push({ keep: sorted[0], dupes: sorted.slice(1) });
+  }
+  return out;
+}
+
 /** Обратный маппер WorkoutLog → WorkoutSession (для зеркалирования IDB → localStorage).
  *  Сохраняет id как sessionId, чтобы удаление/обновление работало в обоих слоях. */
 export function workoutLogToSession(log: WorkoutLog): WorkoutSession {

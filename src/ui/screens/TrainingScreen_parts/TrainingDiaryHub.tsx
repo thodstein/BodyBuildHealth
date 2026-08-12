@@ -38,8 +38,8 @@ import MMCTrackingCard from './MMCTrackingCard';
 import { CheckinMetricsCard } from './CheckinMetricsCard';
 import { CsvImportTab } from './CsvImportTab';
 import { useIsMobile } from './useIsMobile';
-import { getStorageTrimWarning, clearStorageTrimWarning, getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logger.engine';
-import { migrateWeightLogLegacy } from '../../../engines/profile-store';
+import { getStorageTrimWarning, clearStorageTrimWarning, getISOWeekNumber, getISOWeekYear, findDuplicateWorkouts } from '../../../engines/workout-logger.engine';
+import { migrateWeightLogLegacy, getWeightLog, saveWeightLog } from '../../../engines/profile-store';
 import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, type Discipline } from '../../../engines/pl-norms.engine';
 import type { ProgressionAlert } from '../../../engines/strength-diary.engine';
 import { ACCENT, DIM, GRP_RU, GROUP_COLORS, diaryCard, diaryLabel, diaryInput, diaryBtn } from './diary-tokens';
@@ -517,6 +517,10 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [trainingArchive, setTrainingArchive] = useState<any[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_training_reports') || '[]'); } catch { return []; }
   });
+
+  // Дубли хранилища (диагностика + очистка)
+  const [dupes, setDupes] = useState<ReturnType<typeof findDuplicateWorkouts> | null>(null);
+  const [dupesBusy, setDupesBusy] = useState(false);
 
   // Session editing / deletion / progression alerts / storage trim warning
   const [editingWorkout, setEditingWorkout] = useState<WorkoutLog | null>(null);
@@ -3359,6 +3363,95 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           {/* Plate Calculator — existing component */}
           <div style={style.card}>
             <PlateCalcTab />
+          </div>
+          {/* Хранилище: диагностика дублей + импорт/экспорт веса (Google Fit мост) */}
+          <div style={style.card}>
+            <div style={style.label}>🧹 Хранилище: дубли и вес</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+              Поиск одинаковых тренировок (дата + контент) и синхронизация веса с внешними приложениями.
+            </div>
+            {dupes && dupes.length > 0 && (
+              <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b' }}>
+                Найдено дублей: {dupes.reduce((s, d) => s + d.dupes.length, 0)} (групп: {dupes.length}) — например, {dupes[0].dupes[0].date} · {dupes[0].keep.exercises[0]?.exerciseName || '—'}
+              </div>
+            )}
+            {dupes && dupes.length === 0 && (
+              <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e' }}>
+                Дублей не найдено — хранилище чисто.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button onClick={() => setDupes(findDuplicateWorkouts(historyWorkouts))}
+                style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer' }}>
+                🔍 Найти дубли
+              </button>
+              {dupes && dupes.length > 0 && (
+                <button onClick={async () => {
+                  setDupesBusy(true);
+                  const toDelete = dupes.flatMap(d => d.dupes);
+                  for (const d of toDelete) await diary.deleteWorkoutLog(d.id);
+                  setDupes(findDuplicateWorkouts(await diary.getWorkoutLogs()));
+                  setDupesBusy(false);
+                  onRefresh();
+                }} disabled={dupesBusy}
+                  style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)', cursor: 'pointer' }}>
+                  {dupesBusy ? 'Удаляю...' : `🗑 Удалить ${dupes.reduce((s, d) => s + d.dupes.length, 0)} дублей`}
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              <button onClick={() => {
+                // Экспорт веса для Google Fit / сторонних приложений
+                const rows = getWeightLog().map(e => `${e.date},${e.weight}${e.bodyFat ? `,${e.bodyFat}` : ''}`);
+                const csv = ['date,weight_kg,body_fat_pct', ...rows].join('\n');
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `weight_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }} style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>
+                📤 Экспорт веса CSV (Google Fit)
+              </button>
+              <label style={{ flex: 1, minWidth: 120, padding: '8px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer', textAlign: 'center' }}>
+                📥 Импорт веса CSV
+                <input type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    try {
+                      const text = String(reader.result || '');
+                      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                      const entries: Array<{ date: string; weight: number; bodyFat?: number }> = [];
+                      for (const l of lines) {
+                        if (/^date/i.test(l)) continue;
+                        const parts = l.split(/[;,]/).map(p => p.trim());
+                        const date = parts[0];
+                        const weight = parseFloat(parts[1]);
+                        const bodyFat = parts[2] !== undefined ? parseFloat(parts[2]) : undefined;
+                        if (!/^\d{4}-\d{2}-\d{2}/.test(date) || !Number.isFinite(weight) || weight <= 0) continue;
+                        entries.push({ date, weight, bodyFat: Number.isFinite(bodyFat) && (bodyFat as number) > 0 ? bodyFat as number : undefined });
+                      }
+                      if (entries.length === 0) { alert('Нет валидных строк (формат: дата,вес[,жир%])'); return; }
+                      const existing = getWeightLog();
+                      const byDate = new Map(existing.map(e => [e.date, e]));
+                      entries.forEach(entry => {
+                        const prev = byDate.get(entry.date);
+                        byDate.set(entry.date, { date: entry.date, weight: entry.weight, ...(entry.bodyFat != null ? { bodyFat: entry.bodyFat } : {}), ...(prev?.bodyFat != null && entry.bodyFat == null ? { bodyFat: prev.bodyFat } : {}) });
+                      });
+                      saveWeightLog([...byDate.values()]);
+                      setMeasurements(loadMeasurements());
+                      alert(`Импортировано: ${entries.length} записей веса`);
+                      onRefresh();
+                    } catch { alert('Ошибка чтения файла'); }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }} />
+              </label>
+            </div>
           </div>
           {/* JSON Full Backup */}
           <div style={style.card}>
