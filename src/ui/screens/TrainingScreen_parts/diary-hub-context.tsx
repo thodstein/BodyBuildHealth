@@ -10,6 +10,7 @@ export interface DiaryHubCtx {
   setMode: (m: any) => void;
   onGoRecord?: () => void;
   onRefresh: () => void;
+  diary: any;
   historyWorkouts: WorkoutLog[];
   diaryProgress: WeeklyProgress[];
   diaryStats: StrengthStats[];
@@ -21,6 +22,14 @@ export interface DiaryHubCtx {
   selectedWeek: number;
   mesoLength: number;
   curPhase: any;
+  goal: string;
+  daysPerWeek: number;
+  splitType: string;
+  periodizationType: string;
+  trainingArchive: any[];
+  setTrainingArchive: (a: any[]) => void;
+  trainingReportGenerated: boolean;
+  setTrainingReportGenerated: (b: boolean) => void;
 
   analytics: any;
   wsg: Record<string, number[]>;
@@ -66,6 +75,14 @@ export interface DiaryHubCtx {
   setSearch: (s: string) => void;
   filterGroup: string;
   setFilterGroup: (s: string) => void;
+  groupPickerOpen: boolean;
+  setGroupPickerOpen: (b: boolean) => void;
+  exPickerOpen: boolean;
+  setExPickerOpen: (b: boolean) => void;
+  exSearch: string;
+  setExSearch: (s: string) => void;
+  notesPickerOpen: boolean;
+  setNotesPickerOpen: (b: boolean) => void;
   historyExerciseFilter: string;
   setHistoryExerciseFilter: (s: string) => void;
   notesFilter: string;
@@ -73,6 +90,8 @@ export interface DiaryHubCtx {
   allExerciseNames: string[];
   groupedHistory: [string, WorkoutLog[]][];
   filteredHistory: [string, WorkoutLog[]][];
+  historyExpanded: string | null;
+  setHistoryExpanded: (s: any) => void;
 
   handleEditWorkout: (w: WorkoutLog) => void;
   handleDeleteWorkout: (id: string) => Promise<void>;
@@ -87,10 +106,11 @@ export interface DiaryHubCtx {
   setPlanToRecord: (p: any) => void;
   reminderTime: string | null;
   scheduleReminder: (t: string, name: string, exercises: string[]) => void;
-  dupes: any;
-  setDupes: (d: any) => void;
+  dupes: Array<{ keep: any; dupes: any[] }> | null;
+  setDupes: (d: Array<{ keep: any; dupes: any[] }> | null) => void;
   dupesBusy: boolean;
   setDupesBusy: (b: boolean) => void;
+  filteredHistoryWorkouts: WorkoutLog[];
 }
 
 export const DiaryHubContext = createContext<DiaryHubCtx | null>(null);
