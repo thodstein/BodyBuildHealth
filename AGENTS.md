@@ -40,7 +40,7 @@
 
 ---
 
-## Injection Diary Audit Round (Aug 11 2026, uncommitted)
+## Injection Diary Audit Round (Aug 11 2026, committed 4fabcf41e)
 
 Полный аудит дневника инъекций: 6 багов + 5 доработок. Без интеграции с калькулятором поддержки (работа другого агента не тронута).
 
@@ -75,7 +75,7 @@
 
 ---
 
-## Diary Modals Round 3 — Reset-guard, stale-чипы, умные дефолты (Aug 10 2026, uncommitted)
+## Diary Modals Round 3 — Reset-guard, stale-чипы, умные дефолты (Aug 10 2026, committed 4fabcf41e)
 
 Третья ротация дневниковых модалок Профиля v2 (поверх коммита 95e5593d6, незакоммичено — 11 файлов + 25 новых тестов).
 
@@ -113,7 +113,7 @@
 
 ---
 
-## Diary Modals Round 4 — Предупреждение о замене записи за дату (Aug 10 2026, uncommitted)
+## Diary Modals Round 4 — Предупреждение о замене записи за дату (Aug 10 2026, committed 4fabcf41e)
 
 Поверх Round 3 (a536cf2d). Все 5 onSave уже дедуплицируют по дате (`filter(x => x.date !== e.date)`), но пользователь не знал, что старая запись молча заменится.
 
