@@ -37,7 +37,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
     });
   };
 
-  const patchSet = (ei: number, si: number, p: Partial<{ weight: number; reps: number; rpe: number; rir: number }>) => {
+  const patchSet = (ei: number, si: number, p: Partial<{ weight: number; reps: number; rpe: number; rir: number; techniqueScore: number }>) => {
     setLog(prev => {
       const exercises = [...prev.exercises];
       const ex = { ...exercises[ei] } as StrengthLogEntry;
@@ -140,15 +140,25 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
                 <button onClick={() => removeExercise(ei)} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer' }}>Удалить</button>
               </div>
               {ex.note ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>📝 {ex.note}</div> : null}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 28px', gap: 4, marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
-                <span>кг</span><span>повт</span><span>RPE</span><span>RIR</span><span></span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 56px 28px', gap: 4, marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+                <span>кг</span><span>повт</span><span>RPE</span><span>RIR</span><span style={{ textAlign: 'center' }}>техника</span><span></span>
               </div>
               {ex.sets.map((s, si) => (
-                <div key={si} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 28px', gap: 4, marginBottom: 4 }}>
+                <div key={si} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 56px 28px', gap: 4, marginBottom: 4 }}>
                   <input type="number" value={s.weight || 0} disabled={isBWEx} onChange={e => patchSet(ei, si, { weight: parseFloat(e.target.value) || 0 })} style={{ ...IN, textAlign: 'center', padding: '6px 2px', minHeight: 36 }} />
                   <input type="number" value={s.reps || 0} onChange={e => patchSet(ei, si, { reps: parseInt(e.target.value) || 0 })} style={{ ...IN, textAlign: 'center', padding: '6px 2px', minHeight: 36 }} />
                   <input type="number" min={1} max={10} value={s.rpe ?? 7} onChange={e => patchSet(ei, si, { rpe: parseInt(e.target.value) || 7 })} style={{ ...IN, textAlign: 'center', padding: '6px 2px', minHeight: 36 }} />
                   <input type="number" min={0} max={5} value={s.rir ?? 2} onChange={e => patchSet(ei, si, { rir: parseInt(e.target.value) || 2 })} style={{ ...IN, textAlign: 'center', padding: '6px 2px', minHeight: 36 }} />
+                  <button onClick={() => {
+                    const next = s.techniqueScore === undefined ? 5 : s.techniqueScore === 5 ? 4 : s.techniqueScore === 4 ? 3 : undefined;
+                    patchSet(ei, si, { techniqueScore: next });
+                  }}
+                    style={{ height: 36, borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 11,
+                      background: s.techniqueScore ? (s.techniqueScore === 5 ? 'rgba(34,197,94,0.15)' : s.techniqueScore === 4 ? 'rgba(96,165,250,0.15)' : 'rgba(239,68,68,0.15)') : 'rgba(255,255,255,0.05)',
+                      color: s.techniqueScore ? (s.techniqueScore === 5 ? '#22c55e' : s.techniqueScore === 4 ? '#60a5fa' : '#ef4444') : 'rgba(255,255,255,0.3)' }}
+                    title={s.techniqueScore ? `Техника: ${s.techniqueScore}/5` : 'Оценить технику'}>
+                    {s.techniqueScore ? (s.techniqueScore === 5 ? '✅' : s.techniqueScore === 4 ? '🎯' : '⚠️') : '🎯'}
+                  </button>
                   <button onClick={() => removeSet(ei, si)} style={{ width: 28, height: 36, borderRadius: 5, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}>✕</button>
                 </div>
               ))}

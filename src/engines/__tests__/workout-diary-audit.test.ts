@@ -17,9 +17,9 @@ vi.mock('../../core/db', () => ({
 import {
   splitCSVRow, importSessionsFromCSV, updateSession, deleteSession, workoutLogToSession,
   logSet, startSession, addExerciseToSession, getVolumeTrend, getISOWeekNumber, getISOWeekYear,
-  getStorageTrimWarning, clearStorageTrimWarning, saveSessions, loadSessions,
+  getStorageTrimWarning, clearStorageTrimWarning, saveSessions, loadSessions, cleanLegacyExerciseName, SET_LIMITS,
 } from '../workout-logger.engine';
-import { StrengthDiary } from '../strength-diary.engine';
+import { StrengthDiary, sessionToWorkoutLog } from '../strength-diary.engine';
 import { db } from '../../core/db';
 import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 
@@ -187,6 +187,33 @@ describe('предупреждение о срезе хранилища', () => 
     expect(getStorageTrimWarning()).toEqual({ kept: 50, at: 123 });
     clearStorageTrimWarning();
     expect(getStorageTrimWarning()).toBeNull();
+  });
+});
+
+describe('валидация лимитов и legacy-чистка имён', () => {
+  beforeEach(() => { localStorage.clear(); });
+  it('logSet отклоняет вес/повторы сверх лимитов', () => {
+    let s = startSession('PPL', 1);
+    s = addExerciseToSession(s, { id: 'bench', name: 'Жим', pattern: 'horizontal_push', muscleGroup: 'chest' });
+    expect(logSet(s, 0, { setNumber: 1, weightKg: 600, reps: 5, rpe: 8, rir: 2 }).success).toBe(false);
+    expect(logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 200, rpe: 8, rir: 2 }).success).toBe(false);
+    expect(logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 5, rpe: 8, rir: 2 }).success).toBe(true);
+    expect(SET_LIMITS.maxWeightKg).toBe(500);
+  });
+  it('cleanLegacyExerciseName убирает маркеры [superset:N] и [note:...]', () => {
+    expect(cleanLegacyExerciseName('Жим штанги лёжа [superset:1] [note:тяжело]')).toBe('Жим штанги лёжа');
+    expect(cleanLegacyExerciseName('Приседания')).toBe('Приседания');
+    expect(cleanLegacyExerciseName('Тяга [note:с паузой]')).toBe('Тяга');
+  });
+  it('techniqueScore проходит круг: сессия → WorkoutLog → сессия', () => {
+    let s = startSession('PPL', 1);
+    s = addExerciseToSession(s, { id: 'bench', name: 'Жим', pattern: 'horizontal_push', muscleGroup: 'chest' });
+    const r = logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 5, rpe: 8, rir: 2, techniqueScore: 4 });
+    expect(r.session.exercises[0].sets[0].techniqueScore).toBe(4);
+    const wl = sessionToWorkoutLog(r.session);
+    expect(wl.exercises[0].sets[0].techniqueScore).toBe(4);
+    const back = workoutLogToSession(wl);
+    expect(back.exercises[0].sets[0].techniqueScore).toBe(4);
   });
 });
 

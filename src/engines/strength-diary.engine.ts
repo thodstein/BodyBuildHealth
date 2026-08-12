@@ -1,6 +1,6 @@
 import { db } from '../core/db';
 import type { StrengthLogEntry, WorkoutLog } from '../core/types';
-import { getISOWeekNumber, getISOWeekYear, loadSessions, saveSessions, deleteSession, workoutLogToSession, type WorkoutSession } from './workout-logger.engine';
+import { getISOWeekNumber, getISOWeekYear, loadSessions, saveSessions, deleteSession, workoutLogToSession, cleanLegacyExerciseName, type WorkoutSession } from './workout-logger.engine';
 import { epley1RM } from './e1rm';
 
 export interface StrengthStats {
@@ -48,8 +48,8 @@ export function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
       id: `${s.sessionId}_${ex.exerciseId}_${ex.order}`,
       date: s.date,
       exerciseId: ex.exerciseId || ex.exerciseName,
-      exerciseName: ex.exerciseName,
-      sets: ex.sets.map(st => ({ weight: st.weightKg, reps: st.reps, rir: st.rir, rpe: st.rpe })),
+      exerciseName: cleanLegacyExerciseName(ex.exerciseName),
+      sets: ex.sets.map(st => ({ weight: st.weightKg, reps: st.reps, rir: st.rir, rpe: st.rpe, techniqueScore: st.techniqueScore })),
       totalVolume: ex.totalVolume,
       estimated1RM: ex.best1RM,
       isCompound: COMPOUND_PATTERNS.has(ex.pattern),
@@ -117,6 +117,8 @@ export class StrengthDiary {
         seenWorkouts.add(l.id);
         const exercises = (l.exercises || []).map(ex => ({
           ...ex,
+          // Legacy-маркеры («[superset:1]», «[note:...]») больше не пишутся — чистим при чтении
+          exerciseName: cleanLegacyExerciseName(ex.exerciseName),
           sets: (ex.sets || []).filter((st, index) => {
             const signature = workoutSetKey(l.date, ex.exerciseName, index + 1, st);
             if (seenSets.has(signature)) return false;

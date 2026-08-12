@@ -280,6 +280,29 @@ export function generateInsights(
     });
   }
 
+  // ── Technique quality (оценка 3-5 за подход) ──
+  const scored = sets.filter(s => typeof s.techniqueScore === 'number' && s.techniqueScore >= 1);
+  if (scored.length >= 3) {
+    const avgTech = scored.reduce((s, x) => s + (x.techniqueScore || 0), 0) / scored.length;
+    if (avgTech < 4) {
+      insights.push({
+        type: 'warning',
+        category: 'technique',
+        message: `⚠️ Средняя техника ${avgTech.toFixed(1)}/5 (${scored.length} подходов)`,
+        detail: 'Более половины подходов с оценкой ниже 4. Снизьте вес или повторы, сфокусируйтесь на форме.',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      insights.push({
+        type: 'positive',
+        category: 'technique',
+        message: `✅ Техника: ${avgTech.toFixed(1)}/5 (${scored.length} подходов)`,
+        detail: 'Стабильное качество выполнения. Можно повышать нагрузку.',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
   // ── Consistency insights ──
   if (history.currentStreak >= 10) {
     insights.push({

@@ -34,7 +34,12 @@ export interface WorkoutSet {
   plannedWeight?: number;
   plannedReps?: number;
   plannedRir?: number;
+  /** Оценка техники выполнения подхода: 3 (слабо) / 4 (норма) / 5 (отлично). */
+  techniqueScore?: number;
 }
+
+/** Лимиты валидации подходов (guard от опечаток и повреждённых данных). */
+export const SET_LIMITS = { maxWeightKg: 500, maxReps: 100, maxRpe: 10, maxRir: 20 } as const;
 
 export interface WorkoutExercise {
   exerciseId: string;
@@ -216,13 +221,15 @@ export function logSet(
   const rir = Math.max(0, Math.min(20, Number(set.rir) || 0));
 
   if (weightKg <= 0 || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
+  if (weightKg > SET_LIMITS.maxWeightKg) return { session, success: false, reason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг`, discardReason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг` };
+  if (reps > SET_LIMITS.maxReps) return { session, success: false, reason: `Повторения превышают лимит ${SET_LIMITS.maxReps}`, discardReason: `Повторения превышают лимит ${SET_LIMITS.maxReps}` };
 
   const estimated1RM = epley1RM(weightKg, reps);
   // PR по расчётному 1RM (а не только по весу): 80кг×5 (e1RM 93) > 82кг×1 (e1RM 85).
   const sessionBestE1RM = ex.sets.length > 0 ? Math.max(...ex.sets.map(s => epley1RM(s.weightKg, s.reps))) : 0;
   const isPR = estimated1RM > sessionBestE1RM || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight);
 
-  ex.sets = [...ex.sets, { setNumber: set.setNumber, weightKg, reps, rpe, rir, isPR, notes: set.notes || '' }];
+  ex.sets = [...ex.sets, { setNumber: set.setNumber, weightKg, reps, rpe, rir, isPR, notes: set.notes || '', techniqueScore: set.techniqueScore }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
   ex.best1RM = Math.max(ex.best1RM, estimated1RM);
   ex.avgRPE = Math.round(ex.sets.reduce((s, st) => s + st.rpe, 0) / ex.sets.length * 10) / 10;
@@ -273,6 +280,15 @@ export function deleteSession(sessionId: string): boolean {
   return true;
 }
 
+/** Убрать legacy-маркеры из имени упражнения («[superset:1]», «[note:...]»), которыми
+ *  старые версии формы загрязняли exerciseName. */
+export function cleanLegacyExerciseName(name: string): string {
+  return (name || '')
+    .replace(/\s*\[superset:\d+\]/gi, '')
+    .replace(/\s*\[note:[^\]]*\]/gi, '')
+    .trim();
+}
+
 /** Обратный маппер WorkoutLog → WorkoutSession (для зеркалирования IDB → localStorage).
  *  Сохраняет id как sessionId, чтобы удаление/обновление работало в обоих слоях. */
 export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
@@ -286,6 +302,7 @@ export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
       velocityMs: undefined,
       isPR: false,
       notes: '',
+      techniqueScore: st.techniqueScore,
     }));
     return {
       exerciseId: ex.exerciseId,
@@ -473,6 +490,8 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
     const weight = parseFloat(weightStr);
     const reps = parseInt(repsStr);
     if (isNaN(weight) || isNaN(reps)) { errors.push(`Строка ${lineNo}: вес/повт не число.`); continue; }
+    if (weight > SET_LIMITS.maxWeightKg || weight <= 0) { errors.push(`Строка ${lineNo}: вес вне лимита (0..${SET_LIMITS.maxWeightKg}).`); continue; }
+    if (reps > SET_LIMITS.maxReps || reps <= 0) { errors.push(`Строка ${lineNo}: повторения вне лимита (1..${SET_LIMITS.maxReps}).`); continue; }
     const rpe = rpeStr ? parseFloat(rpeStr) || 0 : 0;
     const rirRaw = rirStr !== undefined && rirStr !== '' ? parseFloat(rirStr) : 2;
     const rir = isNaN(rirRaw) ? 2 : rirRaw;

@@ -91,7 +91,7 @@ export function workoutLogToStrengthLogEntries(log: WorkoutLog): StrengthLogEntr
     date: log.date,
     exerciseId: ex.exerciseId,
     exerciseName: ex.exerciseName,
-    sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe })),
+    sets: ex.sets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, techniqueScore: s.techniqueScore })),
     totalVolume: ex.totalVolume,
     estimated1RM: ex.estimated1RM,
     isCompound: ex.isCompound,

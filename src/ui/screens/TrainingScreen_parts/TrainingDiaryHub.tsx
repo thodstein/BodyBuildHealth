@@ -40,6 +40,7 @@ import { CsvImportTab } from './CsvImportTab';
 import { useIsMobile } from './useIsMobile';
 import { getStorageTrimWarning, clearStorageTrimWarning, getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logger.engine';
 import { migrateWeightLogLegacy } from '../../../engines/profile-store';
+import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, type Discipline } from '../../../engines/pl-norms.engine';
 import type { ProgressionAlert } from '../../../engines/strength-diary.engine';
 import { ACCENT, DIM, GRP_RU, GROUP_COLORS, diaryCard, diaryLabel, diaryInput, diaryBtn } from './diary-tokens';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
@@ -522,6 +523,33 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [progressionAlerts, setProgressionAlerts] = useState<ProgressionAlert[]>([]);
   const [trimWarning, setTrimWarning] = useState(() => getStorageTrimWarning());
+
+  // Напоминание «тренировка по плану» (Notification API + localStorage pref)
+  const [reminderTime, setReminderTime] = useState<string | null>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_diary_reminder') || 'null');
+      if (raw && raw.date === new Date().toISOString().slice(0, 10)) return raw.time || null;
+      return null;
+    } catch { return null; }
+  });
+  const scheduleReminder = (time: string, plannedName: string, plannedExercises: string[]) => {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      void Notification.requestPermission().then(p => { if (p === 'granted') scheduleReminder(time, plannedName, plannedExercises); });
+      return;
+    }
+    if (Notification.permission !== 'granted') return;
+    const [h, m] = time.split(':').map(Number);
+    const now = new Date();
+    const target = new Date(); target.setHours(h || 18, m || 0, 0, 0);
+    const delay = target.getTime() - now.getTime();
+    if (delay <= 0) return;
+    setTimeout(() => {
+      try { new Notification('🏋️ Тренировка по плану', { body: `${plannedName} — ${plannedExercises.length} упр.` }); } catch {}
+    }, delay);
+    try { localStorage.setItem('he_diary_reminder', JSON.stringify({ date: new Date().toISOString().slice(0, 10), time })); } catch {}
+    setReminderTime(time);
+  };
   useEffect(() => {
     let cancelled = false;
     diary.checkProgressionAlerts().then(alerts => { if (!cancelled) setProgressionAlerts(alerts); }).catch(() => {});
@@ -769,8 +797,20 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 </div>
                 {planned && (
                   <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎯 По плану сегодня: {planned.name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎯 По плану сегодня: {planned.name}</div>
+                      {reminderTime ? (
+                        <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', whiteSpace: 'nowrap' }}>
+                          🔔 Напоминание: {reminderTime}
+                        </span>
+                      ) : (
+                        <button onClick={() => scheduleReminder('18:00', planned.name, planned.exercises.map((e: any) => e.name))}
+                          style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          🔔 Напомнить в 18:00
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
                       {planned.exercises.slice(0, 6).map(e => e.name).join(' · ')}{planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
                     </div>
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>~{planned.duration} мин</div>
@@ -879,6 +919,20 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
                   Упражнений плана выполнено: {matched} из {plannedNames.size} ({matchPct}%)
                 </div>
+                {(() => {
+                  // Пропущенные плановые дни: день плана (0=Пн) vs дни недели с факт-тренировками
+                  const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+                  const factDays = new Set(factWeek.map(w => (new Date(w.date).getDay() + 6) % 7));
+                  const missed = plannedDays
+                    .filter((d: any) => typeof d.day === 'number' && !factDays.has(d.day % 7))
+                    .map((d: any) => `${dayNames[d.day % 7]} (${d.name})`);
+                  if (missed.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b' }}>
+                      ⏭ Пропущено: {missed.join(', ')}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
@@ -1590,7 +1644,19 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               {/* Volume by group stacked bars */}
               {totals.some(t => t > 0) && (
                 <div style={style.card}>
-                  <div style={style.label}>📊 Объём по неделям (сеты)</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={style.label} >📊 Объём по неделям (сеты)</div>
+                    {(() => {
+                      const acwr = expertAcwr;
+                      const zoneColor = acwr > 1.5 ? '#ef4444' : acwr > 1.3 ? '#eab308' : acwr < 0.8 ? '#3b82f6' : '#22c55e';
+                      const zoneLabel = acwr > 1.5 ? 'опасно' : acwr > 1.3 ? 'осторожно' : acwr < 0.8 ? 'недотрен' : 'оптимум';
+                      return (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, color: zoneColor, border: `1px solid ${zoneColor}55`, background: `${zoneColor}14` }}>
+                          ACWR {acwr.toFixed(2)} · {zoneLabel}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   {/* MRV reference: avg ~20 sets/week for large groups */}
                   <div style={{ position: 'relative', height: 100, marginBottom: 4 }}>
                     {/* MRV reference line */}
@@ -1705,6 +1771,45 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             {ratio && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>×{ratio} МТ</span>}
                             <span><strong style={{ color: ACCENT }}>{Math.round(rm as number)} кг</strong><span style={{ marginLeft: 6, fontSize: 10, color: trend >= 0 ? '#22c55e' : '#ef4444' }}>{trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%</span></span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+              {/* Нормативы ПЛ по основным движениям (e1RM из дневника) */}
+              {(() => {
+                const bw = measurements.length > 0 ? (measurements[measurements.length - 1].weightKg || 0) : 0;
+                const discFor = (id: string): Discipline | null => {
+                  const n = (id || '').toLowerCase();
+                  if (/squat|присед/.test(n)) return 'squat';
+                  if (/bench|жим.*л[её]жа|жим лежа|жим л[её]жа/.test(n)) return 'bench';
+                  if (/deadlift|станов/.test(n) && !/румын|сумо/.test(n)) return 'deadlift';
+                  return null;
+                };
+                const lifts = Object.entries(analytics.strength.estimated1RM)
+                  .map(([id, rm]) => ({ id, rm: rm as number, disc: discFor(id) }))
+                  .filter(x => x.disc && x.rm > 0)
+                  .slice(0, 3);
+                if (bw <= 0 || lifts.length === 0) return null;
+                const table = PL_NORM_TABLES.find(t => t.federation === 'wrpf_untested');
+                return (
+                  <div style={style.card}>
+                    <div style={style.label}>🏅 Нормативы ПЛ (WRPF, raw · {bw} кг)</div>
+                    {lifts.map(({ id, rm, disc }) => {
+                      if (!table) return null;
+                      const cls = classifyTotal(table, bw, rm);
+                      return (
+                        <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, fontSize: 11 }}>
+                          <span style={{ color: 'var(--text-dim)' }}>{EXERCISE_CATALOG.find(e => e.id === id)?.name || id}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{Math.round(rm)} кг</span>
+                            {cls.achievedRank ? (
+                              <span style={{ fontSize: 10, fontWeight: 800, color: cls.achievedRank === 'kms' ? '#22c55e' : cls.achievedRank === 'ms' ? '#60a5fa' : '#f59e0b', padding: '1px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>{RANK_LABELS[cls.achievedRank as keyof typeof RANK_LABELS]}</span>
+                            ) : (
+                              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>до {RANK_LABELS[cls.nextRank as keyof typeof RANK_LABELS]}: {cls.kgToNext} кг</span>
+                            )}
                           </span>
                         </div>
                       );
@@ -2083,7 +2188,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   </div>
                 );
               })()}
-              {/* Muscle group frequency per week */}
+              {/* Muscle group frequency per week — heatmap: интенсивность по подходам */}
               {historyWorkouts.length >= 4 && (() => {
                 const weeks = 8;
                 const today = new Date();
@@ -2092,33 +2197,49 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - (w + 1) * 7);
                   const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() - w * 7);
                   const weekWorkouts = historyWorkouts.filter(wo => { const d = new Date(wo.date); return d > weekStart && d <= weekEnd; });
-                  const trainedGroups = new Set<string>();
+                  const groupSets: Record<string, number> = {};
                   weekWorkouts.forEach(wo => wo.exercises.forEach((e: any) => {
                     const cat = EXERCISE_CATALOG.find((c: any) => c.id === e.exerciseId);
-                    if (cat?.group) trainedGroups.add(cat.group);
+                    if (cat?.group) groupSets[cat.group] = (groupSets[cat.group] || 0) + (e.sets?.length || 0);
                   }));
-                  trainedGroups.forEach(g => { if (!groupWeeks[g]) groupWeeks[g] = new Array(weeks).fill(0); groupWeeks[g][weeks - 1 - w] = 1; });
+                  Object.entries(groupSets).forEach(([g, sets]) => { if (!groupWeeks[g]) groupWeeks[g] = new Array(weeks).fill(0); groupWeeks[g][weeks - 1 - w] = sets; });
                 }
                 const groups = Object.entries(groupWeeks)
                   .map(([g, arr]) => ({ group: g, total: arr.reduce((s, v) => s + v, 0), data: arr }))
                   .sort((a, b) => b.total - a.total)
                   .slice(0, 8);
                 if (groups.length === 0) return null;
+                const maxSets = Math.max(1, ...groups.flatMap(g => g.data));
+                const heat = (v: number) => {
+                  if (v === 0) return 'rgba(255,255,255,0.04)';
+                  const t = v / maxSets;
+                  if (t > 0.7) return 'rgba(239,68,68,0.65)';
+                  if (t > 0.45) return 'rgba(245,158,11,0.55)';
+                  if (t > 0.2) return 'rgba(0,230,138,0.4)';
+                  return 'rgba(0,230,138,0.15)';
+                };
                 return (
                   <div style={style.card}>
-                    <div style={style.label}>💪 Частота по группам</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '80px repeat(8, 1fr)', gap: '2px 4px', alignItems: 'center' }}>
+                    <div style={style.label}>💪 Частота по группам (подходы/нед)</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '86px repeat(8, 1fr)', gap: '2px 4px', alignItems: 'center' }}>
+                      <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', textAlign: 'right' }}>Н-8…Н-1</span>
+                      {Array.from({ length: weeks }, (_, i) => <span key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>{i + 1}</span>)}
                       {groups.map(({ group, total, data }) => (
                         <React.Fragment key={group}>
                           <span style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
                           {data.map((v, wi) => (
-                            <div key={wi} style={{ height: 10, borderRadius: 2, background: v > 0 ? (total >= 6 ? '#22c55e' : total >= 3 ? '#f59e0b' : '#ef4444') : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {v > 0 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>✓</span>}
+                            <div key={wi} style={{ height: 12, borderRadius: 3, background: heat(v), display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }} title={`${GRP_RU[group] || group}: ${v} подходов`}>
+                              {v > 0 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>{v}</span>}
                             </div>
                           ))}
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>{total}/{weeks}</span>
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>{total}</span>
                         </React.Fragment>
                       ))}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
+                      <span>меньше</span>
+                      {[0.1, 0.3, 0.6, 1].map(t => <span key={t} style={{ width: 10, height: 10, borderRadius: 2, background: heat(maxSets * t) }} />)}
+                      <span>больше</span>
                     </div>
                   </div>
                 );
@@ -3113,6 +3234,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           })()}
           <div style={style.card}>
             <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>📄 Отчёты</div>
+            <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => {
               const planWeeks = macrocycle?.totalWeeks ?? (trainingOutput?.plan?.length && daysPerWeek > 0 ? Math.ceil(trainingOutput.plan.length / daysPerWeek) : 0);
               const report = {
@@ -3127,9 +3249,40 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               try { localStorage.setItem('he_training_reports', JSON.stringify(updated)); } catch {}
               try { localStorage.setItem('he_training_report_current', JSON.stringify(report)); } catch {}
               setTrainingReportGenerated(true);
-            }} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer', width: '100%' }}>
+            }} style={{ flex: 1, padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
               Сгенерировать отчёт
             </button>
+            <button onClick={() => {
+              // Печатный отчёт за последние 30 дней
+              const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+              const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+              const month = historyWorkouts.filter(w => new Date(w.date) >= cutoff).sort((a, b) => a.date.localeCompare(b.date));
+              const vol = month.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
+              const sets = month.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + (e.sets?.length || 0), 0), 0);
+              const prs = month.flatMap(w => (w.exercises || []).flatMap(e => (e.sets || []).filter((x: any) => x.isPR).map(() => ({ ex: e.exerciseName, w: w.date }))));
+              const rows = month.map(w => `
+                <tr>
+                  <td>${esc(w.date)}</td><td>${esc(w.split || 'Тренировка')}</td>
+                  <td>${w.exercises.length}</td><td>${w.exercises.reduce((s, e) => s + (e.sets?.length || 0), 0)}</td>
+                  <td>${Math.round(w.exercises.reduce((s, e) => s + e.totalVolume, 0)).toLocaleString()}</td>
+                  <td>${esc(w.notes || '')}</td>
+                </tr>`).join('');
+              const html = `<!doctype html><html><head><meta charset="utf-8"><title>Дневник — отчёт за 30 дней</title>
+                <style>body{font-family:system-ui;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:12px}
+                th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f5f5f5}h1{font-size:18px}h2{font-size:14px;margin-top:20px}
+                .stats{display:flex;gap:24px;font-size:13px;margin:8px 0}</style></head><body>
+                <h1>📊 Тренировочный дневник — 30 дней</h1>
+                <div class="stats"><span>Тренировок: <b>${month.length}</b></span><span>Подходов: <b>${sets}</b></span><span>Тоннаж: <b>${(vol / 1000).toFixed(1)} т</b></span></div>
+                ${prs.length > 0 ? `<h2>🏆 PR за период</h2><ul>${prs.slice(0, 10).map(p => `<li>${esc(p.ex)} — ${esc(p.w)}</li>`).join('')}</ul>` : ''}
+                <h2>📋 Сессии</h2>
+                <table><thead><tr><th>Дата</th><th>Сплит</th><th>Упр.</th><th>Сеты</th><th>Объём</th><th>Заметки</th></tr></thead><tbody>${rows}</tbody></table>
+                <script>window.print();</script></body></html>`;
+              const win = window.open('', '_blank', 'width=900,height=700');
+              if (win) { win.document.write(html); win.document.close(); }
+            }} style={{ flex: 1, padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer' }}>
+              🖨 Отчёт месяца
+            </button>
+            </div>
             {trainingReportGenerated && <p style={{ margin: '6px 0 0', fontSize: 11, color: '#22c55e' }}>✓ Отчёт сохранён</p>}
             {trainingArchive.length > 0 && (
               <div style={{ marginTop: 8 }}>

@@ -21,6 +21,8 @@ interface SetRecord {
   rpe: number;
   completed: boolean;
   notes?: string;
+  /** Оценка техники: 5 (отлично) / 4 (норма) / 3 (слабо). */
+  technique?: number;
 }
 
 interface ExerciseRecord {
@@ -305,7 +307,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       return {
         id: `${wid}_${i}`, date: logDate, exerciseId: e.exerciseId,
         exerciseName: cat?.name || e.exerciseId,
-        sets: completedSets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, notes: s.notes || undefined })),
+        sets: completedSets.map(s => ({ weight: s.weight, reps: s.reps, rir: s.rir, rpe: s.rpe, notes: s.notes || undefined, techniqueScore: s.technique })),
         totalVolume: completedSets.reduce((s, st) => s + st.weight * st.reps, 0),
         estimated1RM: Math.max(...completedSets.map(s => epley1RM(s.weight, s.reps)), 0),
         isCompound: cat?.type === 'compound', weekNumber: selectedWeek,
@@ -642,13 +644,13 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                   </div>
                 )}
 
-      {/* Set header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 24px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', paddingLeft: 2 }}>
+                {/* Set header */}
+                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 74px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', paddingLeft: 2 }}>
                   <span>#</span><span style={{ textAlign: 'center' }}>кг</span><span style={{ textAlign: 'center' }}>повт</span><span style={{ textAlign: 'center' }}>RPE</span><span style={{ textAlign: 'center' }}>RIR</span><span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
                   <React.Fragment key={setIdx}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 24px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 74px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textAlign: 'center' }}>{setIdx + 1}</span>
                       <input type="number" value={set.weight} disabled={isBWExercise({ name: ex.exerciseName })} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { weight: parseFloat(e.target.value) || 0 })}
@@ -671,6 +673,17 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                         onChange={e => updateSet(exIdx, setIdx, { rir: parseInt(e.target.value) || 0 })}
                         style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
                       <div style={{ display: 'flex', gap: 2 }}>
+                        <button onClick={() => {
+                          // Цикл оценки техники: нет → 5 → 4 → 3 → нет
+                          const next = set.technique === undefined ? 5 : set.technique === 5 ? 4 : set.technique === 4 ? 3 : undefined;
+                          updateSet(exIdx, setIdx, { technique: next });
+                        }}
+                          style={{ width: 22, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 10,
+                            background: set.technique ? (set.technique === 5 ? 'rgba(34,197,94,0.15)' : set.technique === 4 ? 'rgba(96,165,250,0.15)' : 'rgba(239,68,68,0.15)') : 'rgba(255,255,255,0.05)',
+                            color: set.technique ? (set.technique === 5 ? '#22c55e' : set.technique === 4 ? '#60a5fa' : '#ef4444') : 'rgba(255,255,255,0.3)' }}
+                          title={set.technique ? `Техника: ${set.technique}/5` : 'Оценить технику (нет)'}>
+                          {set.technique ? (set.technique === 5 ? '✅' : set.technique === 4 ? '🎯' : '⚠️') : '🎯'}
+                        </button>
                         <button onClick={() => {
                           const updated = [...exercises];
                           const ex2 = { ...updated[exIdx] };

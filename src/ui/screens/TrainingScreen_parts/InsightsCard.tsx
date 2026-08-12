@@ -51,6 +51,7 @@ export const InsightsCard: React.FC = () => {
             setId: ex.id + '_' + i, sessionId: w.id, exerciseId: ex.exerciseId, exerciseName: ex.exerciseName,
             setIndex: i + 1, targetReps: st.reps, targetWeight: st.weight, actualReps: st.reps, actualWeight: st.weight,
             actualRPE: st.rpe || 5, actualRIR: st.rir ?? 3, errors: [], restSeconds: 120, terminatedEarly: false,
+            techniqueScore: (st as any).techniqueScore,
           };
           if (isCurrent) sets.push(setData);
           else if (isPrev) prevSets.push(setData);

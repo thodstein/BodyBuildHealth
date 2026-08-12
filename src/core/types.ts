@@ -1199,7 +1199,7 @@ export interface StrengthLogEntry {
   date: string;
   exerciseId: string;
   exerciseName: string;
-  sets: { weight: number; reps: number; rir: number; rpe?: number }[];
+  sets: { weight: number; reps: number; rir: number; rpe?: number; techniqueScore?: number }[];
   totalVolume: number;
   estimated1RM: number;
   isCompound: boolean;
