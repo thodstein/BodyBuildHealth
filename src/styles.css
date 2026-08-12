@@ -2765,10 +2765,15 @@ input[type="range"]:active {
   }
 }
 
-/* ── 6. flex-контейнеры с gap > 6px → flex-wrap ── */
-.training-screen [style*="display: flex"][style*="gap:"],
-.training-screen [style*="display:flex"][style*="gap:"] {
+/* ── 6. flex-контейнеры с gap > 6px → flex-wrap (только РЯДЫ; column-контейнеры
+   при wrap раздувают свои элементы до max-content и выходят за экран) ── */
+.training-screen [style*="display: flex"][style*="gap:"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display:flex"][style*="gap:"]:not([style*="flex-direction: column"]) {
   flex-wrap: wrap !important;
+}
+.training-screen [style*="display: flex"][style*="flex-direction: column"],
+.training-screen [style*="display:flex"][style*="flex-direction: column"] {
+  flex-wrap: nowrap !important;
 }
 
 /* ── 7. Контейнеры с minWidth/width > 280 → не вылезают ── */
@@ -2905,15 +2910,15 @@ input[type="range"]:active {
   line-height: 1.2 !important;
 }
 
-/* ── 14. Flex-строки с inline-gap — перенос ── */
-.training-screen [style*="display: flex"][style*="gap: 4"],
-.training-screen [style*="display: flex"][style*="gap:4"],
-.training-screen [style*="display:flex"][style*="gap: 4"],
-.training-screen [style*="display:flex"][style*="gap:4"],
-.training-screen [style*="display: flex"][style*="gap: 6"],
-.training-screen [style*="display: flex"][style*="gap:6"],
-.training-screen [style*="display:flex"][style*="gap: 6"],
-.training-screen [style*="display:flex"][style*="gap:6"] {
+/* ── 14. Flex-строки с inline-gap — перенос (только РЯДЫ, см. правило 6) ── */
+.training-screen [style*="display: flex"][style*="gap: 4"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display: flex"][style*="gap:4"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display:flex"][style*="gap: 4"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display:flex"][style*="gap:4"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display: flex"][style*="gap: 6"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display: flex"][style*="gap:6"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display:flex"][style*="gap: 6"]:not([style*="flex-direction: column"]),
+.training-screen [style*="display:flex"][style*="gap:6"]:not([style*="flex-direction: column"]) {
   flex-wrap: wrap !important;
 }
 

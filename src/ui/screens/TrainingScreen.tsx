@@ -453,7 +453,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
 
   return (
-    <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'visible', padding: 0 }}>
+    <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0, WebkitOverflowScrolling: 'touch' }}>
 
       {/* ─── HERO PAGE ─── */}
       {page === 'hero' && (
