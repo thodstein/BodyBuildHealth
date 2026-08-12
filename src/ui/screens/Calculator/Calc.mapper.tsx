@@ -2204,9 +2204,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {(() => {
                       const hema = systemRiskOf('hematologic');
                       if (!hema) return null;
+                      const mechOf = (id: string) => hema.mechanisms.find(m => m.id === id);
+                      const h1 = mechOf('hem1');
+                      const h2 = mechOf('hem2');
+                      const h3 = mechOf('hem3');
+                      const h4 = mechOf('hem4');
+                      const h5 = mechOf('hem5');
+                      const sum = (a?: number, b?: number) => (a ?? 0) + (b ?? 0);
                       return (
                         <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginBottom:4, padding:'4px 6px', borderRadius:5, background:'rgba(20,184,166,0.08)', border:'1px solid rgba(20,184,166,0.18)' }}>
-                          ⚖️ Риск системы (механизм-модель, единый расчёт): <b style={{ color: hema.rawPercent >= 50 ? '#f87171' : '#fbbf24' }}>{hema.rawPercent}%</b> → <b style={{ color: '#4ade80' }}>{hema.afterPercent}%</b> после поддержки (защита {hema.k_protect}%)
+                          ⚖️ Под-риски гемато-блока (механизм-модель, единый расчёт):
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:3 }}>
+                            <span style={{ padding:'1px 5px', borderRadius:3, background:'rgba(20,184,166,0.15)', border:'1px solid rgba(20,184,166,0.25)' }}>🩸 эритроцитоз {h1?.rawPercent ?? 0}% → {h1?.afterPercent ?? 0}%</span>
+                            <span style={{ padding:'1px 5px', borderRadius:3, background:'rgba(249,115,22,0.15)', border:'1px solid rgba(249,115,22,0.25)' }}>🍬 метаболизм {sum(h2?.rawPercent, h3?.rawPercent)}% → {sum(h2?.afterPercent, h3?.afterPercent)}%</span>
+                            <span style={{ padding:'1px 5px', borderRadius:3, background:'rgba(56,189,248,0.15)', border:'1px solid rgba(56,189,248,0.25)' }}>⚡ электролиты {sum(h4?.rawPercent, h5?.rawPercent)}% → {sum(h4?.afterPercent, h5?.afterPercent)}%</span>
+                          </div>
                         </div>
                       );
                     })()}
