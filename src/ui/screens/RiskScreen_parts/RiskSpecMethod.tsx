@@ -378,7 +378,10 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                           </div>
                           <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: hasProtection ? '#4ade80' : '#f87171' }}>
-                              {Math.round(m.raw)} → {Math.round(m.afterSupport)}
+                              {m.rawPercent}% → {m.afterPercent}%
+                            </div>
+                            <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>
+                              {Math.round(m.raw)} → {Math.round(m.afterSupport)} баллов
                             </div>
                             {hasProtection && (
                               <div style={{ fontSize: 9, color: ACCENT, fontWeight: 600 }}>

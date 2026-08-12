@@ -87,6 +87,8 @@ export interface TzSpecInput {
 export interface TzSpecMechanismResult {
   id: string; name: string; weight: number; m_i: number;
   E_i: number; raw: number; afterSupport: number; k_used: number; q_label: string;
+  /** Доля механизма в системе, шкала 0-100 (как и у системы) — сумма долей = rawPercent системы */
+  rawPercent: number; afterPercent: number;
 }
 export interface TzSpecOrganResult {
   id: string; name: string; icon: string;
@@ -650,6 +652,8 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         E_i:Math.round(T_i*100)/100,raw:Math.round(mechRaw*10)/10,
         afterSupport:Math.round(mechAfter*10)/10,
         k_used:Math.round((1-productK)*100),q_label:bestQ,
+        rawPercent:sys.maxRaw>0?Math.min(100,Math.round((mechRaw/sys.maxRaw)*100)):0,
+        afterPercent:sys.maxRaw>0?Math.min(100,Math.round((mechAfter/sys.maxRaw)*100)):0,
       });
     }
 

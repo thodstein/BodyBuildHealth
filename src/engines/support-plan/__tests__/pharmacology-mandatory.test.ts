@@ -171,6 +171,7 @@ describe('course pharmacology mandatory rules', () => {
     const blockedRec = resolvePlan(blockedCtx);
     expect(blockedRec.subs.some(s => s.substanceId === 'spironolactone')).toBe(true);
     expect(blockedRec.subs.some(s => s.substanceId === 'telmisartan')).toBe(false);
+    expect(blockedRec.protocolWarnings?.some(w => w.includes('Блок-конфликт'))).toBe(true);
   });
 
   it('рецептурные препараты помечены как под контролем врача', () => {

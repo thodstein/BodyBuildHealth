@@ -1,5 +1,7 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+﻿import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
+import { calculateTzSpecRisk } from '../../../engines/risk-engine-tz-spec';
 import type { LabSlice } from '../../../engines/support-plan';
 import type { CalculatorState } from '../../../engines/support-plan';
 import { resolvePlan, isDoctorControlled, type SupportRisk } from '../../../engines/tz-mapper-engine';
@@ -696,6 +698,25 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showLifestyle, setShowLifestyle] = useState(true);
   const [removedSubs, setRemovedSubs] = useState<string[]>([]);
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
+  const [pendingBlockAdd, setPendingBlockAdd] = useState<{ ids: string[]; conflicts: { a: string; b: string; reason: string }[] } | null>(null);
+  // Централизованное добавление с проверкой блок-конфликтов: при конфликте
+  // запрашиваем согласие пользователя (движок исключит конфликтующий препарат).
+  const requestAddSubs = (ids: string[]) => {
+    const fresh = ids.filter(id => !(finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(id)));
+    if (fresh.length === 0) return;
+    const allIds = [...(finalRec?.subs || []).map(s => s.substanceId), ...fresh];
+    const blocks = checkInteractions(allIds).filter(i => i.severity === 'block' && fresh.some(f => f.toLowerCase() === i.a.toLowerCase() || f.toLowerCase() === i.b.toLowerCase()));
+    if (blocks.length > 0) {
+      setPendingBlockAdd({ ids: fresh, conflicts: blocks });
+    } else {
+      setAddedSubs(prev => [...new Set([...prev, ...fresh])]);
+    }
+  };
+  const confirmBlockAdd = () => {
+    if (!pendingBlockAdd) return;
+    setAddedSubs(prev => [...new Set([...prev, ...pendingBlockAdd.ids])]);
+    setPendingBlockAdd(null);
+  };
   const [substanceManagerKey, setSubstanceManagerKey] = useState(0);
   const [stackModulePopup, setStackModulePopup] = useState<string | null>(null);
   const [articularPreset, setArticularPreset] = useState<string | null>(null);
@@ -830,6 +851,20 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   }, [finalRec]);
 
   const synergyDesc = finalRec ? buildStackSynergyDescription(finalRec) : [];
+
+  // ══ ЕДИНЫЙ РАСЧЁТ РИСКА ПО МЕХАНИЗМ-МОДЕЛИ (ТЗ) ══
+  // Пересчитывается по ФИНАЛЬНОМУ составу (с учётом попап-правок), чтобы
+  // системные риски, попапы и safety-слой показывали ОДИН и тот же результат.
+  const tzFinalRisk = useMemo(() => {
+    if (!finalRec || finalRec.subs.length === 0) return null;
+    try {
+      const inp = buildTzInput(state, finalRec.subs.map(s => s.substanceId));
+      return inp ? calculateTzSpecRisk(inp) : null;
+    } catch {
+      return null;
+    }
+  }, [finalRec, state]);
+  const systemRiskOf = (sysId: string) => tzFinalRisk?.organs.find(o => o.id === sysId) || null;
 
   const pairSynergies = useMemo(() => {
     if (!finalRec || finalRec.subs.length <= 1) return [] as { a: string; b: string; effect: string; mechanism: string; severity: string; score: number }[];
@@ -1620,7 +1655,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     const newSubs = Array.from(megaSelected).filter(sid =>
                       !(finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid))
                     );
-                    setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+                    requestAddSubs(newSubs);
                     setShowMegaPopup(false);
                   }}
                     disabled={megaSelected.size === 0}
@@ -1677,7 +1712,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
             <div style={{ overflowY:'auto', padding:'10px 14px', minHeight:0 }}>
               <div style={{ padding:'7px 8px', marginBottom:8, borderRadius:8, background:`${cfg.color}12`, border:`1px solid ${cfg.color}30`, fontSize:8, lineHeight:1.5 }}>
-                <b>Риск системы:</b> {planResult?.systems?.[genericEnhancementPopup]?.raw ?? '—'}% → {planResult?.systems?.[genericEnhancementPopup]?.net ?? '—'}%<br/>
+                <b>Риск системы:</b> {systemRiskOf(genericEnhancementPopup)?.rawPercent ?? '—'}% → {systemRiskOf(genericEnhancementPopup)?.afterPercent ?? '—'}% (механизм-модель, по финальному составу)<br/>
                 <b>Механизмы:</b> {cfg.domains.join(' · ')}<br/>
                 <b>Анализы:</b> {activeMarkers.length ? activeMarkers.map(m => `${m} ${labs[m]}`).join(', ') : 'нет данных — поддержка по фармакологии курса, нужен контроль'}
               </div>
@@ -1709,7 +1744,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
             <div style={{ display:'flex', gap:6, padding:'9px 14px', borderTop:'1px solid rgba(255,255,255,0.08)', background:'#16161a' }}>
               <button onClick={() => setGenericEnhancementPopup(null)} style={{ flex:1, padding:9, borderRadius:8, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.14)', cursor:'pointer' }}>Отмена</button>
-              <button onClick={() => { const add = Array.from(selected).filter(id => !(finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(id))); setAddedSubs(prev => [...new Set([...prev, ...add])]); setGenericEnhancementPopup(null); }} style={{ flex:2, padding:9, borderRadius:8, color:'#000', background:cfg.color, border:'none', fontWeight:800, cursor:'pointer' }}>Добавить ({selected.size})</button>
+              <button onClick={() => { const add = Array.from(selected).filter(id => !(finalRec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(id))); requestAddSubs(add); setGenericEnhancementPopup(null); }} style={{ flex:2, padding:9, borderRadius:8, color:'#000', background:cfg.color, border:'none', fontWeight:800, cursor:'pointer' }}>Добавить ({selected.size})</button>
             </div>
           </div>
         </div>;
@@ -2166,6 +2201,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       <span style={{ fontSize:10, fontWeight:700, color:riskColor }}>{riskLabel}</span>
                       <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>Счет: {hematoScore}</span>
                     </div>
+                    {(() => {
+                      const hema = systemRiskOf('hematologic');
+                      if (!hema) return null;
+                      return (
+                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginBottom:4, padding:'4px 6px', borderRadius:5, background:'rgba(20,184,166,0.08)', border:'1px solid rgba(20,184,166,0.18)' }}>
+                          ⚖️ Риск системы (механизм-модель, единый расчёт): <b style={{ color: hema.rawPercent >= 50 ? '#f87171' : '#fbbf24' }}>{hema.rawPercent}%</b> → <b style={{ color: '#4ade80' }}>{hema.afterPercent}%</b> после поддержки (защита {hema.k_protect}%)
+                        </div>
+                      );
+                    })()}
                     <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
                       {hct != null && <div>• Гематокрит: {hct}% {hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма'}</div>}
                       {hgb != null && <div>• Гемоглобин: {hgb} г/л {hgb > 175 ? '⚠️' : '✓'}</div>}
@@ -2356,7 +2400,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </button>
             <button onClick={() => {
               const newSubs = Array.from(articularSelected).filter(sid => !(rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid)));
-              setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+              requestAddSubs(newSubs);
               setArticularConfirm(false);
               setStackModulePopup(null);
               if (!selectedStacks.includes('articular_stack')) setSelectedStacks(prev => [...prev, 'articular_stack']);
@@ -2393,7 +2437,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </button>
             <button onClick={() => {
               const newSubs = Array.from(neuroSelected).filter(sid => !(rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid)));
-              setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+              requestAddSubs(newSubs);
               setNeuroConfirm(false);
               setStackModulePopup(null);
               if (!selectedStacks.includes('neuroprotection_stack')) setSelectedStacks(prev => [...prev, 'neuroprotection_stack']);
@@ -2430,7 +2474,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </button>
             <button onClick={() => {
               const newSubs = Array.from(hematoSelected).filter(sid => !(rec?.subs || []).some(s => canonIdLocal(s.substanceId) === canonIdLocal(sid)));
-              setAddedSubs(prev => [...new Set([...prev, ...newSubs])]);
+              requestAddSubs(newSubs);
               setHematoConfirm(false);
               setStackModulePopup(null);
               if (!selectedStacks.includes('hemato_stack')) setSelectedStacks(prev => [...prev, 'hemato_stack']);
@@ -2674,7 +2718,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   const toRemove = current.filter(id => !newSubs.includes(id));
                   const toAdd = newSubs.filter(id => !current.includes(id));
                   setRemovedSubs(toRemove);
-                  setAddedSubs(toAdd);
+                  requestAddSubs(toAdd);
                   setSubstanceManagerKey(prev => prev + 1);
                 }}
               />
@@ -3518,9 +3562,29 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {finalRecWithResidual && <CalcActions rec={finalRecWithResidual} level={level} state={state} />}
 
       {/* Дисклеймер */}
-      <div style={{ marginTop: 8, padding: '7px 9px', borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.16)', fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
-        ⚠️ Система не является медицинским инструментом, не ставит диагнозы и не назначает лечение. Все расчёты, рекомендации и препараты — справочные: применять их можно только под наблюдением и контролем врача. Рецептурные препараты (помечены <span style={{ color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>) — строго по назначению врача.
+      <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 7, color: 'rgba(255,255,255,0.62)', lineHeight: 1.6 }}>
+        <b style={{ color: '#fbbf24' }}>⚠️ Важно:</b> система носит справочно-информационный характер и <b>не является медицинским изделием, инструментом диагностики или лечебным приложением</b>. Она не ставит диагнозы, не назначает и не отменяет лечение и не заменяет консультацию врача. Все расчёты рисков, дозировки и рекомендации — ориентировочные и основаны на открытых данных и обобщённом опыте. Перед началом любого курса, приёмом любых препаратов и БАД, а также при изменении доз — обязательна очная консультация врача (терапевта, эндокринолога или кардиолога). Рецептурные препараты (помечены <span style={{ color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>) принимаются только по назначению врача и под контролем анализов. При появлении тревожных симптомов — боли в груди, одышки, тахикардии, желтухи, отёков, температуры — немедленно прекратите приём и обратитесь к врачу.
       </div>
+
+      {/* ⛔ Согласие на блок-конфликт при добавлении */}
+      {pendingBlockAdd && ReactDOM.createPortal(
+        <div style={{ position:'fixed', inset:0, zIndex:400, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.82)', padding:14 }} onClick={() => setPendingBlockAdd(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:380, borderRadius:16, background:'#16161a', border:'1px solid rgba(239,68,68,0.4)', padding:14, color:'#fff' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#f87171', marginBottom:8 }}>⛔ Блок-конфликт при добавлении</div>
+            {pendingBlockAdd.conflicts.map((c, i) => (
+              <div key={i} style={{ padding:'6px 8px', borderRadius:7, marginBottom:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.24)', fontSize:8, lineHeight:1.45 }}>
+                <b>{subNameRu(c.a)}</b> + <b>{subNameRu(c.b)}</b>: {c.reason}
+              </div>
+            ))}
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', lineHeight:1.5, marginBottom:10 }}>
+              {pendingBlockAdd.ids.map(id => subNameRu(id)).join(', ')} — конфликтующий препарат будет исключён из плана автоматически. Продолжить?
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={() => setPendingBlockAdd(null)} style={{ flex:1, padding:9, borderRadius:8, color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.14)', cursor:'pointer', fontSize:9, fontWeight:700 }}>Отмена</button>
+              <button onClick={confirmBlockAdd} style={{ flex:2, padding:9, borderRadius:8, color:'#000', background:'#f87171', border:'none', fontWeight:800, cursor:'pointer', fontSize:9 }}>Добавить и исключить конфликт</button>
+            </div>
+          </div>
+        </div>, document.body)}
     </div>
     </React.Fragment>
   );

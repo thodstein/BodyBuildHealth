@@ -27,6 +27,19 @@ describe('TZ mechanism risk invariants', () => {
       expect(organ.afterPercent).toBeGreaterThanOrEqual(0);
       expect(organ.afterPercent).toBeLessThanOrEqual(100);
       expect(organ.afterPercent).toBeLessThanOrEqual(organ.rawPercent);
+      // Механизмы — та же шкала 0-100, не «баллы» > 100
+      for (const mech of organ.mechanisms) {
+        expect(mech.rawPercent).toBeGreaterThanOrEqual(0);
+        expect(mech.rawPercent).toBeLessThanOrEqual(100);
+        expect(mech.afterPercent).toBeGreaterThanOrEqual(0);
+        expect(mech.afterPercent).toBeLessThanOrEqual(100);
+        expect(mech.afterPercent).toBeLessThanOrEqual(mech.rawPercent);
+      }
+      // Сумма долей механизмов сходится к проценту системы (до капа 100)
+      const sumMech = organ.mechanisms.reduce((s, m) => s + m.rawPercent, 0);
+      if (organ.rawPercent < 100) {
+        expect(Math.abs(sumMech - organ.rawPercent)).toBeLessThanOrEqual(organ.mechanisms.length * 2);
+      }
     }
     expect(result.overallRaw).toBeGreaterThanOrEqual(0);
     expect(result.overallRaw).toBeLessThanOrEqual(100);

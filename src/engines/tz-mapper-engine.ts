@@ -1184,7 +1184,7 @@ export interface MonitoringItemLine {
 }
 
 export interface MonitoringSection {
-  id: 'baseline' | 'daily' | 'week2' | 'week4' | 'week8' | 'post' | 'urgent';
+  id: 'baseline' | 'daily' | 'week2' | 'week4' | 'week8' | 'week12' | 'post' | 'urgent';
   label: string;
   period: string;
   icon: string;
@@ -1195,7 +1195,9 @@ export function buildMonitoringSchedule(
   ctx: MapperCtx,
   flags: ReturnType<typeof derivePEDFlags>,
   phase: PhaseKey,
+  protocolIds: string[] = [],
 ): MonitoringSection[] {
+  const planIdSet = new Set(protocolIds.map(s => s.toLowerCase()));
   const sections: MonitoringSection[] = [];
   const add = (id: MonitoringSection['id'], label: string, period: string, icon: string, items: MonitoringItemLine[]) => {
     if (items.length === 0) return;
@@ -1210,6 +1212,13 @@ export function buildMonitoringSchedule(
     target: 'АЛТ<40, АСТ<40, HCT<50%, LDL<3.0, E2 20-40 пг/мл',
   });
   baseline.push({ marker: 'АД, ЧСС', reason: 'Базовое артериальное давление и пульс', target: 'АД<130/85, ЧСС 60-90' });
+  baseline.push({ marker: 'Электролиты Na⁺/K⁺/Mg²⁺', reason: 'База для ARB/диуретиков/кленбутерола', target: 'K 3.5-5.0, Na 135-145, Mg 0.75-1.0' });
+  baseline.push({ marker: 'Коагулограмма (МНО/АЧТВ/фибриноген/D-димер)', reason: 'База перед фибринолитиками/антиагрегантами', target: 'фибриноген 2-4 г/л, D-димер <0.5' });
+  baseline.push({ marker: 'Ферритин, сыв. железо, витамин D (25-OH), B12, фолат', reason: 'База для управления эритроцитозом и дефицитами', target: 'ферритин 50-200, D3 50-80 нг/мл' });
+  baseline.push({ marker: 'ЭКГ', reason: 'Базовая ритмология (перед β-блокаторами/высокими дозами)', escalation: 'QTc>450 или аритмия — кардиолог до курса' });
+  if (flags.hasOral17) {
+    baseline.push({ marker: 'УЗИ печени', reason: 'База перед 17α-оралами', escalation: 'Стеатоз/фиброз — гепатолог' });
+  }
   baseline.push({ marker: 'PSA', reason: 'Мужчины >40 лет или при наличии ААС в анамнезе', target: 'PSA<4 нг/мл', drug: 'aas' });
   if (phase === 'fertility') {
     baseline.push({ marker: 'Спермограмма + LH/FSH/TT/E2/PRL', reason: 'Исходный фертильный профиль', drug: 'fertility' });
@@ -1220,6 +1229,8 @@ export function buildMonitoringSchedule(
   add('baseline', 'До курса (исходно)', '0 нед — перед началом', '📋', baseline);
 
   const daily: MonitoringItemLine[] = [];
+  daily.push({ marker: 'Вес (утром)', reason: 'Задержка воды/отёки', target: '↑ <2 кг/нед', escalation: '↑>2 кг/нед + отёки — Na⁺, диуретики под врачом' });
+  daily.push({ marker: 'Гидратация (мл/день, цвет мочи)', reason: 'Тёмная моча = дегидратация → гемоконцентрация', target: '40-45 мл/кг/сут, моча светло-жёлтая' });
   if (flags.hasTren || flags.hasNandrolone || flags.hasBold || (ctx.pedDoses || []).some(p => (p.mgPerWeek || 0) >= 500) || flags.hasClenbut) {
     daily.push({ marker: 'АД, ЧСС', reason: 'Высокая PED/кардио-нагрузка или кленбутерол', target: 'АД<130/85, ЧСС 60-90', escalation: 'ЧСС покоя >100 или АД>160/100 — STOP и врач' });
   }
@@ -1251,6 +1262,12 @@ export function buildMonitoringSchedule(
   week4.push({ marker: 'АД, ЧСС, HCT/HGB, АЛТ/АСТ', reason: 'Базовый контроль на курсе', target: 'HCT<50%, HGB<170 г/л' });
   week4.push({ marker: 'HCT, ферритин', reason: 'Управление эритроцитозом', target: 'HCT<50%, ферритин 30-300' });
   week4.push({ marker: 'E2 (титрация AI), PRL', reason: 'Гормональный контроль', target: 'E2 20-40 пг/мл, PRL<25' });
+  if ((ctx.pedDoses || []).some(p => (p.mgPerWeek || 0) >= 500)) {
+    week4.push({ marker: 'Липидограмма (ЛПНП/ЛПВП/ТГ)', reason: 'Дозы >500 мг/нед — липидный контроль', target: 'LDL<3.0, HDL>1.0, ТГ<1.7' });
+  }
+  if (['nattokinase', 'serrapeptase', 'bromelain', 'aspirin'].some(id => planIdSet.has(id))) {
+    week4.push({ marker: 'Коагулограмма (фибриноген, D-димер)', reason: 'Фибринолитики/антиагреганты в плане', target: 'D-димер <0.5', escalation: 'D-димер>0.5 — срочная оценка тромботического риска' });
+  }
   if (flags.hasTren) {
     week4.push({ marker: 'PRL, E2', reason: '19-nor: пролактин и ароматизация', target: 'PRL<25, E2 20-40' });
   }
@@ -1286,19 +1303,33 @@ export function buildMonitoringSchedule(
   add('week8', 'Через 8 недель', 'каждые 8 нед', '🩺', week8);
   }
 
+  if (phase !== 'pct') {
+  const week12: MonitoringItemLine[] = [];
+  week12.push({ marker: 'Полный набор: ОАК+БХ+липиды, E2/PRL/ТТГ, глюкоза/HbA1c, креатинин/eGFR, HCT/ферритин', reason: 'Длительные курсы (>8 нед) — полный пересмотр', target: 'как на 8 нед' });
+  week12.push({ marker: 'УЗИ печени и предстательной железы, ЭКГ', reason: 'Органный контроль длительных курсов', escalation: 'Отклонения — профильный врач' });
+  if (phase === 'bridge') {
+    week12.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, АД/ЧСС', reason: 'Контроль моста (каждые 6 нед)' });
+  }
+  add('week12', 'Через 12 недель', 'длительные курсы >8 нед', '🗓', week12);
+  }
+
   const post: MonitoringItemLine[] = [];
   if (phase === 'pct') {
     post.push({ marker: 'LH, FSH, TT, E2, PRL', reason: 'Нед 2 после отмены — старт восстановления HPTA', drug: 'pct' });
     post.push({ marker: 'LH, FSH, TT, E2', reason: 'Нед 6 после отмены — динамика', escalation: 'Не восстановление >6 нед (LH/FSH <50% нормы) — эндокринолог' });
+    post.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, HCT', reason: 'Контроль после курса' });
   } else {
     post.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, HCT', reason: 'Контроль после курса', target: 'HCT<50%, АЛТ<40' });
+    post.push({ marker: 'LH/FSH/TT/E2/PRL — через 8-12 нед после отмены', reason: 'Проверка восстановления HPTA', escalation: 'Не восстановилось — эндокринолог' });
   }
   add('post', 'После курса (ПКТ/выход)', 'нед 2 и 6 после отмены', '🎯', post);
 
   const urgent: MonitoringItemLine[] = [];
   urgent.push({ marker: 'Боль в груди, одышка, тахикардия >100, АД >160/100', reason: 'Кардио-симптомы на фоне PED', escalation: 'STOP AAS + срочный врач' });
   urgent.push({ marker: 'Желтуха, отёки, гинекомастия, головная боль', reason: 'Симптомы печень/объём/гормоны', escalation: 'БХ + врач' });
-  urgent.push({ marker: 'D-димер >0.5 или симптомы ТГВ/ТЭЛА', reason: 'Тромботический риск', escalation: 'Срочная медицинская оценка; антикоагулянт ТОЛЬКО по назначению' });
+  urgent.push({ marker: 'D-димер >0.5 или симптомы ТГВ/ТЭЛА (боль/отёк одной ноги)', reason: 'Тромботический риск', escalation: 'Срочная медицинская оценка; антикоагулянт ТОЛЬКО по назначению' });
+  urgent.push({ marker: 'Температура >38.5°C, покраснение/абсцесс в месте инъекции', reason: 'Инфекция места инъекции', escalation: 'Срочно врач — абсцесс требует дренирования' });
+  urgent.push({ marker: 'Судороги, потеря сознания, нарушение зрения', reason: 'Гипервязкость/неврология', escalation: 'Экстренная госпитализация' });
   if (flags.hasOral17) {
     urgent.push({ marker: 'ALT >2×ULN', reason: 'Гепатотоксичность оралов', escalation: 'Снизить/отменить орал, врач' });
   }
@@ -1402,7 +1433,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   const protocolIds = protocolAll.map(pd => pd.substanceId);
   const protocolWarnings = computeProtocolWarnings(protocolIds, pedFlags);
   const monitoringPlan = buildMonitoringPlan(ctx, pedFlags, phase);
-  const monitoringSchedule = buildMonitoringSchedule(ctx, pedFlags, phase);
+  const monitoringSchedule = buildMonitoringSchedule(ctx, pedFlags, phase, protocolIds);
   const subs: RecommendedSub[] = [];
   const phaseDrugs: PhaseAssignedDrug[] = [];
   for (const pd of protocolAll) {
@@ -1761,8 +1792,12 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       if (aIdx >= 0 && bIdx >= 0) {
         const aPrio = subs[aIdx].priority ?? 3;
         const bPrio = subs[bIdx].priority ?? 3;
-        if (aPrio <= bPrio) { subs.splice(aIdx, 1); }
-        else { subs.splice(bIdx, 1); }
+        const victim = aPrio <= bPrio ? aIdx : bIdx;
+        const survivor = aPrio <= bPrio ? bIdx : aIdx;
+        finalProtocolWarnings.push(
+          `⛔ Блок-конфликт: ${subs[victim].substanceId} исключён из плана — несовместим с ${subs[survivor].substanceId}: ${intr.reason} (${intr.action})`
+        );
+        subs.splice(victim, 1);
       }
     }
   }
