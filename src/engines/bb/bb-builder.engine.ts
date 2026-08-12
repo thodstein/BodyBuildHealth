@@ -1055,9 +1055,16 @@ function buildSession(
   bodyweightCapability?: BBBuilderInput['bodyweightCapability'],
 ): BBSession {
   const character = sched.character as DayCharacter;
+    // Focus-группа инжектируется в сессию, только если тег совместим:
+    // FullBody — всегда, Legs/Lower — только для ног/ягодиц,
+    // Upper/Push/Pull — только для верхних групп.
+    const focusIsLegs = !!focusGroup && ['quads', 'hamstrings', 'glutes', 'calves'].includes(collapseKey(focusGroup));
+    const focusIsUpper = !!focusGroup && ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'forearms', 'traps', 'arms'].includes(collapseKey(focusGroup));
     const tagHasFocus = !!focusGroup && (
       musclesForTag(sched.sessionTag).some(m => collapseKey(m) === collapseKey(focusGroup))
-      || /FullBody|Legs|Lower|Glute/i.test(sched.sessionTag || '')
+      || /FullBody/.test(sched.sessionTag || '')
+      || (/Legs|Lower|Glute/i.test(sched.sessionTag || '') && focusIsLegs)
+      || (/Upper|Push|Pull|Chest|Back|Shoulders|Arms/i.test(sched.sessionTag || '') && focusIsUpper)
     );
     const musclePlans = dedupeMuscles(sched.sessionTag, excludedMuscles, focusGroup, tagHasFocus);
   const exercises: BBExercise[] = [];
@@ -1489,8 +1496,12 @@ function buildSession(
        // Для high-volume enhanced back не сокращаем второй back-день до
        // одного упражнения из-за freshness-guard: повтор паттерна между
        // сессиями допустим, а недобор недельного бюджета — нет.
-       const preserveBackVolume = muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
-       if (fresh.length > 0 && !preserveBackVolume) exDatas = fresh;
+        // High-volume enhanced профили не должны терять упражнение из-за
+        // недельной ротации: объём распределяется по реальным движениям,
+        // а не превращается в 1 упражнение × несколько подходов.
+        const preserveHighVolume = level === 'enhanced' && (trainingYears ?? 0) >= 3 &&
+          ['back', 'quads', 'hamstrings', 'glutes', 'chest', 'shoulders'].includes(muscle);
+        if (fresh.length > 0 && !preserveHighVolume) exDatas = fresh;
       for (const d of exDatas) weekUsedForMuscle.add((d as any).name || '');
       weekLocalUsed.set(muscle, weekUsedForMuscle);
     }
@@ -1860,7 +1871,9 @@ function buildSession(
     let remainingBudget = highVolumeBack
       ? Math.max(muscleBudget, pl.sets * 10)
       : highVolumeLegs
-        ? Math.max(muscleBudget, pl.sets * 8)
+        // Независимый budget floor: quads не может забрать весь котёл,
+        // оставив hamstrings/glutes с одним упражнением.
+        ? Math.max(muscleBudget, (trainingYears ?? 0) >= 6 ? 120 : 90)
         : highVolumeTorso
           ? Math.max(muscleBudget, pl.sets * 6)
           : highVolumeArms

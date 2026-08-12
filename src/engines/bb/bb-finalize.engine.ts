@@ -55,7 +55,9 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
  */
 function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
-  if (!/^(Upper|UpperPower|UpperHyp|Pull|Back|ChestBack|Torso|FullBody)$/i.test(session.sessionTag || '')) return;
+  // FullBody уже планирует back штатно через buildSession; дополнительный
+  // allocation здесь вытесняет ноги/руки/плечи из остальных FullBody-сессий.
+  if (!/^(Upper|UpperPower|UpperHyp|Pull|Back|ChestBack|Torso)$/i.test(session.sessionTag || '')) return;
 
   let current: any[] = session.exercises.filter((e: any) => e.muscle === 'back');
   // В adapt библиотечная FullBody-программа может вообще не содержать back
@@ -76,8 +78,11 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
     current = [base];
   }
   const years = options.trainingYears ?? 0;
-  const targetExercises = years >= 6 ? 6 : 5;
-  const targetSets = years >= 6 ? 22 : 18;
+  // FullBody — не back-день: здесь спина не должна вытеснять ноги/руки/плечи.
+  // В FullBody-сессии back-блок ограничен до 3 упражнений / 12 сетов.
+  const isFullBody = /FullBody/i.test(session.sessionTag || '');
+  const targetExercises = isFullBody ? 3 : (years >= 6 ? 6 : 5);
+  const targetSets = isFullBody ? 12 : (years >= 6 ? 22 : 18);
   const usedNames = new Set(current.map(e => e.name));
   const usedPatterns = new Set(current.map(e => annotateBackExercise(e).movementPattern));
   const template = current[0];
@@ -179,6 +184,52 @@ function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions)
   });
 }
 
+function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) return;
+  const legAllocationEnabled = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
+  if (!legAllocationEnabled) return;
+  const targets: Record<string, number> = (options.trainingYears ?? 0) >= 6
+    ? { quads: 16, hamstrings: 16, glutes: 12 }
+    : { quads: 12, hamstrings: 12, glutes: 10 };
+  for (const [muscle, target] of Object.entries(targets)) {
+    // allocation is intentionally post-budget; no shared fatigue cap here
+    let items: any[] = session.exercises.filter((e: any) => e.muscle === muscle);
+    if (!items.length) {
+      const candidate = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === muscle && !options.excludedExercises?.includes(x.id) && !options.excludedExercises?.includes(x.name));
+      if (!candidate) continue;
+      const added: any = {
+        muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+        sets: 4, repsRange: [10, 15], rir: 3, restSeconds: 75, warmupSets: [],
+        workSets: Array.from({ length: 4 }, () => ({ reps: 12, rir: 3, weight: 0, restSeconds: 75 })),
+        rationale: `Experienced enhanced: ${muscle} direct leg allocation`,
+      };
+      session.exercises.push(added);
+      items = [added];
+    }
+    let total = items.reduce((n, e) => n + (e.sets || 0), 0);
+    for (const e of items) {
+      while (total < target && e.sets < 8) {
+        const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+        e.sets += 1; e.workSets.push({ ...sample }); total += 1;
+      }
+      if (total >= target) break;
+    }
+    if (total >= target) continue;
+    const used = new Set(items.map(e => e.name));
+    for (const candidate of EXERCISE_CATALOG) {
+      if (total >= target || trueMuscleOf(candidate) !== muscle || used.has(candidate.name)) continue;
+      const base: any = items[0];
+      const added: any = structuredClone(base);
+      added.name = candidate.name; added.exerciseName = candidate.name; added.role = 'accessory';
+      added.sets = Math.min(4, target - total);
+      const sample = base.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
+      added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
+      session.exercises.push(added); items.push(added); used.add(candidate.name); total += added.sets;
+    }
+  }
+}
+
 /**
  * Weekly back-pattern repair for adaptive/generic plans.
  * Volume specialization must not mean repeating pull-ups/vertical pulls in
@@ -188,22 +239,21 @@ function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions)
 function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   const backSessionCount = week.sessions.filter((session: any) => session.exercises.some((e: any) => e.muscle === 'back')).length;
-  // Vertical pull is a weekly slot, not a per-session entitlement. At two
-  // back sessions/week only one gets a vertical pull; with 3+ sessions allow
-  // two, still preventing daily pull-ups in specialization blocks.
-  const maxVerticalSessions = backSessionCount >= 3 ? 3 : backSessionCount;
   const keptProfiles = new Set<string>();
   let verticalSessionsSeen = 0;
   const sessions = [...week.sessions].sort((a: any, b: any) => a.day - b.day);
   for (const session of sessions) {
-    const usedPatterns = new Set(session.exercises.filter((e: any) => e.muscle === 'back').map((e: any) => annotateBackExercise(e).movementPattern));
     let sessionHasKeptVertical = false;
     for (const exercise of session.exercises) {
       if (exercise.muscle !== 'back') continue;
       const tagged = annotateBackExercise(exercise);
       if (tagged.movementPattern !== 'vertical_pull') continue;
       const profile = verticalPullProfile(exercise.name) || 'cable_vertical';
-      const shouldKeep = !sessionHasKeptVertical && (!keptProfiles.has(profile) || verticalSessionsSeen < maxVerticalSessions);
+      // Один профиль — максимум одна сессия. Вторая встреча того же профиля
+      // (pullup в 2-й и 3-й FullBody-сессиях) заменяется на другой профиль
+      // или row/lat работу, чтобы специализация не превращалась в ежедневные
+      // одинаковые подтягивания.
+      const shouldKeep = !sessionHasKeptVertical && !keptProfiles.has(profile);
       if (shouldKeep) {
         sessionHasKeptVertical = true;
         keptProfiles.add(profile);
@@ -220,7 +270,7 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
         const next = annotateBackExercise({ ...exercise, name: candidate.name, exerciseName: candidate.name } as any);
         if (next.movementPattern !== 'vertical_pull') return false;
         const candidateProfile = verticalPullProfile(candidate.name);
-        return candidateProfile !== null && candidateProfile !== profile;
+        return candidateProfile !== null && candidateProfile !== profile && !keptProfiles.has(candidateProfile);
       }) || EXERCISE_CATALOG.find((candidate: any) => {
         if (trueMuscleOf(candidate) !== 'back') return false;
         if (isAxialLoadExercise(candidate) && options.avoidAxialLoad) return false;
@@ -235,7 +285,8 @@ function repairBackFrequency(week: any, options: BBFinalizeOptions): void {
       exercise.movementPattern = next.movementPattern;
       exercise.backSubgroup = next.backSubgroup;
       exercise.rationale = `${exercise.rationale || ''} Адаптация частоты: избыток vertical pull заменён на ${next.movementPattern}.`;
-      usedPatterns.add(next.movementPattern);
+      const replacedProfile = verticalPullProfile(replacement.name);
+      if (replacedProfile) keptProfiles.add(replacedProfile);
     }
   }
 }
@@ -549,6 +600,43 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
   }
   syncBBPlanSetShape(next);
+  // Final hard invariant for adaptive high-volume leg sessions. This is kept
+  // after every other pass so fatigue/rotation cannot silently turn a major
+  // leg group into one 3-4 set exercise.
+  if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) continue;
+      const target = (options.trainingYears ?? 0) >= 6 ? 12 : 10;
+      for (const muscle of ['quads', 'hamstrings', 'glutes']) {
+        const items = session.exercises.filter((e: any) => e.muscle === muscle);
+        if (!items.length) continue;
+        let total = items.reduce((n: number, e: any) => n + e.sets, 0);
+        for (const e of items) {
+          while (total < target && e.sets < 8) {
+            const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+            e.sets += 1; e.workSets.push({ ...sample }); total += 1;
+          }
+          if (total >= target) break;
+        }
+        if (total < target) {
+          const used = new Set(items.map((e: any) => e.name));
+          const candidate = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === muscle && !used.has(x.name));
+          if (candidate) {
+            const base: any = items[0];
+            const added: any = structuredClone(base);
+            added.name = candidate.name;
+            added.exerciseName = candidate.name;
+            added.role = 'accessory';
+            added.sets = Math.min(4, target - total);
+            const sample = base.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
+            added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
+            session.exercises.push(added);
+          }
+        }
+      }
+    }
+  }
+  syncBBPlanSetShape(next);
   if (!options.preserveSource && options.phaseSafety) applyAdaptivePhaseSafety(next);
   if (!options.preserveSource && options.reorder !== false) repairAdaptiveSafety(next, options);
   if (!options.preserveSource && options.ensureMinimumVolume) addAdaptiveMEVFeeders(next, options);
@@ -589,20 +677,21 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   for (const week of next.weeks) for (const session of week.sessions) {
     allocateExperiencedBackSession(session, options);
     allocateExperiencedArmSession(session, options);
+    allocateExperiencedLegSession(session, options);
   }
-  // Последний adaptive-проход: после rotation/fatigue/taper никакой поздний
-  // pass не должен снова вернуть ежедневные подтягивания/vertical pull.
-  for (const week of next.weeks) repairBackFrequency(week, options);
-  for (const week of next.weeks) capAdaptiveSpecializationFrequency(week, options);
-  // Аналогично для ног: если после всех проходов glutes/quads отсутствуют
-  // в Lower-сессии опытного enhanced — добавляем из каталога.
+  // FullBody/Lower: после всех проходов добираем отсутствующие группы
+  // (fbUsedIds может вытеснить мышцы между FullBody-сессиями).
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
     for (const week of next.weeks) for (const session of week.sessions) {
-      if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) continue;
+      const tag = session.sessionTag || '';
+      if (!/Legs|Lower|LowerPower|LowerHyp/.test(tag) && !/FullBody/.test(tag)) continue;
       const present = new Set(session.exercises.map((e: any) => e.muscle));
       const template = session.exercises[0];
       if (!template) continue;
-      for (const muscle of ['glutes', 'quads', 'hamstrings']) {
+      const needMuscles = /FullBody/.test(tag)
+        ? ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'calves', 'forearms', 'abs']
+        : ['glutes', 'quads', 'hamstrings'];
+      for (const muscle of needMuscles) {
         if (present.has(muscle)) continue;
         const candidate = EXERCISE_CATALOG.find((x: any) => {
           if (trueMuscleOf(x) !== muscle) return false;
@@ -619,13 +708,18 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
         added.name = candidate.name;
         added.exerciseName = candidate.name;
         added.role = 'accessory';
-        added.sets = 4;
+        added.sets = /FullBody/.test(tag) ? 3 : 4;
         const sample = template.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
-        added.workSets = Array.from({ length: 4 }, () => ({ ...sample }));
+        added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
         session.exercises.push(added);
+        present.add(muscle);
       }
     }
   }
+  // Последний adaptive-проход: после дозаполнения и всех поздних проходов
+  // ремонтируем weekly back frequency (повтор одного vertical профиля).
+  for (const week of next.weeks) repairBackFrequency(week, options);
+  for (const week of next.weeks) capAdaptiveSpecializationFrequency(week, options);
   syncBBPlanSetShape(next);
   if (options.level) {
     const peakWeek = next.weeks.reduce((best, week) => {
@@ -702,6 +796,11 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .slice(0, 20)
     .map(issue => `⚠ Валидация: ${issue.message}`);
   if (warnings.length) next.rationale = [...next.rationale, ...warnings];
+  // Пересчитываем функциональную разметку спины после всех поздних проходов
+  // (rotation/dedupe/taper/fill могут клонировать упражнения без полей).
+  for (const week of next.weeks) for (const session of week.sessions) {
+    session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
+  }
   const backQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => e.muscle === 'back')).reduce((acc, e) => {
     const pattern = e.movementPattern || 'other';
     acc[pattern] = (acc[pattern] || 0) + e.sets;

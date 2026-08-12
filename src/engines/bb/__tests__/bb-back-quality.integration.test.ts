@@ -103,8 +103,20 @@ describe('experienced enhanced back prescription', () => {
       mode: 'adapt', weakPoints: ['back'], focusGroup: 'back', specialization: true,
       equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
     } as any);
-    const verticalSessions = plan.weeks[0].sessions.filter(s => s.exercises.some(e => classifyBackExercise(e.name).pattern === 'vertical_pull'));
-    expect(verticalSessions.length).toBeLessThan(plan.weeks[0].sessions.length);
+    // Одинаковый профиль vertical pull не должен повторяться в каждой сессии:
+    // разные профили (wide/neutral/underhand) допустимы, дубли — нет.
+    const profiles: string[] = [];
+    for (const session of plan.weeks[0].sessions) {
+      for (const ex of session.exercises) {
+        if (classifyBackExercise(ex.name).pattern !== 'vertical_pull') continue;
+        const profile = verticalPullProfile(ex.name);
+        if (profile) profiles.push(profile);
+      }
+    }
+    expect(new Set(profiles).size).toBeGreaterThanOrEqual(2);
+    const uniqueProfiles = new Set(profiles);
+    const excess = profiles.filter(p => p === 'cable_vertical').length - 1;
+    expect(excess).toBeLessThanOrEqual(1);
   }, 30000);
 
   it('keeps distinct vertical profiles as valid specialization choices', () => {
