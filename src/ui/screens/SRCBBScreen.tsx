@@ -1048,7 +1048,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           })()}
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ПЛ + ББ-акцент, сохраняются в профиль)</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
-            💪 Добавляются accessory-упражнения в 1-2 дня (малые → 2 дня: тяжёлый + памп).
+            💪 Accessory-упражнения добавляются по раскладке самого цикла: %ПМ/повторы/подходы — как у аксессуаров этого дня недели цикла, RIR — из матрицы по фазе, упражнения — вариации движений этого цикла.
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           {/* 📅 Выбор дней для слабых групп — авто-распределение если не выбрано */}

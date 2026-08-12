@@ -905,29 +905,70 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           targetDays = dayStats.slice(0, targetDayCount).map(s => s.idx + 1);
         }
 
-        // Для каждого выбранного дня — добавить accessory упражнения с разным протоколом
+        // ПРОТОКОЛ СЛАБОЙ ГРУППЫ — ИЗ РАСКЛАДКИ ЦИКЛА (не выдуманный):
+        // берём протокол РЕАЛЬНОГО аксессуарного упражнения этого дня недели цикла
+        // (weekLayout уже содержит свои %ПМ/повторы/подходы по неделям).
+        // RIR — из RIR_MATRIX (goal×level×phase, rirBase уже вычислен для недели).
+        const accSpecsOfDay = (dayIdx: number): SRExerciseSpec[] => {
+          const day = weekLayout[dayIdx];
+          if (!day) return [];
+          return day.exercises.filter((s: SRExerciseSpec) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0);
+        };
+        // Первый аксессуар дня (или всей недели), лучше — с совпадением по мышце слабой группы.
+        const dayProtocol = (dayIdx: number, wg: string): { pct: number; reps: number; sets: number; load: string } => {
+          const daySpecs = accSpecsOfDay(dayIdx);
+          const pool = daySpecs.length > 0 ? daySpecs : weekLayout.flatMap((d: SRDaySpec) => d.exercises).filter((s: SRExerciseSpec) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0);
+          // Приоритет аксессуару, чья группа совпадает со слабой (грудь→жим-аксессуары и т.п.).
+          const match = pool.find((s: SRExerciseSpec) => exEnGroup(s.group) === wg);
+          const spec = (match ?? pool[0]) as SRExerciseSpec | undefined;
+          const first = spec?.sets?.[0];
+          const daySpec = weekLayout[dayIdx];
+          const hasLight = daySpec?.exercises.some(s => s.load === 'Легкая');
+          return {
+            pct: first?.pct ?? 0.6,
+            reps: Math.max(2, first?.reps ?? 8),
+            sets: Math.max(1, first?.sets ?? 3),
+            load: hasLight ? 'Легкая' : 'Средняя',
+          };
+        };
+
+        // Упражнения ПОД КОНКРЕТНЫЙ ЦИКЛ: приоритет вариациям движений, которые
+        // уже есть в этом цикле (названия из шаблона), затем каталог группы.
+        const cycleExNames = new Set(extractExercises(template).map(norm));
+        const STOP = new Set(['лежа', 'стоя', 'сидя', 'штанги', 'гантелей', 'гантели', 'блока', 'на', 'в', 'с', 'и', 'из']);
+        const cycleTokens = new Set<string>();
+        for (const cn of cycleExNames) {
+          for (const tok of cn.split(/[\s,]+/)) {
+            if (tok.length >= 3 && !STOP.has(tok)) cycleTokens.add(tok);
+          }
+        }
+        const rankForCycle = (ex: Exercise): number => {
+          const n = norm(ex.name);
+          if (cycleExNames.has(n)) return 0;              // 0: точно в цикле
+          for (const tok of cycleTokens) if (n.includes(tok)) return 1; // 1: вариация движения цикла
+          return 2;                                       // 2: просто каталог группы
+        };
+
+        // Для каждого выбранного дня — добавить accessory упражнение с протоколом ЭТОГО дня цикла.
         for (let ti = 0; ti < targetDays.length; ti++) {
           const dayIdx = targetDays[ti] - 1;
           if (dayIdx < 0 || dayIdx >= days.length) continue;
           const targetDay = days[dayIdx];
-          // P1-2: large weak groups (chest, back, quads, hamstrings) also get heavy protocol
-          const isWeakLarge = ['chest', 'back', 'quads', 'hamstrings', 'shoulders'].includes(wg);
-          // Протокол дня: 1-й = тяжёлый добив (3×8 RIR 2), 2-й = памп-добив (3×12 RIR 3)
-          // P1-2: расширено для large weak groups (chest, back, quads, hamstrings)
-          // чтобы слабые крупные группы не получали только pump-протокол
-          const isHeavyDay = ti === 0 && (isSmall || isWeakLarge) && targetDays.length > 1;
-          // Выбрать упражнение: тяж-день → compound/isolation если есть; памп-день → изоляция
+          const proto = dayProtocol(dayIdx, wg);
+          // Выбрать упражнение: приоритет — вариации движений цикла.
           const poolFiltered = candidates.filter(ex => !targetDay.exercises.some(e => norm(e.name) === norm(ex.name)));
           if (poolFiltered.length === 0) continue;
-          const pick = (isHeavyDay
-            ? (poolFiltered.find(e => e.type === 'compound' || e.movementType === 'compound') || poolFiltered[0])
-            : (poolFiltered.find(e => e.type === 'isolation' || e.movementType === 'isolation') || poolFiltered[0])) as Exercise;
+          const pick = [...poolFiltered].sort((a, b) => {
+            const rc = rankForCycle(a) - rankForCycle(b);
+            if (rc !== 0) return rc;
+            const ac = a.type === 'compound' || a.movementType === 'compound' ? 0 : 1;
+            const bc = b.type === 'compound' || b.movementType === 'compound' ? 0 : 1;
+            if (proto.load === 'Легкая') return bc - ac; // лёгкий день → изоляция
+            return ac - bc;                               // иначе → compound
+          })[0] as Exercise;
 
-          // Выбор exercises сделан; протокол
-          const pct = isHeavyDay ? 0.68 : 0.55;
-          const reps = isHeavyDay ? 8 : 12;
-          let sets = 3;
-          const rir = isHeavyDay ? 2 : 3;
+          // RIR: аксессуар = база фазы + 1 (лёгкий день +2).
+          const rir = Math.max(0, rirBase + (proto.load === 'Легкая' ? 2 : 1));
           // User explicitly selected these weak groups — always add, no MRV cap.
           // Day cap: упражнений ≤ 10 (raised from 8 to allow user-selected additions)
           if (targetDay.exercises.length >= 10) continue;
@@ -940,13 +981,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             group: wg,
             coef: accCoef,
             mnosz: 1,
-            load: isHeavyDay ? 'Тяжелая' : 'Средняя',
+            load: proto.load,
             pm: wPm,
             rir,
-            workSets: [{ pct, reps, sets, weight: workWeight(wPm, pct), rir }],
+            workSets: [{ pct: proto.pct, reps: proto.reps, sets: proto.sets, weight: workWeight(wPm, proto.pct), rir }],
           });
           allWeekNames.add(norm(pick.name));
-          weakNotes.push(`🔥 Слабая группа ${wg} — добивка в день ${dayIdx + 1}: ${pick.name} ${sets}×${reps} @${Math.round(workWeight(wPm, pct))}кг RIR ${rir}${isHeavyDay ? ' (heavy)' : ' (pump)'}.`);
+          weakNotes.push(`🔥 Слабая группа ${wg} — добивка в день ${dayIdx + 1} (${phase}, ${proto.load}): ${pick.name} ${proto.sets}×${proto.reps} @${Math.round(proto.pct * 100)}% (${Math.round(workWeight(wPm, proto.pct))}кг) RIR ${rir}${rankForCycle(pick) <= 1 ? ' · вариация цикла' : ''}.`);
         }
       }
     }
