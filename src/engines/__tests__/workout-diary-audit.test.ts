@@ -18,7 +18,7 @@ import {
   splitCSVRow, importSessionsFromCSV, updateSession, deleteSession, workoutLogToSession,
   logSet, startSession, addExerciseToSession, getVolumeTrend, getISOWeekNumber, getISOWeekYear,
   getStorageTrimWarning, clearStorageTrimWarning, saveSessions, loadSessions, cleanLegacyExerciseName, SET_LIMITS,
-  findDuplicateWorkouts, workoutContentSignature,
+  findDuplicateWorkouts, workoutContentSignature, finishSession, getLastSession, compareWithPrevious,
 } from '../workout-logger.engine';
 import { StrengthDiary, sessionToWorkoutLog } from '../strength-diary.engine';
 import { db } from '../../core/db';
@@ -241,6 +241,39 @@ describe('findDuplicateWorkouts', () => {
     const a = mkLog('a', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
     const b = { ...mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]), exercises: [mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]).exercises[0]] };
     expect(workoutContentSignature(a)).toBe(workoutContentSignature(b));
+  });
+});
+
+describe('finishSession roundtrip (проведение тренировки → дневник)', () => {
+  beforeEach(() => { localStorage.clear(); });
+  it('завершённая сессия появляется в loadSessions и getLastSession', () => {
+    let s = startSession('ББ', 1);
+    s = addExerciseToSession(s, { id: 'bench_press', name: 'Жим штанги лёжа', pattern: 'horizontal_push', muscleGroup: 'chest' });
+    const r = logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 5, rpe: 8, rir: 2 });
+    const finished = finishSession(r.session, 'тест');
+    expect(finished.durationMin).toBeGreaterThanOrEqual(0);
+    const stored = loadSessions();
+    expect(stored.length).toBe(1);
+    expect(stored[0].sessionId).toBe(finished.sessionId);
+    expect(stored[0].exercises[0].sets[0].weightKg).toBe(80);
+    expect(getLastSession()?.sessionId).toBe(finished.sessionId);
+  });
+  it('сравнение с предыдущей сессией (compareWithPrevious)', () => {
+    let s1 = startSession('ББ', 1);
+    s1 = { ...s1, sessionId: 'a', totalVolume: 1000, totalSets: 5 };
+    let s2 = startSession('ББ', 1);
+    s2 = { ...s2, sessionId: 'b', totalVolume: 1200, totalSets: 6 };
+    saveSessions([s2, s1]);
+    const cmp = compareWithPrevious(s2);
+    expect(cmp.older?.sessionId).toBe('a');
+    expect(cmp.volumeDelta).toBe(200);
+  });
+  it('повторное сохранение workout с тем же id не дублирует зеркало в localStorage', async () => {
+    const diary = new StrengthDiary();
+    const w = mkLog('w_dup', '2026-08-13', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
+    await diary.saveWorkoutLog(w);
+    await diary.saveWorkoutLog(w);
+    expect(loadSessions().filter(s => s.sessionId === 'w_dup').length).toBe(1);
   });
 });
 

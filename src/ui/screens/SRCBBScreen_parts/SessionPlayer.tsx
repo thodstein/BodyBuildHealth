@@ -657,7 +657,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
       <style>{timerAnimationStyle}</style>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         {days.map((d, i) => (
-          <button key={i} style={i === dayIdx ? BTN : BTN_GHOST} onClick={() => setDayIdx(i)}>{d.label}</button>
+          <button key={i} disabled={phase !== 'ready' && phase !== 'done'}
+            title={phase !== 'ready' && phase !== 'done' ? 'Завершите текущую тренировку, чтобы сменить день' : undefined}
+            style={{ ...(i === dayIdx ? BTN : BTN_GHOST), opacity: phase !== 'ready' && phase !== 'done' && i !== dayIdx ? 0.35 : 1, cursor: phase !== 'ready' && phase !== 'done' && i !== dayIdx ? 'not-allowed' : 'pointer' }}
+            onClick={() => setDayIdx(i)}>{d.label}</button>
         ))}
       </div>
 

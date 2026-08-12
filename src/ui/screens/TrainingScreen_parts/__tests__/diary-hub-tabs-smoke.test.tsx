@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import { DiaryRecordingForm } from '../DiaryRecordingForm';
 import { QuickEntry } from '../QuickEntry';
+import { SessionPlayer, type PlayerDay } from '../../SRCBBScreen_parts/SessionPlayer';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
 import type { StrengthDiary, WeeklyProgress } from '../../../engines/strength-diary.engine';
 
@@ -92,5 +93,28 @@ describe('Формы записи дневника', () => {
       <QuickEntry diary={{ saveWorkoutLog: async () => {} } as any} historyWorkouts={baseProps.historyWorkouts} selectedWeek={1} onSave={() => {}} />
     );
     expect(html.length).toBeGreaterThan(50);
+  });
+});
+
+describe('SessionPlayer (проведение тренировки)', () => {
+  const mkDays = (): PlayerDay[] => [
+    {
+      label: 'День 1',
+      exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 5, rir: 2 }, { weight: 80, reps: 5, rir: 2 }], restSec: 120 }],
+    },
+    {
+      label: 'День 2',
+      exercises: [{ name: 'Приседания', muscleGroup: 'quads', targetSets: [{ weight: 100, reps: 5, rir: 2 }], restSec: 180 }],
+    },
+  ];
+  it('рендерит вкладки дней и кнопку старта', () => {
+    const html = renderToStaticMarkup(<SessionPlayer days={mkDays()} weekNumber={1} focus="ББ тест" />);
+    expect(html).toContain('День 1');
+    expect(html).toContain('День 2');
+    expect(html).toContain('Начать тренировку');
+  });
+  it('рендерит пустое состояние без дней', () => {
+    const html = renderToStaticMarkup(<SessionPlayer days={[]} weekNumber={1} focus="x" />);
+    expect(html).toContain('Нет дней');
   });
 });
