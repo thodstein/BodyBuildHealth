@@ -255,12 +255,13 @@ export function findFood(name: string, extraCatalog?: FoodItem[]): FoodItem | un
   if (extraCatalog && extraCatalog.length > 0) {
     return extraCatalog
       .map(food => {
+        if (!food || typeof food.name !== 'string' || !food.name.trim()) return { food, score: 0 };
         const foodWords = normalizeFoodText(food.name).split(/\s+/);
-        const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.toLowerCase().includes(word) || (candidate.length >= 3 && word.includes(candidate.toLowerCase())) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
+        const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || (candidate.length >= 3 && word.includes(candidate)) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
         return { food, score };
       })
       .filter(result => result.score > 0)
-      .sort((a, b) => b.score - a.score || a.food.name.length - b.food.name.length)[0]?.food;
+      .sort((a, b) => b.score - a.score || (a.food.name || '').length - (b.food.name || '').length)[0]?.food;
   }
   return undefined;
 }
