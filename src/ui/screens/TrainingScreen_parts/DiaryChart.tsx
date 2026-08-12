@@ -16,30 +16,50 @@ export const MiniLineChart: React.FC<{
   height?: number;
   showDots?: boolean;
   ySuffix?: string;
-}> = ({ data, labels, color = '#00e68a', width = 280, height = 50, showDots = true, ySuffix = '' }) => {
-  if (data.length < 2) return null;
-  const min = Math.min(...data, 0);
-  const max = Math.max(...data, 1);
+  /** Несколько серий на одном графике (оверлей мезоциклов и т.п.). */
+  series?: Array<{ name: string; color: string; data: number[]; labels?: string[] }>;
+}> = ({ data, labels, color = '#00e68a', width = 280, height = 50, showDots = true, ySuffix = '', series }) => {
+  const allData = series ? series.flatMap(s => s.data) : data;
+  if (allData.length < 2) return null;
+  const min = Math.min(...allData, 0);
+  const max = Math.max(...allData, 1);
   const range = max - min || 1;
-  const px = (i: number) => 4 + (i / (data.length - 1)) * (width - 8);
+  const px = (i: number, len: number) => 4 + (i / Math.max(len - 1, 1)) * (width - 8);
   const py = (v: number) => height - 4 - ((v - min) / range) * (height - 12);
-  const path = data.map((v, i) => `${i === 0 ? 'M' : 'L'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+  const renderSeries = (pts: number[], lbls: string[] | undefined, col: string, dots: boolean, lastBold: boolean) => {
+    if (pts.length < 2) return null;
+    const path = pts.map((v, i) => `${i === 0 ? 'M' : 'L'}${px(i, pts.length).toFixed(1)},${py(v).toFixed(1)}`).join(' ');
+    return (
+      <g key={col + pts.length}>
+        <path d={path} fill="none" stroke={col} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+        {dots && pts.map((v, i) => (
+          <circle key={i} cx={px(i, pts.length)} cy={py(v)} r={lastBold && i === pts.length - 1 ? 3 : 1.8}
+            fill={lastBold && i === pts.length - 1 ? col : 'rgba(255,255,255,0.3)'} stroke={lastBold && i === pts.length - 1 ? '#000' : 'none'} strokeWidth={0.5}>
+            <title>{`${lbls?.[i] ?? i + 1}: ${Math.round(v)}${ySuffix}`}</title>
+          </circle>
+        ))}
+      </g>
+    );
+  };
   return (
-    <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', maxWidth: width }}>
-      {[0.25, 0.5, 0.75].map(p => (
-        <line key={p} x1={4} x2={width - 4} y1={height - 4 - p * (height - 12)} y2={height - 4 - p * (height - 12)}
-          stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
-      ))}
-      <text x={2} y={height - 4} fontSize={7} fill="rgba(255,255,255,0.3)">{Math.round(min)}{ySuffix}</text>
-      <text x={2} y={10} fontSize={7} fill="rgba(255,255,255,0.3)">{Math.round(max)}{ySuffix}</text>
-      <path d={path} fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-      {showDots && data.map((v, i) => (
-        <circle key={i} cx={px(i)} cy={py(v)} r={i === data.length - 1 ? 3 : 1.8}
-          fill={i === data.length - 1 ? color : 'rgba(255,255,255,0.3)'} stroke={i === data.length - 1 ? '#000' : 'none'} strokeWidth={0.5}>
-          <title>{`${labels?.[i] ?? i + 1}: ${Math.round(v)}${ySuffix}`}</title>
-        </circle>
-      ))}
-    </svg>
+    <div>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', maxWidth: width }}>
+        {[0.25, 0.5, 0.75].map(p => (
+          <line key={p} x1={4} x2={width - 4} y1={height - 4 - p * (height - 12)} y2={height - 4 - p * (height - 12)}
+            stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
+        ))}
+        <text x={2} y={height - 4} fontSize={7} fill="rgba(255,255,255,0.3)">{Math.round(min)}{ySuffix}</text>
+        <text x={2} y={10} fontSize={7} fill="rgba(255,255,255,0.3)">{Math.round(max)}{ySuffix}</text>
+        {series
+          ? series.map(s => renderSeries(s.data, s.labels, s.color, showDots, false))
+          : renderSeries(data, labels, color, showDots, true)}
+      </svg>
+      {series && (
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 2 }}>
+          {series.map(s => <span key={s.name} style={{ fontSize: 9, color: s.color }}>● {s.name}</span>)}
+        </div>
+      )}
+    </div>
   );
 };
 

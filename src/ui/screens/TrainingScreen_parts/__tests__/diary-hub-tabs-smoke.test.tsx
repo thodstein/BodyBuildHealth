@@ -2,6 +2,8 @@ import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
+import { DiaryRecordingForm } from '../DiaryRecordingForm';
+import { QuickEntry } from '../QuickEntry';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
 import type { StrengthDiary, WeeklyProgress } from '../../../engines/strength-diary.engine';
 
@@ -75,4 +77,20 @@ describe('TrainingDiaryHub — все вкладки рендерят конте
       if (marker) expect(html).toContain(marker);
     });
   }
+});
+
+describe('Формы записи дневника', () => {
+  it('DiaryRecordingForm рендерится с заголовком сохранения', () => {
+    const html = renderToStaticMarkup(
+      <DiaryRecordingForm diary={{ saveWorkoutLog: async () => {}, saveStrengthLog: async () => {} } as any} selectedWeek={1} onSave={() => {}} historyWorkouts={baseProps.historyWorkouts} />
+    );
+    expect(html).toContain('Записать тренировку');
+    expect(html).toContain('Сохран');
+  });
+  it('QuickEntry рендерится без ошибок', () => {
+    const html = renderToStaticMarkup(
+      <QuickEntry diary={{ saveWorkoutLog: async () => {} } as any} historyWorkouts={baseProps.historyWorkouts} selectedWeek={1} onSave={() => {}} />
+    );
+    expect(html.length).toBeGreaterThan(50);
+  });
 });

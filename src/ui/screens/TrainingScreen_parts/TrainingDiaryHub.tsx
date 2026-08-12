@@ -1817,6 +1817,49 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   </div>
                 );
               })()}
+              {/* Оверлей e1RM по мезоциклам (если записи тегированы mesocycleId) */}
+              {historyWorkouts.some(w => (w as any).mesocycleId) && (() => {
+                const MESO_COLORS = ['#00e68a', '#60a5fa', '#a855f7', '#f59e0b', '#ec4899'];
+                const byEx = new Map<string, { meso: string; date: string; e1rm: number }[]>();
+                historyWorkouts.forEach((w: any) => {
+                  const meso = w.mesocycleId;
+                  if (!meso) return;
+                  (w.exercises || []).forEach((e: any) => {
+                    const best = (e.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
+                    if (best <= 0) return;
+                    const name = e.exerciseName || e.exerciseId;
+                    if (!byEx.has(name)) byEx.set(name, []);
+                    byEx.get(name)!.push({ meso, date: w.date, e1rm: Math.round(best) });
+                  });
+                });
+                const exercises = [...byEx.entries()].map(([name, pts]) => {
+                  const mesoMap = new Map<string, { name: string; color: string; pts: { date: string; e1rm: number }[] }>();
+                  [...new Set(pts.map(p => p.meso))].forEach((meso, mi) => mesoMap.set(meso, { name: `Цикл ${mi + 1}`, color: MESO_COLORS[mi % MESO_COLORS.length], pts: [] }));
+                  pts.forEach(p => mesoMap.get(p.meso)!.pts.push({ date: p.date, e1rm: p.e1rm }));
+                  const mesos = [...mesoMap.values()]
+                    .map(m => ({ ...m, pts: m.pts.sort((a, b) => a.date.localeCompare(b.date)) }))
+                    .filter(m => m.pts.length >= 2);
+                  return { name, mesos };
+                }).filter(e => e.mesos.length >= 2).slice(0, 2);
+                if (exercises.length === 0) return null;
+                return (
+                  <div style={style.card}>
+                    <div style={style.label}>🔀 Прогресс по мезоциклам (e1RM)</div>
+                    {exercises.map(ex => (
+                      <div key={ex.name} style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{ex.name}</div>
+                        <MiniLineChart
+                          data={[]}
+                          series={ex.mesos.map(m => ({ name: m.name, color: m.color, data: m.pts.map(p => p.e1rm), labels: m.pts.map(p => p.date) }))}
+                          width={290}
+                          height={50}
+                          ySuffix=" кг"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* PR history */}
               {historyWorkouts.length >= 2 && (() => {
                 const prMap = new Map<string, { name: string; weight: number; reps: number; e1rm: number; date: string }>();

@@ -3,6 +3,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { epley1RM } from '../../../engines/e1rm';
 import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
+import { loadReadinessHistory } from './readiness-history';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -95,6 +96,18 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   // Auto-save draft to localStorage
   const DRAFT_KEY = 'he_diary_draft';
   const [draftRestored, setDraftRestored] = useState(false);
+
+  // Чек-ин: префилл «Восстановление» из последней записи готовности (readiness history)
+  useEffect(() => {
+    try {
+      const rh = loadReadinessHistory();
+      if (rh.length > 0) {
+        const last = rh[rh.length - 1];
+        const rec = Math.round((last.recovery || 50) / 10);
+        setLogRecovery(Math.max(1, Math.min(10, rec || 5)));
+      }
+    } catch {}
+  }, []);
   useEffect(() => {
     if (exercises.length === 0) return;
     const timer = setTimeout(() => {
