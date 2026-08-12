@@ -1,11 +1,42 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Current project state (Aug 10 2026)
+## Current project state (Aug 12 2026)
 
 ### Build status
 - `tsc --noEmit` - 0 errors (entire project clean)
 - `vite build` - OK
-- `vitest` - 2644 passing (211 test files; **BB-auto full audit** — 10 исправлений, 42 новых теста)
+- `vitest` - **3918 passing** (238 test files)
+
+---
+
+## Support Calculator Full Verification + Commit (Aug 12 2026, pushed b5344a43d)
+
+Полная верификация всей работы по калькулятору поддержки (вчера-сегодня): всё присутствует, работает, **закоммичено и запушено** (b5344a43d, 20 файлов, +1132/−335). Больше не потеряется.
+
+### Что проверено (всё OK)
+- `tsc --noEmit` 0 ошибок, `vite build` OK, **vitest 3918/3918** (238 файлов)
+- Тесты калькулятора поддержки: **240/240** (9 файлов: pharmacology-mandatory 7, tz-spec-risk-invariants 3, ped-risk-matrix, support-calc-audit 42, tz-bridge-boosters-tiered, support-new-substances, support-profile-autopull, hydrate-crash, interactions-calculator) + 106 PED-тестов BB
+- Все части на месте: ped-risk-matrix, boosters LV1-LV3 (+getHematoBoosterSubstanceIds), 15 веществ в БД/дозировках/каталоге (+lamotrigine в каталоге), UnifiedSettings-поля (17 шт.), hydrateState читает he_profile_v2 nested, кнопки «Из профиля» (Calc.mapper:1338/2487), 32 протокола поддержки
+
+### Что в коммите b5344a43d
+- `engine.ts` — resolvePlan единый источник правды (legacy fallback), каберголин только lab-gated (PRL>25), база курса hydration/cardio_aerobic/electrolyte_balance (не таблетки), cardio/hemato контуры высокой PED-нагрузки, бюджет AUTO_PLAN_LIMIT (28/40/48/56), protocolWarnings, timeline peak patch
+- `tz-mapper-engine.ts` — procedures (эритроцитаферез/флеботомия/гематолог/ТГВ-оценка), assayWarnings, nebivolol, agmatine-профиль нандролона, нейро-трио тренболона (Mg-L-треонат/PS/B12), расширенный monitoring plan
+- `Calc.mapper.tsx` — GENERIC_ENHANCEMENT_CONFIG 7 систем + SPECIALIZED_DOMAINS 28 доменов, finalRec merge с лимитом уровня/contra/конфликтами, парные синергии, planItemKind, категоризированные отчёты плана/врача, имена базы
+- `CalcSafetyLayer.tsx` — секции: фарм-ограничения, конфликты плана, мед-эскалация, интерпретация анализов
+- `substances.ts` FOUNDATION_ITEMS + NON_PILL_SUPPORT_IDS; `display.ts` pill burden без базы; `shared-constants.ts` canonId lowercases + blacklist 6 рецептурных; `risk-engine-tz-spec.ts` phaseDoseMultiplier; `tz-bridge-mechanism.ts` TOTAL_LIMIT 28/40/48
+- NEW: `mapper-ctx.ts` (единый buildMapperCtx), `pharmacology-mandatory.test.ts` (7), `tz-spec-risk-invariants.test.ts` (3)
+- Фиксы: matchMedia mock в `src/test/setup.ts` (чинил реальное падение diary-hub-tabs-smoke), русские имена базы в Calc UI (FALLBACK_NAMES), ocr-engine.ts providerResults refLow/refHigh тип (tsc)
+
+### ВАЖНО — «Symptom Solver Critical Audit» (Aug 12) — НЕ СУЩЕСТВОВАЛ
+Форензика git (`git log -S` по всем веткам/стэшам/dangling-объектам, `git log --all -- src/ui/screens/SymptomSolver/`):
+- `src/ui/screens/SymptomSolver/` **никогда не существовал** в репозитории
+- функций `updateStatsTotals/topCulprit/countActiveSymptoms/perBodySystemStats/NON_LINEAR_SCALES/analyzeAndScoreSymptoms` и `толудин/толуидин` **нет ни в одном коммите истории**
+- `symptom-solver-audit.test.ts` не существует
+- Предыдущая секция AGENTS.md с этим аудитом была ошибочной (описывала несуществующую работу) — удалена
+- Текущий Symptom Solver — это справочно-поисковый движок (`symptom-solver.engine.ts` 79 строк: SYMPTOM_DB, findSymptomById, searchSymptoms; UI: `SupportScreen_parts/SymptomSolverTab.tsx` + `ComplaintsTab.tsx`), работает и покрыт тестами (symptom-diary-audit и др.)
+
+### Не трогаем (WIP других агентов в worktree)
+`bb-builder.engine.ts`, `DiaryRecordingForm.tsx`, `TrainingDiaryHub.tsx`, `NutritionDiary.tsx`, `nutrition-ocr-parser.ts`, `diary-cards.tsx`, `food-recognition-audit.test.ts`, `AGENTS.md` (до правки)
 
 ---
 
