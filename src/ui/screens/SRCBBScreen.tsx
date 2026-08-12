@@ -1576,8 +1576,44 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   </MetricCard>
                 );
               })()}
-              <div style={{ marginTop:8 }}>
-                <SaveButton label="💾 Сохранить программу" savedLabel="✓ Программа сохранена" onSave={() => { try { const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId); const data = { name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString().slice(0,10), goal: level, weekCount: totalW, cycleWeeks, generatedAt: Date.now() }; const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]'); existing.unshift(data); localStorage.setItem('myTrainingPlans', JSON.stringify(existing.slice(0,30))); } catch {} }} />
+              <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
+                <SaveButton label="💾 Сохранить программу" savedLabel="✓ Программа сохранена" onSave={() => {
+                  try {
+                    const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
+                    // Полный формат «Моих тренировок»: id + exercises (иначе вкладка «Планы» крашится на plan.exercises.length).
+                    const week1 = builtSrc.weeks[0];
+                    const exercises = week1 ? week1.days.flatMap(d => d.exercises.map(e => ({
+                      name: e.name,
+                      sets: e.workSets.reduce((s, ws) => s + ws.sets, 0),
+                      reps: e.workSets[0]?.reps ?? 5,
+                      rir: e.workSets[0]?.rir ?? e.rir ?? 2,
+                    }))) : [];
+                    const plan = { id: 'plplan_' + Date.now(), name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString(), exercises, weekCount: totalW, cycleWeeks };
+                    const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+                    // Отбрасываем битые записи старых версий (без exercises) — они ломали рендер «Планы».
+                    const updated = [...(Array.isArray(existing) ? existing : []).filter((p: any) => p && typeof p === 'object' && Array.isArray(p.exercises)), plan].slice(-30);
+                    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+                    setMethodNote(`✓ Программа сохранена в «Мои тренировки»: ${plan.name} — ${exercises.length} упр. · ${totalW} нед`);
+                  } catch (e) { setMethodNote(`⚠ Ошибка сохранения: ${(e as Error).message}`); }
+                }} />
+                <button
+                  onClick={() => {
+                    if (!builtSrc || playerDays.length === 0) { setMethodNote('⚠ Сначала сгенерируйте план'); return; }
+                    try {
+                      // План уже пишется в he_pl_runtime эффектом выше; фиксируем выбранную неделю явно.
+                      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: 'pl' }));
+                      localStorage.setItem('he_training_tab', 'runtime');
+                      if (typeof (window as any).__navigateToTrainingTab === 'function') {
+                        (window as any).__navigateToTrainingTab('runtime');
+                      } else {
+                        setMethodNote('▶ План готов к выполнению: откройте «Тренировки → Проведение тренировки».');
+                      }
+                    } catch (e) { setMethodNote(`⚠ Не удалось запустить: ${(e as Error).message}`); }
+                  }}
+                  style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', minHeight: 44,
+                    background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#fff', fontWeight: 800, fontSize: 12 }}
+                  title="Записать план в «Проведение тренировки» и открыть выполнение (SessionPlayer)"
+                >▶ Начать работу по циклу</button>
               </div>
               {wk.days.map((d, di) => {
                 const sourcePhase = sourceWeek?.phase || phase;
