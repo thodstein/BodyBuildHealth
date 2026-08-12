@@ -6,6 +6,8 @@ export interface ParsedLabResult {
   value: number;
   unit: string;
   refRange?: string;
+  refLow?: number;
+  refHigh?: number;
   confidence: number;
   raw: string;
   provider?: 'gemotest' | 'helix' | 'invitro' | 'kdl' | 'unknown';
@@ -95,22 +97,25 @@ export function parseLabText(text: string): ParsedLabResult[] {
       seenMarkers.add(marker);
 
       let refRange: string | undefined;
+      let refLowNum: number | undefined;
+      let refHighNum: number | undefined;
       let isAbnormal: boolean | undefined;
       let deviation: 'low' | 'high' | 'normal' | undefined;
 
       if (refLow !== undefined && refHigh !== undefined) {
         refRange = `${refLow}-${refHigh}`;
-        isAbnormal = value < parseFloat(refLow) || value > parseFloat(refHigh);
+        refLowNum = parseFloat(refLow);
+        refHighNum = parseFloat(refHigh);
+        isAbnormal = value < refLowNum || value > refHighNum;
         if (isAbnormal) {
-          deviation = value < parseFloat(refLow) ? 'low' : 'high';
+          deviation = value < refLowNum ? 'low' : 'high';
         }
       } else {
         const ucum = UCUM_MAP[marker];
         if (ucum) {
-          const ratio = normalizedRatio(marker, value, unit);
-          isAbnormal = ratio !== null && (ratio < 0.2 || ratio > 0.8);
-          if (isAbnormal && ratio !== null) {
-            deviation = ratio < 0.2 ? 'low' : 'high';
+          isAbnormal = value > ucum.uln || value < ucum.lln;
+          if (isAbnormal) {
+            deviation = value < ucum.lln ? 'low' : 'high';
           }
         }
       }
@@ -120,6 +125,8 @@ export function parseLabText(text: string): ParsedLabResult[] {
         value,
         unit: unit.trim(),
         refRange,
+        refLow: refLowNum,
+        refHigh: refHighNum,
         confidence: 0.85,
         raw: line,
         provider,

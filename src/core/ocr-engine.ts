@@ -95,12 +95,16 @@ function mergeParsedResults(
     const sourceUnit = source.unit || '';
     const normalized = normalizeLabMeasurement(code, source.value, sourceUnit);
     const info = UCUM_MAP[code];
-    const selectedUnit = source.unit || table?.unit || '';
+    const refUnit = table?.unit || source.unit || '';
     const refLow = table?.refLow !== undefined
-      ? normalizeLabMeasurement(code, table.refLow, selectedUnit).value
+      ? normalizeLabMeasurement(code, table.refLow, refUnit).value
+      : providerValue?.refLow !== undefined
+      ? normalizeLabMeasurement(code, providerValue.refLow, providerValue.unit || refUnit).value
       : undefined;
     const refHigh = table?.refHigh !== undefined
-      ? normalizeLabMeasurement(code, table.refHigh, selectedUnit).value
+      ? normalizeLabMeasurement(code, table.refHigh, refUnit).value
+      : providerValue?.refHigh !== undefined
+      ? normalizeLabMeasurement(code, providerValue.refHigh, providerValue.unit || refUnit).value
       : undefined;
     const result = {
       code,
@@ -212,7 +216,7 @@ function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
         if (biomarkerUnit) unit = biomarkerUnit;
       }
     }
-    if (!unit) continue; // truly unknown marker with no known unit
+    if (unit === undefined || unit === null) continue; // truly unknown marker with no known unit (empty string is valid for dimensionless markers like INR)
     const current = byCode.get(code);
     if (!current) {
       byCode.set(code, { ...lab, code, unit });

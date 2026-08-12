@@ -41,7 +41,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
     if (lab.value < lab.refLow) return 'low';
     return 'normal';
   }
-  const info = UCUM_MAP[lab.code.toUpperCase()];
+  const info = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
   if (!info) return 'unknown';
   if (lab.value > info.uln) return 'high';
   if (lab.value < info.lln) return 'low';

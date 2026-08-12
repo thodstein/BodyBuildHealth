@@ -1638,7 +1638,7 @@ const LabsRisksTab: React.FC = () => {
     }
     const devs: { code:string; name:string; value:number; uln:number; lln:number; deviation:number; system:string }[] = [];
     for (const lab of labs) {
-      const ref = UCUM_MAP[lab.code];
+      const ref = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
       if (!ref?.uln || !ref?.lln) continue;
       const coeff = ref.coeff || 1;
       const norm = lab.value * coeff;

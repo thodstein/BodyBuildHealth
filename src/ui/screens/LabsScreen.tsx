@@ -403,7 +403,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       : 0;
     const markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] = [];
     for (const lab of currentLabs) {
-      const ref = UCUM_MAP[lab.code];
+      const ref = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
       if (!ref) continue;
       const coeff = ref.coeff || 1;
       const norm = lab.value * coeff;

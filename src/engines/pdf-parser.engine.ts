@@ -207,6 +207,14 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: 'URINE_NITRITE_QR', names: ['нитриты мочи (кач)', 'nitrite urine qual', 'нитриты мочи кач'], unitPatterns: ['', 'score'] },
   { code: 'URINE_LEU_QR', names: ['лейкоциты мочи (кач)', 'leu urine qual', 'лейкоциты мочи кач', 'тест-полоска лейкоциты'], unitPatterns: ['', 'score'] },
   { code: 'URINE_BLOOD_QR', names: ['кровь мочи (кач)', 'blood urine qual', 'кровь в моче (кач)', 'эритроциты кач мочи', 'скрытая кровь мочи'], unitPatterns: ['', 'score'] },
+  // ══════════════════════════════════════════════════════════════════════
+  //  КРИТИЧЕСКИЕ МАРКЁРЫ ДЛЯ PED-ПОЛЬЗОВАТЕЛЕЙ (аудит Aug 2026)
+  // ══════════════════════════════════════════════════════════════════════
+  { code: 'APOB', names: ['аполипопротеин B', 'Apolipoprotein B', 'АпоВ', 'ApoB', 'апо B', 'аполипопротеин B-100'], unitPatterns: ['г/л', 'g/L', 'мг/дл', 'mg/dL'] },
+  { code: 'APOA1', names: ['аполипопротеин A1', 'Apolipoprotein A1', 'АпоА1', 'ApoA1', 'апо A1', 'аполипопротеин A-I'], unitPatterns: ['г/л', 'g/L', 'мг/дл', 'mg/dL'] },
+  { code: 'CYSTATIN_C', names: ['цистатин C', 'Cystatin C', 'цистатин-C', 'Cystatin-C', 'цистатин'], unitPatterns: ['мг/л', 'mg/L', 'мкг/мл'] },
+  { code: 'DHT', names: ['дигидротестостерон', 'DHT', 'Dihydrotestosterone', 'дигидро-тестостерон', 'DHT-testosterone'], unitPatterns: ['пг/мл', 'pg/mL', 'нмоль/л', 'nmol/L', 'нг/мл'] },
+  { code: 'KIM1', names: ['KIM-1', 'KIM1', 'Kidney Injury Molecule-1', 'молекула повреждения почек', 'KIM 1'], unitPatterns: ['пг/мл', 'pg/mL', 'нг/мл', 'ng/mL'] },
 ];
 
 function containsLabName(text: string, name: string): boolean {
@@ -251,7 +259,7 @@ function extractNumber(text: string): number | null {
     // Skip if it looks like a year, phone number, etc.
     const clean = n.replace(',', '.');
     const val = parseFloat(clean);
-    if (isNaN(val) || val <= 0) continue;
+    if (isNaN(val) || val < 0) continue;
     return val;
   }
   // All numbers are part of a range — not a value column

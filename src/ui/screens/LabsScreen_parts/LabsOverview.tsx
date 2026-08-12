@@ -14,7 +14,7 @@ function getLabStatus(lab: LabPoint): 'normal' | 'high' | 'low' | 'unknown' {
     if (lab.value < lab.refLow) return 'low';
     return 'normal';
   }
-  const range = LAB_RANGES[lab.code.toUpperCase()];
+  const range = LAB_RANGES[lab.code] || LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return 'unknown';
   if (lab.value > range.max) return 'high';
   if (lab.value < range.min) return 'low';
@@ -25,7 +25,7 @@ function getLabRefInfo(lab: LabPoint): string {
   if (lab.refLow !== undefined && lab.refHigh !== undefined) {
     return `${lab.refLow}–${lab.refHigh} ${lab.unit || ''}`;
   }
-  const range = LAB_RANGES[lab.code.toUpperCase()];
+  const range = LAB_RANGES[lab.code] || LAB_RANGES[lab.code.toUpperCase()];
   if (!range) return '';
   return `${range.min}–${range.max} ${range.unit}`;
 }
@@ -45,26 +45,29 @@ export const LabsOverview: React.FC<{
   const systemGroups: Record<string, LabPoint[]> = {};
   const labSystemMap: Record<string, string> = {
     // Cardiovascular
-    'LDL': '', 'HDL': '', 'TG': '',
-    'GLU': '', 'HBA1C': '', 'HOMOCYSTEINE': '',
+    'LDL': 'cardio', 'HDL': 'cardio', 'TG': 'cardio', 'CHOL': 'cardio',
+    'GLU': 'metabolic', 'HBA1C': 'metabolic', 'HbA1c': 'metabolic', 'HOMOCYSTEINE': 'cardio',
     // Hepatic
-    'ALT': '', 'AST': '', 'GGT': '', 'ALP': '',
-    'BILIRUBIN_TOTAL': '', 'BIL_T': '', 'BIL': '', 'ALB': '',
+    'ALT': 'hepatic', 'AST': 'hepatic', 'GGT': 'hepatic', 'ALP': 'hepatic',
+    'BILIRUBIN_TOTAL': 'hepatic', 'BIL_T': 'hepatic', 'BIL': 'hepatic', 'DBIL': 'hepatic', 'ALB': 'hepatic',
     // Renal
-    'CREATININE': '', 'BUN': '', 'EGFR': '', 'PROTEIN_TOTAL': '', 'TP': '', 'UA': '',
+    'CREATININE': 'renal', 'BUN': 'renal', 'EGFR': 'renal', 'UREA': 'renal',
+    'PROTEIN_TOTAL': '', 'TP': '', 'UA': 'renal',
     // Endocrine
-    'TSH': '', 'FT3': '', 'FT4': '',
-    'TESTOSTERONE': '', 'TT': '', 'E2': '', 'ESTRADIOL': '',
-    'PRL': '', 'PROLACTIN': '', 'CORTISOL': '',
-    'INSULIN': '', 'INS': '', 'HOMA': '',
-    'LH': '', 'FSH': '', 'SHBG': '',
+    'TSH': 'endocrine', 'FT3': 'endocrine', 'FT4': 'endocrine',
+    'TESTOSTERONE': 'endocrine', 'TT': 'endocrine', 'E2': 'endocrine', 'ESTRADIOL': 'endocrine',
+    'PRL': 'endocrine', 'PROLACTIN': 'endocrine', 'CORTISOL': 'endocrine',
+    'INSULIN': 'metabolic', 'INS': 'metabolic', 'HOMA': 'metabolic',
+    'LH': 'endocrine', 'FSH': 'endocrine', 'SHBG': 'endocrine',
     // Hematologic
-    'HGB': '', 'HCT': '', 'PLT': '', 'WBC': '',
-    'RBC': '', 'MCV': '', 'MCH': '',
+    'HGB': 'hematologic', 'HCT': 'hematologic', 'PLT': 'hematologic', 'WBC': 'hematologic',
+    'RBC': 'hematologic', 'MCV': 'hematologic', 'MCH': 'hematologic', 'MCHC': 'hematologic',
     // Other
-    'CRP': '', 'FERRITIN': '', 'VITD': '', 'CALCIDIOL': '',
-    'IGF1': '', 'DHEA_S': '', 'PSA': '',
-    'PROGESTERONE': '', 'AMH': '', 'INHB': '',
+    'CRP': 'cardio', 'FERRITIN': 'hematologic', 'VITD': 'metabolic', 'CALCIDIOL': 'metabolic',
+    'IGF1': 'endocrine', 'DHEA_S': 'endocrine', 'PSA': 'reproductive',
+    'PROGESTERONE': 'reproductive', 'AMH': 'reproductive', 'INHB': 'reproductive',
+    'K': 'metabolic', 'NA': 'metabolic', 'CA': 'metabolic', 'MG': 'metabolic', 'P': 'metabolic',
+    'IRON': 'hematologic', 'TIBC': 'hematologic',
   };
 
   labs.forEach(lab => {

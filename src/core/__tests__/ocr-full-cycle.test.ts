@@ -803,3 +803,72 @@ describe('Интеграция с UCUM_MAP и DYNAMIC_REFS', () => {
     expect(mapToUcumCode('CK-18')).toBe('CK_18');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10. CRITICAL AUDIT REGRESSION TESTS (Aug 12 2026)
+// ═══════════════════════════════════════════════════════════════════════════
+describe('Критический аудит — регрессионные тесты', () => {
+  it('P0-3: INR (безразмерный) не теряется при финализации', async () => {
+    const text = 'МНО\t1.1\t0.8-1.2\t';
+    const result = await processUploadedFile(textFile(text));
+    expect(result.labs.some(l => l.code === 'INR')).toBe(true);
+  });
+
+  it('P0-3: URINE_PH (безразмерный) не теряется', async () => {
+    const text = 'pH мочи\t6.0\t5.0-7.0\t';
+    const result = await processUploadedFile(textFile(text));
+    expect(result.labs.some(l => l.code === 'URINE_PH')).toBe(true);
+  });
+
+  it('P0-1: нулевые значения CRP не теряются', async () => {
+    const text = 'С-реактивный белок\t0.5\t<5.0\tмг/л';
+    const result = await processUploadedFile(textFile(text));
+    const crp = result.labs.find(l => l.code === 'CRP');
+    expect(crp).toBeDefined();
+    expect(crp!.value).toBe(0.5);
+  });
+
+  it('P0-4: lab-auto-parser использует UCUM_MAP.uln а не normalizedRatio', () => {
+    const providerResults = parseProviderAware('Глюкоза 5.0 ммоль/л');
+    const glu = providerResults.find(r => r.marker === 'GLUCOSE' || r.marker === 'GLU');
+    expect(glu).toBeDefined();
+    // 5.0 is within UCUM_MAP range 3.9-5.6
+    expect(glu!.isAbnormal).toBe(false);
+  });
+
+  it('P1-5: HbA1c (mixed case) находит UCUM_MAP через fallback', async () => {
+    const text = 'HbA1c\t5.2\t<6.0\t%';
+    const result = await processUploadedFile(textFile(text));
+    const hba1c = result.labs.find(l => l.code === 'HbA1c' || l.code === 'HBA1C');
+    expect(hba1c).toBeDefined();
+    expect(hba1c!.isAbnormal).toBe(false);
+  });
+
+  it('P1-4: ApoB распознаётся табличным парсером', async () => {
+    const text = 'Аполипопротеин B\t1.2\t0.6-1.3\tг/л';
+    const result = await processUploadedFile(textFile(text));
+    expect(result.labs.some(l => l.code === 'APOB')).toBe(true);
+  });
+
+  it('P1-4: Цистатин C распознаётся', async () => {
+    const text = 'Цистатин C\t0.9\t0.5-1.2\tмг/л';
+    const result = await processUploadedFile(textFile(text));
+    expect(result.labs.some(l => l.code === 'CYSTATIN_C')).toBe(true);
+  });
+
+  it('P1-4: DHT распознаётся', async () => {
+    const text = 'Дигидротестостерон\t45\t20-80\tпг/мл';
+    const result = await processUploadedFile(textFile(text));
+    expect(result.labs.some(l => l.code === 'DHT')).toBe(true);
+  });
+
+  it('P1-2/3: provider-aware refLow/refHigh сохраняются в merge', async () => {
+    // lab-auto-parser line pattern 4 extracts numeric refLow/refHigh
+    const text = 'АЛТ: 35 Е/л 0-41';
+    const result = await processUploadedFile(textFile(text));
+    const alt = result.labs.find(l => l.code === 'ALT');
+    expect(alt).toBeDefined();
+    expect(alt!.refLow).toBe(0);
+    expect(alt!.refHigh).toBe(41);
+  });
+});
