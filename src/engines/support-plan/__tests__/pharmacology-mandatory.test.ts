@@ -106,6 +106,22 @@ describe('course pharmacology mandatory rules', () => {
     expect(removedRec.suppression?.some(s => s.substanceId === 'hcg')).toBe(true);
   });
 
+  it('образ жизни: шаги/курение/алкоголь входят в базу любого курса', () => {
+    const result = calculateSupportTZ(stateWithAas(['test_enan']));
+    for (const id of ['hydration', 'cardio_aerobic', 'electrolyte_balance', 'daily_steps', 'no_smoking', 'no_alcohol']) {
+      expect(result.selectedSubstances).toContain(id);
+    }
+  });
+
+  it('образ жизни не считается таблетками и участвует в расчёте риска', () => {
+    const result = runSupportUnified(stateWithAas(['test_enan']));
+    const lifestyleIds = ['daily_steps', 'no_smoking', 'no_alcohol', 'hydration', 'cardio_aerobic', 'electrolyte_balance'];
+    const lifestyle = result.substances.filter(s => lifestyleIds.includes(s.id));
+    expect(lifestyle).toHaveLength(6);
+    expect(lifestyle.every(s => s.kind === 'lifestyle' || s.kind === 'mineral')).toBe(true);
+    expect(result.pillBurden?.totalSubstances).toBeLessThan(result.substances.length);
+  });
+
   it('процедурная эскалация по HCT', () => {
     const labs = (hct: string) => ({
       ...DEFAULT_STATE.labs,

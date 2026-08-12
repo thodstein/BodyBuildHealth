@@ -23,6 +23,23 @@ export const SUPPLEMENTS_DB: Record<string, TzSupportEntry[]> = {
     {organId:'renal',mechId:'ren4',k:0.12,q:'C',source:'Коррекция электролитного компонента только по Na/K/Mg'},
     {organId:'hematologic',mechId:'hem5',k:0.15,q:'B',source:'Баланс Na/K/Mg как часть плазменной поддержки'},
   ],
+  daily_steps: [
+    {organId:'cardio',mechId:'cv4',k:0.10,q:'B',source:'NEAT-активность (10 000+ шагов/день): реология и эндотелий'},
+    {organId:'cardio',mechId:'cv1',k:0.08,q:'B',source:'Повседневная активность → сосудистая адаптация и липидный профиль'},
+    {organId:'hematologic',mechId:'hem1',k:0.08,q:'C',source:'Умеренная активность поддерживает объём плазмы и микроциркуляцию'},
+  ],
+  no_smoking: [
+    {organId:'cardio',mechId:'cv1',k:0.15,q:'B',source:'Отказ от курения: эндотелий и атерогенный риск'},
+    {organId:'cardio',mechId:'cv4',k:0.10,q:'B',source:'Снижение карбоксигемоглобина и агрегации тромбоцитов'},
+    {organId:'hematologic',mechId:'hem1',k:0.10,q:'C',source:'Курение ↑ HCT/вязкость — отказ снижает гемоконцентрацию'},
+    {organId:'hepatic',mechId:'liv1',k:0.05,q:'C',source:'Снижение окислительной нагрузки на печень'},
+  ],
+  no_alcohol: [
+    {organId:'hepatic',mechId:'liv2',k:0.12,q:'B',source:'Отказ от алкоголя: ↓ жировой гепатоз и ГГТ/ЩФ'},
+    {organId:'hepatic',mechId:'liv1',k:0.10,q:'B',source:'Снижение цитолиза и окислительного стресса печени'},
+    {organId:'cardio',mechId:'cv4',k:0.08,q:'C',source:'Алкоголь ↑ АД и ТГ — отказ стабилизирует липиды'},
+    {organId:'cns',mechId:'cns1',k:0.08,q:'C',source:'Алкоголь нарушает нейромедиаторный баланс и сон'},
+  ],
   nac: [{organId:'hepatic',mechId:'liv1',k:0.40,q:'B',source:'NAC ↑GSH, ↓АЛТ/АСТ при ААС'},{organId:'hepatic',mechId:'liv3',k:0.15,q:'C',source:'Антиоксидант, ↓окислительного повреждения ДНК'},{organId:'cns',mechId:'cns2',k:0.20,q:'C',source:'Антиоксидант ЦНС'},{organId:'cns',mechId:'cns3',k:0.15,q:'C',source:'↑GSH предотвращает апоптоз нейронов'},{organId:'renal',mechId:'ren3',k:0.15,q:'C',source:'↓окислительного стресса клубочков'},{organId:'cardio',mechId:'cv4',k:0.10,q:'C',source:'↓агрегации тромбоцитов'}],
   tudca: [{organId:'hepatic',mechId:'liv1',k:0.35,q:'B',source:'TUDCA ↓ER-стресс, ↓цитолиза'},{organId:'hepatic',mechId:'liv2',k:0.45,q:'B',source:'TUDCA ↑BSEP, ↓ГГТ/ЩФ'},{organId:'hepatic',mechId:'liv3',k:0.10,q:'C',source:'↓холестаза ↓пренеопластический риск'}],
   udca: [{organId:'hepatic',mechId:'liv2',k:0.30,q:'B',source:'Холат, ↓ГГТ/ЩФ'},{organId:'hepatic',mechId:'liv3',k:0.10,q:'C',source:'Улучшение желчеоттока'}],

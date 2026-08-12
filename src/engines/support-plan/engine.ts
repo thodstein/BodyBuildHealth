@@ -28,7 +28,7 @@ const AUTO_DOCTOR_ONLY = new Set([
   'dipyridamole', 'pentoxifylline',
 ]);
 const AUTO_PLAN_LIMIT: Record<string, number> = { basic: 28, mid: 40, max: 48, boost: 56 };
-const COURSE_FOUNDATION = ['hydration', 'cardio_aerobic', 'electrolyte_balance'];
+const COURSE_FOUNDATION = ['hydration', 'cardio_aerobic', 'electrolyte_balance', 'daily_steps', 'no_smoking', 'no_alcohol'];
 
 function isAutoDoctorOnly(id: string): boolean {
   return AUTO_DOCTOR_ONLY.has(canonId(id));
@@ -130,7 +130,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
 
       // База активного курса: всегда присутствует в расчёте риска.
       // Это не препараты и не должна учитываться как pill burden.
-      for (const foundationId of ['hydration', 'cardio_aerobic', 'electrolyte_balance']) {
+      for (const foundationId of COURSE_FOUNDATION) {
         if (!isUsed(foundationId)) { substances.push(foundationId); markUsed(foundationId); }
       }
 

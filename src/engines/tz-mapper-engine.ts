@@ -786,6 +786,9 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     add('hydration', 'Гидратация — базовая поддержка объёма плазмы и гемоконцентрации', 'Любой активный PED-курс', 'other');
     add('cardio_aerobic', 'Кардио — базовая эндотелиальная и реологическая поддержка', 'Любой активный PED-курс', 'other');
     add('electrolyte_balance', 'Электролиты Na/K/Mg — базовая поддержка водно-электролитного баланса; контроль K⁺/Na⁺/Mg²⁺ обязателен', 'Любой активный PED-курс', 'mineral');
+    add('daily_steps', 'Бытовая активность 10 000+ шагов/день — NEAT: реология, эндотелий, липиды', 'Любой активный PED-курс', 'other');
+    add('no_smoking', 'Отказ от курения — эндотелий, CO-Hb/гемоконцентрация, атерогенный риск', 'Любой активный PED-курс', 'other');
+    add('no_alcohol', 'Отказ от алкоголя — печень (ГГТ/ЩФ/жир), липиды, АД, ЦНС', 'Любой активный PED-курс', 'other');
     add('tadalafil', `Tadalafil 5 мг/день — PDE5i → вазодилатация, эндотелий/АД`, 'PED в курсе', 'pharma');
     add('telmisartan', `Telmisartan ${telDose} мг — ARB + PPAR-γ (АД, инсулин-чувствительность)`, 'PED в курсе', 'pharma');
     add('agmatine', flags.hasNandrolone

@@ -83,6 +83,9 @@ const FOUNDATION_ITEMS: Record<string, { name: string; dose: string; timing: str
   hydration: { name: 'Гидратация', dose: '40–45 мл/кг/сут', timing: 'в течение дня', reason: 'Поддержка объёма плазмы и снижение гемоконцентрации', kind: 'lifestyle' },
   cardio_aerobic: { name: 'Кардио (аэробная нагрузка)', dose: '30–45 мин, 5×/нед', timing: 'отдельно от силовой', reason: 'Эндотелиальная и реологическая поддержка', kind: 'lifestyle' },
   electrolyte_balance: { name: 'Электролиты Na/K/Mg', dose: 'по рациону и анализам', timing: 'с водой/едой', reason: 'Водно-электролитный баланс; K⁺ только с учётом eGFR/лекарств', kind: 'mineral' },
+  daily_steps: { name: 'Бытовая активность (10 000+ шагов)', dose: '10 000–12 000 шагов/день', timing: 'в течение дня', reason: 'NEAT-активность: реология, эндотелий, липиды', kind: 'lifestyle' },
+  no_smoking: { name: 'Отказ от курения', dose: 'полный отказ', timing: 'постоянно', reason: 'Эндотелий, гемоконцентрация (CO-Hb), атерогенный риск', kind: 'lifestyle' },
+  no_alcohol: { name: 'Отказ от алкоголя', dose: 'полный отказ на курсе', timing: 'постоянно', reason: 'Печень (ГГТ/ЩФ/жир), липиды, АД, ЦНС', kind: 'lifestyle' },
 };
 
 export const NON_PILL_SUPPORT_IDS = new Set(Object.keys(FOUNDATION_ITEMS));

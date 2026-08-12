@@ -486,6 +486,7 @@ function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]
 const SUB_NAME_CACHE: Record<string, string> = {};
 const FALLBACK_NAMES: Record<string, string> = {
   hydration: 'Гидратация', cardio_aerobic: 'Кардио (аэробная)', electrolyte_balance: 'Электролиты Na/K/Mg',
+  daily_steps: 'Бытовая активность 10 000+', no_smoking: 'Отказ от курения', no_alcohol: 'Отказ от алкоголя',
   niacin: 'Ниацин (B3)', phosphatidylserine: 'Фосфатидилсерин', glycine: 'Глицин',
   theanine: 'L-Теанин', quercetin: 'Кверцетин', garlic: 'Чеснок (экстракт)',
   beetroot: 'Beetroot (экстракт)', lecithin: 'Лецитин (ФХ)',
@@ -520,9 +521,9 @@ const FALLBACK_NAMES: Record<string, string> = {
   ashwagandha: 'Ашваганда', rhodiola: 'Родиола', bacopa: 'Бакопа',
   lions_mane: 'Ежовик',
 };
-const NON_DRUG_IDS = new Set(['hydration', 'cardio_aerobic', 'electrolyte_balance']);
+const NON_DRUG_IDS = new Set(['hydration', 'cardio_aerobic', 'electrolyte_balance', 'daily_steps', 'no_smoking', 'no_alcohol']);
 function planItemKind(id: string): 'База' | 'Минерал' | 'БАД' | 'Препарат' {
-  if (id === 'hydration' || id === 'cardio_aerobic') return 'База';
+  if (['hydration', 'cardio_aerobic', 'daily_steps', 'no_smoking', 'no_alcohol'].includes(id)) return 'База';
   if (id === 'electrolyte_balance') return 'Минерал';
   if (['telmisartan','tadalafil','nebivolol','anastrozole','hcg','aspirin','cabergoline','metformin'].includes(id)) return 'Препарат';
   return 'БАД';
@@ -690,6 +691,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [showPrescription, setShowPrescription] = useState(true);
   const [showSynergy, setShowSynergy] = useState(true);
+  const [showLifestyle, setShowLifestyle] = useState(true);
   const [removedSubs, setRemovedSubs] = useState<string[]>([]);
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
   const [substanceManagerKey, setSubstanceManagerKey] = useState(0);
@@ -2698,6 +2700,51 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         </div>
       )}
 
+      {/* ===== ОБРАЗ ЖИЗНИ — база курса (не препараты) ===== */}
+      {finalRec && finalRec.subs.some(s => NON_DRUG_IDS.has(s.substanceId)) && (() => {
+        const lifestyleSubs = finalRec.subs.filter(s => NON_DRUG_IDS.has(s.substanceId));
+        const impact = (id: string): string => {
+          if (id === 'hydration') return '↓ HCT/HGB (гемодилюция), поддержка почек и АД';
+          if (id === 'cardio_aerobic') return '↓ АД, липиды, гемоконцентрация; эндотелий';
+          if (id === 'electrolyte_balance') return 'стабильный ритм, нервная проводимость';
+          if (id === 'daily_steps') return 'NEAT: ↓ АД, липиды, реология';
+          if (id === 'no_smoking') return '↓ CO-Hb, вязкость, атерогенный риск';
+          if (id === 'no_alcohol') return '↓ ГГТ/ЩФ, ТГ, АД; печень и ЦНС';
+          return '';
+        };
+        return (
+          <div style={{ marginTop: 8 }}>
+            <div onClick={() => setShowLifestyle(!showLifestyle)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showLifestyle ? '8px 8px 0 0' : 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.16)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🌿 Образ жизни — база курса
+                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(74,222,128,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(34,197,94,0.1)' }}>{lifestyleSubs.length} пунктов · не препараты</span>
+              </span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showLifestyle ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showLifestyle && (
+              <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.1)', borderTop: 'none' }}>
+                {lifestyleSubs.map(s => {
+                  const e = SUPPORT_CATALOG_DATA[s.substanceId] || SUPPORT_CATALOG_DATA[s.substanceId.toLowerCase()];
+                  return (
+                    <div key={s.substanceId} style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{planItemKind(s.substanceId) === 'База' ? '🧭' : '⚡'} {subNameRu(s.substanceId)}</span>
+                        <span style={{ fontSize: 8, color: '#4ade80', textAlign: 'right' }}>{e?.dosage?.timing || ''}</span>
+                      </div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', marginTop: 2, lineHeight: 1.45 }}>{s.reason || e?.description}</div>
+                      <div style={{ fontSize: 7, color: '#4ade80', marginTop: 2 }}>Риск: {impact(s.substanceId)}</div>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', marginTop: 5, lineHeight: 1.45 }}>
+                  Участвуют в механизм-ориентированном расчёте риска (cv/ren/hem/liv) автоматически; не считаются таблетками и не увеличивают pill burden.
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ===== СИНЕРГИИ И ВЗАИМОДЕЙСТВИЯ ПЛАНА (объединено) ===== */}
       {finalRec && (synergyDesc.length > 0 || pairSynergies.length > 0) && (
         <div style={{ marginTop:8 }}>
@@ -3447,7 +3494,7 @@ function buildPlanText(rec: SupportRecommendation): string {
     for (const s of items) {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
-      const doseStr = dose ? ` · ${dose.mg} мг (${dose.timing})` : '';
+      const doseStr = dose && dose.mg > 0 ? ` · ${dose.mg} мг (${dose.timing})` : '';
       lines.push(`• ${name}${doseStr} — ${s.reason}`);
       if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
       lines.push(`  k=${s.k.toFixed(2)} · док.уровень: ${s.q}`);
@@ -3523,7 +3570,7 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
     for (const s of items) {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
-      const doseStr = dose ? `, ${dose.mg} мг (${dose.timing})` : '';
+      const doseStr = dose && dose.mg > 0 ? `, ${dose.mg} мг (${dose.timing})` : '';
       lines.push(`- ${name}${doseStr}`);
       const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';
       lines.push(`  Категория: ${s.category}, система: ${organGuess}`);
