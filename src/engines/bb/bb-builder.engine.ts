@@ -1197,6 +1197,11 @@ function buildSession(
     if (muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
       sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 22 : 18);
     }
+    // Natural advanced: спина не должна терять объём в Upper-днях из-за
+    // fatigue budget (грудь забирает бюджет). Минимум 10 сетов на сессию.
+    if (muscle === 'back' && level === 'advanced' && phase !== 'deload') {
+      sets = Math.max(sets, 10);
+    }
     // High-volume enhanced legs: ноги тоже получают повышенный минимум,
     // а не остаточный бюджет после рук/пресса.
     if (['quads', 'hamstrings', 'glutes'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
@@ -1870,21 +1875,25 @@ function buildSession(
         : Math.floor(budgetSource / Math.max(1, plans.length)));
     // Solo-дни (1-2 мышцы): 90% бюджета; multi-дни: 60% (70% на PED — больше recovery).
     const highVolumeBack = pl.muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3;
+    // Natural advanced: спина в Upper-днях не должна быть остатком после груди.
+    const balancedBack = pl.muscle === 'back' && level === 'advanced';
     const highVolumeLegs = ['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const highVolumeTorso = ['chest', 'shoulders'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const highVolumeArms = ['biceps', 'triceps'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = highVolumeBack
       ? Math.max(muscleBudget, pl.sets * 10)
-      : highVolumeLegs
-        // Независимый budget floor: quads не может забрать весь котёл,
-        // оставив hamstrings/glutes с одним упражнением.
-        ? Math.max(muscleBudget, (trainingYears ?? 0) >= 6 ? 120 : 90)
-        : highVolumeTorso
-          ? Math.max(muscleBudget, pl.sets * 6)
-          : highVolumeArms
-            ? Math.max(muscleBudget, 30) // минимум 6 сетов × 5 fatigue
-            : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
+      : balancedBack
+        ? Math.max(muscleBudget, pl.sets * 6)
+        : highVolumeLegs
+          // Независимый budget floor: quads не может забрать весь котёл,
+          // оставив hamstrings/glutes с одним упражнением.
+          ? Math.max(muscleBudget, (trainingYears ?? 0) >= 6 ? 120 : 90)
+          : highVolumeTorso
+            ? Math.max(muscleBudget, pl.sets * 6)
+            : highVolumeArms
+              ? Math.max(muscleBudget, 30) // минимум 6 сетов × 5 fatigue
+              : Math.max(1, Math.min(muscleBudget, Math.floor(budgetSource * (isArmMuscle ? 1.0 : budgetCapPct))));
     // High-volume legs: fatigue budget не должен резать ноги до остатка.
     // Минимум — целевые сеты × fatigueCost, а не пропорция от общего бюджета.
     if (highVolumeLegs && remainingBudget < pl.sets * 5) {
@@ -1912,6 +1921,7 @@ function buildSession(
        // back target уже масштабирован на недельном prescription-уровне выше;
        // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
        const setCap = (pl.muscle === 'back' && trainingYears !== undefined) ? 10
+         : (pl.muscle === 'back' && level === 'advanced') ? 8
          : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && trainingYears !== undefined) ? 8
          : 5;
        const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
