@@ -512,6 +512,16 @@ export interface UnifiedSettings {
     recovery: number;             // 1-10
     motivation: number;           // 1-10
     doms: number;                 // 1-10
+    // График тренировок для привязки рациона к тренировке (планировщик питания).
+    // 'weekly' — фиксированные дни недели; 'eod' — через день; 'pattern' — цикл work/off.
+    schedule?: {
+      enabled: boolean;           // привязать рацион к тренировке
+      startTime: string;          // 'HH:MM' начало тренировки
+      endTime: string;            // 'HH:MM' конец тренировки
+      weeklyDays: boolean[];      // 7 элементов (Пн..Вс) для 'weekly'
+      scheduleType: 'weekly' | 'eod' | 'pattern';
+      pattern: { work: number; off: number }; // для 'pattern' (например 2+1)
+    };
   };
 
   // ─────────── 3. ФАРМА / КУРС ───────────

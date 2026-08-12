@@ -110,6 +110,7 @@ export const IndividualPlanSettings: React.FC = () => {
     showSuppPicker, setShowSuppPicker, suppSearch, setSuppSearch,
     linkToTraining, setLinkToTraining,
     trainStart, setTrainStart, trainEnd, setTrainEnd,
+    trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
     dietPrefs, setDietPrefs,
@@ -797,26 +798,62 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <div><label style={{ color: 'rgba(255,255,255,0.85)' }}>Начало</label><input type="time" value={trainStart} onChange={e => setTrainStart(e.target.value)} style={inputStyle} /></div>
               <div><label style={{ color: 'rgba(255,255,255,0.85)' }}>Конец</label><input type="time" value={trainEnd} onChange={e => setTrainEnd(e.target.value)} style={inputStyle} /></div>
             </div>
-            <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)' }}>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Выберите тренировочные дни:</div>
-              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                {DAY_LABELS.map((label, idx) => {
-                  const isTrain = trainingDays[idx];
-                  return (
-                    <button key={idx} onClick={() => {
-                      setTrainingDays(trainingDays.map((d, i) => i === idx ? !d : d));
-                    }} style={{
-                      width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
-                      border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
-                      background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
-                      color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.85)',
-                      fontSize: 9, fontWeight: isTrain ? 800 : 500,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'all 0.15s',
-                    }}>{label}</button>
-                  );
-                })}
+            {/* FIX train-bind: плавающий график — недельный / через день / цикл N+M */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+              {([
+                { id: 'weekly' as const, label: '📅 Неделя' },
+                { id: 'eod' as const, label: '🔁 Через день' },
+                { id: 'pattern' as const, label: '🔢 Цикл N+M' },
+              ]).map(opt => (
+                <button key={opt.id} onClick={() => setTrainScheduleType(opt.id)} style={{
+                  flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600,
+                  background: trainScheduleType === opt.id ? 'rgba(34,197,94,0.2)' : '#202023',
+                  border: trainScheduleType === opt.id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
+                  color: trainScheduleType === opt.id ? '#22c55e' : 'rgba(255,255,255,0.7)',
+                }}>{opt.label}</button>
+              ))}
+            </div>
+            {trainScheduleType === 'pattern' && (
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6, fontSize: 9 }}>
+                <span style={{ color: 'rgba(255,255,255,0.85)' }}>Цикл:</span>
+                <input type="number" min={1} max={7} value={trainPattern.work} onChange={e => { const v = Math.max(1, Math.min(7, parseInt(e.target.value) || 1)); setTrainPattern({ ...trainPattern, work: v }); }} style={{ ...inputStyle, width: 48 }} aria-label="Тренировочных дней в цикле" />
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>тр +</span>
+                <input type="number" min={1} max={7} value={trainPattern.off} onChange={e => { const v = Math.max(1, Math.min(7, parseInt(e.target.value) || 1)); setTrainPattern({ ...trainPattern, off: v }); }} style={{ ...inputStyle, width: 48 }} aria-label="Дней отдыха в цикле" />
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>отдых</span>
               </div>
+            )}
+            {trainScheduleType === 'weekly' && (
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)', marginBottom: 6 }}>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Выберите тренировочные дни:</div>
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                  {DAY_LABELS.map((label, idx) => {
+                    const isTrain = trainingDays[idx];
+                    return (
+                      <button key={idx} onClick={() => {
+                        setTrainingDays(trainingDays.map((d, i) => i === idx ? !d : d));
+                      }} style={{
+                        width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                        border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
+                        background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
+                        color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.85)',
+                        fontSize: 9, fontWeight: isTrain ? 800 : 500,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.15s',
+                      }}>{label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div style={{ fontSize: 9, color: '#22c55e', marginBottom: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)' }}>
+              {trainScheduleType === 'eod' && '🔁 Через день (EOD): 3-4 тренировки в неделе'}
+              {trainScheduleType === 'pattern' && `🔢 Цикл ${trainPattern.work}+${trainPattern.off}: ${trainPattern.work} тр / ${trainPattern.off} отдых`}
+              {trainScheduleType === 'weekly' && `📅 ${trainingDays.filter(Boolean).length} тренировочных дней: ${DAY_LABELS.filter((_, i) => trainingDays[i]).join(', ') || '—'}`}
+            </div>
+            {/* Синхронизация с профилем — только по кнопке */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Загрузить график тренировок из Профиля">📋 Из профиля</button>
+              <button onClick={saveToProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }} title="Сохранить график тренировок в Профиль">💾 Сохранить в профиль</button>
             </div>
           </>
         )}

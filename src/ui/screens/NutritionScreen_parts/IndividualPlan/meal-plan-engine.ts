@@ -75,6 +75,10 @@ export interface MealPlanInput {
   trainDurationMin?: number;
   allowIntraWorkout?: boolean;
   excludedIds?: Set<string>;
+  // FIX allergens-restrictions: теги аллергенов (dairy/gluten/eggs/...). Defense-in-depth:
+  // контекст резолвит аллергены в excludedIds, этот фильтр защищает прочих вызывающих
+  // (тесты, прямые вызовы buildDayPlan без резолвера).
+  allergenTags?: Set<string>;
   preferredIds?: Set<string>;
   // D-28: meal-bound preferred — food bound to a specific meal (e.g. rice_cream only on breakfast).
   preferredByMeal?: Record<string, Set<string>>;
@@ -458,7 +462,7 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 }
 
 // ─── Пулы продуктов по ролям (с фильтром аллергенов и диеты) ───────────
-function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string> }) {
+function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string>; allergenTags?: Set<string> }) {
   const isMealFood = (f: FoodItem) =>
     f.category !== 'supplement' || ['whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar', 'supp_pea_protein', 'supp_soy_isolate', 'supp_rice_protein', 'supp_eaa', 'bcaa'].includes(f.id);
   // Д-3: build basePoolRaw first, then exclude premium/exotic at the source for low/medium budgets so
@@ -479,8 +483,22 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     // Д-10: prefer explicit isVegetarian tag; isMeatId is only a last-resort heuristic for unlabeled foods.
     // Vegetarian (lacto-ovo) ALLOWS dairy and eggs — only isVegan excludes them, so we don't use isVegan here.
     if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || (diet === undefined && f.isVegetarian === false) || (isMeatId(f.id) && f.isVegetarian !== true && f.isVegan !== true)) return false; }
+    // FIX allergens-restrictions: фильтр по тегам аллергенов (defense-in-depth)
+    if (opts?.allergenTags && opts.allergenTags.size > 0) {
+      const diet = FOOD_ALLERGEN_DIET[f.id];
+      const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+      if ([...opts.allergenTags].some(t => tags.includes(t))) return false;
+    }
     return true;
   });
+  // FIX allergens-restrictions: те же теги применяются к прямым пулам из FOOD_DB
+  // (fastProtein/slowProtein/eaa/dextrin), которые строятся в обход basePoolRaw.
+  const matchesAllergenTags = (f: FoodItem): boolean => {
+    if (!opts?.allergenTags || opts.allergenTags.size === 0) return false;
+    const diet = FOOD_ALLERGEN_DIET[f.id];
+    const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+    return [...opts.allergenTags].some(t => tags.includes(t));
+  };
   let _baseFiltered = (budget === 'max' || budget === 'enhanced')
     ? basePoolRaw
     : basePoolRaw.filter(f => !isPremiumOrExotic(f.id));
@@ -519,16 +537,21 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   };
   return {
     proteinSolid: mergePreferred(limitPoolByVariety(pSolid.length > 0 ? pSolid : anyProtein, 10001), f => f.category === 'protein' || f.category === 'dairy'),
-    proteinFatty: limitPoolByVariety(pFatty.length > 0 ? pFatty : anyProtein, 10003),
-    proteinLean: limitPoolByVariety(pLean.length > 0 ? pLean : anyProtein, 10005),
-    fastProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'whey_isolate' || f.id === 'whey_protein' || f.id === 'egg_white')),
-    slowProtein: FOOD_DB.filter(f => !excludedIds.has(f.id) && (f.id === 'casein' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')),
+    // FIX preferred-foods: любимые белки добавляются и в fatty/lean пулы (раньше только solid)
+    proteinFatty: mergePreferred(limitPoolByVariety(pFatty.length > 0 ? pFatty : anyProtein, 10003), f => f.category === 'protein'),
+    proteinLean: mergePreferred(limitPoolByVariety(pLean.length > 0 ? pLean : anyProtein, 10005), f => f.category === 'protein'),
+    // FIX preferred-foods: любимые быстрые/медленные белки подмешиваются в хардкод-пулы
+    fastProtein: mergePreferred(FOOD_DB.filter(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && (f.id === 'whey_isolate' || f.id === 'whey_protein' || f.id === 'egg_white')), f => f.category === 'protein' || f.category === 'supplement'),
+    slowProtein: mergePreferred(FOOD_DB.filter(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && (f.id === 'casein' || f.id === 'cottage_cheese_5' || f.id === 'yogurt_greek')), f => f.category === 'protein' || f.category === 'dairy' || f.category === 'supplement'),
     carbSlow: mergePreferred(limitPoolByVariety(cSlowBud.length > 0 ? cSlowBud : cSlowRaw.length > 0 ? cSlowRaw : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10011), f => f.category === 'grain' || f.category === 'carb'),
     carbFast: mergePreferred(limitPoolByVariety(cFastBud.length > 0 ? cFastBud : cFastRaw.length > 0 ? cFastRaw : cFruitBud.length > 0 ? cFruitBud : basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 15), 10013), f => f.category === 'grain' || f.category === 'carb'),
-    carbFruit: mergePreferred(limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015), f => f.category === 'veg_fruit'),
+    // FIX preferred-foods: любимые фрукты проходят независимо от GI/fiber-гейта
+    // (арбуз/финики/изюм раньше отсекались: gi<=55 && fiber>=1.5)
+    carbFruit: mergePreferred(limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015), f => f.category === 'veg_fruit' && (f.carbs || 0) >= 4),
     fats: mergePreferred(limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017), f => f.category === 'fat'),
-    vegGreen: basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple','bok_choy','brussels','cauliflower','watercress','arugula','endive','peas_green','edamame','fennel','leek'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
-    vegColor: basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus','radish','sweet_potato','mushrooms','champignon','seaweed','wakame','papaya','kiwi','squash','turnip','parsnip'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    // FIX preferred-foods: любимые овощи подмешиваются в зелёный/цветной пулы
+    vegGreen: mergePreferred(basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple','bok_choy','brussels','cauliflower','watercress','arugula','endive','peas_green','edamame','fennel','leek'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2), f => f.category === 'veg_fruit' && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    vegColor: mergePreferred(basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus','radish','sweet_potato','mushrooms','champignon','seaweed','wakame','papaya','kiwi','squash','turnip','parsnip'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2), f => f.category === 'veg_fruit' && (f.protein || 0) < 5 && (f.fat || 0) < 2),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
     // Д-5: vegetarian protein pool — relaxed thresholds so tofu/tempeh/seitan and carb-category
     // legumes (lentils, chickpeas, edamame) actually enter the rotation (not only dairy).
@@ -537,8 +560,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
       (f.id === 'tofu' || f.id === 'tempeh' || f.id === 'seitan' || f.id === 'edamame' ||
        f.id === 'lentils' || f.id === 'chickpeas' || f.id === 'hummus')
     )),
-    eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'supp_eaa') ?? FOOD_DB.find(f => !excludedIds.has(f.id) && f.id === 'bcaa'),
-    dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && (f.id === 'amylopectin' || f.id === 'dextrose')),
+    eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && f.id === 'supp_eaa') ?? FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && f.id === 'bcaa'),
+    dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && (f.id === 'amylopectin' || f.id === 'dextrose')),
   };
 }
 
@@ -583,8 +606,10 @@ function buildWholeMeal(
     ? rotPoolAll.filter(f => (f.fat || 0) <= 5)
     : rotPoolAll;
   const rotPoolFinal = rotPool.length > 0 ? rotPool : rotPoolAll; // fall back to full rotation if lean empty
-  const preferredRot = preferredIds && preferredIds.size > 0 ? rotPoolAll.filter(f => preferredIds.has(f.id)) : [];
-  // Д-5: veg fallback chain adds vegProteinExtra (plant proteins) before generic dairy pools.
+  // FIX preferred-foods: любимые белки выбираются из ПОЛНОГО пула (без гейта ротации —
+  // раньше говядина в «рыбный» день не выбиралась никогда); ротация остаётся fallback.
+  const _allProteinPool = [...pool.proteinSolid, ...pool.proteinFatty, ...(pool.vegProteinExtra || [])];
+  const preferredRot = preferredIds && preferredIds.size > 0 ? _allProteinPool.filter(f => preferredIds.has(f.id)) : [];
   const proteinPool = preferredRot.length > 0
     ? preferredRot
     : rotPoolFinal.length > 0 ? rotPoolFinal
@@ -723,7 +748,10 @@ function buildWholeMeal(
         const curLeu = items.reduce((s, i) => s + (i.leucine_mg || 0), 0);
         if (curP < 25 && curLeu < LEU_THRESHOLD_MG && pool.fastProtein.length > 0) {
           // Lacto-ovo vegetarian допускает молочные продукты → whey подходит и для вег-режима
-          const whey = pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
+          // FIX preferred-foods: любимый быстрый белок (казеин/яйца/pea) имеет приоритет перед whey
+          const _prefFast = (preferredIds && preferredIds.size > 0) ? pool.fastProtein.filter(f => preferredIds.has(f.id)) : [];
+          const whey = (_prefFast.length > 0 ? _prefFast[0] : undefined)
+            ?? pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
           const needLeu = LEU_THRESHOLD_MG - curLeu;
           const wheyLeuPer100 = getLeucine(whey);
           const wheyGramsRaw = Math.round(needLeu / Math.max(1, wheyLeuPer100) * 100);
@@ -851,9 +879,13 @@ function buildPostWorkout(
   carbG: number = POSTW_FAST_CARB_G,
   isVegetarian: boolean = false,
 ): Meal {
-    const fastProtein = isVegetarian
-      ? (pool.fastProtein.find(f => f.id === 'supp_pea_protein') ?? pool.fastProtein.find(f => f.id === 'supp_soy_isolate') ?? pool.fastProtein.find(f => f.id === 'supp_rice_protein') ?? pool.fastProtein[0])
-      : (pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0]);
+    // FIX preferred-foods: любимый быстрый белок приоритетнее whey
+    const _prefFastPW = (preferredIds && preferredIds.size > 0) ? pool.fastProtein.filter(f => preferredIds.has(f.id)) : [];
+    const fastProtein = _prefFastPW.length > 0
+      ? _prefFastPW[0]
+      : isVegetarian
+        ? (pool.fastProtein.find(f => f.id === 'supp_pea_protein') ?? pool.fastProtein.find(f => f.id === 'supp_soy_isolate') ?? pool.fastProtein.find(f => f.id === 'supp_rice_protein') ?? pool.fastProtein[0])
+        : (pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_concentrate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0]);
   // #8 GI-based: post-workout — prefer high-GI (>=70) fast carbs for rapid glycogen replenishment + insulin spike.
   const _giFast = pool.carbFast.filter(f => (f.gi || 0) >= 70);
   const _carbBase = _giFast.length > 0 ? _giFast : pool.carbFast; // fall back if no high-GI tagged
@@ -927,13 +959,16 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
 }
 
 // ─── МЕТОД: pre-sleep казеиновый приём ───────────────────────────────
-function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string> }): Meal {
+function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; preferredIds?: Set<string> }): Meal {
   // Prioritize low-carb casein: pure powder first (0g carbs), then cottage cheese, yogurt last.
   // Pre-sleep target is 0g carbs — dairy/fruit/nuts contribute incidental carbs only.
   const caseinPowder = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'casein' || f.id === 'casein_micellar') : undefined;
   const cottageCheese = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id.includes('cottage')) : undefined;
   const greekYogurt = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'yogurt_greek') : undefined;
-  const orderedCasein = [caseinPowder, cottageCheese, greekYogurt, ...pool.slowProtein].filter(Boolean) as FoodItem[];
+  // FIX preferred-foods: любимый медленный белок — первый в очереди (не только casein по умолчанию)
+  const _prefSlow = (opts?.preferredIds && opts.preferredIds.size > 0) ? pool.slowProtein.filter(f => opts.preferredIds!.has(f.id)) : [];
+  const _uniqById = <T extends { id: string }>(arr: T[]): T[] => { const seen = new Set<string>(); return arr.filter(x => { if (seen.has(x.id)) return false; seen.add(x.id); return true; }); };
+  const orderedCasein = _uniqById([..._prefSlow, caseinPowder, cottageCheese, greekYogurt, ...pool.slowProtein].filter(Boolean) as FoodItem[]);
   const caseinSource = orderedCasein.length > 0 ? orderedCasein[Math.floor(seededRandom(seed) * Math.min(2, orderedCasein.length))] : undefined;
   const items: MealItem[] = [];
   const targetP = residualP <= 0 ? 0 : Math.max(20, Math.min(45, residualP));
@@ -1089,7 +1124,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const combinedExcluded = new Set([...(input.excludedIds || []), ...labAdj.restrictFoodIds]);
   const combinedPreferred = new Set([...(input.preferredIds || []), ...labAdj.preferFoodIds]);
 
-  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { specificity: input.specificity, categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds });
+  const pool = buildFoodPools(combinedExcluded, !!input.isVegetarian, input.budget, varietyPoolSize, input.preferredIds, { specificity: input.specificity, categoryPref: input.categoryPref, intolerances: input.intolerances, tasteProfile: input.tasteProfile, deprioritizedIds: input.deprioritizedIds, allergenTags: input.allergenTags });
 
   // P5: PCT food preference boost — крестоцветные (DIM/I3C) + zinc-rich + flax
   let effectivePreferred = combinedPreferred;
@@ -1377,7 +1412,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // Sort meals by time (chronological order)

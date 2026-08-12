@@ -22,6 +22,8 @@ import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep в
 import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
+import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
+import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
@@ -87,6 +89,9 @@ export interface PlanCtx {
   trainStart: string; setTrainStart: (v: string) => void;
   trainEnd: string; setTrainEnd: (v: string) => void;
   linkToTraining: boolean; setLinkToTraining: (v: boolean) => void;
+  trainScheduleType: TrainScheduleType; setTrainScheduleType: (v: TrainScheduleType) => void;
+  trainPattern: { work: number; off: number }; setTrainPattern: (v: { work: number; off: number }) => void;
+  isTrainDay: (offset: number) => boolean;
   injectDrugTypes: string[];
   calcTargets: { kcal: number; protein: number; fats: number; carbs: number; bmr?: number; tdee?: number; adjustment?: number };
   profileTargets: any;
@@ -476,9 +481,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [injUnit, setInjUnit] = useState('mg');
   const [injType, setInjType] = useState('инсулин');
   const [injEster, setInjEster] = useState<'rapid' | 'short' | 'long' | 'none'>('none');
-  const [trainStart, setTrainStart] = useState('16:00');
-  const [trainEnd, setTrainEnd] = useState('17:30');
-  const [linkToTraining, setLinkToTraining] = useState(false);
+  // FIX train-bind: график тренировок персистится в he_train_bind и читается при старте
+  // (раньше linkToTraining/trainStart/trainEnd/trainingDays сбрасывались при перезагрузке).
+  const _trainBindInit = (() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_train_bind') || 'null');
+      if (v && typeof v === 'object') return normalizeTrainSchedule(v);
+    } catch {}
+    try {
+      const sch = (getProfile().settings as any)?.training?.schedule;
+      if (sch && typeof sch === 'object') return normalizeTrainSchedule(sch);
+    } catch {}
+    return DEFAULT_TRAIN_SCHEDULE;
+  })();
+  const [trainStart, setTrainStart] = useState(_trainBindInit.startTime);
+  const [trainEnd, setTrainEnd] = useState(_trainBindInit.endTime);
+  const [linkToTraining, setLinkToTraining] = useState(_trainBindInit.enabled);
+  const [trainScheduleType, setTrainScheduleType] = useState<TrainScheduleType>(_trainBindInit.scheduleType);
+  const [trainPattern, setTrainPattern] = useState<{ work: number; off: number }>({ ..._trainBindInit.pattern });
   const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
   const calcTargets = useMemo(() => {
@@ -778,7 +798,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [workEndTime, setWorkEndTime] = useState('18:00');
   const [workDays, setWorkDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
   const [workScheduleType, setWorkScheduleType] = useState('standard');
-  const [trainingDays, setTrainingDays] = useState<boolean[]>([true, false, true, false, true, true, false]);
+  const [trainingDays, setTrainingDays] = useState<boolean[]>([..._trainBindInit.weeklyDays]);
+  // FIX train-bind: персист графика тренировок (создаётся ПОСЛЕ объявления trainingDays)
+  useEffect(() => {
+    try {
+      safeWriteJSON('he_train_bind', buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern));
+    } catch {}
+  }, [linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern]);
+  // FIX train-bind: единая функция «тренировочный день?» для всех режимов графика.
+  const isTrainDay = (offset: number): boolean => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset);
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const [generated, setGenerated] = useState(false);
   const [planDays, setPlanDays] = useState<1 | 3 | 7>(() => { try { const v = parseInt(localStorage.getItem("he_plan_days") || "1"); return (v === 3 || v === 7) ? v : 1; } catch { return 1; } });
@@ -1084,6 +1112,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           // не подменяем minutesPerSession напрямую, маппим в workout duration
         }
         if (s.training.primaryGoal) { setGoal(s.training.primaryGoal as GoalId); setGoalUserSet(true); }
+        // FIX train-bind: график тренировок из профиля (по кнопке «Из профиля»)
+        if (s.training.schedule && typeof s.training.schedule === 'object') {
+          const sch = normalizeTrainSchedule(s.training.schedule);
+          setLinkToTraining(sch.enabled);
+          setTrainStart(sch.startTime);
+          setTrainEnd(sch.endTime);
+          setTrainingDays([...sch.weeklyDays]);
+          setTrainScheduleType(sch.scheduleType);
+          setTrainPattern({ ...sch.pattern });
+        }
       }
       if (s.lifestyle) {
         if (s.lifestyle.dailySteps !== undefined) setDailySteps(s.lifestyle.dailySteps);
@@ -1133,6 +1171,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (bodyFatPct !== undefined && bodyFatPct !== null) next.personal.bodyFat = bodyFatPct;
       if (!next.training) next.training = {};
       if (goal) next.training.primaryGoal = goal;
+      // FIX train-bind: график тренировок в профиль (по кнопке «Сохранить в профиль»)
+      next.training.schedule = buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern);
+      next.training.daysPerWeek = [0, 1, 2, 3, 4, 5, 6].filter(d => isTrainingDayFor(next.training.schedule, d)).length;
       if (!next.lifestyle) next.lifestyle = {};
       if (dailySteps !== undefined) next.lifestyle.dailySteps = dailySteps;
       if (sleepHours !== undefined) next.lifestyle.sleepHours = sleepHours;
@@ -1318,10 +1359,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
        const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
        const lbmKg = weight * (1 - bfPct / 100);
        const nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
-       const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
-       const excludedIds = new Set<string>(excludedFoods || []);
-       (healthIssues || []).forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
-       getAutoExcludedFoodIds(FOOD_DB, healthIssues || []).forEach(fid => excludedIds.add(fid));
+        const trainStartMin = linkToTraining && trainStart?.includes(':') ? toMin(trainStart) : undefined;
+        const excludedIds = new Set<string>(excludedFoods || []);
+        (healthIssues || []).forEach(hid => { const issue = HEALTH_ISSUES.find(h => h.id === hid); if (issue?.foodIds) issue.foodIds.forEach(fid => excludedIds.add(fid)); });
+        getAutoExcludedFoodIds(FOOD_DB, healthIssues || []).forEach(fid => excludedIds.add(fid));
+        // FIX allergens-restrictions: аллергены и dietPrefs-ограничения теперь исключаются
+        // единым резолвером в ОБОИХ путях генерации (раньше pro-движок их игнорировал).
+        for (const fid of resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || [])) excludedIds.add(fid);
+        try { setAllergenExcludedCount(countExcludedByAllergens(FOOD_DB, allergens || [])); } catch {}
        const lockedIds = new Set<string>([...(lockedFoodIds || [])]);
        const recentFoodIds = new Set<string>();
        const collectFoods = (plan: any) => { if (plan?.meals) plan.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); })); if (plan?.days) plan.days.forEach((d: any) => d?.meals?.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); }))); };
@@ -1331,7 +1376,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
          Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
        }
        const dayIdx = days === 1 ? selectedDayIndex : 0;
-       const isTrainingDay = !!trainingDays[dayIdx];
+        const isTrainingDay = isTrainDay(dayIdx);
       // Каждый вызов generatePlan → новый salt → разный набор продуктов
       const planRandomSalt = Math.floor(Math.random() * 1000000);
 
@@ -1363,13 +1408,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
       const buildOneDay = (offset: number): any => {
         // Apply cycling mode adjustments per-day
-        const isTrain = !!trainingDays[offset % 7];
+        const isTrain = isTrainDay(offset);
         let dayKcalMod = 1.0, dayCarbMod = 1.0;
         // #13 Настоящий refeed: высоко-углеводный день (carb x2.5, fat x0.5, protein hold) для восстановления лептина/гликогена на сушке.
         // Назначается на определённый день недели (используем isTrain=false — refeed обычно в день отдыха от тяжёлой тренировки).
         let isRefeedDay = false;
         if (cyclingMode === 'cheatmeal') {
-          isRefeedDay = (offset % 7 === 6) || (!isTrain && (offset % 7 === 0 || !trainingDays.slice(0, 7).some(Boolean)));
+          isRefeedDay = (offset % 7 === 6) || (!isTrain && (offset % 7 === 0 || ![0, 1, 2, 3, 4, 5, 6].every(d => !isTrainDay(d))));
           if (isRefeedDay) { dayKcalMod = 1.15; dayCarbMod = 2.5; }
           else { dayKcalMod = 0.85; dayCarbMod = 0.5; }
         } else if (cyclingMode === 'macro') {
@@ -1436,11 +1481,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalProteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
           goalCarbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
-          mealsCount, isTrainingDay: !!trainingDays[offset % 7],
-          trainStartMin: linkToTraining && trainingDays[offset % 7] ? toMin(trainStart) : undefined,
+          mealsCount, isTrainingDay: isTrainDay(offset),
+          trainStartMin: linkToTraining && isTrainDay(offset) ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds: (() => { const s = new Set(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
+          allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
           preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
           specificity, intolerances, tasteProfile,
@@ -1499,6 +1545,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }));
         const dayKcalForPct = Math.max(1, v2.totals.kcal);
         const mealTimesPro = meals.map((m: { time: string; label: string; totals: { kcal: number } }) => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
+        // FIX allergens-restrictions: пост-генерационная проверка аллергенов в pro-пути
+        // (раньше была только в legacy; с резолвером в excludedIds срабатывает редко —
+        // только если пользователь вручную заменил продукт на аллергенный).
+        const _allergenWarnings: { food: string; allergens: string[] }[] = [];
+        if ((allergens || []).length > 0) {
+          meals.forEach((m: any) => (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
+            const food = FOOD_DB.find(f => f.id === it.id);
+            if (!food || excludedIds.has(food.id)) return;
+            const matched = allergens.filter(a => matchesSelectedAllergen(food, a, FOOD_DB));
+            if (matched.length > 0) _allergenWarnings.push({ food: it.name, allergens: matched.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a) });
+          }));
+        }
         // Smart 7-day variety: collect this day's foods so subsequent days see them (soft + hard window).
         const _dayFoodIds = collectDayFoods({ meals });
         _dayFoodIds.forEach((id: string) => recentFoodIds.add(id));
@@ -1507,6 +1565,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         return {
           meals, totals: { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c, fiber: v2.totals.fiber },
           isTrainingDay: v2.isTrainingDay,
+          allergenWarnings: _allergenWarnings,
           supplementTimeline: buildSupplementTimeline(mealTimesPro, v2.isTrainingDay),
           waterTimeline: (() => { const wl = buildWaterTimeline(weight, mealTimesPro, v2.isTrainingDay, trainStart); if (_peakDay) return wl.map((w: any) => ({ ...w, ml: Math.round(w.ml * _peakDay.waterMod) })); return wl; })(),
           nutritionLogic: [],
@@ -1569,7 +1628,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const aasCount = safeInjections.filter(i => i.type === 'ААС').length;
       const pharmaHeavy = aasCount + safeInjections.filter(i => i.type === 'инсулин').length + safeInjections.filter(i => i.type === 'ГР').length;
       const baseWaterMl = weight * Math.min(45, 40 + pharmaHeavy * 1.5);
-      const trainBonusL = trainingDays.some(Boolean) ? 0.5 : 0.2;
+      const trainBonusL = [0, 1, 2, 3, 4, 5, 6].some(d => isTrainDay(d)) ? 0.5 : 0.2;
       const fiberBonusL = 0.1;
       const pharmaBonusL = hasPharma ? 0.5 : 0;
       const totalWaterL = Math.max(1.5, Math.round((baseWaterMl / 1000 + trainBonusL + fiberBonusL + pharmaBonusL) * 10) / 10);
@@ -1605,42 +1664,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (tags.isVegetarian === false) excludedIds.add(fid);
       });
     }
-    const getFoodAllergens = (foodId: string): string[] => { const fromDiet = FOOD_ALLERGEN_DIET[foodId]; if (fromDiet) return fromDiet.allergens; const food = FOOD_DB.find(f => f.id === foodId); return food?.allergens || []; };
-    const userAllergenToValues: Record<string, string[]> = { 'лактоза':['dairy'],'молочные':['dairy'],'глютен':['gluten'],'орехи':['nuts','tree_nuts'],'арахис':['peanuts'],'яйца':['eggs'],'соя':['soy'],'рыба':['fish'],'морепродукты':['shellfish'],'кунжут':['sesame'],'горчица':['mustard'],'сельдерей':['celery'],'сульфиты':['sulfites'],'люпин':['lupin'] };
-    const allergenTextMatches = (a: string, fName: string): boolean => { const n = fName.toLowerCase();
-      if (a === 'лактоза' || a === 'молочные') { if (n.includes('молок')||n.includes('сыр')||n.includes('творог')||n.includes('кефир')||n.includes('сливк')||n.includes('йогурт')||n.includes('сметан')||n.includes('масл')||n.includes('морожен')||n.includes('сывороточ')||n.includes('whey')||n.includes('cas')||n.includes('casein')||n.includes('лактоз')) return true; }
-      if (a === 'глютен') { if (n.includes('пшениц')||n.includes('мук')||n.includes('хлеб')||n.includes('макарон')||n.includes('пельмен')||n.includes('вареник')||n.includes('пицц')||n.includes('лаваш')||n.includes('булгур')||n.includes('кускус')||n.includes('манк')||n.includes('паниров')||n.includes('сухар')||n.includes('кляр')||n.includes('тест')||n.includes('блин')||n.includes('олад')||n.includes('круасс')||n.includes('багет')||n.includes('чиабат')||n.includes('лепёш')||n.includes('торт')||n.includes('пирож')||n.includes('пончик')||n.includes('печень')||n.includes('крекер')||n.includes('вафл')||n.includes('глютен')) return true; }
-      if (a === 'орехи') { if (n.includes('миндаль')||n.includes('грецк')||n.includes('кешью')||n.includes('фундук')||n.includes('пекан')||n.includes('макадам')||n.includes('фисташк')||n.includes('орех')||n.includes('nut')||n.includes('almond')||n.includes('walnut')||n.includes('cashew')||n.includes('hazeln')||n.includes('pecan')||n.includes('pistach')) return true; }
-      if (a === 'арахис') { if (n.includes('арахис')||n.includes('peanut')||n.includes('groundnut')||n.includes('ахид')||n.includes('землян')) return true; }
-      if (a === 'яйца') { if (n.includes('яйц')||n.includes('яич')||n.includes('яичн')||n.includes('белок')||n.includes('желтк')||n.includes('омлет')||n.includes('egg')||n.includes('egg_')||n.includes('майонез')) return true; }
-      if (a === 'соя') { if (n.includes('соя')||n.includes('соев')||n.includes('тофу')||n.includes('edamame')||n.includes('soy')||n.includes('мисо')||n.includes('miso')||n.includes('темпе')||n.includes('tamari')) return true; }
-      if (a === 'рыба') { if (n.includes('рыб')||n.includes('лосос')||n.includes('тунец')||n.includes('треск')||n.includes('палтус')||n.includes('скумбр')||n.includes('форель')||n.includes('сардин')||n.includes('сельдь')||n.includes('anchov')||n.includes('fish')||n.includes('salmon')||n.includes('tuna')||n.includes('cod')||n.includes('halibut')) return true; }
-      if (a === 'морепродукты') { if (n.includes('креветк')||n.includes('краб')||n.includes('лобстер')||n.includes('омар')||n.includes('мидии')||n.includes('кальмар')||n.includes('осьминог')||n.includes('shrimp')||n.includes('crab')||n.includes('lobster')||n.includes('mussel')||n.includes('squid')||n.includes('scallop')||n.includes('устриц')||n.includes('моллюск')||n.includes('ракушк')||n.includes('langoust')) return true; }
-      if (a === 'кунжут') { if (n.includes('кунжут')||n.includes('сезам')||n.includes('тахини')||n.includes('sesame')||n.includes('tahini')) return true; }
-      if (a === 'горчица') { if (n.includes('горчиц')||n.includes('mustard')) return true; }
-      if (a === 'сельдерей') { if (n.includes('сельдерей')||n.includes('celery')) return true; }
-      if (a === 'сульфиты') { if (n.includes('сульфит')||n.includes('sulfite')||n.includes('вино')||n.includes('пиво')||n.includes('сухофрукт')) return true; }
-      if (a === 'люпин') { if (n.includes('люпин')||n.includes('lupin')) return true; }
-      return false;
-    };
+    // FIX allergens-restrictions: единый резолвер аллергенов и dietPrefs-ограничений
+    // (раньше аллергены работали только здесь, в legacy, и только по тегам;
+    // текстовый фолбэк был фактически мёртв, а pro-движок не знал о них вовсе).
+    for (const fid of resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || [])) excludedIds.add(fid);
+    try { setAllergenExcludedCount(countExcludedByAllergens(FOOD_DB, allergens || [])); } catch {}
     const allergenIds = new Set<string>();
-    allergens.forEach(a => { const vals = userAllergenToValues[a] || [a]; vals.forEach(v => allergenIds.add(v)); });
+    allergens.forEach(a => { (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => allergenIds.add(v)); });
+    dietRestrictionTags(dietPrefs || []).forEach(v => allergenIds.add(v));
     const allergenLabel = (code: string): string => ALLERGEN_LIST.find(a => a.id === code)?.label || code;
-    const matchesSelectedAllergen = (food: any, selectedCode: string): boolean => {
-      const tags = getFoodAllergens(food.id);
-      return tags.includes(selectedCode) || allergenTextMatches(selectedCode, food.name);
-    };
-    // Wire diet preferences into allergen/exclusion system
-    dietPrefs.forEach(dp => {
-      if (dp === 'no_dairy' && !allergens.includes('молочные')) { ['dairy'].forEach(v => allergenIds.add(v)); }
-      if (dp === 'no_gluten' && !allergens.includes('глютен')) { ['gluten'].forEach(v => allergenIds.add(v)); }
-      if (dp === 'min_sugar') {
-        FOOD_DB.filter(f => (f.carbs || 0) > 15 && (f.gi || 0) > 60).forEach(f => excludedIds.add(f.id));
-      }
-      if (dp === 'min_processed') {
-        ['sausage','bacon','ham','kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','chips','nuggets','mayonnaise','ketchup','cream_sauce','marmalade','cookie','chocolate','ice_cream','condensed_milk','cheese_processed','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','bread_white'].forEach(fid => excludedIds.add(fid));
-      }
-    });
     const preferredSet = new Set(preferredFoods);
     const qualitySort = (pool: any[], highFirst: boolean) => [...pool].sort((a, b) => highFirst ? ((b.bb_quality_score || 5) - (a.bb_quality_score || 5)) : ((a.bb_quality_score || 5) - (b.bb_quality_score || 5)));
     const limitPool = (pool: any[], seed: number) => {
@@ -1656,7 +1688,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // N1: track used food IDs across meals to avoid duplicates when budget=max
     const usedFoodIds = new Set<string>();
     const portableFilter = (pool: any[]) => { if (workFood !== 'portable') return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
-    const applyFoodPrefs = (pool: any[], prefType: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool).filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergens(f.id).includes(a) && !allergenTextMatches(a, f.name))); };
+    const applyFoodPrefs = (pool: any[], prefType: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool).filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergenTags(f.id, FOOD_DB).includes(a) && !allergenTextMatches(a, f.name))); };
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
     // ═══════════════════════════════════════════════════════════════════════
     // T1.1 — Smart breakfast templates by day type
@@ -2317,7 +2349,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         m.items.forEach((it: any) => {
           const food = FOOD_DB.find(f => f.id === it.id);
           if (!food || excludedIds.has(food.id) || allergenIds.size === 0) return;
-          const matched = [...allergenIds].filter(a => matchesSelectedAllergen(food, a));
+          const matched = allergens.filter(a => matchesSelectedAllergen(food, a, FOOD_DB));
           if (matched.length > 0) allergenWarnings.push({ food: it.name, allergens: matched.map(allergenLabel) });
         });
       });
@@ -2334,16 +2366,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       };
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
-    const d1 = buildDay(dayIdx, trainingDays[dayIdx]);
+    const d1 = buildDay(dayIdx, isTrainDay(dayIdx));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
-    const d2 = days >= 3 ? buildDay(1, trainingDays[1]) : null;
-    const d3 = days >= 3 ? buildDay(2, trainingDays[2]) : null;
+    const d2 = days >= 3 ? buildDay(1, isTrainDay(1)) : null;
+    const d3 = days >= 3 ? buildDay(2, isTrainDay(2)) : null;
     setDayPlan(d1);
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
     if (days >= 7) {
-      weekDays = Array.from({ length: 7 }, (_, i) => buildDay(i, trainingDays[i]));
+      weekDays = Array.from({ length: 7 }, (_, i) => buildDay(i, isTrainDay(i)));
       if (periodizationEnabled) {
         const pWeek = weekIndex !== undefined ? weekIndex % 5 : 0;
         if (pWeek === 0 || pWeek === 4) {
@@ -2428,15 +2460,18 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lazyDayPlan, setLazyDayPlan] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<string[]>([]);
 
-  const generateCheatMeal = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
+  // FIX train-bind: спец-режимы получают тренировочные дни как производный 7-дневный
+  // массив (weekly/eod/pattern → единый формат boolean[7]).
+  const _trainDaysArr = Array.from({ length: 7 }, (_, i) => isTrainDay(i));
+  const generateCheatMeal = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
 
-  const generateCarbload = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
+  const generateCarbload = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
 
-  const generateBUTCH = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setButchPlan(generateBUTCHSm(_smDeps)); };
+  const generateBUTCH = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setButchPlan(generateBUTCHSm(_smDeps)); };
 
-  const generateCravingPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setCravingPlan(generateCravingPlanSm(_smDeps)); };
+  const generateCravingPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setCravingPlan(generateCravingPlanSm(_smDeps)); };
 
-  const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
+  const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
 
   const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections: Array.isArray(injections) ? injections : [], linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {}, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
 
@@ -2538,7 +2573,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const generateDrugCompatReport = () => { const safeInjections = Array.isArray(injections) ? injections : []; if (!dayPlan || safeInjections.length === 0) return; setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections: safeInjections, weight, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [] })); setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']); };
   const generateFullNutritionReport = (planArg?: any, archve = true) => {
     const src = planArg || dayPlan; if (!src) return;
-    try { const rep = generateNutritionReport({ meals: src.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: src.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&trainingDays.some(Boolean)?trainStart:undefined });
+    try { const rep = generateNutritionReport({ meals: src.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: src.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&_trainDaysArr.some(Boolean)?trainStart:undefined });
       if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']);
         if (archve) { try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); safeWriteJSON('he_nutrition_report_archive', arch.slice(0,50)); safeWriteJSON('he_nutrition_report_current', rep); try { safeWriteJSON('he_profile_nutrition_reports', arch.slice(0,20)); } catch {} } catch {} }
       }
@@ -2577,6 +2612,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     injName, setInjName, injTime, setInjTime, injDose, setInjDose,
     injUnit, setInjUnit, injType, setInjType, injEster, setInjEster,
     trainStart, setTrainStart, trainEnd, setTrainEnd, linkToTraining, setLinkToTraining,
+    trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern, isTrainDay,
     injectDrugTypes, calcTargets, profileTargets,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
     kbjuMode, setKbjuMode, switchKbjuMode,
@@ -2643,7 +2679,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList(ctx);
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, renderMealList }), [ctx, renderMealList]);
