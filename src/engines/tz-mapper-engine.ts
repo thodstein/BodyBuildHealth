@@ -1618,6 +1618,26 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     ? protocolWarnings.filter(w => !w.includes('КАБЕРГОЛИН НЕ НАЗНАЧЕН'))
     : protocolWarnings;
 
+  // ── Bleeding-риск: фибринолитики/антиагреганты/антикоагулянты в плане ─
+  // Фибринолитическая синергия (натто+серра+бромелайн) полезна, но при
+  // дополнительных антиагрегантах даёт аддитивный риск кровотечения.
+  const FIBRINOLYTIC_IDS = new Set([
+    'nattokinase', 'serrapeptase', 'bromelain', 'lumbrokinase',
+    'aspirin', 'dipyridamole', 'pentoxifylline', 'warfarin', 'enoxaparin',
+    'sulodexide', 'ginkgo', 'garlic',
+  ]);
+  const bleedingSubs = Array.from(new Set(
+    subs.map(s => canonId(s.substanceId)).filter(id => FIBRINOLYTIC_IDS.has(id))
+  ));
+  const bleedingRisk = bleedingSubs.length >= 2
+    ? (bleedingSubs.length >= 3 ? 'high' : 'medium')
+    : 'low';
+  if (bleedingRisk !== 'low') {
+    finalProtocolWarnings.push(
+      `🩸 Фибринолитическая/антиагрегантная нагрузка (${bleedingSubs.join(' + ')}): суммарный риск кровотечения ${bleedingRisk === 'high' ? 'ВЫСОКИЙ' : 'повышен'}. Сообщить врачу перед операцией/инвазивными процедурами; не добавлять дополнительные антикоагулянты самостоятельно.`
+    );
+  }
+
   // ── Отсеивание block-конфликтов ПЕРЕД возвратом ──
   const blockPairs = checkInteractions(subs.map(s => s.substanceId)).filter(i => i.severity === 'block');
   if (blockPairs.length > 0) {

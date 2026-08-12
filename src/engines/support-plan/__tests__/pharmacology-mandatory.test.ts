@@ -147,6 +147,16 @@ describe('course pharmacology mandatory rules', () => {
     expect(pctRec.monitoringSchedule?.find(s => s.id === 'post')?.items.some(i => i.marker.includes('LH'))).toBe(true);
   });
 
+  it('bleeding-риск: 2+ фибринолитиков → предупреждение', () => {
+    const tren = resolvePlan(buildMapperCtx(stateWithAas(['test_enan', 'tren_enan']), 'medium'));
+    const fib = tren.subs.filter(s => ['nattokinase', 'serrapeptase', 'bromelain', 'aspirin', 'ginkgo', 'garlic', 'lumbrokinase'].includes(canonId(s.substanceId)));
+    expect(fib.length).toBeGreaterThanOrEqual(2);
+    expect(tren.protocolWarnings?.some(w => w.includes('Фибринолитическая'))).toBe(true);
+
+    const plain = resolvePlan(buildMapperCtx(stateWithAas(['test_enan']), 'medium'));
+    expect(plain.protocolWarnings?.some(w => w.includes('Фибринолитическая'))).toBe(false);
+  });
+
   it('процедурная эскалация по HCT', () => {
     const labs = (hct: string) => ({
       ...DEFAULT_STATE.labs,

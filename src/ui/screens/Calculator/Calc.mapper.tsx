@@ -1871,6 +1871,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                             <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
                               <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : '#ffffff' }}>{item.nameRu}</span>
                               <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', padding:'0px 3px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>{item.dose}</span>
+                              {item.id === 'voltaren_gel' && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.18)', color:'#93c5fd', fontWeight:700 }}>🧴 местно · НЕ таблетка</span>}
                               {isRecommended && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рек.</span>}
                               {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
                             </div>
@@ -2052,6 +2053,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                             <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
                               <span style={{ fontSize:9, fontWeight:600, color: inPlan ? 'rgba(255,255,255,0.4)' : '#ffffff' }}>{item.nameRu}</span>
                               <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.4)', padding:'0px 3px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>{item.dose}</span>
+                              {item.id === 'voltaren_gel' && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.18)', color:'#93c5fd', fontWeight:700 }}>🧴 местно · НЕ таблетка</span>}
                               {isRecommended && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(99,102,241,0.15)', color:'#a5b4fc', fontWeight:700 }}>рек.</span>}
                               {inPlan && <span style={{ fontSize:6, padding:'1px 4px', borderRadius:3, background:'rgba(0,230,138,0.15)', color:'#00e68a', fontWeight:700 }}>в плане</span>}
                             </div>
@@ -2756,6 +2758,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
           {showSynergy && (
             <div style={{ padding:'6px 10px', borderRadius:'0 0 8px 8px', background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.1)', borderTop:'none' }}>
+              {(() => {
+                const FIB = ['nattokinase', 'serrapeptase', 'bromelain', 'lumbrokinase', 'aspirin', 'dipyridamole', 'pentoxifylline', 'warfarin', 'enoxaparin', 'sulodexide', 'ginkgo', 'garlic'];
+                const inPlan = new Set(finalRec.subs.map((s: any) => (s.substanceId || '').toLowerCase()));
+                const hits = FIB.filter(id => inPlan.has(id));
+                if (hits.length >= 2) {
+                  const high = hits.length >= 3;
+                  return (
+                    <div style={{ padding: '5px 8px', borderRadius: 6, marginBottom: 5, background: high ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)', border: `1px solid ${high ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.26)'}`, fontSize: 7, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+                      <b style={{ color: high ? '#f87171' : '#fbbf24' }}>🩸 Фибринолитическая/антиагрегантная нагрузка ({hits.map(id => subNameRu(id)).join(' + ')})</b>
+                      <div style={{ color: 'rgba(255,255,255,0.8)', marginTop: 1 }}>Синергия фибринолиза — да, но суммарный риск кровотечения {high ? 'ВЫСОКИЙ' : 'повышен'}: сообщить врачу перед операцией/инвазивными процедурами, не добавлять антикоагулянты самостоятельно.</div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               {synergyDesc.map((s, i) => <div key={`desc-${i}`} style={{ fontSize:8, color:'#c4b5fd', marginBottom:3, lineHeight:1.5 }}>{s}</div>)}
               {pairSynergies.length > 0 && (
                 <>
