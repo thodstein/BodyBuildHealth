@@ -4,6 +4,11 @@
  * мировых координатах модели, каждому вертексу назначается зона. Подсветка —
  * через второй меш (additive blending) с vertex colors: выбранная часть тела
  * светится цветом боли БЕЗ кругов/маркеров. Клик по модели циклирует VAS 0–10.
+ *
+ * Зоны разделены на стороны (13 шт., как было 13 кружков на SVG-карте):
+ * shoulders_l/r, elbows_l/r, wrists_l/r, lower_back, hips_l/r, knees_l/r, ankles_l/r.
+ * Данные сохраняются в 7 базовых ключей (shoulders, elbows, …) — сторона пишет
+ * в свою базовую зону, что совместимо со статистикой/CSV/поддержкой.
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
@@ -12,27 +17,40 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PAIN_ZONES, painZoneColor } from '../../diary-modals';
 
 export interface ZoneAnchor {
-  id: string;
+  id: string; // уникальный: shoulders_l, shoulders_r, …
   pos: [number, number, number];
   r: number;
 }
 
-/** Якоря зон в мировых координатах hulk.glb (y: −1 стопы … +1 голова). */
+/** Базовый ключ данных для зоны-стороны (shoulders_l → shoulders). */
+export function baseZoneKey(zoneId: string): string {
+  return zoneId.replace(/_(l|r)$/, '');
+}
+
+/** Якоря зон в мировых координатах hulk.glb (y: −1 стопы … +1 голова). 13 шт. */
 export const ZONE_ANCHORS: ZoneAnchor[] = [
-  { id: 'shoulders', pos: [-0.48, 0.6, 0.2], r: 0.3 },
-  { id: 'shoulders', pos: [0.3, 0.6, 0.1], r: 0.3 },
-  { id: 'elbows', pos: [-0.55, 0.4, 0.3], r: 0.25 },
-  { id: 'elbows', pos: [0.55, 0.25, -0.2], r: 0.28 },
-  { id: 'wrists', pos: [-0.5, 0.15, 0.35], r: 0.22 },
-  { id: 'wrists', pos: [0.55, 0.05, -0.35], r: 0.25 },
+  { id: 'shoulders_l', pos: [-0.48, 0.6, 0.2], r: 0.3 },
+  { id: 'shoulders_r', pos: [0.3, 0.6, 0.1], r: 0.3 },
+  { id: 'elbows_l', pos: [-0.55, 0.4, 0.3], r: 0.25 },
+  { id: 'elbows_r', pos: [0.55, 0.25, -0.2], r: 0.28 },
+  { id: 'wrists_l', pos: [-0.5, 0.15, 0.35], r: 0.22 },
+  { id: 'wrists_r', pos: [0.55, 0.05, -0.35], r: 0.25 },
   { id: 'lower_back', pos: [0, 0.12, 0], r: 0.42 },
-  { id: 'hips', pos: [-0.2, -0.18, 0.15], r: 0.3 },
-  { id: 'hips', pos: [0.2, -0.18, 0.15], r: 0.3 },
-  { id: 'knees', pos: [-0.28, -0.55, 0.1], r: 0.28 },
-  { id: 'knees', pos: [0.28, -0.55, 0.1], r: 0.28 },
-  { id: 'ankles', pos: [-0.28, -0.92, 0.1], r: 0.3 },
-  { id: 'ankles', pos: [0.28, -0.92, 0.1], r: 0.3 },
+  { id: 'hips_l', pos: [-0.2, -0.18, 0.15], r: 0.3 },
+  { id: 'hips_r', pos: [0.2, -0.18, 0.15], r: 0.3 },
+  { id: 'knees_l', pos: [-0.28, -0.55, 0.1], r: 0.28 },
+  { id: 'knees_r', pos: [0.28, -0.55, 0.1], r: 0.28 },
+  { id: 'ankles_l', pos: [-0.28, -0.92, 0.1], r: 0.3 },
+  { id: 'ankles_r', pos: [0.28, -0.92, 0.1], r: 0.3 },
 ];
+
+/** Список зон-сторон для чипов: {id, base, label} — 13 шт. */
+export const SIDE_ZONES: { id: string; base: string; label: string }[] = ZONE_ANCHORS.map((a) => {
+  const base = baseZoneKey(a.id);
+  const meta = PAIN_ZONES.find((z) => z.id === base);
+  const side = a.id.endsWith('_l') ? 'Л' : a.id.endsWith('_r') ? 'П' : '';
+  return { id: a.id, base, label: `${meta?.label || base}${side ? ` ${side}` : ''}` };
+});
 
 /**
  * Чистая функция: каждому вертексу (x,y,z × N) — индекс якоря (или −1).
@@ -152,6 +170,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     let colorAttr: THREE.BufferAttribute | null = null;
     let zoneIdx: Int8Array = new Int8Array(0);
     let anchorToZone: string[] = [];
+    let baseMesh: THREE.Mesh | null = null;
 
     const loader = new GLTFLoader();
     loader.load(
@@ -162,12 +181,10 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
 
         // Зоны считаются по ИСХОДНОЙ мировой матрице (масштаб ещё не применён):
         // якоря ZONE_ANCHORS измерены на оригинальной модели (стопы y≈−1, голова y≈+1)
-        let baseMesh: THREE.Mesh | null = null;
         model.traverse((child) => {
           if (child instanceof THREE.Mesh) baseMesh = child;
         });
         if (!baseMesh) return;
-
         const pos = baseMesh.geometry.attributes.position as THREE.BufferAttribute;
         const worldPos = new Float32Array(pos.count * 3);
         const v = new THREE.Vector3();
@@ -251,7 +268,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           continue;
         }
         const zoneId = anchorToZone[ai];
-        const val = z[zoneId] || 0;
+        const val = z[baseZoneKey(zoneId)] || 0;
         if (val > 0) {
           const [r, g, b] = hexToRgb(painZoneColor(val));
           zoneColor.setRGB(r, g, b);
@@ -316,9 +333,10 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
       if (!onChangeRef.current) return;
       const zone = zoneAt(event);
       if (!zone) return;
-      const current = zonesRef.current[zone] || 0;
+      const base = baseZoneKey(zone);
+      const current = zonesRef.current[base] || 0;
       const next = current >= 10 ? 0 : current + 1;
-      onChangeRef.current({ ...zonesRef.current, [zone]: next });
+      onChangeRef.current({ ...zonesRef.current, [base]: next });
     };
     const handleLeave = () => {
       hoverRef.current = null;
@@ -378,8 +396,9 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
 
   const cycleZone = useCallback((id: string) => {
     if (!onChange) return;
-    const current = zones[id] || 0;
-    onChange({ ...zones, [id]: current >= 10 ? 0 : current + 1 });
+    const base = baseZoneKey(id);
+    const current = zones[base] || 0;
+    onChange({ ...zones, [base]: current >= 10 ? 0 : current + 1 });
   }, [zones, onChange]);
 
   const selectAll = useCallback(() => {
@@ -396,7 +415,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     onChange(next);
   }, [onChange]);
 
-  const hoverInfo = hoveredZone ? PAIN_ZONES.find((z) => z.id === hoveredZone) : null;
+  const hoverInfo = hoveredZone ? SIDE_ZONES.find((z) => z.id === hoveredZone) : null;
 
   return (
     <div>
@@ -427,20 +446,23 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Загрузка 3D модели…</span>
           </div>
         )}
-        {hoverInfo && !failed && (
-          <div style={{
-            position: 'absolute', top: 8, left: 8,
-            background: 'rgba(0,0,0,0.85)', color: '#fff',
-            padding: '6px 10px', borderRadius: 6, fontSize: 11,
-            pointerEvents: 'none', zIndex: 10,
-            border: `1px solid ${painZoneColor(zones[hoverInfo.id] || 0)}55`,
-          }}>
-            <b>{hoverInfo.label}</b>
-            <span style={{ marginLeft: 6, fontWeight: 700, color: painZoneColor(zones[hoverInfo.id] || 0) }}>
-              {zones[hoverInfo.id] || 0}/10
-            </span>
-          </div>
-        )}
+        {hoverInfo && !failed && (() => {
+          const val = zones[hoverInfo.base] || 0;
+          return (
+            <div style={{
+              position: 'absolute', top: 8, left: 8,
+              background: 'rgba(0,0,0,0.85)', color: '#fff',
+              padding: '6px 10px', borderRadius: 6, fontSize: 11,
+              pointerEvents: 'none', zIndex: 10,
+              border: `1px solid ${painZoneColor(val)}55`,
+            }}>
+              <b>{hoverInfo.label}</b>
+              <span style={{ marginLeft: 6, fontWeight: 700, color: painZoneColor(val) }}>
+                {val}/10
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Управление */}
@@ -472,10 +494,10 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         </div>
       )}
 
-      {/* Чипы зон */}
+      {/* Чипы зон: 13 (левая/правая стороны) */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-        {PAIN_ZONES.map((z) => {
-          const val = zones[z.id] || 0;
+        {SIDE_ZONES.map((z) => {
+          const val = zones[z.base] || 0;
           const active = val > 0;
           const c = painZoneColor(val);
           return (
@@ -491,6 +513,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
                 transition: 'all 0.15s',
               }}
               aria-pressed={active}
+              title={`${z.label}: ${val}/10`}
             >
               {z.label} <b>{val}</b>
             </button>
