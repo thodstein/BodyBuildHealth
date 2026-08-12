@@ -39,6 +39,16 @@ export interface TrainingProfile {
   monthsSinceLastCourse: number;
   totalYearsOnPharma: number;
   injuries: { muscle: string; from: string; to?: string; weightPct?: number; volumePct?: number; repsCap?: number; exclude?: boolean }[];
+  /** Способность к bodyweight-упражнениям: если не подтверждена — подтягивания
+   *  не ставятся как primary (заменяются pulldown/машиной). */
+  bodyweightCapability?: {
+    pullUpsStrict?: number;
+    chinUpsStrict?: number;
+    dipsStrict?: number;
+    pushUpsStrict?: number;
+    weightedPullUpLoad?: number;
+    assistedPullUpLoad?: number;
+  };
 }
 
 export const DEFAULT_PROFILE: TrainingProfile = {
@@ -71,6 +81,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   monthsSinceLastCourse: 0,
   totalYearsOnPharma: 0,
   injuries: [],
+  bodyweightCapability: undefined,
 };
 
 export function loadTrainingProfile(): TrainingProfile {
@@ -97,6 +108,7 @@ export function loadTrainingProfile(): TrainingProfile {
         avoidAxialLoad: (s.training as any).avoidAxialLoad ?? DEFAULT_PROFILE.avoidAxialLoad,
         equipment: s.training?.equipment ?? DEFAULT_PROFILE.equipment,
         loadStrategy: (s.training as any).loadStrategy ?? DEFAULT_PROFILE.loadStrategy,
+        bodyweightCapability: (s.training as any).bodyweightCapability ?? DEFAULT_PROFILE.bodyweightCapability,
         pmSquat: s.training?.pmSquat ?? DEFAULT_PROFILE.pmSquat,
         pmBench: s.training?.pmBench ?? DEFAULT_PROFILE.pmBench,
         pmDead: s.training?.pmDeadlift ?? DEFAULT_PROFILE.pmDead,
@@ -141,6 +153,7 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (p.avoidAxialLoad !== undefined) (next.training as any).avoidAxialLoad = p.avoidAxialLoad;
     if (p.equipment?.length) next.training.equipment = p.equipment;
     if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;
+    if (p.bodyweightCapability) (next.training as any).bodyweightCapability = p.bodyweightCapability;
     if (p.pmSquat) next.training.pmSquat = p.pmSquat;
     if (p.pmBench) next.training.pmBench = p.pmBench;
     if (p.pmDead) next.training.pmDeadlift = p.pmDead;
