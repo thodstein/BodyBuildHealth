@@ -630,6 +630,15 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
           }
         }
       }
+      // ── Синергии поддержки (калиброванные групповые эффекты) ──
+      // База курса: гидратация + кардио + электролиты → плазменная/реологическая
+      // синергия (гемодилюция + эндотелий работают вместе сильнее, чем по отдельности).
+      const hasPlasmaTrio=['hydration','cardio_aerobic','electrolyte_balance'].every(s=>supportLookup.has(s));
+      if(hasPlasmaTrio&&(mech.id==='hem1'||mech.id==='cv4'||mech.id==='cv3')) productK*=0.90;
+      // Фибринолитическое трио: натто+серра+бромелайн → 3 пути фибринолиза,
+      // дополнительное снижение тромботического/реологического риска.
+      const hasFibrinoTrio=['nattokinase','serrapeptase','bromelain'].every(s=>supportLookup.has(s));
+      if(hasFibrinoTrio&&(mech.id==='hem2'||mech.id==='cv4')) productK*=0.90;
       productK=Math.max(0.30,productK);
       mechAfter=mechRaw*productK;
 

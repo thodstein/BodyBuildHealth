@@ -59,4 +59,26 @@ describe('TZ mechanism risk invariants', () => {
     expect(bridge.overallAfter).toBeLessThanOrEqual(course.overallAfter);
     expect(bridge.organs.every(o => o.rawPercent <= 100 && o.afterPercent <= 100)).toBe(true);
   });
+
+  it('синергия базы курса: полное трио снижает cardio/hemato сильнее пары', () => {
+    const pair = calculateTzSpecRisk(input({ supportSubstances: ['hydration', 'cardio_aerobic'] }));
+    const trio = calculateTzSpecRisk(input({ supportSubstances: ['hydration', 'cardio_aerobic', 'electrolyte_balance'] }));
+
+    const cardioPair = pair.organs.find(o => o.id === 'cardio')!;
+    const cardioTrio = trio.organs.find(o => o.id === 'cardio')!;
+    const hemaPair = pair.organs.find(o => o.id === 'hematologic')!;
+    const hemaTrio = trio.organs.find(o => o.id === 'hematologic')!;
+
+    expect(cardioTrio.afterPercent).toBeLessThanOrEqual(cardioPair.afterPercent);
+    expect(hemaTrio.afterPercent).toBeLessThanOrEqual(hemaPair.afterPercent);
+  });
+
+  it('синергия фибринолитиков: натто+серра+бромелайн снижают гемато-риск сильнее одного', () => {
+    const single = calculateTzSpecRisk(input({ supportSubstances: ['nattokinase'] }));
+    const trio = calculateTzSpecRisk(input({ supportSubstances: ['nattokinase', 'serrapeptase', 'bromelain'] }));
+
+    const hemaSingle = single.organs.find(o => o.id === 'hematologic')!;
+    const hemaTrio = trio.organs.find(o => o.id === 'hematologic')!;
+    expect(hemaTrio.afterPercent).toBeLessThanOrEqual(hemaSingle.afterPercent);
+  });
 });

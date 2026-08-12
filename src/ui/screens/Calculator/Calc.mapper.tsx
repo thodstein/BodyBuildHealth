@@ -1982,6 +1982,27 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     })}
                   </div>
 
+                  {/* 📜 Нейро-протокол (из протоколов поддержки) */}
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#818cf8', marginBottom:4 }}>📜 Нейро-протокол (фазы)</div>
+                    {[
+                      { label: 'Фаза 1 — профилактика', cond: 'любой курс ААС', color: '#22c55e', items: ['NAC 1200-2400 мг (утро+вечер)', 'Таурин 2-3 г (утро+вечер)', 'Глицин 3 г (на ночь)', 'Магний (цитрат/глицинат) 400 мг'] },
+                      { label: 'Фаза 2 — усиление', cond: 'доза >500 мг/нед или >2 циклов', color: '#f59e0b', items: ['L-Теанин 200 мг', 'Ашваганда 300-600 мг (кортизол)', 'Агматин 1 г 2р/день (NMDA/NO)', 'Альфа-липоевая 300 мг (Nrf2)'] },
+                      { label: 'Фаза 3 — 19-nor', cond: 'трен/нандролон/стимуляторы', color: '#f97316', items: ['Mg-L-треонат 2000 мг (сон/нейро)', 'Фосфатидилсерин 300-400 мг (HPA)', 'B12 метил 1000 мкг', 'Прегненолон 10-30 мг (осторожно с 19-nor)'] },
+                      { label: 'Фаза 4 — врач', cond: 'нейролептики/высокий риск', color: '#ef4444', items: ['NMDA-альтернативы: мемантин ИЛИ ламотриджин ИЛИ амантадин — НЕ комбинировать', 'α2: гуанфацин/тизанидин — только психиатр', 'Ноопепт 10-30 мг (BDNF/NGF) — только врач'] },
+                    ].map(ph => (
+                      <div key={ph.label} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 4, background: ph.color + '0a', border: '1px solid ' + ph.color + '28' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 7, fontWeight: 800, padding: '1px 5px', borderRadius: 3, background: ph.color + '26', color: ph.color }}>{ph.label}</span>
+                          <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.5)' }}>{ph.cond}</span>
+                        </div>
+                        <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginTop: 3, paddingLeft: 4 }}>
+                          {ph.items.map((it, ii) => <div key={ii}>• {it}</div>)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   {/* ⚡ PED-AUTO preset: авто-выбор по PED-risk tier */}
                   {pedNeuroTier > 0 && (() => {
                     const pedAutoIds = getNeuroBoosterSubstanceIds(pedNeuroTier)
