@@ -1246,14 +1246,19 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     disabled={!builtSrc}
                     onClick={() => {
                       if (!builtSrc) return;
-                      const next = appendPLTaperWeeks(builtSrc, taperWeeksToAdd);
+                      const next = appendPLTaperWeeks(builtSrc, taperWeeksToAdd, {
+                        peds: peds.length ? peds : undefined,
+                        pedDoses,
+                        courseIntensity,
+                        mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+                      });
                       setBuiltSrc(next);
-                      setTaperNote(`+${taperWeeksToAdd} нед (объём ×0.65/×0.45, RIR +1/+2)`);
-                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet 2005).`);
+                      setTaperNote(`+${taperWeeksToAdd} нед${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}`);
+                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''}`);
                     }}
                     style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
-                    title={builtSrc ? `Добавить ${taperWeeksToAdd} тапер-недели в конец плана` : 'Сначала сгенерируйте план'}
-                  >📉 Добавить тапер к плану ({taperWeeksToAdd} нед)</button>
+                    title={builtSrc ? `Добавить ${taperWeeksToAdd} тапер-недели в конец плана${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
+                  >📉 Добавить тапер к плану ({taperWeeksToAdd} нед){pedAuto && peds.length > 0 ? ' · 💉' : ''}</button>
                   <button
                     disabled={!builtSrc}
                     onClick={() => {

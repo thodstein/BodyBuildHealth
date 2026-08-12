@@ -59,12 +59,24 @@ describe('appendPLTaperWeeks', () => {
     expect(last.days[0].exercises[0].rir).toBeGreaterThanOrEqual(prev.days[0].exercises[0].rir);
   });
 
-  it('сохраняет вес (интенсивность) — меняется только объём', () => {
+  it('вес пересчитан от прогрессирующего ПМ (как в цикле: workWeight(pm, pct))', () => {
     const plan = buildBase(6);
     const baseW = plan.weeks[plan.weeks.length - 1].days[0].exercises[0].workSets[0].weight;
     const next = appendPLTaperWeeks(plan, 2);
     const lastW = next.weeks[next.weeks.length - 1].days[0].exercises[0].workSets[0].weight;
-    expect(lastW).toBe(baseW);
+    // Натурал: correctionPct цикла (k≈0.005-0.01) — вес чуть растёт, но не падает.
+    expect(lastW).toBeGreaterThanOrEqual(baseW);
+    expect(lastW).toBeLessThanOrEqual(Math.round(baseW * 1.06));
+  });
+
+  it('pmRow taper-недель продолжает прогрессию от последней недели', () => {
+    const plan = buildBase(6);
+    const basePm = plan.weeks[plan.weeks.length - 1].pmRow['Присед'];
+    const next = appendPLTaperWeeks(plan, 2);
+    const lastPm = next.weeks[next.weeks.length - 1].pmRow['Присед'];
+    expect(lastPm).toBeGreaterThan(basePm);
+    const lastWkPm = next.weeks[next.weeks.length - 2].pmRow['Присед'];
+    expect(lastWkPm).toBeGreaterThan(basePm);
   });
 
   it('помечает добавленные недели sourcePhase=peak и macroPhase=competition', () => {
@@ -118,6 +130,58 @@ describe('appendPLTaperWeeks', () => {
     const plan = buildBase(6);
     expect(appendPLTaperWeeks(plan, 0).weeks.length).toBe(plan.weeks.length);
     expect(appendPLTaperWeeks({ ...plan, weeks: [] } as LMSBuildOutput, 2).weeks.length).toBe(0);
+  });
+
+  // ── PED-адаптация по аналогии с buildLMSPlan ──
+  it('PED: mode=on_course → прогрессия ПМ быстрее (k=2% moderate), веса выше натурала', () => {
+    const nat = buildBase(6);
+    const onCourse = appendPLTaperWeeks(nat, 2, {
+      peds: ['AAS'], pedDoses: { AAS: 500 }, courseIntensity: 'moderate', mode: 'on_course',
+    });
+    const natLast = appendPLTaperWeeks(nat, 2, { mode: 'natural' });
+    const onPm = onCourse.weeks[onCourse.weeks.length - 1].pmRow['Присед'];
+    const natPm = natLast.weeks[natLast.weeks.length - 1].pmRow['Присед'];
+    const basePm = nat.weeks[nat.weeks.length - 1].pmRow['Присед'];
+    // На курсе ПМ растёт на 2%/нед — заметно выше натурала.
+    expect(onPm).toBeGreaterThan(basePm * 1.02);
+    expect(onPm).toBeGreaterThan(natPm);
+  });
+
+  it('PED: mode=pct → ПМ падает (−0.5%/нед)', () => {
+    const nat = buildBase(6);
+    const pct = appendPLTaperWeeks(nat, 2, { mode: 'pct' });
+    const lastPm = pct.weeks[pct.weeks.length - 1].pmRow['Присед'];
+    const basePm = nat.weeks[nat.weeks.length - 1].pmRow['Присед'];
+    expect(lastPm).toBeLessThan(basePm);
+  });
+
+  it('PED: адаптация (dose-aware) отражена в rationale (MRV/восст множители)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, {
+      peds: ['AAS'], pedDoses: { AAS: 1500 }, courseIntensity: 'heavy', mode: 'on_course',
+    });
+    expect(next.progressionRationale).toContain('PED-адаптация');
+    expect(next.progressionRationale).toContain('MRV ×');
+  });
+
+  it('PED: на курсе taper-недели не режут аксессуары ниже PED-адаптированного объёма', () => {
+    const plan = buildBase(6);
+    const nat = appendPLTaperWeeks(plan, 2, { mode: 'natural' });
+    const onCourse = appendPLTaperWeeks(plan, 2, {
+      peds: ['AAS'], pedDoses: { AAS: 1500 }, courseIntensity: 'heavy', mode: 'on_course',
+    });
+    const accSetsNat = (wk: LMSBuildOutput['weeks'][number]) =>
+      wk.days.reduce((s, d) => s + d.exercises.filter(e => e.load !== 'main').reduce((ss, e) => ss + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
+    const accOn = accSetsNat(onCourse.weeks[onCourse.weeks.length - 1]);
+    const accNat = accSetsNat(nat.weeks[nat.weeks.length - 1]);
+    // Объём аксессуаров на курсе ≥ натурала (pedMrvMult ≥ 1 в buildLMSPlan-логике).
+    expect(accOn).toBeGreaterThanOrEqual(accNat);
+  });
+
+  it('PED: без PED и без явного mode → natural поведение (нет PED-заметки)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2);
+    expect(next.progressionRationale).not.toContain('PED-адаптация');
   });
 });
 

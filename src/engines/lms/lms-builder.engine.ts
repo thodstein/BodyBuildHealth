@@ -1064,14 +1064,61 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
  * в конец готового плана (LMSBuildOutput). В отличие от applyPLTaper (который
  * только модифицирует последние 2 недели при сборке), эта функция именно
  * РАСШИРЯЕТ план: новая неделя N-1 → объём ×0.65 + RIR+1, неделя N → ×0.45 + RIR+2
- * (Bosquet 2005), интенсивность (вес) сохранена. Добавленные недели помечаются
- * sourcePhase='peak' + macroPhase='competition' для корректного отображения.
+ * (Bosquet 2005). Добавленные недели помечаются sourcePhase='peak' +
+ * macroPhase='competition' для корректного отображения.
+ *
+ * PED-адаптация — ТА ЖЕ, что в buildLMSPlan (не выдумана заново):
+ *  - mode='on_course' → прогрессия ПМ k = 1.5/2.0/2.5% в неделю по courseIntensity,
+ *    mode='pct' → −0.5% (ПМ падает), natural → correctionPct шаблона;
+ *  - ПМ продолжает расти/падать в taper-неделях: pmRow[name] × (1+k) за неделю;
+ *  - веса пересчитываются workWeight(pm, pct) — как в buildLMSPlan:800;
+ *  - adaptForPEDs (dose-aware) → pedMrvMult/pedRecMult для аннотации и
+ *    объёмной адаптации (как buildLMSPlan:703-708).
  */
-export function appendPLTaperWeeks(plan: LMSBuildOutput, taperWeeks: number): LMSBuildOutput {
+export function appendPLTaperWeeks(
+  plan: LMSBuildOutput,
+  taperWeeks: number,
+  opts?: {
+    peds?: PED[];
+    pedDoses?: Record<string, number>;
+    courseIntensity?: 'mild' | 'moderate' | 'heavy';
+    mode?: ProgressionMode;
+    weeklyPercent?: number;
+  },
+): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   const last = plan.weeks[plan.weeks.length - 1];
   const nextWeekNum = last.week + 1;
   const lastPhase = mesocyclePhaseForWeek(last.week, plan.weeks.length);
+
+  // ── PED-адаптация по аналогии с buildLMSPlan (строки 697-762) ──
+  const activePeds = (opts?.peds ?? []).filter(ped => {
+    const dose = opts?.pedDoses?.[ped];
+    return dose != null && Number.isFinite(Number(dose)) && Number(dose) > 0;
+  });
+  // Режим прогрессии: явный mode, иначе on_course при активном курсе (как UI buildSrc).
+  const mode: ProgressionMode = opts?.mode ?? (activePeds.length > 0 ? 'on_course' : 'natural');
+  const k = (opts?.weeklyPercent != null ? opts.weeklyPercent
+    : mode === 'on_course' ? (opts?.courseIntensity === 'mild' ? 0.015 : opts?.courseIntensity === 'heavy' ? 0.025 : 0.02)
+    : mode === 'pct' ? -0.005
+    : (plan.template?.meta?.correctionPct ?? 0.005));
+  let pedMrvMult = 1;
+  let pedRecMult = 1;
+  if (activePeds.length > 0) {
+    try {
+      const level = plan.template?.meta?.level as string | undefined;
+      const baseMrv = level
+        ? Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([kv, v]) => [kv, v.mrv]))
+        : {};
+      const adapt = adaptForPEDs(activePeds, baseMrv, opts?.pedDoses, opts?.courseIntensity ?? 'moderate');
+      pedMrvMult = adapt.combinedMrvMultiplier || 1;
+      pedRecMult = adapt.combinedRecoveryMultiplier || 1;
+    } catch { /* leave 1.0 */ }
+  }
+  // На курсе объём аксессуаров в taper-неделях не режем ниже PED-адаптированного
+  // уровня (как buildLMSPlan:784 применяет Math.min(1.5, pedMrvMult) к аксессуарам).
+  const pedVolFloor = Math.min(1.5, pedMrvMult);
+
   const refVolume = (() => {
     // Эталон объёма: последняя НЕ-deload неделя (иначе делод станет базой тапера).
     for (let i = plan.weeks.length - 1; i >= 0; i--) {
@@ -1085,16 +1132,27 @@ export function appendPLTaperWeeks(plan: LMSBuildOutput, taperWeeks: number): LM
   })();
 
   const buildTaperWeek = (idx: number, volumeMult: number, rirAdd: number): LMSPlanWeek => {
-    const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
+    // Прогрессия ПМ продолжается по курсу (как buildLMSPlan:757-762): +k за неделю.
+    const pmGrowth = Math.pow(1 + k, idx + 1);
+    const pmRow: Record<string, number> = {};
+    for (const [name, pm] of Object.entries(last.pmRow)) {
+      pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
+    }
     const days = last.days.map(d => {
       const exercises = d.exercises.map(e => ({
         ...e,
         rir: e.rir + rirAdd,
-        workSets: e.workSets.map(ws => ({
-          ...ws,
-          sets: Math.max(1, Math.round(ws.sets * volumeMult)),
-          rir: ws.rir + rirAdd,
-        })),
+        workSets: e.workSets.map(ws => {
+          const pm = pmRow[e.name] ?? e.pm;
+          // Вес пересчитывается от нового ПМ — ровно как workWeight(pm, pct) в buildLMSPlan.
+          const weight = Math.round(workWeight(pm, ws.pct) * 10) / 10;
+          return {
+            ...ws,
+            sets: Math.max(1, Math.round(ws.sets * volumeMult * (e.load === 'main' ? 1 : pedVolFloor))),
+            weight,
+            rir: ws.rir + rirAdd,
+          };
+        }),
       }));
       const metricsEx: SRExercise[] = exercises.map(pe => ({
         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
@@ -1104,7 +1162,7 @@ export function appendPLTaperWeeks(plan: LMSBuildOutput, taperWeeks: number): LM
     });
     return {
       week: nextWeekNum + idx,
-      pmRow: last.pmRow,
+      pmRow,
       days,
       sourcePhase: 'peak' as MesocyclePhase,
       sourcePhaseOrigin: 'inferred' as const,
@@ -1114,9 +1172,10 @@ export function appendPLTaperWeeks(plan: LMSBuildOutput, taperWeeks: number): LM
 
   const extra: LMSPlanWeek[] = [];
   for (let i = 0; i < taperWeeks; i++) {
-    // Строго убывающая кривая объёма от 0.9 → 0.45; последняя неделя RIR+2,
-    // остальные RIR+1. Для 2 нед: ×0.675/×0.45 ≈ классические ×0.65/×0.45.
-    const volumeMult = Math.max(0.4, 0.9 - ((i + 1) / taperWeeks) * 0.45);
+    // Классическая taper-кривая (как applyPLTaper): последняя неделя ×0.45 RIR+2,
+    // предпоследняя ×0.65 RIR+1; для более длинных — плавное снижение 0.9 → 0.45.
+    const progress = (i + 1) / taperWeeks;
+    const volumeMult = Math.max(0.4, 0.9 - progress * 0.45);
     const rirAdd = i === taperWeeks - 1 ? 2 : 1;
     extra.push(buildTaperWeek(i, volumeMult, rirAdd));
   }
@@ -1128,12 +1187,17 @@ export function appendPLTaperWeeks(plan: LMSBuildOutput, taperWeeks: number): LM
   } as SRExercise))));
   const cycleMetrics = calcCycleMetricsAggregate(allSessions, weeks.length);
 
+  const pedNote = activePeds.length > 0
+    ? ` 💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}; прогрессия ПМ ${k >= 0 ? '+' : ''}${(k * 100).toFixed(1)}%/нед продолжена в taper-неделях.`
+    : '';
+
   return {
     ...plan,
     weeks,
     cycleMetrics,
     progressionRationale: plan.progressionRationale +
-      ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet 2005).` +
+      ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).` +
+      pedNote +
       (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),
   };
 }
