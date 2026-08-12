@@ -946,48 +946,106 @@ async function extractTextFromImage(file: File): Promise<string> {
   }
   try {
     if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap not supported in this browser');
-    const bitmap = await createImageBitmap(file);
-    const MAX_CANVAS_PX = 8000000;
-    const srcPx = bitmap.width * bitmap.height;
-    const scale = Math.min(3, Math.sqrt(MAX_CANVAS_PX / Math.max(1, srcPx)));
+    // Resize BEFORE OCR — mobile photos (12MP+) crash tabs with Tesseract WASM.
+    const MAX_DIM = 1800;
+    const bitmap = await createImageBitmap(file, {
+      resizeWidth: MAX_DIM,
+      resizeHeight: MAX_DIM,
+      resizeQuality: 'high',
+    });
     const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(bitmap.width * scale);
-    canvas.height = Math.ceil(bitmap.height * scale);
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
     const context = canvas.getContext('2d');
     if (!context) { bitmap.close(); errors.push('Canvas 2D context unavailable'); }
     else {
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0);
       bitmap.close();
       const enhanced = enhanceOcrCanvas(canvas);
+      // Try English-first on mobile — rus+eng language pack is ~5MB and can OOM
+      let ocrText = '';
+      let triedRusEng = false;
       try {
-        const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+        const engWorker = await Tesseract.createWorker('eng', 1, workerOptions);
         try {
-          const { data } = await worker.recognize(enhanced);
-          if (data.text?.trim()) return data.text;
-          errors.push('OCR completed but produced no text (image may be blank)');
+          const { data } = await engWorker.recognize(enhanced);
+          ocrText = data.text || '';
         } finally {
-          await worker.terminate();
+          await engWorker.terminate();
         }
-      } catch (ocrError: any) {
-        errors.push(`rus+eng OCR failed: ${ocrError?.message || String(ocrError)}`);
-        try {
-          const worker = await Tesseract.createWorker('eng', 1, workerOptions);
+        // If English OCR found text with Cyrillic characters, retry with rus+eng
+        if (/[а-яё]/i.test(ocrText)) {
+          triedRusEng = true;
           try {
-            const { data } = await worker.recognize(enhanced);
-            if (data.text?.trim()) return data.text;
-            errors.push('English OCR produced no text');
-          } finally {
-            await worker.terminate();
+            const ruWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+            try {
+              const { data } = await ruWorker.recognize(enhanced);
+              if (data.text?.trim()) return data.text;
+            } finally {
+              await ruWorker.terminate();
+            }
+          } catch (ruError: any) {
+            errors.push(`rus+eng upgrade failed, using English result: ${ruError?.message || String(ruError)}`);
           }
-        } catch (engError: any) {
-          errors.push(`English OCR also failed: ${engError?.message || String(engError)}`);
+        }
+      } catch (engError: any) {
+        errors.push(`English OCR failed: ${engError?.message || String(engError)}`);
+      }
+      if (ocrText.trim()) return ocrText;
+      if (!triedRusEng) {
+        try {
+          const ruWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+          try {
+            const { data } = await ruWorker.recognize(enhanced);
+            if (data.text?.trim()) return data.text;
+            errors.push('rus+eng OCR produced no text');
+          } finally {
+            await ruWorker.terminate();
+          }
+        } catch (ruError: any) {
+          errors.push(`rus+eng OCR failed: ${ruError?.message || String(ruError)}`);
         }
       }
+      errors.push('OCR completed but produced no text (image may be blank)');
     }
   } catch (imageProcessingError: any) {
     errors.push(`Image preprocessing failed: ${imageProcessingError?.message || String(imageProcessingError)}`);
+    // Fallback: try canvas-based resize if createImageBitmap failed
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Image failed to load'));
+        img.src = URL.createObjectURL(file);
+      });
+      const MAX_DIM = 1600;
+      let w = img.width, h = img.height;
+      if (w > MAX_DIM || h > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+        w = Math.ceil(w * ratio);
+        h = Math.ceil(h * ratio);
+      }
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(img.src);
+        // English-only for canvas fallback
+        const engWorker = await Tesseract.createWorker('eng', 1, workerOptions);
+        try {
+          const { data } = await engWorker.recognize(c);
+          return data.text || '';
+        } finally {
+          await engWorker.terminate();
+        }
+      }
+    } catch (fallbackError: any) {
+      errors.push(`Fallback resize OCR also failed: ${fallbackError?.message || String(fallbackError)}`);
+    }
   }
-  // All enhanced paths exhausted — try direct OCR as last resort
+  // Direct OCR as last resort
   try {
     const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
     try {
