@@ -157,6 +157,7 @@ export interface SupportRecommendation {
   assayWarnings?: string[];
   monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга (строка, legacy)
   monitoringSchedule?: MonitoringSection[]; // H6: структурированный мониторинг (до курса → экстренно)
+  supportRisks?: SupportRisk[];  // H7: комбинаторные риски самого плана поддержки
   pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
 }
 
@@ -1062,6 +1063,118 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
 //  baseline (до курса) → daily → week2 → week4 → week8 → post → urgent.
 //  Учитывает фазу, препараты (PED-флаги) и целевые диапазоны.
 // ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+//  DOCTOR_CONTROLLED_IDS — рецептурные/врачебные препараты.
+//  Доступны к выбору в попапах, но в плане помечаются
+//  «под обязательным контролем врача».
+// ════════════════════════════════════════════════════════════════════════════
+export const DOCTOR_CONTROLLED_IDS = new Set<string>([
+  // АД/сердце
+  'tadalafil', 'telmisartan', 'nebivolol', 'metoprolol', 'bisoprolol',
+  'atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin',
+  // Гормоны/ПКТ
+  'anastrozole', 'letrozole', 'exemestane', 'tamoxifen', 'clomiphene',
+  'enclomiphene', 'cabergoline', 'hcg', 'finasteride',
+  // Метаболизм
+  'metformin', 'pioglitazone',
+  // Диуретики/электролиты Rx
+  'spironolactone', 'hydrochlorothiazide', 'indapamide', 'eplerenone',
+  // Антикоагулянты/антиагреганты Rx
+  'warfarin', 'enoxaparin', 'sulodexide', 'lumbrokinase', 'dipyridamole',
+  'pentoxifylline', 'apixaban', 'rivaroxaban', 'dabigatran',
+  // Нейро Rx (LV3/LV4)
+  'memantine', 'lamotrigine', 'amantadine', 'guanfacine', 'tizanidine',
+  'fluvoxamine', 'naltrexone', 'dihexa', 'tropoflavin', 'phenylpiracetam',
+  'fasoracetam', 'bromantane', 'pregnenolone', 'noopept',
+  // Пептиды (исследовательские)
+  'bpc157', 'tb500', 'ghk_cu', 'bpc_157', 'thymosin_beta4',
+]);
+
+export function isDoctorControlled(id: string): boolean {
+  return DOCTOR_CONTROLLED_IDS.has(String(id || '').toLowerCase());
+}
+
+export interface SupportRisk {
+  id: string;
+  label: string;
+  level: 'low' | 'medium' | 'high';
+  detail: string;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  РИСКИ ПОДДЕРЖКИ — комбинаторные риски самого плана поддержки
+//  (не курса): гипотония, гиперкалиемия, кровотечение, гепато-, гипогликемия,
+//  CYP3A4-нагрузка. Калькулируются по итоговому составу subs.
+// ════════════════════════════════════════════════════════════════════════════
+export function buildSupportRisks(subs: RecommendedSub[]): SupportRisk[] {
+  const ids = new Set(subs.map(s => canonId(s.substanceId)));
+  const has = (x: string) => ids.has(x);
+  const risks: SupportRisk[] = [];
+
+  const hypotensionCount = ['tadalafil', 'telmisartan', 'nebivolol'].filter(has).length;
+  if (hypotensionCount >= 2) {
+    risks.push({
+      id: 'hypotension',
+      label: 'Гипотония',
+      level: hypotensionCount >= 3 ? 'high' : 'medium',
+      detail: `${['Тадалафил', 'Тельмисартан', 'Небиволол'].filter((_, i) => hypotensionCount >= 2).slice(0, hypotensionCount).join(' + ')} — ежедневный контроль АД (сист. >100); при головокружении/слабости снизить дозу.`,
+    });
+  }
+
+  const kSparing = ['telmisartan', 'spironolactone', 'eplerenone', 'potassium'].filter(has);
+  if (kSparing.length >= 2) {
+    risks.push({
+      id: 'hyperkalemia',
+      label: 'Гиперкалиемия',
+      level: kSparing.length >= 3 ? 'high' : 'medium',
+      detail: `K⁺-сберегающая комбинация (${kSparing.join(' + ')}): контроль K⁺ каждые 4 нед, ЭКГ при K⁺ >5.5.`,
+    });
+  }
+
+  const fibrinolytics = ['nattokinase', 'serrapeptase', 'bromelain', 'lumbrokinase', 'aspirin', 'dipyridamole', 'pentoxifylline', 'warfarin', 'enoxaparin', 'sulodexide', 'ginkgo', 'garlic'].filter(has);
+  if (fibrinolytics.length >= 2) {
+    risks.push({
+      id: 'bleeding',
+      label: 'Риск кровотечения',
+      level: fibrinolytics.length >= 3 ? 'high' : 'medium',
+      detail: `Фибринолитики/антиагреганты (${fibrinolytics.join(' + ')}): сообщить врачу перед операцией/инвазивными процедурами; антикоагулянты не добавлять самостоятельно.`,
+    });
+  }
+
+  const cyp3a4 = ['tadalafil', 'anastrozole', 'simvastatin'].filter(has).length;
+  const cypInhibitors = ['milk_thistle', 'berberine', 'grapefruit'].filter(has);
+  if (cyp3a4 > 0 && cypInhibitors.length > 0) {
+    risks.push({
+      id: 'cyp3a4',
+      label: 'CYP3A4-взаимодействие',
+      level: 'medium',
+      detail: `${cypInhibitors.join(' + ')} ингибируют CYP3A4 → ↑ концентрация tadalafil/anastrozole: разнести приём на 2+ ч, мониторинг побочек.`,
+    });
+  }
+
+  const hypoglycemia = ['berberine', 'alpha_lipoic', 'chromium'].filter(has);
+  if (hypoglycemia.length > 0 && (has('insulin_rapid') || has('somatropin') || has('igf1_lr3') || has('metformin'))) {
+    risks.push({
+      id: 'hypoglycemia',
+      label: 'Гипогликемия',
+      level: 'high',
+      detail: `${hypoglycemia.join(' + ')} на фоне инсулина/GH/метформина: контроль глюкозы, не принимать натощак без показаний.`,
+    });
+  }
+
+  const giIrritants = ['aspirin', 'nattokinase', 'omega3'].filter(has).length;
+  if (giIrritants >= 2 && (has('telmisartan') || has('spironolactone'))) {
+    risks.push({
+      id: 'gi',
+      label: 'ЖКТ-нагрузка',
+      level: 'medium',
+      detail: 'Аспирин/омега-3/фибринолитики + препараты с ЖКТ-эффектом: принимать с едой, при боли/изжоге — гастропротектор.',
+    });
+  }
+
+  return risks;
+}
+
 export interface MonitoringItemLine {
   marker: string;
   reason: string;
@@ -1160,6 +1273,7 @@ export function buildMonitoringSchedule(
   const week8: MonitoringItemLine[] = [];
   week8.push({ marker: 'ОАК + БХ + липидограмма, E2, PRL, ТТГ', reason: 'Полный пересмотр на курсе', target: 'LDL<3.0, HDL>1.0, ТГ<1.7' });
   week8.push({ marker: 'УЗИ печени (при ААС), D-димер (при HCT>52%)', reason: 'Органный контроль', escalation: 'D-димер>0.5 — срочная оценка тромботического риска' });
+  week8.push({ marker: 'Повтор полного набора (ОАК+БХ+липиды+гормоны)', reason: 'Длительные курсы — каждые 12 нед' });
   if (phase === 'bridge') {
     week8.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, АД/ЧСС', reason: 'Контроль моста (каждые 6 нед)' });
   }
@@ -1730,6 +1844,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     assayWarnings,
     monitoringPlan,
     monitoringSchedule,
+    supportRisks: buildSupportRisks(subs),
     pedRisk: ctx.pedRisk,
   };
 }

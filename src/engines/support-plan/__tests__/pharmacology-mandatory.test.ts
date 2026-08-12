@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateSupportTZ } from '../engine';
 import { runSupportUnified } from '../index';
 import { buildMapperCtx } from '../mapper-ctx';
-import { resolvePlan } from '../../tz-mapper-engine';
+import { resolvePlan, isDoctorControlled } from '../../tz-mapper-engine';
 import { canonId } from '../shared-constants';
 import { DEFAULT_STATE } from '../../../ui/screens/Calculator/Calc.types';
 
@@ -155,6 +155,32 @@ describe('course pharmacology mandatory rules', () => {
 
     const plain = resolvePlan(buildMapperCtx(stateWithAas(['test_enan']), 'medium'));
     expect(plain.protocolWarnings?.some(w => w.includes('Фибринолитическая'))).toBe(false);
+  });
+
+  it('риски поддержки: гипотония при тройке АД-препаратов, K⁺-комбинации', () => {
+    const state = stateWithAas(['test_enan', 'tren_enan']);
+    const ctx = buildMapperCtx(state, 'medium', { addSubs: ['tadalafil', 'telmisartan', 'nebivolol'] });
+    const rec = resolvePlan(ctx);
+    expect(rec.supportRisks?.some(r => r.id === 'hypotension' && r.level === 'high')).toBe(true);
+
+    const kCtx = buildMapperCtx(state, 'medium', { addSubs: ['potassium'] });
+    const kRec = resolvePlan(kCtx);
+    expect(kRec.supportRisks?.some(r => r.id === 'hyperkalemia')).toBe(true);
+
+    const blockedCtx = buildMapperCtx(state, 'medium', { addSubs: ['spironolactone'] });
+    const blockedRec = resolvePlan(blockedCtx);
+    expect(blockedRec.subs.some(s => s.substanceId === 'spironolactone')).toBe(true);
+    expect(blockedRec.subs.some(s => s.substanceId === 'telmisartan')).toBe(false);
+  });
+
+  it('рецептурные препараты помечены как под контролем врача', () => {
+    const rec = resolvePlan(buildMapperCtx(stateWithAas(['test_enan', 'tren_enan']), 'medium'));
+    const doctorSubs = rec.subs.filter(s => isDoctorControlled(s.substanceId));
+    expect(doctorSubs.length).toBeGreaterThan(0);
+    expect(doctorSubs.every(s => isDoctorControlled(s.substanceId))).toBe(true);
+    expect(isDoctorControlled('cabergoline')).toBe(true);
+    expect(isDoctorControlled('memantine')).toBe(true);
+    expect(isDoctorControlled('hydration')).toBe(false);
   });
 
   it('процедурная эскалация по HCT', () => {

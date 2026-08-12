@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import type { LabSlice } from '../../../engines/support-plan';
 import type { CalculatorState } from '../../../engines/support-plan';
-import { resolvePlan } from '../../../engines/tz-mapper-engine';
+import { resolvePlan, isDoctorControlled, type SupportRisk } from '../../../engines/tz-mapper-engine';
 import type { MapperCtx, SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import type { SupportLevel } from '../../../engines/tz-bridge-mechanism';
 import type { PhaseContext, PhaseKey } from '../../../engines/tz-bridge-phase';
@@ -72,6 +72,8 @@ const JOINT_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
   { id: 'ghk_cu', nameRu: 'GHK-Cu (медь-пептид)', dose: '1-2 мг', desc: '↑коллаген/эластин, анти-воспаление (Суставы.txt: 6-нед протокол)' },
   { id: 'havinson_a4', nameRu: 'Хавинсон A4 (хрящ)', dose: '1-2 капс', desc: 'Пептидный биорегулятор, ↑хондроцитов (Суставы.txt)' },
   { id: 'ligamentide', nameRu: 'LigamenTIDE PLUS', dose: '1-2 капс', desc: 'Пептид для связок/сухожилий (Суставы.txt: 6-нед курс)' },
+  { id: 'artra', nameRu: 'Артра (глюкозамин+хондроитин)', dose: '500+500 мг 2р/день', desc: 'Комбинированный хондропротектор: глюкозамин 500 + хондроитин 500 (Суставы.txt: 1 таблетка 2 раза/день)' },
+  { id: 'neovitin', nameRu: 'Неовитин (аргинин+витамины)', dose: '1-2 капсулы', desc: 'Сосуды и восстановление связок (Суставы.txt)' },
   { id: 'voltaren_gel', nameRu: 'Вольтарен гель (диклофенак местно)', dose: '2-3р/день', desc: '↓COX-2 локально (Суставы.txt)' },
 ];
 const JOINT_RECOMMENDED_HIGH: Set<string> = new Set(['glucosamine','chondroitin','collagen','vitamin_c','msm']);
@@ -366,7 +368,7 @@ const HEMATO_DOMAINS: DomainCfg[] = [
       { code: 'hyperviscosity_symptom', label: 'Головная боль / плетора / тиннитус' },
     ],
     substances: new Set(['nattokinase','serrapeptase','omega3','garlic']) },
-  { id: 'anticoagulation', label: 'Антикоагуляция (только врач)', icon: '💊', color: '#7c3aed',
+  { id: 'anticoagulation', label: 'Антикоагуляция (под обязательным контролем врача)', icon: '💊', color: '#7c3aed',
     symptoms: [],
     substances: new Set(['enoxaparin','warfarin','sulodexide']) },
 ];
@@ -2654,6 +2656,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         color: isTitr ? '#fbbf24' : '#a5b4fc',
                       }}>
                          {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
+                        {isDoctorControlled(s.substanceId) && <span style={{ marginLeft:3, fontSize:6, color:'#fca5a5', fontWeight:800 }}>👨⚕️</span>}
                         {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
                       </span>
                     );
@@ -2753,7 +2756,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{planItemKind(s.substanceId) === 'База' ? '🧭' : '⚡'} {subNameRu(s.substanceId)}</span>
                         <span style={{ fontSize: 8, color: '#4ade80', textAlign: 'right' }}>{e?.dosage?.timing || ''}</span>
                       </div>
-                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', marginTop: 2, lineHeight: 1.45 }}>{s.reason || e?.description}</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', marginTop: 2, lineHeight: 1.45 }}>{e?.description || s.reason}</div>
                       <div style={{ fontSize: 7, color: '#4ade80', marginTop: 2 }}>Риск: {impact(s.substanceId)}</div>
                     </div>
                   );
@@ -2794,6 +2797,20 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 }
                 return null;
               })()}
+              {(finalRec.supportRisks || []).length > 0 && (
+                <div style={{ marginBottom: 5 }}>
+                  <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Риски плана поддержки</div>
+                  {(finalRec.supportRisks || []).map(r => (
+                    <div key={r.id} style={{ padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: r.level === 'high' ? 'rgba(239,68,68,0.09)' : r.level === 'medium' ? 'rgba(245,158,11,0.07)' : 'rgba(255,255,255,0.03)', border: `1px solid ${r.level === 'high' ? 'rgba(239,68,68,0.28)' : r.level === 'medium' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
+                      <div style={{ fontSize: 8, fontWeight: 800, color: r.level === 'high' ? '#f87171' : r.level === 'medium' ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>⚠ {r.label} {r.level === 'high' ? '(высокий)' : r.level === 'medium' ? '(повышенный)' : ''}</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginTop: 1 }}>{r.detail}</div>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: 3 }}>
+                    Препараты с пометкой <span style={{ color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span> — рецептурные, принимать под обязательным контролем врача.
+                  </div>
+                </div>
+              )}
               {synergyDesc.map((s, i) => <div key={`desc-${i}`} style={{ fontSize:8, color:'#c4b5fd', marginBottom:3, lineHeight:1.5 }}>{s}</div>)}
               {pairSynergies.length > 0 && (
                 <>
@@ -3438,7 +3455,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                       const instr: string[] = [];
                       if ((b.tier ?? 0) >= 3) {
                         instr.push('⚡ LV3: селективные NMDA-антагонисты (memantine ИЛИ lamotrigine ИЛИ amantadine — не комбинировать)');
-                        instr.push('⚡ LV3: рецептурные препараты — только через врача (психиатр/невролог)');
+                        instr.push('⚡ LV3: рецептурные препараты — под обязательным контролем врача (психиатр/невролог)');
                         instr.push('⚡ LV3: титрация — мемантин 5 мг/нед → 20 мг, ламотриджин 25 мг → +25 мг каждые 2 нед');
                       }
                       if ((b.tier ?? 0) >= 2) {
@@ -3499,6 +3516,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
       {/* CalcActions (сохранить/копировать/врачу) */}
       {finalRecWithResidual && <CalcActions rec={finalRecWithResidual} level={level} state={state} />}
+
+      {/* Дисклеймер */}
+      <div style={{ marginTop: 8, padding: '7px 9px', borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.16)', fontSize: 7, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+        ⚠️ Система не является медицинским инструментом, не ставит диагнозы и не назначает лечение. Все расчёты, рекомендации и препараты — справочные: применять их можно только под наблюдением и контролем врача. Рецептурные препараты (помечены <span style={{ color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>) — строго по назначению врача.
+      </div>
     </div>
     </React.Fragment>
   );
@@ -3537,7 +3559,7 @@ function buildPlanText(rec: SupportRecommendation): string {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
       const doseStr = dose && dose.mg > 0 ? ` · ${dose.mg} мг (${dose.timing})` : '';
-      lines.push(`• ${name}${doseStr} — ${s.reason}`);
+      lines.push(`• ${name}${doseStr}${isDoctorControlled(s.substanceId) ? ' [под обязательным контролем врача]' : ''} — ${s.reason}`);
       if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
       lines.push(`  k=${s.k.toFixed(2)} · док.уровень: ${s.q}`);
     }
