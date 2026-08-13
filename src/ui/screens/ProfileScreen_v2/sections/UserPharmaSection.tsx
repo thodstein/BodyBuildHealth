@@ -43,7 +43,7 @@ const PHASE_META: Record<string, { icon: string; color: string; note: string }> 
   fertility: { icon: '🤰', color: colors.pink, note: 'Фертильность — принудительные бустеры отключены' },
 };
 
-export const UserPharmaSection: React.FC = () => {
+export const UserPharmaSection: React.FC = React.memo(function UserPharmaSection() {
   const [pharma, updatePharma] = useSectionState('pharma');
 
   return (
@@ -185,4 +185,4 @@ export const UserPharmaSection: React.FC = () => {
       </div>
     </AccordionSection>
   );
-};
+});

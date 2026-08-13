@@ -55,7 +55,7 @@ const COMMON_INJURIES = [
   'Шея', 'Бедро', 'Голеностоп', 'Бицепс', 'Трицепс',
 ];
 
-export const UserHealthSection: React.FC = () => {
+export const UserHealthSection: React.FC = React.memo(function UserHealthSection() {
   const [health, updateHealth] = useSectionState('health');
 
   return (
@@ -374,4 +374,4 @@ export const UserHealthSection: React.FC = () => {
       </div>
     </AccordionSection>
   );
-};
+});

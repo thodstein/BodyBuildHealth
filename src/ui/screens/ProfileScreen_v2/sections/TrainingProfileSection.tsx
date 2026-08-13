@@ -30,7 +30,7 @@ const GOAL_OPTIONS = [
   { id: 'health', label: 'Здоровье' },
 ];
 
-export const TrainingProfileSection: React.FC = () => {
+export const TrainingProfileSection: React.FC = React.memo(function TrainingProfileSection() {
   const [training, updateTraining] = useSectionState('training');
 
   return (
@@ -127,4 +127,4 @@ export const TrainingProfileSection: React.FC = () => {
       </FieldRow>
     </AccordionSection>
   );
-};
+});

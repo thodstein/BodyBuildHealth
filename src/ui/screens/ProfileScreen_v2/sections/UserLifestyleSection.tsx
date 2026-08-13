@@ -17,7 +17,7 @@ const SLEEP_QUALITY = [
   { id: 'poor', label: 'Плохое' },
 ];
 
-export const UserLifestyleSection: React.FC = () => {
+export const UserLifestyleSection: React.FC = React.memo(function UserLifestyleSection() {
   const [lifestyle, updateLifestyle] = useSectionState('lifestyle');
 
   return (
@@ -134,4 +134,4 @@ export const UserLifestyleSection: React.FC = () => {
       </div>
     </AccordionSection>
   );
-};
+});

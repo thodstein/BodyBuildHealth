@@ -38,7 +38,7 @@ const JUMP_COLORS: Record<string, string> = {
   '1-9': colors.pink,
 };
 
-export const ProfileUserTab: React.FC = () => {
+export const ProfileUserTab: React.FC = React.memo(function ProfileUserTab() {
   const handleJump = (id: string) => {
     const el = document.getElementById(`profile-section-${id}`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -124,4 +124,4 @@ export const ProfileUserTab: React.FC = () => {
       </div>
     </div>
   );
-};
+});

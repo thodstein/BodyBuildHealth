@@ -42,7 +42,7 @@ const LIFE_STAGES = [
   { id: 'recovery', label: 'Восстановление' },
 ];
 
-export const UserGoalsSection: React.FC = () => {
+export const UserGoalsSection: React.FC = React.memo(function UserGoalsSection() {
   const [goals, updateGoals] = useSectionState('goals');
   const [training, updateTraining] = useProfileSection('training');
   const [personal] = useProfileSection('personal');
@@ -160,4 +160,4 @@ export const UserGoalsSection: React.FC = () => {
       )}
     </AccordionSection>
   );
-};
+});

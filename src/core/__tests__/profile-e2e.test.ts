@@ -389,33 +389,39 @@ describe('Profile v2 E2E scenarios', () => {
 
   describe('ProfileScreen_v2 UI integrity', () => {
     it('21. Module exports ProfileScreen_v2 + 4 tab components', async () => {
+      const isComponent = (x: unknown): boolean =>
+        typeof x === 'function' ||
+        (!!x && typeof x === 'object' && !!(x as { $$typeof?: unknown }).$$typeof);
       const v2 = await import('../../ui/screens/ProfileScreen_v2/ProfileScreen_v2');
       const userTab = await import('../../ui/screens/ProfileScreen_v2/ProfileUserTab');
       const trainingTab = await import('../../ui/screens/ProfileScreen_v2/ProfileTrainingTab');
       const diariesTab = await import('../../ui/screens/ProfileScreen_v2/ProfileDiariesTab');
       const settingsTab = await import('../../ui/screens/ProfileScreen_v2/ProfileSettingsTab');
       const hero = await import('../../ui/screens/ProfileScreen_v2/ProfileHero');
-      expect(typeof v2.ProfileScreen_v2).toBe('function');
-      expect(typeof userTab.ProfileUserTab).toBe('function');
-      expect(typeof trainingTab.ProfileTrainingTab).toBe('function');
-      expect(typeof diariesTab.ProfileDiariesTab).toBe('function');
-      expect(typeof settingsTab.ProfileSettingsTab).toBe('function');
-      expect(typeof hero.ProfileHero).toBe('function');
+      expect(isComponent(v2.ProfileScreen_v2)).toBe(true);
+      expect(isComponent(userTab.ProfileUserTab)).toBe(true);
+      expect(isComponent(trainingTab.ProfileTrainingTab)).toBe(true);
+      expect(isComponent(diariesTab.ProfileDiariesTab)).toBe(true);
+      expect(isComponent(settingsTab.ProfileSettingsTab)).toBe(true);
+      expect(isComponent(hero.ProfileHero)).toBe(true);
     }, 20_000);
 
     it('22. Р’СЃРµ 6 section-РєРѕРјРїРѕРЅРµРЅС‚РѕРІ РџРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЌРєСЃРїРѕСЂС‚РёСЂСѓСЋС‚СЃСЏ', async () => {
+      const isComponent = (x: unknown): boolean =>
+        typeof x === 'function' ||
+        (!!x && typeof x === 'object' && !!(x as { $$typeof?: unknown }).$$typeof);
       const personal = await import('../../ui/screens/ProfileScreen_v2/sections/UserPersonalSection');
       const health = await import('../../ui/screens/ProfileScreen_v2/sections/UserHealthSection');
       const diet = await import('../../ui/screens/ProfileScreen_v2/sections/UserDietSection');
       const lifestyle = await import('../../ui/screens/ProfileScreen_v2/sections/UserLifestyleSection');
       const pharma = await import('../../ui/screens/ProfileScreen_v2/sections/UserPharmaSection');
       const goals = await import('../../ui/screens/ProfileScreen_v2/sections/UserGoalsSection');
-      expect(typeof personal.UserPersonalSection).toBe('function');
-      expect(typeof health.UserHealthSection).toBe('function');
-      expect(typeof diet.UserDietSection).toBe('function');
-      expect(typeof lifestyle.UserLifestyleSection).toBe('function');
-      expect(typeof pharma.UserPharmaSection).toBe('function');
-      expect(typeof goals.UserGoalsSection).toBe('function');
+      expect(isComponent(personal.UserPersonalSection)).toBe(true);
+      expect(isComponent(health.UserHealthSection)).toBe(true);
+      expect(isComponent(diet.UserDietSection)).toBe(true);
+      expect(isComponent(lifestyle.UserLifestyleSection)).toBe(true);
+      expect(isComponent(pharma.UserPharmaSection)).toBe(true);
+      expect(isComponent(goals.UserGoalsSection)).toBe(true);
     });
 
     it('23. UI-СѓС‚РёР»РёС‚С‹ (NumberInput, SelectInput, SliderInput, BoolChip, AccordionSection) СЌРєСЃРїРѕСЂС‚РёСЂСѓСЋС‚СЃСЏ', async () => {

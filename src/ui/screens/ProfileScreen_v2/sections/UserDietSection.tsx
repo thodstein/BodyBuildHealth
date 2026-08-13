@@ -23,7 +23,7 @@ const COOKING_SKILLS = [
   { id: 'advanced', label: 'Продвинутый' },
 ];
 
-export const UserDietSection: React.FC = () => {
+export const UserDietSection: React.FC = React.memo(function UserDietSection() {
   const [nutrition, updateNutrition] = useSectionState('nutrition');
 
   const toggle = (key: 'foodAllergies' | 'foodIntolerances' | 'excludedFoods' | 'preferredFoods' | 'tasteProfile' | 'excludedCategories', id: string) => {
@@ -173,4 +173,4 @@ export const UserDietSection: React.FC = () => {
       </div>
     </AccordionSection>
   );
-};
+});

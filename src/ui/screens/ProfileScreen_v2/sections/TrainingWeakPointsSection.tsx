@@ -29,7 +29,7 @@ const EQUIPMENT = [
   { id: 'kettlebell', label: 'Гиря' },
 ];
 
-export const TrainingWeakPointsSection: React.FC = () => {
+export const TrainingWeakPointsSection: React.FC = React.memo(function TrainingWeakPointsSection() {
   const [training, updateTraining] = useSectionState('training');
 
   const toggle = (key: 'weakPoints' | 'equipment', id: string) => {
@@ -73,4 +73,4 @@ export const TrainingWeakPointsSection: React.FC = () => {
       </div>
     </AccordionSection>
   );
-};
+});

@@ -19,7 +19,7 @@ const SEX_OPTIONS = [
   { id: 'female', label: '♀ Женский' },
 ];
 
-export const UserPersonalSection: React.FC = () => {
+export const UserPersonalSection: React.FC = React.memo(function UserPersonalSection() {
   const [personal, updatePersonal] = useSectionState('personal');
   const [system, setSystem] = useProfileSection('system');
 
@@ -156,4 +156,4 @@ export const UserPersonalSection: React.FC = () => {
       )}
     </AccordionSection>
   );
-};
+});

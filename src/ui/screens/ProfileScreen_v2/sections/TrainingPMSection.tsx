@@ -19,7 +19,7 @@ const WORK_MAX_GROUPS = [
   { id: 'abs', label: 'Пресс' },
 ];
 
-export const TrainingPMSection: React.FC = () => {
+export const TrainingPMSection: React.FC = React.memo(function TrainingPMSection() {
   const [training, updateTraining] = useSectionState('training');
   const workMax = training.workMax || {};
 
@@ -89,4 +89,4 @@ export const TrainingPMSection: React.FC = () => {
       </FieldRow>
     </AccordionSection>
   );
-};
+});

@@ -1,5 +1,5 @@
 import { UserRole, UserProfile, UnifiedSettings, getDefaultSettings } from "./types";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from "react";
 import { broadcastProfileChange } from './profile-events';
 
 const STORAGE_KEY = "he_profile_v2";
@@ -19,6 +19,14 @@ function cleanupRemovedBioStackStorage(): void {
       if (key?.startsWith('he_biostack_name_')) localStorage.removeItem(key);
     }
   } catch {}
+}
+
+/** Очистка легаси-ключей выполняется один раз за сессию (перебор ВСЕХ ключей localStorage дорогой). */
+let bioStackCleanupDone = false;
+function ensureBioStackCleanup(): void {
+  if (bioStackCleanupDone) return;
+  bioStackCleanupDone = true;
+  cleanupRemovedBioStackStorage();
 }
 
 type ProfileListener = () => void;
@@ -163,13 +171,24 @@ function normalizeArrayFields(settings: any): void {
 /* Читает профиль из localStorage с backward-compat proxy для settings. */
 export function getProfile(): UserProfile {
   try {
-    cleanupRemovedBioStackStorage();
+    ensureBioStackCleanup();
     const saved = localStorage.getItem(STORAGE_KEY);
     const p: UserProfile = saved ? JSON.parse(saved) : getDefaultProfile();
     p.settings = makeSettingsProxy(p.settings);
     normalizeArrayFields(p.settings);
     return p;
   } catch { return getDefaultProfile(); }
+}
+
+/* ── Кэш парсинга профиля: один JSON.parse на все подписки за один notify ── */
+let parsedProfile: UserProfile | null = null;
+let parsedProfileVersion = -1;
+function getCachedProfile(): UserProfile {
+  if (!parsedProfile || parsedProfileVersion !== profileVersion) {
+    parsedProfile = getProfile();
+    parsedProfileVersion = profileVersion;
+  }
+  return parsedProfile;
 }
 
 /**
@@ -349,33 +368,35 @@ function getDefaultProfile(): UserProfile {
 }
 
 export function useProfileRefresh(): UserProfile {
-  const [profile, setProfile] = useState<UserProfile>(getProfile());
-  useEffect(() => {
-    return onProfileChange(() => setProfile(getProfile()));
-  }, []);
-  return profile;
+  const getSnapshot = useCallback(() => getCachedProfile(), []);
+  return useSyncExternalStore(onProfileChange, getSnapshot);
 }
+
+/* ── Кэш снапшотов секций: секция перерисовывается ТОЛЬКО при изменении своей версии ── */
+const sectionSnapshots: Record<string, { version: number; value: any }> = {};
 
 /**
  * Granularный хук: подписка на одну секцию настроек.
- * Перерендеривается ТОЛЬКО при изменении этой секции.
+ * Перерендеривается ТОЛЬКО при изменении этой секции (сравнение по sectionVersions),
+ * снапшот кэшируется по ссылке — соседние секции не перерисовываются.
  */
 export function useProfileSection<K extends keyof UnifiedSettings>(
   section: K
 ): [UnifiedSettings[K], (patch: Partial<UnifiedSettings[K]>) => void] {
-  const [value, setValue] = useState<UnifiedSettings[K]>(() => {
-    const p = getProfile();
-    return ((p.settings as any)[section] || {}) as UnifiedSettings[K];
-  });
-
-  useEffect(() => {
-    const unsub = onProfileChange(() => {
-      const p = getProfile();
-      const sec = ((p.settings as any)[section] || {}) as UnifiedSettings[K];
-      setValue(sec);
-    });
-    return unsub;
+  const getSnapshot = useCallback((): UnifiedSettings[K] => {
+    const v = getSectionVersion(section);
+    const cached = sectionSnapshots[section as string];
+    if (!cached || cached.version !== v) {
+      const p = getCachedProfile();
+      sectionSnapshots[section as string] = {
+        version: v,
+        value: ((p.settings as any)[section] || {}) as UnifiedSettings[K],
+      };
+    }
+    return sectionSnapshots[section as string].value;
   }, [section]);
+
+  const value = useSyncExternalStore(onProfileChange, getSnapshot);
 
   const setter = useCallback((patch: Partial<UnifiedSettings[K]>) => {
     updateSection(section, patch);
