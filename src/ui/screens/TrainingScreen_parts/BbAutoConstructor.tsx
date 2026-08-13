@@ -22,7 +22,7 @@ import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../
 import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
-import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
@@ -58,6 +58,7 @@ import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } fro
 import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from '../../../engines/periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
+import { BBMetricsSummaryCard } from './BBMetricsSummaryCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../../engines/bb/bb-peak-week.engine';
@@ -2750,9 +2751,7 @@ export const BbAutoConstructor: React.FC = () => {
           )}
         </div>
         <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
-        <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-          <div style={{ ...SMALL, whiteSpace:'pre-wrap' }}>{explainBBMetrics(metrics)}</div>
-        </div>
+        <BBMetricsSummaryCard metrics={metrics} />
         {/* Export plan card */}
         {quality && (
           <div style={{ marginTop:8 }}>
