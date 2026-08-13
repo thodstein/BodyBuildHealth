@@ -50,6 +50,7 @@ import { DiaryAnalyticsView } from './DiaryAnalyticsView';
 import { DiaryProgressView } from './DiaryProgressView';
 import { DiaryHistoryView } from './DiaryHistoryView';
 import { DiaryToolsView } from './DiaryToolsView';
+import { MixDiarySection } from './MixDiarySection';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -505,6 +506,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             );
           })()}
+          <MixDiarySection />
           <RecordModeSelector diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} />

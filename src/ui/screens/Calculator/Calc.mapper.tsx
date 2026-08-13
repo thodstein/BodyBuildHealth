@@ -43,6 +43,7 @@ import { printProtocol, buildExportDataFromRec } from '../../../ui/components/Pr
 import { checkNotifications, type NotificationRule } from '../../../engines/notification-engine';
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
 import { LabsDueBanner } from './LabsDueBanner';
+import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue } from '../../../engines/training-plan-save.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -758,16 +759,20 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [genericEnhancementSelected, setGenericEnhancementSelected] = useState<Set<string>>(new Set());
   const [showMegaPopup, setShowMegaPopup] = useState(false);
   const [megaSelected, setMegaSelected] = useState<Set<string>>(new Set());
+  // Очередь «тренировочные миксы и пресеты здоровья» → план поддержки
+  const [mixQueueRefresh, setMixQueueRefresh] = useState(0);
+  const [showMixCard, setShowMixCard] = useState(true);
 
   const ctx = useMemo(() => {
+    const externalMixIds = getSupportPlanQueueIds();
     const base = buildMapperCtx(state, level, {
-      addSubs: Array.from(new Set([...manualSubs, ...addedSubs])),
+      addSubs: Array.from(new Set([...manualSubs, ...addedSubs, ...externalMixIds])),
       removeSubs: removedSubs,
     }, selectedStacks);
     if (symptoms.length > 0) base.symptoms = symptoms;
     base.libidoLow = symptoms.includes('low_libido');
     return base;
-  }, [state, level, manualSubs, addedSubs, removedSubs, selectedStacks, symptoms]);
+  }, [state, level, manualSubs, addedSubs, removedSubs, selectedStacks, symptoms, mixQueueRefresh]);
 
   const rec = useMemo(() => {
     try { return resolvePlan(ctx); }
@@ -2780,6 +2785,52 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           )}
         </div>
       )}
+
+      {/* ===== ТРЕНИРОВОЧНЫЕ МИКСЫ И ПРЕСЕТЫ ЗДОРОВЬЯ ===== */}
+      {readSupportPlanQueue().length > 0 && (() => {
+        const mixQueue = readSupportPlanQueue();
+        return (
+          <div style={{ marginTop: 8 }}>
+            <div onClick={() => setShowMixCard(!showMixCard)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showMixCard ? '8px 8px 0 0' : 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🏋️ Тренировочные миксы и пресеты здоровья ({mixQueue.length})
+                <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}>
+                  · внесено в план: {mixQueue.reduce((s, e) => s + e.ids.length, 0)} веществ
+                </span>
+              </span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showMixCard ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showMixCard && (
+              <>
+                <div style={{ padding: '5px 9px', fontSize: 8, color: 'rgba(255,255,255,0.5)', background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.1)', borderTop: 'none' }}>
+                  Сохранены из «Интеллект тренировки». Вещества участвуют в расчёте рисков, дозировок, синергий и мониторинга этого плана. Рекомендации — в «⭐ Избранном» блока БАД.
+                </div>
+                {mixQueue.map(entry => (
+                  <div key={entry.recId} style={{ marginTop: 4, padding: '7px 9px', borderRadius: 8, background: 'rgba(24,24,27,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
+                        {entry.kind === 'preset' ? '🧪' : '💪'} {entry.title}
+                        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}> · {entry.ids.length} веществ</span>
+                      </div>
+                      <button onClick={() => {
+                        removeFromSupportPlanQueue(entry.recId);
+                        setMixQueueRefresh(v => v + 1);
+                      }} style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: '3px 6px' }}>🗑 Убрать из плана</button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 4 }}>
+                      {entry.ids.map((id, i) => (
+                        <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, fontWeight: 600, background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                          {subNameRu(id)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===== ОБРАЗ ЖИЗНИ — база курса (не препараты) ===== */}
       {finalRec && finalRec.subs.some(s => NON_DRUG_IDS.has(s.substanceId)) && (() => {

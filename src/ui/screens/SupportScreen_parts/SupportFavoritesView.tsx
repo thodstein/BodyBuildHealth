@@ -4,6 +4,7 @@ import { readSupportStacks } from '../../../engines/stack-storage';
 import { ALL_INTERACTIONS } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
+import { readFavRecommendations, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
 
 export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -84,6 +85,39 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
             </div>
           ))
         )}
+
+        {/* Рекомендации из сохранённых миксов/пресетов */}
+        {(() => {
+          const recs = readFavRecommendations();
+          if (recs.length === 0) return null;
+          return (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>💊 Рекомендации тренировочных миксов и пресетов ({recs.length})</div>
+              {recs.slice(0, 10).map(rec => (
+                <div key={rec.id} style={{ padding: '8px 10px', background: 'rgba(139,92,246,0.06)', borderRadius: 8, border: '1px solid rgba(139,92,246,0.2)', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{rec.title}</div>
+                    <button onClick={() => { deleteFavRecommendation(rec.id); setFavRefresh((prev: number) => prev + 1); }}
+                      style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>✕ Убрать</button>
+                  </div>
+                  <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
+                    {new Date(rec.ts).toLocaleDateString('ru-RU')} · {rec.substances.length} препаратов · конфликтов: {rec.interactions.length}
+                  </div>
+                  {rec.general.slice(0, 2).map((g, i) => (
+                    <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 3, lineHeight: 1.35 }}>• {g}</div>
+                  ))}
+                  {rec.interactions.length > 0 && (
+                    <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 3 }}>
+                      {rec.interactions.slice(0, 2).map((x, i) => (
+                        <div key={i}>⚠️ {x.a} ↔ {x.b}: {x.effect}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
       )}
 

@@ -8,6 +8,10 @@ import {
 import type { MixSubstance, MixProfile, TrainingMixScore } from '../../../engines/training-mix-scoring.engine';
 import { loadTrainingProfile } from './training-profile';
 import { pushSubsToPlan } from './support-plan-bridge';
+import {
+  saveMixToDiaryAndFavorites, queueMixToSupportPlan, readDiaryMixes,
+  type SaveMixResult, type PlanSubstance,
+} from '../../../engines/training-plan-save.engine';
 
 const ACCENT = 'var(--accent)';
 const CARD: React.CSSProperties = {
@@ -75,6 +79,63 @@ const ScoreBar: React.FC<{ label: string; value: number; color: string }> = ({ l
   </div>
 );
 
+/** Всплывающее окно «Куда сохранено»: подтверждение перед сохранением + итог после. */
+const SaveResultPopup: React.FC<{
+  popup: { step: 'confirm' | 'done'; toPlan: boolean; result: SaveMixResult | null };
+  count: number;
+  onToPlanChange: (v: boolean) => void;
+  onConfirm: () => void;
+  onClose: () => void;
+}> = ({ popup, count, onToPlanChange, onConfirm, onClose }) => {
+  const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: 16 };
+  const box: React.CSSProperties = { maxWidth: 420, width: '100%', background: '#1a1a1f', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.5)' };
+  const row: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' };
+  const btn = (bg: string, color: string, flex = true): React.CSSProperties => ({
+    flex: flex ? 1 : undefined, padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: bg, color, minHeight: 44,
+  });
+  const res = popup.result;
+  const favCount = res ? res.addedFavCount : null;
+  return (
+    <div style={overlay} onClick={e => { if (e.target === e.currentTarget && popup.step === 'done') onClose(); }}>
+      <div style={box}>
+        {popup.step === 'confirm' ? (
+          <>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 10 }}>💾 Сохранение микса</div>
+            <div style={row}><span>📓</span><span><b>Дневник тренировок</b> — запись «Микс: {count} веществ» с составом и дозами.</span></div>
+            <div style={row}><span>⭐</span><span><b>Избранное БАД</b> — добавятся вещества набора (без дублей).</span></div>
+            <div style={row}><span>💊</span><span><b>Рекомендации</b> — анализ препаратов: дозы, предупреждения, мониторинг, конфликты. Сохранятся в избранном БАД.</span></div>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0', padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', cursor: 'pointer', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+              <input type="checkbox" checked={popup.toPlan} onChange={e => onToPlanChange(e.target.checked)} style={{ marginTop: 2 }} />
+              <span>🧮 <b>Внести в план поддержки</b> — вещества попадут в калькулятор поддержки: расчёт рисков, дозировок и карточка «Тренировочные миксы и пресеты здоровья».</span>
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={onClose} style={btn('rgba(255,255,255,0.08)', 'rgba(255,255,255,0.75)', true)}>Отмена</button>
+              <button onClick={onConfirm} style={btn('linear-gradient(135deg,#00e68a,#00c853)', '#000', true)}>Сохранить</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 10 }}>✅ Сохранено</div>
+            {res ? (
+              <>
+                <div style={row}><span>📓</span><span>Запись добавлена в <b>дневник тренировок</b> ({count} веществ).</span></div>
+                <div style={row}><span>⭐</span><span>В <b>избранное БАД</b> добавлено{favCount != null && favCount > 0 ? ` новых веществ: +${favCount}` : ' новых веществ: 0 (уже в избранном)'}.</span></div>
+                <div style={row}><span>💊</span><span><b>Рекомендации сохранены</b>: {res.rec.substances.length} препаратов проанализировано{res.rec.interactions.length > 0 ? `, конфликтов в наборе: ${res.rec.interactions.length}` : ''}.</span></div>
+                {popup.toPlan && <div style={row}><span>🧮</span><span>Внесено в <b>план поддержки</b> — появится в карточке калькулятора «Тренировочные миксы и пресеты здоровья».</span></div>}
+              </>
+            ) : (
+              <div style={row}><span>🎯</span><span><b>Комплект сохранён в Избранное</b> — вкладка «🎯 Миксы» блока БАД.</span></div>
+            )}
+            <div style={{ marginTop: 12 }}>
+              <button onClick={onClose} style={{ width: '100%', ...btn('linear-gradient(135deg,#00e68a,#00c853)', '#000') }}>Готово</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const TrainingMixTab: React.FC = () => {
   const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
@@ -93,6 +154,7 @@ export const TrainingMixTab: React.FC = () => {
   const [mixDrugMGF, setMixDrugMGF] = useState<number>(0);
   const [mixDrugGLP1, setMixDrugGLP1] = useState(false);
   const [mixPushed, setMixPushed] = useState(false);
+  const [savePopup, setSavePopup] = useState<{ step: 'confirm' | 'done'; toPlan: boolean; result: SaveMixResult | null } | null>(null);
 
   // автоопределение фармы
   useEffect(() => {
@@ -136,6 +198,13 @@ export const TrainingMixTab: React.FC = () => {
 
   const mixSubstances: MixSubstance[] = useMemo(() =>
     stack.filter(s => s.mg > 0).map(s => ({ id: s.id, name: s.name, doseMg: s.mg })), [stack]);
+
+  const planSubstances: PlanSubstance[] = useMemo(() =>
+    stack.filter(s => s.mg > 0).map(s => ({
+      id: s.id, name: s.name, dose: String(s.dose ?? ''), unit: s.unit || 'мг', mg: s.mg, note: s.note, timing: mixTiming,
+    })), [stack, mixTiming]);
+
+  const mixTitle = `${mixGoal === 'pump' ? 'Памп' : GOAL_OPTIONS.find(g => g.id === mixGoal)?.label || mixGoal} (${mixTiming === 'pre' ? 'пред' : mixTiming === 'intra' ? 'интра' : 'пост'})`;
 
   const score: TrainingMixScore = useMemo(() => {
     if (mixSubstances.length === 0) return {
@@ -323,11 +392,9 @@ export const TrainingMixTab: React.FC = () => {
 
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => {
-              const entry = { goal: mixGoal, timing: mixTiming, score: score.compositeScore, label: score.label, date: new Date().toLocaleDateString('ru-RU') };
-              const updated = [entry, ...mixHistory].slice(0, 20);
-              setMixHistory(updated);
-              localStorage.setItem('he_training_mixes', JSON.stringify(updated));
-            }} style={{ flex: 1, padding: '8px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa' }}>💾 Сохранить</button>
+              if (planSubstances.length === 0) return;
+              setSavePopup({ step: 'confirm', toPlan: false, result: null });
+            }} style={{ flex: 1, padding: '8px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa' }}>💾 Сохранить в дневник и избранное</button>
             <button onClick={() => {
               const kit = {
                 id: Date.now(), type: 'mix',
@@ -341,7 +408,7 @@ export const TrainingMixTab: React.FC = () => {
                 const arr: any[] = JSON.parse(localStorage.getItem('he_saved_calc_results') || '[]');
                 arr.push(kit);
                 localStorage.setItem('he_saved_calc_results', JSON.stringify(arr));
-                alert('✅ Комплект сохранён в Избранное');
+                setSavePopup({ step: 'done', toPlan: false, result: null });
               } catch { /* ignore */ }
             }} style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a' }}>💾 Комплект</button>
           </div>
@@ -387,6 +454,33 @@ export const TrainingMixTab: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+      {savePopup && (
+        <SaveResultPopup
+          popup={savePopup}
+          count={planSubstances.length}
+          onToPlanChange={v => setSavePopup(prev => prev ? { ...prev, toPlan: v } : prev)}
+          onConfirm={() => {
+            if (!savePopup) return;
+            try {
+              const input = {
+                title: `Микс: ${mixTitle}`,
+                kind: 'mix' as const,
+                goal: mixGoal,
+                timing: mixTiming,
+                score: score.compositeScore,
+                label: score.label,
+                weightKg: bw,
+                substances: planSubstances,
+              };
+              const result = saveMixToDiaryAndFavorites(input);
+              if (savePopup.toPlan) queueMixToSupportPlan(result.rec);
+              setMixHistory(readDiaryMixes() as any);
+              setSavePopup({ step: 'done', toPlan: savePopup.toPlan, result });
+            } catch { /* ignore */ }
+          }}
+          onClose={() => setSavePopup(null)}
+        />
       )}
     </div>
   );
