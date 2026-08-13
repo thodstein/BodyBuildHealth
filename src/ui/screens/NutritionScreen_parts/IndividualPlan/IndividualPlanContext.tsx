@@ -160,6 +160,10 @@ export interface PlanCtx {
   draggedItem: any; setDraggedItem: (v: any) => void;
   dropTarget: number | null; setDropTarget: (v: any) => void;
   undoStack: any[]; setUndoStack: (v: any) => void;
+  undoLast: () => void;
+  weekEditDay: number | null;
+  openWeekDayForEdit: (di: number) => void;
+  switchPlanDays: (d: 1 | 3 | 7) => void;
   userRecipes: any[]; setUserRecipes: (v: any) => void;
   showRecipeCreator: boolean; setShowRecipeCreator: (v: boolean) => void;
   showAddDrug: boolean; setShowAddDrug: (v: boolean) => void;
@@ -176,7 +180,8 @@ export interface PlanCtx {
   replaceFoodItem: (a: number, b: number, c: number, d: any) => void;
   updateItemAmount: (a: number, b: number, c: number, d: number) => void;
   removeFoodItem: (a: number, b: number, c: number) => void;
-  replaceMealWithRecipe: (recipe: Recipe, mealIdx: number) => void;
+  replaceMealWithRecipe: (recipe: Recipe, mealIdx: number, dayIdx?: number) => void;
+  addFoodToMeal: (dayIdx: number, mealIdx: number, food: any) => void;
   generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean }) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
@@ -225,7 +230,7 @@ export interface PlanCtx {
   generateRiskReport: () => void;
   generateDrugCompatReport: () => void;
   generateFullNutritionReport: () => void;
-  renderMealList: (dayData: any, editable?: boolean) => React.ReactNode;
+  renderMealList: (dayData: any, editable?: boolean, dayIdx?: number) => React.ReactNode;
   cyclePhase: string; setCyclePhase: (v: any) => void;
   bbCategory: BBCategory; setBBCategory: (v: any) => void;
   peakWeekEnabled: boolean; setPeakWeekEnabled: (v: boolean) => void;
@@ -885,6 +890,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setUndoStack(prev => [snap, ...prev].slice(0, 5));
   };
 
+  // FIX button-audit: единая реализация undo — восстанавливает ВСЕ части снапшота
+  // (раньше recommendations не восстанавливались, а setState вызывался внутри updater)
+  const _undoRef = useRef(undoStack); _undoRef.current = undoStack;
+  const undoLast = () => {
+    const stack = _undoRef.current;
+    if (!Array.isArray(stack) || stack.length === 0) return;
+    const snap = stack[0];
+    if (snap.dayPlan) setDayPlan(snap.dayPlan);
+    if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
+    if (snap.weekPlan) setWeekPlan(snap.weekPlan);
+    if (snap.shoppingList) setShoppingList(snap.shoppingList);
+    if (snap.waterCalc) setWaterCalc(snap.waterCalc);
+    if (snap.recommendations) setRecommendations(snap.recommendations);
+    setUndoStack(prev => prev.slice(1));
+  };
+
   const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0), fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0) });
   const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) });
   const updateMealsInPlan = (prev: any, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
@@ -967,50 +988,106 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return scored;
   };
  
+  // FIX button-audit: единая конвенция dayIdx — 0 = dayPlan, 1..3 = threeDayPlan.days[dayIdx-1],
+  // 7..13 = weekPlan.days[dayIdx-7]. Раньше недельные дни 1..3 попадали в ветку threeDayPlan
+  // (замена/удаление в недельном виде молча правили 3-дневную копию).
+  const _resolvePlanDay = (dayIdx: number): { plan: any; day: number } | null => {
+    if (dayIdx === 0) return { plan: 'day', day: 0 };
+    if (dayIdx >= 7 && weekPlan) return { plan: 'week', day: dayIdx - 7 };
+    if (dayIdx >= 1 && dayIdx <= 3 && threeDayPlan) return { plan: 'three', day: dayIdx - 1 };
+    if (dayIdx >= 1 && dayIdx <= 3 && weekPlan) return { plan: 'week', day: dayIdx - 1 }; // fallback: нет threeDayPlan, но есть week
+    return null;
+  };
+
+  // FIX button-audit: при открытии дня недели для редактирования dayPlan становится копией
+  // этого дня; правки синхронизируются обратно в weekPlan (раньше терялись при возврате к неделе).
+  const [weekEditDay, setWeekEditDay] = useState<number | null>(null);
+  const openWeekDayForEdit = (di: number) => {
+    if (!weekPlan?.days?.[di]) return;
+    try { setDayPlan(JSON.parse(JSON.stringify(weekPlan.days[di]))); } catch { setDayPlan(weekPlan.days[di]); }
+    setWeekEditDay(di);
+    setPlanDays(1);
+    setSelectedDayIndex(di);
+  };
+  const switchPlanDays = (d: 1 | 3 | 7) => {
+    if (d !== 1) setWeekEditDay(null);
+    setPlanDays(d);
+  };
+  const _applyDayPlanMealUpdate = (mealIdx: number, updater: (items: any[]) => any[]) => {
+    setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, updater));
+    if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+      updateMultiDayPlan(weekPlan, weekEditDay, mealIdx, updater);
+    }
+  };
+
+  // FIX button-audit: быстрый «+ Продукт» в любом дне плана (раньше всегда правил dayPlan)
+  const addFoodToMeal = (dayIdx: number, mealIdx: number, food: any) => {
+    if (!food || !food.name) return;
+    const resolved = _resolvePlanDay(dayIdx);
+    if (!resolved) return;
+    const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
+    if (!dayData?.meals?.[mealIdx]) return;
+    saveUndo();
+    const item = { name: food.name, id: food.id, amount: 100, kcal: food.kcal || 0, p: food.protein || 0, f: food.fat || 0, c: food.carbs || 0, fiber: food.fiber || 0 };
+    if (resolved.plan === 'day') {
+      _applyDayPlanMealUpdate(mealIdx, items => [...items, item]);
+    } else if (resolved.plan === 'three') {
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => [...items, item]);
+    } else if (resolved.plan === 'week') {
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => [...items, item]);
+    }
+  };
+
   const replaceFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number, newFood: any) => {
-    const dayData = dayIdx === 0 ? dayPlan : threeDayPlan?.days?.[dayIdx - 1] || weekPlan?.days?.[dayIdx - 1];
+    if (!newFood || typeof newFood !== 'object' || !newFood.name) return; // FIX button-audit: guard
+    const resolved = _resolvePlanDay(dayIdx);
+    if (!resolved) return;
+    const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
     const old = dayData.meals[mealIdx].items[itemIdx]; const portion = (old.amount || 100) / 100;
     const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), fiber: Math.round((newFood.fiber || 0) * portion), amount: Math.round(portion * (parseServingSizeGrams(newFood.servingSize) || 100)) };
-    if (dayIdx === 0) {
-      setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => { items[itemIdx] = replacement; return items; }));
-    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
-      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, items => { items[itemIdx] = replacement; return items; });
-    } else if (weekPlan) {
-      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, items => { items[itemIdx] = replacement; return items; });
+    if (resolved.plan === 'day') {
+      _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = replacement; return items; });
+    } else if (resolved.plan === 'three') {
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; });
+    } else if (resolved.plan === 'week') {
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => { items[itemIdx] = replacement; return items; });
     }
     setReplacingItem(null);
   };
 
   const updateItemAmount = (dayIdx: number, mealIdx: number, itemIdx: number, newAmount: number) => {
-    if (dayIdx === 0) {
-      setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => {
-        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), p: Math.round((items[itemIdx].p || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), f: Math.round((items[itemIdx].f || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), c: Math.round((items[itemIdx].c || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)), fiber: Math.round((items[itemIdx].fiber || 0) / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
-        items[itemIdx] = it; return items;
-      }));
-    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
-      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, items => {
-        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
-        items[itemIdx] = it; return items;
-      });
-    } else if (weekPlan) {
-      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, items => {
-        const it = { ...items[itemIdx], amount: Math.max(1, newAmount), kcal: Math.round(items[itemIdx].kcal / Math.max(1, items[itemIdx].amount) * Math.max(1, newAmount)) };
-        items[itemIdx] = it; return items;
-      });
+    const resolved = _resolvePlanDay(dayIdx);
+    if (!resolved) return;
+    const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
+    if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) { setEditItem(null); return; }
+    const it = dayData.meals[mealIdx].items[itemIdx];
+    const amt = Math.max(1, newAmount);
+    const ratio = amt / Math.max(1, it.amount || 1);
+    const scaled = { ...it, amount: amt, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio), f: Math.round((it.f || 0) * ratio), c: Math.round((it.c || 0) * ratio), fiber: Math.round((it.fiber || 0) * ratio) };
+    if (resolved.plan === 'day') {
+      _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = scaled; return items; });
+    } else if (resolved.plan === 'three') {
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => { items[itemIdx] = scaled; return items; });
+    } else if (resolved.plan === 'week') {
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => { items[itemIdx] = scaled; return items; });
     }
     setEditItem(null);
   };
 
   const removeFoodItem = (dayIdx: number, mealIdx: number, itemIdx: number) => {
+    const resolved = _resolvePlanDay(dayIdx);
+    if (!resolved) return;
+    const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
+    if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
-    if (dayIdx === 0) {
-      setDayPlan((prev: any) => updateMealsInPlan(prev, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx)));
-    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
-      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
-    } else if (weekPlan) {
-      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+    if (resolved.plan === 'day') {
+      _applyDayPlanMealUpdate(mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+    } else if (resolved.plan === 'three') {
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+    } else if (resolved.plan === 'week') {
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
     }
   };
 
@@ -1055,20 +1132,29 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       });
     };
     if (dayIdx === 0) {
+      const matchedItems = buildRecipeItems();
       setDayPlan((prev: any) => {
         if (!prev || !Array.isArray(prev.meals)) return prev;
         // P0-fix: bounds check на mealIdx — предотвращает молчаливую порчу данных
         if (mealIdx < 0 || mealIdx >= prev.meals.length) return prev;
         const meals = [...prev.meals];
-        const matchedItems = buildRecipeItems();
         const totals = calcItemTotals(matchedItems);
         meals[mealIdx] = { ...meals[mealIdx], items: matchedItems, totals };
         return { ...prev, meals, totals: calcMealTotals(meals) };
       });
-    } else if (threeDayPlan && dayIdx >= 1 && dayIdx <= 3) {
-      updateMultiDayPlan(threeDayPlan, dayIdx - 1, mealIdx, () => buildRecipeItems());
-    } else if (weekPlan) {
-      updateMultiDayPlan(weekPlan, dayIdx - 1, mealIdx, () => buildRecipeItems());
+      // FIX button-audit: синхронизация правок обратно в недельный план
+      if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+        updateMultiDayPlan(weekPlan, weekEditDay, mealIdx, () => matchedItems);
+      }
+    } else {
+      // FIX button-audit: недельные дни (dayIdx >= 7) идут в weekPlan, 1..3 — в threeDayPlan
+      const resolved = _resolvePlanDay(dayIdx);
+      if (!resolved) { setRecipePickerMeal(null); return; }
+      if (resolved.plan === 'three') {
+        updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, () => buildRecipeItems());
+      } else if (resolved.plan === 'week') {
+        updateMultiDayPlan(weekPlan, resolved.day, mealIdx, () => buildRecipeItems());
+      }
     }
     setRecipePickerMeal(null);
   };
@@ -1355,6 +1441,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
      if (!opts?.skipUndo) saveUndo();
      setPlanDays(days);
      if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
+     setWeekEditDay(null); // FIX button-audit: новая генерация сбрасывает редактирование недели
 
      // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
      if (useProEngine) {
@@ -2680,6 +2767,8 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     saveUndo, moveFoodItem, findSimilarFoods, replaceFoodItem,
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
     updateItemAmount, removeFoodItem, replaceMealWithRecipe, generatePlan,
+    weekEditDay, openWeekDayForEdit, switchPlanDays,
+    addFoodToMeal, undoLast,
     toggleAllergen, toggleHealthIssue, loadSavedPlan,
     autofillFromProfile, saveToProfile,
     generateCheatMeal, generateCarbload, generateBUTCH,
