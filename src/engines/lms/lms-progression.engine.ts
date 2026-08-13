@@ -28,6 +28,24 @@ export const DEFAULT_WEEKLY_PERCENT: Record<ProgressionMode, number> = {
   custom: 0.005,
 };
 
+/**
+ * Недельный темп прогрессии ПМ по уровню спортсмена (Rhea 2003; Schoenfeld 2019).
+ * Новички адаптируются быстрее (+1.5%/нед), продвинутые — медленнее (+0.5%/нед).
+ * Это НИЖНЯЯ граница для натурала: если цикл задаёт более медленный correctionPct —
+ * берётся levelK. На курсе применяется курсовая кривая (выше), на ПКТ — нисходящая.
+ */
+export const LEVEL_PM_K: Record<string, number> = {
+  beginner: 0.015,     // +1.5%/нед — быстрый адаптационный рост
+  intermediate: 0.008, // +0.8%/нед
+  advanced: 0.005,     // +0.5%/нед — предел натурального роста
+};
+
+/** levelK (нижняя граница) по нормализованному уровню; null — если уровень не задан. */
+export function levelPmFloor(level?: string): number | null {
+  if (!level) return null;
+  return LEVEL_PM_K[level.toLowerCase()] ?? null;
+}
+
 /** Дефолтный % для on_course по интенсивности курса. */
 export function courseDefaultPercent(intensity?: 'mild' | 'moderate' | 'heavy'): number {
   if (intensity === 'mild') return 0.015;     // +1.5%

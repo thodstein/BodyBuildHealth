@@ -168,3 +168,64 @@ describe('слабые группы мышц — упражнения под к�
     expect(chestDay).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('прогрессия ПМ — уровень спортсмена (Rhea 2003)', () => {
+  function planForLevel(metaLevel: string, weeksOverride = 8): LMSBuildOutput {
+    const tpl = { ...CYCLE_01, meta: { ...CYCLE_01.meta, level: metaLevel } } as never;
+    return buildLMSPlan({
+      template: tpl,
+      pmMap,
+      fallbackPm: 80,
+      mode: 'natural',
+      weeksOverride,
+      faithful: false,
+    } as never);
+  }
+
+  it('новичок (novice) прогрессирует ПМ быстрее, чем intermediate', () => {
+    const novice = planForLevel('novice', 8);
+    const intermediate = planForLevel('intermediate', 8);
+    const base = novice.weeks[0].pmRow['Присед'];
+    expect(novice.weeks[7].pmRow['Присед']).toBeGreaterThan(intermediate.weeks[7].pmRow['Присед']);
+    // Новичок: k ≥ 1.5%/нед → к неделе 8 рост > 10%.
+    expect(novice.weeks[7].pmRow['Присед']).toBeGreaterThan(base * 1.1);
+  });
+
+  it('продвинутый (KMS-MS/MS-MSMK) прогрессирует медленнее новичка', () => {
+    const advanced = planForLevel('KMS-MS', 8);
+    const novice = planForLevel('novice', 8);
+    expect(advanced.weeks[7].pmRow['Присед']).toBeLessThan(novice.weeks[7].pmRow['Присед']);
+  });
+
+  it('levelK — нижняя граница: цикл с correctionPct=0.002 у intermediate даёт ≥0.8%/нед', () => {
+    const tpl = { ...CYCLE_01, meta: { ...CYCLE_01.meta, level: 'intermediate', correctionPct: 0.002 } } as never;
+    const p = buildLMSPlan({ template: tpl, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 8, faithful: false });
+    const base = p.weeks[0].pmRow['Присед'];
+    const end = p.weeks[7].pmRow['Присед'];
+    // 0.8%/нед за 7 недель прироста ≈ ×1.057; floor гарантирует не ниже.
+    expect(end).toBeGreaterThanOrEqual(base * 1.05);
+  });
+
+  it('на курсе (on_course) levelK НЕ применяется — курсовая кривая выше', () => {
+    const tpl = { ...CYCLE_01, meta: { ...CYCLE_01.meta, level: 'novice' } } as never;
+    const p = buildLMSPlan({ template: tpl, pmMap, fallbackPm: 80, mode: 'on_course', courseIntensity: 'moderate', weeksOverride: 8, faithful: false });
+    const base = p.weeks[0].pmRow['Присед'];
+    const end = p.weeks[7].pmRow['Присед'];
+    // Курс moderate: +2%/нед → рост ×1.14 к неделе 8 (выше levelK новичка).
+    expect(end).toBeGreaterThanOrEqual(base * 1.12);
+  });
+
+  it('натуральный явный weeklyPercent имеет приоритет над levelK (не понижается)', () => {
+    const tpl = { ...CYCLE_01, meta: { ...CYCLE_01.meta, level: 'novice' } } as never;
+    const p = buildLMSPlan({ template: tpl, pmMap, fallbackPm: 80, mode: 'natural', weeklyPercent: 0.02, weeksOverride: 8, faithful: false });
+    const base = p.weeks[0].pmRow['Присед'];
+    const end = p.weeks[7].pmRow['Присед'];
+    expect(end).toBeGreaterThanOrEqual(base * 1.14);
+  });
+
+  it('progressionRationale упоминает уровень спортсмена', () => {
+    const p = planForLevel('novice', 8);
+    expect(p.progressionRationale).toContain('Уровень beginner');
+    expect(p.progressionRationale).toContain('1.5%');
+  });
+});

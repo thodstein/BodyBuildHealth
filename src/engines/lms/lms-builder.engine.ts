@@ -7,7 +7,7 @@
  */
 
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec } from '../../data/lms-cycles/lms-types';
-import { pmProgression, pmForWeek, workWeight, progressionRationale, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
+import { pmProgression, pmForWeek, workWeight, progressionRationale, levelPmFloor, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { type Exercise } from '../../core/types';
@@ -816,6 +816,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const goalKey = rirGoalKey(template.meta.period);
   const levelKey = rirLevelKey(template.meta.level);
   const vrLevel = vrLevelKey(template.meta.level);
+  // Уровень спортсмена в темпе прогрессии ПМ (натурал/custom): k ≥ levelK (Rhea 2003).
+  const levelPmNote = (!hasExplicitWeeks && (mode === 'natural' || mode === 'custom') && levelPmFloor(vrLevel) != null)
+    ? ` 🎓 Уровень ${vrLevel}: темп ПМ ≥ +${(levelPmFloor(vrLevel)! * 100).toFixed(1)}%/нед.`
+    : '';
   // PED-адаптация: dose-aware через adaptForPEDs (если переданы PEDs), иначе fallback на хардкод.
   let pedMrvMult = 1;
   let pedRecMult = 1;
@@ -876,9 +880,14 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       if (input.progressionEnabled === false) {
         pmRow[name] = pm0Map[name];
       } else {
-        const k = (input.weeklyPercent != null ? input.weeklyPercent
+        // Уровень спортсмена влияет на темп прогрессии ПМ для натурала:
+        // k = max(коррекция цикла, levelK) — новичок растёт быстрее (Rhea 2003).
+        // На курсе — курсовая кривая, на ПКТ — нисходящая (levelK не применяется).
+        const rawK = (input.weeklyPercent != null ? input.weeklyPercent
           : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
           : mode === 'pct' ? -0.005 : template.meta.correctionPct);
+        const levelK = (mode === 'natural' || mode === 'custom') ? levelPmFloor(vrLevel) : null;
+        const k = (levelK != null && rawK < levelK) ? levelK : rawK;
         const progInput: PMProgressionInput = { pm0: pm0Map[name], weeks: totalWeeks, mode, weeklyPercent: k, courseIntensity: input.courseIntensity };
         const progressedPm = pmForWeek(progInput, weekNumber);
         pmRow[name] = progressedPm * (faithful ? 1 : arTopMult);
@@ -1185,6 +1194,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   const proRationale = [
     rationale,
+    levelPmNote,
     input.volumeGoal ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}.` : '',
     input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
     input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',
@@ -1307,10 +1317,14 @@ export function appendPLTaperWeeks(
   });
   // Режим прогрессии: явный mode, иначе on_course при активном курсе (как UI buildSrc).
   const mode: ProgressionMode = opts?.mode ?? (activePeds.length > 0 ? 'on_course' : 'natural');
-  const k = (opts?.weeklyPercent != null ? opts.weeklyPercent
+  const rawK = (opts?.weeklyPercent != null ? opts.weeklyPercent
     : mode === 'on_course' ? (opts?.courseIntensity === 'mild' ? 0.015 : opts?.courseIntensity === 'heavy' ? 0.025 : 0.02)
     : mode === 'pct' ? -0.005
     : (plan.template?.meta?.correctionPct ?? 0.005));
+  // Уровень спортсмена (как в buildLMSPlan): натурал/custom — k ≥ levelK.
+  const taperLevel = vrLevelKey(plan.template?.meta?.level as string | undefined ?? 'intermediate');
+  const levelK = (mode === 'natural' || mode === 'custom') ? levelPmFloor(taperLevel) : null;
+  const k = (levelK != null && rawK < levelK) ? levelK : rawK;
   let pedMrvMult = 1;
   let pedRecMult = 1;
   if (activePeds.length > 0) {
