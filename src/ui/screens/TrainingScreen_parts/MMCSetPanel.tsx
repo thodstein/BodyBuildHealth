@@ -1,12 +1,14 @@
 /**
- * MMCSetPanel.tsx — самостоятельная панель ввода MMC/Пампинг/Суставы/Энергия для одного подхода.
+ * MMCSetPanel.tsx — панель ввода MMC/Пампинг/Суставы/Энергия для одного подхода.
  *
- * Не зависит от формы сохранения тренировки: записывает в he_mmc_log сразу по кнопке «✓ Записать»
- * через recordMMCFromPartial (upsert по дате+упражнению+подходу — повторное сохранение обновляет,
- * а не дублирует). Встраивается в любой список подходов: передать exerciseId/exerciseName/setNumber/date.
+ * Каждая метрика — сегментированная шкала-выбор 0–10 (кнопки, как в модалках дневников Профиля).
+ * Записывает в he_mmc_log по кнопке «Записать» через recordMMCFromPartial
+ * (upsert по дате+упражнению+подходу — повторное сохранение обновляет, а не дублирует).
+ * Встраивается в любой список подходов: передать exerciseId/exerciseName/setNumber/date.
  */
 import React, { useState } from 'react';
 import { recordMMCFromPartial, hasMMCValues, type MMCPartial } from '../../../engines/mmc-tracking.engine';
+import { ScalePicker } from '../ProfileScreen_v2/diary-modals';
 
 const ACCENT = '#00e68a';
 
@@ -14,15 +16,23 @@ interface MMCFieldDef {
   key: keyof MMCPartial;
   label: string;
   emoji: string;
-  placeholder: string;
+  hint: string;
+  /** true = выше значение лучше (MMC/пампинг/энергия) — инверсия цвета шкалы. */
+  higherIsBetter: boolean;
 }
 
 const FIELDS: MMCFieldDef[] = [
-  { key: 'mmc', label: 'MMC', emoji: '🧠', placeholder: 'связь' },
-  { key: 'pump', label: 'Пампинг', emoji: '💪', placeholder: 'памп' },
-  { key: 'jointDiscomfort', label: 'Суставы', emoji: '🦵', placeholder: 'дискомфорт' },
-  { key: 'energy', label: 'Энергия', emoji: '⚡', placeholder: 'силы' },
+  { key: 'mmc', label: 'MMC', emoji: '🧠', hint: 'связь мозг-мышцы', higherIsBetter: true },
+  { key: 'pump', label: 'Пампинг', emoji: '💪', hint: 'наполнение мышцы кровью', higherIsBetter: true },
+  { key: 'jointDiscomfort', label: 'Суставы', emoji: '🦵', hint: 'дискомфорт (0 — нет)', higherIsBetter: false },
+  { key: 'energy', label: 'Энергия', emoji: '⚡', hint: 'общий запас сил', higherIsBetter: true },
 ];
+
+const toneFor = (f: MMCFieldDef, v: number | undefined): string => {
+  if (v === undefined) return 'rgba(255,255,255,0.35)';
+  const pct = f.higherIsBetter ? (10 - v) / 10 : v / 10;
+  return pct <= 0.25 ? '#22c55e' : pct <= 0.5 ? '#84cc16' : pct <= 0.75 ? '#f59e0b' : '#ef4444';
+};
 
 export interface MMCSetPanelProps {
   exerciseId: string;
@@ -38,11 +48,8 @@ export const MMCSetPanel: React.FC<MMCSetPanelProps> = ({ exerciseId, exerciseNa
   const [values, setValues] = useState<MMCPartial>({});
   const [saved, setSaved] = useState(false);
 
-  const setField = (key: keyof MMCPartial, raw: string) => {
-    setValues(prev => ({
-      ...prev,
-      [key]: raw === '' ? undefined : Math.min(10, Math.max(0, parseInt(raw, 10) || 0)),
-    }));
+  const setField = (key: keyof MMCPartial, v: number) => {
+    setValues(prev => ({ ...prev, [key]: Math.min(10, Math.max(0, v)) }));
     setSaved(false);
   };
 
@@ -64,43 +71,59 @@ export const MMCSetPanel: React.FC<MMCSetPanelProps> = ({ exerciseId, exerciseNa
 
   return (
     <div style={{
-      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6,
-      padding: compact ? '4px 6px' : '6px 8px', borderRadius: 8,
+      padding: compact ? '8px' : '10px 12px', borderRadius: 10,
       background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)',
     }}>
-      {FIELDS.map(f => (
-        <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: compact ? 9 : 10, color: 'rgba(255,255,255,0.55)' }}>
-          <span style={{ whiteSpace: 'nowrap', minWidth: compact ? 0 : 44 }}>{f.emoji} {!compact && f.label}</span>
-          <input
-            type="number" min={0} max={10}
-            value={values[f.key] ?? ''}
-            onChange={e => setField(f.key, e.target.value)}
-            placeholder={f.placeholder}
-            style={{
-              width: 34, padding: compact ? '2px 2px' : '4px 4px', borderRadius: 5,
-              border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
-              color: '#fff', fontSize: compact ? 10 : 11, textAlign: 'center',
-              minHeight: compact ? 24 : 30,
-            }}
-          />
-        </label>
-      ))}
-      <button
-        onClick={save}
-        disabled={!filled}
-        title="Записать MMC в дневник"
-        style={{
-          padding: compact ? '3px 8px' : '5px 10px', borderRadius: 6, border: 'none', cursor: filled ? 'pointer' : 'not-allowed',
-          background: filled ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)',
-          color: filled ? '#000' : 'rgba(255,255,255,0.3)',
-          fontWeight: 700, fontSize: compact ? 9 : 10, minHeight: compact ? 24 : 30,
-        }}
-      >
-        {saved ? '✓ Записано' : '✓ Записать'}
-      </button>
-      {saved && (
-        <span style={{ fontSize: compact ? 8 : 9, color: ACCENT, fontWeight: 700 }}>обновлено</span>
-      )}
+      <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : '1fr 1fr', gap: compact ? 6 : 8 }}>
+        {FIELDS.map(f => {
+          const v = values[f.key];
+          return (
+            <div key={f.key} style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <span style={{ fontSize: compact ? 10 : 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
+                  {f.emoji} {f.label}
+                </span>
+                <span style={{ fontSize: compact ? 9 : 10, color: toneFor(f, v), fontWeight: 800, minWidth: 30, textAlign: 'right' }}>
+                  {v !== undefined ? `${v}/10` : '—'}
+                </span>
+              </div>
+              <ScalePicker
+                value={v ?? 0}
+                min={0}
+                max={10}
+                dense
+                height={compact ? 30 : 36}
+                onChange={val => setField(f.key, val)}
+                toneFn={val => toneFor(f, val)}
+              />
+              {!compact && (
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{f.hint}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: compact ? 6 : 8 }}>
+        <button
+          onClick={save}
+          disabled={!filled}
+          title="Записать MMC в дневник"
+          style={{
+            flex: 1, padding: compact ? '6px 10px' : '9px 12px', borderRadius: 8, border: 'none',
+            cursor: filled ? 'pointer' : 'not-allowed',
+            background: filled ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)',
+            color: filled ? '#000' : 'rgba(255,255,255,0.3)',
+            fontWeight: 800, fontSize: compact ? 10 : 11, minHeight: compact ? 30 : 38,
+          }}
+        >
+          {saved ? '✓ Записано' : '💾 Записать MMC'}
+        </button>
+        {saved && (
+          <span style={{ fontSize: compact ? 9 : 10, color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            ✓ обновлено
+          </span>
+        )}
+      </div>
     </div>
   );
 };

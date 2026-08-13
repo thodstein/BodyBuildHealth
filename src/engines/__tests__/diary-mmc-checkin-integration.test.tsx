@@ -11,7 +11,15 @@ import MMCTrackingCard from '../../ui/screens/TrainingScreen_parts/MMCTrackingCa
 import { clearMMCLog, loadMMCLog } from '../mmc-tracking.engine';
 import { syncHistoryFromProfileDiaries, loadMetrics } from '../profile-settings.engine';
 
-const today = new Date().toISOString().slice(0, 10);
+/** Локальная дата (как дневники Профиля todayIso) — синхронизация чек-ина работает по ней. */
+const today = (() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+})();
 
 beforeEach(() => {
   localStorage.clear();
@@ -58,23 +66,35 @@ describe('Чек-ин ↔ дневники профиля', () => {
     expect(wl[0].weight).toBe(79.4);
     expect(wl[0].waistCm).toBe(85);
   });
+
+  it('РЕГРЕССИЯ даты: вес из дневника Профиля за вчера попадает в записи/тренды чек-ина (локальная дата)', async () => {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+    localStorage.setItem('he_weight_log', JSON.stringify([{ date: yesterday, weight: 81.5 }]));
+    render(<CheckinMetricsCard />);
+    // syncHistory создаёт запись чек-ина за вчера → секция «Последние 7 записей» показывает вес
+    expect(await screen.findByText(/81\.5 кг/)).toBeTruthy();
+  });
 });
 
 describe('MMC/Пампинг/Суставы в дневнике', () => {
-  it('MMCSetPanel записывает в he_mmc_log (upsert по дата+упражнение+подход)', async () => {
+  it('MMCSetPanel: выбор по шкалам 0–10, запись в he_mmc_log (upsert)', async () => {
     render(<MMCSetPanel exerciseId="bench" exerciseName="Жим лёжа" setNumber={1} date={today} />);
-    const mmcInput = screen.getByPlaceholderText('связь');
-    fireEvent.change(mmcInput, { target: { value: '9' } });
-    const pumpInput = screen.getByPlaceholderText('памп');
-    fireEvent.change(pumpInput, { target: { value: '7' } });
-    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    // 4 шкалы по 11 кнопок (role=radio): MMC 0-10, Пампинг 0-10, Суставы 0-10, Энергия 0-10
+    const radios = screen.getAllByRole('radio');
+    expect(radios.length).toBe(44);
+    fireEvent.click(radios[9]);   // MMC = 9
+    fireEvent.click(radios[18]);  // Пампинг = 7 (11 + 7)
+    expect(screen.getByText('9/10')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Записать MMC/ }));
     const log = loadMMCLog();
     expect(log).toHaveLength(1);
     expect(log[0]).toMatchObject({ date: today, exerciseName: 'Жим лёжа', setNumber: 1, mmc: 9, pump: 7 });
     expect(screen.getByText(/Записано/)).toBeTruthy();
     // повторная запись — апдейт, не дубль
-    fireEvent.change(mmcInput, { target: { value: '8' } });
-    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    fireEvent.click(radios[8]); // MMC = 8
+    fireEvent.click(screen.getByRole('button', { name: /Записать MMC/ }));
     expect(loadMMCLog()).toHaveLength(1);
     expect(loadMMCLog()[0].mmc).toBe(8);
   });

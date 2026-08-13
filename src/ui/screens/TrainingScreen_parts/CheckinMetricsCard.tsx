@@ -25,10 +25,11 @@ export const CheckinMetricsCard: React.FC = () => {
   const [form, setForm] = useState<DailyMetrics>(today);
   const [saved, setSaved] = useState(false);
   const [synced, setSynced] = useState(false);
-  const stats = useMemo(() => getAllTimeStats(), [saved]);
-  const rolling = useMemo(() => getRollingAverages(), [saved]);
-  const trend = useMemo(() => weightTrend(7), [saved]);
-  const last7 = useMemo(() => loadMetrics().slice(-7).reverse(), [saved]);
+  const [syncTick, setSyncTick] = useState(0);
+  const stats = useMemo(() => getAllTimeStats(), [saved, syncTick]);
+  const rolling = useMemo(() => getRollingAverages(), [saved, syncTick]);
+  const trend = useMemo(() => weightTrend(7), [saved, syncTick]);
+  const last7 = useMemo(() => loadMetrics().slice(-7).reverse(), [saved, syncTick]);
 
   // Синхронизация: подтянуть сегодняшние вес/сон/пульс из дневников Профиля
   const pullDiaries = useCallback(() => {
@@ -36,6 +37,7 @@ export const CheckinMetricsCard: React.FC = () => {
     syncHistoryFromProfileDiaries();
     const pulled = pullFromProfileDiaries(before);
     setForm(pulled);
+    setSyncTick(t => t + 1);
     const changed = pulled.weightKg !== before.weightKg || pulled.sleepHours !== before.sleepHours
       || pulled.sleepQuality !== before.sleepQuality || pulled.restingHR !== before.restingHR;
     if (changed) setSynced(true);

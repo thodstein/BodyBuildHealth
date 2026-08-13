@@ -92,8 +92,18 @@ export function saveMetric(metric: DailyMetrics): DailyMetrics[] {
   return metrics;
 }
 
+/** Сегодня по ЛОКАЛЬНОМУ времени (YYYY-MM-DD) — как дневники Профиля (todayIso). */
+export function todayLocalIso(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function getTodayMetric(): DailyMetrics {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const metrics = loadMetrics();
   const existing = metrics.find(m => m.date === today);
   if (existing) return existing;
