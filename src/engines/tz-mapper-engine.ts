@@ -69,6 +69,8 @@ import {
   type AppliedBooster,
 } from './tz-bridge-boosters';
 import { assessPedRisk, type PedRiskAssessment } from './ped-risk-matrix';
+import { buildAssayWarningsFromDb } from '../data/assay-interference-db';
+import { getSubstanceMonitoring } from '../data/substance-monitoring-db';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { canonId, sameClassIds } from './support-plan/shared-constants';
 import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
@@ -300,6 +302,10 @@ function buildAssayWarnings(substanceIds: string[], ctx: MapperCtx): string[] {
   if (ctx.aasIds?.length || ctx.pedDoses?.length) {
     warnings.push('TT/FT/E2/LH/FSH/SHBG/PRL/HCT и липиды интерпретируются на фоне PED и не являются естественным baseline. В отчёте указывать все препараты и дозы.');
   }
+  // DB-driven интерференции (ASSAY_INTERFERENCE_DB): биотин/креатин/фибринолитики/железо и т.д.
+  for (const w of buildAssayWarningsFromDb(substanceIds)) warnings.push(w);
+  // Преаналитические факторы (PREANALYTIC_EFFECTS_DB)
+  warnings.push('Преаналитика: натощак 8-12 ч; утром в одно и то же время (кортизол/ТТ циркадны); без стресса и недосыпа накануне (кортизол/PRL/ТТ); после интенсивной тренировки CK/AST/CRP/тропонин ↑ — учитывать время последней нагрузки; гидратация — в сопоставимом состоянии (HCT/HGB/мочевина/Na).');
   return Array.from(new Set(warnings));
 }
 
@@ -1211,10 +1217,14 @@ export function buildMonitoringSchedule(
     reason: 'Исходная точка рисков до начала курса; сравнение во время/после',
     target: 'АЛТ<40, АСТ<40, HCT<50%, LDL<3.0, E2 20-40 пг/мл',
   });
+  baseline.push({ marker: 'ОАК с СОЭ (WBC, RBC, PLT, эозинофилы, СОЭ/ESR)', reason: 'Базовый анализ крови с СОЭ — воспалительный фон', target: 'СОЭ <15 мм/ч, WBC 4-9' });
+  baseline.push({ marker: 'Общий анализ мочи (удельный вес, белок, глюкоза, эритроциты, лейкоциты)', reason: 'База почек — ОАМ до курса', target: 'белок<0.15 г/л, глюкоза нет' });
+  baseline.push({ marker: 'Почечный блок: креатинин/eGFR, цистатин C, мочевина, мочевая кислота, UACR', reason: 'Полный ренальный baseline', target: 'eGFR>90, UACR<30, мочевая <420' });
   baseline.push({ marker: 'АД, ЧСС', reason: 'Базовое артериальное давление и пульс', target: 'АД<130/85, ЧСС 60-90' });
   baseline.push({ marker: 'Электролиты Na⁺/K⁺/Mg²⁺', reason: 'База для ARB/диуретиков/кленбутерола', target: 'K 3.5-5.0, Na 135-145, Mg 0.75-1.0' });
   baseline.push({ marker: 'Коагулограмма (МНО/АЧТВ/фибриноген/D-димер)', reason: 'База перед фибринолитиками/антиагрегантами', target: 'фибриноген 2-4 г/л, D-димер <0.5' });
   baseline.push({ marker: 'Ферритин, сыв. железо, витамин D (25-OH), B12, фолат', reason: 'База для управления эритроцитозом и дефицитами', target: 'ферритин 50-200, D3 50-80 нг/мл' });
+  baseline.push({ marker: 'ИФР-1 (IGF-1) — при GH/IGF-1', reason: 'База для GH-курса', target: 'верхняя граница возрастной нормы' });
   baseline.push({ marker: 'ЭКГ', reason: 'Базовая ритмология (перед β-блокаторами/высокими дозами)', escalation: 'QTc>450 или аритмия — кардиолог до курса' });
   if (flags.hasOral17) {
     baseline.push({ marker: 'УЗИ печени', reason: 'База перед 17α-оралами', escalation: 'Стеатоз/фиброз — гепатолог' });
@@ -1334,6 +1344,22 @@ export function buildMonitoringSchedule(
     urgent.push({ marker: 'ALT >2×ULN', reason: 'Гепатотоксичность оралов', escalation: 'Снизить/отменить орал, врач' });
   }
   add('urgent', 'Экстренно при симптомах', 'немедленно', '🚨', urgent);
+
+  // ── Мониторинг ПО ПРЕПАРАТАМ ПОДДЕРЖКИ (SUBSTANCE_MONITORING_DB) ──
+  // План сдачи на курсе расширяется вместе с назначенными препаратами:
+  // фибринолитики → коагулограмма; ARB/диуретики → K/Na/eGFR; статины →
+  // АЛТ/КФК; метформин/берберин → глюкоза; D3/железо → уровень/ферритин.
+  for (const sm of getSubstanceMonitoring(protocolIds)) {
+    const item: MonitoringItemLine = {
+      marker: sm.marker,
+      reason: sm.reason,
+      target: sm.target,
+      drug: sm.substanceId,
+      escalation: sm.escalation,
+    };
+    const sec = sections.find(s => s.id === sm.freq);
+    if (sec) sec.items.push(item);
+  }
 
   return sections;
 }

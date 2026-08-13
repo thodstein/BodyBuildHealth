@@ -2,6 +2,7 @@
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
 import { calculateTzSpecRisk } from '../../../engines/risk-engine-tz-spec';
+import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { findSeparationRules } from '../../../data/separation-timing-db';
 import { MINERAL_SEPARATION_HOURS } from '../../../engines/support-plan/types';
@@ -2884,23 +2885,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               {synergyDesc.map((s, i) => <div key={`desc-${i}`} style={{ fontSize:8, color:'#c4b5fd', marginBottom:3, lineHeight:1.5 }}>{s}</div>)}
               {pairSynergies.length > 0 && (
                 <>
-                  <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.5)', margin:'6px 0 4px', textTransform:'uppercase', letterSpacing:'0.3px' }}>Парные синергии (SYNERGY_NETWORK)</div>
-                  {pairSynergies.slice(0, 20).map((syn, i) => {
-                    const sevColor = syn.severity === 'HIGH' ? '#22c55e' : syn.severity === 'MEDIUM' ? '#f59e0b' : 'rgba(255,255,255,0.5)';
-                    const sevBg = syn.severity === 'HIGH' ? 'rgba(34,197,94,0.06)' : syn.severity === 'MEDIUM' ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.03)';
-                    return (
-                      <div key={`pair-${i}`} style={{ padding:'4px 7px', borderRadius:5, background:sevBg, border:`1px solid ${sevColor}15`, marginBottom:3 }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
-                          <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.a)}</span>
-                          <span style={{ fontSize:7, color:sevColor, fontWeight:700 }}>+{syn.score}</span>
-                          <span style={{ fontSize:9, color:'#fff', fontWeight:600 }}>{subNameRu(syn.b)}</span>
-                          <span style={{ marginLeft:'auto', fontSize:7, fontWeight:700, color:sevColor, padding:'1px 5px', borderRadius:3, background:`${sevColor}15` }}>{syn.severity}</span>
-                        </div>
-                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.7)', marginBottom:1 }}>{syn.effect}</div>
-                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', lineHeight:1.3 }}>{syn.mechanism}</div>
+                  <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', margin:'6px 0 4px', textTransform:'uppercase', letterSpacing:'0.3px' }}>Парные синергии ({pairSynergies.length})</div>
+                  {pairSynergies.map((syn, i) => (
+                    <div key={`pair-${i}`} style={{ padding:'4px 7px', borderRadius:5, marginBottom:3, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.14)', width:'100%', boxSizing:'border-box' }}>
+                      <div style={{ fontSize:8, color:'#bfdbfe', lineHeight:1.45 }}>
+                        <b>{subNameRu(syn.a)}</b> + <b>{subNameRu(syn.b)}</b> — {syn.effect}{syn.score ? ` (+${syn.score})` : ''}
                       </div>
-                    );
-                  })}
+                      <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', lineHeight:1.4, marginTop:1 }}>{syn.mechanism}</div>
+                    </div>
+                  ))}
                 </>
               )}
               {finalRec.subs.length > 1 && (() => {
@@ -3240,25 +3233,26 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* ===== ПРЕАНАЛИТИКА И РАЗНЕСЕНИЕ ПРИЁМА (полная карточка, сворачиваемая) ===== */}
+      {/* ===== ПРЕАНАЛИТИКА, ПРИЁМ И РАЗНЕСЕНИЕ (полная карточка, сворачиваемая) ===== */}
       {finalRec && (() => {
         const planIds = finalRec.subs.map(s => s.substanceId);
         const idSet = new Set(planIds.map(id => id.toLowerCase()));
         const interferences = ASSAY_INTERFERENCE_DB.filter(e => idSet.has(e.substanceId));
+        const adminRules = getAdministrationRules(planIds);
         const mineralPairs: string[] = [];
         for (const [pair, hours] of Object.entries(MINERAL_SEPARATION_HOURS)) {
           const [a, b] = pair.split('||');
           if (idSet.has(a) && idSet.has(b)) mineralPairs.push(`${subNameRu(a)} + ${subNameRu(b)} → разнести на ${hours} ч`);
         }
         const sepRules = findSeparationRules(planIds);
-        const total = interferences.length + mineralPairs.length + sepRules.length;
+        const total = interferences.length + adminRules.length + mineralPairs.length + sepRules.length;
         if (total === 0) return null;
         const rowStyle: React.CSSProperties = { padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.16)', fontSize: 7, lineHeight: 1.45, color: 'rgba(255,255,255,0.8)' };
         return (
           <div style={{ marginTop: 8 }}>
             <div onClick={() => setShowPreanalytics(!showPreanalytics)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showPreanalytics ? '8px 8px 0 0' : 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.16)' }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 5 }}>
-                🧪 Преаналитика и разнесение приёма
+                🧪 Преаналитика, приём и разнесение
                 <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(96,165,250,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(96,165,250,0.12)' }}>{total} пунктов</span>
               </span>
               <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showPreanalytics ? '▲ скрыть' : '▼ показать'}</span>
@@ -3277,6 +3271,21 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {interferences.map((e, i) => (
                       <div key={`int-${i}`} style={rowStyle}>
                         <b style={{ color: '#fca5a5' }}>{e.substanceId}</b>: {e.marker} — {e.effect === 'distorts' ? 'искажает assay' : e.effect === 'increases' ? 'может повышать' : 'может снижать'} ({e.mechanism}). <span style={{ color: '#bfdbfe' }}>{e.advice}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {adminRules.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '6px 0 4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>💊 Особые указания по приёму</div>
+                    {adminRules.map((r, i) => (
+                      <div key={`adm-${r.substanceId}-${i}`} style={{ padding: '5px 7px', borderRadius: 6, marginBottom: 4, background: r.critical ? 'rgba(248,113,113,0.07)' : 'rgba(34,197,94,0.04)', border: `1px solid ${r.critical ? 'rgba(248,113,113,0.24)' : 'rgba(34,197,94,0.14)'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                          <span style={{ fontSize: 8, fontWeight: 800, color: '#fff' }}>{subNameRu(r.substanceId)}</span>
+                          {r.critical && <span style={{ fontSize: 6, fontWeight: 700, color: '#fca5a5', padding: '1px 4px', borderRadius: 3, background: 'rgba(248,113,113,0.18)' }}>критично</span>}
+                        </div>
+                        <div style={{ fontSize: 7, color: '#4ade80', fontWeight: 600, lineHeight: 1.4 }}>⏱ {r.timing}</div>
+                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.65)', lineHeight: 1.45, marginTop: 1 }}>{r.reason}</div>
                       </div>
                     ))}
                   </>
@@ -3380,7 +3389,97 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* Противопоказания — все (каталог + правила + условия) */}
+      {/* ===== МЕДИЦИНСКАЯ ЭСКАЛАЦИЯ (процедуры, только врач) ===== */}
+      <SafetyProcedures rec={finalRecWithResidual ?? finalRec} />
+
+      {/* ===== ИНЪЕКЦИИ: РОТАЦИЯ И ТЕХНИКА ===== */}
+      <SafetyInjections rec={finalRecWithResidual ?? finalRec} />
+
+      {/* ===== ОСОБЫЕ УКАЗАНИЯ БУСТЕРОВ (PED-risk + LV3) ===== */}
+                {finalRec.boosters && finalRec.boosters.length > 0 && (() => {
+                  const boosterInstructions: { booster: string; tier: number; instructions: string[] }[] = [];
+                  for (const b of finalRec.boosters) {
+                    if (b.key === 'neuro' && (b.tier ?? 0) >= 2) {
+                      const instr: string[] = [];
+                      if ((b.tier ?? 0) >= 3) {
+                        instr.push('⚡ LV3: селективные NMDA-антагонисты (memantine ИЛИ lamotrigine ИЛИ amantadine — не комбинировать)');
+                        instr.push('⚡ LV3: рецептурные препараты — под обязательным контролем врача (психиатр/невролог)');
+                        instr.push('⚡ LV3: титрация — мемантин 5 мг/нед → 20 мг, ламотриджин 25 мг → +25 мг каждые 2 нед');
+                      }
+                      if ((b.tier ?? 0) >= 2) {
+                        instr.push('LV2: прегненолон 10-30 мг — осторожно с прогестогенными ААС (нандролон)');
+                      }
+                      if (instr.length > 0) boosterInstructions.push({ booster: '🧠 Нейропротекция', tier: b.tier ?? 0, instructions: instr });
+                    }
+                    if (b.key === 'joints' && (b.tier ?? 0) >= 2) {
+                      const instr: string[] = [];
+                      if ((b.tier ?? 0) >= 3) {
+                        instr.push('⚡ LV3: BPC-157+TB-500+GHK-Cu — 6-недельный протокол (Суставы.txt)');
+                        instr.push('⚡ LV3: пептиды — исследовательские, только под ортопедом');
+                        instr.push('⚡ LV3: стерильные шприцы/инсулинки, бактериостатическая вода');
+                        instr.push('⚡ LV3: контроль УЗИ на 14-й и 28-й день');
+                      }
+                      if ((b.tier ?? 0) >= 2) {
+                        instr.push('LV2: voltaren_gel — только местно, 2-3р/день, не на открытые раны');
+                      }
+                      if (instr.length > 0) boosterInstructions.push({ booster: '🦴 Суставы', tier: b.tier ?? 0, instructions: instr });
+                    }
+                  }
+                  if (boosterInstructions.length === 0) return null;
+                  return (
+                    <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+                      <div style={{ fontSize:8, fontWeight:700, color:'#c084fc', marginBottom:4 }}>📋 Особые указания бустеров</div>
+                      {boosterInstructions.map((bi, i) => (
+                        <div key={i} style={{ marginBottom:4 }}>
+                          <div style={{ fontSize:7, fontWeight:700, color:'#a5b4fc' }}>{bi.booster} (LV{bi.tier})</div>
+                          {bi.instructions.map((inst, j) => (
+                            <div key={j} style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.4, marginLeft:8, marginBottom:1 }}>• {inst}</div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      
+{/* ===== ТОКСИКОЛОГИЧЕСКИЙ КОНТРОЛЬ ДОЗ (UL + титрация) ===== */}
+      {finalRec && toxWarnings.length > 0 && (
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
+            ⚠️ Контроль дозировок ({toxWarnings.length})
+          </div>
+          {toxWarnings.map((w, i) => {
+            const isDanger = w.severity === 'danger';
+            const isTitr = w.severity === 'titrate';
+            const col = isDanger ? '#ef4444' : isTitr ? '#f59e0b' : '#fbbf24';
+            const bg = isDanger ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)';
+            const bd = isDanger ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.2)';
+            const tag = isDanger ? 'ПРЕВЫШЕН UL' : isTitr ? 'ТИТРАЦИЯ' : 'ВНИМАНИЕ';
+            return (
+              <div key={i} style={{ margin:'3px 0', padding:'6px 8px', borderRadius:8, background:bg, border:`1px solid ${bd}` }}>
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
+                  <span style={{ fontSize:7, fontWeight:800, color:col, padding:'1px 5px', borderRadius:4, background:bg, border:`1px solid ${bd}` }}>{tag}</span>
+                  <span style={{ fontSize:9, fontWeight:700, color:'#ffffff' }}>{subNameRu(w.substanceId)}</span>
+                </div>
+                <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
+                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
+              </div>
+            );
+          })}
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
+        </div>
+      )}
+
+      
+
+
+{/* Противопоказания — все (каталог + правила + условия) */}
       {finalRec && finalRec.subs.length > 0 && (() => {
         interface FlatContra { substanceId: string; label: string; severity: 'absolute' | 'relative'; source: 'catalog' | 'rule' | 'condition'; }
         const flat: FlatContra[] = [];
@@ -3472,95 +3571,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         );
       })()}
 
-      {/* ===== МЕДИЦИНСКАЯ ЭСКАЛАЦИЯ (процедуры, только врач) ===== */}
-      <SafetyProcedures rec={finalRecWithResidual ?? finalRec} />
-
-      {/* ===== ИНЪЕКЦИИ: РОТАЦИЯ И ТЕХНИКА ===== */}
-      <SafetyInjections rec={finalRecWithResidual ?? finalRec} />
-
-      {/* ===== ОСОБЫЕ УКАЗАНИЯ БУСТЕРОВ (PED-risk + LV3) ===== */}
-                {finalRec.boosters && finalRec.boosters.length > 0 && (() => {
-                  const boosterInstructions: { booster: string; tier: number; instructions: string[] }[] = [];
-                  for (const b of finalRec.boosters) {
-                    if (b.key === 'neuro' && (b.tier ?? 0) >= 2) {
-                      const instr: string[] = [];
-                      if ((b.tier ?? 0) >= 3) {
-                        instr.push('⚡ LV3: селективные NMDA-антагонисты (memantine ИЛИ lamotrigine ИЛИ amantadine — не комбинировать)');
-                        instr.push('⚡ LV3: рецептурные препараты — под обязательным контролем врача (психиатр/невролог)');
-                        instr.push('⚡ LV3: титрация — мемантин 5 мг/нед → 20 мг, ламотриджин 25 мг → +25 мг каждые 2 нед');
-                      }
-                      if ((b.tier ?? 0) >= 2) {
-                        instr.push('LV2: прегненолон 10-30 мг — осторожно с прогестогенными ААС (нандролон)');
-                      }
-                      if (instr.length > 0) boosterInstructions.push({ booster: '🧠 Нейропротекция', tier: b.tier ?? 0, instructions: instr });
-                    }
-                    if (b.key === 'joints' && (b.tier ?? 0) >= 2) {
-                      const instr: string[] = [];
-                      if ((b.tier ?? 0) >= 3) {
-                        instr.push('⚡ LV3: BPC-157+TB-500+GHK-Cu — 6-недельный протокол (Суставы.txt)');
-                        instr.push('⚡ LV3: пептиды — исследовательские, только под ортопедом');
-                        instr.push('⚡ LV3: стерильные шприцы/инсулинки, бактериостатическая вода');
-                        instr.push('⚡ LV3: контроль УЗИ на 14-й и 28-й день');
-                      }
-                      if ((b.tier ?? 0) >= 2) {
-                        instr.push('LV2: voltaren_gel — только местно, 2-3р/день, не на открытые раны');
-                      }
-                      if (instr.length > 0) boosterInstructions.push({ booster: '🦴 Суставы', tier: b.tier ?? 0, instructions: instr });
-                    }
-                  }
-                  if (boosterInstructions.length === 0) return null;
-                  return (
-                    <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-                      <div style={{ fontSize:8, fontWeight:700, color:'#c084fc', marginBottom:4 }}>📋 Особые указания бустеров</div>
-                      {boosterInstructions.map((bi, i) => (
-                        <div key={i} style={{ marginBottom:4 }}>
-                          <div style={{ fontSize:7, fontWeight:700, color:'#a5b4fc' }}>{bi.booster} (LV{bi.tier})</div>
-                          {bi.instructions.map((inst, j) => (
-                            <div key={j} style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.4, marginLeft:8, marginBottom:1 }}>• {inst}</div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
       
-{/* ===== ТОКСИКОЛОГИЧЕСКИЙ КОНТРОЛЬ ДОЗ (UL + титрация) ===== */}
-      {finalRec && toxWarnings.length > 0 && (
-        <div style={{ marginTop:8 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
-            ⚠️ Контроль дозировок ({toxWarnings.length})
-          </div>
-          {toxWarnings.map((w, i) => {
-            const isDanger = w.severity === 'danger';
-            const isTitr = w.severity === 'titrate';
-            const col = isDanger ? '#ef4444' : isTitr ? '#f59e0b' : '#fbbf24';
-            const bg = isDanger ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)';
-            const bd = isDanger ? 'rgba(239,68,68,0.28)' : 'rgba(245,158,11,0.2)';
-            const tag = isDanger ? 'ПРЕВЫШЕН UL' : isTitr ? 'ТИТРАЦИЯ' : 'ВНИМАНИЕ';
-            return (
-              <div key={i} style={{ margin:'3px 0', padding:'6px 8px', borderRadius:8, background:bg, border:`1px solid ${bd}` }}>
-                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
-                  <span style={{ fontSize:7, fontWeight:800, color:col, padding:'1px 5px', borderRadius:4, background:bg, border:`1px solid ${bd}` }}>{tag}</span>
-                  <span style={{ fontSize:9, fontWeight:700, color:'#ffffff' }}>{subNameRu(w.substanceId)}</span>
-                </div>
-                <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
-                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
-              </div>
-            );
-          })}
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
-        </div>
-      )}
-
-      
-
 {/* Прогноз ребаунда гормонов после отмены */}
       {finalRec && (() => {
         // Build ReboundInput from context
