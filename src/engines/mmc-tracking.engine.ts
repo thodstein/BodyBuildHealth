@@ -52,6 +52,81 @@ export function clearMMCLog(): void {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
 }
 
+/** Частичный ввод MMC (не все поля обязательны). */
+export interface MMCPartial {
+  mmc?: number;
+  pump?: number;
+  jointDiscomfort?: number;
+  energy?: number;
+}
+
+/** Есть ли хоть одно заполненное поле. */
+export function hasMMCValues(p: MMCPartial | undefined | null): boolean {
+  if (!p) return false;
+  return p.mmc !== undefined || p.pump !== undefined || p.jointDiscomfort !== undefined || p.energy !== undefined;
+}
+
+const clampTo10 = (v: number | undefined, def: number): number => {
+  if (v === undefined || Number.isNaN(v)) return def;
+  return Math.min(10, Math.max(0, v));
+};
+
+const entryKey = (e: Pick<MMCSetEntry, 'date' | 'exerciseName' | 'setNumber'>) =>
+  `${e.date}|${e.exerciseName}|${e.setNumber}`;
+
+/**
+ * Записать частичные MMC-значения с дефолтами для незаполненных (ммс/пампинг/энергия = 5, суставы = 0).
+ * Upsert: повторная запись для той же (дата + упражнение + подход) заменяет старую, а не дублирует.
+ * Возвращает true, если запись создана/обновлена; false — если ввод пуст.
+ */
+export function recordMMCFromPartial(
+  date: string,
+  exerciseId: string,
+  exerciseName: string,
+  setNumber: number,
+  p: MMCPartial | undefined | null,
+): boolean {
+  if (!hasMMCValues(p)) return false;
+  const entry: MMCSetEntry = {
+    date,
+    exerciseId,
+    exerciseName,
+    setNumber,
+    mmc: clampTo10(p!.mmc, 5),
+    pump: clampTo10(p!.pump, 5),
+    jointDiscomfort: clampTo10(p!.jointDiscomfort, 0),
+    energy: clampTo10(p!.energy, 5),
+  };
+  try {
+    const raw = localStorage.getItem(KEY);
+    const log: MMCSetEntry[] = raw ? JSON.parse(raw) : [];
+    const key = entryKey(entry);
+    const idx = log.findIndex(e => entryKey(e) === key);
+    if (idx >= 0) log[idx] = entry; else log.push(entry);
+    if (log.length > MAX_ENTRIES) log.splice(0, log.length - MAX_ENTRIES);
+    localStorage.setItem(KEY, JSON.stringify(log));
+  } catch { return false; }
+  return true;
+}
+
+/**
+ * Слить записи из другого источника (бэкап/импорт) в лог без дублей
+ * (дедуп по дата + упражнение + подход). Возвращает число добавленных.
+ */
+export function mergeMMCLog(entries: MMCSetEntry[] | undefined | null): number {
+  if (!Array.isArray(entries) || entries.length === 0) return 0;
+  try {
+    const log = loadMMCLog();
+    const existing = new Set(log.map(entryKey));
+    const fresh = entries.filter(e => e && e.date && e.exerciseName && !existing.has(entryKey(e)));
+    if (fresh.length === 0) return 0;
+    const merged = [...log, ...fresh];
+    if (merged.length > MAX_ENTRIES) merged.splice(0, merged.length - MAX_ENTRIES);
+    localStorage.setItem(KEY, JSON.stringify(merged));
+    return fresh.length;
+  } catch { return 0; }
+}
+
 /** Агрегировать по упражнению */
 export function aggregateMMC(exerciseName?: string): MMCSetEntry[] | MMCAggregate[] {
   const log = loadMMCLog();

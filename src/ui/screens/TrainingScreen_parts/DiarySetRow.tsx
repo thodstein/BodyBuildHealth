@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { epley1RM } from '../../../engines/e1rm';
+import { MMCSetPanel } from './MMCSetPanel';
 
 const ACCENT = '#00e68a';
 
@@ -25,15 +26,22 @@ interface DiarySetRowProps {
   onSkip: () => void;
   /** When true, show compact inline grid (for DiaryRecordingForm). Default: false (full row for QuickEntry). */
   compact?: boolean;
+  /** When provided, show MMC/Pump/Joints/Energy panel for the set (записывает в he_mmc_log напрямую). */
+  exerciseId?: string;
+  exerciseName?: string;
+  /** Date of the workout (YYYY-MM-DD). Default: today. */
+  date?: string;
 }
 
 export const DiarySetRow: React.FC<DiarySetRowProps> = ({
   set, setNumber, isCurrent, isBodyweight, prevData, onComplete, onSkip, compact,
+  exerciseId, exerciseName, date,
 }) => {
   const [weight, setWeight] = useState(set.weight || prevData?.weight || 0);
   const [reps, setReps] = useState(set.reps || prevData?.reps || 10);
   const [rpe, setRpe] = useState(set.rpe || 7);
   const [rir, setRir] = useState(set.rir ?? prevData?.rir ?? 2);
+  const [mmcOpen, setMmcOpen] = useState(false);
 
   useEffect(() => {
     if (prevData && set.weight === 0) {
@@ -110,6 +118,20 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
               flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
               background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 11, minHeight: 40,
             }}>Пропустить</button>
+          {exerciseId && exerciseName && (
+            <button onClick={() => setMmcOpen(o => !o)}
+              style={{
+                flex: 1, padding: '10px', borderRadius: 8,
+                border: mmcOpen ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                background: mmcOpen ? 'rgba(0,230,138,0.08)' : 'transparent',
+                color: mmcOpen ? ACCENT : 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 11, minHeight: 40,
+              }}>🧠 MMC</button>
+          )}
+        </div>
+      )}
+      {mmcOpen && exerciseId && exerciseName && (
+        <div style={{ marginTop: 6 }}>
+          <MMCSetPanel exerciseId={exerciseId} exerciseName={exerciseName} setNumber={setNumber} date={date} />
         </div>
       )}
     </div>

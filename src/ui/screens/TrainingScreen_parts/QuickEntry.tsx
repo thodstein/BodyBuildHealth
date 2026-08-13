@@ -537,6 +537,9 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                       isCurrent={isCurrentSet}
                       isBodyweight={isBWExercise({ name: ex.exerciseName })}
                       prevData={setIdx === 0 ? prevData : null}
+                      exerciseId={ex.exerciseId}
+                      exerciseName={ex.exerciseName}
+                      date={new Date().toISOString().split('T')[0]}
                       onComplete={(w, r, rpe, rir) => {
                         setCurrentSetIdx(setIdx);
                         completeSet(w, r, rpe, rir);
