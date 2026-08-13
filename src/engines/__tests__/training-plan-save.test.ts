@@ -17,6 +17,9 @@ import {
   getSupportPlanQueueIds,
   analyzePresetEffect,
   subscribePlanQueueChanged,
+  getMixIntake,
+  toggleMixPhaseIntake,
+  analyzeMixEffectiveness,
   MIX_DIARY_KEY,
   FAVORITES_KEY,
   FAV_REC_KEY,
@@ -346,5 +349,92 @@ describe('analyzePresetEffect (эффект пресета через недел
     localStorage.setItem('he_sleep_diary', '{{{{');
     const record = saveMixToDiary({ ...jointInput(), goal: 'sleep', kind: 'preset' }, daysAgo(3));
     expect(analyzePresetEffect(record)).toBeNull();
+  });
+});
+
+describe('getMixIntake / toggleMixPhaseIntake (единый слой фаз приёма)', () => {
+  it('возвращает пустой объект без записей', () => {
+    expect(getMixIntake('2026-08-13')).toEqual({});
+  });
+
+  it('включает и выключает фазу приёма на дату', () => {
+    const after1 = toggleMixPhaseIntake('2026-08-13', 'mix_1', 'pre');
+    expect(after1.mix_1.pre).toBe(true);
+    expect(getMixIntake('2026-08-13').mix_1.pre).toBe(true);
+    const after2 = toggleMixPhaseIntake('2026-08-13', 'mix_1', 'post');
+    expect(after2.mix_1.post).toBe(true);
+    expect(after2.mix_1.pre).toBe(true);
+    const after3 = toggleMixPhaseIntake('2026-08-13', 'mix_1', 'pre');
+    expect(after3.mix_1.pre).toBe(false);
+  });
+
+  it('не пересекается по датам', () => {
+    toggleMixPhaseIntake('2026-08-13', 'mix_1', 'pre');
+    toggleMixPhaseIntake('2026-08-14', 'mix_1', 'post');
+    expect(getMixIntake('2026-08-13').mix_1.post).toBeUndefined();
+    expect(getMixIntake('2026-08-14').mix_1.pre).toBeUndefined();
+  });
+
+  it('устойчив к битому дневнику поддержки', () => {
+    localStorage.setItem('he_support_diary', '{{{');
+    expect(getMixIntake('2026-08-13')).toEqual({});
+    toggleMixPhaseIntake('2026-08-13', 'mix_1', 'pre');
+    expect(getMixIntake('2026-08-13').mix_1.pre).toBe(true);
+  });
+});
+
+describe('analyzeMixEffectiveness (микс → качество сессии)', () => {
+  const seedIntake = (dates: string[]) => {
+    for (const d of dates) toggleMixPhaseIntake(d, 'mix_1', 'pre');
+  };
+
+  it('сравнивает RPE/объём/длительность в дни с миксом и без', () => {
+    seedIntake(['2026-08-10', '2026-08-11']);
+    const result = analyzeMixEffectiveness([
+      { date: '2026-08-10', overallRPE: 8, duration: 70, totalVolume: 12000 }, // с миксом
+      { date: '2026-08-11', overallRPE: 9, duration: 80, totalVolume: 14000 }, // с миксом
+      { date: '2026-08-12', overallRPE: 7, duration: 60, totalVolume: 10000 }, // без
+      { date: '2026-08-13', overallRPE: 6, duration: 55, totalVolume: 9000 },  // без
+    ]);
+    expect(result).not.toBeNull();
+    expect(result!.withMix.sessions).toBe(2);
+    expect(result!.withoutMix.sessions).toBe(2);
+    expect(result!.withMix.avgRpe).toBe(8.5);
+    expect(result!.withoutMix.avgRpe).toBe(6.5);
+    expect(result!.rpeDelta).toBe(2);
+    expect(result!.volumeDelta).toBeGreaterThan(0);
+  });
+
+  it('возвращает null без тренировок', () => {
+    expect(analyzeMixEffectiveness([])).toBeNull();
+    expect(analyzeMixEffectiveness(null as unknown as { date: string }[])).toBeNull();
+  });
+
+  it('возвращает null, если миксы не принимались ни в один день', () => {
+    const result = analyzeMixEffectiveness([
+      { date: '2026-08-12', overallRPE: 7, totalVolume: 10000 },
+      { date: '2026-08-13', overallRPE: 6, totalVolume: 9000 },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('возвращает null, если миксы принимались во все дни', () => {
+    seedIntake(['2026-08-12', '2026-08-13']);
+    const result = analyzeMixEffectiveness([
+      { date: '2026-08-12', overallRPE: 7, totalVolume: 10000 },
+      { date: '2026-08-13', overallRPE: 6, totalVolume: 9000 },
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it('считает объём из exercises, если totalVolume не задан', () => {
+    seedIntake(['2026-08-10']);
+    const result = analyzeMixEffectiveness([
+      { date: '2026-08-10', overallRPE: 8, exercises: [{ totalVolume: 5000 }, { totalVolume: 3000 }] },
+      { date: '2026-08-12', overallRPE: 7, exercises: [{ totalVolume: 4000 }] },
+    ]);
+    expect(result).not.toBeNull();
+    expect(result!.withMix.avgVolume).toBe(8000);
+    expect(result!.withoutMix.avgVolume).toBe(4000);
   });
 });

@@ -51,6 +51,7 @@ import { DiaryProgressView } from './DiaryProgressView';
 import { DiaryHistoryView } from './DiaryHistoryView';
 import { DiaryToolsView } from './DiaryToolsView';
 import { MixDiarySection } from './MixDiarySection';
+import { MixEffectivenessCard } from './MixEffectivenessCard';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -506,7 +507,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             );
           })()}
-          <MixDiarySection />
+          <MixDiarySection hasTrainingToday={historyWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} />
           <RecordModeSelector diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} />
@@ -517,7 +518,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'history' && <DiaryHistoryView hub={hub} />}
 
       {/* ═══ MODE: ANALYTICS ═══ */}
-      {mode === 'analytics' && <DiaryAnalyticsView hub={hub} />}
+      {mode === 'analytics' && (
+        <>
+          <DiaryAnalyticsView hub={hub} />
+          <MixEffectivenessCard workouts={historyWorkouts} />
+        </>
+      )}
 
       {/* ═══ MODE: PROGRESS ═══ */}
       {mode === 'progress' && <DiaryProgressView hub={hub} />}

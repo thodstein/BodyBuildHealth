@@ -43,7 +43,7 @@ import { printProtocol, buildExportDataFromRec } from '../../../ui/components/Pr
 import { checkNotifications, type NotificationRule } from '../../../engines/notification-engine';
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
 import { LabsDueBanner } from './LabsDueBanner';
-import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue } from '../../../engines/training-plan-save.engine';
+import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -762,6 +762,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   // Очередь «тренировочные миксы и пресеты здоровья» → план поддержки
   const [mixQueueRefresh, setMixQueueRefresh] = useState(0);
   const [showMixCard, setShowMixCard] = useState(true);
+  const [mixRemoveConfirm, setMixRemoveConfirm] = useState<string | null>(null);
   const mixPlanIds = useMemo(() => new Set(getSupportPlanQueueIds().map(canonIdLocal)), [mixQueueRefresh]);
 
   const ctx = useMemo(() => {
@@ -2814,10 +2815,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         {entry.kind === 'preset' ? '🧪' : '💪'} {entry.title}
                         <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}> · {entry.ids.length} веществ</span>
                       </div>
-                      <button onClick={() => {
-                        removeFromSupportPlanQueue(entry.recId);
-                        setMixQueueRefresh(v => v + 1);
-                      }} style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: '3px 6px' }}>🗑 Убрать из плана</button>
+                      {mixRemoveConfirm === entry.recId ? (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          <button onClick={() => { removeFromSupportPlanQueue(entry.recId); setMixQueueRefresh(v => v + 1); setMixRemoveConfirm(null); }}
+                            style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', padding: '3px 8px' }}>Убрать из плана</button>
+                          <button onClick={() => { removeFromSupportPlanQueue(entry.recId); deleteFavRecommendation(entry.recId); setMixQueueRefresh(v => v + 1); setMixRemoveConfirm(null); }}
+                            style={{ fontSize: 9, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', padding: '3px 8px' }}>🗑 И из избранного</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setMixRemoveConfirm(entry.recId)}
+                          style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', padding: '3px 6px' }}>🗑 Убрать из плана</button>
+                      )}
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 4 }}>
                       {entry.ids.map((id, i) => (
@@ -2826,6 +2834,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         </span>
                       ))}
                     </div>
+                    {mixRemoveConfirm === entry.recId && (
+                      <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>
+                        Подтвердите: убрать только из плана или также удалить рекомендацию из «⭐ Избранного» блока БАД?
+                      </div>
+                    )}
                   </div>
                 ))}
               </>

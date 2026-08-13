@@ -1,14 +1,28 @@
 /** MixDiarySection.tsx — секция «💊 Тренировочные миксы и пресеты здоровья» в дневнике тренировок.
  *  Показывает записи из he_training_mixes (сохраняются кнопкой «💾 Сохранить в дневник и избранное»
- *  в TrainingMixTab и MixPresetsCard), с удалением, эффектом пресета через неделю и напоминанием о приёме. */
+ *  в TrainingMixTab и MixPresetsCard), с удалением, эффектом пресета через неделю, напоминанием о приёме,
+ *  отметкой фаз приёма (единый слой с дневником поддержки) и бейджем «тренировка сегодня». */
 import React, { useState, useEffect } from 'react';
-import { readDiaryMixes, deleteDiaryMix, analyzePresetEffect, type DiaryMixRecord } from '../../../engines/training-plan-save.engine';
+import {
+  readDiaryMixes, deleteDiaryMix, analyzePresetEffect, getMixIntake, toggleMixPhaseIntake,
+  type DiaryMixRecord,
+} from '../../../engines/training-plan-save.engine';
 
 const CARD: React.CSSProperties = {
   padding: 10, borderRadius: 12,
   background: 'rgba(24,24,27,0.35)', border: '1px solid rgba(139,92,246,0.2)',
   marginBottom: 8,
 };
+
+const PHASE_META: Record<string, { label: string; icon: string }> = {
+  pre: { label: 'До тренировки', icon: '🔥' },
+  intra: { label: 'Во время', icon: '💧' },
+  post: { label: 'После', icon: '🍗' },
+};
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 /** Напоминание «Принять микс/пресет» через N минут (Notification API + localStorage pref). */
 export function scheduleMixReminder(title: string, minutes = 30): void {
@@ -26,10 +40,11 @@ export function scheduleMixReminder(title: string, minutes = 30): void {
   } catch {}
 }
 
-export const MixDiarySection: React.FC = () => {
+export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasTrainingToday }) => {
   const [records, setRecords] = useState<DiaryMixRecord[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [reminderMsg, setReminderMsg] = useState<string | null>(null);
+  const [intakeTick, setIntakeTick] = useState(0);
 
   useEffect(() => {
     setRecords(readDiaryMixes());
@@ -41,6 +56,14 @@ export const MixDiarySection: React.FC = () => {
   if (records.length === 0) return null;
 
   const shown = records.slice(0, expanded ? records.length : 3);
+  const today = todayStr();
+  const todayIntake = getMixIntake(today);
+  const phasesOf = (r: DiaryMixRecord): string[] => {
+    const set = new Set<string>();
+    for (const s of r.substances || []) if (s.timing) set.add(s.timing);
+    return ['pre', 'intra', 'post'].filter(p => set.has(p));
+  };
+  const anyTakenToday = Object.values(todayIntake).some(m => Object.values(m || {}).some(v => v));
 
   return (
     <div style={CARD}>
@@ -50,7 +73,15 @@ export const MixDiarySection: React.FC = () => {
           {expanded ? 'Свернуть ▲' : 'Все ▼'}
         </button>
       </div>
-      {shown.map(r => (
+      {hasTrainingToday && !anyTakenToday && (
+        <div style={{ marginBottom: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#c4b5fd' }}>
+          🏋️ Тренировка сегодня — отметьте приём фаз микса (до/во время/после).
+        </div>
+      )}
+      {shown.map(r => {
+        const phases = phasesOf(r);
+        const taken = todayIntake[r.id] || {};
+        return (
         <div key={r.id} style={{ padding: '7px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 13 }}>{r.kind === 'preset' ? '🧪' : '💪'}</span>
@@ -76,6 +107,23 @@ export const MixDiarySection: React.FC = () => {
             <button onClick={() => { deleteDiaryMix(r.id); setRecords(readDiaryMixes()); }}
               style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🗑</button>
           </div>
+          {phases.length > 0 && (
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 5, marginLeft: 24 }}>
+              {phases.map(p => {
+                const meta = PHASE_META[p];
+                const active = !!taken[p];
+                return (
+                  <button key={p} onClick={() => { toggleMixPhaseIntake(today, r.id, p); setIntakeTick(t => t + 1); }} style={{
+                    padding: '4px 9px', borderRadius: 8, cursor: 'pointer', fontSize: 9, border: 'none',
+                    background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)',
+                    color: active ? '#c4b5fd' : 'rgba(255,255,255,0.55)', fontWeight: active ? 700 : 400,
+                  }}>
+                    {active ? '✓ ' : ''}{meta.icon} {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {reminderMsg && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 4 }}>{reminderMsg}</div>}
           {r.substances.length > 0 && (
             <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginTop: 4 }}>
@@ -93,7 +141,8 @@ export const MixDiarySection: React.FC = () => {
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

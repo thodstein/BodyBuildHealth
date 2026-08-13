@@ -509,3 +509,106 @@ export function analyzePresetEffect(record: DiaryMixRecord, windowDays = 7): Pre
     return null;
   }
 }
+
+// ─── фазы приёма микса (общий слой дневников: тренировки ↔ поддержка) ───
+
+const SUPPORT_DIARY_KEY = 'he_support_diary';
+
+interface SupportDiaryEntryLike {
+  date: string;
+  mixIntake?: Record<string, Record<string, boolean>>;
+}
+
+/** Текущие отметки фаз приёма микса на дату (из дневника поддержки). */
+export function getMixIntake(date: string): Record<string, Record<string, boolean>> {
+  try {
+    const arr = JSON.parse(localStorage.getItem(SUPPORT_DIARY_KEY) || '[]') as SupportDiaryEntryLike[];
+    const entry = (Array.isArray(arr) ? arr : []).find(e => e.date === date);
+    return (entry && entry.mixIntake) || {};
+  } catch {
+    return {};
+  }
+}
+
+/** Отметить/снять фазу приёма микса на дату (единая запись he_support_diary).
+ *  Возвращает обновлённый mixIntake для этой даты. */
+export function toggleMixPhaseIntake(date: string, mixId: string, phase: string): Record<string, Record<string, boolean>> {
+  let arr: SupportDiaryEntryLike[] = [];
+  try {
+    arr = JSON.parse(localStorage.getItem(SUPPORT_DIARY_KEY) || '[]');
+    if (!Array.isArray(arr)) arr = [];
+  } catch {
+    arr = [];
+  }
+  let idx = arr.findIndex(e => e.date === date);
+  if (idx < 0) {
+    arr.unshift({ date, mixIntake: {} });
+    idx = 0;
+  }
+  const entry = arr[idx];
+  const cur = (entry.mixIntake || {});
+  const phases = { ...(cur[mixId] || {}) };
+  phases[phase] = !phases[phase];
+  const mixIntake = { ...cur, [mixId]: phases };
+  arr[idx] = { ...entry, mixIntake };
+  try { localStorage.setItem(SUPPORT_DIARY_KEY, JSON.stringify(arr)); } catch { /* ignore */ }
+  return mixIntake;
+}
+
+// ─── эффективность миксов: микс-дни → качество сессии ───
+
+export interface MixEffectiveness {
+  withMix: { sessions: number; avgRpe: number; avgVolume: number; avgDuration: number };
+  withoutMix: { sessions: number; avgRpe: number; avgVolume: number; avgDuration: number };
+  rpeDelta: number;
+  volumeDelta: number;
+}
+
+interface EffectivenessWorkout {
+  date: string;
+  overallRPE?: number;
+  duration?: number;
+  totalVolume?: number;
+  exercises?: { totalVolume?: number }[];
+}
+
+function avgOf(nums: number[]): number {
+  return nums.length === 0 ? 0 : nums.reduce((s, x) => s + x, 0) / nums.length;
+}
+
+/** Корреляция «принял микс → качество сессии»: сравнивает средние RPE/объём/длительность
+ *  тренировок в дни с приёмом микса (любая фаза) против дней без микса. */
+export function analyzeMixEffectiveness(workouts: EffectivenessWorkout[]): MixEffectiveness | null {
+  if (!Array.isArray(workouts) || workouts.length === 0) return null;
+  const withMix = { sessions: 0, rpes: [] as number[], volumes: [] as number[], durations: [] as number[] };
+  const withoutMix = { sessions: 0, rpes: [] as number[], volumes: [] as number[], durations: [] as number[] };
+  for (const w of workouts) {
+    const intake = getMixIntake(w.date);
+    const anyTaken = Object.values(intake).some(m => Object.values(m || {}).some(v => v));
+    const bucket = anyTaken ? withMix : withoutMix;
+    bucket.sessions++;
+    if (typeof w.overallRPE === 'number' && w.overallRPE > 0) bucket.rpes.push(w.overallRPE);
+    const vol = w.totalVolume ?? (w.exercises || []).reduce((s, e) => s + (e.totalVolume || 0), 0);
+    if (vol > 0) bucket.volumes.push(vol);
+    if (typeof w.duration === 'number' && w.duration > 0) bucket.durations.push(w.duration);
+  }
+  if (withMix.sessions === 0 || withoutMix.sessions === 0) return null;
+  const rpeDelta = Math.round((avgOf(withMix.rpes) - avgOf(withoutMix.rpes)) * 10) / 10;
+  const volumeDelta = Math.round(avgOf(withMix.volumes) - avgOf(withoutMix.volumes));
+  return {
+    withMix: {
+      sessions: withMix.sessions,
+      avgRpe: Math.round(avgOf(withMix.rpes) * 10) / 10,
+      avgVolume: Math.round(avgOf(withMix.volumes)),
+      avgDuration: Math.round(avgOf(withMix.durations)),
+    },
+    withoutMix: {
+      sessions: withoutMix.sessions,
+      avgRpe: Math.round(avgOf(withoutMix.rpes) * 10) / 10,
+      avgVolume: Math.round(avgOf(withoutMix.volumes)),
+      avgDuration: Math.round(avgOf(withoutMix.durations)),
+    },
+    rpeDelta,
+    volumeDelta,
+  };
+}
