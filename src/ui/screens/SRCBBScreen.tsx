@@ -54,6 +54,7 @@ import { updateSection } from '../../core/profile-manager';
 import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
+import { loadSessions } from '../../engines/workout-logger.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
   const isCompound = !exerciseName.toLowerCase().includes('сгибан') &&
@@ -535,6 +536,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [appliedMethods, setAppliedMethods] = useState<Record<string, string>>({});
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
+  const diarySessions = useMemo(() => loadSessions(), []);
   // P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary)
   const [autoRegMode, setAutoRegMode] = useState<AutoRegMode>('off');
   const autoRegOn = autoRegMode !== 'off';
@@ -1155,7 +1157,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
               Выберите фазу, отклонения траектории, упражнения из диагностики и дни добавления. Исходный цикл не изменяется. Протокол упражнений — из раскладки этого цикла.
             </div>
-            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} />
+            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
           </div>
            {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
                      <div style={{ marginTop: 10 }}>

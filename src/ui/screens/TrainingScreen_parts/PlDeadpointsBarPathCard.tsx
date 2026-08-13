@@ -32,6 +32,25 @@ const ISSUE_RU: Record<BarPathIssue, string> = {
   bar_loops: 'Петлеобразная траектория',
   asymmetric: 'Асимметрия сторон',
 };
+/** Русские подписи фаз (слабых точек) — для селектора и схемы. */
+const PHASE_RU: Record<string, string> = {
+  off_chest: 'Сход со груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт',
+  bottom: 'Низ (выход из ямы)', sticking_mid: 'Зависание в середине',
+  ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим вверх',
+  row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
+  pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
+  inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
+};
+/** Все фазы в порядке, типичном для каждого движения. */
+const LIFT_PHASES: Record<Lift, WeakPoint[]> = {
+  bench: ['off_chest', 'mid', 'lockout', 'start'],
+  squat: ['bottom', 'mid', 'lockout'],
+  deadlift: ['start', 'mid', 'lockout'],
+  ohp: ['ohp_start', 'ohp_mid', 'ohp_lockout'],
+  row: ['row_start', 'row_mid', 'row_squeeze'],
+  pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
+  incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
+};
 const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
 
 const CARD: React.CSSProperties = {
@@ -39,17 +58,22 @@ const CARD: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.08)', marginTop: 8,
 };
 
-/** Мини-схема траектории штанги: идеальная линия vs выбранные отклонения. */
-const BarPathSvg: React.FC<{ lift: Lift; issues: BarPathIssue[] }> = ({ lift, issues }) => {
-  const W = 300, H = 150, PAD = 24;
-  const cx = W / 2, topY = PAD, botY = H - PAD;
+/** Мини-схема траектории штанги: идеальная линия vs выбранные отклонения.
+ *  Клик по зоне фазы выбирает фазу; клик по кривой отклонения — цикл по issues. */
+const BarPathSvg: React.FC<{
+  lift: Lift;
+  issues: BarPathIssue[];
+  onIssue: (issue: BarPathIssue) => void;
+  onPhase: (phase: WeakPoint) => void;
+  activePhase: WeakPoint | '';
+  phases: WeakPoint[];
+}> = ({ lift, issues, onIssue, onPhase, activePhase, phases }) => {
+  const W = 300, H = 170, PAD = 24;
+  const cx = W / 2, topY = PAD, botY = H - PAD - 6;
   const path = (pts: [number, number][]): string => pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]},${p[1]}`).join(' ');
   const ideal: [number, number][] = lift === 'squat'
     ? [[cx, topY], [cx - 6, topY + (botY - topY) * 0.3], [cx + 5, topY + (botY - topY) * 0.62], [cx, botY]]
     : [[cx, topY], [cx, botY]];
-  const wavy: [number, number][] = lift === 'squat'
-    ? [[cx, topY], [cx - 4, topY + (botY - topY) * 0.3], [cx + 3, topY + (botY - topY) * 0.5], [cx - 5, topY + (botY - topY) * 0.72], [cx, botY]]
-    : [[cx - 2, topY], [cx + 4, topY + (botY - topY) * 0.3], [cx - 4, topY + (botY - topY) * 0.6], [cx + 2, botY]];
   // Отклонения: смещение кривой по X в зависимости от issues
   const offset = issues.reduce((sum, issue) => {
     switch (issue) {
@@ -66,34 +90,43 @@ const BarPathSvg: React.FC<{ lift: Lift; issues: BarPathIssue[] }> = ({ lift, is
     const bend = issues.includes('hips_shoot_up') && i === 1 ? -8 : 0;
     return [p[0] + offset + bend, p[1]] as [number, number];
   });
-  const phaseZones = lift !== 'ohp' && lift !== 'row' && lift !== 'pulldown' && lift !== 'incline_press';
+  const phaseZones = phases.length > 0;
+  // Циклический выбор отклонения при клике на кривую
+  const cycleIssue = () => {
+    const all = barPathIssuesForLift(lift);
+    if (all.length === 0) return;
+    const current = all.findIndex(i => issues.includes(i));
+    const next = all[(current + 1) % all.length];
+    onIssue(next);
+  };
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 320, display: 'block', margin: '0 auto' }} role="img" aria-label="Схема траектории штанги">
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 340, display: 'block', margin: '0 auto', cursor: 'pointer' }} role="img" aria-label="Схема траектории штанги — клик по зоне выбирает фазу, по кривой — отклонение" onClick={cycleIssue}>
       {/* ось движения */}
       <line x1={PAD} y1={botY} x2={W - PAD} y2={botY} stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
       <line x1={cx} y1={topY - 8} x2={cx} y2={botY} stroke="rgba(255,255,255,0.1)" strokeWidth={1} strokeDasharray="4 4" />
-      {/* зоны фаз */}
-      {phaseZones && ['bottom', 'mid', 'lockout'].map((zone, zi) => {
-        const y0 = topY + (botY - topY) * (zi / 3);
-        const y1 = topY + (botY - topY) * ((zi + 1) / 3);
-        return <g key={zone}>
-          <rect x={PAD - 4} y={y0} width={W - 2 * PAD + 8} height={y1 - y0} fill={zi === 1 ? 'rgba(0,230,138,0.06)' : 'transparent'} />
-          <text x={W - PAD - 2} y={(y0 + y1) / 2 + 3} fontSize={8} fill="rgba(255,255,255,0.4)" textAnchor="end">{zone}</text>
+      {/* зоны фаз (клик выбирает фазу) */}
+      {phaseZones && phases.map((zone, zi) => {
+        const y0 = topY + (botY - topY) * (zi / Math.max(1, phases.length));
+        const y1 = topY + (botY - topY) * ((zi + 1) / Math.max(1, phases.length));
+        const isActive = activePhase === zone;
+        return <g key={zone} onClick={e => { e.stopPropagation(); onPhase(zone); }} style={{ cursor: 'pointer' }}>
+          <rect x={PAD - 4} y={y0} width={W - 2 * PAD + 8} height={y1 - y0} fill={isActive ? 'rgba(0,230,138,0.12)' : 'rgba(0,230,138,0.03)'} stroke={isActive ? 'rgba(0,230,138,0.4)' : 'transparent'} strokeWidth={1} rx={3} />
+          <text x={W - PAD - 2} y={(y0 + y1) / 2 + 3} fontSize={8} fill={isActive ? ACCENT : 'rgba(255,255,255,0.4)'} textAnchor="end">{PHASE_RU[zone] || zone}</text>
         </g>;
       })}
       {/* идеальная линия */}
       <path d={path(ideal)} fill="none" stroke="#22c55e" strokeWidth={2} strokeDasharray="5 3" />
-      {/* отклонение */}
-      {issues.length > 0 && <path d={path(wavy.map((p, i) => deviated[i] ?? p))} fill="none" stroke="#ef4444" strokeWidth={2} />}
+      {/* отклонение (клик — цикл) */}
+      {issues.length > 0 && <path d={path(deviated)} fill="none" stroke="#ef4444" strokeWidth={2} />}
       {/* точки */}
       {ideal.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill="#22c55e" />)}
       {issues.length > 0 && deviated.map((p, i) => <circle key={'d' + i} cx={p[0]} cy={p[1]} r={2.5} fill="#ef4444" />)}
-      <text x={PAD} y={12} fontSize={8} fill="rgba(255,255,255,0.5)">─ идеальная · ─ отклонение{issues.length ? ` (${issues.length})` : ''}</text>
+      <text x={PAD} y={12} fontSize={8} fill="rgba(255,255,255,0.5)">кл.зона = фаза · кл.кривая = отклонение{issues.length ? ` (${issues.map(i => ISSUE_RU[i]).join(', ')})` : ''}</text>
     </svg>
   );
 };
 
-export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: SRCycleTemplate | null }> = ({ dayCount = 7, template = null }) => {
+export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: SRCycleTemplate | null; sessions?: any[] }> = ({ dayCount = 7, template = null, sessions = [] }) => {
   const [lift, setLift] = useState<Lift>('squat');
   const [phase, setPhase] = useState<WeakPoint | ''>('');
   const [issues, setIssues] = useState<BarPathIssue[]>([]);
@@ -101,27 +134,64 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   const [days, setDays] = useState<Record<string, number[]>>({});
   const [savedFocus, setSavedFocus] = useState(false);
 
-  const phases = useMemo(() => {
-    const all = ['off_chest', 'mid', 'lockout', 'start', 'bottom', 'sticking_mid', 'ohp_start', 'ohp_mid', 'ohp_lockout', 'row_start', 'row_mid', 'row_squeeze', 'pd_top', 'pd_mid', 'pd_squeeze', 'inc_off', 'inc_mid', 'inc_lockout'] as WeakPoint[];
-    const m = diagnoseMovement(lift, phase || (all[0] as WeakPoint));
-    return all.filter(p => {
-      const d = diagnoseMovement(lift, p);
-      return d.weakPoint.assistance.length > 0 || d.sticking != null;
-    });
-  }, [lift, phase]);
+  // Авто-пресет из дневника: частые тяжёлые подходы (RPE≥8) в фазе движения — подсказка (не авто-выбор).
+  const diaryHint = useMemo(() => {
+    if (!sessions.length) return null;
+    const LIFT_ALIASES: Record<Lift, string[]> = {
+      squat: ['squat', 'присед', 'приседания'],
+      bench: ['bench', 'жим', 'жим лёжа', 'bench press'],
+      deadlift: ['deadlift', 'тяга', 'становая тяга'],
+      ohp: ['overhead press', 'жим стоя', 'ohp', 'military press'],
+      row: ['barbell row', 'тяга в наклоне', 'bent over row', 'pendlay row'],
+      pulldown: ['pulldown', 'тяга верхнего', 'lat pulldown', 'подтягивания'],
+      incline_press: ['incline bench', 'жим на наклонной', 'incline press'],
+    };
+    const aliases = LIFT_ALIASES[lift] ?? [];
+    const phaseCounts: Record<string, number> = {};
+    let totalHard = 0;
+    for (const w of sessions) {
+      for (const e of (w.exercises || [])) {
+        const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
+        if (!aliases.some(a => en.includes(a))) continue;
+        for (const s of (e.sets || [])) {
+          const weight = s.weightKg || 0;
+          const reps = s.reps || 0;
+          const rpe = (s.rpe && s.rpe > 0) ? s.rpe : (s.rir != null ? 10 - s.rir : 0);
+          const isHard = rpe >= 8 && weight > 0 && reps > 0;
+          if (!isHard) continue;
+          totalHard += 1;
+          // Фаза по повторениям (эвристика) — только для 3 классических движений
+          const cand = reps <= 3 ? 'lockout' : reps <= 5 ? 'mid' : 'bottom';
+          const phases = LIFT_PHASES[lift];
+          if (phases.includes(cand as WeakPoint)) phaseCounts[cand] = (phaseCounts[cand] || 0) + 1;
+        }
+      }
+    }
+    if (totalHard === 0) return null;
+    const top = Object.entries(phaseCounts).sort((a, b) => b[1] - a[1])[0];
+    return top ? { phase: top[0] as WeakPoint, count: top[1], totalHard } : null;
+  }, [sessions, lift]);
 
-  const movement = useMemo(() => (phase ? diagnoseMovement(lift, phase) : null), [lift, phase]);
+  const phases = useMemo(() => (LIFT_PHASES[lift] ?? []).filter(p => {
+    const d = diagnoseMovement(lift, p);
+    return d.weakPoint.assistance.length > 0 || d.sticking != null;
+  }), [lift]);
+
+  // Авто-выбор первой доступной фазы при смене движения — секция видна сразу.
+  const effectivePhase = phase || phases[0] || '';
+
+  const movement = useMemo(() => (effectivePhase ? diagnoseMovement(lift, effectivePhase as WeakPoint) : null), [lift, effectivePhase]);
   const applicableIssues = useMemo(() => barPathIssuesForLift(lift), [lift]);
   const barPath = useMemo(() => issues.length ? barPathAnalysis(lift, issues) : null, [lift, issues]);
 
   // Анализ оптимальности по каждому параметру
-  const phaseAnalysis = useMemo<AssistanceAnalysis | null>(() => (phase ? analyzePhaseAssistance(lift, phase, template ?? undefined) : null), [lift, phase, template]);
+  const phaseAnalysis = useMemo<AssistanceAnalysis | null>(() => (effectivePhase ? analyzePhaseAssistance(lift, effectivePhase as WeakPoint, template ?? undefined) : null), [lift, effectivePhase, template]);
   const issueAnalyses = useMemo(() => Object.fromEntries(issues.map(i => [i, analyzeBarPathAssistance(lift, i, template ?? undefined)])), [lift, issues, template]);
 
   const changeLift = (value: Lift) => { setLift(value); setPhase(''); setIssues([]); setSelected({}); };
   const toggleIssue = (issue: BarPathIssue) => setIssues(cur => cur.includes(issue) ? cur.filter(i => i !== issue) : [...cur, issue]);
 
-  const keyForPhase = `${lift}|${phase}`;
+  const keyForPhase = `${lift}|${effectivePhase}`;
   const toggleExercise = (key: string, name: string) => setSelected(cur => {
     const values = new Set(cur[key] || []);
     if (values.has(name)) values.delete(name); else values.add(name);
@@ -171,11 +241,15 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>1 · Слабые точки и мёртвые точки</div>
         <label style={{ display: 'block', fontSize: 10, color: DIM, marginTop: 6 }}>
           Фаза (срыв / слабое место)
-          <select value={phase} onChange={event => setPhase(event.target.value as WeakPoint)} style={{ display: 'block', width: '100%', marginTop: 4, minHeight: 40, borderRadius: 7, padding: 8, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <option value="">Выберите фазу...</option>
-            {phases.map(item => <option key={item} value={item}>{item}</option>)}
+          <select value={effectivePhase} onChange={event => setPhase(event.target.value as WeakPoint)} style={{ display: 'block', width: '100%', marginTop: 4, minHeight: 40, borderRadius: 7, padding: 8, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+            {phases.map(item => <option key={item} value={item}>{PHASE_RU[item] || item}</option>)}
           </select>
         </label>
+        {diaryHint && (
+          <div style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 10, color: '#fbbf24', lineHeight: 1.5 }}>
+            📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов ({lift === 'squat' ? 'присед' : lift === 'bench' ? 'жим' : lift === 'deadlift' ? 'тяга' : LIFT_RU[lift]}) срываются в фазе «{PHASE_RU[diaryHint.phase]}». Присмотритесь к ней — подсказка, не авто-выбор.
+          </div>
+        )}
         {movement && (
           <div style={{ marginTop: 10 }}>
             <div style={{ fontWeight: 800, color: '#ef4444', fontSize: 12 }}>⚠ {movement.weakPoint.label}</div>
@@ -225,7 +299,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
               return <button key={issue} onClick={() => toggleIssue(issue)} style={{ minHeight: 34, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', border: on ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(168,85,247,0.14)' : 'transparent', color: on ? '#c084fc' : DIM, fontSize: 10 }}>{ISSUE_RU[issue]}</button>;
             })}
           </div>
-          <BarPathSvg lift={lift} issues={issues} />
+          <BarPathSvg lift={lift} issues={issues} onIssue={toggleIssue} onPhase={p => setPhase(p)} activePhase={effectivePhase} phases={phases} />
           {barPath && barPath.diagnoses.map(item => (
             <div key={item.issue} style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#c084fc' }}>{ISSUE_RU[item.issue]}{item.relatedPhase ? ` · связана с фазой ${item.relatedPhase}` : ''}</div>

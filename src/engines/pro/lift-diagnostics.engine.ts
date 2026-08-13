@@ -87,8 +87,8 @@ export interface BarPathIssueMeta {
 
 export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
   forward_drift: {
-    lifts: ['squat', 'deadlift', 'bench'],
-    relatedWeakPoint: { squat: 'bottom', deadlift: 'start', bench: 'off_chest' },
+    lifts: ['squat', 'deadlift', 'bench', 'ohp', 'incline_press'],
+    relatedWeakPoint: { squat: 'bottom', deadlift: 'start', bench: 'off_chest', ohp: 'ohp_mid', incline_press: 'inc_mid' },
     assistance: ['Румынская тяга', 'Наклоны', 'Гиперэкстензия'],
   },
   hips_shoot_up: {
@@ -102,12 +102,12 @@ export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
     assistance: ['Присед на груди', 'Болгарские сплит-приседы', 'Наклоны'],
   },
   bar_loops: {
-    lifts: ['squat', 'bench', 'deadlift'],
-    relatedWeakPoint: { squat: 'mid', bench: 'mid', deadlift: 'mid' },
+    lifts: ['squat', 'bench', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'],
+    relatedWeakPoint: { squat: 'mid', bench: 'mid', deadlift: 'mid', ohp: 'ohp_mid', row: 'row_mid', pulldown: 'pd_mid', incline_press: 'inc_mid' },
     assistance: ['Скоростной жим', 'Присед с остановками', 'Тяга с остановками'],
   },
   asymmetric: {
-    lifts: ['squat', 'bench', 'deadlift'],
+    lifts: ['squat', 'bench', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'],
     relatedWeakPoint: {},
     assistance: ['Выпады', 'Болгарские сплит-приседы', 'Тяга гантели одной рукой'],
   },
