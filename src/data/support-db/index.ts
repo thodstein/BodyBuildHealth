@@ -542,8 +542,8 @@ export const TZ_SYSTEM_LABELS: Record<string, string> = {
 };
 
 export const TZ_SYSTEM_ICONS: Record<string, string> = {
-  cardio: 'вќ¤пёЏ', hepatic: 'рџ«Ѓ', renal: 'рџ«',
-  cns: 'рџ§ ', reproductive: 'рџ§¬', hematologic: 'рџ©ё',
+  cardio: '❤️', hepatic: '🫁', renal: '🫘',
+  cns: '🧠', reproductive: '🧬', hematologic: '🩸',
 };
 
 // ── Вспомогательные функции ──
