@@ -94,7 +94,7 @@ export const DiaryHeader: React.FC<{
           {undoLabel}
         </button>
       )}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', marginLeft: 'auto' }}>
         <button style={btnBase(accent)} onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu">
           {exportLabel}
         </button>
@@ -109,6 +109,9 @@ export const DiaryHeader: React.FC<{
                 top: 'calc(100% + 8px)',
                 zIndex: 5,
                 minWidth: 200,
+                maxWidth: 'calc(100vw - 20px)',
+                maxHeight: 'min(60vh, 420px)',
+                overflowY: 'auto',
                 padding: 6,
                 borderRadius: 12,
                 background: 'rgba(28,28,34,0.98)',

@@ -781,7 +781,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
             ↩ Undo
           </button>
         )}
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
           <button style={btnBase} onClick={() => setExportOpen((v) => !v)} aria-expanded={exportOpen} aria-haspopup="menu">
             ••• Ещё
           </button>
@@ -796,6 +796,9 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                   top: 'calc(100% + 8px)',
                   zIndex: 5,
                   minWidth: 200,
+                  maxWidth: 'calc(100vw - 20px)',
+                  maxHeight: 'min(60vh, 420px)',
+                  overflowY: 'auto',
                   padding: 6,
                   borderRadius: 12,
                   background: 'rgba(28,28,34,0.98)',
@@ -1294,32 +1297,38 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         )}
 
         {/* Тренды метрик */}
-        {trends.some((t) => t.thisWeek !== null && t.lastWeek !== null) && (
-          <section id="sleep-trends" style={{ ...glassCard, marginBottom: 12 }}>
-            <b style={{ display: 'block', marginBottom: 10 }}>📊 Эта неделя vs прошлая</b>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
-              {trends.map((t) => {
-                const changed = t.delta !== null && Math.abs(t.delta) >= 0.05;
-                const better = changed && (t.betterWhenUp ? t.delta! > 0 : t.delta! < 0);
-                const worse = changed && !better;
-                return (
-                  <div key={t.label} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-                    <div style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                      {t.label}
+        <section id="sleep-trends" style={{ ...glassCard, marginBottom: 12 }}>
+          {trends.some((t) => t.thisWeek !== null && t.lastWeek !== null) ? (
+            <>
+              <b style={{ display: 'block', marginBottom: 10 }}>📊 Эта неделя vs прошлая</b>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
+                {trends.map((t) => {
+                  const changed = t.delta !== null && Math.abs(t.delta) >= 0.05;
+                  const better = changed && (t.betterWhenUp ? t.delta! > 0 : t.delta! < 0);
+                  const worse = changed && !better;
+                  return (
+                    <div key={t.label} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+                      <div style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        {t.label}
+                      </div>
+                      <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>
+                        {t.thisWeek !== null ? t.thisWeek.toFixed(1) : '—'}
+                        <span style={{ fontSize: 11, color: colors.textSubtle, fontWeight: 500 }}> vs {t.lastWeek !== null ? t.lastWeek.toFixed(1) : '—'}</span>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: better ? '#34d399' : worse ? '#f87171' : 'rgba(255,255,255,0.4)' }}>
+                        {changed ? `${t.delta! > 0 ? '↑ +' : '↓ '}${Math.abs(t.delta!).toFixed(1)}` : '— стабильно'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>
-                      {t.thisWeek !== null ? t.thisWeek.toFixed(1) : '—'}
-                      <span style={{ fontSize: 11, color: colors.textSubtle, fontWeight: 500 }}> vs {t.lastWeek !== null ? t.lastWeek.toFixed(1) : '—'}</span>
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: better ? '#34d399' : worse ? '#f87171' : 'rgba(255,255,255,0.4)' }}>
-                      {changed ? `${t.delta! > 0 ? '↑ +' : '↓ '}${Math.abs(t.delta!).toFixed(1)}` : '— стабильно'}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div style={{ color: colors.textMuted, fontSize: 12 }}>
+              📊 Тренды появятся при наличии записей за 2 недели: сравнение текущей и прошлой недели по часам, качеству, латентности и пробуждениям.
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* По дням недели */}
         {weekdayHasData && (
@@ -1373,10 +1382,11 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         )}
 
         {/* Инсайты */}
-        {(hygiene.length || recommendations.length || ped.length) > 0 && (
-          <section id="sleep-insights" style={{ ...glassCard, marginBottom: 12 }}>
-            <b style={{ display: 'block', marginBottom: 8 }}>🧠 Инсайты и рекомендации</b>
-            {hygiene.length > 0 && (
+        <section id="sleep-insights" style={{ ...glassCard, marginBottom: 12 }}>
+          {(hygiene.length || recommendations.length || ped.length) > 0 ? (
+            <>
+              <b style={{ display: 'block', marginBottom: 8 }}>🧠 Инсайты и рекомендации</b>
+              {hygiene.length > 0 && (
               <>
                 <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.5px', margin: '6px 0 2px' }}>
                   Гигиена сна
@@ -1424,8 +1434,13 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                 {c.factor}: <b style={{ color: colors.text }}>{c.description}</b> · {c.strength}
               </div>
             ))}
-          </section>
-        )}
+            </>
+          ) : (
+            <div style={{ color: colors.textMuted, fontSize: 12 }}>
+              🧠 Инсайты появятся с данными: заполняйте качество, засыпание, стресс и факторы (кофеин, алкоголь, экран) — алгоритм найдёт корреляции с тренировками и добавками.
+            </div>
+          )}
+        </section>
 
         {/* Аномалии */}
         {anomalies.length > 0 && (

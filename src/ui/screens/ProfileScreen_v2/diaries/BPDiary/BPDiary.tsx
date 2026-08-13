@@ -571,6 +571,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         {/* ========== STATS TAB ========== */}
         {tab === 'stats' && (
           <>
+            {rows.length < 3 && (
+              <div style={{ ...infoCard, marginTop: 12 }}>
+                📊 Минимум 3 записи для полной статистики. Сейчас: {rows.length}.
+              </div>
+            )}
             <section style={{ ...card, marginTop: 12 }}>
               <h3>📊 Распределение и экстремумы</h3>
               <div>Среднее: <b>{dist?.mean.toFixed(1) || '—'}</b> · медиана: <b>{dist?.median.toFixed(1) || '—'}</b> · SD:{' '}
@@ -628,6 +633,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         {/* ========== ANALYSIS TAB ========== */}
         {tab === 'analysis' && (
           <>
+            {rows.length < 3 && (
+              <div style={{ ...infoCard, marginTop: 12 }}>
+                🔬 Анализ требует минимум 3 записи (ортопроба — пару «сидя/стоя» за день). Сейчас: {rows.length}.
+              </div>
+            )}
             <section style={{ ...card, marginTop: 12 }}>
               <h3>🩺 Ортостатический тест</h3>
               {orthostatic.detected || recentRows.some(r => r.position === 'standing') ? (

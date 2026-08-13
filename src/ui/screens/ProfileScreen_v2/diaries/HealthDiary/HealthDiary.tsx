@@ -971,18 +971,28 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                   const c = r.priority === 'critical' ? '#ef4444' : r.priority === 'high' ? '#f97316' : r.priority === 'medium' ? '#f59e0b' : '#22c55e';
                   const supportable = onNavigate && (r.domain === 'pain' || r.domain === 'neuro' || r.domain === 'hemato' || r.domain === 'acne');
                   return (
-                    <div key={r.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${c}44`, opacity: done ? 0.55 : 1 }}>
-                      <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', fontSize: 12 }}>
-                        <input type="checkbox" checked={done} onChange={() => togglePlanItem(r.id)} style={{ marginTop: 2, accentColor: c }} aria-label={`Выполнено: ${r.title}`} />
-                        <span style={{ flex: 1 }}>
-                          <b style={{ color: c }}>{r.title}</b>
-                          <div style={{ color: colors.textMuted, marginTop: 2 }}>{r.rationale}</div>
-                          <div style={{ color: colors.text, marginTop: 2 }}>→ {r.action}</div>
+                    <div key={r.id} style={{ padding: '7px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: `1px solid ${c}44`, opacity: done ? 0.6 : 1 }}>
+                      <label style={{ display: 'flex', gap: 9, alignItems: 'center', cursor: 'pointer', fontSize: 12, minHeight: 40 }}>
+                        <input
+                          type="checkbox"
+                          checked={done}
+                          onChange={() => togglePlanItem(r.id)}
+                          style={{ width: 20, height: 20, accentColor: c, flexShrink: 0, cursor: 'pointer' }}
+                          aria-label={`Выполнено: ${r.title}`}
+                        />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', lineHeight: 1.35 }}>
+                            <b style={{ color: c }}>{r.title}</b>
+                            <span style={{ color: colors.text, marginLeft: 6 }}>— {r.action}</span>
+                          </span>
+                          <span style={{ display: 'block', color: colors.textMuted, marginTop: 2, fontSize: 11, lineHeight: 1.3 }}>
+                            {r.rationale}
+                          </span>
                         </span>
                       </label>
                       {supportable && (
-                        <div style={{ marginTop: 6, paddingLeft: 26 }}>
-                          <button style={button} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
+                        <div style={{ marginTop: 3, paddingLeft: 29 }}>
+                          <button style={{ ...button, minHeight: 32, padding: '3px 10px', fontSize: 11 }} onClick={() => onNavigate('support')}>🛡 Протокол поддержки</button>
                         </div>
                       )}
                     </div>

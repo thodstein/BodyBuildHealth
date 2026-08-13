@@ -421,7 +421,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       : [{ date: today, weight: w, timeOfDay: quickTod }, ...rows];
     commit(next);
     setQuickW('');
-    setQuickTod('morning');
+    (window as any).showToast?.(`✅ Вес записан (${quickTod === 'morning' ? 'утро' : 'вечер'})`);
   };
   const entries = useMemo<DiaryEntryLike[]>(
     () =>
@@ -955,15 +955,32 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               onKeyDown={(e) => { if (e.key === 'Enter') quickAdd(); }}
               aria-label="Быстрый ввод веса"
             />
-            <select
-              style={{ ...input, width: 130, cursor: 'pointer' }}
-              value={quickTod}
-              onChange={(e) => setQuickTod(e.target.value as 'morning' | 'evening')}
-              aria-label="Время суток"
-            >
-              <option value="morning">🌅 Утро</option>
-              <option value="evening">🌙 Вечер</option>
-            </select>
+            <div style={{ display: 'inline-flex', borderRadius: 10, overflow: 'hidden', border: `1px solid ${colors.border}`, flexShrink: 0 }} role="radiogroup" aria-label="Время суток">
+              {(['morning', 'evening'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={quickTod === t}
+                  onClick={() => setQuickTod(t)}
+                  style={{
+                    ...input,
+                    width: 88,
+                    minHeight: 38,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    border: 'none',
+                    borderRadius: 0,
+                    background: quickTod === t ? 'rgba(34,197,94,0.16)' : 'transparent',
+                    color: quickTod === t ? '#4ade80' : colors.textMuted,
+                    fontWeight: 700,
+                    fontSize: 12,
+                  }}
+                >
+                  {t === 'morning' ? '🌅 Утро' : '🌙 Вечер'}
+                </button>
+              ))}
+            </div>
             <button
               style={{ ...btnPrimary, minHeight: 36 }}
               onClick={quickAdd}
