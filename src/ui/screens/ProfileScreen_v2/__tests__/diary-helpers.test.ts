@@ -497,7 +497,8 @@ describe('paceToTarget', () => {
     const now = new Date();
     const target = new Date(now);
     target.setDate(target.getDate() + 14);
-    const iso = target.toISOString().slice(0, 10);
+    // Локальная дата (toISOString даёт UTC и может отставать на день в +зонах).
+    const iso = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
     const out = paceToTarget(90, 85, iso);
     expect(out).not.toBeNull();
     if (out) {
