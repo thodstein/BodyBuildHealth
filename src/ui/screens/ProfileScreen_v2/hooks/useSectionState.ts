@@ -61,6 +61,13 @@ export function useSectionState<K extends keyof UnifiedSettings>(
       isDirtyRef.current = false;
       return;
     }
+    // Анти-цикл: если локальное значение уже равно тому, что в профиле
+    // (например, профиль перезаписан извне с тем же содержимым) — не пишем.
+    if (deepEqual(localValue, profileValueRef.current)) {
+      isDirtyRef.current = false;
+      lastWrittenRef.current = localValue;
+      return;
+    }
     isDirtyRef.current = true;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {

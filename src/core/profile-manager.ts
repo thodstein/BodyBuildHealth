@@ -146,13 +146,14 @@ function makeSettingsProxy(s: UnifiedSettings): UnifiedSettings {
   }) as UnifiedSettings;
 }
 
-/** Поля, которые должны быть массивами — нормализуем при чтении. */
+/** Поля, которые должны быть массивами — нормализуем при чтении.
+ *  ВАЖНО: сюда нельзя добавлять объекты/строки (напр. health.genetics — Record,
+ *  personal.bloodType — string) — normalize заменит их на [] и УНИЧТОЖИТ данные. */
 const ARRAY_FIELDS: Record<string, string[]> = {
-  health: ['injuries', 'chronicConditions', 'excludedSupplements', 'excludedMeds', 'genetics'],
-  nutrition: ['foodAllergies', 'foodIntolerances', 'excludedFoods', 'preferredFoods', 'excludedCategories', 'lockedFoods', 'tasteProfile', 'preferredByMeal'],
+  health: ['injuries', 'chronicConditions', 'excludedSupplements', 'excludedMeds'],
+  nutrition: ['foodAllergies', 'foodIntolerances', 'excludedFoods', 'preferredFoods', 'excludedCategories', 'lockedFoods', 'tasteProfile'],
   training: ['weakPoints', 'equipment', 'daysOfWeek'],
   symptoms: ['recent'],
-  personal: ['bloodType'],
 };
 
 function normalizeArrayFields(settings: any): void {
@@ -161,7 +162,11 @@ function normalizeArrayFields(settings: any): void {
     const sec = settings[section];
     if (!sec || typeof sec !== 'object') continue;
     for (const field of fields) {
-      if (sec[field] !== undefined && !Array.isArray(sec[field])) {
+      const v = sec[field];
+      if (v === undefined || v === null) continue;
+      // Только если значение — «плохой массив» (не массив и не объект).
+      // Объекты (Record) не трогаем — они легитимные данные.
+      if (!Array.isArray(v) && typeof v !== 'object') {
         sec[field] = [];
       }
     }
