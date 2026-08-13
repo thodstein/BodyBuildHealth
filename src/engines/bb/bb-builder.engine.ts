@@ -1245,13 +1245,15 @@ function buildSession(
     // косвенный объём уже закрывает часть target (иначе MRV-overflow).
     if (muscle === 'biceps') {
       const pullSets = muscleVolumeRotation['back'] || 0;
-      if (pullSets >= 40) sets = Math.min(sets, Math.round(pullSets * 0.15));
-      else if (pullSets >= 24) sets = Math.min(sets, Math.round(pullSets * 0.2));
+      if (pullSets >= 40) sets = Math.min(sets, Math.round(pullSets * 0.12));
+      else if (pullSets >= 24) sets = Math.min(sets, Math.round(pullSets * 0.15));
+      else if (pullSets >= 14) sets = Math.min(sets, Math.round(pullSets * 0.2));
     }
     if (muscle === 'triceps') {
       const pushSets = (muscleVolumeRotation['chest'] || 0) + (muscleVolumeRotation['shoulders'] || 0);
-      if (pushSets >= 40) sets = Math.min(sets, Math.round(pushSets * 0.15));
-      else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.2));
+      if (pushSets >= 40) sets = Math.min(sets, Math.round(pushSets * 0.12));
+      else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.15));
+      else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
     }
     if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
@@ -2335,21 +2337,25 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // fix C: для отстающих/фокус-групп поднимаем потолок в такт объёмному
       // бусту (weak ×1.2, focus ×1.3), иначе normalizeWeekMrv стирает акцент.
       // PED: базовый MRV умножается на combinedMrvMultiplier ДО корректировок
-      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1) * (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined ? legProfile.capMult : 1) * (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined ? torsoProfile.capMult : 1));
+      // Ноги: недельный кап масштабируется частотой сессий (3×/нед переносится
+      // лучше, чем тот же объём за 2× — распределённый объём, Helms 2019).
+      const legFreqMult = ['quads', 'hamstrings', 'glutes'].includes(m) ? Math.max(1, (muscleSessionCount[m] || 1) / 2) : 1;
+      let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * (m === 'back' && input.trainingYears !== undefined ? backProfile.capMult : 1) * (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined ? legProfile.capMult * legFreqMult : 1) * (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined ? torsoProfile.capMult : 1));
       // Руки/ягодицы/плечи: при больших тягах/жимах/приседаниях косвенный
       // объём закрывает часть target, но потолок тоже должен расти со стажем
       // (иначе ложный MRV-overflow на enhanced-планах).
       if (['biceps', 'triceps', 'glutes', 'shoulders'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
-        capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.6 : input.trainingYears >= 6 ? 1.4 : 1.2));
+        capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
       }
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
       mrvByMuscle[m] = capMrv;
     }
   }
-  // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps, lower_back, abs, calves).
-  // Раньше cap отсутствовал → normalizeWeekMrv игнорировал эти мышцы при `mrvByMuscle[m] || 0 = 0`.
-  const PRO_KEYS = ['delt_front', 'delt_mid', 'delt_rear', 'forearms', 'traps', 'lower_back', 'abs', 'calves'];
+  // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps,
+  // lower_back, abs, calves) и рук (biceps/triceps — в сплитах с 'arms' они не
+  // попадают в muscleSessionCount, но кап нужен для валидации/капов упражнений).
+  const PRO_KEYS = ['delt_front', 'delt_mid', 'delt_rear', 'forearms', 'traps', 'lower_back', 'abs', 'calves', 'biceps', 'triceps'];
   for (const m of PRO_KEYS) {
     if (mrvByMuscle[m]) continue;
     // BUG-FIX: проверяем excludedMuscles для PRO-ключей (и их collapseKey).
@@ -2359,6 +2365,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
       let capMrv = Math.round(lm.mrv * (pedAdapt?.combinedMrvMultiplier ?? 1) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult);
+      // Руки/ягодицы/плечи: косвенный объём от тяг/жимов требует стажевый кап-буст.
+      if (['biceps', 'triceps'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
+        capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
+      }
       if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
       mrvByMuscle[m] = capMrv;
     }
@@ -3093,7 +3103,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     .filter(issue => issue.code !== 'target_volume_deficit')
     .slice(0, 20)
     .map(issue => `⚠ Валидация: ${issue.message}`);
-  if (validationWarnings.length > 0) output.rationale.push(...validationWarnings);
+  if (validationWarnings.length > 0) {
+    const seen = new Set(output.rationale);
+    for (const w of validationWarnings) if (!seen.has(w)) { seen.add(w); output.rationale.push(w); }
+  }
   return finalizeBBPlan(output, {
     reorder: true,
     methodology: input.methodology,

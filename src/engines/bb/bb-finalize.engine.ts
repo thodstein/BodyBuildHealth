@@ -862,20 +862,42 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     diversifyExperiencedChestSession(session, options);
     ensureRearDeltInPull(session, options);
   }
-  // FullBody/Lower: после всех проходов добираем отсутствующие группы
-  // (fbUsedIds может вытеснить мышцы между FullBody-сессиями).
-  if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
-    for (const week of next.weeks) for (const session of week.sessions) {
+  // FullBody/Lower/Upper: после всех проходов добираем отсутствующие группы
+  // (fbUsedIds может вытеснить мышцы между сессиями; enhanced-бюджеты
+  // вытесняют calves/traps/abs из Lower/Upper). Для natural — 3 сета,
+  // для enhanced 3+ — 4 (крупные) / 3 (малые).
+  if (!options.preserveSource) {
+    const fillSets = (muscle: string) => ['calves', 'abs', 'traps', 'forearms'].includes(muscle) ? 3 : (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 4 : 3);
+    for (const week of next.weeks) {
+      // Natural: малые группы (abs/traps) добираем ТОЛЬКО если их нет во всей
+      // неделе — иначе fill дублирует пресс в каждой сессии (> MRV).
+      const weekMuscles = new Set(week.sessions.flatMap(s => s.exercises.map((e: any) => e.muscle)));
+      const weekHas = (m: string) => weekMuscles.has(m);
+      for (const session of week.sessions) {
       const tag = session.sessionTag || '';
-      if (!/Legs|Lower|LowerPower|LowerHyp/.test(tag) && !/FullBody/.test(tag)) continue;
+      if (!/Legs|Lower|LowerPower|LowerHyp/.test(tag) && !/FullBody/.test(tag) && !/Upper|Push|Pull/.test(tag) && !/Torso|Limbs/.test(tag)) continue;
       const present = new Set(session.exercises.map((e: any) => e.muscle));
       const template = session.exercises[0];
       if (!template) continue;
+      // Не превышаем level-aware лимит упражнений в сессии (10 natural / 18 enhanced).
+      const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+      const workingCount = () => session.exercises.filter((e: any) => !(e as any).warmupActivator).length;
+      if (workingCount() >= maxEx) continue;
+      // Сетовой лимит сессии (60 enhanced 3+ / 24 natural) не превышаем.
+      const maxSessionSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : 24;
+      const sessionSets = () => session.exercises.reduce((sum: number, e: any) => sum + (e.sets || 0), 0);
       const needMuscles = /FullBody/.test(tag)
-        ? ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'calves', 'forearms', 'abs']
-        : ['glutes', 'quads', 'hamstrings'];
+        ? ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'calves', 'forearms', 'abs', 'traps']
+        : /Upper|Push|Pull/.test(tag)
+          ? ['traps', 'abs']
+          : ['glutes', 'quads', 'hamstrings', 'calves', 'abs'];
       for (const muscle of needMuscles) {
         if (present.has(muscle)) continue;
+        // Natural: малые группы не дублируются по сессиям (только если нет в неделе).
+        if (options.level !== 'enhanced' && ['abs', 'traps', 'calves'].includes(muscle) && weekHas(muscle)) continue;
+        if (workingCount() >= maxEx) break;
+        const addSets = fillSets(muscle);
+        if (sessionSets() + addSets > maxSessionSets) continue;
         const candidate = EXERCISE_CATALOG.find((x: any) => {
           if (trueMuscleOf(x) !== muscle) return false;
           if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
@@ -891,11 +913,12 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
         added.name = candidate.name;
         added.exerciseName = candidate.name;
         added.role = 'accessory';
-        added.sets = /FullBody/.test(tag) ? 3 : 4;
+        added.sets = addSets;
         const sample = template.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
         added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
         session.exercises.push(added);
         present.add(muscle);
+      }
       }
     }
   }
@@ -998,7 +1021,10 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .filter(issue => issue.level === 'warning')
     .slice(0, 20)
     .map(issue => `⚠ Валидация: ${issue.message}`);
-  if (warnings.length) next.rationale = [...next.rationale, ...warnings];
+  if (warnings.length) {
+    const seen = new Set(next.rationale);
+    for (const w of warnings) if (!seen.has(w)) { seen.add(w); next.rationale.push(w); }
+  }
   // Пересчитываем функциональную разметку спины после всех поздних проходов
   // (rotation/dedupe/taper/fill могут клонировать упражнения без полей).
   for (const week of next.weeks) for (const session of week.sessions) {

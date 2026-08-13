@@ -184,10 +184,14 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
         // Фактический per-muscle MRV-кап после всех множителей (PED/recovery/
         // lab/стаж) имеет приоритет над landmarks.mrv — иначе enhanced-планы
         // получают ложные overflow (landmarks.mrv не учитывает стажевые бусты).
+        // Допуск ×1.1: MRV — мягкий ориентир, пограничные ±10% не флагаются
+        // (ложные «на грани» предупреждения у natural-планов).
+        // Допуск ×1.15 (паритет с plan-validator error-порогом): MRV — мягкий
+        // ориентир, пограничные ±15% не флагаются (ложные «на грани» у natural).
         const actualCap = plan.mrvByMuscle?.[muscle];
         const lm = getVolumeLandmarks(options.level, muscle);
         const cap = actualCap ?? (lm ? Math.round(lm.mrv * (options.mrvMultiplier ?? 1)) : 0);
-        if (cap > 0 && values.effectiveSets > cap) {
+        if (cap > 0 && values.effectiveSets > cap * 1.15) {
           issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.`, week: week.week });
         }
       }

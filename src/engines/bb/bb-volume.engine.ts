@@ -144,13 +144,13 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
   }
   if (hasAny(name, /подтяг|pull.?up|pulldown|пуллдаун|тяга.*верх/i)) {
     return [
-      { muscle: 'biceps', coefficient: 0.5 },
+      { muscle: 'biceps', coefficient: 0.4 },
       { muscle: 'shoulders', coefficient: 0.25 },
     ];
   }
   if (hasAny(name, /row|тяга.*наклон|тяга.*гриф|тяга.*гантел|горизонтальн.*тяга/i)) {
     return [
-      { muscle: 'biceps', coefficient: 0.5 },
+      { muscle: 'biceps', coefficient: 0.4 },
       { muscle: 'shoulders', coefficient: 0.25 },
     ];
   }

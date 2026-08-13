@@ -3,7 +3,8 @@ import { validateBBPlan } from '../bb-validator.engine';
 
 describe('BB validator volume contract', () => {
   it('warns when effective peak-week volume exceeds MRV', () => {
-    const sets = 21;
+    // intermediate chest MRV=20; допуск ×1.15 → флаг только при >23 сетов.
+    const sets = 26;
     const ex: any = {
       muscle: 'chest', name: 'Жим лёжа', role: 'primary', character: 'тяж', sets,
       repsRange: [6, 8], rir: 2,

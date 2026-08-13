@@ -28,11 +28,12 @@ describe('plan-validator с фактическими капами', () => {
   });
 
   it('выдаёт error когда фактический кап превышен', () => {
-    const ws = { back: 80 };
+    // Допуск 15%: error только при > cap×1.15 = 80.5.
+    const ws = { back: 85 };
     const banners = validatePlan({ weeklySets: ws, level: 'enhanced', goal: 'mass', daysPerWeek: 4, weakPoints: [], trainingYears: 6, mrvMultiplier: 1.3, mrvByMuscle: { back: 70 } });
     const err = banners.find(b => b.category === 'mrv' && b.level === 'error');
     expect(err).toBeDefined();
-    expect(err!.title).toContain('80 > 70');
+    expect(err!.title).toContain('85 > 70');
   });
 
   it('добавляет контекстный комментарий о параметрах пользователя', () => {
