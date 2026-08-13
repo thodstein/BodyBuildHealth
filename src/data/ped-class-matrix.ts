@@ -148,11 +148,13 @@ export function detectActivePedClasses(state: any): PedClassMatrixEntry[] {
   const out: PedClassMatrixEntry[] = [];
   const ids = (state?.pharma?.aas || []).map((a: { id?: string }) => String(a.id || '').toLowerCase());
   const has = (rx: RegExp) => ids.some((id: string) => rx.test(id));
-  if (has(/test|sust|omnadren|cyp|prop|enan|undecan/)) out.push(PED_CLASS_MATRIX[0]);
-  if (has(/tren/)) out.push(PED_CLASS_MATRIX[1]);
+  // порядок важен: 19-нор проверяем ДО тестостерона (nandrolone_propionate содержит 'prop')
   if (has(/nand|deca|npp/)) out.push(PED_CLASS_MATRIX[2]);
-  if (has(/bold|eq|dhb/)) out.push(PED_CLASS_MATRIX[3]);
-  if (has(/oxand|anavar|stan|winstrol|meth|dianabol|oxymeth|anadrol|turin|superdrol|halotestin|methyltest/)) out.push(PED_CLASS_MATRIX[4]);
+  if (has(/test_|sust|omnadren/)) out.push(PED_CLASS_MATRIX[0]);
+  if (has(/tren/)) out.push(PED_CLASS_MATRIX[1]);
+  if (has(/bold|equipoise|dhb/)) out.push(PED_CLASS_MATRIX[3]);
+  // полные имена оралов: без голых 'stan'/'meth' (sustanon содержит 'stan')
+  if (has(/oxand|anavar|stanozolol|winstrol|methandienone|dianabol|oxymetholone|anadrol|turinabol|superdrol|halotestin|methyltestosterone|cheque_drops/)) out.push(PED_CLASS_MATRIX[4]);
   if (state?.pharma?.ghIU > 0 || state?.pharma?.hasGH) out.push(PED_CLASS_MATRIX[5]);
   if (state?.pharma?.igfMcg > 0 || state?.pharma?.hasIGF) out.push(PED_CLASS_MATRIX[6]);
   if (state?.pharma?.insulinIU > 0 || state?.pharma?.hasInsulin) out.push(PED_CLASS_MATRIX[7]);
