@@ -15,6 +15,7 @@ import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/pe
 import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { SafetyGuardrails, SafetyAlerts, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyDepletion, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyPctTiming, SafetyInjections } from './CalcSafetyLayer';
+import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL, type SubRiskGroup } from './CalcSystemPanel';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { getSubstanceForm, type SubstanceForm } from '../../../data/substance-forms';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
@@ -1725,10 +1726,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
             <div style={{ overflowY:'auto', padding:'10px 14px', minHeight:0 }}>
               <div style={{ padding:'7px 8px', marginBottom:8, borderRadius:8, background:`${cfg.color}12`, border:`1px solid ${cfg.color}30`, fontSize:8, lineHeight:1.5 }}>
-                <b>Риск системы:</b> {systemRiskOf(genericEnhancementPopup)?.rawPercent ?? '—'}% → {systemRiskOf(genericEnhancementPopup)?.afterPercent ?? '—'}% (механизм-модель, по финальному составу)<br/>
                 <b>Механизмы:</b> {cfg.domains.join(' · ')}<br/>
                 <b>Анализы:</b> {activeMarkers.length ? activeMarkers.map(m => `${m} ${labs[m]}`).join(', ') : 'нет данных — поддержка по фармакологии курса, нужен контроль'}
               </div>
+              <CalcSystemPanel
+                risk={systemRiskOf(genericEnhancementPopup)}
+                panel={SYSTEM_PANELS.find(p => p.id === SYSTEM_TO_PANEL[genericEnhancementPopup]) || null}
+              />
               {activeDomains.length > 0 && <button onClick={() => setGenericEnhancementSelected(new Set(autoIds))} style={{ width:'100%', padding:'8px', marginBottom:8, borderRadius:8, border:`1px solid ${cfg.color}66`, background:`${cfg.color}18`, color:'#fff', fontSize:8, fontWeight:800, cursor:'pointer', textAlign:'left' }}>⚡ AUTO по данным: {activeDomains.map(d => d.label).join(' · ')} ({autoIds.length} кандидатов)</button>}
               <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:5 }}>📊 Контрольные маркеры</div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:9 }}>{cfg.markers.map(m => <span key={m} style={{ fontSize:7, padding:'2px 5px', borderRadius:4, background:labs[m] != null ? `${cfg.color}25` : 'rgba(255,255,255,0.05)', color:'#fff' }}>{m}{labs[m] != null ? `: ${labs[m]}` : ' · нет'}</span>)}</div>
@@ -1896,6 +1900,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     </b>
                   </div>
 
+                  <CalcSystemPanel
+                    risk={null}
+                    panel={SYSTEM_PANELS.find(p => p.id === 'oda') || null}
+                    note="ОДА (суставы/связки) не входит в 6 систем механизм-модели риска — контроль по маркерам и УЗИ, поддержка влияет на кардио/метаболический контур косвенно."
+                  />
+
                   {/* Список веществ */}
                   <div style={{ fontSize:9, fontWeight:700, color:'#ffffff', marginBottom:4 }}>💊 Выберите вещества ({articularSelected.size} из {JOINT_CATALOG.length})</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:8 }}>
@@ -1999,6 +2009,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {hasInsomnia ? ' · бессонница' : ''}{hasAnxiety ? ' · тревога' : ''}{sleepHours < 7 ? ` · сон ${sleepHours}ч` : ''}{stressLevel > 7 ? ` · стресс ${stressLevel}/10` : ''}
                     {pedNeuroTier > 0 && <span style={{ color:'#818cf8', fontWeight:700 }}> · ⚡ PED AUTO LV{pedNeuroTier} ({pedNeuroRisk})</span>}
                   </div>
+
+                  <CalcSystemPanel risk={systemRiskOf('cns')} panel={SYSTEM_PANELS.find(p => p.id === 'cns') || null} />
 
                   <DomainSymptomMap domains={NEURO_DOMAINS} checked={neuroSymptoms} onToggle={toggleNeuroSymptom} />
 
@@ -2179,17 +2191,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const plt = labs['PLT'];
           const fibrinogen = labs['FIBRINOGEN'];
           const ddimer = labs['D_DIMER'];
-          // Risk score
-          let hematoScore = 0;
-          if (hct != null) { if (hct >= 57) hematoScore += 30; else if (hct >= 52) hematoScore += 25; else if (hct >= 48) hematoScore += 15; else if (hct >= 45) hematoScore += 5; }
-          if (hgb != null && hgb > 175) hematoScore += 10;
-          if (plt != null && plt > 400) hematoScore += 10;
-          if (fibrinogen != null && fibrinogen > 4) hematoScore += 10;
-          if (ddimer != null && ddimer > 0.5) hematoScore += 15;
-          hematoScore += pedHematoTier * 10;
-          if (hematoSymptoms.has('hyperviscosity_symptom')) hematoScore += 15;
-          const riskColor = hematoScore >= 50 ? '#ef4444' : hematoScore >= 30 ? '#f97316' : hematoScore >= 15 ? '#f59e0b' : '#22c55e';
-          const riskLabel = hematoScore >= 50 ? '🔴 Высокий' : hematoScore >= 30 ? '🟠 Умеренный' : hematoScore >= 15 ? '🟡 Низкий' : '🟢 Минимальный';
+          // Risk score — ЕДИНЫЙ источник: механизм-модель (системный риск hematologic).
+          // Локальная формула удалена (P0-2/C3): цвета/статус — от системного риска.
+          const hemaSys = systemRiskOf('hematologic');
+          const hematoScore = hemaSys ? Math.round(hemaSys.rawPercent) : 0;
+          const riskColor = hematoScore >= 75 ? '#ef4444' : hematoScore >= 50 ? '#f97316' : hematoScore >= 25 ? '#f59e0b' : '#22c55e';
+          const riskLabel = hematoScore >= 75 ? '🔴 Очень высокий' : hematoScore >= 50 ? '🔴 Высокий' : hematoScore >= 25 ? '🟠 Умеренный' : '🟢 Низкий';
           const toggleSub = (id: string) => { setHematoSelected(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); };
           const toggleHematoSymptom = (code: string) => setHematoSymptoms(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });
           const hematoRecSet = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
@@ -2212,29 +2219,17 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:8, background:`${riskColor}10`, border:`1px solid ${riskColor}22` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                       <span style={{ fontSize:10, fontWeight:700, color:riskColor }}>{riskLabel}</span>
-                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>Счет: {hematoScore}</span>
+                      <span style={{ fontSize:8, color:'rgba(255,255,255,0.5)' }}>Риск системы: {hematoScore}%</span>
                     </div>
-                    {(() => {
-                      const hema = systemRiskOf('hematologic');
-                      if (!hema) return null;
-                      const mechOf = (id: string) => hema.mechanisms.find(m => m.id === id);
-                      const h1 = mechOf('hem1');
-                      const h2 = mechOf('hem2');
-                      const h3 = mechOf('hem3');
-                      const h4 = mechOf('hem4');
-                      const h5 = mechOf('hem5');
-                      const sum = (a?: number, b?: number) => (a ?? 0) + (b ?? 0);
-                      return (
-                        <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginBottom:4, padding:'4px 6px', borderRadius:5, background:'rgba(20,184,166,0.08)', border:'1px solid rgba(20,184,166,0.18)' }}>
-                          ⚖️ Под-риски гемато-блока (механизм-модель, единый расчёт):
-                          <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:3 }}>
-                            <span style={{ padding:'1px 5px', borderRadius:3, background:'rgba(20,184,166,0.15)', border:'1px solid rgba(20,184,166,0.25)' }}>🩸 эритроцитоз {h1?.rawPercent ?? 0}% → {h1?.afterPercent ?? 0}%</span>
-                            <span style={{ padding:'1px 5px', borderRadius:3, background:'rgba(249,115,22,0.15)', border:'1px solid rgba(249,115,22,0.25)' }}>🍬 метаболизм {sum(h2?.rawPercent, h3?.rawPercent)}% → {sum(h2?.afterPercent, h3?.afterPercent)}%</span>
-                            <span style={{ padding:'1px 5px', borderRadius:3, background:'rgba(56,189,248,0.15)', border:'1px solid rgba(56,189,248,0.25)' }}>⚡ электролиты {sum(h4?.rawPercent, h5?.rawPercent)}% → {sum(h4?.afterPercent, h5?.afterPercent)}%</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    <CalcSystemPanel
+                      risk={systemRiskOf('hematologic')}
+                      panel={SYSTEM_PANELS.find(p => p.id === 'hema') || null}
+                      groups={[
+                        { label: 'эритроцитоз', icon: '🩸', color: '#14b8a6', mechs: ['hem1'] },
+                        { label: 'метаболизм', icon: '🍬', color: '#f97316', mechs: ['hem2', 'hem3'] },
+                        { label: 'электролиты', icon: '⚡', color: '#38bdf8', mechs: ['hem4', 'hem5'] },
+                      ]}
+                    />
                     <div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>
                       {hct != null && <div>• Гематокрит: {hct}% {hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма'}</div>}
                       {hgb != null && <div>• Гемоглобин: {hgb} г/л {hgb > 175 ? '⚠️' : '✓'}</div>}
@@ -3104,30 +3099,23 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <div style={{ marginBottom:7 }}>
                   <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане)</div>
 
-                  {[{ id:'hep', icon:'🫁', name:'Печёночная панель', color:'#f59e0b', active:hasHepatic, markers:'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq:'Каждые 4 нед', targets:'АЛТ/АСТ <40 Ед/л, ГГТ <55, билирубин <21 мкмоль/л', alert:'АЛТ >80 → снижение доз · >200 → СТОП' },
-                    { id:'cardio', icon:'❤️', name:'Кардио-липидная панель', color:'#f87171', active:hasCardio, markers:'ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I (при боли)', freq:'Каждые 4 нед', targets:'ЛПНП <2.6, ЛПВП >1.0, ТГ <1.7, hs-СРБ <1.0', alert:'ЛПНП >4.0 → статины · Д-димер >0.5 → УЗДГ вен' },
-                    { id:'renal', icon:'💧', name:'Почечная панель', color:'#38bdf8', active:hasRenal, markers:'Креатинин, рСКФ (CKD-EPI), цистатин C, мочевина, мочевая кислота, электролиты (Na⁺, K⁺, Cl⁻), общий белок мочи, микроальбуминурия', freq:'Каждые 4 нед', targets:'Креатинин <115, рСКФ >90, K⁺ 3.5–5.0, микроальбумин <30 мг/сут', alert:'Креатинин >130 → УЗИ почек · K⁺ <3.5/>5.5 → ЭКГ' },
-                    { id:'hema', icon:'🩸', name:'Гематологическая панель', color:'#ef4444', active:hasHemat, markers:'ОАК: HCT, Hgb, RBC, PLT, WBC, ретикулоциты, ферритин, сыв. железо, коагулограмма (МНО, АЧТВ, фибриноген, D-димер), JAK2 V617F (при Hct>52%)', freq:'Каждые 2-4 нед (при ↑Hct — каждые 2 нед)', targets:'HCT 40–50% (♂), Hgb 140–170 г/л, PLT 150–400×10⁹/л, фибриноген 2-4 г/л, D-димер <0.5', alert:'HCT >52% → эритроцитаферез (первая линия) / флеботомия · >54% → СТОП AAS + эритроцитаферез · >60% → госпитализация' },
-                    { id:'horm', icon:'🧬', name:'Гормональная панель', color:'#a78bfa', active:hasRepro || subs.some(s => (s.mechsCovered||[]).some(m => m.startsWith('rep')||m.startsWith('hem'))), markers:'Тестостерон общ./своб., эстрадиол (чувств.), пролактин, ЛГ, ФСГ, SHBG, кортизол (утро), ДГТ, прогестерон', freq:'Каждые 4 нед (на курсе), каждые 2 нед (ПКТ)', targets:'E2 20–50 пг/мл (♂ на курсе), пролактин <15 нг/мл, кортизол 140–690 нмоль/л', alert:'E2 >60 → ↑ИА · пролактин >25 → каберголин · ЛГ<1.0 → ХГЧ' },
-                    { id:'meta', icon:'🍬', name:'Метаболическая панель', color:'#f97316', active:hasHemat || hasCardio, markers:'Глюкоза натощак, HbA1c, инсулин, HOMA-IR, гомоцистеин, СРБ', freq:'Каждые 4–8 нед', targets:'Глюкоза <5.6, HbA1c <5.7%, HOMA-IR <2.5, гомоцистеин <10', alert:'HbA1c >6.0 → метформин · глюкоза >11 → ER · HOMA-IR >3 → берберин' },
-                    { id:'thy', icon:'🦋', name:'Тиреоидная панель', color:'#22d3ee', active:subs.some(s => s.substanceId === 'selenium' || s.substanceId === 'iodine' || s.substanceId === 't3' || s.substanceId === 't4'), markers:'ТТГ, Т3 своб., Т4 своб., АТ-ТПО', freq:'Каждые 8 нед (при приёме T3/T4 — каждые 4 нед)', targets:'ТТГ 0.4–4.0, Т3 св. 3.5–6.5, Т4 св. 11.5–22.7', alert:'ТТГ >4.5 → гипотиреоз · ТТГ <0.1 → гипертиреоз · ↑T3 → ↓дозу' },
-                    { id:'vit', icon:'💊', name:'Витамины и минералы', color:'#4ade80', active:true, markers:'Витамин D (25-OH), B12, фолат, ферритин, Mg²⁺, Zn²⁺, Se, Ca²⁺ общ., фосфор', freq:'Каждые 8 нед', targets:'D3 50–80 нг/мл, B12 200–900, фолат >4, ферритин 50–200, Mg²⁺ 0.8–1.0, Zn²⁺ 70–140', alert:'D3 <30 → нагрузка 50K МЕ/нед · ферритин <30 → Fe²⁺ + vitC' },
-                  ].map(panel => {
+                  {SYSTEM_PANELS.map(panel => {
                     const drivers = driversBySystem[panel.id] || [];
+                    const isActive = panel.id === 'hep' ? hasHepatic : panel.id === 'cardio' ? hasCardio : panel.id === 'renal' ? hasRenal : panel.id === 'hema' ? hasHemat : panel.id === 'horm' ? (hasRepro || subs.some(s => (s.mechsCovered || []).some(m => m.startsWith('rep') || m.startsWith('hem')))) : panel.id === 'meta' ? (hasHemat || hasCardio) : panel.id === 'thy' ? subs.some(s => ['selenium', 'iodine', 't3', 't4'].includes(s.substanceId)) : panel.id === 'oda' ? subs.some(s => ['collagen', 'glucosamine', 'chondroitin', 'msm', 'bpc157', 'tb500', 'ghk_cu'].includes(s.substanceId)) : true;
                     return (
-                    <div key={panel.id} style={{ padding:'5px 7px', borderRadius:6, marginBottom:3, background: panel.active ? `${panel.color}08` : 'rgba(255,255,255,0.01)', border:`1px solid ${panel.active ? panel.color+'18' : 'rgba(255,255,255,0.04)'}`, opacity: panel.active ? 1 : 0.6 }}>
+                    <div key={panel.id} style={{ padding:'5px 7px', borderRadius:6, marginBottom:3, background: isActive ? `${panel.color}08` : 'rgba(255,255,255,0.01)', border:`1px solid ${isActive ? panel.color+'18' : 'rgba(255,255,255,0.04)'}`, opacity: isActive ? 1 : 0.6 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
                         <span style={{ fontSize:11 }}>{panel.icon}</span>
-                        <span style={{ fontSize:8, fontWeight:700, color: panel.active ? panel.color : 'rgba(255,255,255,0.55)' }}>{panel.name}</span>
-                        {!panel.active && <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>плановая</span>}
+                        <span style={{ fontSize:8, fontWeight:700, color: isActive ? panel.color : 'rgba(255,255,255,0.55)' }}>{panel.name}</span>
+                        {!isActive && <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>плановая</span>}
                       </div>
                       <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginLeft:16 }}>
                         <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Маркеры:</span> {panel.markers}<br/>
                         <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Частота:</span> {panel.freq}<br/>
                         <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Цели:</span> {panel.targets}
-                        {panel.active && <><br/><span style={{ fontWeight:600, color:panel.color }}>⚠ Тревога:</span> <span style={{ color:panel.color, opacity:0.85 }}>{panel.alert}</span></>}
+                        {isActive && <><br/><span style={{ fontWeight:600, color:panel.color }}>⚠ Тревога:</span> <span style={{ color:panel.color, opacity:0.85 }}>{panel.alert}</span></>}
                       </div>
-                      {panel.active && drivers.length > 0 && (
+                      {isActive && drivers.length > 0 && (
                         <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:3, marginLeft:16 }}>
                           <span style={{ fontSize:6, color:'rgba(255,255,255,0.4)' }}>вещества плана: </span>
                           {drivers.map((dn, di) => (
