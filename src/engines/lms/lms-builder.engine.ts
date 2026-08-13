@@ -981,12 +981,40 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
         for (const wg of input.weakPoints) {
           const selectedExercises = input.weakGroupExerciseMap?.[wg];
+          // Оборудование профиля: если задано — разрешаем только доступные снаряды.
+          const equipmentSet = (input.equipment && input.equipment.length > 0)
+            ? new Set(input.equipment.map(eq => eq.toLowerCase()))
+            : null;
           const candidates = getPLWeakGroupExerciseCandidates(template, wg)
             .filter(ex => !selectedExercises || selectedExercises.length === 0 || selectedExercises.includes(ex.name))
             .filter(ex => !input.orthopedicBlockedPatterns?.includes(ex.movementPattern || derivePattern(ex)))
             .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)))
-            .filter((ex: Exercise) => !ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup));
+            .filter((ex: Exercise) => !ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup))
+            .filter((ex: Exercise) => {
+              if (!equipmentSet) return true;
+              const eq = String(ex.equipment || '').toLowerCase();
+              return eq === 'bodyweight' || equipmentSet.has(eq);
+            });
           if (candidates.length === 0) continue;
+
+          // Тренерский MRV-бюджет слабой группы: суммарные сеты группы за неделю
+          // не должны превышать MRV мышцы, скорректированный PED/recovery и
+          // ACWR/авторегуляцией. Пользовательский ручной выбор не ограничивается.
+          const weakMrv = (() => {
+            try {
+              const mrvMuscle = wg === 'legs' ? 'quads' : wg === 'core' ? 'abs' : wg === 'arms' ? 'arms' : wg;
+              // vrLevel — нормализованный уровень атлета (novice→beginner, II-KMS→intermediate,
+              // KMS-MS/MS-MSMK→advanced): ориентиры MEV/MAV/MRV зависят от уровня спортсмена.
+              const lm = getVolumeLandmarks(vrLevel, mrvMuscle);
+              if (!lm) return null;
+              const mult = Math.max(1, combinedMrvMult) * acwrVolMod * arVolMult;
+              return Math.round(lm.mrv * mult);
+            } catch { return null; }
+          })();
+          const weakSetsThisWeek = (): number => days.reduce((sum, d) => sum + d.exercises
+            .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
+            .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
+          const noMrvCap = Boolean(selectedExercises && selectedExercises.length > 0);
 
         // Определить число дней для добивки
         const isSmall = SMALL_GROUPS_2X.has(wg);
@@ -1104,6 +1132,15 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // Day cap: упражнений ≤ 10 (raised from 8 to allow user-selected additions)
           if (targetDay.exercises.length >= 10) continue;
 
+          // Тренерский MRV-бюджет слабой группы: суммарные сеты группы за неделю
+          // (уровень атлета × PED/recovery × ACWR/авторегуляция) не должны превышать
+          // скорректированный MRV мышцы. Ручной выбор пользователя — вне бюджета.
+          const addedSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
+          if (!noMrvCap && weakMrv != null && weakSetsThisWeek() + addedSets > weakMrv) {
+            weakNotes.push(`⚠ Слабая группа ${wg} (${vrLevel}): ${pick.name} не добавлен — объём ${weakSetsThisWeek() + addedSets} сетов > MRV ${weakMrv} (уровень ×${Math.max(1, combinedMrvMult).toFixed(2)} PED/восст ×${acwrVolMod} ACWR ×${arVolMult} авторег).`);
+            continue;
+          }
+
           // P2: coef by catalog type — compound ~0.7, isolation ~0.3, fallback 0.5
           const accCoef = pick?.type === 'compound' ? 0.7 : pick?.type === 'isolation' ? 0.3 : 0.5;
           targetDay.exercises.push({
@@ -1118,7 +1155,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           });
           allWeekNames.add(norm(pick.name));
           if (pick.substitutionGroup) allWeekSubstitutionGroups.add(pick.substitutionGroup);
-          weakNotes.push(`🔥 Слабая группа ${wg} — PL-ассистент в день ${dayIdx + 1} (${proto.load}): ${pick.name} ${workSets.map(set => `${set.sets}×${set.reps} @${Math.round(set.pct * 100)}%`).join(' + ')} (${Math.round(workSets[0]?.weight || 0)}кг) RIR ${rir}.`);
+          weakNotes.push(`🔥 Слабая группа ${wg} (${vrLevel}) — PL-ассистент в день ${dayIdx + 1} (${proto.load}): ${pick.name} ${workSets.map(set => `${set.sets}×${set.reps} @${Math.round(set.pct * 100)}%`).join(' + ')} (${Math.round(workSets[0]?.weight || 0)}кг) RIR ${rir} · объём группы ${weakSetsThisWeek()} сетов ≤ MRV ${weakMrv ?? '—'}.`);
         }
       }
     }
