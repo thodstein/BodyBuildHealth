@@ -243,6 +243,16 @@ export const BbAutoConstructor: React.FC = () => {
   const [bridgeMsg, setBridgeMsg] = useState('');
   // C4: flash helper — заменяет alert() для некритичных уведомлений.
   const flash = useCallback((m: string) => { setBridgeMsg(m); setTimeout(() => setBridgeMsg(''), 4000); }, []);
+  // Имя для сохранения (модалка вместо prompt — prompt не работает в Telegram Mini App).
+  const [namePrompt, setNamePrompt] = useState<{ title: string; value: string; onOk: (name: string) => void } | null>(null);
+  const confirmName = () => {
+    if (!namePrompt) return;
+    const v = namePrompt.value.trim();
+    if (!v) { flash('Введите название'); return; }
+    const cb = namePrompt.onOk;
+    setNamePrompt(null);
+    cb(v);
+  };
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
@@ -420,7 +430,14 @@ export const BbAutoConstructor: React.FC = () => {
   // FIX-6: Единый источник качества — validatePlanQuality (канонический движок)
   const quality = useMemo(() => {
     if (!builtPlan) return null;
-    const input = bbPlanToQualityInput(builtPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 });
+    const input = bbPlanToQualityInput(builtPlan, {
+      level: bbLevel,
+      weakPoints,
+      hasDeload: autoDeload,
+      onCourse: peds.length > 0,
+      trainingYears: prof.trainingYears,
+      pedMultiplier: pedAdapt.combinedMrvMultiplier,
+    });
     const result = validatePlanQuality(input);
     return {
       score: result.score,
@@ -428,11 +445,11 @@ export const BbAutoConstructor: React.FC = () => {
       details: result.issues.map(i => i.message),
       perMuscle: result.muscles.map(m => ({
         muscle: m.muscle, sets: m.weeklySets, mev: m.mev, mav: m.mav, mrv: m.mrv,
-        pct: m.pctOfMav, status: m.status,
+        pct: m.pctOfMav, status: m.status, contextNote: m.contextNote,
       })),
       recommendations: result.recommendations,
     };
-  }, [builtPlan, bbLevel, weakPoints, autoDeload, peds]);
+  }, [builtPlan, bbLevel, weakPoints, autoDeload, peds, prof.trainingYears, pedAdapt.combinedMrvMultiplier]);
 
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
@@ -795,23 +812,28 @@ export const BbAutoConstructor: React.FC = () => {
     const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuryCount: injuries.length });
     if (saveSafety.riskLevel === 'dangerous') { flash(`План небезопасен: SafetyScore ${saveSafety.score}/100.`); return; }
     if (!exportPlan.validation?.valid) { flash('План нельзя сохранить: исправьте ошибки валидации.'); return; }
-    const name = prompt('Название плана:', `${exportPlan.pattern.name} ${bbWeeks}нед`);
-    if (!name) return;
-    // Конвертация BB-плана в flat-формат Моих тренировок: все упражнения недели 1
-    const week1 = exportPlan.weeks[0];
-    const exs = week1.sessions.flatMap(s => s.exercises.map(e => ({
-      name: e.name,
-      sets: e.sets,
-      reps: e.workSets[0]?.reps ?? 10,
-      rir: e.rir,
-    })));
-    const plan = { id: 'bbplan_' + Date.now(), name, date: new Date().toISOString(), exercises: exs };
-    try {
-      const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
-      const updated = [...existing, plan].slice(-20);
-      localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
-      flash(`План «${name}» сохранён в Мои тренировки (${exs.length} упр.)`);
-    } catch { flash('Ошибка сохранения'); }
+    const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
+    setNamePrompt({
+      title: '💾 Название плана (Мои тренировки)',
+      value: fallbackName,
+      onOk: (name) => {
+        // Конвертация BB-плана в flat-формат Моих тренировок: все упражнения недели 1
+        const week1 = exportPlan.weeks[0];
+        const exs = week1.sessions.flatMap(s => s.exercises.map(e => ({
+          name: e.name,
+          sets: e.sets,
+          reps: e.workSets[0]?.reps ?? 10,
+          rir: e.rir,
+        })));
+        const plan = { id: 'bbplan_' + Date.now(), name, date: new Date().toISOString(), exercises: exs };
+        try {
+          const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+          const updated = [...existing, plan].slice(-20);
+          localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+          flash(`План «${name}» сохранён в Мои тренировки (${exs.length} упр.)`);
+        } catch { flash('Ошибка сохранения'); }
+      },
+    });
   };
 
   const handleSaveVariant = () => {
@@ -820,45 +842,50 @@ export const BbAutoConstructor: React.FC = () => {
     if (!exportPlan.validation?.valid) { flash('Вариант нельзя сохранить: исправьте ошибки валидации.'); return; }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
     const exportQuality = validatePlanQuality(bbPlanToQualityInput(exportPlan, { level: bbLevel, weakPoints, hasDeload: autoDeload, onCourse: peds.length > 0 }));
-    const name = prompt('Название варианта:', `${exportPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`);
-    if (!name) return;
-    const params: SavedBBPlan['params'] = {
-      patternId: selectedSplitId,
-       patternName: exportPlan.pattern.name,
-      level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
-      peds, pedDoses, courseIntensity: courseIntensity as string,
-       weakPoints, focusGroup: bbFocus, intensityTechnique: intensityTech,
-       loadStrategy, autoDeload, deloadType, planMode,
-       trainingFocus: bbTrainingFocus,
-       methodology: bbMethodology,
-       equipment: bbEquipment.slice(),
-       specialization: specializationMode,
-       daysPerWeek: bbDays,
-       source: bbSource,
-       programPath: bbProgramPath,
-       programId: selectedProgramId || undefined,
-       cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
-    };
-    const planMetrics: SavedBBPlan['metrics'] = {
-       totalSets: exportMetrics.totalSets,
-       avgRir: exportMetrics.avgRir,
-       sessionsPerWeek: exportPlan.pattern.sessionsPerRotation,
-      phases: phases.map(p => p.phase),
-       qualityScore: exportQuality.score,
-       muscleCount: Object.keys(exportPlan.muscleFrequency || {}).length,
-      mrvMult: pedAdapt.combinedMrvMultiplier,
-       peakWeek: exportPlan.report?.peakWeek,
-       peakDirectSets: exportPlan.report?.peakDirectSets,
-        peakEffectiveSets: exportPlan.report
-          ? Object.values(exportPlan.report.peakVolume as Record<string, { effectiveSets: number }>)
-            .reduce((sum: number, item: { effectiveSets: number }) => sum + item.effectiveSets, 0)
-          : undefined,
-       maxSessionMinutes: exportPlan.report?.maxSessionMinutes,
-       maxAxialCost: exportPlan.report?.maxAxialCost,
-    };
-    const updated = saveBBPlanVariant(name, exportPlan, params, planMetrics);
-    setSavedPlans(updated);
-    setShowCompare(true);
+    const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед ${peds.length > 0 ? peds.join('+') : 'натурал'}`;
+    setNamePrompt({
+      title: '💾 Название варианта',
+      value: fallbackName,
+      onOk: (name) => {
+        const params: SavedBBPlan['params'] = {
+          patternId: selectedSplitId,
+           patternName: exportPlan.pattern.name,
+          level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
+          peds, pedDoses, courseIntensity: courseIntensity as string,
+           weakPoints, focusGroup: bbFocus, intensityTechnique: intensityTech,
+           loadStrategy, autoDeload, deloadType, planMode,
+           trainingFocus: bbTrainingFocus,
+           methodology: bbMethodology,
+           equipment: bbEquipment.slice(),
+           specialization: specializationMode,
+           daysPerWeek: bbDays,
+           source: bbSource,
+           programPath: bbProgramPath,
+           programId: selectedProgramId || undefined,
+           cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
+        };
+        const planMetrics: SavedBBPlan['metrics'] = {
+           totalSets: exportMetrics.totalSets,
+           avgRir: exportMetrics.avgRir,
+           sessionsPerWeek: exportPlan.pattern.sessionsPerRotation,
+          phases: phases.map(p => p.phase),
+           qualityScore: exportQuality.score,
+           muscleCount: Object.keys(exportPlan.muscleFrequency || {}).length,
+          mrvMult: pedAdapt.combinedMrvMultiplier,
+           peakWeek: exportPlan.report?.peakWeek,
+           peakDirectSets: exportPlan.report?.peakDirectSets,
+            peakEffectiveSets: exportPlan.report
+              ? Object.values(exportPlan.report.peakVolume as Record<string, { effectiveSets: number }>)
+                .reduce((sum: number, item: { effectiveSets: number }) => sum + item.effectiveSets, 0)
+              : undefined,
+           maxSessionMinutes: exportPlan.report?.maxSessionMinutes,
+           maxAxialCost: exportPlan.report?.maxAxialCost,
+        };
+        const updated = saveBBPlanVariant(name, exportPlan, params, planMetrics);
+        setSavedPlans(updated);
+        setShowCompare(true);
+      },
+    });
   };
 
   const handleDeleteVariant = (id: string) => {
@@ -872,22 +899,26 @@ export const BbAutoConstructor: React.FC = () => {
     const exportPlan = applyEditsToPlan(builtPlan);
     if (!exportPlan.validation?.valid) { flash('Программу нельзя сохранить: исправьте ошибки валидации.'); return; }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
-    const name = window.prompt('📂 Название программы (Мои программы):', fallbackName);
-    if (!name) return;
-    try {
-      const userProg = createUserProgramFromBuild(exportPlan, {
-        title: name,
-        goal: bbGoal,
-        level: bbLevel,
-        weakPoints: weakPoints.slice(),
-        equipment: bbEquipment.slice(),
-      });
-      saveUserProgramStore(userProg, 'Импорт из ББ-визарда');
-      flash(`✅ Сохранено в «Мои программы»: ${name}`);
-    } catch (e: any) {
-      console.error('[BB-auto] Ошибка сохранения в Мои программы:', e);
-      flash('⚠ Не удалось сохранить: ' + (e?.message || String(e)));
-    }
+    setNamePrompt({
+      title: '📂 Название программы (Мои программы)',
+      value: fallbackName,
+      onOk: (name) => {
+        try {
+          const userProg = createUserProgramFromBuild(exportPlan, {
+            title: name,
+            goal: bbGoal,
+            level: bbLevel,
+            weakPoints: weakPoints.slice(),
+            equipment: bbEquipment.slice(),
+          });
+          saveUserProgramStore(userProg, 'Импорт из ББ-виззарда');
+          flash(`✅ Сохранено в «Мои программы»: ${name}`);
+        } catch (e: any) {
+          console.error('[BB-auto] Ошибка сохранения в Мои программы:', e);
+          flash('⚠ Не удалось сохранить: ' + (e?.message || String(e)));
+        }
+      },
+    });
   };
 
   const handleLoadVariant = (v: SavedBBPlan) => {
@@ -1064,15 +1095,25 @@ export const BbAutoConstructor: React.FC = () => {
     </div>
   );
 
+  // Общий блок действий: «Начать работу по циклу/программе» + сохранение.
+  // На шаге «План» кнопка старта уже в шапке, поэтому там рендерится только сохранение.
+  const renderActionRow = (withStart: boolean) => {
+    const canSave = !builtPlan || !builtPlan.validation || builtPlan.validation.valid;
+    return (
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10 }}>
+        {withStart && (
+          <button style={{ ...BTN, flex:'1 1 100%' }} onClick={handleSendToExecution}>▶ Начать работу по циклу/программе</button>
+        )}
+        <button style={{ ...BTN_GHOST, flex:'1 1 30%' }} disabled={!canSave} onClick={handleSavePlan}>💾 Сохранить план</button>
+        <button style={{ ...BTN_GHOST, flex:'1 1 30%' }} disabled={!canSave} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
+        <button style={{ ...BTN_GHOST, flex:'1 1 30%' }} disabled={!canSave} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
+      </div>
+    );
+  };
+
   const renderParams = () => (
     <div>
       <div style={H}>📋 Шаг 1: Базовые параметры</div>
-
-      {bridgeMsg && (
-        <div style={{ marginBottom:10, padding:'8px 12px', borderRadius:10, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontSize:11, fontWeight:700 }}>
-          {bridgeMsg}
-        </div>
-      )}
 
       {/* Plan mode: cycle vs generic split */}
       <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
@@ -1627,7 +1668,7 @@ export const BbAutoConstructor: React.FC = () => {
             onClick={handleSendToExecution}
             aria-label="Начать тренировку с этим планом"
           >
-            ▶ Начать тренировку
+            ▶ Начать работу по циклу/программе
           </button>
         </div>
 
@@ -2347,6 +2388,7 @@ export const BbAutoConstructor: React.FC = () => {
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('quality')}>Далее: отчёт качества →</button>
           <button style={BTN_GHOST} onClick={() => setBbWeekSel(1)}>На первую нед</button>
         </div>
+        {renderActionRow(false)}
       </div>
     );
   };
@@ -2369,7 +2411,13 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Validation banners */}
         {(() => {
           const ws = weeklySetsFromBBPlan(W);
-          const b = validatePlan({ weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints, readiness: ((prof.recovery ?? 7) * 10) });
+          const b = validatePlan({
+            weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints,
+            readiness: ((prof.recovery ?? 7) * 10),
+            trainingYears: prof.trainingYears,
+            mrvMultiplier: pedAdapt.combinedMrvMultiplier,
+            mrvByMuscle: builtPlan.mrvByMuscle,
+          });
           if (b.length === 0) return null;
           return (
             <div style={{ ...CARD, marginBottom:8, background:'rgba(220,38,38,0.04)', border:'1px solid rgba(220,38,38,0.15)' }}>
@@ -2636,9 +2684,15 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints);
           if (garbage.length === 0) return null;
+          const ctxParts: string[] = [`уровень ${bbLevel}`];
+          if (prof.trainingYears !== undefined) ctxParts.push(`стаж ${prof.trainingYears} лет`);
+          if (weakPoints.length > 0) ctxParts.push(`слабые: ${weakPoints.join(', ')}`);
           return (
             <div style={{ ...CARD, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🗑 Мусорный объём ({garbage.length})</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginBottom:6, lineHeight:1.4 }}>
+                Дублирование изоляций оценено по вашим параметрам: {ctxParts.join(' · ')}. Для слабых групп дубль паттерна допустим (дополнительный стимул), для остальных — срезан или помечен.
+              </div>
               {garbage.slice(0, 5).map((g, i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.7)', marginBottom:3, padding:'3px 6px', borderRadius:4, background:'rgba(239,68,68,0.04)' }}>
                 • {g.exerciseName} ({g.muscle}): {g.reason}
               </div>)}
@@ -2670,7 +2724,7 @@ export const BbAutoConstructor: React.FC = () => {
               {quality.perMuscle.map(pm => {
                 const color = pm.status === 'exceeding_mrv' ? '#ef4444' : pm.status === 'below_mev' ? '#f59e0b' : '#22c55e';
                 return (
-                  <div key={pm.muscle} style={{ padding:'4px 8px', borderRadius:8, background:color+'10', border:'1px solid '+color+'30', fontSize:11, display:'flex', alignItems:'center', gap:4 }}>
+                  <div key={pm.muscle} title={pm.contextNote || undefined} style={{ padding:'4px 8px', borderRadius:8, background:color+'10', border:'1px solid '+color+'30', fontSize:11, display:'flex', alignItems:'center', gap:4, cursor:'help' }}>
                     <span style={{ fontWeight:700, color:'#fff' }}>{pm.muscle}</span>
                     <span style={{ fontWeight:700, color }}>{pm.sets}</span>
                     <span style={{ color:'rgba(255,255,255,0.35)' }}>· {pm.mev} · {pm.mav} · {pm.mrv} · {pm.pct}%</span>
@@ -2774,6 +2828,7 @@ export const BbAutoConstructor: React.FC = () => {
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
         </div>
+        {renderActionRow(true)}
       </div>
     );
   };
@@ -3104,6 +3159,12 @@ export const BbAutoConstructor: React.FC = () => {
            }} />
         </div>
       )}
+      {/* Глобальное уведомление (flash) — видно на ВСЕХ шагах, не только в параметрах */}
+      {bridgeMsg && (
+        <div role="status" style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontSize: 11, fontWeight: 700 }}>
+          {bridgeMsg}
+        </div>
+      )}
       {step === 'params' && renderParams()}
       {step === 'ped' && renderPedWorkMax()}
       {step === 'split' && renderSplit()}
@@ -3124,6 +3185,23 @@ export const BbAutoConstructor: React.FC = () => {
           />
         ) : null;
       })()}
+      {/* Модалка ввода имени вместо prompt() — prompt не работает в Telegram Mini App */}
+      {namePrompt && (
+        <div style={{ position:'fixed', inset:0, zIndex:260, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)', padding:16 }}
+          onClick={() => setNamePrompt(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.12)', padding:16, boxSizing:'border-box', boxShadow:'0 20px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#00e68a', marginBottom:10 }}>{namePrompt.title}</div>
+            <input autoFocus value={namePrompt.value}
+              onChange={e => setNamePrompt({ ...namePrompt, value: e.target.value })}
+              onKeyDown={e => { if (e.key === 'Enter') confirmName(); }}
+              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:16, boxSizing:'border-box', marginBottom:12 }} />
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => setNamePrompt(null)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'transparent', color:'rgba(255,255,255,0.6)', fontWeight:700, fontSize:12, cursor:'pointer', minHeight:44 }}>Отмена</button>
+              <button onClick={confirmName} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12, minHeight:44 }}>✓ Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
