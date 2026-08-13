@@ -11,6 +11,10 @@ import { SUPPLEMENTS_DB } from './support-db/supplements';
 import { PHARMACY_DB } from './support-db/pharmacy-db';
 import { TZ_MECH_TO_SUBS } from '../engines/tz-bridge-mechanism';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from './support-db';
+import { ADMINISTRATION_RULES_DB } from './administration-rules-db';
+
+const ADMIN_RULES_BY_ID: Record<string, { timing: string; reason: string }> = {};
+for (const r of ADMINISTRATION_RULES_DB) ADMIN_RULES_BY_ID[r.substanceId] = r;
 
 export interface CatalogExtra {
   id: string;
@@ -362,9 +366,23 @@ export function registerCatalogExtras(cat: Record<string, any>): void {
     const systems = Array.from(new Set(entries.map(e => e.organId)));
     const cat_ = categoryOf(id);
     const nameRu = RU_NAMES[key] || humanName(id);
-    const description = mechParts.length > 0
-      ? `${nameRu}: влияние на механизмы риска — ${mechParts.join('; ')}. Подбирается по механизм-модели; режим и дозировка — по протоколу, рецептурные препараты — под контролем врача.`
-      : `${nameRu}: включён в мех-модель риска; детальное описание по протоколу, рецептурные — под контролем врача.`;
+    const catDesc: Record<string, string> = {
+      pharma: 'Рецептурный препарат — принимать только по назначению и под контролем врача.',
+      vitamin: 'Витамин: применяется для профилактики/коррекции дефицитов, влияет на энергетику и метаболизм.',
+      mineral: 'Минерал: кофактор ферментов, электролитный и костный обмен; разнесение приёма — по правилам минералов.',
+      antioxidant: 'Антиоксидант: снижает окислительный стресс и защищает органы-мишени курса.',
+      antiinflam: 'Противовоспалительное/протеолитическое: снижает системное воспаление, фибринолитический/противовоспалительный эффект.',
+      herb: 'Растительное средство: адаптогенные/тонизирующие эффекты; взаимодействия с рецептурными — по протоколу.',
+    };
+    const catLine = catDesc[cat_[0]] || 'Средство поддержки: влияет на механизмы риска курса.';
+    const mechList = mechParts.length > 0
+      ? `Механизмы влияния: ${mechParts.join('; ')}.`
+      : 'Включено в механизм-модель риска; точное влияние описано в протоколе.';
+    const adminRule = ADMIN_RULES_BY_ID[key];
+    const adminLine = adminRule ? `Схема приёма: ${adminRule.timing}. ${adminRule.reason}` : '';
+    const contraLine = cat_[0] === 'pharma' ? 'Противопоказания: рецептурный — только по назначению врача.' : '';
+    const monitoringLine = organs.length > 0 ? `Контроль: ${organs.join(', ')} (анализы каждые 4-8 нед).` : '';
+    const description = `${catLine} ${mechList} ${adminLine} ${monitoringLine} ${contraLine}`.replace(/\s+/g, ' ').trim();
     cat[key] = {
       id, name: id, nameRu, tier: cat_[0] === 'pharma' ? 'specialty' : 'standard', category: cat_,
       forms: [{ id, name: id, nameRu, dose: '', best: true }],
