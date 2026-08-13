@@ -1151,11 +1151,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             );
           })()}
           <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Мёртвые точки + bar-path</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Мёртвые точки → Слабые точки → Движение штанги</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
-              Выберите фазу, отклонения траектории, упражнения из диагностики и дни добавления. Исходный цикл не изменяется.
+              Выберите фазу, отклонения траектории, упражнения из диагностики и дни добавления. Исходный цикл не изменяется. Протокол упражнений — из раскладки этого цикла.
             </div>
-            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
+            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} />
           </div>
            {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
                      <div style={{ marginTop: 10 }}>

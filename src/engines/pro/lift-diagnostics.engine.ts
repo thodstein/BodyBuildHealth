@@ -76,25 +76,100 @@ export function diagnoseLift(lift: Lift, weakPoint: WeakPoint): LiftDiagnosis | 
 
 export type BarPathIssue = "forward_drift" | "hips_shoot_up" | "good_morning" | "bar_loops" | "asymmetric";
 
+export interface BarPathIssueMeta {
+  /** Для каких движений применимо отклонение траектории. */
+  lifts: Lift[];
+  /** С какой слабой фазой связано (по движению). null — универсальное отклонение. */
+  relatedWeakPoint: Partial<Record<Lift, WeakPoint>>;
+  /** Ассистентные упражнения (PL-пул коррекции отклонения). */
+  assistance: string[];
+}
+
+export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
+  forward_drift: {
+    lifts: ['squat', 'deadlift', 'bench'],
+    relatedWeakPoint: { squat: 'bottom', deadlift: 'start', bench: 'off_chest' },
+    assistance: ['Румынская тяга', 'Наклоны', 'Гиперэкстензия'],
+  },
+  hips_shoot_up: {
+    lifts: ['squat'],
+    relatedWeakPoint: { squat: 'bottom' },
+    assistance: ['Присед на груди', 'Присед с паузой', 'Болгарские сплит-приседы'],
+  },
+  good_morning: {
+    lifts: ['squat'],
+    relatedWeakPoint: { squat: 'lockout' },
+    assistance: ['Присед на груди', 'Болгарские сплит-приседы', 'Наклоны'],
+  },
+  bar_loops: {
+    lifts: ['squat', 'bench', 'deadlift'],
+    relatedWeakPoint: { squat: 'mid', bench: 'mid', deadlift: 'mid' },
+    assistance: ['Скоростной жим', 'Присед с остановками', 'Тяга с остановками'],
+  },
+  asymmetric: {
+    lifts: ['squat', 'bench', 'deadlift'],
+    relatedWeakPoint: {},
+    assistance: ['Выпады', 'Болгарские сплит-приседы', 'Тяга гантели одной рукой'],
+  },
+};
+
 export interface BarPathAnalysis {
   lift: Lift;
   issues: BarPathIssue[];
-  diagnoses: { issue: BarPathIssue; cause: string; correction: string }[];
+  diagnoses: { issue: BarPathIssue; cause: string; correction: string; assistance: string[]; relatedPhase: WeakPoint | null }[];
 }
 
-/** Анализ bar-path отклонений → причины + коррекции. */
+/** Анализ bar-path отклонений → причины + коррекции + ассистенты (с фильтром по движению). */
 export function barPathAnalysis(lift: Lift, issues: BarPathIssue[]): BarPathAnalysis {
   const MAP: Record<BarPathIssue, { cause: string; correction: string }> = {
     forward_drift: { cause: "Штанга уходит вперёд — слабые спина/ягодицы держат позу, или стартовая позиция.", correction: "Усилить заднюю цепь (RDL, наклоны), контролировать стартовую позицию (плечи над грифом)." },
-    hips_shoot_up: { cause: "Таз «выстреливает» первым — квадрицепсы слабее разгибателей спины.", correction: "Присед на груди (квадрицепс), пауза в яме, коррекция техники — initiate одновременный подъём." },
-    good_morning: { cause: "Good-morning squat — таз поднимается, корпус наклоняется (слабые квадрицепсы/ягодицы).", correction: "Присед на груди, болгарские сплит, пауза в яме; проверить глуботу/старт." },
+    hips_shoot_up: { cause: "Таз «выстреливает» первым — квадрицепсы слабее разгибателей спины.", correction: "Присед на груди (квадрицепс), пауза в яме, коррекция техники — одновременный подъём." },
+    good_morning: { cause: "Good-morning squat — таз поднимается, корпус наклоняется (слабые квадрицепсы/ягодицы).", correction: "Присед на груди, болгарские сплит, пауза в яме; проверить глубину/старт." },
     bar_loops: { cause: "Траектория «петля» — неконтролируемый путь (скорость/техника).", correction: "Скоростной жим/присед, остановки в амплитуде, запись техники." },
     asymmetric: { cause: "Асимметричная траектория — асимметрия силы/подвижности.", correction: "Унилатеральная работа (выпады, болгарские сплит), мобилизация, коррекция техники." },
   };
+  const applicable = issues.filter(issue => BAR_PATH_ISSUES[issue].lifts.includes(lift));
   return {
     lift,
-    issues,
-    diagnoses: issues.map(i => ({ issue: i, cause: MAP[i].cause, correction: MAP[i].correction })),
+    issues: applicable,
+    diagnoses: applicable.map(issue => ({
+      issue,
+      cause: MAP[issue].cause,
+      correction: MAP[issue].correction,
+      assistance: BAR_PATH_ISSUES[issue].assistance,
+      relatedPhase: BAR_PATH_ISSUES[issue].relatedWeakPoint[lift] ?? null,
+    })),
+  };
+}
+
+/** Отклонения, применимые к движению. */
+export function barPathIssuesForLift(lift: Lift): BarPathIssue[] {
+  return (Object.keys(BAR_PATH_ISSUES) as BarPathIssue[]).filter(issue => BAR_PATH_ISSUES[issue].lifts.includes(lift));
+}
+
+/** Отклонения, связанные с конкретной фазой движения (для синхронизации секций). */
+export function barPathIssuesForPhase(lift: Lift, phase: WeakPoint): BarPathIssue[] {
+  return barPathIssuesForLift(lift).filter(issue => BAR_PATH_ISSUES[issue].relatedWeakPoint[lift] === phase);
+}
+
+/** Единый bundle диагностики движения: слабая точка + мёртвая точка + связанные bar-path отклонения. */
+export interface MovementDiagnosis {
+  lift: Lift;
+  phase: WeakPoint;
+  weakPoint: ReturnType<typeof diagnoseWeakPoint>;
+  sticking: LiftDiagnosis | null;
+  barPathAll: BarPathIssue[];
+  barPathRelated: BarPathIssue[];
+}
+
+export function diagnoseMovement(lift: Lift, phase: WeakPoint): MovementDiagnosis {
+  return {
+    lift,
+    phase,
+    weakPoint: diagnoseWeakPoint(lift, phase),
+    sticking: diagnoseLift(lift, phase),
+    barPathAll: barPathIssuesForLift(lift),
+    barPathRelated: barPathIssuesForPhase(lift, phase),
   };
 }
 

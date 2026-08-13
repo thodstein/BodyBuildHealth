@@ -707,18 +707,10 @@ export const CheckinGuardPanel: React.FC<GuardPanelProps> = () => {
   );
 };
 
-/* ═════════════ P-14: BiomechanicsPanel (bar-path анализ для ПЛ-движений плана) ═════════════ */
-const BAR_PATH_RU: Record<BarPathIssue, string> = {
-  forward_drift: 'Уход штанги вперёд',
-  hips_shoot_up: 'Таз выстреливает вверх',
-  good_morning: 'Good-morning присед',
-  bar_loops: 'Петлеобразная траектория',
-  asymmetric: 'Асимметрия сторон',
-};
+/* ═════════════ P-14: BiomechanicsPanel (единый калькулятор движения для ПЛ-движений плана) ═════════════ */
+import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
 export const BiomechanicsPanel: React.FC<GuardPanelProps> = ({ program, dir }) => {
-  const [selectedLift, setSelectedLift] = useState<Lift | null>(null);
-
   if (dir !== 'bb' || !program.bb) return null;
   const week = program.bb.weeks[0];
   if (!week) return null;
@@ -741,30 +733,10 @@ export const BiomechanicsPanel: React.FC<GuardPanelProps> = ({ program, dir }) =
   }
   if (detectedLifts.length === 0) return null;
 
-  const lift = selectedLift ?? detectedLifts[0];
-  const allIssues: BarPathIssue[] = ['forward_drift', 'hips_shoot_up', 'good_morning', 'bar_loops', 'asymmetric'];
-  const analysis = barPathAnalysis(lift, allIssues);
-
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #06b6d4' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🦴 Биомеханика</span>
-        <div style={{ display: 'flex', gap: 3, marginLeft: 'auto' }}>
-          {detectedLifts.map(l => (
-            <button key={l} onClick={() => setSelectedLift(l)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: lift === l ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.04)', border: '1px solid ' + (lift === l ? 'rgba(6,182,212,0.3)' : 'rgba(255,255,255,0.06)'), color: lift === l ? '#06b6d4' : DIM }}>{l}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
-        Возможные ошибки траектории штанги для {lift}. Причина + коррекция.
-      </div>
-      {analysis && analysis.diagnoses && analysis.diagnoses.map((d, i) => (
-        <div key={i} style={{ marginBottom: 4, padding: 6, borderRadius: 6, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.12)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#06b6d4' }}>{BAR_PATH_RU[d.issue] ?? d.issue}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>📍 {d.cause}</div>
-          <div style={{ fontSize: 10, color: '#22c55e', marginTop: 2 }}>✅ {d.correction}</div>
-        </div>
-      ))}
+      <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🦴 Биомеханика — диагностика движения ({detectedLifts.join(', ')})</div>
+      <PlDeadpointsBarPathCard />
     </div>
   );
 };

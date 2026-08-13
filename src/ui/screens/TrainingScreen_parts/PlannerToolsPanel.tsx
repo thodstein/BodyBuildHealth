@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import { ExpandableCard, CalcSection, PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 // ПЛ-специфичные
-import { PlWeakpointsCard } from './PlWeakpointsCard';
 import { RelativeStrengthCalcTab } from './RelativeStrengthCalcTab';
 import PeakingProtocolTab from './PeakingProtocolTab';
 import { TaperPlannerTab } from './TaperPlannerTab';
@@ -28,7 +27,6 @@ import { DEFAULT_PROFILE } from './training-profile';
 import { loadTrainingProfile } from './training-profile';
 import { DiagnosticsHub } from './DiagnosticsHub';
 import { StrengthAnalysisHub } from './StrengthAnalysisHub';
-import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
 // ББ-специфичные
 import { SplitGenCard } from './SplitGenCard';
@@ -40,8 +38,7 @@ interface ToolDef { id: string; title: string; icon: string; short: string; rend
 const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
   // ═══ ПЛ-АВТО ═══
   pl: [
-    { id: 'deadpoints-barpath', title: 'Мёртвые точки + bar-path', icon: '🎯', short: 'Биомеханика, слабые фазы, углы, слабые мышцы и отклонения траектории из интеллектуальной диагностики.', render: () => <PlDeadpointsBarPathCard /> },
-    { id: 'intelligence-diagnostics', title: 'Диагностика', icon: '🔬', short: 'Интеллектуальная диагностика: слабые точки, срывы, биомеханика, RIR и коррекция мезоцикла.', render: () => (
+    { id: 'intelligence-diagnostics', title: 'Диагностика', icon: '🔬', short: 'Единый калькулятор движения (мёртвые точки → слабые точки → bar-path), срывы, RIR, коррекция мезо.', render: () => (
       <DiagnosticsHub
         sessions={[]}
         tprofile={loadTrainingProfile()}
@@ -56,7 +53,6 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
     { id: 'intelligence-strength', title: 'Анализ силы', icon: '🏋️', short: 'Интеллектуальный анализ силы: 1RM, VBT, относительная сила, нормативы и аналитика.', render: () => <StrengthAnalysisHub /> },
     { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры.', render: () => <StrengthAnalyticsCard /> },
     { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума по весу и повторениям → ПМ планировщику.', render: () => <OneRmCalcTab /> },
-    { id: 'weak', title: 'Слабые точки ПЛ', icon: '🎯', short: 'Диагностика мёртвой точки движения → ассистентные упражнения.', render: () => <PlWeakpointsCard /> },
     { id: 'relstr', title: 'Относительная сила', icon: '⚖️', short: 'Wilks/DOTS/GL — определение слабейшего движения.', render: () => <RelativeStrengthCalcTab /> },
     { id: 'pri', title: 'PRI / готовность', icon: '🧠', short: 'Готовность к тренировке (PRI) + RIR-корректировка.', render: () => <PriRepPatternCard /> },
     { id: 'fatigue', title: 'Индекс усталости', icon: '📉', short: 'ACWR, монотонность, strain → корректировка объёма.', render: () => <FatigueIndexTab /> },
