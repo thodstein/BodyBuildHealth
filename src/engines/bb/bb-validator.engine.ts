@@ -202,8 +202,10 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       const peakVolume = plan.weeklyVolume
         ? Math.max(...Object.values(plan.weeklyVolume).map(week => week[muscle]?.effectiveSets || 0))
         : 0;
-      if (peakVolume < target.mev) {
-        issues.push({ level: 'warning', code: 'target_volume_deficit', message: `${muscle}: effective volume ${Math.round(peakVolume * 10) / 10} ниже MEV ${target.mev}; проверьте feeder/session cap или ограничения оборудования.`, exercise: muscle });
+      // Порог 70% MEV: дефициты 70-100% — пограничная точность распределения
+      // (шум в rationale для лимитированных natural-сплитов); значимые <70%.
+      if (peakVolume < target.mev * 0.7) {
+        issues.push({ level: 'warning', code: 'target_volume_deficit', message: `${muscle}: effective volume ${Math.round(peakVolume * 10) / 10} ниже MEV ${target.mev} (${Math.round((peakVolume / target.mev) * 100)}%); проверьте feeder/session cap или ограничения оборудования.`, exercise: muscle });
       }
     }
   }
