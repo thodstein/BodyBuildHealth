@@ -48,7 +48,7 @@ import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycl
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
-import { competitionAttempts } from '../../engines/lms/competition-attempts';
+import { competitionAttempts, MEET_STRATEGY_LABEL, type MeetStrategy } from '../../engines/lms/competition-attempts';
 import { recommendWeightCut } from '../../engines/gym-competition.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
@@ -204,6 +204,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [weeksToMeet, setWeeksToMeet] = useState<number>(_plSaved?.plWeeksToMeet ?? 8);
   const [taperWeeksToAdd, setTaperWeeksToAdd] = useState<number>(_plSaved?.plTaperWeeksToAdd ?? 2);
   const [taperNote, setTaperNote] = useState<string>(_plSaved?.plTaperNote ?? '');
+  // Стратегия прикидов соревновательного дня (выход на пик: агрессивная — 93/97/105%).
+  const [attemptStrategy, setAttemptStrategy] = useState<MeetStrategy>(_plSaved?.plAttemptStrategy ?? 'balanced');
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
     if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
     if (!plan.weeks.every((week: any) => week && Number.isFinite(week.week) && Array.isArray(week.days))) return null;
@@ -217,7 +219,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
@@ -1187,19 +1189,36 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={26} suffix=" нед" onChange={v => setWeeksToMeet(v)} />
                   <PopupNumber label="Тапер-недель к циклу" value={taperWeeksToAdd} min={1} max={4} suffix="" hint="Сколько недель снижения объёма добавить в конец активного плана" onChange={v => setTaperWeeksToAdd(v)} />
                 </div>
-                {/* Рекомендации по сбросу */}
+                <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 6 }}>
+                  <PopupSelect
+                    label="Стратегия прикидов (выход на пик)"
+                    value={attemptStrategy}
+                    onChange={v => setAttemptStrategy(v as MeetStrategy)}
+                    hint="Прикиды дня соревнований на финальной тапер-неделе: консервативная 90/95.5/100%, сбалансированная 92/96/102%, агрессивная 93/97/105% от ПМ"
+                    options={[
+                      { id: 'conservative', label: MEET_STRATEGY_LABEL.conservative, desc: 'Опенер 90%, 2nd 95.5%, 3rd 100%' },
+                      { id: 'balanced', label: MEET_STRATEGY_LABEL.balanced, desc: 'Опенер 92%, 2nd 96%, 3rd 102%' },
+                      { id: 'aggressive', label: MEET_STRATEGY_LABEL.aggressive, desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
+                    ]}
+                  />
+                </div>
+                {/* Рекомендации по сбросу ИЛИ набору (текущий вес ниже целевого — переход в более тяжёлую категорию) */}
                 <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
-                    ⚖️ Сброс: {rec.toCut > 0 ? `${rec.toCut.toFixed(1)} кг · темп ${(rec.toCut / Math.max(1, weeksToMeet)).toFixed(2)} кг/нед · дефицит ≈${rec.dailyDeficitKcal} ккал/день` : 'уже в категории'}
+                    {rec.toCut > 0
+                      ? `⚖️ Сброс: ${rec.toCut.toFixed(1)} кг · темп ${(rec.toCut / Math.max(1, weeksToMeet)).toFixed(2)} кг/нед · дефицит ≈${rec.dailyDeficitKcal} ккал/день`
+                      : rec.toGain > 0
+                        ? `📈 Набор: +${rec.toGain.toFixed(1)} кг · темп ${(rec.toGain / Math.max(1, weeksToMeet)).toFixed(2)} кг/нед · профицит ≈${rec.dailySurplusKcal} ккал/день`
+                        : 'уже в категории'}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
-                    {rec.recommendations.map((r, i) => (
+                    {(rec.toCut > 0 ? rec.recommendations : rec.toGain > 0 ? rec.gainRecommendations : rec.recommendations).map((r, i) => (
                       <div key={i} style={{ fontSize: 10, color: r.startsWith('❌') ? '#f87171' : r.startsWith('⚠') ? '#fbbf24' : r.startsWith('✅') ? '#4ade80' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{r}</div>
                     ))}
                   </div>
-                  {rec.timeline.length > 0 && (
+                  {(rec.toCut > 0 ? rec.timeline : rec.toGain > 0 ? rec.gainTimeline : rec.timeline).length > 0 && (
                     <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                      {rec.timeline.map(t => (
+                      {(rec.toCut > 0 ? rec.timeline : rec.toGain > 0 ? rec.gainTimeline : rec.timeline).map(t => (
                         <div key={t.week} title={t.note} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 9, background: t.week === weeksToMeet ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${t.week === weeksToMeet ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
                           <b style={{ color: t.week === weeksToMeet ? '#f59e0b' : 'rgba(255,255,255,0.8)' }}>Н{t.week}</b> {t.weight.toFixed(1)} кг
                         </div>
@@ -1218,10 +1237,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         pedDoses,
                         courseIntensity,
                         mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+                        peakExit: { strategy: attemptStrategy },
                       });
                       setBuiltSrc(next);
-                      setTaperNote(`+${taperWeeksToAdd} нед${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}`);
-                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''}`);
+                      setTaperNote(`+${taperWeeksToAdd} нед${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''} · 🏁 пик ${attemptStrategy === 'aggressive' ? '105%' : attemptStrategy === 'conservative' ? '100%' : '102%'}`);
+                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005). 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''}`);
                     }}
                     style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
                     title={builtSrc ? `Добавить ${taperWeeksToAdd} тапер-недели в конец плана${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
@@ -1277,12 +1297,15 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
              };
              const sourceCycle = getCycleById(selectedCycleId);
-             const sourceCalendar = sourceCycle && !W.some(week => week.macroPhase)
+             // Тапер-неделя: добавленная (taperWeek) или legacy-разметка peak/competition.
+             // ВАЖНО: проверяем ТОЛЬКО оригинальные недели — иначе добавление тапера
+             // «перекрашивает» весь цикл (sourceCalendar обнуляется, все недели теряют свои цвета).
+             const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.taperWeek === true || (w.macroPhase === 'competition' && w.sourcePhase === 'peak');
+             const sourceCalendar = sourceCycle && !W.filter(w => !isTaperWeek(w)).some(w => w.macroPhase)
                  ? summarizeSourceCycleWeeks(sourceCycle.weeks && sourceCycle.weeks.length > 0
                  ? sourceCycle.weeks
                  : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1), sourceCycle.meta.period, sourceCycle.meta.sourcePhases, sourceCycle.meta.sourcePhaseSource ?? 'original')
                : undefined;
-             const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.macroPhase === 'competition' && w.sourcePhase === 'peak';
              const TAPER_COLOR = '#f59e0b';
              const sourceWeek = sourceCalendar?.[wk.week - 1];
              const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase];
@@ -1448,7 +1471,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 10, color: colors[ei] }}>● {n}</span>)}</div>
                 </div>;
               })()}
-              {goal === 'peak' && <MetricCard title="🏁 Попытки на соревнования" icon="🏁" accent="#f59e0b">
+              {(goal === 'peak' || W.some(isTaperWeek)) && <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) ? ` · ${MEET_STRATEGY_LABEL[attemptStrategy]}` : ''}`} icon="🏁" accent="#f59e0b">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                   {([['Присед', pmSquat], ['Жим', pmBench], ['Становая', pmDead]] as const).map(([name, value]) => {
                     const a = competitionAttempts(value);
@@ -1456,6 +1479,25 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   })}
                 </div>
               </MetricCard>}
+              {wk.meetAttempts && wk.meetAttempts.lifts.length > 0 && (
+                <MetricCard title={`🏁 Соревновательный день · прикиды ${wk.meetAttempts.strategy === 'aggressive' ? '93/97/105%' : wk.meetAttempts.strategy === 'conservative' ? '90/95.5/100%' : '92/96/102%'} (неделя ${wk.week})`} icon="🏁" accent="#f59e0b">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                    {wk.meetAttempts.lifts.map(l => (
+                      <div key={l.name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10 }}>
+                        <b style={{ color: '#f59e0b' }}>{l.name}</b>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>1-я</div><b style={{ fontSize: 12 }}>{l.opener}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>2-я</div><b style={{ fontSize: 12 }}>{l.second}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: '1px solid rgba(245,158,11,0.3)' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>3-я</div><b style={{ fontSize: 12, color: '#f59e0b' }}>{l.third}</b></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+                    📉 Разгрузка уже выполнена тапер-неделями (объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена — Bosquet 2005). Прикиды — план дня соревнований, не тренировочная нагрузка: разминка по опенеру, подходы строго по стратегии, между попытками 10-20 мин.
+                  </div>
+                </MetricCard>
+              )}
               {e1rmSeries.length > 0 && (() => {
                 const W = 300, H = 120, PADX = 26, PADY = 16;
                 const allVals = e1rmSeries.flatMap(s => s.pts.map(p => p.val));
@@ -1773,7 +1815,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 weeks={totalW}
                 sourceWeeks={(() => {
                   const sourceCycle = getCycleById(selectedCycleId);
-                  if (!sourceCycle || W.some(week => week.macroPhase)) return undefined;
+                  // Только оригинальные недели решают про исходный календарь: добавленные
+                  // тапер-недели (macroPhase/taperWeek) не должны «перекрашивать» цикл.
+                  if (!sourceCycle || W.filter(w => !isTaperWeek(w)).some(week => week.macroPhase)) return undefined;
                   const layouts = sourceCycle.weeks && sourceCycle.weeks.length > 0
                     ? sourceCycle.weeks
                     : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1);

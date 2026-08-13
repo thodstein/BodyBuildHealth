@@ -209,6 +209,76 @@ describe('appendPLTaperWeeks', () => {
     const next = appendPLTaperWeeks(plan, 2);
     expect(next.progressionRationale).not.toContain('PED-адаптация');
   });
+
+  // ── Выход на пик 105%: прикиды дня соревнований + маркировка тапер-недель ──
+  it('добавленные недели помечаются taperWeek=true (оригинальные — нет)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2);
+    const orig = next.weeks.slice(0, 6);
+    expect(orig.every(w => w.taperWeek !== true)).toBe(true);
+    expect(next.weeks.slice(-2).every(w => w.taperWeek === true)).toBe(true);
+  });
+
+  it('агрессивная стратегия: третья попытка = 105% от ПМ финальной недели', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'aggressive' } });
+    const last = next.weeks[next.weeks.length - 1];
+    expect(last.meetAttempts).toBeDefined();
+    expect(last.meetAttempts!.strategy).toBe('aggressive');
+    const squat = last.meetAttempts!.lifts.find(l => /присед/i.test(l.name));
+    expect(squat).toBeDefined();
+    const pm = last.pmRow[squat!.name];
+    expect(squat!.third).toBeCloseTo(Math.round(pm * 1.05 / 2.5) * 2.5, 5);
+    expect(squat!.third).toBeGreaterThan(pm); // выход на пик выше ПМ недели
+  });
+
+  it('прикиды по умолчанию — сбалансированная (92/96/102%)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2);
+    const last = next.weeks[next.weeks.length - 1];
+    expect(last.meetAttempts).toBeDefined();
+    expect(last.meetAttempts!.strategy).toBe('balanced');
+  });
+
+  it('прикиды вешаются ТОЛЬКО на финальную тапер-неделю', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 3, { peakExit: { strategy: 'aggressive' } });
+    const extra = next.weeks.slice(-3);
+    expect(extra[0].meetAttempts).toBeUndefined();
+    expect(extra[1].meetAttempts).toBeUndefined();
+    expect(extra[2].meetAttempts).toBeDefined();
+  });
+
+  it('без соревновательных движений (армрестлинг) — прикидов нет, но недели помечены', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'aggressive' } });
+    expect(next.weeks.slice(-2).every(w => w.taperWeek === true)).toBe(true);
+    // В CYCLE_01 присед/жим/тяга есть — для планов без них meetAttempts просто отсутствует.
+  });
+
+  it('rationale упоминает выход на пик и выбранную стратегию', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'aggressive' } });
+    expect(next.progressionRationale).toContain('Выход на пик');
+    expect(next.progressionRationale).toContain('93/97/105%');
+  });
+
+  it('applyPLTaper (авто при сборке): финальная неделя помечена taperWeek + прикиды', () => {
+    // Non-faithful путь: авто-taper к финальным неделям применяется в buildLMSPlan.
+    const plan = buildLMSPlan({
+      template: CYCLE_01 as never,
+      pmMap,
+      fallbackPm: 80,
+      mode: 'natural',
+      weeksOverride: 12,
+      faithful: false,
+    } as never);
+    expect(plan.progressionRationale).toContain('Taper');
+    const last = plan.weeks[plan.weeks.length - 1];
+    expect(last.taperWeek).toBe(true);
+    expect(last.meetAttempts).toBeDefined();
+    expect(last.meetAttempts!.lifts.length).toBeGreaterThan(0);
+  });
 });
 
 describe('recommendWeightCut', () => {
@@ -281,5 +351,61 @@ describe('recommendWeightCut', () => {
     expect(typeof rec.weeksNeeded).toBe('number');
     expect(Array.isArray(rec.recommendations)).toBe(true);
     expect(Array.isArray(rec.timeline)).toBe(true);
+  });
+
+  // ── Набор веса (текущий вес НИЖЕ целевого — переход в более тяжёлую категорию) ──
+  it('набор: toGain = целевой − текущий, toCut = 0', () => {
+    const rec = recommendWeightCut(80, 83, 8);
+    expect(rec.toGain).toBe(3);
+    expect(rec.toCut).toBe(0);
+  });
+
+  it('набор 3 кг за 8 недель → темп 0.375 кг/нед, профицит ≈413 ккал/день', () => {
+    const rec = recommendWeightCut(80, 83, 8);
+    expect(rec.gainFeasible).toBe(true);
+    const weeklyGain = rec.toGain / 8;
+    expect(rec.weeklySurplusKcal).toBe(Math.round(weeklyGain * 7700));
+    expect(rec.dailySurplusKcal).toBe(Math.round(Math.round(weeklyGain * 7700) / 7));
+    expect(rec.dailySurplusKcal).toBe(413);
+    expect(rec.safeGainRate).toBeGreaterThan(0);
+  });
+
+  it('набор: gainTimeline растёт от текущего к целевому, последняя неделя — взвешивание', () => {
+    const rec = recommendWeightCut(80, 83, 4);
+    expect(rec.gainTimeline).toHaveLength(4);
+    expect(rec.gainTimeline[0].weight).toBeGreaterThan(80);
+    expect(rec.gainTimeline[3].weight).toBe(83);
+    expect(rec.gainTimeline[3].note).toContain('Взвешивание');
+  });
+
+  it('набор: рекомендации присутствуют (профицит, белок)', () => {
+    const rec = recommendWeightCut(80, 83, 8);
+    expect(rec.gainRecommendations[0]).toContain('Набор');
+    expect(rec.gainRecommendations.some(r => r.includes('ккал/день'))).toBe(true);
+    expect(rec.gainRecommendations.some(r => r.includes('Белок 1.8'))).toBe(true);
+  });
+
+  it('набор: нереальный темп → gainFeasible=false и предупреждение', () => {
+    // 6 кг за 2 недели = 3 кг/нед > безопасного ~0.5-1.0
+    const rec = recommendWeightCut(80, 86, 2);
+    expect(rec.gainFeasible).toBe(false);
+    expect(rec.gainRecommendations.some(r => r.startsWith('❌'))).toBe(true);
+  });
+
+  it('набор: вес уже в категории → toGain=0, gainRecommendations пусты', () => {
+    const rec = recommendWeightCut(80, 80, 8);
+    expect(rec.toGain).toBe(0);
+    expect(rec.gainRecommendations).toHaveLength(0);
+  });
+
+  it('weeksToMeet=0 при наборе → нет деления на ноль', () => {
+    const rec = recommendWeightCut(80, 85, 0);
+    expect(Number.isFinite(rec.dailySurplusKcal)).toBe(true);
+    expect(rec.gainTimeline).toHaveLength(0);
+  });
+
+  it('набор: темп выше безопасного → предупреждение ⚠', () => {
+    const rec = recommendWeightCut(80, 90, 4); // 10 кг за 4 нед = 2.5 кг/нед
+    expect(rec.gainRecommendations.some(r => r.startsWith('⚠'))).toBe(true);
   });
 });

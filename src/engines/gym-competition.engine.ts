@@ -273,9 +273,9 @@ export interface WeightCutRecommendation {
   currentWeight: number;
   /** Целевой вес (категория), кг. */
   targetWeight: number;
-  /** Сколько нужно сбросить, кг. */
+  /** Сколько нужно сбросить, кг (0 если вес ниже целевого). */
   toCut: number;
-  /** Безопасный темп, кг/нед (0.5–1.0% массы тела). */
+  /** Безопасный темп сброса, кг/нед (0.5–1.0% массы тела). */
   safeWeeklyRate: number;
   /** Минимальное число недель при безопасном темпе. */
   weeksNeeded: number;
@@ -289,12 +289,30 @@ export interface WeightCutRecommendation {
   timeline: { week: number; weight: number; note: string }[];
   /** Рекомендации текстом. */
   recommendations: string[];
+  /** Сколько нужно НАБРАТЬ, кг (0 если вес выше/равен целевому). */
+  toGain: number;
+  /** Безопасный темп набора, кг/нед (0.5 кг/нед, максимум 1.0 для весовой категории). */
+  safeGainRate: number;
+  /** Минимальное число недель при безопасном темпе набора. */
+  weeksNeededForGain: number;
+  /** Успевается ли набор за оставшиеся недели. */
+  gainFeasible: boolean;
+  /** Недельный профицит калорий, ккал (≈7700 ккал/кг массы). */
+  weeklySurplusKcal: number;
+  /** Дневной профицит, ккал. */
+  dailySurplusKcal: number;
+  /** Понедельный план набора веса. */
+  gainTimeline: { week: number; weight: number; note: string }[];
+  /** Рекомендации по набору текстом. */
+  gainRecommendations: string[];
 }
 
 /**
- * Рекомендации по сбросу веса перед соревнованием.
- * Безопасный темп: 0.5–1.0% массы тела в неделю (Helms 2018, NSCA).
- * 1 кг жира ≈ 7700 ккал. Последняя неделя — водная/углеводная манипуляция (не дефицит).
+ * Рекомендации по приведению веса к целевой категории перед соревнованием:
+ * сброс (текущий > целевой) ИЛИ набор (текущий < целевой — переход в более
+ * тяжёлую категорию). Безопасный темп сброса: 0.5–1.0% массы тела в неделю
+ * (Helms 2018, NSCA); безопасный темп набора: 0.5 кг/нед (0.25–0.5 — мышечная
+ * масса, до 1.0 для весовой категории). 1 кг массы ≈ 7700 ккал.
  */
 export function recommendWeightCut(currentWeight: number, targetWeight: number, weeksToMeet: number): WeightCutRecommendation {
   const toCut = Math.max(0, currentWeight - targetWeight);
@@ -335,9 +353,44 @@ export function recommendWeightCut(currentWeight: number, targetWeight: number, 
     }
   }
   recommendations.push('Взвешивание в федерации обычно утром — взвесьтесь за 2-3 дня до, чтобы учесть запас.');
+
+  // ── Набор веса (текущий вес НИЖЕ целевого — переход в более тяжёлую категорию) ──
+  const toGain = Math.max(0, targetWeight - currentWeight);
+  const safeGainRate = Math.min(1.0, Math.max(0.25, Math.round(currentWeight * 0.006 * 10) / 10));
+  const weeksNeededForGain = safeGainRate > 0 ? Math.ceil(toGain / safeGainRate) : 0;
+  const gainFeasible = toGain === 0 || weeksNeededForGain <= weeksToMeet;
+  const weeklyGain = weeksToMeet > 0 ? toGain / weeksToMeet : 0;
+  const weeklySurplusKcal = Math.round(weeklyGain * 7700);
+  const dailySurplusKcal = Math.round(weeklySurplusKcal / 7);
+  const gainTimeline: WeightCutRecommendation['gainTimeline'] = [];
+  for (let w = 1; w <= weeksToMeet; w++) {
+    const weight = Math.min(targetWeight, Math.round((currentWeight + weeklyGain * w) * 10) / 10);
+    const note = w === weeksToMeet
+      ? 'Взвешивание. Набор остановить за 24-48ч — лишний вес/вода уйдут.'
+      : weeklyGain > 0 ? `+${weeklyGain.toFixed(1)} кг/нед` : 'поддержание';
+    gainTimeline.push({ week: w, weight, note });
+  }
+  const gainRecommendations: string[] = [];
+  if (toGain > 0) {
+    gainRecommendations.push(`Набор: +${toGain.toFixed(1)} кг за ${weeksToMeet} нед → темп ${weeklyGain.toFixed(2)} кг/нед.`);
+    if (gainFeasible) {
+      gainRecommendations.push(`✅ Темп ${safeGainRate.toFixed(1)} кг/нед — успеваете. Профицит ≈${dailySurplusKcal} ккал/день (350–700).`);
+    } else {
+      gainRecommendations.push(`❌ За ${weeksToMeet} нед безопасно набрать только ${(safeGainRate * weeksToMeet).toFixed(1)} кг (нужно ${toGain.toFixed(1)}). Снизьте категорию или начните набор раньше.`);
+    }
+    if (weeklyGain > safeGainRate) {
+      gainRecommendations.push(`⚠ Темп ${weeklyGain.toFixed(2)} кг/нед выше безопасного ${safeGainRate.toFixed(1)} — большая часть будет жиром.`);
+    }
+    if (toGain >= 2) {
+      gainRecommendations.push('Белок 1.8–2.2 г/кг, профицит 10-15% от TDEE, силовая прогрессия сохраняется — набирайте мышцы, а не жир.');
+    }
+    gainRecommendations.push('Взвешивание в федерации обычно утром — взвесьтесь за 2-3 дня до, чтобы учесть запас (и вода, и пища).');
+  }
   return {
     currentWeight, targetWeight, toCut, safeWeeklyRate, weeksNeeded, feasible,
     weeklyDeficitKcal, dailyDeficitKcal, timeline, recommendations,
+    toGain, safeGainRate, weeksNeededForGain, gainFeasible,
+    weeklySurplusKcal, dailySurplusKcal, gainTimeline, gainRecommendations,
   };
 }
 

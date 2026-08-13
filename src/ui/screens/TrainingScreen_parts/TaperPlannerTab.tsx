@@ -12,7 +12,7 @@ import {
 import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
 import {
   selectWeightClass, generateCompetitionTimeline,
-  getRecoveryProtocols, getMentalRoutines,
+  getRecoveryProtocols, getMentalRoutines, recommendWeightCut,
 } from '../../../engines/gym-competition.engine';
 import { applyToPlanner } from './planner-bridge';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -270,6 +270,16 @@ export const TaperPlannerTab: React.FC = () => {
           <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>Категория до {cls.weightClass} кг</div>
             {cls.cuttingRequired && <div style={{ fontSize: 10, color: '#eab308' }}>Сушка: {cls.cuttingAmount} кг</div>}
+            {!cls.cuttingRequired && bw < cls.weightClass && (() => {
+              const g = recommendWeightCut(bw, cls.weightClass, Math.max(1, Math.ceil(daysUntil / 7)));
+              return (
+                <div style={{ fontSize: 10, color: '#4ade80', marginTop: 2, lineHeight: 1.45 }}>
+                  📈 Набор до {cls.weightClass} кг: +{g.toGain.toFixed(1)} кг · темп {g.safeGainRate.toFixed(1)} кг/нед · профицит ≈{g.dailySurplusKcal} ккал/день
+                  {g.gainFeasible && ` · успеваете за ${Math.ceil(daysUntil / 7)} нед`}
+                  {g.gainRecommendations.length > 0 && <div style={{ color: DIM, marginTop: 2 }}>{g.gainRecommendations[1]}</div>}
+                </div>
+              );
+            })()}
             <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{cls.recommendation}</div>
           </div>
         </div>

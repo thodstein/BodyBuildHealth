@@ -23,6 +23,7 @@ import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
+import { meetAttemptsFor, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -108,6 +109,10 @@ export interface LMSPlanWeek {
   sourcePhaseOrigin?: 'original' | 'inferred';
   /** Фаза годового макроцикла, если план собран из Macrocycle. */
   macroPhase?: string;
+  /** Добавленная тапер-неделя (appendPLTaperWeeks/applyPLTaper) — не часть исходного цикла. */
+  taperWeek?: boolean;
+  /** Прикиды соревновательного дня (выход на пик до 105%) — вешается на финальную тапер-неделю. */
+  meetAttempts?: MeetAttemptsInfo;
 }
 
 export interface LMSBuildOutput {
@@ -1218,6 +1223,29 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 }
 
 /**
+ * Прикиды соревновательного дня из ПМ-строки финальной тапер-недели.
+ * Основные движения ищутся по имени (присед / жим лёжа / становая) — как в UI.
+ * Если соревновательных движений нет (армрестлинг и т.п.) — возвращает null.
+ */
+export function computeMeetAttemptsFromPmRow(pmRow: Record<string, number>, strategy: MeetStrategy = 'balanced'): MeetAttemptsInfo | null {
+  const keys = Object.keys(pmRow).filter(k => Number.isFinite(pmRow[k]) && pmRow[k] > 0);
+  const pick = (re: RegExp): string | undefined => keys.find(k => re.test(norm(k)));
+  const liftKeys = [
+    pick(/присед|сквот/),
+    pick(/жим.*леж|леж.*жим/),
+    pick(/станов/),
+  ].filter((k): k is string => !!k);
+  if (liftKeys.length === 0) return null;
+  return {
+    strategy,
+    lifts: liftKeys.map(name => ({
+      name,
+      ...meetAttemptsFor(pmRow[name], strategy),
+    })),
+  };
+}
+
+/**
  * PL Taper: снижение объёма (сетов) к финальным 2 неделям цикла (peaking phase).
  * Интенсивность (вес) сохраняется — снижается только объём (Bosquet 2005, Bosquet et al.).
  * Неделя N-1: объём ×0.65; неделя N: объём ×0.45. RIR растёт на 1-2.
@@ -1273,7 +1301,13 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
       }));
       d.metrics = calcSessionMetrics(metricsEx);
     }
-    return { ...wk, days: newDays };
+    const week: LMSPlanWeek = { ...wk, days: newDays, taperWeek: true };
+    // Выход на пик: прикиды соревновательного дня (по умолчанию сбалансированная 92/96/102%).
+    if (idx === lastIdx) {
+      const attempts = computeMeetAttemptsFromPmRow(week.pmRow, 'balanced');
+      if (attempts) week.meetAttempts = attempts;
+    }
+    return week;
   });
 }
 
@@ -1303,6 +1337,10 @@ export function appendPLTaperWeeks(
     courseIntensity?: 'mild' | 'moderate' | 'heavy';
     mode?: ProgressionMode;
     weeklyPercent?: number;
+    /** Выход на пик: прикиды соревновательного дня на финальной тапер-неделе
+     *  (консервативная 90/95.5/100, сбалансированная 92/96/102, агрессивная 93/97/105%).
+     *  Прикиды — план дня соревнований, а не тренировочная нагрузка. */
+    peakExit?: { strategy?: MeetStrategy };
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1383,14 +1421,23 @@ export function appendPLTaperWeeks(
       }));
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
-    return {
+    const week: LMSPlanWeek = {
       week: nextWeekNum + idx,
       pmRow,
       days,
       sourcePhase: 'peak' as MesocyclePhase,
       sourcePhaseOrigin: 'inferred' as const,
       macroPhase: 'competition' as const,
+      taperWeek: true,
     };
+    // Выход на пик 105% (или выбранной стратегии): прикиды дня соревнований
+    // от ПМ финальной тапер-недели — как в тапер-калькуляторе. Тренировочная
+    // нагрузка остаётся разгрузочной (×0.45, RIR+2); прикиды — план соревнований.
+    if (idx === taperWeeks - 1) {
+      const attempts = computeMeetAttemptsFromPmRow(week.pmRow, opts?.peakExit?.strategy ?? 'balanced');
+      if (attempts) week.meetAttempts = attempts;
+    }
+    return week;
   };
 
   const extra: LMSPlanWeek[] = [];
@@ -1414,6 +1461,11 @@ export function appendPLTaperWeeks(
     ? ` 💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}; прогрессия ПМ ${k >= 0 ? '+' : ''}${(k * 100).toFixed(1)}%/нед продолжена в taper-неделях.`
     : '';
 
+  // Выход на пик: описание стратегии прикидов финальной недели (как в тапер-калькуляторе).
+  const peakStrategy = opts?.peakExit?.strategy ?? 'balanced';
+  const peakPct = peakStrategy === 'aggressive' ? '93/97/105%' : peakStrategy === 'conservative' ? '90/95.5/100%' : '92/96/102%';
+  const peakNote = ` 🏁 Выход на пик: прикиды соревновательного дня ${peakPct} от ПМ финальной недели (${peakStrategy === 'aggressive' ? 'агрессивная' : peakStrategy === 'conservative' ? 'консервативная' : 'сбалансированная'} стратегия).`;
+
   // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
   // и PED-множителя — иначе peakWeek/статусы остаются от исходного плана.
   const level = plan.template?.meta?.level as string | undefined;
@@ -1428,6 +1480,7 @@ export function appendPLTaperWeeks(
     plVolumeLandmarks,
     progressionRationale: plan.progressionRationale +
       ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).` +
+      peakNote +
       pedNote +
       (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),
   };
