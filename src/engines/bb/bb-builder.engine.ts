@@ -747,7 +747,7 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
  *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика).
  *  C6: isDeload — во время deload floor=2 НЕ применяется (4 упр × 2 = 8 сетов
  *  нарушает intended deload ~4-6 сетов). floor=1 для deload, floor=2 для рабочих недель. */
-function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false): void {
+export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false): void {
   const syncWorkSets = (ex: BBExercise): void => {
     const target = Math.max(0, ex.sets || 0);
     const current = Array.isArray(ex.workSets) ? ex.workSets : [];

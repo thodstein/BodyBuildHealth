@@ -14,6 +14,7 @@ import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
+import { normalizeWeekMrv } from './bb-builder.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место). */
@@ -1423,7 +1424,13 @@ for (const week of next.weeks) {
       }
     }
   }
-  // Taper is a source-independent final phase pass. It is deliberately here
+  // Повторный MRV-кап ПОСЛЕ fill/ensureSmall/alloc: builder-кап был до
+  // finalize, а поздние проходы могли добавить сверх (overflow-контроль).
+  if ((next as any).mrvByMuscle) {
+    for (const week of next.weeks) normalizeWeekMrv(week.sessions, (next as any).mrvByMuscle, !!(week as any).deload);
+    syncBBPlanSetShape(next);
+  }
+    // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.
   if (!options.preserveSource) {
     const tapered = applyTaperToFinalWeeks(next, next.weeks.length);
