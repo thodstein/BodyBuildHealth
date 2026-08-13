@@ -68,8 +68,10 @@ export function validatePlan(input: ValidateInput): ValidationBanner[] {
     const cap = mrvByMuscle?.[muscle] ?? Math.round(lm.mrv * (mrvMultiplier ?? 1));
     // MAV масштабируется пропорционально факту (соотношение MAV/MRV из landmarks).
     const scaledMav = mrvByMuscle?.[muscle] ? Math.round(lm.mav * cap / lm.mrv) : lm.mav;
-    if (sets > cap) {
+    if (sets > cap * 1.15) {
       banners.push({ level: 'error', category: 'mrv', title: '⚠ ' + muscle + ': превышен MRV (' + sets + ' > ' + cap + ')', detail: 'Снизьте объём на группу «' + muscle + '» до ' + cap + ' сетов/нед (превышение на ' + Math.round((sets - cap) / cap * 100) + '%)' + ctxSuffix + '.' });
+    } else if (sets > cap * 1.1) {
+      banners.push({ level: 'warning', category: 'mrv', title: muscle + ': у границы MRV (' + sets + ' ≈ ' + cap + ')', detail: 'Объём у верхней границы восстановления. Контролируйте прогресс' + ctxSuffix + '.' });
     } else if (sets < lm.mev) {
       banners.push({ level: 'info', category: 'mrv', title: muscle + ': ниже MEV (' + sets + ' < ' + lm.mev + ')', detail: 'Объём на «' + muscle + '» ниже стимульного минимума. Добавьте ' + (lm.mev - sets) + ' сета/нед для роста.' });
     } else if (sets > scaledMav) {
