@@ -47,13 +47,14 @@ describe('buildLMSPlan', () => {
     }
   });
 
-  it('PM растёт по неделям (natural, +0.5%/нед)', () => {
+  it('PM растёт по неделям (natural)', () => {
     const plan = buildCycle01Plan();
     const w1pm = plan.weeks[0].pmRow['Присед'];
     const w12pm = plan.weeks[11].pmRow['Присед'];
     expect(w12pm).toBeGreaterThan(w1pm);
-    // (1.005)^11 ≈ 1.056
-    expect(w12pm / w1pm).toBeCloseTo(1.056, 2);
+    // CYCLE_01.meta.level = 'II-KMS' → intermediate → levelK = +0.8%/нед;
+    // k = max(correctionPct 0.005, levelK 0.008) = 0.008 → (1.008)^11 ≈ 1.0916
+    expect(w12pm / w1pm).toBeCloseTo(1.0916, 2);
   });
 
   it('rationale uses actual PM data, not a dummy PM0', () => {
