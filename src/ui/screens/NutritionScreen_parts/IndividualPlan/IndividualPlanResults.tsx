@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { generateNutritionReport } from "../../../../engines/nutrition-report.engine";
 import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
+import { resolveAllergenFoodIds } from "./planner-restrictions";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
@@ -37,6 +38,7 @@ const getDiaryLoggedDayCount = (): number => {
 export const IndividualPlanResults: React.FC = () => {
   const {
     generatePlan, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex,
+    weekEditDay, openWeekDayForEdit, switchPlanDays,
     DAY_LABELS, trainingDays, planView, setPlanView, weekPlan, setWeekPlan,
     monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan,
     selectedWeek, setSelectedWeek,
@@ -80,6 +82,7 @@ export const IndividualPlanResults: React.FC = () => {
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
+  const _monthRunningRef = useRef(false); // FIX button-audit: guard двойного клика «План на месяц»
   const [calcTab, setCalcTab] = useState<'day' | 'week'>('day');
   const [calcSelections, setCalcSelections] = useState<Set<string>>(new Set());
   const [calcResults, setCalcResults] = useState<{ id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null>(null);
@@ -92,7 +95,11 @@ export const IndividualPlanResults: React.FC = () => {
   const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
 
   const analyzePlanIssues = () => {
-    if (!dayPlan || !dayPlan.meals) return;
+    // FIX button-audit: активный план по view + клэмп индекса (иначе после недельного вида
+    // threeDayPlan.days[3..6] = undefined → попап зависал на «Анализ рациона...»)
+    const _di = Math.max(0, Math.min(selectedDayIndex, planDays === 3 ? 2 : planDays === 7 ? 6 : 0));
+    const activePlan = planDays === 1 ? dayPlan : planDays === 3 ? threeDayPlan?.days?.[_di] : weekPlan?.days?.[_di];
+    if (!activePlan || !Array.isArray(activePlan.meals)) { setCorrectIssues([]); return; }
     const profile = getDefaultProfile();
     profile.phase = (v2Phase as any) || 'LEAN_MASS';
     profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
@@ -112,7 +119,9 @@ export const IndividualPlanResults: React.FC = () => {
     profile.lbm = profile.weightKg * 0.85;
 
     const excludedSet = new Set(excludedFoods || []);
-    const allergenSet = new Set(allergens || []);
+    // FIX button-audit: аллергены резолвятся в конкретные foodId (раньше сравнивались русские ID
+    // аллергенов с food.id — никогда не совпадали, и предложения могли содержать аллергены)
+    const allergenSet = resolveAllergenFoodIds(FOOD_DB, allergens || []);
     const healthIssueFoodIds = new Set<string>();
     (healthIssues || []).forEach((hi: string) => {
       const found = HEALTH_ISSUES.find(h => h.id === hi);
@@ -121,9 +130,6 @@ export const IndividualPlanResults: React.FC = () => {
     const isFoodBlocked = (foodId: string) => excludedSet.has(foodId) || healthIssueFoodIds.has(foodId) || allergenSet.has(foodId);
 
     const result: { mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] = [];
-
-    const activePlan = planDays === 1 ? dayPlan : planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex] : weekPlan?.days?.[selectedDayIndex];
-    if (!activePlan?.meals) return;
 
     activePlan.meals.forEach((m: any, mi: number) => {
       const currentFoodIds = new Set((m.items || []).map((it: any) => it.id).filter(Boolean));
@@ -229,7 +235,7 @@ export const IndividualPlanResults: React.FC = () => {
     const allMeals: { timing?: MealTiming; products: { foodId: string; weightGrams: number }[] }[] = [];
     const results: { id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] = [];
 
-    if (dayPlan) {
+    if (dayPlan && Array.isArray(dayPlan.meals)) { // FIX button-audit: guard на meals=null
       calcSelections.forEach(id => {
         if (id.startsWith('meal_')) {
           const idx = parseInt(id.replace('meal_', ''));
@@ -295,19 +301,26 @@ export const IndividualPlanResults: React.FC = () => {
   // P1-fix: увеличен yield до 100мс (было 50мс) + skipUndo=true для генерации недели
   // (раньше 5×saveUndo заполняли undoStack cap=5, уничтожая историю отмен пользователя).
   const runMonthPlan = async () => {
-    // P1-fix: один saveUndo до начала массовой генерации, а не 5 раз внутри
-    saveUndo();
-    setMonthPlanMode(true);
-    setMonthPlan([]);
-    for (let w = 0; w < 4; w++) {
-      // короткий yield для UI-рендера между неделями (100мс), без расы перекрытия state.
+    // FIX button-audit: защита от двойного клика (два конкурирующих цикла генерации)
+    if (_monthRunningRef.current) return;
+    _monthRunningRef.current = true;
+    try {
+      // P1-fix: один saveUndo до начала массовой генерации, а не 5 раз внутри
+      saveUndo();
+      setMonthPlanMode(true);
+      setMonthPlan([]);
+      for (let w = 0; w < 4; w++) {
+        // короткий yield для UI-рендера между неделями (100мс), без расы перекрытия state.
+        await new Promise<void>(r => setTimeout(() => r(), 100));
+        try { generatePlan(7, w, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
+      }
       await new Promise<void>(r => setTimeout(() => r(), 100));
-      try { generatePlan(7, w, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
+      setSelectedWeek(0);
+      // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
+      try { generatePlan(7, 0, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
+    } finally {
+      _monthRunningRef.current = false;
     }
-    await new Promise<void>(r => setTimeout(() => r(), 100));
-    setSelectedWeek(0);
-    // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
-    try { generatePlan(7, 0, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
   };
 
   return (
@@ -394,8 +407,8 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
           {monthPlan.length > 0 && (
             <button onClick={() => {
-              if (monthPlanMode) { setMonthPlanMode(false); setPlanDays(7); }
-              else { setMonthPlanMode(true); setPlanDays(7); setSelectedWeek(0); if (monthPlan[0]) setWeekPlan(monthPlan[0]); }
+              if (monthPlanMode) { setMonthPlanMode(false); switchPlanDays(7); }
+              else { setMonthPlanMode(true); switchPlanDays(7); setSelectedWeek(0); if (monthPlan[0]) setWeekPlan(monthPlan[0]); }
             }} style={{
               marginBottom:6, padding:'10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:600, width:'100%', minHeight: 36,
               background: monthPlanMode ? 'rgba(139,92,246,0.15)' : '#202023',
@@ -426,14 +439,14 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
             <button onClick={() => {
               const txt = dayPlan ? `🍽 План питания\n${(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any) => `${m.time} ${m.label}: ${(Array.isArray(m.items) ? m.items : []).map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals?.kcal || 0)} ккал, Б${Math.round(dayPlan.totals?.p || 0)}/Ж${Math.round(dayPlan.totals?.f || 0)}/У${Math.round(dayPlan.totals?.c || 0)}, клетчатка ${Math.round(dayPlan.totals?.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
-              try { void navigator.clipboard?.writeText(txt); } catch { setErrorMsg('Не удалось скопировать план.'); }
+              try { void (navigator.clipboard?.writeText(txt)?.catch(() => setErrorMsg('Не удалось скопировать план.'))); } catch { setErrorMsg('Не удалось скопировать план.'); }
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>📤 Копировать</button>
             <button onClick={() => {
               const input = prompt('Вставьте план из буфера:');
               if (!input) return;
               try {
                 const parsed = JSON.parse(input);
-                if (parsed.meals) { setDayPlan(parsed); setGenerated(true); }
+                if (parsed.meals) { setDayPlan(parsed); setGenerated(true); setPlanDays(1); } // FIX button-audit: импорт всегда показывает 1-дневный план
               } catch { setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».'); }
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:10, fontWeight:600 }}>📥 Импорт</button>
           </div>
@@ -610,7 +623,13 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && planDays === 1 && dayPlan && (<>
         <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${{macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'}[cyclingMode] || ''}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
-          {renderMealList(dayPlan)}
+          {weekEditDay !== null && (
+            <div style={{ marginBottom: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 9, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>✏️ Редактируете {DAY_LABELS[weekEditDay]} из недельного плана — изменения сохранятся в неделе.</span>
+              <button onClick={() => switchPlanDays(7)} style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap' }}>↩ К неделе</button>
+            </div>
+          )}
+          {renderMealList(dayPlan, false, 0)}
           <textarea value={dayPlanNotes} onChange={e => { const value = e.target.value; setDayPlanNotes(value); try { localStorage.setItem('he_day_notes', value); } catch {} }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
           <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:8, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             🔄 Перегенерировать день
@@ -704,7 +723,7 @@ export const IndividualPlanResults: React.FC = () => {
                   border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
                 }}>Н{wi + 1}</button>
               ))}
-              <button onClick={() => { setMonthPlanMode(false); setMonthPlan([]); }} style={{
+              <button onClick={() => { setMonthPlanMode(false); }} style={{
                 padding:'5px 8px', borderRadius:8, fontSize:9, cursor:'pointer',
                 background:'transparent', color:'rgba(255,255,255,0.8)', border:'1px solid rgba(255,255,255,0.06)',
               }}>✕</button>
@@ -727,7 +746,7 @@ export const IndividualPlanResults: React.FC = () => {
               const wC = Math.round(d.totals?.c || 0);
               const wIsTraining = d.isTrainingDay;
               return (
-                <div key={di} onClick={() => { if (weekPlan?.days?.[di]) { setDayPlan(weekPlan.days[di]); setPlanDays(1); setSelectedDayIndex(di); } }} style={{
+                <div key={di} onClick={() => openWeekDayForEdit(di)} style={{
                   padding: 10, borderRadius: 12, cursor: 'pointer',
                   background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
                   border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.06)',
@@ -810,7 +829,7 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {generated && planDays === 1 && dayPlan && weekPlan && (
-        <button onClick={() => setPlanDays(7)} style={{ marginBottom:6, padding:'6px 12px', borderRadius:8, border:'1px solid rgba(139,92,246,0.25)', background:'rgba(139,92,246,0.06)', color:'#a78bfa', cursor:'pointer', fontSize:9, fontWeight:600 }}>← Назад к неделе</button>
+        <button onClick={() => switchPlanDays(7)} style={{ marginBottom:6, padding:'6px 12px', borderRadius:8, border:'1px solid rgba(139,92,246,0.25)', background:'rgba(139,92,246,0.06)', color:'#a78bfa', cursor:'pointer', fontSize:9, fontWeight:600 }}>← Назад к неделе</button>
       )}
       {generated && planDays === 1 && dayPlan && (
         <GlassCard title="⏳ Таймлайн дня" icon="⏳" color="#06b6d4">
@@ -873,7 +892,7 @@ export const IndividualPlanResults: React.FC = () => {
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
               ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r, i) => (
                 <div key={i} style={{ display:'flex', gap:4, width:'100%' }}>
-                  <button onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
+                  <button onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx)} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
                     onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
                     onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
                     <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
@@ -915,7 +934,7 @@ export const IndividualPlanResults: React.FC = () => {
                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Угл</div>
               </div>
               <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)', textAlign:'center' }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6' }}>{Math.round(recipeDetail.protein*4/recipeDetail.kcal*100)}%</div>
+                <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6' }}>{(recipeDetail.kcal && recipeDetail.kcal > 0) ? Math.round(recipeDetail.protein*4/recipeDetail.kcal*100) : 0}%</div>
                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>% белка</div>
               </div>
             </div>
@@ -1158,7 +1177,7 @@ export const IndividualPlanResults: React.FC = () => {
                     {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}<br />
                     🥑 <strong>Жиры МИНИМУМ</strong> в окне действия (первые 90 мин) — не более 3-5г. Жиры замедляют опорожнение желудка и блокируют поступление глюкозы.<br />
                     🩸 <strong>Глюкоза:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель не ниже 4.0 ммоль/л.<br />
-                    🍬 <strong>Экстренно:</strong> 200мл сока + 4 таблетки глюкозы при уровне &lt;3.5 ммоль/л. 
+                    🍬 <strong>Экстренно:</strong> 200мл сока + 4 таблетки глюкозы при уровне {'<'}3.5 ммоль/л. 
                   </div>
                 )}
                 {isInsulin && inj.esterType === 'short' && (
@@ -1167,7 +1186,7 @@ export const IndividualPlanResults: React.FC = () => {
                     🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Ввести за 20-30 мин до еды. <strong>ПРОПУСК ЕДЫ ОПАСЕН!</strong><br />
                     {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до+после'}). В приёме: изолят + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
                     {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы каждые 20 мин!' : ''}<br />
-                    🥑 <strong>Жиры &lt;5г</strong> в окне 90 мин — иначе гипогликемия на фоне уже принятых углеводов.<br />
+                    🥑 <strong>Жиры {'<'}5г</strong> в окне 90 мин — иначе гипогликемия на фоне уже принятых углеводов.<br />
                     🩸 <strong>Правило 4 часов:</strong> каждый час после укола — минимум 10-15г углеводов на подержание.
                   </div>
                 )}
@@ -1211,12 +1230,12 @@ export const IndividualPlanResults: React.FC = () => {
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
                     💊 <strong>GLP-1 агонист</strong> — замедляет опорожнение желудка, подавляет аппетит.<br />
                     📏 <strong>Питание дробное:</strong> 5-6 раз/день по 100-200г. Не переедать — тошнота, рвота.<br />
-                    🥑 <strong>Жиры &lt;5г/приём</strong> — жирная пища задерживается в желудке на 4-6ч, вызывая тошноту и риск панкреатита.<br />
+                    🥑 <strong>Жиры {'<'}5г/приём</strong> — жирная пища задерживается в желудке на 4-6ч, вызывая тошноту и риск панкреатита.<br />
                     💧 <strong>Вода 30-40мл/кг</strong> — GLP-1 снижает моторику ЖКТ, риск запора. Клетчатка 25-30г/день.<br />
-                    ⏰ <strong>Дни пик тошноты:</strong> первые 24-72ч после еженедельной инъекции — самые лёгкие приёмы, жиры &lt;20г/день.<br />
+                    ⏰ <strong>Дни пик тошноты:</strong> первые 24-72ч после еженедельной инъекции — самые лёгкие приёмы, жиры {'<'}20г/день.<br />
                     🩸 <strong>B12 и электролиты:</strong> добавки обязательны — GLP-1 снижает всасывание через IF-фактор.<br />
                     🚫 <strong>Алкоголь</strong> — исключить полностью (панкреатит, гипогликемия).<br />
-                    ? <strong>Боли в животе/подреберье:</strong> немедленно к врачу — исключить панкреатит.
+                    🚨 <strong>Боли в животе/подреберье:</strong> немедленно к врачу — исключить панкреатит.
                   </div>
                 )}
                 {inj.type === 'другое' && (
@@ -1236,8 +1255,8 @@ export const IndividualPlanResults: React.FC = () => {
                 🛌 <strong>Не принимать короткий инсулин после 18:00</strong> — риск ночной гипогликемии<br />
                 ⏰ <strong>Каждый час после инъекции</strong> — минимум 10-15г углеводов (4-часовое окно действия)<br />
                 🏋️ <strong>На тренировке:</strong> изотоник 6-8% (500-1000мл) + банан каждые 20 мин<br />
-                🔴 <strong>Если глюкоза &lt;3.5 ммоль/л:</strong> немедленно 15-20г быстрых углеводов, замер через 15 мин<br />
-                🚑 <strong>Если &lt;2.5 ммоль/л или потеря сознания:</strong> ВЫЗОВ 103! Глюкагон 1мг в/м или в/в глюкоза 40%<br />
+                🔴 <strong>Если глюкоза {'<'}3.5 ммоль/л:</strong> немедленно 15-20г быстрых углеводов, замер через 15 мин<br />
+                🚑 <strong>Если {'<'}2.5 ммоль/л или потеря сознания:</strong> ВЫЗОВ 103! Глюкагон 1мг в/м или в/в глюкоза 40%<br />
                 📋 <strong>Симптомы:</strong> потливость, дрожь, голод → спутанность, агрессия → потеря сознания, судороги<br />
                 🥑 <strong>Жиры МИНИМУМ:</strong> в окне действия инсулина — не более 5г жиров за приём (жиры замедляют всасывание углеводов!)
               </div>
@@ -1256,11 +1275,11 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>💊 GLP-1 — справочник питания</div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
                 📏 <strong>Дробное питание:</strong> 5-6 раз/день по 100-200г за приём. Не переполнять желудок — риск рвоты.<br />
-                🥑 <strong>Жиры &lt;5г/приём:</strong> GLP-1 замедляет опорожнение желудка — жиры задерживаются и вызывают тошноту, изжогу, риск панкреатита.<br />
+                🥑 <strong>Жиры {'<'}5г/приём:</strong> GLP-1 замедляет опорожнение желудка — жиры задерживаются и вызывают тошноту, изжогу, риск панкреатита.<br />
                 💧 <strong>Вода 30-40 мл/кг:</strong> GLP-1 снижает моторику ЖКТ — риск запоров. Клетчатка 25-30г/день дополнительно.<br />
-                ⏰ <strong>График инъекций:</strong> пик тошноты — первые 24-72ч после инъекции. Планируй самые лёгкие приёмы на эти дни. Жиры в эти дни &lt;20г/день.<br />
+                ⏰ <strong>График инъекций:</strong> пик тошноты — первые 24-72ч после инъекции. Планируй самые лёгкие приёмы на эти дни. Жиры в эти дни {'<'}20г/день.<br />
                 🩸 <strong>Контроль B12 и электролитов:</strong> GLP-1 снижает всасывание B12 (через IF-фактор) и калия/магния — добавки обязательны.<br />
-                ? <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый панкреатит.<br />
+                🚨 <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый панкреатит.<br />
                 🚫 <strong>Алкоголь:</strong> исключить полностью — усиливает тошноту, риск гипогликемии, панкреатит.<br />
                 🍬 <strong>Гипогликемия:</strong> в комбинации с инсулином — риск возрастает вдвое. Глюкометр обязателен!
               </div>
@@ -1282,7 +1301,7 @@ export const IndividualPlanResults: React.FC = () => {
               <strong style={{ color:'#ef4444' }}>🚫 ПРОПУСК ЕДЫ КРИТИЧЕН:</strong> гипогликемия развивается за 15-30 минут. Каждый час после укола — минимум 10-15г углеводов.
             </div>
             <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🩸 Глюкометр:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель — не ниже 4.0 ммоль/л. При &lt;3.5 — 15-20г быстрых углеводов.
+              <strong style={{ color:'#ef4444' }}>🩸 Глюкометр:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель — не ниже 4.0 ммоль/л. При {'<'}3.5 — 15-20г быстрых углеводов.
             </div>
             <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
               <strong style={{ color:'#ef4444' }}>🏋️ Тренировка + инсулин:</strong> предтрен — изолят (40-50г) + амилопектин (80-100г). Пост-трен — изолят + декстроза (10г/1ЕД). На тренировке изотоник каждые 20 мин.
@@ -1584,7 +1603,7 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {lazyDayPlan && (
-        <GlassCard title="Ленивый день" icon="?" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
+        <GlassCard title="Ленивый день" icon="🛋️" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{lazyDayPlan.kcal} ккал (85% от нормы, {lazyDayPlan.days} {lazyDayPlan.days === 1 ? 'день' : 'дней'})</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
@@ -1650,7 +1669,7 @@ export const IndividualPlanResults: React.FC = () => {
 
       {carbloadPlan && (
         <GlassCard title="Углеводная загрузка" icon="🍚" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / weight)} г/кг)</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / Math.max(1, weight || 80))} г/кг)</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
@@ -1712,7 +1731,7 @@ export const IndividualPlanResults: React.FC = () => {
              specialMealGoal === 'high_protein' ? '🥩 Высокобелковый приём' :
              specialMealGoal === 'keto' ? '🥑 Кето-приём' :
              specialMealGoal === 'low_cal_day' ? '📉 Низкокалорийный приём' : '⚙️ Свой приём'}
-            · {specialMealTiming === 'breakfast' ? '🌅 Завтрак' : specialMealTiming === 'lunch' ? '?️ Обед' : specialMealTiming === 'dinner' ? '🌆 Ужин' : specialMealTiming === 'snack' ? '🍪 Перекус' : '🌙 Перед сном'}
+            · {specialMealTiming === 'breakfast' ? '🌅 Завтрак' : specialMealTiming === 'lunch' ? '🍽️ Обед' : specialMealTiming === 'dinner' ? '🌆 Ужин' : specialMealTiming === 'snack' ? '🍪 Перекус' : '🌙 Перед сном'}
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
             <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', textAlign: 'center' }}>
@@ -2346,7 +2365,8 @@ export const IndividualPlanResults: React.FC = () => {
                               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🔀 Заменить на:</div>
                               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
                                 {issue.suggestion.map((s, si) => {
-                                  const dayIdx = planDays === 1 ? 0 : selectedDayIndex + 1;
+                                  // FIX button-audit: dayIdx по единой конвенции (7+ = неделя), guard на foodId
+                                  const dayIdx = planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
                                   const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
                                   return (
                                   <button key={si} onClick={() => {
@@ -2354,9 +2374,10 @@ export const IndividualPlanResults: React.FC = () => {
                                       const food = FOOD_DB.find(f => f.id === it.id || f.name === it.name);
                                       return food?.id === s.foodId || it.name === s.name;
                                     });
-                                    if (itemIdx !== undefined && itemIdx >= 0) {
-                                      saveUndo();
-                                      replaceFoodItem(dayIdx, meal.mealIdx, itemIdx, FOOD_DB.find(f => f.id === s.foodId));
+                                    const target = FOOD_DB.find(f => f.id === s.foodId);
+                                    if (itemIdx !== undefined && itemIdx >= 0 && target) {
+                                      // FIX button-audit: replaceFoodItem сам вызывает saveUndo — убран дубль
+                                      replaceFoodItem(dayIdx, meal.mealIdx, itemIdx, target);
                                       analyzePlanIssues();
                                     }
                                   }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
@@ -2365,7 +2386,7 @@ export const IndividualPlanResults: React.FC = () => {
                                   );
                                 })}
                                 <button onClick={() => {
-                                  const dayIdx = planDays === 1 ? 0 : selectedDayIndex + 1;
+                                  const dayIdx = planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
                                   const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
                                   const allItems = activeMeal?.items || [];
                                   allItems.forEach((it: any, i: number) => {
@@ -2373,7 +2394,7 @@ export const IndividualPlanResults: React.FC = () => {
                                     if (similar.length > 0) {
                                       const targetFood = similar.find(f => issue.suggestion?.some(s => s.foodId === f.id));
                                       if (targetFood) {
-                                        saveUndo();
+                                        // FIX button-audit: replaceFoodItem сам вызывает saveUndo — убран дубль
                                         replaceFoodItem(dayIdx, meal.mealIdx, i, targetFood);
                                       }
                                     }
@@ -2395,7 +2416,8 @@ export const IndividualPlanResults: React.FC = () => {
                   <button onClick={() => {
                     setShowCorrectPopup(false);
                     setCorrectIssues(null);
-                    generatePlan(1, undefined, selectedDayIndex);
+                    // FIX button-audit: перегенерация в текущем виде (не сбрасывать на 1 день)
+                    generatePlan(planDays === 3 ? 3 : planDays === 7 ? 7 : 1, undefined, selectedDayIndex);
                   }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:800 }}>
                     ♻️ Перегенерировать рацион
                   </button>

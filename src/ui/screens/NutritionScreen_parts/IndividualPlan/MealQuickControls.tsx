@@ -272,7 +272,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     if (!popup || popup.selectedMealIdx === undefined) return;
     saveUndo();
     const food = FOOD_DB.find(f => f.id === result.foodId);
-    const amount = Math.round(food?.servingSize ? parseInt(food.servingSize) : 100);
+    const amount = parseServingSizeGrams(food?.servingSize) || 100;
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
@@ -305,23 +305,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     }
   };
 
-  const undoLast = () => {
-    // P1-fix: используем functional updater для undoStack, чтобы избежать stale closure
-    // при быстром двойном клике (раньше второй клик читал устаревший массив и терял отмену).
-    let restored = false;
-    setUndoStack((prev: any[]) => {
-      if (prev.length === 0) return prev;
-      const snap = prev[0];
-      if (snap.dayPlan) setDayPlan(snap.dayPlan);
-      if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
-      if (snap.weekPlan) setWeekPlan(snap.weekPlan);
-      // P1-fix: восстанавливаем shoppingList/waterCalc/recommendations если есть в снапшоте
-      if (snap.shoppingList && ctx.setShoppingList) ctx.setShoppingList(snap.shoppingList);
-      if (snap.waterCalc && ctx.setWaterCalc) ctx.setWaterCalc(snap.waterCalc);
-      restored = true;
-      return prev.slice(1);
-    });
-  };
+  const undoLast = () => ctx.undoLast();
 
   return (
     <div style={{ marginBottom: 10 }}>

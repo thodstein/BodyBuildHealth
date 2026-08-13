@@ -203,6 +203,8 @@ export const IndividualPlanSettings: React.FC = () => {
   const TIME_OPTIONS = Array.from({length:48},(_,i)=>{const h=Math.floor(i/2);const m=i%2===0?'00':'30';return{id:`${String(h).padStart(2,'0')}:${m}`,label:`${String(h).padStart(2,'0')}:${m}`};});
 
   const [recentPreset, setRecentPreset] = useState<string | null>(null);
+  // FIX button-audit: локальный toast вместо alert() (window.showToast нигде не определён)
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const settingsSection = 'all';
   const persistPlannerValue = (key: string, value: unknown) => {
     try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch {}
@@ -1646,8 +1648,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 const mealBound = (['Завтрак','Обед','Ужин','Полдник']).find(m => (preferredByMeal[m]||[]).includes(f.id));
                 return (
                   <div key={f.id} style={{ padding:'6px 8px', borderRadius:8, fontSize:9, background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent', color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                    <span onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); if (sel) { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); } }} style={{ cursor:'pointer', fontSize:9, minWidth:12 }}>{sel ? '✅' : '○'}</span>
-                    <span style={{ cursor:'pointer' }} onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); localStorage.setItem('he_preferred_foods', JSON.stringify(upd)); }}>{f.name}</span>
+                    <span onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); if (sel) { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); } }} style={{ cursor:'pointer', fontSize:9, minWidth:12 }}>{sel ? '✅' : '○'}</span>
+                    <span style={{ cursor:'pointer' }} onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); }}>{f.name}</span>
                     {sel && (<div style={{ display:'flex', gap:2, marginLeft:'auto' }}>{[['Завтрак','🌅'],['Обед','☀️'],['Ужин','🌙'],['Полдник','🍏']].map(([m,icon]) => { const isB = (preferredByMeal[m]||[]).includes(f.id); return (<span key={m} onClick={() => { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); bm[m] = [...(bm[m]||[]), f.id]; setPreferredByMeal(bm); }} style={{ cursor:'pointer', fontSize:9, padding:'1px 4px', borderRadius:4, background: isB ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.03)', border: isB ? '1px solid rgba(0,230,138,0.4)' : '1px solid transparent' }}>{icon}</span>); })}{mealBound && <span onClick={() => { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.4)' }} title='Любой приём'>★</span>}</div>)}
                   </div>
                 );
@@ -1673,7 +1675,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 return (
                   <div key={f.id} onClick={() => {
                     const upd = sel ? excludedFoods.filter(x => x !== f.id) : [...excludedFoods, f.id];
-                    setExcludedFoods(upd); localStorage.setItem('he_excluded_foods', JSON.stringify(upd));
+                    setExcludedFoods(upd); persistPlannerValue('he_excluded_foods', upd);
                   }} style={{
                     padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
                     background: sel ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)',
@@ -2173,12 +2175,17 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 ].map(p => (
                   <button key={p.id} onClick={() => {
                     setWeightLogPeriod(p.id);
+                    // FIX button-audit: при смене периода сохраняем введённые пользователем веса по датам
+                    // (раньше все замеры перезаписывались заглушками с одинаковым весом)
+                    const existing = [...weightLogEntries];
+                    const lastWeight = existing.length > 0 ? existing[existing.length - 1].weight : 80;
+                    const byDate = new Map(existing.map(e => [e.date, e.weight]));
                     const entries: { date: string; weight: number }[] = [];
-                    const lastWeight = weightLogEntries.length > 0 ? weightLogEntries[weightLogEntries.length - 1].weight : 80;
                     const step = p.id === 'daily' ? 1 : p.id === 'every2' ? 2 : p.id === 'every3' ? 3 : 4;
                     for (let i = 0; i < p.slots; i++) {
                       const d = new Date(); d.setDate(d.getDate() - (p.slots - 1 - i) * step);
-                      entries.push({ date: d.toISOString().split('T')[0], weight: lastWeight });
+                      const ds = d.toISOString().split('T')[0];
+                      entries.push({ date: ds, weight: byDate.has(ds) ? byDate.get(ds) as number : lastWeight });
                     }
                     setWeightLogEntries(entries);
                   }} style={{
@@ -2232,7 +2239,9 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
 
               {/* Add entry button */}
               <button onClick={() => {
-                const lastDate = weightLogEntries.length > 0 ? new Date(weightLogEntries[weightLogEntries.length - 1].date) : new Date();
+                // FIX button-audit: guard на Invalid Date (пустая дата последней записи → RangeError)
+                const _rawLast = weightLogEntries.length > 0 ? new Date(weightLogEntries[weightLogEntries.length - 1].date) : null;
+                const lastDate = (_rawLast && Number.isFinite(_rawLast.getTime())) ? _rawLast : new Date();
                 const nextDate = new Date(lastDate); nextDate.setDate(nextDate.getDate() + 1);
                 setWeightLogEntries([...weightLogEntries, { date: nextDate.toISOString().split('T')[0], weight: weightLogEntries.length > 0 ? weightLogEntries[weightLogEntries.length - 1].weight : 80 }]);
               }} style={{
@@ -2245,7 +2254,10 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 const firstW = weightLogEntries[0].weight;
                 const lastW = weightLogEntries[weightLogEntries.length - 1].weight;
                 const diff = lastW - firstW;
-                const daysBetween = Math.round((new Date(weightLogEntries[weightLogEntries.length-1].date).getTime() - new Date(weightLogEntries[0].date).getTime()) / 86400000);
+                // FIX button-audit: guard на Invalid Date — пустые даты не дают NaN-темп
+                const _t1 = new Date(weightLogEntries[0].date).getTime();
+                const _t2 = new Date(weightLogEntries[weightLogEntries.length-1].date).getTime();
+                const daysBetween = (Number.isFinite(_t1) && Number.isFinite(_t2)) ? Math.round((_t2 - _t1) / 86400000) : 0;
                 const weeklyRate = daysBetween > 0 ? diff / daysBetween * 7 : 0;
                 const onTrack = weeklyRate < 0 && expectedLossKgWeek > 0 && Math.abs(weeklyRate) >= expectedLossKgWeek * 0.7 && Math.abs(weeklyRate) <= expectedLossKgWeek * 1.3;
                 return (
@@ -2297,7 +2309,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         <GlassCard title={cyclingMode === 'cheatmeal' ? 'Читмил' : 'Углеводная загрузка'} icon="📅">
           <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
             <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-              📅 Выберите день тяжёлой тренировки:
+              📅 Выберите тренировочные дни (влияют на циклирование и привязку рациона):
             </div>
             <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
               {DAY_LABELS.map((label, idx) => {
@@ -2320,7 +2332,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               })}
             </div>
             <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
-              🏋️ Тяжёлая тренировка: {trainingDays.map((d,i) => d ? DAY_LABELS[i] : null).filter(Boolean).join(', ')}
+              🏋️ Тренировочные дни: {trainingDays.map((d,i) => d ? DAY_LABELS[i] : null).filter(Boolean).join(', ') || '—'}
             </div>
           </div>
         </GlassCard>
@@ -2351,9 +2363,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                   {m.replaceMeal && <span style={{ color:'#00e68a', marginLeft:4, fontSize:10, background:'rgba(0,230,138,0.08)', padding:'1px 5px', borderRadius:4 }}>↻ {m.replaceMeal}</span>}
                   {m.notes && <div style={{ color:'rgba(255,255,255,0.85)', marginTop:2, fontSize:10 }}>{m.notes}</div>}
                 </div>
-                <button onClick={() =>
-
- { const upd = specialMeals.filter((_, j) => j !== i); setSpecialMeals(upd); localStorage.setItem('he_special_meals', JSON.stringify(upd)); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:9 }}>✕</button>
+                <button onClick={() => { const upd = specialMeals.filter((_, j) => j !== i); setSpecialMeals(upd); persistPlannerValue('he_special_meals', upd); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:9 }}>✕</button>
               </div>
             ))}
           </div>
@@ -2424,10 +2434,12 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 const typeLabels: Record<string, string> = { cheat_meal:'🍔 Читмил', refeed:'🍝 Рефид', fast:'⏳ Фастинг' };
                 const newItem = { type: specialMealType, typeLabel: typeLabels[specialMealType], date: specialMealDate, notes: specialMealNotes, replaceMeal: selectedMealToReplace || undefined };
                 const upd = [...specialMeals, newItem];
-                setSpecialMeals(upd);
-                localStorage.setItem('he_special_meals', JSON.stringify(upd));
+                // FIX button-audit: state-закрытие ПОСЛЕ persist (иначе при QuotaExceeded модалка
+                // не закрывалась и повторный клик плодил дубликаты)
                 setSelectedMealToReplace('');
                 setShowSpecialMealPopup(false);
+                setSpecialMeals(upd);
+                persistPlannerValue('he_special_meals', upd);
               }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:700 }}>✓ Сохранить</button>
             </div>
           </div>

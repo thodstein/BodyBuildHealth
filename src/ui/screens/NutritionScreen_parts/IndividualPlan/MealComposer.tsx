@@ -285,7 +285,9 @@ export const MealComposer: React.FC = () => {
           </div>
 
           {renderMealList ? (
-            renderMealList(dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null), true)
+            // FIX button-audit: dayIdx по единой конвенции — правки применяются к видимому дню
+            renderMealList(dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null), true,
+              planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0)
           ) : (
             <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', textAlign:'center', padding:20 }}>
               Выберите день для просмотра состава приёмов
@@ -303,7 +305,7 @@ export const MealComposer: React.FC = () => {
                   {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
                   ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r: any, i: number) => (
-                    <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9 }}>
+                    <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9 }}>
                       <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
                       <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
                     </button>
