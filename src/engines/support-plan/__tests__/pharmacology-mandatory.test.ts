@@ -139,6 +139,13 @@ describe('course pharmacology mandatory rules', () => {
     expect(week4.items.some(i => i.marker.includes('PRL'))).toBe(true);
     const daily = sched.find(s => s.id === 'daily')!;
     expect(daily.items.some(i => i.marker.includes('АД'))).toBe(true);
+    const baseline = sched.find(s => s.id === 'baseline')!;
+    const allBaseline = baseline.items.map(i => i.marker).join(' | ');
+    expect(allBaseline).toContain('ОАК с СОЭ');
+    expect(allBaseline).toContain('ОАМ');
+    expect(allBaseline).toContain('ИФР-1');
+    expect(allBaseline).toContain('Почечный блок');
+    expect(allBaseline).toContain('Системные панели');
 
     const pctState = stateWithAas(['test_enan']);
     pctState.pharma.phase = 'pct';
