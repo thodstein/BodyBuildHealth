@@ -774,19 +774,42 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   const isEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
   const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string): void => {
-    if (working.length >= maxEx) return;
     const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !working.some((e: any) => e.name === c.name));
     if (!candidate) return;
     const baseWeight = options.workMax?.[muscle] || 40;
-    session.exercises.push({
-      muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
-      sets, repsRange: reps, rir: 3, restSeconds: 45, warmupSets: [],
-      workSets: Array.from({ length: sets }, () => ({ reps: reps[1], rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 45 })),
-      rationale: note,
-    });
+    if (working.length < maxEx) {
+      session.exercises.push({
+        muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+        sets, repsRange: reps, rir: 3, restSeconds: 45, warmupSets: [],
+        workSets: Array.from({ length: sets }, () => ({ reps: reps[1], rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 45 })),
+        rationale: note,
+      });
+    } else {
+      // Сессия на лимите упражнений: заменяем accessory другой мышцы с дублем
+      // (стимул той мышцы сохраняется), чтобы малая группа получила работу —
+      // иначе fullbody-сплиты теряют calves/traps/abs (их нет в musclePlans).
+      const slot = working.find((e: any) =>
+        e.role === 'accessory' &&
+        !['calves', 'traps', 'forearms', 'abs'].includes(e.muscle) &&
+        !/(шраг|скручив|подъём.*носк|подъем.*носк|calf|запяст|wrist|зоттман)/i.test(e.name || '') &&
+        working.filter((x: any) => x.muscle === e.muscle).length > 1,
+      );
+      if (slot) {
+        slot.muscle = muscle;
+        slot.name = candidate.name;
+        slot.exerciseName = candidate.name;
+        slot.character = 'памп';
+        slot.sets = sets;
+        slot.repsRange = reps;
+        slot.rir = 3;
+        slot.restSeconds = 45;
+        slot.workSets = Array.from({ length: sets }, () => ({ reps: reps[1], rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 45 }));
+        slot.rationale = note;
+      }
+    }
   };
   // Икры: в Legs-сессиях стоя (растянутая икроножная) + сидя (камбаловидная).
-  if (/Legs|Lower|LowerPower|LowerHyp/.test(tag)) {
+  if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag)) {
     const calves = working.filter((e: any) => e.muscle === 'calves');
     const standing = calves.find((e: any) => /носк|calf/i.test(e.name || '') && !/сидя|sitting|seated/i.test(e.name || ''));
     if (standing) {
@@ -799,15 +822,29 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
     } else {
       addEx('calves', /подъём.*носк|подъем.*носк|calf.*raise/i, isEnhanced ? 5 : 4, [12, 20], 'Малые группы: икры стоя (растянутая позиция)');
     }
-    // Сидячие (камбаловидная) — только в одной из двух Legs-сессий (без дублей).
+    // Сидячие (камбаловидная) — без ограничения по дню: вторая Lower/FullBody
+    // сессия получает seated (stretch soleus), если нет ни одного сидячего.
     const seated = calves.find((e: any) => /сидя|sitting|seated/i.test(e.name || ''));
-    if (!seated && !calves.some((e: any) => /сидя/i.test(e.name || '')) && (session.day ?? 1) % 2 === 0) {
+    if (!seated && !calves.some((e: any) => /сидя/i.test(e.name || '')) && weekCountOf('calves') >= 2) {
       addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|seated.*calf/i, isEnhanced ? 4 : 3, [15, 25], 'Малые группы: икры сидя (камбаловидная, stretch)');
     }
   }
-  // Предплечья — с тягами (Pull/Back/Upper): хватовая работа идёт со спиной.
+  // Пресс: скручивания/подъёмы ног добираются до MEV (5 сетов) в Upper/FullBody.
+  if (/Upper|Pull|Push|Torso|FullBody/.test(tag)) {
+    const absEx = working.find((e: any) => e.muscle === 'abs');
+    if (absEx) {
+      const targetSets = isEnhanced ? 5 : 4;
+      if (absEx.sets < targetSets) {
+        const sample = absEx.workSets?.[absEx.workSets.length - 1] || { reps: 15, rir: 3, weight: 0 };
+        while (absEx.sets < targetSets) { absEx.workSets.push({ ...sample }); absEx.sets += 1; }
+      }
+    } else if (weekCountOf('abs') < 2) {
+      addEx('abs', /скручиван|crunch|подъём.*ног|подъем.*ног|велосипед/i, isEnhanced ? 5 : 4, [15, 25], 'Малые группы: пресс (скручивания)');
+    }
+  }
+  // Предплечья — с тягами (Pull/Back/Upper/FullBody): хватовая работа.
   // Не дублируем: максимум 2 источника в неделю (иначе > MRV).
-  if (/Pull|Back|Upper|Torso/.test(tag)) {
+  if (/Pull|Back|Upper|Torso|FullBody/.test(tag)) {
     const hasForearms = working.some((e: any) => e.muscle === 'forearms');
     if (!hasForearms && weekCountOf('forearms') < 2) {
       addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват)');
@@ -815,7 +852,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   }
   // Трапеции: шраги доводятся до MEV (natural 5 / enhanced 6) сетов — stretch
   // + задержка вверху; если шрагов в сессии нет — добавляем (до 2 источников).
-  if (/Pull|Back|Upper|Torso/.test(tag)) {
+  if (/Pull|Back|Upper|Torso|FullBody/.test(tag)) {
     const shrug = working.find((e: any) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
     if (shrug) {
       const targetSets = isEnhanced ? 6 : 5;
@@ -1424,13 +1461,7 @@ for (const week of next.weeks) {
       }
     }
   }
-  // Повторный MRV-кап ПОСЛЕ fill/ensureSmall/alloc: builder-кап был до
-  // finalize, а поздние проходы могли добавить сверх (overflow-контроль).
-  if ((next as any).mrvByMuscle) {
-    for (const week of next.weeks) normalizeWeekMrv(week.sessions, (next as any).mrvByMuscle, !!(week as any).deload);
-    syncBBPlanSetShape(next);
-  }
-    // Taper is a source-independent final phase pass. It is deliberately here
+  // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.
   if (!options.preserveSource) {
     const tapered = applyTaperToFinalWeeks(next, next.weeks.length);
@@ -1507,7 +1538,13 @@ for (const week of next.weeks) {
       }
     }
   }
-  // Повторный tidy ПОСЛЕ allocation/дозаполнения: добавленные упражнения
+  // Повторный MRV-кап ПОСЛЕ fill/ensureSmall/alloc: builder-кап был до
+  // finalize, а поздние проходы могли добавить сверх (overflow-контроль).
+  if ((next as any).mrvByMuscle) {
+    for (const week of next.weeks) normalizeWeekMrv(week.sessions, (next as any).mrvByMuscle, !!(week as any).deload);
+    syncBBPlanSetShape(next);
+  }
+    // Повторный tidy ПОСЛЕ allocation/дозаполнения: добавленные упражнения
   // должны встать в правильные группы (иначе quads → hamstrings → quads).
   // Только сортировка — НЕ capExercisesPerMuscle (это срезало бы добавленный
   // allocation back-объём до 4 упражнений).

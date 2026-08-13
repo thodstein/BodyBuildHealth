@@ -12,7 +12,8 @@ describe('BB volume model', () => {
       name: 'Жим штанги лёжа', muscle: 'chest', type: 'compound', sets: 4,
     });
     expect(contributions[0]).toMatchObject({ muscle: 'chest', directSets: 4, effectiveSets: 4 });
-    expect(contributions.find(c => c.muscle === 'triceps')?.effectiveSets).toBe(2);
+    // triceps от жимов: 4 × 0.45 = 1.8
+    expect(contributions.find(c => c.muscle === 'triceps')?.effectiveSets).toBeCloseTo(1.8);
   });
 
   it('does not add indirect volume to isolation', () => {
@@ -29,7 +30,8 @@ describe('BB volume model', () => {
     ] }]);
     expect(totals.chest.directSets).toBe(4);
     expect(totals.triceps.directSets).toBe(3);
-    expect(totals.triceps.effectiveSets).toBe(5);
+    // 3 direct + 4×0.45 от жима = 4.8
+    expect(totals.triceps.effectiveSets).toBeCloseTo(4.8);
   });
 
   it('builds a capped target before exercise selection', () => {

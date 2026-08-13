@@ -138,31 +138,33 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
 
   if (hasAny(name, /жим|bench|press|dip|отжим.*брус/i)) {
     return [
-      { muscle: 'triceps', coefficient: 0.5 },
-      { muscle: 'shoulders', coefficient: 0.25 },
+      // 0.45: трицепс получает ~45% косвенной работы от жимов (EMG-оценки);
+      // 0.5 завышал effective — fullbody-сплиты 5x/нед уходили в MRV-overflow.
+      { muscle: 'triceps', coefficient: 0.45 },
+      { muscle: 'shoulders', coefficient: 0.2 },
     ];
   }
   if (hasAny(name, /подтяг|pull.?up|pulldown|пуллдаун|тяга.*верх/i)) {
     return [
       { muscle: 'biceps', coefficient: 0.4 },
-      { muscle: 'shoulders', coefficient: 0.25 },
+      { muscle: 'shoulders', coefficient: 0.2 },
     ];
   }
   if (hasAny(name, /row|тяга.*наклон|тяга.*гриф|тяга.*гантел|горизонтальн.*тяга/i)) {
     return [
       { muscle: 'biceps', coefficient: 0.4 },
-      { muscle: 'shoulders', coefficient: 0.25 },
+      { muscle: 'shoulders', coefficient: 0.2 },
     ];
   }
   if (hasAny(name, /присед|squat|leg.?press|жим.*ног|выпад|lunge/i)) {
     return [
-      { muscle: 'glutes', coefficient: 0.5 },
+      { muscle: 'glutes', coefficient: 0.45 },
       { muscle: 'hamstrings', coefficient: 0.25 },
     ];
   }
   if (hasAny(name, /румын|rdl|гудморнинг|good.?morning|гиперэкстенз/i)) {
     return [
-      { muscle: 'glutes', coefficient: 0.5 },
+      { muscle: 'glutes', coefficient: 0.45 },
       { muscle: 'back', coefficient: 0.25 },
     ];
   }

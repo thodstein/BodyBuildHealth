@@ -10,6 +10,7 @@ describe('BB fatigue-weighted volume parity', () => {
 
     const totals = aggregateBBVolume([{ exercises: [exercise] }]);
     expect(totals.chest.fatigueWeightedSets).toBe(chest?.fatigueWeightedSets);
-    expect(totals.triceps.fatigueWeightedSets).toBe(2.8);
+    // triceps от жимов: 4 × 0.45 = 1.8 (fatigue-weighted ≈ 2.52)
+    expect(totals.triceps.fatigueWeightedSets).toBeCloseTo(2.52);
   });
 });
