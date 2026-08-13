@@ -4,6 +4,7 @@ import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-
 import { epley1RM } from '../../../engines/e1rm';
 import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { loadReadinessHistory } from './readiness-history';
+import { MMCSetPanel } from './MMCSetPanel';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -83,6 +84,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   const [nextSupersetGroup, setNextSupersetGroup] = useState(1);
   const [restTimer, setRestTimer] = useState(0);
   const [restTarget, setRestTarget] = useState(90);
+  const [mmcOpen, setMmcOpen] = useState<Record<string, boolean>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Undo history
@@ -691,12 +693,12 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                 )}
 
                 {/* Set header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 74px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', paddingLeft: 2 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', paddingLeft: 2 }}>
                   <span>#</span><span style={{ textAlign: 'center' }}>кг</span><span style={{ textAlign: 'center' }}>повт</span><span style={{ textAlign: 'center' }}>RPE</span><span style={{ textAlign: 'center' }}>RIR</span><span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
                   <React.Fragment key={setIdx}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 74px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 3, alignItems: 'center' }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textAlign: 'center' }}>{setIdx + 1}</span>
                       <input type="number" value={set.weight} disabled={isBWExercise({ name: ex.exerciseName })} data-set-input="1"
                         onChange={e => updateSet(exIdx, setIdx, { weight: parseFloat(e.target.value) || 0 })}
@@ -719,6 +721,13 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                         onChange={e => updateSet(exIdx, setIdx, { rir: parseInt(e.target.value) || 0 })}
                         style={{ padding: '6px 4px', borderRadius: 5, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 12, textAlign: 'center', minHeight: isMobile ? 44 : 34 }} />
                       <div style={{ display: 'flex', gap: 2 }}>
+                        <button onClick={() => setMmcOpen(prev => ({ ...prev, [`${exIdx}_${setIdx}`]: !prev[`${exIdx}_${setIdx}`] }))}
+                          style={{ width: 22, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 9,
+                            background: mmcOpen[`${exIdx}_${setIdx}`] ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                            color: mmcOpen[`${exIdx}_${setIdx}`] ? '#00e68a' : 'rgba(255,255,255,0.3)' }}
+                          title="MMC/Пампинг/Суставы/Энергия">
+                          🧠
+                        </button>
                         <button onClick={() => {
                           // Цикл оценки техники: нет → 5 → 4 → 3 → нет
                           const next = set.technique === undefined ? 5 : set.technique === 5 ? 4 : set.technique === 4 ? 3 : undefined;
@@ -749,6 +758,11 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                         onChange={e => updateSet(exIdx, setIdx, { notes: e.target.value })}
                         placeholder="заметка к подходу..."
                         style={{ width: '100%', padding: '3px 6px', borderRadius: 4, background: 'transparent', border: '1px solid rgba(168,85,247,0.15)', color: 'rgba(255,255,255,0.5)', fontSize: 9, marginBottom: 3, boxSizing: 'border-box' as any }} />
+                    )}
+                    {mmcOpen[`${exIdx}_${setIdx}`] && (
+                      <div style={{ marginBottom: 3 }}>
+                        <MMCSetPanel exerciseId={ex.exerciseId} exerciseName={ex.exerciseName} setNumber={setIdx + 1} date={logDate} compact />
+                      </div>
                     )}
                   </React.Fragment>
                 ))}

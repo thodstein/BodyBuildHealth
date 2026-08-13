@@ -255,6 +255,53 @@ export function pullFromProfileDiaries(m: DailyMetrics): DailyMetrics {
   return merged;
 }
 
+/** Слить ИСТОРИЮ дневников профиля в чек-ин (he_daily_metrics):
+ *  для дат, которых нет в чек-ине, создаются записи с весом/сном/пульсом из дневников —
+ *  тренды и статистика чек-ина начинают учитывать данные, введённые в Профиле.
+ *  Существующие записи чек-ина не перезаписываются. Возвращает число созданных записей. */
+export function syncHistoryFromProfileDiaries(): number {
+  try {
+    const metrics = loadMetrics();
+    const byDate = new Map(metrics.map(m => [m.date, m]));
+    const created = new Set<string>();
+    const ensure = (date: string): DailyMetrics | null => {
+      if (!date) return null;
+      let m = byDate.get(date);
+      if (!m) {
+        m = {
+          date, sleepHours: 7, sleepQuality: 4, restingHR: 60, hrvMs: 45,
+          weightKg: 80, waterLiters: 2, steps: 5000,
+          subjectiveEnergy: 4, subjectiveSoreness: 2, subjectiveStress: 3, notes: '',
+        };
+        byDate.set(date, m);
+        created.add(date);
+      }
+      return m;
+    };
+    for (const w of getWeightLog()) {
+      if (!(w.weight > 0)) continue;
+      const m = ensure(w.date);
+      if (m && created.has(w.date)) m.weightKg = w.weight;
+    }
+    for (const s of readDiaryEntries<{ date?: string; hours?: number; quality?: number }>(SLEEP_DIARY_KEY)) {
+      const m = ensure(s.date || '');
+      if (m && created.has(s.date || '')) {
+        if (typeof s.hours === 'number' && s.hours > 0) m.sleepHours = s.hours;
+        if (typeof s.quality === 'number' && s.quality > 0) m.sleepQuality = s.quality;
+      }
+    }
+    for (const b of readDiaryEntries<{ date?: string; pulse?: number }>(BP_DIARY_KEY)) {
+      const m = ensure(b.date || '');
+      if (m && created.has(b.date || '') && typeof b.pulse === 'number' && b.pulse > 0) m.restingHR = b.pulse;
+    }
+    if (created.size > 0) {
+      const merged = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-365);
+      localStorage.setItem(METRICS_KEY, JSON.stringify(merged));
+    }
+    return created.size;
+  } catch { return 0; }
+}
+
 /** Записать чек-ин в дневники профиля: вес → he_weight_log, сон → he_sleep_diary,
  *  пульс → he_bp_diary. Записи обновляются (upsert по дате), существующие поля
  *  (замеры/пробуждения/АД) сохраняются. Возвращает, какие дневники затронуты. */

@@ -56,7 +56,7 @@ export type TrainingPage = 'hero' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
   constructor: '🛠 Конструктор тренировок', runtime: '▶️ Проведение тренировки', exercises: '🏋️ Упражнения', calculators: '⚖️ Тоннаж',
-  diary: '📝 Дневник + аналитика + отчёты', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
+  diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱️ Таймеры отдыха',
   progress: '📏 Прогресс', mytraining: '⭐ Мои тренировки', exercise_lab: '🧬 Лаборатория упражнений', volume: '📐 Расчёт объёма',
   reports: '📄 Отчёты',

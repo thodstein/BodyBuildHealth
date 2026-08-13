@@ -7,6 +7,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   getTodayMetric, quickCheckin, loadMetrics, getRollingAverages,
   weightTrend, getAllTimeStats, pullFromProfileDiaries, pushToProfileDiaries,
+  syncHistoryFromProfileDiaries,
   type DailyMetrics,
 } from '../../../engines/profile-settings.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -31,10 +32,12 @@ export const CheckinMetricsCard: React.FC = () => {
 
   // Синхронизация: подтянуть сегодняшние вес/сон/пульс из дневников Профиля
   const pullDiaries = useCallback(() => {
-    const pulled = pullFromProfileDiaries(getTodayMetric());
+    const before = getTodayMetric();
+    syncHistoryFromProfileDiaries();
+    const pulled = pullFromProfileDiaries(before);
     setForm(pulled);
-    const changed = pulled.weightKg !== getTodayMetric().weightKg || pulled.sleepHours !== getTodayMetric().sleepHours
-      || pulled.sleepQuality !== getTodayMetric().sleepQuality || pulled.restingHR !== getTodayMetric().restingHR;
+    const changed = pulled.weightKg !== before.weightKg || pulled.sleepHours !== before.sleepHours
+      || pulled.sleepQuality !== before.sleepQuality || pulled.restingHR !== before.restingHR;
     if (changed) setSynced(true);
     return changed;
   }, []);
@@ -62,7 +65,7 @@ export const CheckinMetricsCard: React.FC = () => {
       <div style={H}>📋 Чек-ин метрик тела</div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 10, color: DIM }}>
-          Ежедневная фиксация веса, сна, HRV, воды, шагов и самочувствия. Данные хранятся локально и питают тренды и аналитику.
+          Ежедневная фиксация веса, сна, HRV, воды, шагов и самочувствия. Вес/сон/пульс синхронизируются с дневниками Профиля (история подтягивается в тренды).
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {synced && (
@@ -71,7 +74,7 @@ export const CheckinMetricsCard: React.FC = () => {
             </span>
           )}
           <button onClick={pullDiaries} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            📥 Из дневников профиля
+            🔁 Синхронизировать с дневниками
           </button>
         </div>
       </div>
