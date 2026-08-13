@@ -320,6 +320,77 @@ describe('appendPLTaperWeeks', () => {
     expect(next.progressionRationale).toContain('mock meet');
   });
 
+  // ── Паритет стратегий: «Сбалансированная» (дефолт) не хуже новых ──
+  it('все 3 стратегии: mock meet имеет одинаковую структуру (неделя/прикиды-синглы/аксессуары ×0.5)', () => {
+    for (const strategy of ['conservative', 'balanced', 'aggressive'] as const) {
+      const plan = buildBase(6);
+      const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy } });
+      const mock = next.weeks[plan.weeks.length];
+      expect(mock.mockMeet).toBe(true);
+      expect(mock.meetAttempts).toBeDefined();
+      expect(mock.meetAttempts!.strategy).toBe(strategy);
+      expect(mock.meetAttempts!.lifts.length).toBeGreaterThan(0);
+      const compEx = mock.days.flatMap(d => d.exercises).find(e => /присед|жим лежа|становая/i.test(e.name));
+      expect(compEx).toBeDefined();
+      expect(compEx!.workSets).toHaveLength(3);
+      expect(compEx!.workSets.every(s => s.reps === 1 && s.sets === 1)).toBe(true);
+      expect(compEx!.workSets[2].rir).toBe(0);
+    }
+  });
+
+  it('все 3 стратегии: прикиды финальной тапер-недели на месте с корректными процентами', () => {
+    const pctMap = { conservative: 1.0, balanced: 1.02, aggressive: 1.05 } as const;
+    for (const strategy of ['conservative', 'balanced', 'aggressive'] as const) {
+      const plan = buildBase(6);
+      const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy } });
+      const last = next.weeks[next.weeks.length - 1];
+      expect(last.meetAttempts).toBeDefined();
+      expect(last.meetAttempts!.strategy).toBe(strategy);
+      const squat = last.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
+      const pm = last.pmRow[squat.name];
+      // Третья попытка = стратегия × ПМ (округление до 2.5 кг)
+      expect(squat.third).toBeCloseTo(Math.round(pm * pctMap[strategy] / 2.5) * 2.5, 5);
+      expect(squat.third).toBeGreaterThan(squat.opener);
+    }
+  });
+
+  it('все 3 стратегии: refreshMeetAttempts round-trip возвращает планы с той же структурой', () => {
+    for (const from of ['conservative', 'balanced', 'aggressive'] as const) {
+      for (const to of ['conservative', 'balanced', 'aggressive'] as const) {
+        const plan = buildBase(6);
+        const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: from }, mockMeet: { strategy: from } });
+        const refreshed = refreshMeetAttempts(next, to);
+        for (const wk of refreshed.weeks) {
+          if (wk.meetAttempts) {
+            expect(wk.meetAttempts.strategy).toBe(to);
+            expect(wk.meetAttempts.lifts.length).toBeGreaterThan(0);
+          }
+        }
+        expect(refreshed.weeks.length).toBe(next.weeks.length);
+      }
+    }
+  });
+
+  it('balanced: meetAttempts для финальной недели не хуже — третий вес > ПМ (102% > 100%)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'balanced' } });
+    const last = next.weeks[next.weeks.length - 1];
+    const squat = last.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
+    expect(squat.third).toBeGreaterThan(last.pmRow[squat.name]);
+    expect(squat.opener).toBeLessThan(last.pmRow[squat.name]);
+  });
+
+  it('balanced: разминка (MEET_WARMUP_STEPS) применима к опенеру любой стратегии', async () => {
+    const { MEET_WARMUP_STEPS, meetAttemptsFor } = await import('../competition-attempts');
+    for (const strategy of ['conservative', 'balanced', 'aggressive'] as const) {
+      const attempts = meetAttemptsFor(200, strategy);
+      const warmup = MEET_WARMUP_STEPS.map(p => Math.round(attempts.opener * p * 2) / 2);
+      expect(warmup.length).toBe(5);
+      expect(warmup[4]).toBeLessThan(attempts.opener); // 90% от опенера < опенера
+      expect(warmup.every(w => w > 0)).toBe(true);
+    }
+  });
+
   // ── Пересчёт прикидов (refreshMeetAttempts) ──
   it('refreshMeetAttempts: меняет стратегию на всех неделях с прикидами', () => {
     const plan = buildBase(6);
