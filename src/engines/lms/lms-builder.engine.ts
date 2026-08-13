@@ -113,6 +113,8 @@ export interface LMSPlanWeek {
   taperWeek?: boolean;
   /** Неделя имитации соревнований (mock meet) — прикиды как тренировочные синглы за 10-14 дней до старта. */
   mockMeet?: boolean;
+  /** Неделя соревнований в конце тапера — прикиды (опенер/вторая/третья) как подходы дня старта. */
+  meetWeek?: boolean;
   /** Прикиды соревновательного дня (выход на пик до 105%) — вешается на финальную тапер-неделю. */
   meetAttempts?: MeetAttemptsInfo;
 }
@@ -1347,6 +1349,9 @@ export function appendPLTaperWeeks(
      *  тапер-неделями, в которой основные движения выполняются как прикиды-синглы
      *  (опенер RIR2 → вторая RIR1 → третья RIR0), аксессуары — 50% объёма. */
     mockMeet?: { strategy?: MeetStrategy };
+    /** Неделя соревнований В КОНЦЕ (после тапер-недель): прикиды как подходы дня
+     *  старта (опенер/вторая/третья ×1), аксессуары — 50% объёма. */
+    meetWeek?: { strategy?: MeetStrategy };
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1428,7 +1433,7 @@ export function appendPLTaperWeeks(
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
     const week: LMSPlanWeek = {
-      week: nextWeekNum + (mockMeetOn ? 1 : 0) + idx,
+      week: nextWeekNum + offsetBefore + idx,
       pmRow,
       days,
       sourcePhase: 'peak' as MesocyclePhase,
@@ -1446,12 +1451,18 @@ export function appendPLTaperWeeks(
     return week;
   };
 
-  // ── Имитация соревнований (mock meet): прикиды как тренировочные синглы ──
-  const buildMockMeetWeek = (): LMSPlanWeek | null => {
-    const attempts = computeMeetAttemptsFromPmRow(last.pmRow, mockStrategy);
+  // ── Неделя прикидов (mock meet ИЛИ соревнования): прикиды как подходы ──
+  const buildAttemptsWeek = (idx: number, kind: 'mock' | 'meet'): LMSPlanWeek | null => {
+    const strategy = kind === 'mock' ? mockStrategy : meetStrategy;
+    const attempts = computeMeetAttemptsFromPmRow(last.pmRow, strategy);
     if (!attempts) return null;
     const liftByName = new Map(attempts.lifts.map(l => [norm(l.name), l]));
-    const pmRow: Record<string, number> = { ...last.pmRow };
+    // Прогрессия ПМ продолжается по курсу (как тапер-недели): +k за неделю.
+    const pmGrowth = Math.pow(1 + k, idx + 1);
+    const pmRow: Record<string, number> = {};
+    for (const [name, pm] of Object.entries(last.pmRow)) {
+      pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
+    }
     const days = last.days.map(d => {
       const exercises = d.exercises.map(e => {
         const lift = liftByName.get(norm(e.name));
@@ -1479,23 +1490,28 @@ export function appendPLTaperWeeks(
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
     return {
-      week: nextWeekNum,
+      week: nextWeekNum + idx,
       pmRow,
       days,
       sourcePhase: 'peak' as MesocyclePhase,
       sourcePhaseOrigin: 'inferred' as const,
       macroPhase: 'competition' as const,
-      mockMeet: true,
+      [kind === 'mock' ? 'mockMeet' : 'meetWeek']: true,
       meetAttempts: attempts,
     };
   };
 
   const mockMeetOn = !!opts?.mockMeet;
+  const meetWeekOn = !!opts?.meetWeek;
   const mockStrategy = opts?.mockMeet?.strategy ?? opts?.peakExit?.strategy ?? 'balanced';
+  const meetStrategy = opts?.meetWeek?.strategy ?? opts?.peakExit?.strategy ?? 'balanced';
   const peakStrategy = opts?.peakExit?.strategy ?? 'balanced';
-  const mockWeek = mockMeetOn ? buildMockMeetWeek() : null;
+  const offsetBefore = mockMeetOn ? 1 : 0;
   const extra: LMSPlanWeek[] = [];
-  if (mockWeek) extra.push(mockWeek);
+  if (mockMeetOn) {
+    const wk = buildAttemptsWeek(0, 'mock');
+    if (wk) extra.push(wk);
+  }
   for (let i = 0; i < taperWeeks; i++) {
     // Классическая taper-кривая (как applyPLTaper): последняя неделя ×0.45 RIR+2,
     // предпоследняя ×0.65 RIR+1; для более длинных — плавное снижение 0.9 → 0.45.
@@ -1503,6 +1519,10 @@ export function appendPLTaperWeeks(
     const volumeMult = Math.max(0.4, 0.9 - progress * 0.45);
     const rirAdd = i === taperWeeks - 1 ? 2 : 1;
     extra.push(buildTaperWeek(i, volumeMult, rirAdd));
+  }
+  if (meetWeekOn) {
+    const wk = buildAttemptsWeek(extra.length, 'meet');
+    if (wk) extra.push(wk);
   }
 
   const weeks = [...plan.weeks, ...extra];
@@ -1520,8 +1540,13 @@ export function appendPLTaperWeeks(
   const peakPct = MEET_STRATEGY_PCT_LABEL[peakStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced;
   const peakLabel = peakStrategy === 'aggressive' ? 'агрессивная' : peakStrategy === 'conservative' ? 'консервативная' : 'сбалансированная';
   const peakNote = ` 🏁 Выход на пик: прикиды соревновательного дня ${peakPct} от ПМ финальной недели (${peakLabel} стратегия).`;
-  const mockNote = mockWeek
-    ? ` 🎯 Имитация соревнований (mock meet): неделя ${mockWeek.week} — прикиды-синглы ${MEET_STRATEGY_PCT_LABEL[mockStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} от ПМ, аксессуары ×0.5.`
+  const mockWk = weeks.find(w => w.mockMeet);
+  const meetWk = weeks.find(w => w.meetWeek);
+  const mockNote = mockWk
+    ? ` 🎯 Имитация соревнований (mock meet): неделя ${mockWk.week} — прикиды-синглы ${MEET_STRATEGY_PCT_LABEL[mockStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} от ПМ, аксессуары ×0.5.`
+    : '';
+  const meetNote = meetWk
+    ? ` 🏁 Неделя соревнований: ${meetWk.week} — прикиды (${MEET_STRATEGY_PCT_LABEL[meetStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}) как подходы дня старта (опенер/вторая/третья ×1).`
     : '';
 
   // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
@@ -1539,6 +1564,7 @@ export function appendPLTaperWeeks(
     progressionRationale: plan.progressionRationale +
       ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).` +
       mockNote +
+      meetNote +
       peakNote +
       pedNote +
       (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),

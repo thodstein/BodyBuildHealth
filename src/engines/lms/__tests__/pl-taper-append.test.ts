@@ -320,6 +320,72 @@ describe('appendPLTaperWeeks', () => {
     expect(next.progressionRationale).toContain('mock meet');
   });
 
+  // ── Неделя соревнований в конце тапера (meetWeek) ──
+  it('meet week: добавляется ПОСЛЕ тапер-недель', () => {
+    const plan = buildBase(6);
+    const baseLen = plan.weeks.length;
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'aggressive' } });
+    expect(next.weeks.length).toBe(baseLen + 3);
+    const meet = next.weeks[next.weeks.length - 1];
+    expect(meet.meetWeek).toBe(true);
+    expect(meet.taperWeek).not.toBe(true);
+    expect(meet.meetAttempts).toBeDefined();
+    expect(next.weeks[baseLen].taperWeek).toBe(true);
+    expect(next.weeks[baseLen + 1].taperWeek).toBe(true);
+    expect(meet.week).toBeGreaterThan(next.weeks[baseLen + 1].week);
+  });
+
+  it('meet week: подходы = прикиды из карточек (опенер/вторая/третья ×1, третья RIR0)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'aggressive' } });
+    const meet = next.weeks[next.weeks.length - 1];
+    const squatEx = meet.days.flatMap(d => d.exercises).find(e => /присед/i.test(e.name));
+    expect(squatEx).toBeDefined();
+    const sets = squatEx!.workSets;
+    expect(sets).toHaveLength(3);
+    expect(sets.every(s => s.reps === 1 && s.sets === 1)).toBe(true);
+    const attempts = meet.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
+    expect(sets[0].weight).toBe(attempts.opener);
+    expect(sets[2].weight).toBe(attempts.third);
+    expect(sets[2].rir).toBe(0);
+    expect(sets[2].weight).toBeGreaterThan(meet.pmRow[squatEx!.name]); // 105% > ПМ
+  });
+
+  it('meet week: комбинация mock + taper + meet — порядок: mock → тапер → соревнования', () => {
+    const plan = buildBase(6);
+    const baseLen = plan.weeks.length;
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy: 'aggressive' }, meetWeek: { strategy: 'aggressive' } });
+    expect(next.weeks.length).toBe(baseLen + 4);
+    expect(next.weeks[baseLen].mockMeet).toBe(true);
+    expect(next.weeks[baseLen + 1].taperWeek).toBe(true);
+    expect(next.weeks[baseLen + 2].taperWeek).toBe(true);
+    expect(next.weeks[baseLen + 3].meetWeek).toBe(true);
+    expect(next.weeks[baseLen + 3].meetAttempts).toBeDefined();
+  });
+
+  it('meet week: стратегия по умолчанию = сбалансированная', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: {} });
+    const meet = next.weeks[next.weeks.length - 1];
+    expect(meet.meetAttempts!.strategy).toBe('balanced');
+  });
+
+  it('meet week: refreshMeetAttempts обновляет прикиды и на неделе соревнований', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' } });
+    const refreshed = refreshMeetAttempts(next, 'aggressive');
+    const meet = refreshed.weeks[refreshed.weeks.length - 1];
+    expect(meet.meetAttempts!.strategy).toBe('aggressive');
+    const squat = meet.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
+    expect(squat.third).toBeGreaterThan(meet.pmRow[squat.name]);
+  });
+
+  it('meet week: rationale упоминает неделю соревнований', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'aggressive' } });
+    expect(next.progressionRationale).toContain('Неделя соревнований');
+  });
+
   // ── Паритет стратегий: «Сбалансированная» (дефолт) не хуже новых ──
   it('все 3 стратегии: mock meet имеет одинаковую структуру (неделя/прикиды-синглы/аксессуары ×0.5)', () => {
     for (const strategy of ['conservative', 'balanced', 'aggressive'] as const) {
