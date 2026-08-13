@@ -67,6 +67,22 @@ describe('buildDayPlan — любимые продукты (все попада�
     expect(allDayIds(plan)).toContain('avocado');
   });
 
+  it('любимый рисовый крем попадает в ЗАВТРАК трен-дня (без цели >=60г)', () => {
+    // FIX favorite-breakfast: раньше любимый углевод добавлялся в пул только при carbTarget>=60,
+    // поэтому завтрак никогда не получал rice_cream (GI 82, не в commonCarbs)
+    const plan = buildDayPlan(baseInput({ preferredIds: new Set(['rice_cream']), isTrainingDay: true, goalCarbsG: 250 }));
+    const breakfast = plan.meals.find((m: any) => m.label === 'Завтрак');
+    expect(breakfast).toBeTruthy();
+    expect(breakfast!.items.map((it: any) => it.id)).toContain('rice_cream');
+  });
+
+  it('любимый углевод не монополизирует все приёмы (следующие приёмы — разнообразие)', () => {
+    const plan = buildDayPlan(baseInput({ preferredIds: new Set(['rice_cream']), isTrainingDay: true, goalCarbsG: 300 }));
+    const mealsWithRice = plan.meals.filter((m: any) => m.items.some((i: any) => i.id === 'rice_cream')).length;
+    expect(mealsWithRice).toBeGreaterThanOrEqual(1);
+    expect(mealsWithRice).toBeLessThan(plan.meals.length);
+  });
+
   it('любимый быстрый белок (egg_white) приоритетнее whey в post-workout', () => {
     const plan = buildDayPlan(baseInput({ preferredIds: new Set(['egg_white']) }));
     const postw = plan.meals.find((m: any) => m.label === 'Пост-трен');

@@ -269,12 +269,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [age, setAge] = useState(s?.age || 30);
   const [sex, setSex] = useState<'male' | 'female'>(s?.sex || 'male');
   const [dailySteps, setDailySteps] = useState(s?.dailySteps || 8000);
-  const [cookTimeMin, setCookTimeMin] = useState(60);
-  const [cravingMode, setCravingMode] = useState(false);
-  const [cravingDays, setCravingDays] = useState(1);
-  const [lazyDayMode, setLazyDayMode] = useState(false);
-  const [lazyDayDays, setLazyDayDays] = useState(1);
-  const [periodizationEnabled, setPeriodizationEnabled] = useState(false);
+  // FIX persist-settings: единый объект локальных предпочтений планировщика (he_planner_prefs).
+  // Раньше ~24 настройки (бюджет, режим, время приёмов, цикл фазы и т.д.) сбрасывались при
+  // перезагрузке — выбора пользователя не было ни в localStorage, ни в профиле.
+  const _plannerPrefsRef = useRef<Record<string, any>>({});
+  if (Object.keys(_plannerPrefsRef.current).length === 0) {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_planner_prefs') || 'null');
+      if (v && typeof v === 'object' && !Array.isArray(v)) _plannerPrefsRef.current = v;
+    } catch {}
+  }
+  const _pf = _plannerPrefsRef.current;
+  const [cookTimeMin, setCookTimeMin] = useState<number>(typeof _pf.cookTimeMin === 'number' ? _pf.cookTimeMin : 60);
+  const [cravingMode, setCravingMode] = useState<boolean>(!!_pf.cravingMode);
+  const [cravingDays, setCravingDays] = useState<number>(typeof _pf.cravingDays === 'number' ? _pf.cravingDays : 1);
+  const [lazyDayMode, setLazyDayMode] = useState<boolean>(!!_pf.lazyDayMode);
+  const [lazyDayDays, setLazyDayDays] = useState<number>(typeof _pf.lazyDayDays === 'number' ? _pf.lazyDayDays : 1);
+  const [periodizationEnabled, setPeriodizationEnabled] = useState<boolean>(!!_pf.periodizationEnabled);
   // P1-fix (Aug 5 2026): читаем из UnifiedSettings через proxy, а НЕ из мёртвого localStorage
   // (после миграции he_surplus_pct удалён → default). Реальное значение в profile.nutrition.surplusPct.
   const [surplusPct, setSurplusPct] = useState<number>(() => {
@@ -290,9 +301,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     return 10;
   });
-  const [trainType, setTrainType] = useState<'strength' | 'cardio' | 'mixed' | 'hiit'>('strength');
-  const [trainIntensity, setTrainIntensity] = useState<'low' | 'medium' | 'high'>('medium');
-  const [householdActivity, setHouseholdActivity] = useState<'sedentary' | 'light' | 'moderate' | 'active'>('light');
+  const [trainType, setTrainType] = useState<'strength' | 'cardio' | 'mixed' | 'hiit'>((['strength', 'cardio', 'mixed', 'hiit'] as const).includes(_pf.trainType as any) ? _pf.trainType : 'strength');
+  const [trainIntensity, setTrainIntensity] = useState<'low' | 'medium' | 'high'>((['low', 'medium', 'high'] as const).includes(_pf.trainIntensity as any) ? _pf.trainIntensity : 'medium');
+  const [householdActivity, setHouseholdActivity] = useState<'sedentary' | 'light' | 'moderate' | 'active'>((['sedentary', 'light', 'moderate', 'active'] as const).includes(_pf.householdActivity as any) ? _pf.householdActivity : 'light');
   const [bodyFatPct, setBodyFatPct] = useState<number>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings) через proxy
     try {
@@ -324,7 +335,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     return 5;
   });
-  const [cyclePhase, setCyclePhase] = useState<'none' | 'follicular' | 'ovulation' | 'luteal' | 'menstrual'>('none');
+  const [cyclePhase, setCyclePhase] = useState<'none' | 'follicular' | 'ovulation' | 'luteal' | 'menstrual'>((['none', 'follicular', 'ovulation', 'luteal', 'menstrual'] as const).includes(_pf.cyclePhase as any) ? _pf.cyclePhase : 'none');
   // P1-fix: читаем из UnifiedSettings (goals.bbCategory), а не из мёртвого he_bb_category
   const [bbCategory, setBBCategory] = useState<BBCategory>(() => {
     try {
@@ -374,10 +385,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return 'none';
   });
   useEffect(() => { try { updateSection('goals', { lifeStage }); } catch {} }, [lifeStage]);
-  const [hungerLevel, setHungerLevel] = useState(5);
-  const [weightAdaptMode, setWeightAdaptMode] = useState(false);
+  const [hungerLevel, setHungerLevel] = useState<number>(typeof _pf.hungerLevel === 'number' ? _pf.hungerLevel : 5);
+  const [weightAdaptMode, setWeightAdaptMode] = useState<boolean>(!!_pf.weightAdaptMode);
   const [weightLogWeek, setWeightLogWeek] = useState<number[]>([80, 80, 80]);
-  const [expectedLossKgWeek, setExpectedLossKgWeek] = useState(0.5);
+  const [expectedLossKgWeek, setExpectedLossKgWeek] = useState<number>(typeof _pf.expectedLossKgWeek === 'number' ? _pf.expectedLossKgWeek : 0.5);
   const [showWeightAdaptModal, setShowWeightAdaptModal] = useState(false);
   const [weightLogEntries, setWeightLogEntries] = useState<{ date: string; weight: number }[]>(() => {
     try {
@@ -402,7 +413,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     for (let i = 0; i < 3; i++) { const d = new Date(); d.setDate(d.getDate() - (2 - i)); e.push({ date: d.toISOString().split('T')[0], weight: 80 }); }
     return e;
   });
-  const [weightLogPeriod, setWeightLogPeriod] = useState('every3');
+  const [weightLogPeriod, setWeightLogPeriod] = useState<string>(typeof _pf.weightLogPeriod === 'string' ? _pf.weightLogPeriod : 'every3');
   useEffect(() => {
     try {
       // Канонический лог: обновляем weight у существующих записей, добавляем недостающие
@@ -423,9 +434,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     setWeightLogWeek(weightLogEntries.map(e => e.weight));
   }, [weightLogEntries]);
-  const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState(false);
-  const [metabolicAdaptPct, setMetabolicAdaptPct] = useState(10);
-  const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>('none');
+  const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState<boolean>(!!_pf.metabolicAdaptEnabled);
+  const [metabolicAdaptPct, setMetabolicAdaptPct] = useState<number>(typeof _pf.metabolicAdaptPct === 'number' ? _pf.metabolicAdaptPct : 10);
+  const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>((['none', 'refeed', 'flex_80_20', 'periodization_2_1', 'diet_5_2'] as const).includes(_pf.dietPauseMode as any) ? _pf.dietPauseMode : 'none');
   // P1-fix: manualGPerKg инициализируется из Profile (UnifiedSettings.nutrition.manualGPerKg) + legacy
   const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>(() => {
     try {
@@ -454,7 +465,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem("he_plan_month") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } });
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
-  const [phase, setPhase] = useState<PhaseId>('course');
+  const [phase, setPhase] = useState<PhaseId>((_pf.phase && (GOALS.some(g => g.id === _pf.phase) || PHASES.some(p => p.id === _pf.phase))) ? _pf.phase as PhaseId : 'course');
   const phaseToGoal: Record<PhaseId, GoalId> = { course: 'mass', bridge: 'maintenance', pct: 'maintenance', recovery: 'maintenance', cutting: 'cutting', maintenance: 'maintenance', recomp: 'recomposition', fat_loss: 'fat_loss', post_cut: 'post_cut' };
   const autoGoal = phaseToGoal[phase] || 'maintenance';
   const [goalUserSet, setGoalUserSet] = useState(false);
@@ -593,7 +604,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // the goal passed to the engine are the SAME number. Previously the engine built at
   // effectiveP*nutrMult while the UI displayed bare effectiveP -> at level 'Максимум' (1.5)
   // the plan read +50% / ~+100g protein over the displayed target.
-  const [nutrLevel, setNutrLevel] = useState<NutritionLevel>('base');
+  const [nutrLevel, setNutrLevel] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const effectiveKcal = Math.round((kbjuMode === 'profile' ? profileTargets.kcal : (manualKcal ?? calcTargets.kcal)) * _nutrMult);
   const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
@@ -604,8 +615,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
   const resultsRef = useRef<HTMLDivElement>(null);
-  const [budget, setBudget] = useState<BudgetLevel>('medium');
-  const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>('max');
+  const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
+  const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   // P1-fix: wakeTime/bedTime из Profile (UnifiedSettings.lifestyle.wakeTime/bedtime) + legacy
   const [wakeTime, setWakeTime] = useState<string>(() => {
     try {
@@ -621,9 +632,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     return '23:00';
   });
-  const [lunchTime, setLunchTime] = useState('13:00');
-  const [dinnerTime, setDinnerTime] = useState('19:00');
-  const [workFood, setWorkFood] = useState<'any' | 'portable'>('any');
+  const [lunchTime, setLunchTime] = useState<string>(typeof _pf.lunchTime === 'string' ? _pf.lunchTime : '13:00');
+  const [dinnerTime, setDinnerTime] = useState<string>(typeof _pf.dinnerTime === 'string' ? _pf.dinnerTime : '19:00');
+  const [workFood, setWorkFood] = useState<'any' | 'portable'>(_pf.workFood === 'portable' ? 'portable' : 'any');
   // P1-fix: mealsCount из Profile (UnifiedSettings.nutrition.mealsPerDay) + legacy
   const [mealsCount, setMealsCount] = useState<number>(() => {
     try {
@@ -668,7 +679,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
   }, [healthIssues]);
 
-  const [planType, setPlanType] = useState<PlanType>('classic');
+  const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
+  // FIX persist-settings: пишем все локальные предпочтения в he_planner_prefs (debounce не нужен —
+  // пишем на каждое изменение, объём крошечный). Раньше эти настройки не сохранялись вообще.
+  useEffect(() => {
+    try {
+      safeWriteJSON('he_planner_prefs', {
+        cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled,
+        trainType, trainIntensity, householdActivity, cyclePhase, hungerLevel,
+        weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct,
+        dietPauseMode, weightLogPeriod, phase, nutrLevel, budget, variety,
+        lunchTime, dinnerTime, workFood, planType,
+      });
+    } catch {}
+  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, trainType, trainIntensity, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, weightLogPeriod, phase, nutrLevel, budget, variety, lunchTime, dinnerTime, workFood, planType]);
   // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => {
     try {
