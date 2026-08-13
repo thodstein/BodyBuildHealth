@@ -242,7 +242,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         });
         overlay = new THREE.Mesh(baseMesh.geometry as THREE.BufferGeometry, overlayMat);
         overlay.renderOrder = 1;
-        model.add(overlay);
+        // ВАЖНО: overlay вешается на baseMesh (а не на group/model), иначе он НЕ наследует
+        // внутренние повороты/масштабы цепочки нод hulk.glb и рендерится второй, повёрнутой копией.
+        baseMesh.add(overlay);
 
         const applyColors = () => {
           if (!colorAttr || !zoneIdx.length) return;

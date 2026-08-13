@@ -251,7 +251,9 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         });
         overlay = new THREE.Mesh(baseMesh.geometry as THREE.BufferGeometry, overlayMat);
         overlay.renderOrder = 1;
-        model.add(overlay);
+        // ВАЖНО: overlay вешается на baseMesh (а не на group/model), иначе он НЕ наследует
+        // внутренние повороты/масштабы цепочки нод hulk.glb и рендерится второй, повёрнутой копией.
+        baseMesh.add(overlay);
 
         sceneRef.current = {
           camera, renderer, controls, animId: 0,
