@@ -18,6 +18,9 @@ export interface BBFatigueBudget {
   minSetsPerExercise?: number;
   maxExercises?: number;
   maxWorkingSets?: number;
+  /** MEV-guard: минимум рабочих сетов на упражнение по мышце (ceil(MEV/частота)).
+   *  Бюджет не режет ниже — иначе natural-планы получают deficit. */
+  minSetsByMuscle?: Record<string, number>;
 }
 
 function catalogType(exercise: BBExercise): string {
@@ -66,13 +69,15 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
   const maxExercises = Math.max(1, budget.maxExercises ?? 10);
   const maxWorkingSets = Math.max(1, budget.maxWorkingSets ?? 24);
   const removed: BBExercise[] = [];
+  // Нижняя граница сетов по мышце (MEV-guard): floor = max(minSets, guard мышцы).
+  const floorFor = (muscle: string): number => Math.max(minSets, budget.minSetsByMuscle?.[muscle] ?? minSets);
   const muscles = () => new Set(session.exercises.map(exercise => exercise.muscle));
   const exerciseSetCount = (exercise: BBExercise): number => Math.max(0, exercise.sets || exercise.workSets?.length || 0);
   const totalWorkingSets = (): number => session.exercises.reduce((sum, exercise) => sum + exerciseSetCount(exercise), 0);
   // Разминочное упражнение не входит в лимит упражнений и рабочий бюджет.
   const workingExercises = (): BBExercise[] => session.exercises.filter(exercise => !(exercise as any).warmupActivator);
   const syncSets = (exercise: BBExercise, sets: number): void => {
-    const target = Math.max(minSets, sets);
+    const target = Math.max(floorFor(exercise.muscle), sets);
     exercise.sets = target;
     const current = exercise.workSets || [];
     const template = current[current.length - 1] || {
@@ -97,7 +102,7 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     return finisher + accessory + isolation + normalizedSystemic + normalizedTime;
   };
   const reducible = (exercise: BBExercise): number => {
-    if (exercise.role === 'primary' || exerciseSetCount(exercise) <= minSets) return -Infinity;
+    if (exercise.role === 'primary' || exerciseSetCount(exercise) <= floorFor(exercise.muscle)) return -Infinity;
     const finisher = exercise.character === 'памп' || exercise.repsRange?.[0] >= 15 ? 20 : 0;
     const isolation = catalogType(exercise) === 'isolation' ? 10 : 0;
     return finisher + isolation + estimateBBExerciseCost(exercise).timeSeconds / 120;

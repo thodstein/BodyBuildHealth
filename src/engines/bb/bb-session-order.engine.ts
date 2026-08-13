@@ -242,7 +242,9 @@ const MUSCLE_EX_CAP: Record<string, number> = {
 
 // Keep at most N exercises per muscle in a session (anti-spam: 4 shrugs -> 2).
 // Ranks by primary role then heavier load; preserves original input order in output.
-export function capExercisesPerMuscle(exercises: BBExercise[]): BBExercise[] {
+// backCap: опытный enhanced (6+ лет) с про-объёмом спины получает до 6 паттернов —
+// cap 4 срезал бы vertical/lat-работу после allocation (паттерны, не сеты).
+export function capExercisesPerMuscle(exercises: BBExercise[], backCap = 4): BBExercise[] {
   const ranked = exercises.map((ex, i) => ({ ex, i }));
   ranked.sort((a, b) => {
     const ra = (a.ex.role === "primary" ? 0 : 1) - (b.ex.role === "primary" ? 0 : 1);
@@ -256,7 +258,7 @@ export function capExercisesPerMuscle(exercises: BBExercise[]): BBExercise[] {
   const keep = new Set<BBExercise>();
   for (const { ex } of ranked) {
     const m = ex.muscle || "";
-    const cap = MUSCLE_EX_CAP[m] ?? 4;
+    const cap = m === 'back' ? backCap : (MUSCLE_EX_CAP[m] ?? 4);
     if ((counts[m] || 0) >= cap) continue;
     counts[m] = (counts[m] || 0) + 1;
     keep.add(ex);
@@ -276,7 +278,8 @@ export function tidySessionExercises(
   sessionTag?: string,
   priorityMuscles?: string[],
   methodology?: SessionMethodology,
+  backCap?: number,
 ): BBExercise[] {
-  const capped = capExercisesPerMuscle(exercises);
+  const capped = capExercisesPerMuscle(exercises, backCap);
   return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: methodology || "compound_first", priorityMuscles });
 }

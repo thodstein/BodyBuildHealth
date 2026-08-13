@@ -1259,6 +1259,19 @@ function buildSession(
     if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
     sets = Math.round(sets * getPhaseVolumeMult(phase));
+    // MEV-гарантия на этапе распределения: мышца не опускается ниже MEV/частота
+    // в рабочей фазе (иначе natural-планы получают deficit, а fill не может
+    // добавить — сессии на лимите). Deload — исключение (восстановление).
+    if (phase !== 'deload') {
+      const mevGuard = getVolumeLandmarks(level, muscle)?.mev ?? 0;
+      if (mevGuard > 0 && sessionsForMuscle > 0) {
+        const perSessionMeV = Math.max(2, Math.ceil(mevGuard / sessionsForMuscle));
+        if (sets < perSessionMeV) sets = perSessionMeV;
+      }
+    }
+    // Про-правило: максимум 5 рабочих сетов на упражнение (объём добивается
+    // дополнительными упражнениями/паттернами, а не 6-8 подходами в одном).
+    if (sets > 5) sets = 5;
     // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D)
     if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
     // P1: reps/tempo/rest берутся из PHASE_CONFIGS[phase] — единый источник правды.
@@ -3005,10 +3018,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
   const fTempo = tempoFor('памп', undefined, phaseByWeek.get(wk1.week) || 'accumulation');
   const need = Math.max(2, targetMEV - weekSets);
-      // P1-5: если need > perExCap (6 для calves/abs/forearms, 8 для остальных) — разбить на 2 упражнения.
-      const perExCapM = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
+      // P1-5: максимум 5 сетов на одно упражнение (про-объём добивается
+      // упражнениями, а не 6-8 подходами в одном движении); остаток — вторым.
+      const perExCapM = 5;
       const useTwoEx = need > perExCapM && feederPool.length >= 2;
-      const setsPerEx = useTwoEx ? Math.ceil(need / 2) : need;
+      const setsPerEx = useTwoEx ? Math.ceil(need / 2) : Math.min(need, perExCapM);
       const fData = feederPool[0];
       const fName = fData.name || fData.id;
       const fData2 = useTwoEx ? feederPool[1] : null;

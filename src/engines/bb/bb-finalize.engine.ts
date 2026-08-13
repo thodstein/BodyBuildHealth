@@ -13,6 +13,97 @@ import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise } from './bb-back-quality.engine';
+import { WEAK_TO_MUSCLE } from './bb-builder.engine';
+
+/** Слабая подгруппа → обязательный функциональный паттерн (специализация:
+ *  не просто больше сетов, а целевое упражнение под слабое место). */
+const WEAK_PATTERN_REQ: Record<string, RegExp> = {
+  chest_upper: /жим.*(наклонн|incline)|(наклонн|incline).*жим/i,
+  chest_mid: /жим лёжа|жим.*лёж|bench/i,
+  chest_lower: /жим.*(нижн|decline)|decline.*press|брус|dip/i,
+  back_width: /подтяг|верхн.*блок|lat.?pull|пуловер|прям.*рук/i,
+  back_thickness: /тяга|row/i,
+  upper_back: /лиц.*тяга|face.?pull|тяга.*груд|upper.?back/i,
+  rear_delts: /обратн|rear|задн.*дельт|лиц.*тяга|face.?pull/i,
+  traps: /шраг|shrug/i,
+  quads: /присед|жим.*ног|leg.?press|разгибан.*ног/i,
+  hamstrings: /сгибан.*ног|румын|rdl|гудморнинг|good.?morning/i,
+  glutes: /мост|hip.?thrust|отведен.*бедр|abduction|kick.?back/i,
+  calves: /носк|calf/i,
+  delt_mid: /мах|lateral|отведен.*рук/i,
+  delt_front: /жим.*стоя|жим.*сидя|армейск|front.?raise|перед.*собой/i,
+  delt_rear: /обратн|rear|задн.*дельт|лиц.*тяга|face.?pull/i,
+  biceps: /сгибан|curl/i,
+  triceps: /разгибан|pushdown|француз|french|жим.*узк|close.?grip/i,
+  forearms: /запяст|wrist|зоттман/i,
+  abs: /скручиван|crunch|подъём.*ног/i,
+  lower_back: /гиперэкстенз|back.?extension/i,
+};
+
+/**
+ * Специализация/слабые группы: гарантирует целевой паттерн для каждой слабой
+ * подгруппы в релевантной сессии. Не просто больше сетов — конкретное
+ * упражнение под слабое место (chest_upper → наклонный жим, back_width →
+ * вертикальная тяга и т.д.). Заменяет непрофильную изоляцию; при отсутствии
+ * слотов добавляет 3 сета памп (в пределах лимитов сессии).
+ */
+function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const weakPoints = options.priorityMuscles || [];
+  if (!weakPoints.length) return;
+      const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+  for (const wp of weakPoints) {
+    const pattern = WEAK_PATTERN_REQ[wp];
+    if (!pattern) continue;
+    const canonical = WEAK_TO_MUSCLE[wp] || wp;
+        const hasAny = working.some((e: any) => (e.muscle || '') === canonical);
+    if (!hasAny) continue; // сессия не релевантна слабой группе
+    // Паттерн проверяем ТОЛЬКО на упражнениях canonical мышцы (иначе «Тяга
+    // штанги в наклоне» или «Подъём на наклонной скамье» ловят чужие regex).
+    const canonicalItems = working.filter((e: any) => (e.muscle || '') === canonical);
+    if (canonicalItems.some((e: any) => pattern.test(e.name || ''))) continue; // паттерн уже есть
+    // Замена: непрофильная изоляция слабой мышцы → целевой паттерн. Если
+    // изоляций нет (все жимы primary) — заменяем второй primary (не главный
+    // compound), чтобы слабая подгруппа получила целевое движение.
+    const slot = canonicalItems.find((e: any) => e.role === 'accessory' && !pattern.test(e.name || ''))
+      || canonicalItems.filter((e: any) => e.role === 'primary' && !pattern.test(e.name || '')).slice(1)[0];
+        if (slot) {
+      const candidate = EXERCISE_CATALOG.find((x: any) => {
+        if (trueMuscleOf(x) !== canonical) return false;
+        if (!pattern.test(x.name || '')) return false;
+        if (working.some((e: any) => e.name === x.name)) return false;
+        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+        return true;
+      });
+      if (candidate) {
+        slot.name = candidate.name;
+        slot.exerciseName = candidate.name;
+        // Целевое движение слабой группы защищено от budget-фита (не удаляется).
+        slot.role = 'primary';
+        slot.rationale = `Специализация: слабая «${wp}» → ${candidate.name}`;
+      }
+      continue;
+    }
+    // Нет слотов — добавляем, если позволяет лимит упражнений сессии.
+    const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+    if (working.length >= maxEx) continue;
+    const candidate = EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== canonical) return false;
+      if (!pattern.test(x.name || '')) return false;
+      if (working.some((e: any) => e.name === x.name)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      return true;
+    });
+    if (!candidate) continue;
+    const baseWeight = options.workMax?.[canonical] || 50;
+    session.exercises.push({
+      muscle: canonical, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+      sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
+      workSets: Array.from({ length: 3 }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.35 * 10) / 10, restSeconds: 60 })),
+      rationale: `Специализация: слабая «${wp}» → ${candidate.name} (памп 3×12-18)`,
+    });
+  }
+}
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
 
@@ -45,7 +136,7 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
     keep.add(item.exercise);
   }
   session.exercises = session.exercises.filter(exercise => keep.has(exercise));
-}
+  }
 
 /**
  * Финальная раскладка back-бюджета для experienced enhanced.
@@ -58,8 +149,25 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
   // FullBody уже планирует back штатно через buildSession; дополнительный
   // allocation здесь вытесняет ноги/руки/плечи из остальных FullBody-сессий.
   if (!/^(Upper|UpperPower|UpperHyp|Pull|Back|ChestBack|Torso)$/i.test(session.sessionTag || '')) return;
+    // Чередование тяж/памп для про: нечётный день — тяж (horizontal rows 4-5×6-10
+  // RIR 1-2, механическое напряжение); чётный — памп (vertical + lat-изоляции
+  // 3-4×12-18 RIR 3, метаболический стресс).
+  const heavyDay = (session.day ?? 1) % 2 === 1;
 
-  let current: any[] = session.exercises.filter((e: any) => e.muscle === 'back');
+  let current: any[] = session.exercises.filter((e: any) => e.muscle === 'back' && !(e as any).warmupActivator);
+  // Переработка существующих back-упражнений под характер дня (тяж/памп).
+  for (const e of current) {
+    if (heavyDay) {
+      e.character = 'тяж';
+      e.rir = Math.min(e.rir ?? 2, 2);
+      e.repsRange = [6, 10];
+    } else {
+      e.character = 'памп';
+      e.rir = 3;
+      e.repsRange = [12, 18];
+      if (e.sets > 4) { e.sets = 4; e.workSets = e.workSets.slice(0, 4); }
+    }
+  }
   // В adapt библиотечная FullBody-программа может вообще не содержать back
   // после исходной фильтрации. Добавляем back-блок только в каждую вторую
   // подходящую сессию, чтобы не превратить FullBody в ежедневный Pull-день.
@@ -83,6 +191,12 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
   const isFullBody = /FullBody/i.test(session.sessionTag || '');
   const targetExercises = isFullBody ? 3 : (years >= 6 ? 6 : 5);
   const targetSets = isFullBody ? 12 : (years >= 6 ? 22 : 18);
+  // Чередование тяж/памп для про: нечётный день — тяж (horizontal rows 4-5×6-10
+  // RIR 1-2, механическое напряжение); чётный — памп (vertical + lat-изоляции
+  // 3-4×12-18 RIR 3, метаболический стресс). Паттерны в памп-день не тяжёлые.
+  const patternOrder = heavyDay
+    ? ['heavy_row', 'supported_row', 'unilateral_row', 'vertical_pull', 'lat_isolation', 'upper_back']
+    : ['vertical_pull', 'lat_isolation', 'upper_back', 'heavy_row', 'supported_row', 'unilateral_row'];
   const usedNames = new Set(current.map(e => e.name));
   const usedPatterns = new Set(current.map(e => annotateBackExercise(e).movementPattern));
   const template = current[0];
@@ -106,8 +220,9 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
 
   // Приоритет: закрыть разные функциональные классы, а не набрать ещё один
   // верхний блок. Каталог остаётся источником реального названия упражнения.
-  const wanted = ['heavy_row', 'supported_row', 'vertical_pull', 'unilateral_row', 'lat_isolation', 'upper_back'];
-  for (const wantedPattern of wanted) {
+  // В памп-день вертикальные тяги/лат-изоляции получают приоритет над тяжёлыми
+  // горизонтальными тягами (чередование тяж/памп).
+  for (const wantedPattern of patternOrder) {
     if (current.length >= targetExercises) break;
     if (usedPatterns.has(wantedPattern)) continue;
     const candidate = EXERCISE_CATALOG.find((x: any) => allowed(x) && annotateBackExercise({ ...template, name: x.name } as any).movementPattern === wantedPattern);
@@ -120,8 +235,18 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
     added.backSubgroup = tagged.backSubgroup;
     added.role = 'primary';
     added.sets = Math.max(3, Math.min(5, template.sets || 4));
-    const sample = template.workSets?.[template.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
-    added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
+    // Тяж-день: rows тяжёлые (6-10 reps). Памп-день: vertical/lat лёгкие (12-18).
+    if (!heavyDay) {
+      added.character = 'памп';
+      added.rir = 3;
+      added.repsRange = [12, 18];
+      const sample = template.workSets?.[template.workSets.length - 1] || { reps: 15, rir: 3, weight: 0 };
+      added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 15, rir: 3 }));
+    } else {
+      added.character = 'тяж';
+      added.rir = Math.min(added.rir ?? 2, 2);
+      added.repsRange = [6, 10];
+    }
     session.exercises.push(added);
     current.push(added);
     usedNames.add(candidate.name);
@@ -132,7 +257,7 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
   // выбранных реальных движениях до profile target.
   let total = current.reduce((sum, e) => sum + (e.sets || 0), 0);
   for (const exercise of current) {
-    while (total < targetSets && exercise.sets < 8) {
+    while (total < targetSets && exercise.sets < 5) {
       const sample = exercise.workSets?.[exercise.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
       exercise.sets += 1;
       exercise.workSets.push({ ...sample });
@@ -140,7 +265,41 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
     }
     if (total >= targetSets) break;
   }
-}
+  // Cap 5 сетов/упражнение: если target не достигнут (22-18 сетов), добираем
+  // ДОПОЛНИТЕЛЬНЫМ упражнением (а не 6-8 подходами в одном движении).
+  if (total < targetSets && current.length < targetExercises) {
+    for (const candidate of EXERCISE_CATALOG) {
+      if (total >= targetSets || current.length >= targetExercises) break;
+      if (!allowed(candidate)) continue;
+      if (usedNames.has(candidate.name)) continue;
+      const candidatePattern = annotateBackExercise({ ...template, name: candidate.name } as any).movementPattern;
+      if (usedPatterns.has(candidatePattern)) continue;
+      const added: any = structuredClone(template);
+      added.name = candidate.name;
+      added.exerciseName = candidate.name;
+      added.movementPattern = candidatePattern;
+      added.backSubgroup = annotateBackExercise({ ...template, name: candidate.name } as any).backSubgroup;
+      added.role = 'primary';
+      added.sets = Math.min(5, Math.max(3, targetSets - total));
+      if (!heavyDay) {
+        added.character = 'памп';
+        added.rir = 3;
+        added.repsRange = [12, 18];
+      } else {
+        added.character = 'тяж';
+        added.rir = Math.min(added.rir ?? 2, 2);
+        added.repsRange = [6, 10];
+      }
+      const sample = template.workSets?.[template.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+      added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
+      session.exercises.push(added);
+      current.push(added);
+      usedNames.add(candidate.name);
+      usedPatterns.add(candidatePattern);
+      total += added.sets;
+    }
+  }
+  }
 
 /** Гарантирует direct arm-блок после indirect overlap и поздних cap-pass. */
 function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions): void {
@@ -154,7 +313,7 @@ function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions)
   // В Upper одновременно доступны оба бюджета; в Pull/Push — соответствующий.
   if (total < targetSets && existing.length) {
     const exercise = existing[0];
-    while (total < targetSets && exercise.sets < 8) {
+    while (total < targetSets && exercise.sets < 5) {
       const sample = exercise.workSets?.[exercise.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
       exercise.sets += 1;
       exercise.workSets.push({ ...sample });
@@ -174,7 +333,8 @@ function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions)
   const candidate = candidates.find((e: any) => !session.exercises.some((x: any) => x.name === e.name));
   if (!candidate) return;
   const baseWeight = options.workMax?.[targetMuscle] || 40;
-  const sets = targetSets - total;
+  // Минимум 2 рабочих сета на упражнение (валидатор single_work_set).
+  const sets = Math.min(5, Math.max(2, targetSets - total));
   session.exercises.push({
     muscle: targetMuscle,
     name: candidate.name,
@@ -191,62 +351,216 @@ function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions)
   });
 }
 
-function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions): void {
-  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
-  if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) return;
-  const legAllocationEnabled = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
-  if (!legAllocationEnabled) return;
-  const targets: Record<string, number> = (options.trainingYears ?? 0) >= 6
-    ? { quads: 16, hamstrings: 16, glutes: 12 }
-    : { quads: 12, hamstrings: 12, glutes: 10 };
-  for (const [muscle, target] of Object.entries(targets)) {
-    // allocation is intentionally post-budget; no shared fatigue cap here
-    let items: any[] = session.exercises.filter((e: any) => e.muscle === muscle);
-    if (!items.length) {
-      const candidate = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === muscle && !options.excludedExercises?.includes(x.id) && !options.excludedExercises?.includes(x.name));
-      if (!candidate) continue;
-      const added: any = {
-        muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
-        sets: 4, repsRange: [10, 15], rir: 3, restSeconds: 75, warmupSets: [],
-        workSets: Array.from({ length: 4 }, () => ({ reps: 12, rir: 3, weight: 0, restSeconds: 75 })),
-        rationale: `Experienced enhanced: ${muscle} direct leg allocation`,
-      };
-      session.exercises.push(added);
-      items = [added];
-    }
-    let total = items.reduce((n, e) => n + (e.sets || 0), 0);
+/**
+ * Ноги 2×/нед (PPL, UL, 8-дневный и др.): день 1 (нечётный) — тяжёлый quads
+ * + памповый hamstrings; день 2 (чётный) — тяжёлый hamstrings + памповый quads.
+ * Тяжёлый блок: compound 4-5 сетов × 6-10 + второй паттерн (quads → жим ногами
+ * предпочтительно, hams → leg curl/RDL) 3-5 сетов; остаток — памп-изоляция.
+ * Максимум 5 сетов на одно упражнение (про-объём добивается упражнениями,
+ * а не 7-8 подходами в одном движении).
+ */
+function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: string, target: number, heavyQuads: boolean): void {
+  let items: any[] = session.exercises.filter((e: any) => e.muscle === muscle && !(e as any).warmupActivator);
+  // Тяж-день: все существующие compound-упражнения мышцы становятся тяжёлыми
+  // (6-10 reps, RIR ≤2); изоляции не трогаем (они — памп-добивка шага 3).
+  if (heavyQuads || true) {
     for (const e of items) {
-      while (total < target && e.sets < 8) {
-        const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
-        e.sets += 1; e.workSets.push({ ...sample }); total += 1;
-      }
-      if (total >= target) break;
+      const p = classifyLegExercise(e.name).pattern;
+      const isCompound = p === 'compound_squat' || p === 'lunge' || p === 'belt_stepup' || p === 'sissy_lengthened' || p === 'rdl_hinge' || /присед|жим.*ног|leg.?press|хак|hack|выпад|lunge|румын|rdl|гудморнинг|мёртв/i.test(e.name);
+      if (!isCompound) continue;
+      e.character = 'тяж';
+      e.rir = Math.min(e.rir ?? 2, 2);
+      e.repsRange = [6, 10];
     }
-    if (total >= target) continue;
-    const used = new Set(items.map(e => e.name));
-    const usedPatterns = new Set(items.map((e: any) => classifyLegExercise(e.name).pattern));
-    for (const candidate of EXERCISE_CATALOG) {
-      if (total >= target || trueMuscleOf(candidate) !== muscle || used.has(candidate.name)) continue;
-      // Не дублируем функциональный паттерн: два hip thrust в одну тренировку
-      // для glutes — это ошибка (нужен hip thrust + kickback/abduction).
-      const candidatePattern = classifyLegExercise(candidate.name).pattern;
-      if (usedPatterns.has(candidatePattern)) continue;
-      const base: any = items[0];
+  }
+  const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+  };
+  const findCatalog = (pred: (c: any) => boolean) => EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pred(c));
+
+  // 1. Primary compound: присед (quads) / RDL (hamstrings). Тяжёлая нагрузка.
+  const compoundKey = muscle === 'quads' ? /присед|squat|хак|hack|гакк|фронт/i : /румын|rdl|гудморнинг|good.?morning|мёртв.*прям/i;
+  let compound = items.find((e: any) => classifyLegExercise(e.name).pattern === 'compound_squat' || (muscle === 'hamstrings' && /румын|rdl|гудморнинг/i.test(e.name)));
+  if (!compound && muscle === 'hamstrings') compound = items.find((e: any) => /румын|rdl|гудморнинг|мёртв/i.test(e.name));
+  if (!compound) {
+    const candidate = findCatalog((c: any) => compoundKey.test(c.name || ''));
+    if (candidate) {
+      const wm = options.workMax?.[muscle] || 80;
+      const added: any = {
+        muscle, name: candidate.name, exerciseName: candidate.name, role: 'primary', character: 'тяж',
+        sets: 5, repsRange: [6, 10], rir: 2, restSeconds: 150, warmupSets: [],
+        workSets: Array.from({ length: 5 }, () => ({ reps: 8, rir: 2, weight: Math.round(wm * 0.7 * 10) / 10, restSeconds: 150 })),
+        rationale: `Experienced enhanced: тяжёлый ${muscle} compound (день ${heavyQuads ? 'quads' : 'hamstrings'})`,
+      };
+      session.exercises.push(added); items.push(added);
+      compound = added;
+    }
+  } else if (compound && !compound.warmupActivator) {
+    // Уже есть compound — доводим до 5 сетов и ставим тяжёлый характер.
+    compound.character = 'тяж';
+    compound.rir = Math.min(compound.rir ?? 2, 2);
+    compound.repsRange = [6, 10];
+    while (compound.sets < 5 && compound.workSets.length < 5) {
+      const sample = compound.workSets?.[compound.workSets.length - 1] || { reps: 8, rir: 2, weight: 0 };
+      compound.workSets.push({ ...sample }); compound.sets += 1;
+    }
+  }
+  let total = items.reduce((n, e) => n + (e.sets || 0), 0);
+
+  // 2. Второй паттерн: quads → жим ногами (приоритет пользователя); hams → leg curl / RDL.
+  const usedPatterns = new Set(items.map((e: any) => classifyLegExercise(e.name).pattern));
+  const usedNames = new Set(items.map((e: any) => e.name));
+  const hasLegPress = items.some((e: any) => /жим.*ног|leg.?press|хак|hack/i.test(e.name));
+  const hasCurl = items.some((e: any) => classifyLegExercise(e.name).pattern === 'leg_curl');
+  let second: any = null;
+  if (muscle === 'quads' && !hasLegPress && items.length < 4) {
+    second = findCatalog((c: any) => /жим.*ног|leg.?press/i.test(c.name || '') && !usedNames.has(c.name));
+    if (!second) second = findCatalog((c: any) => /хак|hack/i.test(c.name || '') && !usedNames.has(c.name));
+  } else if (muscle === 'hamstrings' && !hasCurl && items.length < 4) {
+    second = findCatalog((c: any) => /сгибан.*ног|leg.?curl/i.test(c.name || '') && !usedNames.has(c.name));
+  } else if (items.length < 4) {
+    second = findCatalog((c: any) => !usedNames.has(c.name) && !usedPatterns.has(classifyLegExercise(c.name).pattern));
+  }
+  if (second) {
+    const base = compound || items[0];
+    const added: any = structuredClone(base);
+    added.name = second.name; added.exerciseName = second.name; added.role = 'accessory'; added.character = 'тяж';
+    added.sets = Math.min(5, Math.max(3, target - total));
+    added.repsRange = [8, 12]; added.rir = 2; added.restSeconds = 120;
+    const sample = base?.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
+    added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 10, rir: 2, restSeconds: 120 }));
+    added.rationale = `Experienced enhanced: второй паттерн ${muscle} (${second.name})`;
+    session.exercises.push(added); items.push(added); usedNames.add(second.name); total += added.sets;
+  }
+
+  // 3. Остаток до target — памп-изоляция мышцы (max 5 сетов на упражнение).
+  if (total < target) {
+    const pumpKey = muscle === 'quads' ? /разгибан.*ног|leg.?extension/i : /сгибан.*ног|leg.?curl/i;
+    const pump = findCatalog((c: any) => pumpKey.test(c.name || '') && !usedNames.has(c.name)) || findCatalog((c: any) => !usedNames.has(c.name) && !usedPatterns.has(classifyLegExercise(c.name).pattern));
+    if (pump) {
+      const base = items[0];
       const added: any = structuredClone(base);
-      added.name = candidate.name; added.exerciseName = candidate.name; added.role = 'accessory';
-      added.sets = Math.min(4, target - total);
-      const sample = base.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
-      added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
-      session.exercises.push(added); items.push(added); used.add(candidate.name); usedPatterns.add(candidatePattern); total += added.sets;
+      added.name = pump.name; added.exerciseName = pump.name; added.role = 'accessory'; added.character = 'памп';
+      added.sets = Math.min(5, Math.min(4, target - total));
+      added.repsRange = [12, 18]; added.rir = 3; added.restSeconds = 60;
+      const sample = base?.workSets?.[0] || { reps: 15, rir: 3, weight: 0 };
+      added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 15, rir: 3, restSeconds: 60 }));
+      added.rationale = `Experienced enhanced: памп-добивка ${muscle} (растянутая позиция)`;
+      session.exercises.push(added); items.push(added); total += added.sets;
+    }
+  }
+  // 4. Только для 6+ лет: ещё одно упражнение, если target большой (16 сетов).
+  if (total < target && (options.trainingYears ?? 0) >= 6 && items.length < 5) {
+    const extra = findCatalog((c: any) => !usedNames.has(c.name));
+    if (extra) {
+      const base = items[0];
+      const added: any = structuredClone(base);
+      added.name = extra.name; added.exerciseName = extra.name; added.role = 'accessory'; added.character = 'памп';
+      added.sets = Math.min(5, Math.min(3, target - total));
+      added.repsRange = [10, 15]; added.rir = 2; added.restSeconds = 90;
+      const sample = base?.workSets?.[0] || { reps: 12, rir: 2, weight: 0 };
+      added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 12, rir: 2, restSeconds: 90 }));
+      added.rationale = 'Experienced enhanced 6+: дополнительное leg-упражнение (5-сетовый потолок)';
+      session.exercises.push(added); total += added.sets;
     }
   }
 }
 
+/** Памп-блок пассивной мышцы ног (hamstrings в quads-день и наоборот): 4×12-15.
+ *  Существующие compound-упражнения памп-мышцы перерабатываются в лёгкий памп
+ *  (≤3 сета, 12-20 reps, RIR 3) — в памп-день не должно быть тяжёлой работы. */
+function ensureLegPumpBlock(session: any, options: BBFinalizeOptions, muscle: string, target: number): void {
+  const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+  };
+  const existing = session.exercises.filter((e: any) => e.muscle === muscle && !(e as any).warmupActivator);
+  for (const e of existing) {
+    // Памп-мышца: любое упражнение становится лёгким (12-20 reps, RIR 3, ≤4 сета).
+    e.character = 'памп';
+    e.rir = 3;
+    e.repsRange = [12, 20];
+    if (e.sets > 4) { e.sets = 4; e.workSets = e.workSets.slice(0, 4); }
+    if (e.workSets?.length && e.workSets.length > 4) e.workSets = e.workSets.slice(0, 4);
+  }
+  if (existing.some((e: any) => classifyLegExercise(e.name).pattern === 'leg_curl' || /сгибан.*ног/i.test(e.name))) return;
+  const key = muscle === 'quads' ? /разгибан.*ног|leg.?extension/i : /сгибан.*ног|leg.?curl/i;
+  const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && key.test(c.name || ''));
+  if (!candidate) return;
+  const baseWeight = options.workMax?.[muscle] || 50;
+  const sets = Math.min(4, target);
+  session.exercises.push({
+    muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+    sets, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
+    workSets: Array.from({ length: sets }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 60 })),
+    rationale: `Experienced enhanced: памповый ${muscle} (день ${muscle === 'quads' ? 'hamstrings' : 'quads'})`,
+  });
+}
+
+/** Glutes: тяжёлый hip thrust в quads-день, памп-отведение в hamstrings-день. */
+function ensureGlutesBlock(session: any, options: BBFinalizeOptions, target: number, heavyQuads: boolean): void {
+  const existing = session.exercises.filter((e: any) => e.muscle === 'glutes' && !(e as any).warmupActivator);
+  const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+  };
+  if (existing.some((e: any) => /мост|hip.?thrust|glute.?bridge/i.test(e.name))) {
+    // Доводим существующий hip thrust до 5 сетов (тяж).
+    const thrust = existing.find((e: any) => /мост|hip.?thrust|glute.?bridge/i.test(e.name));
+    if (thrust && heavyQuads) {
+      thrust.character = 'тяж';
+      while (thrust.sets < 5 && thrust.workSets.length < 5) {
+        const sample = thrust.workSets?.[thrust.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+        thrust.workSets.push({ ...sample }); thrust.sets += 1;
+      }
+    }
+    return;
+  }
+  const pattern = heavyQuads ? /мост|hip.?thrust|glute.?bridge/i : /отведен.*бедр|abduction|kick.?back|ягодичн.*отвед|мах.*ног/i;
+  const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === 'glutes' && !used(c) && equipmentOk(c) && pattern.test(c.name || ''));
+  if (!candidate) return;
+  const baseWeight = options.workMax?.glutes || 60;
+  const sets = heavyQuads ? Math.min(5, target) : Math.min(4, target);
+  session.exercises.push({
+    muscle: 'glutes', name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: heavyQuads ? 'тяж' : 'памп',
+    sets, repsRange: heavyQuads ? [8, 12] : [12, 18], rir: heavyQuads ? 2 : 3, restSeconds: heavyQuads ? 120 : 60, warmupSets: [],
+    workSets: Array.from({ length: sets }, () => ({ reps: heavyQuads ? 10 : 15, rir: heavyQuads ? 2 : 3, weight: Math.round(baseWeight * (heavyQuads ? 0.5 : 0.25) * 10) / 10, restSeconds: heavyQuads ? 120 : 60 })),
+    rationale: `Experienced enhanced: glutes ${heavyQuads ? 'тяж (hip thrust)' : 'памп (отведение)'}`,
+  });
+}
+
+function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) return;
+  const years = options.trainingYears ?? 0;
+  // Ноги 2×/нед: нечётный день = тяж quads + памп hams; чётный = тяж hams + памп quads.
+  const heavyQuads = (session.day ?? 1) % 2 === 1;
+  const heavyMuscle = heavyQuads ? 'quads' : 'hamstrings';
+  const pumpMuscle = heavyQuads ? 'hamstrings' : 'quads';
+  const heavyTarget = years >= 6 ? 16 : 12;
+  ensureLegHeavyBlock(session, options, heavyMuscle, heavyTarget, heavyQuads);
+  ensureLegPumpBlock(session, options, pumpMuscle, 4);
+  ensureGlutesBlock(session, options, years >= 6 ? 12 : 10, heavyQuads);
+  // Повторная переработка памп-мышцы: поздние добавления (добивки) тоже
+  // становятся лёгкими (12-20 reps, RIR 3) — в памп-день нет тяжёлой работы.
+  ensureLegPumpBlock(session, options, pumpMuscle, 4);
+}
+
 /** Гарантирует в Push/Chest-дне грудь с разными углами, а не 4 одинаковых жима.
- *  Также не допускает rear delt в Push-днях (rear delt — Pull-работа). */
+ *  Также не допускает rear delt в Push-днях (rear delt — Pull-работа).
+ *  Для enhanced: чередование тяж/памп по дню (нечётный — тяж: жим 4-5×6-10
+ *  RIR 1-2; чётный — памп: 3-4×10-15 + fly/кроссовер 3×12-18). */
 function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
   if (!/^(Push|Chest|ChestBack|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) return;
+  // Задняя дельта не работает в Push-дне (rear delt — тяговая мышца, идёт со спиной).
   const rearDelt = session.exercises.find((e: any) => e.muscle === 'shoulders' && /обратн|rear|задн.*дельт|задн.*пуч/i.test(e.name));
   if (rearDelt) {
     const lateral = EXERCISE_CATALOG.find((x: any) => {
@@ -257,15 +571,27 @@ function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptio
       return true;
     });
     if (lateral) {
-      const sample = rearDelt.workSets?.[0] || { reps: 12, rir: 3, weight: 0 };
       rearDelt.name = lateral.name;
       rearDelt.exerciseName = lateral.name;
-      rearDelt.workSets = rearDelt.workSets.map((set: any) => ({ ...set }));
-      rearDelt.rationale = `${rearDelt.rationale || ''} Адаптация: rear delt заменена на lateral raise в Push-дне.`;
+      rearDelt.rationale = `${rearDelt.rationale || ''} Адаптация: rear delt заменена на lateral raise в Push-дне (rear delt — со спиной).`;
     }
   }
-  const chest = session.exercises.filter((e: any) => e.muscle === 'chest');
-  if (chest.length < 3) return;
+  const heavyDay = (session.day ?? 1) % 2 === 1;
+  const chest = session.exercises.filter((e: any) => e.muscle === 'chest' && !(e as any).warmupActivator);
+  if (!chest.length) return;
+  // Чередование тяж/памп для про-уровня (средняя дельта идёт с грудью в Push).
+  if (heavyDay) {
+    for (const e of chest) {
+      if (/жим|press|отжим/i.test(e.name)) { e.character = 'тяж'; e.rir = Math.min(e.rir ?? 2, 2); e.repsRange = [6, 10]; }
+    }
+  } else {
+    for (const e of chest) {
+      e.character = 'памп';
+      e.rir = 3;
+      e.repsRange = [10, 15];
+      if (e.sets > 4) { e.sets = 4; e.workSets = e.workSets.slice(0, 4); }
+    }
+  }
   const isPress = (name: string) => /жим|press|брус|dip|отжим/i.test(name);
   const presses = chest.filter((e: any) => isPress(e.name));
   const fly = chest.find((e: any) => /развод|fly|crossover|кроссовер|сведен|пек.?дек|бабоч|сведение/i.test(e.name));
@@ -293,6 +619,26 @@ function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptio
       added.workSets = Array.from({ length: 3 }, () => ({ ...sample, reps: 15, rir: 3 }));
       added.rationale = 'Experienced enhanced: chest fly/cable diversity вместо 4-го жима';
       session.exercises.splice(session.exercises.indexOf(target), 1, added);
+    }
+  }
+  // Памп-день: гарантируем fly/кроссовер (растянутая позиция, метаболический стресс).
+  if (!heavyDay && !fly) {
+    const candidate = EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== 'chest') return false;
+      if (!/развод|fly|crossover|кроссовер|сведен|пек.?дек|бабоч|сведение/i.test(x.name)) return false;
+      if (session.exercises.some((e: any) => e.name === x.name)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      return true;
+    });
+    if (candidate) {
+      const base = chest[0];
+      const sample = base.workSets?.[0] || { reps: 15, rir: 3, weight: 0 };
+      session.exercises.push({
+        muscle: 'chest', name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+        sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
+        workSets: Array.from({ length: 3 }, () => ({ ...sample, reps: 15, rir: 3, restSeconds: 60 })),
+        rationale: 'Experienced enhanced: pump-day chest fly (растянутая позиция)',
+      });
     }
   }
 }
@@ -378,6 +724,78 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
         slot.name = candidate.name;
         slot.exerciseName = candidate.name;
         slot.rationale = 'Покрытие длинной головки трицепса (overhead)';
+      }
+    }
+  }
+}
+
+/**
+ * Качество малых групп (Этап E): икры получают stretch-паттерны (стоя —
+ * икроножная в растянутой позиции + сидя — камбаловидная), предплечья идут
+ * с тягами (хват), шраги доводятся до 4-5 сетов с задержкой. Объёмы не
+ * сокращаются — добирается качество (stretch + памп).
+ */
+function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const tag = session.sessionTag || '';
+  const weekCountOf = (m: string) => week.sessions.filter((s: any) => s.exercises.some((e: any) => e.muscle === m && !(e as any).warmupActivator)).length;
+  const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+  };
+  const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+  const isEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
+  const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string): void => {
+    if (working.length >= maxEx) return;
+    const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !working.some((e: any) => e.name === c.name));
+    if (!candidate) return;
+    const baseWeight = options.workMax?.[muscle] || 40;
+    session.exercises.push({
+      muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+      sets, repsRange: reps, rir: 3, restSeconds: 45, warmupSets: [],
+      workSets: Array.from({ length: sets }, () => ({ reps: reps[1], rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 45 })),
+      rationale: note,
+    });
+  };
+  // Икры: в Legs-сессиях стоя (растянутая икроножная) + сидя (камбаловидная).
+  if (/Legs|Lower|LowerPower|LowerHyp/.test(tag)) {
+    const calves = working.filter((e: any) => e.muscle === 'calves');
+    const standing = calves.find((e: any) => /носк|calf/i.test(e.name || '') && !/сидя|sitting|seated/i.test(e.name || ''));
+    if (standing) {
+      // Доводим стоячие до 5 сетов (stretch-позиция, задержка) — не 2-3.
+      const targetSets = isEnhanced ? 5 : 4;
+      if (standing.sets < targetSets) {
+        const sample = standing.workSets?.[standing.workSets.length - 1] || { reps: 15, rir: 3, weight: 0 };
+        while (standing.sets < targetSets) { standing.workSets.push({ ...sample }); standing.sets += 1; }
+      }
+    } else {
+      addEx('calves', /подъём.*носк|подъем.*носк|calf.*raise/i, isEnhanced ? 5 : 4, [12, 20], 'Малые группы: икры стоя (растянутая позиция)');
+    }
+    // Сидячие (камбаловидная) — только в одной из двух Legs-сессий (без дублей).
+    const seated = calves.find((e: any) => /сидя|sitting|seated/i.test(e.name || ''));
+    if (!seated && !calves.some((e: any) => /сидя/i.test(e.name || '')) && (session.day ?? 1) % 2 === 0) {
+      addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|seated.*calf/i, isEnhanced ? 4 : 3, [15, 25], 'Малые группы: икры сидя (камбаловидная, stretch)');
+    }
+  }
+  // Предплечья — с тягами (Pull/Back/Upper): хватовая работа идёт со спиной.
+  // Не дублируем: максимум 2 источника в неделю (иначе > MRV).
+  if (/Pull|Back|Upper|Torso/.test(tag)) {
+    const hasForearms = working.some((e: any) => e.muscle === 'forearms');
+    if (!hasForearms && weekCountOf('forearms') < 2) {
+      addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват)');
+    }
+  }
+  // Трапеции: шраги доводятся до 4-5 сетов (stretch + задержка вверху).
+  if (/Pull|Back|Upper|Torso/.test(tag)) {
+    const shrug = working.find((e: any) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
+    if (shrug) {
+      const targetSets = isEnhanced ? 5 : 4;
+      if (shrug.sets < targetSets) {
+        const sample = shrug.workSets?.[shrug.workSets.length - 1] || { reps: 12, rir: 3, weight: 0 };
+        while (shrug.sets < targetSets) { shrug.workSets.push({ ...sample }); shrug.sets += 1; }
       }
     }
   }
@@ -627,7 +1045,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       const weight = Math.max(5, Math.round(baseWeight * 0.3 * 10) / 10);
       for (const candidate of candidates.filter(item => trueMuscleOf(item) === muscle && !used.has(item.name))) {
         if (remaining <= 0 || session.exercises.length >= 10) break;
-        const sets = Math.min(2, Math.ceil(remaining));
+        const sets = Math.min(2, Math.max(2, Math.ceil(remaining)));
         const workSets = Array.from({ length: sets }, () => ({ reps: 15, rir: 3, weight, tempo: '3-0-1-0', restSeconds: 45 }));
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
@@ -847,7 +1265,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
         if (!items.length) continue;
         let total = items.reduce((n: number, e: any) => n + e.sets, 0);
         for (const e of items) {
-          while (total < target && e.sets < 8) {
+          while (total < target && e.sets < 5) {
             const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
             e.sets += 1; e.workSets.push({ ...sample }); total += 1;
           }
@@ -876,8 +1294,61 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   if (!options.preserveSource && options.reorder !== false) repairAdaptiveSafety(next, options);
   if (!options.preserveSource && options.ensureMinimumVolume) addAdaptiveMEVFeeders(next, options);
   if (!options.preserveSource && options.controlledRotation) applyControlledAccessoryRotation(next, options);
-  for (const week of next.weeks) {
+    // Последний back allocation после rotation/fatigue/taper: именно здесь
+  // проверяем фактические финальные сеты, а не промежуточный план.
+  for (const week of next.weeks) for (const session of week.sessions) {
+    allocateExperiencedBackSession(session, options);
+    allocateExperiencedArmSession(session, options);
+    allocateExperiencedLegSession(session, options);
+    diversifyExperiencedChestSession(session, options);
+    ensureRearDeltInPull(session, options);
+    ensureArmHeadCoverage(session, options);
+    // Специализация/малые группы — только для генераторных планов (pattern.id):
+    // произвольные/faithful входы сохраняют исходный набор упражнений.
+    if ((next as any).pattern?.id) {
+      ensureWeakPatternCoverage(session, options);
+      ensureSmallMuscleQuality(session, week, options);
+    }
+  }
+for (const week of next.weeks) {
+    // MEV-guard карта недели: бюджет не режет сеты ниже ceil(MEV/частота) —
+    // иначе natural-планы получают deficit, а fill не может добавить (сессии
+    // на лимите). Только для генераторных планов (pattern.id): произвольные/
+    // faithful входы сохраняют исходный объём (контракт финализатора).
+    const guardMap: Record<string, number> = {};
+    if (options.level && !options.preserveSource && (next as any).pattern?.id) {
+      const w: any = week;
+      if (w.phase !== 'deload' && !week.sessions.some(s => s.exercises.some(e => /разгруз|deload/i.test(e.comment || '')))) {
+        const sessionsWith = new Map<string, number>();
+        for (const s of week.sessions) for (const e of s.exercises) {
+          if ((e as any).warmupActivator) continue;
+          sessionsWith.set(e.muscle, (sessionsWith.get(e.muscle) || 0) + 1);
+        }
+        for (const [muscle, freq] of sessionsWith) {
+          const lm = getVolumeLandmarks(options.level, muscle);
+          if (!lm) continue;
+          guardMap[muscle] = Math.max(2, Math.ceil(lm.mev / freq));
+        }
+      }
+    }
     for (const session of week.sessions) {
+      // Если суммарный MEV-guard сессии превышает лимит — масштабируем guard'ы
+      // пропорционально (минимум 2), иначе бюджет не сможет уложиться в лимит.
+      const maxWorkingSets = options.maxWorkingSets ?? 24;
+      let sessionGuard = guardMap;
+      if (Object.keys(guardMap).length) {
+        let totalGuard = 0;
+        const sesGuard: Record<string, number> = {};
+        for (const e of session.exercises) {
+          const g = guardMap[e.muscle];
+          if (g) { sesGuard[e.muscle] = g; totalGuard += g; }
+        }
+        if (totalGuard > maxWorkingSets) {
+          const scale = maxWorkingSets / totalGuard;
+          for (const m of Object.keys(sesGuard)) sesGuard[m] = Math.max(2, Math.floor(sesGuard[m] * scale));
+        }
+        sessionGuard = sesGuard;
+      }
       if (!options.preserveSource && options.reorder !== false) {
         session.exercises = tidySessionExercises(
           session.exercises,
@@ -885,6 +1356,9 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
           session.sessionTag,
           options.priorityMuscles,
           options.methodology,
+          // Про-объём спины (6+ лет) — до 6 back-паттернов; cap 4 срезал бы
+          // vertical/lat после allocation (паттерны, а не сеты).
+          options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4,
         );
         dedupeAdaptivePatterns(session, options.priorityMuscles, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3);
       }
@@ -892,7 +1366,8 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       // обязателен для каждого режима и источника BB-auto.
       const fitted = options.preserveSource ? { removed: [], cost: estimateBBSessionCost(session) } : fitBBSessionToBudget(session, {
         maxExercises: options.maxExercises ?? 10,
-        maxWorkingSets: options.maxWorkingSets ?? 24,
+        maxWorkingSets,
+        minSetsByMuscle: sessionGuard,
       });
       if (fitted.removed.length > 0) {
         next.rationale.push(`Fatigue budget: ${session.sessionTag || `день ${session.day}`} — удалено ${fitted.removed.length} вторичных упражнений, расчётная длительность ${Math.round(fitted.cost.timeSeconds / 60)} мин.`);
@@ -907,16 +1382,6 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     next.weeks = tapered.weeks;
     syncBBPlanSetShape(next);
   }
-  // Последний back allocation после rotation/fatigue/taper: именно здесь
-  // проверяем фактические финальные сеты, а не промежуточный план.
-  for (const week of next.weeks) for (const session of week.sessions) {
-    allocateExperiencedBackSession(session, options);
-    allocateExperiencedArmSession(session, options);
-    allocateExperiencedLegSession(session, options);
-    diversifyExperiencedChestSession(session, options);
-    ensureRearDeltInPull(session, options);
-    ensureArmHeadCoverage(session, options);
-  }
   // FullBody/Lower/Upper: после всех проходов добираем отсутствующие группы
   // (fbUsedIds может вытеснить мышцы между сессиями; enhanced-бюджеты
   // вытесняют calves/traps/abs из Lower/Upper). Для natural — 3 сета,
@@ -928,6 +1393,8 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       // неделе — иначе fill дублирует пресс в каждой сессии (> MRV).
       const weekMuscles = new Set(week.sessions.flatMap(s => s.exercises.map((e: any) => e.muscle)));
       const weekHas = (m: string) => weekMuscles.has(m);
+      // Сколько сессий недели уже содержат мышцу (для natural-лимитов дублей).
+      const weekCount = (m: string) => week.sessions.filter(s => s.exercises.some((e: any) => e.muscle === m)).length;
       for (const session of week.sessions) {
       const tag = session.sessionTag || '';
       if (!/Legs|Lower|LowerPower|LowerHyp/.test(tag) && !/FullBody/.test(tag) && !/Upper|Push|Pull/.test(tag) && !/Torso|Limbs/.test(tag)) continue;
@@ -948,9 +1415,17 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
           : ['glutes', 'quads', 'hamstrings', 'calves', 'abs'];
       for (const muscle of needMuscles) {
         if (present.has(muscle)) continue;
-        // Natural: малые группы не дублируются по сессиям (только если нет в неделе).
-        if (options.level !== 'enhanced' && ['abs', 'traps', 'calves'].includes(muscle) && weekHas(muscle)) continue;
+        // Дубли малых групп по сессиям: abs до 2 источников (natural) / 3
+        // (enhanced 1-3, MEV выше); traps/calves до 2 (обе Pull/Lower сессии).
+        const isFullEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
+        if (!isFullEnhanced) {
+          const absCap = options.level === 'enhanced' ? 3 : 2;
+          if (['abs'].includes(muscle) && weekCount(muscle) >= absCap) continue;
+          if (['traps', 'calves'].includes(muscle) && weekCount(muscle) >= 2) continue;
+        }
         if (workingCount() >= maxEx) break;
+        // Строгий сетовой лимит сессии: если добавление не влезает — не добавляем
+        // (иначе 24/60 нарушается; MEV покрывается guardMap в budget-фите).
         const addSets = fillSets(muscle);
         if (sessionSets() + addSets > maxSessionSets) continue;
         const candidate = EXERCISE_CATALOG.find((x: any) => {
@@ -1106,6 +1581,13 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     .slice(0, 20)
     .map(issue => `🚫 Валидация: ${issue.message}`);
   if (errors.length) next.rationale = [...next.rationale, ...errors];
+  // Повторная гарантия головок рук ПОСЛЕ всех проходов (фит/тапер/филл могли
+  // вернуть pushdown-изоляцию; замена — не добавление, лимиты не нарушаются).
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      ensureArmHeadCoverage(session, options);
+    }
+  }
   // Разминочное упражнение на целевую группу — в самом конце, после всех
   // проходов (budget/dedupe/taper не могут его удалить). Не входит в объём.
   // Только для реальных генераторных планов (pattern.id задан) и не-faithful.
