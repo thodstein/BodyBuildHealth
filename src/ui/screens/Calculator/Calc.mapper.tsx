@@ -703,6 +703,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showSynergy, setShowSynergy] = useState(true);
   const [showLifestyle, setShowLifestyle] = useState(true);
   const [showPreanalytics, setShowPreanalytics] = useState(true);
+  const [showCourseWarnings, setShowCourseWarnings] = useState(true);
+  const [showDosageControl, setShowDosageControl] = useState(true);
   const [showPedMatrix, setShowPedMatrix] = useState(true);
   const [removedSubs, setRemovedSubs] = useState<string[]>([]);
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
@@ -3198,42 +3200,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <SafetyAssayWarnings rec={finalRecWithResidual ?? finalRec} />
                 <SafetyAlerts rec={finalRecWithResidual ?? finalRec} />
 
-                {/* ===== ФАРМ-МАТРИЦА КУРСА (активные классы PED) ===== */}
-      {(() => {
-        const active = detectActivePedClasses(state);
-        if (active.length === 0) return null;
-        const rowStyle: React.CSSProperties = { padding: '5px 7px', borderRadius: 6, marginBottom: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 7, lineHeight: 1.5, color: 'rgba(255,255,255,0.8)' };
-        const lbl = (t: string) => <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>{t}: </span>;
-        return (
-          <div style={{ marginTop: 8 }}>
-            <div onClick={() => setShowPedMatrix(!showPedMatrix)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showPedMatrix ? '8px 8px 0 0' : 8, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.16)' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 5 }}>
-                🧪 Фарм-матрица курса
-                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(251,191,36,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(251,191,36,0.12)' }}>{active.length} классов</span>
-              </span>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showPedMatrix ? '▲ скрыть' : '▼ показать'}</span>
-            </div>
-            {showPedMatrix && (
-              <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(251,191,36,0.03)', border: '1px solid rgba(251,191,36,0.1)', borderTop: 'none' }}>
-                {active.map(cls => (
-                  <div key={cls.id} style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 8, fontWeight: 800, color: '#fbbf24', marginBottom: 3 }}>{cls.icon} {cls.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>· фаза: {cls.phase}</span></div>
-                    <div style={rowStyle}>{lbl('Механизмы')}{cls.mechs.join(', ')}</div>
-                    <div style={rowStyle}>{lbl('Анализы')}{cls.labs.join(', ')} <span style={{ color: 'rgba(255,255,255,0.45)' }}>({cls.freq})</span></div>
-                    <div style={{ ...rowStyle, color: '#4ade80' }}>{lbl('Обязательная поддержка')}{cls.mandatory.join(', ')}</div>
-                    {cls.conditional.length > 0 && <div style={{ ...rowStyle, color: '#fbbf24' }}>{lbl('Условная')}{cls.conditional.join(', ')}</div>}
-                    {cls.doctorOnly.length > 0 && <div style={{ ...rowStyle, color: '#fca5a5' }}>{lbl('👨‍⚕️ Под контролем врача')}{cls.doctorOnly.join(', ')}</div>}
-                    {cls.interactions.length > 0 && <div style={rowStyle}>{lbl('Взаимодействия')}{cls.interactions.join(' · ')}</div>}
-                    {cls.assayWarnings.length > 0 && <div style={{ ...rowStyle, color: '#93c5fd' }}>{lbl('Анализы: внимание')}{cls.assayWarnings.join(' · ')}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* ===== ПРЕАНАЛИТИКА, ПРИЁМ И РАЗНЕСЕНИЕ (полная карточка, сворачиваемая) ===== */}
+                {/* ===== ПРЕАНАЛИТИКА, ПРИЁМ И РАЗНЕСЕНИЕ (полная карточка, сворачиваемая) ===== */}
       {finalRec && (() => {
         const planIds = finalRec.subs.map(s => s.substanceId);
         const idSet = new Set(planIds.map(id => id.toLowerCase()));
@@ -3321,16 +3288,63 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         }
         if (warnings.length === 0) return null;
         return (
-          <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize:9, fontWeight:700, color:'#a855f7', marginBottom:3 }}>Предупреждения о курсе</div>
-            {warnings.map((w, i) => <div key={i} style={{ fontSize:8, color:'#c4b5fd', marginBottom:1, lineHeight:1.4 }}>{w}</div>)}
-            <SafetyGuardrails rec={finalRecWithResidual ?? finalRec} />
-            <SafetyPedEscalation rec={finalRecWithResidual ?? finalRec} />
+          <div style={{ marginTop: 8 }}>
+            <div onClick={() => setShowCourseWarnings(!showCourseWarnings)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showCourseWarnings ? '8px 8px 0 0' : 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', display: 'flex', alignItems: 'center', gap: 5 }}>
+                ⚠️ Предупреждения о курсе
+                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(168,85,247,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(168,85,247,0.12)' }}>{warnings.length}</span>
+              </span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showCourseWarnings ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showCourseWarnings && (
+              <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)', borderTop: 'none' }}>
+                {warnings.map((w, i) => <div key={i} style={{ fontSize: 8, color: '#c4b5fd', marginBottom: 1, lineHeight: 1.4 }}>{w}</div>)}
+                <SafetyGuardrails rec={finalRecWithResidual ?? finalRec} />
+                <SafetyPedEscalation rec={finalRecWithResidual ?? finalRec} />
+              </div>
+            )}
           </div>
         );
       })()}
 
-      {/* Нутри-корректировки по анализам */}
+      
+{/* ===== ФАРМ-МАТРИЦА КУРСА (активные классы PED) ===== */}
+      {(() => {
+        const active = detectActivePedClasses(state);
+        if (active.length === 0) return null;
+        const rowStyle: React.CSSProperties = { padding: '5px 7px', borderRadius: 6, marginBottom: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 7, lineHeight: 1.5, color: 'rgba(255,255,255,0.8)' };
+        const lbl = (t: string) => <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>{t}: </span>;
+        return (
+          <div style={{ marginTop: 8 }}>
+            <div onClick={() => setShowPedMatrix(!showPedMatrix)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showPedMatrix ? '8px 8px 0 0' : 8, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.16)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🧪 Фарм-матрица курса
+                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(251,191,36,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(251,191,36,0.12)' }}>{active.length} классов</span>
+              </span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showPedMatrix ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showPedMatrix && (
+              <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(251,191,36,0.03)', border: '1px solid rgba(251,191,36,0.1)', borderTop: 'none' }}>
+                {active.map(cls => (
+                  <div key={cls.id} style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 8, fontWeight: 800, color: '#fbbf24', marginBottom: 3 }}>{cls.icon} {cls.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>· фаза: {cls.phase}</span></div>
+                    <div style={rowStyle}>{lbl('Механизмы')}{cls.mechs.join(', ')}</div>
+                    <div style={rowStyle}>{lbl('Анализы')}{cls.labs.join(', ')} <span style={{ color: 'rgba(255,255,255,0.45)' }}>({cls.freq})</span></div>
+                    <div style={{ ...rowStyle, color: '#4ade80' }}>{lbl('Обязательная поддержка')}{cls.mandatory.join(', ')}</div>
+                    {cls.conditional.length > 0 && <div style={{ ...rowStyle, color: '#fbbf24' }}>{lbl('Условная')}{cls.conditional.join(', ')}</div>}
+                    {cls.doctorOnly.length > 0 && <div style={{ ...rowStyle, color: '#fca5a5' }}>{lbl('👨‍⚕️ Под контролем врача')}{cls.doctorOnly.join(', ')}</div>}
+                    {cls.interactions.length > 0 && <div style={rowStyle}>{lbl('Взаимодействия')}{cls.interactions.join(' · ')}</div>}
+                    {cls.assayWarnings.length > 0 && <div style={{ ...rowStyle, color: '#93c5fd' }}>{lbl('Анализы: внимание')}{cls.assayWarnings.join(' · ')}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      
+{/* Нутри-корректировки по анализам */}
       {finalRec && finalRec.nutritionTips && finalRec.nutritionTips.length > 0 && (() => {
         const tipsByMarker: Record<string, { action: string; target: string; tier: number }[]> = {};
         for (const t of finalRec.nutritionTips!) {
@@ -3450,10 +3464,16 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       
 {/* ===== ТОКСИКОЛОГИЧЕСКИЙ КОНТРОЛЬ ДОЗ (UL + титрация) ===== */}
       {finalRec && toxWarnings.length > 0 && (
-        <div style={{ marginTop:8 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#f59e0b', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
-            ⚠️ Контроль дозировок ({toxWarnings.length})
+        <div style={{ marginTop: 8 }}>
+          <div onClick={() => setShowDosageControl(!showDosageControl)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showDosageControl ? '8px 8px 0 0' : 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.16)' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 5 }}>
+              ⚠️ Контроль дозировок (UL + титрация)
+              <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(245,158,11,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(245,158,11,0.12)' }}>{toxWarnings.length}</span>
+            </span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showDosageControl ? '▲ скрыть' : '▼ показать'}</span>
           </div>
+          {showDosageControl && (
+            <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(245,158,11,0.03)', border: '1px solid rgba(245,158,11,0.1)', borderTop: 'none' }}>
           {toxWarnings.map((w, i) => {
             const isDanger = w.severity === 'danger';
             const isTitr = w.severity === 'titrate';
@@ -3473,6 +3493,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             );
           })}
           <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
+          <SafetyCumulativeLoad planResult={planResult} />
+            </div>
+          )}
         </div>
       )}
 
