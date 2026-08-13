@@ -1404,7 +1404,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Попап полного каталога стеков (Усиление) — ВСЕ 55 стеков из ALL_STACKS ── */}
       {showEnhancementPopup && ReactDOM.createPortal(
          <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setShowEnhancementPopup(false)}>
-           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+           <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, overflowWrap:'anywhere', wordBreak:'break-word', background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
              <div style={{ height:3, background:'linear-gradient(90deg,#f87171,#ef4444)' }} />
              <div style={{ padding:'14px 14px 10px' }}>
                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -1725,7 +1725,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           </div>
         );
         return <div style={{ position:'fixed', inset:0, zIndex:310, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.82)', padding:12 }} onClick={() => setGenericEnhancementPopup(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'94%', maxWidth:420, maxHeight:'90vh', overflow:'hidden', display:'flex', flexDirection:'column', borderRadius:18, background:'#16161a', border:`1px solid ${cfg.color}55`, color:'#fff' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width:'94%', maxWidth:420, maxHeight:'90vh', overflow:'hidden', overflowWrap:'anywhere', wordBreak:'break-word', display:'flex', flexDirection:'column', borderRadius:18, background:'#16161a', border:`1px solid ${cfg.color}55`, color:'#fff' }}>
             <div style={{ padding:'13px 14px 9px', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}><span style={{ fontSize:13, fontWeight:800, color:cfg.color }}>{cfg.icon} {cfg.label} — усиление</span><button onClick={() => setGenericEnhancementPopup(null)} style={{ color:'#fff', background:'transparent', border:'1px solid rgba(255,255,255,0.2)', borderRadius:6, padding:'3px 8px', cursor:'pointer' }}>✕</button></div>
               <div style={{ fontSize:8, color:'#fff', opacity:.7, lineHeight:1.4, marginTop:5, overflowWrap:'anywhere' }}>{cfg.notes}</div>
@@ -1810,7 +1810,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
           return (
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setArticularConfirm(false); }}>
-               <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+               <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, overflowWrap:'anywhere', wordBreak:'break-word', background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
                   <div style={{ height:3, background:'linear-gradient(90deg,#4ade80,#22c55e)' }} />
                  <div style={{ flex:'1 1 0%', minHeight:0, padding:'14px 14px 16px', overflowY:'auto' }}>
                   {/* Заголовок + контекст */}
@@ -2005,7 +2005,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
           return (
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => { setStackModulePopup(null); setNeuroConfirm(false); }}>
-               <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
+               <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:18, overflowWrap:'anywhere', wordBreak:'break-word', background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
                   <div style={{ height:3, background:'linear-gradient(90deg,#818cf8,#6366f1)' }} />
                  <div style={{ flex:'1 1 0%', minHeight:0, padding:'14px 14px 16px', overflowY:'auto' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
@@ -2215,7 +2215,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const pedAutoActive = pedAutoIds.length > 0 && pedAutoIds.every(id => hematoSelected.has(id));
           return ReactDOM.createPortal(
             <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setStackModulePopup(null)}>
-            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(20,184,166,0.2)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column', color:'#fff' }}>
+            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, overflowWrap:'anywhere', wordBreak:'break-word', background:'#16161a', border:'1px solid rgba(20,184,166,0.2)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column', color:'#fff' }}>
                 <div style={{ height:3, background:'linear-gradient(90deg,#14b8a6,#14b8a688)' }} />
                 <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
@@ -2359,7 +2359,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const recommendedCount = analysis.filter(a => a.recommended && !a.inPlan).length;
         return (
            <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }} onClick={() => setStackModulePopup(null)}>
-             <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+             <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:360, borderRadius:18, overflowWrap:'anywhere', wordBreak:'break-word', background:'#16161a', border:'1px solid rgba(255,255,255,0.1)', overflow:'hidden', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
                 <div style={{ height:3, background:`linear-gradient(90deg,${meta.col},${meta.col}88)` }} />
                <div style={{ flex:'1 1 0%', minHeight:0, padding:'16px 14px 16px', overflowY:'auto' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
@@ -3775,6 +3775,19 @@ function buildPlanText(rec: SupportRecommendation): string {
     lines.push('КОНФЛИКТЫ:');
     for (const c of rec.conflicts) lines.push(`• ${subNameRu(c.a)} + ${subNameRu(c.b)}: ${c.reason}`);
   }
+  if (rec.supportRisks && rec.supportRisks.length > 0) {
+    lines.push('');
+    lines.push('РИСКИ ПОДДЕРЖКИ:');
+    for (const r of rec.supportRisks) lines.push(`• [${r.level.toUpperCase()}] ${r.label}: ${r.detail}`);
+  }
+  if (rec.monitoringSchedule && rec.monitoringSchedule.length > 0) {
+    lines.push('');
+    lines.push('МОНИТОРИНГ И АНАЛИЗЫ:');
+    for (const sec of rec.monitoringSchedule) {
+      lines.push(`• ${sec.label} (${sec.period}):`);
+      for (const it of sec.items) lines.push(`    ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}${it.escalation ? ` ⚠ ${it.escalation}` : ''}`);
+    }
+  }
   if (rec.guardrails.length > 0) {
     lines.push('');
     lines.push('GUARDRAILS:');
@@ -3884,6 +3897,44 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
     lines.push('');
     lines.push(`НЕПОКРЫТЫЕ МЕХАНИЗМЫ (${rec.gaps.length}):`);
     for (const g of rec.gaps) lines.push(`- ${g.organLabel} → ${g.mechLabel} (${g.mechId})`);
+  }
+  if (rec.supportRisks && rec.supportRisks.length > 0) {
+    lines.push('');
+    lines.push('РИСКИ ПОДДЕРЖКИ:');
+    for (const r of rec.supportRisks) lines.push(`- [${r.level.toUpperCase()}] ${r.label}: ${r.detail}`);
+  }
+  // Системные риски (механизм-модель, единый расчёт с калькулятором)
+  try {
+    const inp = buildTzInput(state, rec.subs.map(s => s.substanceId));
+    if (inp) {
+      const tz = calculateTzSpecRisk(inp);
+      lines.push('');
+      lines.push(`СИСТЕМНЫЕ РИСКИ (механизм-модель, 0-100%): общий ${tz.overallRaw}% → ${tz.overallAfter}%`);
+      for (const o of tz.organs) {
+        lines.push(`- ${o.name}: ${o.rawPercent}% → ${o.afterPercent}% (защита ${o.k_protect}%)`);
+        for (const m of o.mechanisms) lines.push(`    ${m.name}: ${m.rawPercent}% → ${m.afterPercent}%`);
+      }
+    }
+  } catch {}
+  // Фарм-матрица активных классов
+  try {
+    const classes = detectActivePedClasses(state);
+    if (classes.length > 0) {
+      lines.push('');
+      lines.push('ФАРМ-МАТРИЦА КУРСА (активные классы):');
+      for (const c of classes) {
+        lines.push(`- ${c.name}: механизмы [${c.mechs.join(', ')}]; анализы [${c.labs.join(', ')}] (${c.freq}); обязательная поддержка [${c.mandatory.join(', ')}]; врач [${c.doctorOnly.join(', ')}]; взаимодействия: ${c.interactions.join(' · ')}`);
+      }
+    }
+  } catch {}
+  // Мониторинг
+  if (rec.monitoringSchedule && rec.monitoringSchedule.length > 0) {
+    lines.push('');
+    lines.push('МОНИТОРИНГ И АНАЛИЗЫ:');
+    for (const sec of rec.monitoringSchedule) {
+      lines.push(`- ${sec.label} (${sec.period}):`);
+      for (const it of sec.items) lines.push(`    ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}${it.escalation ? ` ⚠ ${it.escalation}` : ''}`);
+    }
   }
   lines.push('');
   lines.push('СВОДКА ДВИЖКА:');
