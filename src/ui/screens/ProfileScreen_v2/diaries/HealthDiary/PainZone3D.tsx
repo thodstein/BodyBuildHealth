@@ -88,15 +88,26 @@ function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255];
 }
 
+/** Сводный анализ зоны (из истории дневника, по базовому ключу). */
+export interface ZoneAnalysis {
+  last?: number;
+  avg30?: number;
+  count?: number;
+  trend?: 'up' | 'down' | 'stable' | null;
+}
+
 export interface PainZone3DProps {
   zones: Record<string, number>;
   onChange?: (zones: Record<string, number>) => void;
   height?: number;
+  /** Сводный анализ по базовой зоне (shoulders, elbows, …) из истории дневника. */
+  analysisFor?: (baseZone: string) => ZoneAnalysis | null;
 }
 
-export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height = 440 }) => {
+export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height = 440, analysisFor }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
+  const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const sceneRef = useRef<{
@@ -109,12 +120,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     anchorToZone: string[];
     zonesRef: Record<string, number>;
     hoverRef: string | null;
+    selectedRef: string | null;
     applyColors: () => void;
   } | null>(null);
 
   const zonesRef = useRef(zones);
   zonesRef.current = zones;
   const hoverRef = useRef<string | null>(null);
+  const selectedRef = useRef<string | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -238,13 +251,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         });
         overlay = new THREE.Mesh(baseMesh.geometry as THREE.BufferGeometry, overlayMat);
         overlay.renderOrder = 1;
-        group.add(overlay);
+        model.add(overlay);
 
         sceneRef.current = {
           camera, renderer, controls, animId: 0,
           colorAttr, zoneIdx, anchorToZone,
           zonesRef: zonesRef.current,
           hoverRef: hoverRef.current,
+          selectedRef: selectedRef.current,
           applyColors,
         };
         applyColors();
@@ -258,6 +272,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
       if (!colorAttr || !zoneIdx.length) return;
       const z = zonesRef.current;
       const hover = hoverRef.current;
+      const sel = selectedRef.current;
       const arr = colorAttr.array as Float32Array;
       const zoneColor = new THREE.Color();
       const lerp = new THREE.Color();
@@ -275,11 +290,16 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         if (val > 0) {
           const [r, g, b] = hexToRgb(painZoneColor(val));
           zoneColor.setRGB(r, g, b);
-          if (hover === zoneId) {
+          if (sel === zoneId || hover === zoneId) {
             lerp.copy(zoneColor).lerp(WHITE, 0.35);
             arr[i * 3] = lerp.r * 1.6;
             arr[i * 3 + 1] = lerp.g * 1.6;
             arr[i * 3 + 2] = lerp.b * 1.6;
+          } else if (sel) {
+            // другая зона выбрана — приглушаем
+            arr[i * 3] = zoneColor.r * 0.45;
+            arr[i * 3 + 1] = zoneColor.g * 0.45;
+            arr[i * 3 + 2] = zoneColor.b * 0.45;
           } else {
             arr[i * 3] = zoneColor.r * 1.3;
             arr[i * 3 + 1] = zoneColor.g * 1.3;
@@ -333,13 +353,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
       applyColors();
     };
     const handleClick = (event: MouseEvent) => {
-      if (!onChangeRef.current) return;
       const zone = zoneAt(event);
       if (!zone) return;
-      const base = baseZoneKey(zone);
-      const current = zonesRef.current[base] || 0;
-      const next = current >= 10 ? 0 : current + 1;
-      onChangeRef.current({ ...zonesRef.current, [base]: next });
+      setSelectedZone((prev) => {
+        const next = prev === zone ? null : zone;
+        selectedRef.current = next;
+        return next;
+      });
+      applyColors();
     };
     const handleLeave = () => {
       hoverRef.current = null;
@@ -388,20 +409,27 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [height]);
 
-  // ── Перекраска при смене данных / hover ──
+  // ── Перекраска при смене данных / hover / выборе ──
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref) return;
     ref.zonesRef = zones;
     ref.hoverRef = hoveredZone;
+    ref.selectedRef = selectedZone;
     ref.applyColors();
-  }, [zones, hoveredZone, loaded]);
+  }, [zones, hoveredZone, selectedZone, loaded]);
 
-  const cycleZone = useCallback((id: string) => {
+  const selectZone = useCallback((id: string) => {
+    setSelectedZone((prev) => {
+      const next = prev === id ? null : id;
+      selectedRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const setZoneValue = useCallback((base: string, v: number) => {
     if (!onChange) return;
-    const base = baseZoneKey(id);
-    const current = zones[base] || 0;
-    onChange({ ...zones, [base]: current >= 10 ? 0 : current + 1 });
+    onChange({ ...zones, [base]: v });
   }, [zones, onChange]);
 
   const selectAll = useCallback(() => {
@@ -492,31 +520,94 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
             🧹 Сбросить
           </button>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>
-            Клик по телу — отметка зоны (0→10)
+            Клик по телу — анализ зоны (одно нажатие)
           </span>
         </div>
       )}
+
+      {/* Панель выбранной зоны: отметка боли + сводный анализ */}
+      {selectedZone && (() => {
+        const meta = SIDE_ZONES.find((z) => z.id === selectedZone);
+        if (!meta) return null;
+        const base = meta.base;
+        const val = zones[base] || 0;
+        const analysis = analysisFor ? analysisFor(base) : null;
+        const c = painZoneColor(val);
+        return (
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: `1px solid ${c}44` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <b style={{ fontSize: 12, color: c }}>{meta.label}</b>
+              <button
+                onClick={() => selectZone(selectedZone)}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14, minWidth: 32, minHeight: 32 }}
+                aria-label="Закрыть"
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginRight: 2 }}>Боль:</span>
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setZoneValue(base, v)}
+                  disabled={!onChange}
+                  style={{
+                    minWidth: 26, height: 28, borderRadius: 8, fontSize: 10, fontWeight: 800,
+                    cursor: onChange ? 'pointer' : 'default', fontFamily: 'inherit',
+                    background: val === v ? `${painZoneColor(v)}33` : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${val === v ? painZoneColor(v) : 'rgba(255,255,255,0.1)'}`,
+                    color: val === v ? painZoneColor(v) : 'rgba(255,255,255,0.6)',
+                  }}
+                  aria-pressed={val === v}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            {analysis && (
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: c, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+                  📊 Сводный анализ
+                </div>
+                <div>Последняя запись: {analysis.last ?? '—'}/10 · среднее за 30 дней: {analysis.avg30 ?? '—'}/10</div>
+                <div style={{ marginTop: 2 }}>
+                  Записей с зоной: {analysis.count ?? 0}
+                  {analysis.trend
+                    ? ` · динамика: ${analysis.trend === 'up' ? '📈 ухудшение' : analysis.trend === 'down' ? '📉 улучшение' : '➡️ стабильно'}`
+                    : ''}
+                </div>
+              </div>
+            )}
+            {!analysis && (
+              <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+                Записей с этой зоной пока нет — отметьте уровень боли выше.
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Чипы зон: 13 (левая/правая стороны) */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
         {SIDE_ZONES.map((z) => {
           const val = zones[z.base] || 0;
-          const active = val > 0;
+          const active = z.id === selectedZone;
           const c = painZoneColor(val);
           return (
             <button
               key={z.id}
-              onClick={() => cycleZone(z.id)}
+              onClick={() => selectZone(z.id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 10,
-                fontSize: 10, fontWeight: active ? 700 : 500, cursor: onChange ? 'pointer' : 'default',
-                background: active ? `${c}22` : 'rgba(255,255,255,0.03)',
+                fontSize: 10, fontWeight: active ? 700 : 500, cursor: 'pointer',
+                background: active ? `${c}33` : 'rgba(255,255,255,0.03)',
                 border: `1px solid ${active ? c : 'rgba(255,255,255,0.08)'}`,
                 color: active ? c : 'rgba(255,255,255,0.65)',
                 transition: 'all 0.15s',
               }}
               aria-pressed={active}
-              title={`${z.label}: ${val}/10`}
+              title={`${z.label}: ${val}/10 — клик для анализа`}
             >
               {z.label} <b>{val}</b>
             </button>

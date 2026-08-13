@@ -756,6 +756,44 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const [planDone, setPlanDone] = useState<string[]>(() => {
     try { return loadPlanDone(); } catch { return []; }
   });
+  /** Сводный анализ зон боли по истории дневника (для 3D-карты). */
+  const zoneAnalysis = useMemo(() => {
+    const byBase: Record<string, { date: string; v: number }[]> = {};
+    for (const r of rows) {
+      if (!r.pain?.zones) continue;
+      for (const [zone, v] of Object.entries(r.pain.zones)) {
+        if (v > 0) {
+          const list = byBase[zone] || (byBase[zone] = []);
+          list.push({ date: r.date, v });
+        }
+      }
+    }
+    const out: Record<string, { last?: number; avg30?: number; count?: number; trend?: 'up' | 'down' | 'stable' | null }> = {};
+    const cutoff = Date.now() - 30 * 86400000;
+    for (const [base, vals] of Object.entries(byBase)) {
+      const sorted = [...vals].sort((a, b) => a.date.localeCompare(b.date));
+      const recent = sorted.filter((x) => {
+        const t = Date.parse(x.date);
+        return Number.isFinite(t) && t >= cutoff;
+      });
+      const half = Math.max(1, Math.floor(sorted.length / 2));
+      const older = sorted.slice(0, half);
+      const newer = sorted.slice(half);
+      let trend: 'up' | 'down' | 'stable' | null = null;
+      if (older.length && newer.length) {
+        const avgO = older.reduce((s, x) => s + x.v, 0) / older.length;
+        const avgN = newer.reduce((s, x) => s + x.v, 0) / newer.length;
+        trend = avgN - avgO > 1 ? 'up' : avgO - avgN > 1 ? 'down' : 'stable';
+      }
+      out[base] = {
+        last: sorted[sorted.length - 1].v,
+        avg30: recent.length ? Math.round((recent.reduce((s, x) => s + x.v, 0) / recent.length) * 10) / 10 : undefined,
+        count: sorted.length,
+        trend,
+      };
+    }
+    return out;
+  }, [rows]);
   const togglePlanItem = (id: string) => {
     const next = planDone.includes(id) ? planDone.filter((x) => x !== id) : [...planDone, id];
     setPlanDone(next);
@@ -1381,10 +1419,10 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
               <b>🗺 Карта зон боли · 3D</b>
               <span style={{ color: colors.textMuted, fontSize: 11 }}>
-                Клик по части тела — отметить зону · Вращайте модель · Σ {score(mapZones)}/70
+                Клик по части тела — анализ зоны · Вращайте модель · Σ {score(mapZones)}/70
               </span>
             </div>
-            <PainZone3D zones={mapZones} onChange={setMapZones} height={460} />
+            <PainZone3D zones={mapZones} onChange={setMapZones} height={460} analysisFor={(base) => zoneAnalysis[base] || null} />
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               <button style={{ ...button, background: '#ec4899', borderColor: '#ec4899', color: '#fff' }} onClick={savePainZones}>
                 💾 Сохранить в запись за сегодня

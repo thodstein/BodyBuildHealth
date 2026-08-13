@@ -242,7 +242,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         });
         overlay = new THREE.Mesh(baseMesh.geometry as THREE.BufferGeometry, overlayMat);
         overlay.renderOrder = 1;
-        group.add(overlay);
+        model.add(overlay);
 
         const applyColors = () => {
           if (!colorAttr || !zoneIdx.length) return;
