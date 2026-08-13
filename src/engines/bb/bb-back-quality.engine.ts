@@ -100,3 +100,42 @@ export function indirectArmVolume(session: BBSession): { biceps: number; triceps
   }
   return { biceps, triceps };
 }
+
+/** Аннотация упражнения на руки: movementPattern + armSubgroup по головкам. */
+export function annotateArmExercise(exercise: BBExercise): BBExercise {
+  if (!['biceps', 'triceps', 'forearms'].includes(exercise.muscle)) return exercise;
+  const c = classifyArmExercise(exercise.name);
+  return { ...exercise, movementPattern: c.pattern, armSubgroup: c.subgroup };
+}
+
+/**
+ * Качество покрытия рук: позиции головок и дубли паттернов.
+ * Требования (Этап 2/4 плана):
+ *  - biceps: растянутая позиция (длинная головка) + hammer (brachialis);
+ *  - triceps: overhead (длинная головка) + pushdown (lateral/medial);
+ *  - один паттерн изоляции на сессию (дубль = мусор).
+ */
+export function armQualityIssues(weeks: BBWeek[]): string[] {
+  const issues: string[] = [];
+  const counts = new Map<string, number>();
+  for (const week of weeks) for (const session of week.sessions) {
+    const arms = session.exercises.filter(e => ['biceps', 'triceps', 'forearms'].includes(e.muscle)).map(e => annotateArmExercise(e));
+    const biceps = arms.filter(e => e.muscle === 'biceps');
+    const triceps = arms.filter(e => e.muscle === 'triceps');
+    const seen = new Set<string>();
+    for (const e of arms) {
+      const p = e.movementPattern || 'other';
+      counts.set(p, (counts.get(p) || 0) + e.sets);
+      if (p === 'other') continue;
+      if (seen.has(p)) issues.push(`Неделя ${week.week}, день ${session.day}: дубль изоляции рук «${p}» в одной сессии`);
+      seen.add(p);
+    }
+    if (biceps.length > 0 && !biceps.some(e => e.movementPattern === 'biceps_lengthened')) {
+      issues.push(`Неделя ${week.week}, день ${session.day}: бицепс без растянутой позиции (длинная головка)`);
+    }
+    if (triceps.length > 0 && !triceps.some(e => e.movementPattern === 'triceps_overhead')) {
+      issues.push(`Неделя ${week.week}, день ${session.day}: трицепс без overhead (длинная головка)`);
+    }
+  }
+  return issues;
+}

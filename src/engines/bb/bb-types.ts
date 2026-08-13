@@ -43,6 +43,8 @@ export interface BBExercise {
   executionProfile?: import('./bb-exercise-instructions.engine').ExerciseInstructionProfile;
   /** Функциональная подгруппа/паттерн для quality-aware распределения объёма. */
   backSubgroup?: 'back_width' | 'back_thickness' | 'upper_back' | 'rear_delts' | 'traps' | 'erectors';
+  /** Подгруппа рук по головкам (длинная/короткая/brachialis, overhead/pushdown). */
+  armSubgroup?: string;
   movementPattern?: string;
   /** Разминочное упражнение на целевую группу (3×10-15 лёгких). Не входит в объём/бюджет. */
   warmupActivator?: boolean;

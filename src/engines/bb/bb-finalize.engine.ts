@@ -12,7 +12,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
-import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise } from './bb-back-quality.engine';
+import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise } from './bb-back-quality.engine';
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
 
@@ -328,9 +328,63 @@ function ensureRearDeltInPull(session: any, options: BBFinalizeOptions): void {
   });
 }
 
+/**
+ * Головки рук (Этап 2/4): biceps обязан иметь растянутую позицию (длинная
+ * головка), triceps — overhead (длинная головка). Не добавляем слоты —
+ * заменяем одну изоляцию того же слота (лимиты не меняются).
+ */
+function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const tag = session.sessionTag || '';
+  if (!/Upper|Pull|Push|Arms/.test(tag) && tag !== '') return;
+  // Biceps: растянутая позиция (incline curl).
+  const biceps = session.exercises.filter((e: any) => e.muscle === 'biceps' && !(e as any).warmupActivator);
+  if (biceps.length > 0 && !biceps.some((e: any) => classifyArmExercise(e.name).pattern === 'biceps_lengthened')) {
+    const slot = biceps.find((e: any) => classifyArmExercise(e.name).pattern === 'biceps_shortened' || classifyArmExercise(e.name).pattern === 'other');
+    if (slot) {
+      const candidate = EXERCISE_CATALOG.find((x: any) => {
+        if (trueMuscleOf(x) !== 'biceps') return false;
+        if (!/наклон.*скам|incline/i.test(x.name || '')) return false;
+        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+        if (options.equipment?.length) {
+          const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+          if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+        }
+        return true;
+      });
+      if (candidate) {
+        slot.name = candidate.name;
+        slot.exerciseName = candidate.name;
+        slot.rationale = 'Покрытие длинной головки бицепса (растянутая позиция)';
+      }
+    }
+  }
+  // Triceps: overhead (длинная головка).
+  const triceps = session.exercises.filter((e: any) => e.muscle === 'triceps' && !(e as any).warmupActivator);
+  if (triceps.length > 0 && !triceps.some((e: any) => classifyArmExercise(e.name).pattern === 'triceps_overhead')) {
+    const slot = triceps.find((e: any) => classifyArmExercise(e.name).pattern === 'triceps_pushdown' || classifyArmExercise(e.name).pattern === 'triceps_compound' || classifyArmExercise(e.name).pattern === 'other');
+    if (slot) {
+      const candidate = EXERCISE_CATALOG.find((x: any) => {
+        if (trueMuscleOf(x) !== 'triceps') return false;
+        if (!/француз|french|из.?за.*голов|overhead/i.test(x.name || '')) return false;
+        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+        if (options.equipment?.length) {
+          const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+          if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+        }
+        return true;
+      });
+      if (candidate) {
+        slot.name = candidate.name;
+        slot.exerciseName = candidate.name;
+        slot.rationale = 'Покрытие длинной головки трицепса (overhead)';
+      }
+    }
+  }
+}
+
 /** Маппинг целевой группы сессии → разминочное лёгкое изолирующее движение. */
-const WARMUP_ACTIVATOR: Record<string, RegExp> = {
-  back: /пуловер.*(блок|канат|cable)|тяга.*прям.*рук|straight.?arm/i,
+const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /пуловер.*(блок|канат|cable)|тяга.*прям.*рук|straight.?arm/i,
   chest: /сведен.*(кроссовер|блок)|кроссовер|crossover|сведен.*тренаж/i,
   quads: /разгибан.*ног|leg.?extension/i,
   hamstrings: /сгибан.*ног|leg.?curl/i,
@@ -861,6 +915,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     allocateExperiencedLegSession(session, options);
     diversifyExperiencedChestSession(session, options);
     ensureRearDeltInPull(session, options);
+    ensureArmHeadCoverage(session, options);
   }
   // FullBody/Lower/Upper: после всех проходов добираем отсутствующие группы
   // (fbUsedIds может вытеснить мышцы между сессиями; enhanced-бюджеты
@@ -1028,7 +1083,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // Пересчитываем функциональную разметку спины после всех поздних проходов
   // (rotation/dedupe/taper/fill могут клонировать упражнения без полей).
   for (const week of next.weeks) for (const session of week.sessions) {
-    session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
+    session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : (['biceps', 'triceps', 'forearms'].includes(ex.muscle) ? annotateArmExercise(ex) : ex));
   }
   const backQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => e.muscle === 'back')).reduce((acc, e) => {
     const pattern = e.movementPattern || 'other';
@@ -1037,6 +1092,15 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   }, {} as Record<string, number>);
   next.rationale.push(`🧩 Спина по паттернам: ${Object.entries(backQuality).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы'}`);
   next.rationale.push(...backQualityIssues(next.weeks).map(issue => `⚠ Качество спины: ${issue}`));
+  // Руки по головкам (Этап 2/4): длинная/короткая/brachialis, overhead/pushdown.
+  const armQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => ['biceps', 'triceps', 'forearms'].includes(e.muscle))).reduce((acc, e) => {
+    const pattern = e.movementPattern || 'other';
+    acc[pattern] = (acc[pattern] || 0) + e.sets;
+    return acc;
+  }, {} as Record<string, number>);
+  const armSummary = Object.entries(armQuality).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы';
+  next.rationale.push(`💪 Руки по паттернам: ${armSummary}`);
+  next.rationale.push(...armQualityIssues(next.weeks).map(issue => `⚠ Качество рук: ${issue}`));
   const errors = validation.issues
     .filter(issue => issue.level === 'error')
     .slice(0, 20)
