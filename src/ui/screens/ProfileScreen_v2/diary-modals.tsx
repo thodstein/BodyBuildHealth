@@ -754,6 +754,7 @@ export const DiaryModalShell: React.FC<{
         @keyframes diary-badge-in { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes dm-pop { from { transform: scale(0.96) translateY(14px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes dm-slide-up { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes dm-slide-down { from { transform: translateY(-32px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes dm-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes dm-aurora {
           0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.75; }
@@ -784,11 +785,13 @@ export const DiaryModalShell: React.FC<{
         .dm-card .dm-primary-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
         .dm-card .dm-primary-btn:hover .dm-save-arrow { transform: translateX(3px); }
         .dm-card .dm-primary-btn:active { transform: translateY(0); }
+        .dm-card { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
+        .dm-card form { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
         @media (max-width: 480px) {
-          .dm-overlay { align-items: flex-end !important; padding: 0 !important; }
-          .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 88dvh !important; border-radius: 26px 26px 0 0 !important; margin: auto 0 0 0 !important; animation: dm-slide-up 0.28s cubic-bezier(0.32, 0.72, 0.28, 1) !important; }
-          .dm-card form { max-height: 88dvh !important; }
-          .dm-grabber { display: block !important; }
+          .dm-overlay { align-items: flex-start !important; padding: 0 !important; }
+          .dm-card { width: 100vw !important; max-width: 100vw !important; max-height: 100vh !important; max-height: 100dvh !important; border-radius: 0 0 26px 26px !important; margin: 0 auto !important; animation: dm-slide-down 0.26s cubic-bezier(0.32, 0.72, 0.28, 1) !important; }
+          .dm-card form { max-height: 100vh !important; max-height: 100dvh !important; }
+          .dm-grabber { display: none !important; }
         }
       `}</style>
       <div
@@ -815,7 +818,6 @@ export const DiaryModalShell: React.FC<{
           onClick={(e) => e.stopPropagation()}
           style={{
             width: `min(${width}px, 94vw)`,
-            maxHeight: 'calc(100dvh - 24px)',
             overflow: 'hidden',
             margin: 'auto',
             background:
@@ -830,7 +832,7 @@ export const DiaryModalShell: React.FC<{
         >
           <form
             onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
-            style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100dvh - 24px)', position: 'relative' }}
+            style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}
           >
             <div
               className="dm-grabber"

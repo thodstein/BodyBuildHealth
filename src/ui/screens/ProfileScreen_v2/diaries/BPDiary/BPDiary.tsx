@@ -428,7 +428,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         </div>
       )}
 
-      <main style={pageMain}>
+      <main style={{ ...pageMain, paddingBottom: 72 }}>
         {/* Filter bar */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
           {(['all', '7', '30', '90'] as const).map(x => (
@@ -748,7 +748,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
         <div style={{ position: 'fixed', inset: 0, zIndex: 2100, background: 'rgba(5,5,9,0.66)', backdropFilter: 'blur(10px)', display: 'flex', overflowY: 'auto', padding: 16 }}
           onClick={(e) => { if (e.target === e.currentTarget) setModal(false); }}>
           <form onSubmit={e => { e.preventDefault(); save(); }}
-            style={{ margin: 'auto', background: 'linear-gradient(165deg, rgba(36,36,48,0.98), rgba(19,19,26,0.98))', padding: 18, borderRadius: 20, border: `1px solid ${ACCENT}38`, width: 'min(560px,100%)', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', boxShadow: '0 24px 70px rgba(0,0,0,0.6)' }}>
+            style={{ margin: 'auto', background: 'linear-gradient(165deg, rgba(36,36,48,0.98), rgba(19,19,26,0.98))', padding: 18, borderRadius: 20, border: `1px solid ${ACCENT}38`, width: 'min(560px,100%)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', boxShadow: '0 24px 70px rgba(0,0,0,0.6)' }}>
             <h3>{editing ? '✏️ Редактирование АД' : '➕ Добавить запись АД'}</h3>
             {validationErrors.length > 0 && (
               <div style={{ background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.35)', borderRadius: 10, padding: 10, marginBottom: 10 }}>

@@ -256,7 +256,7 @@ const InjectionEditor: React.FC<{
         style={{
           ...card,
           width: 'min(760px, 100%)',
-          maxHeight: 'calc(100dvh - 28px)',
+          maxHeight: 'calc(100vh - 28px)',
           overflowY: 'auto',
           margin: 'auto',
           background: '#202024',
@@ -821,7 +821,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           { label: '🗑 Очистить дневник', onClick: clear, danger: true },
         ]}
       />
-      <main style={{ ...pageMain, maxWidth: 1180 }}>
+      <main style={{ ...pageMain, maxWidth: 1180, paddingBottom: 72 }}>
         <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap' }}>
           {(['journal', 'stats', 'chart'] as ViewMode[]).map((value) => (
             <button

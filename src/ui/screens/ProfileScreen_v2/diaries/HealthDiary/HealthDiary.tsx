@@ -909,7 +909,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
           { label: '🗑 Очистить дневник', onClick: () => { if (confirm('Очистить единый дневник здоровья?')) { commit([]); (window as any).showToast?.('🗑 Дневник очищен (можно отменить)'); } }, danger: true },
         ]}
       />
-      <main style={{ ...pageMain, maxWidth: 1150 }}>
+      <main style={{ ...pageMain, maxWidth: 1150, paddingBottom: 72 }}>
         {/* ── Sub-tabs ── */}
         <div style={{ display: 'flex', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
           {(

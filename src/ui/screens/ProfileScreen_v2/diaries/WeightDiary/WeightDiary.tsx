@@ -845,7 +845,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         ]}
       />
 
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '8px 14px 48px' }}>
+      <main style={{ maxWidth: 900, margin: '0 auto', padding: '8px 14px 72px' }}>
         {rows.length === 0 && (
           <div style={{ ...card, marginTop: 12 }}>
             <div style={{ textAlign: 'center', padding: '30px 12px' }}>

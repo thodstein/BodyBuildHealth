@@ -699,8 +699,6 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         position: 'fixed',
         inset: 0,
         zIndex: 2000,
-        height: '100dvh',
-        maxHeight: '100dvh',
         background:
           'radial-gradient(900px 480px at 15% -10%, rgba(167,139,250,0.13), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0a0a0d',
         color: colors.text,
@@ -847,7 +845,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         </div>
       </header>
 
-      <main style={{ padding: 16, maxWidth: 1100, margin: 'auto' }}>
+      <main style={{ padding: '16px 16px 72px', maxWidth: 1100, margin: 'auto' }}>
         {form && <SleepForm value={form} onCancel={() => setForm(null)} onSave={add} targetHours={goals.targetHours} />}
 
         {/* Фильтры */}
