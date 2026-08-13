@@ -36,8 +36,8 @@ describe('ZONE_ANCHORS / SIDE_ZONES', () => {
 
 describe('assignVertexZones', () => {
   it('присваивает зону вертексам внутри якорной сферы', () => {
-    // центр якоря "knees_r": (0.28, -0.55, 0.1)
-    const positions = new Float32Array([0.28, -0.55, 0.1]);
+    // центр якоря "knees_r": (0.08, -0.46, -0.34)
+    const positions = new Float32Array([0.08, -0.46, -0.34]);
     const out = assignVertexZones(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     const id = ZONE_ANCHORS[out[0]].id;
@@ -52,8 +52,8 @@ describe('assignVertexZones', () => {
 
   it('левая и правая стороны различаются', () => {
     const positions = new Float32Array([
-      -0.48, 0.6, 0.2,  // левое плечо
-      0.3, 0.6, 0.1,    // правое плечо
+      -0.45, 0.6, 0.12,   // левое плечо (рука поднята вперёд)
+      0.15, 0.35, -0.05,  // правое плечо
     ]);
     const out = assignVertexZones(positions);
     const ids = Array.from(out, (i) => (i >= 0 ? ZONE_ANCHORS[i].id : null));
@@ -63,9 +63,9 @@ describe('assignVertexZones', () => {
 
   it('плечи/локти/запястья распределяются по высоте рук', () => {
     const positions = new Float32Array([
-      -0.48, 0.6, 0.2,   // плечо
-      -0.55, 0.4, 0.3,   // локоть
-      -0.5, 0.15, 0.35,  // запястье
+      -0.45, 0.6, 0.12,   // плечо
+      -0.48, 0.36, 0.26,  // локоть
+      -0.37, 0.2, 0.34,   // запястье
     ]);
     const out = assignVertexZones(positions);
     const ids = Array.from(out, (i) => (i >= 0 ? ZONE_ANCHORS[i].id : null));
@@ -76,8 +76,8 @@ describe('assignVertexZones', () => {
 
   it('поясница и колени на центральной линии', () => {
     const positions = new Float32Array([
-      0, 0.12, 0,    // поясница
-      -0.28, -0.55, 0.1, // колено
+      0, 0.12, -0.45,   // поясница (зад, −z)
+      -0.25, -0.54, 0.34, // левое колено
     ]);
     const out = assignVertexZones(positions);
     const ids = Array.from(out, (i) => (i >= 0 ? ZONE_ANCHORS[i].id : null));
@@ -86,7 +86,7 @@ describe('assignVertexZones', () => {
   });
 
   it('голеностопы внизу ног', () => {
-    const positions = new Float32Array([0.28, -0.92, 0.1]);
+    const positions = new Float32Array([0.23, -0.93, -0.44]);
     const out = assignVertexZones(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     expect(ZONE_ANCHORS[out[0]].id).toBe('ankles_r');

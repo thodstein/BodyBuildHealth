@@ -27,21 +27,23 @@ export function baseZoneKey(zoneId: string): string {
   return zoneId.replace(/_(l|r)$/, '');
 }
 
-/** Якоря зон в мировых координатах hulk.glb (y: −1 стопы … +1 голова). 13 шт. */
+/** Якоря зон в мировых координатах hulk.glb (y: −1 стопы … +1 голова). 13 шт.
+ *  Измерены по фактической геометрии модели: фронт тела = +z (поза «боковая
+ *  грудь»: левая рука поднята вперёд, правая за корпусом, левая нога впереди). */
 export const ZONE_ANCHORS: ZoneAnchor[] = [
-  { id: 'shoulders_l', pos: [-0.48, 0.6, 0.2], r: 0.3 },
-  { id: 'shoulders_r', pos: [0.3, 0.6, 0.1], r: 0.3 },
-  { id: 'elbows_l', pos: [-0.55, 0.4, 0.3], r: 0.25 },
-  { id: 'elbows_r', pos: [0.55, 0.25, -0.2], r: 0.28 },
-  { id: 'wrists_l', pos: [-0.5, 0.15, 0.35], r: 0.22 },
-  { id: 'wrists_r', pos: [0.55, 0.05, -0.35], r: 0.25 },
-  { id: 'lower_back', pos: [0, 0.12, 0], r: 0.42 },
-  { id: 'hips_l', pos: [-0.2, -0.18, 0.15], r: 0.3 },
-  { id: 'hips_r', pos: [0.2, -0.18, 0.15], r: 0.3 },
-  { id: 'knees_l', pos: [-0.28, -0.55, 0.1], r: 0.28 },
-  { id: 'knees_r', pos: [0.28, -0.55, 0.1], r: 0.28 },
-  { id: 'ankles_l', pos: [-0.28, -0.92, 0.1], r: 0.3 },
-  { id: 'ankles_r', pos: [0.28, -0.92, 0.1], r: 0.3 },
+  { id: 'shoulders_l', pos: [-0.45, 0.6, 0.12], r: 0.3 },
+  { id: 'shoulders_r', pos: [0.15, 0.35, -0.05], r: 0.28 },
+  { id: 'elbows_l', pos: [-0.48, 0.36, 0.26], r: 0.22 },
+  { id: 'elbows_r', pos: [0.44, 0.2, -0.49], r: 0.22 },
+  { id: 'wrists_l', pos: [-0.37, 0.2, 0.34], r: 0.22 },
+  { id: 'wrists_r', pos: [0.49, 0.11, -0.42], r: 0.22 },
+  { id: 'lower_back', pos: [0, 0.12, -0.45], r: 0.3 },
+  { id: 'hips_l', pos: [-0.17, -0.22, 0.24], r: 0.3 },
+  { id: 'hips_r', pos: [0.08, -0.24, -0.26], r: 0.3 },
+  { id: 'knees_l', pos: [-0.25, -0.54, 0.34], r: 0.26 },
+  { id: 'knees_r', pos: [0.08, -0.46, -0.34], r: 0.26 },
+  { id: 'ankles_l', pos: [-0.25, -0.88, 0.46], r: 0.3 },
+  { id: 'ankles_r', pos: [0.23, -0.93, -0.44], r: 0.3 },
 ];
 
 /** Список зон-сторон для чипов: {id, base, label} — 13 шт. */
@@ -147,7 +149,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -164,15 +166,15 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     controls.target.set(0, 0.25, 0);
     controls.update();
 
-    const ambient = new THREE.AmbientLight('#aabbdd', 1.6);
+    const ambient = new THREE.AmbientLight('#aabbdd', 1.0);
     scene.add(ambient);
-    const key = new THREE.DirectionalLight('#ffffff', 2.4);
+    const key = new THREE.DirectionalLight('#ffffff', 1.8);
     key.position.set(2.5, 4, 4);
     scene.add(key);
-    const fill = new THREE.DirectionalLight('#99aacc', 1.1);
+    const fill = new THREE.DirectionalLight('#99aacc', 0.7);
     fill.position.set(-2.5, 0.5, -2);
     scene.add(fill);
-    const rim = new THREE.DirectionalLight('#dde6ff', 0.8);
+    const rim = new THREE.DirectionalLight('#dde6ff', 0.5);
     rim.position.set(0, 0, 3);
     scene.add(rim);
 
@@ -291,9 +293,9 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
             arr[i * 3 + 1] = zoneColor.g * 0.45;
             arr[i * 3 + 2] = zoneColor.b * 0.45;
           } else {
-            arr[i * 3] = zoneColor.r * 1.3;
-            arr[i * 3 + 1] = zoneColor.g * 1.3;
-            arr[i * 3 + 2] = zoneColor.b * 1.3;
+            arr[i * 3] = zoneColor.r * 1.5;
+            arr[i * 3 + 1] = zoneColor.g * 1.5;
+            arr[i * 3 + 2] = zoneColor.b * 1.5;
           }
         } else {
           // зона без боли — чёрный (текстура остаётся чистой)

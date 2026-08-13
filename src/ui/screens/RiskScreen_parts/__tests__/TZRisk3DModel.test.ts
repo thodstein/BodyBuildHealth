@@ -24,35 +24,35 @@ describe('assignVertexSystems', () => {
   });
 
   it('присваивает cardio вертексам груди', () => {
-    const positions = new Float32Array([-0.1, 0.45, 0.2]);
+    const positions = new Float32Array([-0.1, 0.3, 0.47]);
     const out = assignVertexSystems(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     expect(SYSTEM_ANCHORS[out[0]].id).toBe('cardio');
   });
 
   it('присваивает hepatic вертексам правой верхней части живота', () => {
-    const positions = new Float32Array([0.3, 0.25, -0.1]);
+    const positions = new Float32Array([0.22, 0.18, 0.4]);
     const out = assignVertexSystems(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     expect(SYSTEM_ANCHORS[out[0]].id).toBe('hepatic');
   });
 
   it('присваивает hematologic вертексам левой стороны', () => {
-    const positions = new Float32Array([-0.3, 0.2, 0.15]);
+    const positions = new Float32Array([-0.25, 0.16, 0.15]);
     const out = assignVertexSystems(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     expect(SYSTEM_ANCHORS[out[0]].id).toBe('hematologic');
   });
 
   it('присваивает renal вертексам поясницы (сзади)', () => {
-    const positions = new Float32Array([0, 0.06, -0.28]);
+    const positions = new Float32Array([0, 0.05, -0.45]);
     const out = assignVertexSystems(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     expect(SYSTEM_ANCHORS[out[0]].id).toBe('renal');
   });
 
   it('присваивает reproductive вертексам паха', () => {
-    const positions = new Float32Array([0, -0.75, 0.15]);
+    const positions = new Float32Array([0, -0.42, 0.25]);
     const out = assignVertexSystems(positions);
     expect(out[0]).toBeGreaterThanOrEqual(0);
     expect(SYSTEM_ANCHORS[out[0]].id).toBe('reproductive');

@@ -23,6 +23,7 @@ const TZ_SYSTEM_ICONS: Record<string, string> = {
 };
 
 // ── Якоря систем в мировых координатах hulk.glb (y: −1 стопы … +1 голова) ──
+// Измерены по фактической геометрии модели: фронт тела = +z.
 export interface SystemAnchor {
   id: string; // id системы ТЗ (cardio, hepatic, …)
   label: string;
@@ -31,13 +32,12 @@ export interface SystemAnchor {
 }
 
 export const SYSTEM_ANCHORS: SystemAnchor[] = [
-  { id: 'cns', label: 'Головной мозг', pos: [0, 0.9, 0.02], r: 0.26 },
-  { id: 'cardio', label: 'Сердце / грудь', pos: [-0.1, 0.45, 0.2], r: 0.38 },
-  { id: 'hepatic', label: 'Печень', pos: [0.3, 0.25, -0.1], r: 0.45 },
-  { id: 'hepatic', label: 'Печень', pos: [0.3, 0.05, -0.35], r: 0.4 },
-  { id: 'hematologic', label: 'Селезёнка / кровь', pos: [-0.3, 0.2, 0.15], r: 0.4 },
-  { id: 'renal', label: 'Почки / поясница', pos: [0, 0.06, -0.28], r: 0.38 },
-  { id: 'reproductive', label: 'Репродуктивная', pos: [0, -0.72, 0.12], r: 0.45 },
+  { id: 'cns', label: 'Головной мозг', pos: [0, 0.92, 0], r: 0.28 },
+  { id: 'cardio', label: 'Сердце / грудь', pos: [-0.1, 0.3, 0.47], r: 0.35 },
+  { id: 'hepatic', label: 'Печень', pos: [0.22, 0.18, 0.4], r: 0.35 },
+  { id: 'hematologic', label: 'Селезёнка / кровь', pos: [-0.25, 0.16, 0.15], r: 0.35 },
+  { id: 'renal', label: 'Почки / поясница', pos: [0, 0.05, -0.45], r: 0.35 },
+  { id: 'reproductive', label: 'Репродуктивная', pos: [0, -0.42, 0.25], r: 0.35 },
 ];
 
 /**
@@ -140,7 +140,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2;
+    renderer.toneMappingExposure = 1.0;
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -157,15 +157,15 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     controls.target.set(0, 0.25, 0);
     controls.update();
 
-    const ambient = new THREE.AmbientLight('#aabbdd', 1.6);
+    const ambient = new THREE.AmbientLight('#aabbdd', 1.0);
     scene.add(ambient);
-    const key = new THREE.DirectionalLight('#ffffff', 2.4);
+    const key = new THREE.DirectionalLight('#ffffff', 1.8);
     key.position.set(2.5, 4, 4);
     scene.add(key);
-    const fill = new THREE.DirectionalLight('#99aacc', 1.1);
+    const fill = new THREE.DirectionalLight('#99aacc', 0.7);
     fill.position.set(-2.5, 0.5, -2);
     scene.add(fill);
-    const rim = new THREE.DirectionalLight('#dde6ff', 0.8);
+    const rim = new THREE.DirectionalLight('#dde6ff', 0.5);
     rim.position.set(0, 0, 3);
     scene.add(rim);
 
@@ -271,9 +271,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               arr[i * 3 + 1] = zoneColor.g * 0.45;
               arr[i * 3 + 2] = zoneColor.b * 0.45;
             } else {
-              arr[i * 3] = zoneColor.r * 1.2;
-              arr[i * 3 + 1] = zoneColor.g * 1.2;
-              arr[i * 3 + 2] = zoneColor.b * 1.2;
+              arr[i * 3] = zoneColor.r * 1.5;
+              arr[i * 3 + 1] = zoneColor.g * 1.5;
+              arr[i * 3 + 2] = zoneColor.b * 1.5;
             }
           }
           colorAttr.needsUpdate = true;
