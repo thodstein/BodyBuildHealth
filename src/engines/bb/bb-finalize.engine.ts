@@ -1098,6 +1098,10 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
 
     for (const { muscle, landmarks, effectiveSets, target } of deficitByMuscle) {
       if (!landmarks || effectiveSets >= landmarks.mev) continue;
+      // Интеграция с builder-feeder: если мышца уже получила MEV coverage
+      // (builder-путь, до normalize) — finalize не дублирует свою добивку.
+      const weekHasBuilderFeeder = week.sessions.some(s => s.exercises.some(e => e.muscle === muscle && /MEV coverage/.test(e.rationale || '')));
+      if (weekHasBuilderFeeder) continue;
       const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle) === muscle));
       if (!session || session.exercises.length >= 10) continue;
       // Feeder volume is capped by MEV deficit, not full target deficit,
@@ -1110,9 +1114,16 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       const used = new Set(session.exercises.map(exercise => exercise.name));
       const baseWeight = options.workMax?.[muscle] || 50;
       const weight = Math.max(5, Math.round(baseWeight * 0.3 * 10) / 10);
+      // Интеграция с allocation: максимум 2 feeder-слота на мышцу (3+ одинаковых
+      // изоляций = мусор); deficit разбивается: первый слот до 5 сетов (cap),
+      // второй — остаток (макс. 3).
+      let feederSlots = 0;
       for (const candidate of candidates.filter(item => trueMuscleOf(item) === muscle && !used.has(item.name))) {
-        if (remaining <= 0 || session.exercises.length >= 10) break;
-        const sets = Math.min(2, Math.max(2, Math.ceil(remaining)));
+        if (remaining <= 0 || session.exercises.length >= 10 || feederSlots >= 2) break;
+        const sets = feederSlots === 0
+          ? Math.min(5, Math.max(2, Math.ceil(remaining / 2)))
+          : Math.min(3, Math.max(2, remaining));
+        if (sets < 2) break;
         const workSets = Array.from({ length: sets }, () => ({ reps: 15, rir: 3, weight, tempo: '3-0-1-0', restSeconds: 45 }));
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
@@ -1122,6 +1133,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
         });
         used.add(candidate.name);
         remaining -= sets;
+        feederSlots += 1;
       }
     }
   }
