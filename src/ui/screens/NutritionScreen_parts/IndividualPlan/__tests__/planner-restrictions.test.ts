@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { buildDayPlan } from '../meal-plan-engine';
+import { generateCheatMeal, generateCarbload, generateLazyDayPlan, generateCravingPlan } from '../planner-special-meals';
 import {
   USER_ALLERGEN_TO_TAGS,
   allergenTextMatches,
@@ -241,5 +242,60 @@ describe('buildDayPlan — аллергены и ограничения рабо
     expect(() => buildDayPlan(baseInput({ excludedIds: excluded }))).not.toThrow();
     const plan = buildDayPlan(baseInput({ excludedIds: excluded }));
     expect(plan.meals.length).toBeGreaterThan(0);
+  });
+
+  it('pre-sleep протокол не добавляет миндаль/кешью при аллергии на орехи (allergenTags)', () => {
+    for (let d = 0; d < 3; d++) {
+      const plan = buildDayPlan(baseInput({ dayOffset: d, allergenTags: new Set(['tree_nuts', 'nuts']) }));
+      const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
+      expect(allIds).not.toContain('almonds');
+      expect(allIds).not.toContain('cashew');
+    }
+  });
+
+  it('pre-sleep протокол не добавляет миндаль при excludedIds', () => {
+    const plan = buildDayPlan(baseInput({ excludedIds: new Set(['almonds', 'cashew']) }));
+    const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
+    expect(allIds).not.toContain('almonds');
+    expect(allIds).not.toContain('cashew');
+  });
+
+  it('MPS-добор и пост-тренировочный приём не используют whey при аллергии на молочные', () => {
+    for (let d = 0; d < 3; d++) {
+      const plan = buildDayPlan(baseInput({ dayOffset: d, allergenTags: new Set(['dairy']) }));
+      const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
+      for (const id of ['whey_isolate', 'whey_protein', 'whey_concentrate', 'casein']) {
+        expect(allIds, `dairy продукт в плане (${nameOf(id)})`).not.toContain(id);
+      }
+    }
+  });
+
+  it('киви/вишня в pre-sleep не исключаются без причины (регрессия: план остаётся наполненным)', () => {
+    const plan = buildDayPlan(baseInput({}));
+    expect(plan.meals.length).toBeGreaterThan(0);
+    expect(plan.totals.kcal).toBeGreaterThan(1500);
+  });
+
+  it('спец-режимы уважают исключения: карб-загрузка без глютена, lazy-день без молочки', () => {
+    const excludedGluten = resolveAllExcludedFoodIds(FOOD_DB, [], ['no_gluten']);
+    const carb = generateCarbload({ weight: 90, effectiveKcal: 3000, effectiveP: 180, effectiveF: 72, effectiveC: 408, goal: 'mass', cravingDays: 1, lazyDayDays: 1, trainingDays: [true, false, true, false, true, true, false], excludedIds: [...excludedGluten] });
+    for (const cf of (carb.foods || [])) {
+      const tags = getFoodAllergenTags(cf.name ? FOOD_DB.find(f => f.name === cf.name)?.id || '' : '', FOOD_DB);
+      expect(tags).not.toContain('gluten');
+    }
+    const excludedDairy = resolveAllExcludedFoodIds(FOOD_DB, ['молочные'], []);
+    const lazy = generateLazyDayPlan({ weight: 90, effectiveKcal: 3000, effectiveP: 180, effectiveF: 72, effectiveC: 408, goal: 'mass', cravingDays: 1, lazyDayDays: 1, trainingDays: [true, false, true, false, true, true, false], excludedIds: [...excludedDairy] });
+    for (const li of (lazy.items || [])) {
+      const f = FOOD_DB.find(x => x.id === li.id);
+      if (f) expect(getFoodAllergenTags(f.id, FOOD_DB)).not.toContain('dairy');
+    }
+  });
+
+  it('читмил/крэйвинг не предлагают исключённые продукты', () => {
+    const excluded = [...resolveAllExcludedFoodIds(FOOD_DB, ['молочные'], [])];
+    const cheat = generateCheatMeal({ weight: 90, effectiveKcal: 3000, effectiveP: 180, effectiveF: 72, effectiveC: 408, goal: 'mass', cravingDays: 1, lazyDayDays: 1, trainingDays: [true, false, true, false, true, true, false], excludedIds: excluded });
+    for (const it of (cheat.items || [])) {
+      expect(excluded).not.toContain(it.id);
+    }
   });
 });

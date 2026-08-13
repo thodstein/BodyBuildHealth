@@ -23,7 +23,7 @@ import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList в
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
-import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
+import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } from "./meal-plan-engine";
@@ -483,17 +483,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [injEster, setInjEster] = useState<'rapid' | 'short' | 'long' | 'none'>('none');
   // FIX train-bind: график тренировок персистится в he_train_bind и читается при старте
   // (раньше linkToTraining/trainStart/trainEnd/trainingDays сбрасывались при перезагрузке).
-  const _trainBindInit = (() => {
-    try {
-      const v = JSON.parse(localStorage.getItem('he_train_bind') || 'null');
-      if (v && typeof v === 'object') return normalizeTrainSchedule(v);
-    } catch {}
-    try {
-      const sch = (getProfile().settings as any)?.training?.schedule;
-      if (sch && typeof sch === 'object') return normalizeTrainSchedule(sch);
-    } catch {}
-    return DEFAULT_TRAIN_SCHEDULE;
-  })();
+  const _trainBindRef = useRef<TrainSchedule | null>(null);
+  if (_trainBindRef.current === null) {
+    _trainBindRef.current = (() => {
+      try {
+        const v = JSON.parse(localStorage.getItem('he_train_bind') || 'null');
+        if (v && typeof v === 'object') return normalizeTrainSchedule(v);
+      } catch {}
+      try {
+        const sch = (getProfile().settings as any)?.training?.schedule;
+        if (sch && typeof sch === 'object') return normalizeTrainSchedule(sch);
+      } catch {}
+      return DEFAULT_TRAIN_SCHEDULE;
+    })();
+  }
+  const _trainBindInit = _trainBindRef.current;
   const [trainStart, setTrainStart] = useState(_trainBindInit.startTime);
   const [trainEnd, setTrainEnd] = useState(_trainBindInit.endTime);
   const [linkToTraining, setLinkToTraining] = useState(_trainBindInit.enabled);
@@ -1597,7 +1601,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: (d1?.totals?.kcal || 0) + (d2?.totals?.kcal || 0) + (d3?.totals?.kcal || 0), p: (d1?.totals?.p || 0) + (d2?.totals?.p || 0) + (d3?.totals?.p || 0), f: (d1?.totals?.f || 0) + (d2?.totals?.f || 0) + (d3?.totals?.f || 0), c: (d1?.totals?.c || 0) + (d2?.totals?.c || 0) + (d3?.totals?.c || 0), fiber: (d1?.totals?.fiber||0) + (d2?.totals?.fiber||0) + (d3?.totals?.fiber||0) } });
       }
       if (days >= 7) {
-        weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(i));
+        // FIX train-bind: месяц смещает offset на weekIndex*7 — плавающий график (eod/pattern)
+        // продолжается через границу недель (раньше каждый месяц-week рестартовал паттерн,
+        // давая две тренировки подряд на стыке недель).
+        const _weekBase = weekIndex !== undefined ? weekIndex * 7 : 0;
+        weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(_weekBase + i));
         weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + (d?.totals?.kcal || 0), 0), p: weekDays.reduce((s: any,d: any) => s + (d?.totals?.p || 0), 0), f: weekDays.reduce((s: any,d: any) => s + (d?.totals?.f || 0), 0), c: weekDays.reduce((s: any,d: any) => s + (d?.totals?.c || 0), 0) }};
         if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
         else setWeekPlan(weekData);
@@ -1888,7 +1896,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const buildIntraWorkout = () => {
       const items: { name: string; id: string; amount: number; kcal: number; p: number; f: number; c: number }[] = [];
-      const eaa = FOOD_DB.find(f => f.id === 'supp_eaas') || FOOD_DB.find(f => f.id === 'bcaa');
+      // FIX allergens-restrictions: EAA/BCAA только если не исключены пользователем
+      const eaa = ['supp_eaas', 'bcaa'].map(id => FOOD_DB.find(f => f.id === id)).find(f => f && !excludedIds.has(f.id)) || null;
       if (eaa) { items.push({name:eaa.name,id:eaa.id,amount:15,kcal:Math.round(eaa.kcal*0.15),p:Math.round(eaa.protein*0.15),f:Math.round(eaa.fat*0.15),c:Math.round(eaa.carbs*0.15)}); }
       items.push({name:'Cluster Dextrin (циклический декстрин)',id:'cyclic_dextrin',amount:40,kcal:160,p:0,f:0,c:40});
       return { label:'🏋️ Intra-workout', time: trainStart?.includes(':') ? (() => { const h = parseInt(trainStart.split(':')[0]); const m = parseInt(trainStart.split(':')[1]) + 30; return `${String(h + Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; })() : '16:30', items, totals: {kcal:items.reduce((s,i)=>s+i.kcal,0),p:items.reduce((s,i)=>s+i.p,0),f:items.reduce((s,i)=>s+i.f,0),c:items.reduce((s,i)=>s+i.c,0)}, note:'EAA 10-15г + циклический декстрин 30-60г/ч — снижает катаболизм, поддерживает гликоген' };
@@ -2109,15 +2118,26 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const isCutting = goal === 'cutting' || goal === 'fat_loss';
           const isVeg = dietPrefs.includes('vegetarian');
           if (isBreakfast) {
+            // FIX allergens-restrictions: шаблон завтрака подменяет исключённые продукты
+            // безопасными альтернативами (раньше egg_white/миндаль попадали в план при аллергии)
             const bf = getBreakfastTemplate(isTrainingDay, isCutting, isVeg);
-            const bfP = FOOD_DB.find(f => f.id === bf.pId);
-            const bfC = FOOD_DB.find(f => f.id === bf.carbId);
-            const bfFat = FOOD_DB.find(f => f.id === bf.fatId);
-            const bfBerry = FOOD_DB.find(f => f.id === bf.berryId);
-            if (bfP) { const r = Math.min(2.5, (weight * bf.pG) / Math.max(1, bfP.protein)); let amt = Math.round(r * 100); const bfPCap = SUPP_CAP[bf.pId]; if (bfPCap) amt = Math.min(bfPCap, amt); items.push({name:bfP.name,id:bf.pId,amount:amt,kcal:Math.round(bfP.kcal*r),p:Math.round(bfP.protein*r),f:Math.round(bfP.fat*r),c:Math.round(bfP.carbs*r)}); }
-            if (bfC) { const r = Math.min(2.5, (weight * bf.cG) / Math.max(1, bfC.carbs || 1)); const amt = Math.round(r * 100); items.push({name:bfC.name,id:bf.carbId,amount:amt,kcal:Math.round(bfC.kcal*r),p:Math.round(bfC.protein*r),f:Math.round(bfC.fat*r),c:Math.round(bfC.carbs*r)}); }
-            if (bfFat) { const r = Math.min(2.0, (weight * bf.fG) / Math.max(1, bfFat.fat || 1)); const amt = Math.round(r * 100); items.push({name:bfFat.name,id:bf.fatId,amount:amt,kcal:Math.round(bfFat.kcal*r),p:Math.round(bfFat.protein*r),f:Math.round(bfFat.fat*r),c:Math.round(bfFat.carbs*r)}); }
-            if (bfBerry) { items.push({name:bfBerry.name,id:bf.berryId,amount:80,kcal:Math.round(bfBerry.kcal*0.8),p:Math.round(bfBerry.protein*0.8),f:Math.round(bfBerry.fat*0.8),c:Math.round(bfBerry.carbs*0.8)}); }
+            const _bfSafe = (id: string, fallbacks: string[]): string | null => {
+              if (!excludedIds.has(id)) return id;
+              const fb = fallbacks.find(x => !excludedIds.has(x));
+              return fb || null;
+            };
+            const bfPId = _bfSafe(bf.pId, isVeg ? ['supp_pea_protein', 'soy_isolate', 'lentils'] : ['chicken_breast', 'turkey_breast', 'supp_pea_protein', 'egg_white']);
+            const bfCId = _bfSafe(bf.carbId, ['oats', 'buckwheat', 'rice_white', 'potato_boiled', 'quinoa']);
+            const bfFatId = _bfSafe(bf.fatId, ['olive_oil', 'avocado', 'sunflower_seeds', 'chia_seeds']);
+            const bfBerryId = _bfSafe(bf.berryId, ['kiwi', 'apple', 'pear', 'blueberries']);
+            const bfP = bfPId ? FOOD_DB.find(f => f.id === bfPId) : null;
+            const bfC = bfCId ? FOOD_DB.find(f => f.id === bfCId) : null;
+            const bfFat = bfFatId ? FOOD_DB.find(f => f.id === bfFatId) : null;
+            const bfBerry = bfBerryId ? FOOD_DB.find(f => f.id === bfBerryId) : null;
+            if (bfP && bfPId) { const r = Math.min(2.5, (weight * bf.pG) / Math.max(1, bfP.protein)); let amt = Math.round(r * 100); const bfPCap = SUPP_CAP[bfPId]; if (bfPCap) amt = Math.min(bfPCap, amt); items.push({name:bfP.name,id:bfPId,amount:amt,kcal:Math.round(bfP.kcal*r),p:Math.round(bfP.protein*r),f:Math.round(bfP.fat*r),c:Math.round(bfP.carbs*r)}); }
+            if (bfC && bfCId) { const r = Math.min(2.5, (weight * bf.cG) / Math.max(1, bfC.carbs || 1)); const amt = Math.round(r * 100); items.push({name:bfC.name,id:bfCId,amount:amt,kcal:Math.round(bfC.kcal*r),p:Math.round(bfC.protein*r),f:Math.round(bfC.fat*r),c:Math.round(bfC.carbs*r)}); }
+            if (bfFat && bfFatId) { const r = Math.min(2.0, (weight * bf.fG) / Math.max(1, bfFat.fat || 1)); const amt = Math.round(r * 100); items.push({name:bfFat.name,id:bfFatId,amount:amt,kcal:Math.round(bfFat.kcal*r),p:Math.round(bfFat.protein*r),f:Math.round(bfFat.fat*r),c:Math.round(bfFat.carbs*r)}); }
+            if (bfBerry && bfBerryId) { items.push({name:bfBerry.name,id:bfBerryId,amount:80,kcal:Math.round(bfBerry.kcal*0.8),p:Math.round(bfBerry.protein*0.8),f:Math.round(bfBerry.fat*0.8),c:Math.round(bfBerry.carbs*0.8)}); }
             remainingP -= items.reduce((s:number,i:any)=>s+(i.p||0),0);
             remainingF -= items.reduce((s:number,i:any)=>s+(i.f||0),0);
             remainingC -= items.reduce((s:number,i:any)=>s+(i.c||0),0);
@@ -2300,9 +2320,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const hasFastProtein = morningMeal.items.some((it: any) => fastProteinIds.includes(it.id));
         const morningP = morningMeal.items.reduce((s: number, i: any) => s + (i.p || 0), 0);
         if (!hasFastProtein || morningP < 25) {
-          const mpId = dietPrefs.includes('vegetarian') ? 'supp_pea_protein' : 'whey_isolate';
-          const mp = FOOD_DB.find(f => f.id === mpId);
-          if (mp) {
+          // FIX allergens-restrictions: whey не добавляется при аллергии на молочные/яйца —
+          // ищем первый безопасный быстрый белок из цепочки
+          const mpChain = dietPrefs.includes('vegetarian')
+            ? ['supp_pea_protein', 'soy_isolate', 'whey_isolate', 'egg_white']
+            : ['whey_isolate', 'egg_white', 'chicken_breast', 'supp_pea_protein'];
+          const mpId = mpChain.find(id => !excludedIds.has(id)) || null;
+          const mp = mpId ? FOOD_DB.find(f => f.id === mpId) : null;
+          if (mp && mpId) {
             const needG = Math.max(10, 25 - Math.max(0, morningP));
             const r = Math.min(0.5, needG / Math.max(1, mp.protein));
             const amt = Math.round(r * 100);
@@ -2316,9 +2341,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // T2.2 — Pre-bed sleep protocol: casein + Mg + melatonin foods
         const hasCasein = lastMeal.items.some((it: any) => caseinIds.includes(it.id));
         if (!hasCasein) {
-          const caseinId = dietPrefs.includes('vegetarian') ? 'cottage_cheese_5' : 'casein';
-          const casein = FOOD_DB.find(f => f.id === caseinId);
-          if (casein) {
+          // FIX allergens-restrictions: казеин/творог только если не исключены
+          // (раньше при аллергии на молочные всё равно добавлялся casein)
+          const caseinChain = dietPrefs.includes('vegetarian')
+            ? ['cottage_cheese_5', 'casein', 'yogurt_greek']
+            : ['casein', 'cottage_cheese_5', 'yogurt_greek'];
+          const caseinId = caseinChain.find(id => !excludedIds.has(id)) || null;
+          const casein = caseinId ? FOOD_DB.find(f => f.id === caseinId) : null;
+          if (casein && caseinId) {
             const caseinPG = Math.min(40, Math.round(weight * 0.4));
             const r = Math.min(2.0, caseinPG / Math.max(1, casein.protein));
             const amt = Math.round(r * 100);
@@ -2328,7 +2358,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // Add Mg-rich food for GABA/melatonin pathway
         const hasMg = lastMeal.items.some((it: any) => ['pumpkin_seeds','almonds','spinach'].includes(it.id));
         if (!hasMg) {
-          const mgFood = FOOD_DB.find(f => f.id === 'pumpkin_seeds') || FOOD_DB.find(f => f.id === 'almonds');
+          // FIX allergens-restrictions: миндаль не добавляется при аллергии на орехи
+          const mgFood = ['pumpkin_seeds', 'almonds', 'spinach'].map(id => FOOD_DB.find(f => f.id === id)).find(f => f && !excludedIds.has(f.id)) || null;
           if (mgFood) {
             lastMeal.items.push({name:mgFood.name,id:mgFood.id,amount:20,kcal:Math.round(mgFood.kcal*0.2),p:Math.round(mgFood.protein*0.2),f:Math.round(mgFood.fat*0.2),c:Math.round(mgFood.carbs*0.2)});
           }
@@ -2336,7 +2367,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // Add natural melatonin source (kiwi or cherry) if not already present
         const hasMelatonin = lastMeal.items.some((it: any) => ['kiwi','cherry','tart_cherry'].includes(it.id));
         if (!hasMelatonin) {
-          const melFood = FOOD_DB.find(f => f.id === 'kiwi') || FOOD_DB.find(f => f.id === 'cherry');
+          const melFood = ['kiwi', 'cherry'].map(id => FOOD_DB.find(f => f.id === id)).find(f => f && !excludedIds.has(f.id)) || null;
           if (melFood) {
             lastMeal.items.push({name:melFood.name,id:melFood.id,amount:100,kcal:Math.round(melFood.kcal),p:Math.round(melFood.protein),f:Math.round(melFood.fat),c:Math.round(melFood.carbs)});
           }
@@ -2375,7 +2406,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
     if (days >= 7) {
-      weekDays = Array.from({ length: 7 }, (_, i) => buildDay(i, isTrainDay(i)));
+      // FIX train-bind: смещение месяца (см. V2-путь) — плавающий график не рвётся на границе недель
+      const _weekBase = weekIndex !== undefined ? weekIndex * 7 : 0;
+      weekDays = Array.from({ length: 7 }, (_, i) => buildDay(_weekBase + i, isTrainDay(_weekBase + i)));
       if (periodizationEnabled) {
         const pWeek = weekIndex !== undefined ? weekIndex % 5 : 0;
         if (pWeek === 0 || pWeek === 4) {
@@ -2463,15 +2496,17 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // FIX train-bind: спец-режимы получают тренировочные дни как производный 7-дневный
   // массив (weekly/eod/pattern → единый формат boolean[7]).
   const _trainDaysArr = Array.from({ length: 7 }, (_, i) => isTrainDay(i));
-  const generateCheatMeal = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
+  // FIX allergens-restrictions: спец-режимы уважают исключения пользователя
+  const _smExcludedIds = [...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || [])];
+  const generateCheatMeal = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
 
-  const generateCarbload = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
+  const generateCarbload = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
 
-  const generateBUTCH = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setButchPlan(generateBUTCHSm(_smDeps)); };
+  const generateBUTCH = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setButchPlan(generateBUTCHSm(_smDeps)); };
 
-  const generateCravingPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setCravingPlan(generateCravingPlanSm(_smDeps)); };
+  const generateCravingPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCravingPlan(generateCravingPlanSm(_smDeps)); };
 
-  const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
+  const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
 
   const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections: Array.isArray(injections) ? injections : [], linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {}, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
 

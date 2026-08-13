@@ -959,7 +959,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
 }
 
 // ─── МЕТОД: pre-sleep казеиновый приём ───────────────────────────────
-function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; preferredIds?: Set<string> }): Meal {
+function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; preferredIds?: Set<string>; excludedIds?: Set<string>; allergenTags?: Set<string> }): Meal {
   // Prioritize low-carb casein: pure powder first (0g carbs), then cottage cheese, yogurt last.
   // Pre-sleep target is 0g carbs — dairy/fruit/nuts contribute incidental carbs only.
   const caseinPowder = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'casein' || f.id === 'casein_micellar') : undefined;
@@ -990,11 +990,22 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
     }
   }
   // Mg-источник: тыквенные семечки/миндаль/кешью — ротация по seed, reduced to 10g (was 15g)
-  const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id));
+  // FIX allergens-restrictions: фильтр исключений/аллергенов (раньше миндаль/кешью
+  // попадали в план даже при аллергии на орехи).
+  const _exclOk = (f: FoodItem): boolean => {
+    if (opts?.excludedIds && opts.excludedIds.has(f.id)) return false;
+    if (opts?.allergenTags && opts.allergenTags.size > 0) {
+      const diet = FOOD_ALLERGEN_DIET[f.id];
+      const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+      if ([...opts.allergenTags].some(t => tags.includes(t))) return false;
+    }
+    return true;
+  };
+  const mgPool = FOOD_DB.filter(f => ['pumpkin_seeds','sunflower_seeds','almonds','cashew'].includes(f.id) && _exclOk(f));
   const mgSource = pickPriority(mgPool as any as FoodItem[], seed + 1, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds }) as any || mgPool[0];
   if (mgSource) items.push(makeItem(mgSource, 10, 'fat'));
   // Мелатонин-источник: киви/вишня/ягоды — ротация, reduced to 50g (was 100g)
-  const melPool = FOOD_DB.filter(f => f.id === 'kiwi' || f.id === 'cherry' || f.id.includes('berries'));
+  const melPool = FOOD_DB.filter(f => (f.id === 'kiwi' || f.id === 'cherry' || f.id.includes('berries')) && _exclOk(f));
   const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds }) as any || melPool[0];
   if (melSource) items.push(makeItem(melSource, 50, 'fruit'));
 
@@ -1412,7 +1423,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // Sort meals by time (chronological order)
