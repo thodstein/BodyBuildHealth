@@ -85,7 +85,7 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
       continue;
     }
     // Нет слотов — добавляем, если позволяет лимит упражнений сессии.
-    const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+    const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
     if (working.length >= maxEx) continue;
     const candidate = EXERCISE_CATALOG.find((x: any) => {
       if (trueMuscleOf(x) !== canonical) return false;
@@ -641,6 +641,30 @@ function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptio
       });
     }
   }
+  // Средняя дельта идёт с грудью (Push-связка): если mid-delt изоляции нет —
+  // гарантируем lateral raise (3×12-18 памп) в пределах лимита сессии.
+  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+  const workingCount = session.exercises.filter((e: any) => !(e as any).warmupActivator).length;
+  const hasMidDelt = session.exercises.some((e: any) => e.muscle === 'shoulders' && /мах|lateral|raise|отведен|разведен/i.test(e.name || '') && !/наклон|задн|rear|обратн/i.test(e.name || ''));
+  if (!hasMidDelt && workingCount < maxEx) {
+    const lateral = EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== 'shoulders') return false;
+      if (!/мах|lateral|raise|отведен|разведен/i.test(x.name || '')) return false;
+      if (/наклон|задн|rear|обратн/i.test(x.name || '')) return false;
+      if (session.exercises.some((e: any) => e.name === x.name)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      return true;
+    });
+    if (lateral) {
+      const baseWeight = options.workMax?.shoulders || 50;
+      session.exercises.push({
+        muscle: 'shoulders', name: lateral.name, exerciseName: lateral.name, role: 'accessory', character: 'памп',
+        sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 45, warmupSets: [],
+        workSets: Array.from({ length: 3 }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.25 * 10) / 10, restSeconds: 45 })),
+        rationale: 'Experienced enhanced: mid delt с грудью (Push-связка, lateral raise)',
+      });
+    }
+  }
 }
 
 /** Гарантирует rear delt работу в Pull-дне (задняя дельта — тяговая мышца). */
@@ -746,7 +770,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
     return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
   };
   const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
-  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   const isEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
   const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string): void => {
     if (working.length >= maxEx) return;
@@ -788,15 +812,18 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
       addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват)');
     }
   }
-  // Трапеции: шраги доводятся до 4-5 сетов (stretch + задержка вверху).
+  // Трапеции: шраги доводятся до MEV (natural 5 / enhanced 6) сетов — stretch
+  // + задержка вверху; если шрагов в сессии нет — добавляем (до 2 источников).
   if (/Pull|Back|Upper|Torso/.test(tag)) {
     const shrug = working.find((e: any) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
     if (shrug) {
-      const targetSets = isEnhanced ? 5 : 4;
+      const targetSets = isEnhanced ? 6 : 5;
       if (shrug.sets < targetSets) {
         const sample = shrug.workSets?.[shrug.workSets.length - 1] || { reps: 12, rir: 3, weight: 0 };
         while (shrug.sets < targetSets) { shrug.workSets.push({ ...sample }); shrug.sets += 1; }
       }
+    } else if (weekCountOf('traps') < 2) {
+      addEx('traps', /шраг|shrug/i, isEnhanced ? 6 : 5, [12, 18], 'Малые группы: шраги (stretch, задержка вверху)');
     }
   }
 }
@@ -1320,14 +1347,21 @@ for (const week of next.weeks) {
       const w: any = week;
       if (w.phase !== 'deload' && !week.sessions.some(s => s.exercises.some(e => /разгруз|deload/i.test(e.comment || '')))) {
         const sessionsWith = new Map<string, number>();
-        for (const s of week.sessions) for (const e of s.exercises) {
-          if ((e as any).warmupActivator) continue;
-          sessionsWith.set(e.muscle, (sessionsWith.get(e.muscle) || 0) + 1);
+        for (const s of week.sessions) {
+          const seenInSession = new Set<string>();
+          for (const e of s.exercises) {
+            if ((e as any).warmupActivator) continue;
+            seenInSession.add(e.muscle);
+          }
+          for (const m of seenInSession) sessionsWith.set(m, (sessionsWith.get(m) || 0) + 1);
         }
         for (const [muscle, freq] of sessionsWith) {
           const lm = getVolumeLandmarks(options.level, muscle);
           if (!lm) continue;
-          guardMap[muscle] = Math.max(2, Math.ceil(lm.mev / freq));
+          // Малые группы — константный минимум (freq может раздуваться
+          // промежуточными проходами, ломая guard): calves 5, traps 6 (MEV
+          // enhanced), forearms/abs 5.
+          guardMap[muscle] = muscle === 'traps' ? 6 : ['calves', 'forearms', 'abs'].includes(muscle) ? 5 : Math.max(2, Math.ceil(lm.mev / freq));
         }
       }
     }
@@ -1375,6 +1409,20 @@ for (const week of next.weeks) {
     }
   }
   syncBBPlanSetShape(next);
+  // Глобальный кап: максимум 5 рабочих сетов на упражнение (про-правило) —
+  // source-планы (program/cycle) могут нести 8+ сетов из исходника; объём
+  // добивается дополнительными упражнениями, а не 6-8 подходами в одном.
+  if (!options.preserveSource) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      for (const e of session.exercises) {
+        if ((e as any).warmupActivator) continue;
+        if (e.sets > 5) {
+          e.sets = 5;
+          if (Array.isArray(e.workSets) && e.workSets.length > 5) e.workSets = e.workSets.slice(0, 5);
+        }
+      }
+    }
+  }
   // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.
   if (!options.preserveSource) {
@@ -1402,11 +1450,11 @@ for (const week of next.weeks) {
       const template = session.exercises[0];
       if (!template) continue;
       // Не превышаем level-aware лимит упражнений в сессии (10 natural / 18 enhanced).
-      const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+      const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
       const workingCount = () => session.exercises.filter((e: any) => !(e as any).warmupActivator).length;
       if (workingCount() >= maxEx) continue;
       // Сетовой лимит сессии (60 enhanced 3+ / 24 natural) не превышаем.
-      const maxSessionSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : 24;
+      const maxSessionSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 40 : 24;
       const sessionSets = () => session.exercises.reduce((sum: number, e: any) => sum + (e.sets || 0), 0);
       const needMuscles = /FullBody/.test(tag)
         ? ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'calves', 'forearms', 'abs', 'traps']

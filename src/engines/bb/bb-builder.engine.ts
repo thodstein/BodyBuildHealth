@@ -3139,8 +3139,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     checkOrder: true,
     // Высокообъёмный предел применяется только при явно переданном стаже
     // enhanced-атлета; натуральные и legacy-вызовы сохраняют 24/10.
-    maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : 24,
-    maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : 10,
+    maxWorkingSets: (level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24),
+    maxExercises: (level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10),
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
   });

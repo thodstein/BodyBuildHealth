@@ -63,7 +63,7 @@ export function estimateBBSessionCost(session: BBSession): BBSessionCost {
  * удаляются резервные упражнения.
  */
 export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget = {}): { removed: BBExercise[]; cost: BBSessionCost } {
-  const maxTime = budget.maxTimeSeconds ?? 100 * 60;
+    const maxTime = budget.maxTimeSeconds ?? 100 * 60;
   const maxAxial = budget.maxAxial ?? 16;
   const minSets = Math.max(1, budget.minSetsPerExercise ?? 2);
   const maxExercises = Math.max(1, budget.maxExercises ?? 10);
@@ -91,6 +91,12 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
   const removable = (exercise: BBExercise): number => {
     // Разминочное упражнение не удаляется (не входит в рабочий бюджет).
     if ((exercise as any).warmupActivator) return -Infinity;
+    // Мышца с повышенным MEV-флором (guard > базового minSets): её ПОСЛЕДНЕЕ
+    // упражнение не удаляется — иначе план получает deficit (0 сетов мышцы).
+    // Дубли удалять можно: стимул сохраняется, лимит сессии соблюдается.
+    const floorRaised = floorFor(exercise.muscle) > minSets;
+    const lastForMuscle = session.exercises.filter(e => e.muscle === exercise.muscle).length <= 1;
+    if (floorRaised && lastForMuscle) return -Infinity;
     const cost = estimateBBExerciseCost(exercise);
     const finisher = exercise.character === 'памп' || exercise.repsRange?.[0] >= 15 ? 20 : 0;
     const accessory = exercise.role === 'accessory' ? 10 : 0;
@@ -125,6 +131,7 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     }
     const candidates = session.exercises
       .map((exercise, index) => ({ exercise, index, score: removable(exercise) }))
+      .filter(item => Number.isFinite(item.score))
       .filter(item => item.exercise.role !== 'primary')
       .filter(item => session.exercises.filter(ex => ex.muscle === item.exercise.muscle).length > 1 || present.size > 1)
       .sort((a, b) => b.score - a.score);
@@ -132,5 +139,5 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     if (!candidate) break;
     removed.push(...session.exercises.splice(candidate.index, 1));
   }
-  return { removed, cost: estimateBBSessionCost(session) };
+    return { removed, cost: estimateBBSessionCost(session) };
 }
