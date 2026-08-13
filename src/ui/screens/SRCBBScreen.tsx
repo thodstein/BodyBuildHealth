@@ -11,11 +11,12 @@ import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
-import { adaptForPEDs, explainPEDAdaptation, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
+import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import { DayCard, type PlanDayView, type PlanExerciseView, type PhaseKey } from './TrainingScreen_parts/PlanOutput';
+import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
 
 import { AutoregPanel } from './SRCBBScreen_parts/AutoregPanel';
 import { PeakingPanel } from './SRCBBScreen_parts/PeakingPanel';
@@ -761,7 +762,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setSubView('plan'); // показать пересобранный план
   }, [pmSquat, pmBench, pmDead, weakPoints, bbDays, bbWorkMax, mrvOverride, mainTab]);
   const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, mrvOverride != null ? mrvOverride : v.mrv])), [bbLevel, mrvOverride]);
-  const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv), [peds, baseMrv]);
+  const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv, pedDoses, courseIntensity), [peds, baseMrv, pedDoses, courseIntensity]);
 
   const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
   const srcDays: PlayerDay[] = useMemo(() => {
@@ -1151,65 +1152,25 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
           </div>
            {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
-          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, gap:8, flexWrap:'wrap' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, flex: 1, minWidth: 0 }}>💉 PED / Курс — адаптация объёмов</div>
-              <button onClick={() => setPedAuto(a => !a)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : 'var(--text-dim)', flexShrink: 0 }}>АВТО {pedAuto ? 'ON' : 'OFF'}</button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => (
-                <button key={p} onClick={() => togglePed(p)}
-                  style={{ padding: '6px 12px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: peds.includes(p) ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: peds.includes(p) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: peds.includes(p) ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
-                  {['AAS: ААС','insulin: Инсулин','MGF: MGF','IGF1: IGF-1','GH: ГР'][['AAS','insulin','MGF','IGF1','GH'].indexOf(p)]}{peds.includes(p) ? ' ✓' : ''}
+                     <div style={{ marginTop: 10 }}>
+            <PedInputPanel
+              peds={peds}
+              onToggle={togglePed}
+              pedDoses={pedDoses}
+              onDose={(p, v) => setPedDoses(d => ({ ...d, [p]: v }))}
+              courseIntensity={courseIntensity}
+              onIntensity={setCourseIntensity}
+              headerExtra={
+                <button onClick={() => setPedAuto(a => !a)} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : 'var(--text-dim)', flexShrink: 0, minHeight: 32 }}>
+                  АВТО {pedAuto ? 'ON' : 'OFF'}
                 </button>
-              ))}
-            </div>
+              }
+            />
             {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ включена: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} интенсивность → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
             {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
-            {peds.length > 0 && (
-              <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Дозировки (мг/нед или МЕ/нед)</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6 }}>
-                  {peds.map(p => {
-                    const labels: Record<string, string> = { AAS: 'ААС, мг/нед', insulin: 'Инсулин, МЕ/день', MGF: 'MGF, мкг/нед', IGF1: 'IGF-1, мкг/день', GH: 'ГР, МЕ/день' };
-                    return (
-                      <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
-                        <input type="number" value={pedDoses[p] || 0} min={0} max={p === 'AAS' ? 3000 : p === 'insulin' ? 50 : 500}
-                          onChange={e => {
-                            // P1-fix: parseInt("1e3")=1 (stops at 'e'). Number() handles scientific notation correctly.
-                            const v = Number(e.target.value);
-                            setPedDoses(d => ({ ...d, [p]: Number.isFinite(v) ? Math.max(0, v) : 0 }));
-                          }}
-                          style={{ width: '100%', padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center', boxSizing: 'border-box' }} />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {peds.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Интенсивность курса</div>
-                <div role="radiogroup" aria-label="Интенсивность курса" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {([['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']] as const).map(([val,label]) => (
-                    <button key={val} role="radio" aria-checked={courseIntensity === val} aria-label={label} onClick={() => setCourseIntensity(val)}
-                      style={{ padding: '5px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                        border: courseIntensity === val ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-                        background: courseIntensity === val ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-                        color: courseIntensity === val ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {peds.length > 0 && (
-              <div style={{ ...SMALL, marginTop: 6 }}>
-                Режим курса: MRV повышен ×{(courseIntensity === 'heavy' ? 1.35 : courseIntensity === 'moderate' ? 1.25 : 1.15).toFixed(2)} (как в ББ-авто). Дозировки: {peds.map(p => `${p} ${pedDoses[p] || 0}`).join(', ')}.
-              </div>
-            )}
+            <PedAdaptationCard adaptation={pedAdapt} />
           </div>
+
            <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
           {/* 🏁 Соревнование + тапер: вес → рекомендации по сбросу, тапер-недели к активному циклу, новый цикл на выбор */}
           {(() => {
@@ -2002,7 +1963,7 @@ legs: [
            </div>
            {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
            {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
-          {peds.length > 0 && <ExpandableCard title="Адаптация объёмов под PED" icon="💉" short={explainPEDAdaptation(pedAdapt)} full={null} />}
+           <PedAdaptationCard adaptation={pedAdapt} />
           <div style={{ ...H, marginTop: 10 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
             {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={400} suffix=' кг' onChange={v => setBbWm(k, v)} />)}

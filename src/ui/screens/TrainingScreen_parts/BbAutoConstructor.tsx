@@ -25,7 +25,8 @@ import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
 import { calcBBPlanMetrics, explainBBMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
-import { adaptForPEDs, explainPEDAdaptation, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
+import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
@@ -1481,54 +1482,15 @@ export const BbAutoConstructor: React.FC = () => {
   const renderPedWorkMax = () => (
     <div>
       <div style={H}>💉 Шаг 2: Фармакология и рабочие веса</div>
-      <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)', marginBottom:10 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:ACCENT, marginBottom:6 }}>PED-адаптация объёмов</div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-          {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => (
-            <button key={p} onClick={() => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
-              style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', border:peds.includes(p)?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background:peds.includes(p)?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.02)', color:peds.includes(p)?'#00e68a':'rgba(255,255,255,0.6)' }}>
-              {['AAS: ААС','insulin: Инсулин','MGF: MGF','IGF1: IGF-1','GH: ГР'][['AAS','insulin','MGF','IGF1','GH'].indexOf(p)]}{peds.includes(p)?' ✓':''}
-            </button>
-          ))}
-        </div>
-        {/* FIX-15: Дозировки активных PED */}
-        {peds.length > 0 && (
-          <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.5)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.03em' }}>Дозировки (мг/нед или МЕ/нед)</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-              {peds.map(p => {
-                const labels: Record<string, string> = { AAS: 'ААС, мг/нед', insulin: 'Инсулин, МЕ/день', MGF: 'MGF, мкг/нед', IGF1: 'IGF-1, мкг/день', GH: 'ГР, МЕ/день' };
-                const steps: Record<string, number> = { AAS: 50, insulin: 5, MGF: 50, IGF1: 10, GH: 1 };
-                return (
-                  <div key={p} style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>{labels[p] || p}</span>
-                    <input type="number" value={pedDoses[p] || 0} min={0} max={p === 'AAS' ? 3000 : p === 'insulin' ? 50 : 500}
-                      onChange={e => setPedDoses(d => ({ ...d, [p]: parseInt(e.target.value) || 0 }))}
-                      style={{ width:'100%', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:11, fontWeight:700, textAlign:'center', boxSizing:'border-box' }} />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {peds.length > 0 && <div style={{ ...SMALL, marginTop:6 }}>{explainPEDAdaptation(pedAdapt)}</div>}
-        {peds.length > 0 && (
-          <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:4 }}>Интенсивность курса</div>
-            <div style={{ display:'flex', gap:6 }}>
-              {([['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']] as const).map(([val,label]) => (
-                <button key={val} onClick={() => setCourseIntensity(val)}
-                  style={{ padding:'5px 10px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer',
-                    border: courseIntensity===val ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-                    background: courseIntensity===val ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-                    color: courseIntensity===val ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            </div>
-          )}
-          {/* Рекомендации по питанию */}
+      <PedInputPanel
+        peds={peds}
+        onToggle={p => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])}
+        pedDoses={pedDoses}
+        onDose={(p, v) => setPedDoses(d => ({ ...d, [p]: v }))}
+        courseIntensity={courseIntensity}
+        onIntensity={setCourseIntensity}
+      />
+      <PedAdaptationCard adaptation={pedAdapt} />          {/* Рекомендации по питанию */}
           {(() => {
             const nut: Record<string, { cal: string; pro: string; tip: string }> = {
               mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
@@ -1556,7 +1518,6 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
             );
           })()}
-        </div>
       <div style={H}>💪 Рабочие максимумы (кг)</div>
       <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>
         💡 Введите <b>рабочий вес на 5-8 повторений</b> (НЕ 1ПМ!) для каждой группы. Например: жим лёжа 100кг×8 → «Грудь 100».
