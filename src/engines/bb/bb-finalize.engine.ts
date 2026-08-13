@@ -302,6 +302,92 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
   }
   }
 
+/**
+ * Баланс спины width/thickness (план D): широчайшие (vertical + lat-изоляции)
+ * не должны быть ниже 60% объёма толщины (rows), если не указана слабая
+ * подгруппа. Добираем сеты width-упражнений до 5 (cap) или добавляем
+ * vertical/lat-упражнение в пределах лимитов сессии.
+ */
+function ensureBackBalance(session: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const back = session.exercises.filter((e: any) => e.muscle === 'back' && !(e as any).warmupActivator);
+  if (!back.length) return;
+  const isWidth = (p: string) => p === 'vertical_pull' || p === 'lat_isolation';
+  const isThickness = (p: string) => p === 'heavy_row' || p === 'supported_row' || p === 'unilateral_row';
+  let width = 0, thickness = 0;
+  for (const e of back) {
+    const p = annotateBackExercise(e).movementPattern || '';
+    if (isWidth(p)) width += e.sets;
+    else if (isThickness(p)) thickness += e.sets;
+  }
+  if (thickness <= 0 || width >= thickness * 0.6) return;
+  const target = Math.ceil(thickness * 0.6);
+  const usedNames = new Set(back.map((e: any) => e.name));
+  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : 10;
+  const workingCount = session.exercises.filter((e: any) => !(e as any).warmupActivator).length;
+  // 1. Добираем сеты существующих width-упражнений до 5.
+  for (const e of back) {
+    if (width >= target || e.sets >= 5) continue;
+    const p = annotateBackExercise(e).movementPattern || '';
+    if (!isWidth(p)) continue;
+    while (e.sets < 5 && width < target) {
+      const sample = e.workSets?.[e.workSets.length - 1] || { reps: 12, rir: 2, weight: 0 };
+      e.workSets.push({ ...sample });
+      e.sets += 1;
+      width += 1;
+    }
+  }
+  // 2. Если всё ещё мало — добавляем vertical/lat-упражнение (в пределах лимитов).
+  if (width < target && workingCount < maxEx) {
+    const candidate = EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== 'back') return false;
+      if (usedNames.has(x.name)) return false;
+      const p = annotateBackExercise({ ...(back[0] as any), name: x.name } as any).movementPattern || '';
+      if (!isWidth(p)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (options.equipment?.length) {
+        const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+        if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+      }
+      return true;
+    });
+    if (candidate) {
+      const base = back[0];
+      const sample = base.workSets?.[0] || { reps: 12, rir: 2, weight: 0 };
+      session.exercises.push({
+        muscle: 'back', name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+        sets: Math.min(5, target - width), repsRange: [12, 18], rir: 3, restSeconds: 75, warmupSets: [],
+        workSets: Array.from({ length: Math.min(5, target - width) }, () => ({ ...sample, reps: 15, rir: 3, restSeconds: 75 })),
+        rationale: 'Баланс спины: добивка широчайших (width) под 60% толщины',
+      });
+    }
+  } else if (width < target && workingCount >= maxEx) {
+    // Лимит упражнений исчерпан: заменяем accessory-row (толщина сохраняется
+    // в других сессиях недели) на vertical/lat — ширину нельзя терять.
+    const slot = back.find((e: any) => e.role === 'accessory' && isThickness(annotateBackExercise(e).movementPattern || ''));
+    const candidate = slot ? EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== 'back') return false;
+      if (usedNames.has(x.name)) return false;
+      const p = annotateBackExercise({ ...slot, name: x.name } as any).movementPattern || '';
+      if (!isWidth(p)) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (options.equipment?.length) {
+        const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+        if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+      }
+      return true;
+    }) : undefined;
+    if (slot && candidate) {
+      const tagged = annotateBackExercise({ ...slot, name: candidate.name } as any);
+      slot.name = candidate.name;
+      slot.exerciseName = candidate.name;
+      slot.movementPattern = tagged.movementPattern;
+      slot.backSubgroup = tagged.backSubgroup;
+      slot.rationale = `${slot.rationale || ''} Баланс спины: row заменена на ${tagged.movementPattern} (width под 60% толщины).`;
+    }
+  }
+}
+
 /** Гарантирует direct arm-блок после indirect overlap и поздних cap-pass. */
 function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
@@ -1377,6 +1463,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // проверяем фактические финальные сеты, а не промежуточный план.
   for (const week of next.weeks) for (const session of week.sessions) {
     allocateExperiencedBackSession(session, options);
+    ensureBackBalance(session, options);
     allocateExperiencedArmSession(session, options);
     allocateExperiencedLegSession(session, options);
     diversifyExperiencedChestSession(session, options);
