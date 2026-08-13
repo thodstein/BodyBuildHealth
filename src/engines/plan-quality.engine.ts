@@ -34,9 +34,20 @@ export const VOLUME_THRESHOLDS: Record<string, { big: VolumeThresholds; small: V
 const BIG_GROUPS = new Set(['chest', 'back', 'quads', 'hamstrings', 'glutes', 'legs']);
 const SMALL_GROUPS = new Set(['shoulders', 'biceps', 'triceps', 'arms', 'calves', 'abs', 'core', 'forearms', 'traps']);
 
-function getThresholds(group: string, level: string): VolumeThresholds {
+function getThresholds(group: string, level: string, mrvByMuscle?: Record<string, number>): VolumeThresholds {
   const t = VOLUME_THRESHOLDS[level] || VOLUME_THRESHOLDS.intermediate;
-  return BIG_GROUPS.has(group) ? t.big : t.small;
+  const base = BIG_GROUPS.has(group) ? t.big : t.small;
+  // Фактический per-muscle MRV-кап (после стажевых/PED/recovery множителей)
+  // масштабирует MEV/MAV пропорционально базовому соотношению. Без капа
+  // (ручной конструктор) — табличные пороги уровня.
+  const cap = mrvByMuscle?.[group];
+  if (!cap || cap <= 0 || base.mrv <= 0) return base;
+  const scale = cap / base.mrv;
+  return {
+    mev: Math.max(1, Math.round(base.mev * scale)),
+    mav: Math.max(1, Math.round(base.mav * scale)),
+    mrv: cap,
+  };
 }
 
 // ─── Типы результата ───
@@ -63,6 +74,8 @@ export interface MuscleQualityStatus {
   pctOfMav: number;
   status: 'below_mev' | 'in_mev' | 'in_mav' | 'approaching_mrv' | 'exceeding_mrv';
   weakPoint: boolean;
+  /** Контекст допустимости: на основе каких параметров пользователя вычислен кап. */
+  contextNote?: string;
 }
 
 export interface PlanQualityResult {
@@ -110,6 +123,14 @@ export interface PlanQualityInput {
   injuries?: { muscle: string; exclude?: boolean }[];
   /** PED-курс (увеличивает пороги) */
   onCourse?: boolean;
+  /** Фактические per-muscle MRV-капы плана (после стажевых/PED/recovery множителей).
+   *  Используются вместо табличных порогов — enhanced-планы с большим стажем
+   *  не получают ложных «превышен MRV». */
+  mrvByMuscle?: Record<string, number>;
+  /** Подтверждённый стаж (лет) — для контекстного комментария в отчёте. */
+  trainingYears?: number;
+  /** PED-множитель порогов (combinedMrvMultiplier) — для контекста в отчёте. */
+  pedMultiplier?: number;
 }
 
 // ─── Основная функция ───
@@ -120,7 +141,16 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     weakPoints = [], hasDeload = false, deloadWeeks = [],
     planType = 'manual', totalWeeks = 8, exerciseNames = [],
     injuries = [], onCourse = false,
+    mrvByMuscle, trainingYears, pedMultiplier,
   } = input;
+
+  // Контекстный суффикс для отчёта: на основе каких параметров пользователя
+  // сформирован допустимый объём (стаж, курс, фокус).
+  const contextParts: string[] = [];
+  if (trainingYears !== undefined) contextParts.push(`стаж ${trainingYears} лет`);
+  if (onCourse || (pedMultiplier ?? 0) > 1) contextParts.push(`курс PED ×${(pedMultiplier ?? 1).toFixed(2)}`);
+  if (contextParts.length === 0) contextParts.push('базовый уровень');
+  const USER_CONTEXT = `выбрано по: ${contextParts.join(', ')}`;
 
   const issues: QualityIssue[] = [];
   const recommendations: string[] = [];
@@ -132,7 +162,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     if (g === 'rest' || g === 'off') continue;
     const sets = weeklySets[g] || 0;
     const freq = frequency[g] || 1;
-    const t = getThresholds(g, level);
+    const t = getThresholds(g, level, mrvByMuscle);
     const pctOfMav = t.mav > 0 ? Math.round((sets / t.mav) * 100) : 0;
 
     let status: MuscleQualityStatus['status'];
@@ -143,23 +173,29 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     else status = 'below_mev';
 
     const isWeak = weakPoints.includes(g);
+    const contextNote = mrvByMuscle?.[g]
+      ? `${USER_CONTEXT} → фактический MRV ${t.mrv}`
+      : `базовые пороги ${level}`;
 
     if (sets > t.mrv) {
       issues.push({
         id: `vol_over_${g}`, severity: 'critical', category: 'volume', muscle: g,
         message: `${g}: ${sets} сетов/нед > MRV (${t.mrv}) — риск перетренированности`,
+        detail: `${contextNote}`,
         fix: `Снизить до ${t.mav} сетов/нед (MAV)`,
       });
     } else if (sets > t.mav) {
       issues.push({
         id: `vol_high_${g}`, severity: 'warning', category: 'volume', muscle: g,
         message: `${g}: ${sets} сетов/нед > MAV (${t.mav}) — зона толерантности`,
+        detail: `${contextNote}`,
         fix: `Оптимально ${t.mav} сетов/нед`,
       });
     } else if (sets < t.mev) {
       issues.push({
         id: `vol_low_${g}`, severity: isWeak ? 'critical' : 'warning', category: 'volume', muscle: g,
         message: `${g}: ${sets} сетов/нед < MEV (${t.mev})${isWeak ? ' — слабая группа недогружена' : ''}`,
+        detail: `${contextNote}`,
         fix: `Добавить ${t.mev - sets} сетов/нед (до MEV)`,
       });
     }
@@ -171,6 +207,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     muscles.push({
       muscle: g, weeklySets: sets, frequency: freq,
       mev: t.mev, mav: t.mav, mrv: t.mrv, pctOfMav, status, weakPoint: isWeak,
+      ...(mrvByMuscle?.[g] ? { contextNote } : {}),
     });
   }
 
@@ -242,7 +279,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
   }
 
   // 5. Покрытие слабых групп
-  const weakCovered = weakPoints.filter(g => (weeklySets[g] || 0) >= (getThresholds(g, level).mev));
+  const weakCovered = weakPoints.filter(g => (weeklySets[g] || 0) >= (getThresholds(g, level, mrvByMuscle).mev));
   const weakCoverage = weakPoints.length > 0 ? Math.round((weakCovered.length / weakPoints.length) * 100) : 100;
 
   for (const g of weakPoints) {
@@ -338,7 +375,11 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
 /** Конвертировать BBPlan → PlanQualityInput */
 export function bbPlanToQualityInput(bbPlan: {
   weeks: { sessions: { exercises: { muscle: string; sets: number; name: string }[] }[] }[];
-}, opts: { level: string; weakPoints?: string[]; hasDeload?: boolean; deloadWeeks?: number[]; onCourse?: boolean }): PlanQualityInput {
+  mrvByMuscle?: Record<string, number>;
+}, opts: {
+  level: string; weakPoints?: string[]; hasDeload?: boolean; deloadWeeks?: number[];
+  onCourse?: boolean; trainingYears?: number; pedMultiplier?: number;
+}): PlanQualityInput {
   const weeklySets: Record<string, number> = {};
   const frequency: Record<string, number> = {};
   const dayGroups: string[][] = [];
@@ -375,6 +416,9 @@ export function bbPlanToQualityInput(bbPlan: {
     hasDeload: opts.hasDeload, deloadWeeks: opts.deloadWeeks,
     planType: 'bb', totalWeeks: bbPlan.weeks.length,
     exerciseNames, onCourse: opts.onCourse,
+    mrvByMuscle: bbPlan.mrvByMuscle,
+    trainingYears: opts.trainingYears,
+    pedMultiplier: opts.pedMultiplier,
   };
 }
 

@@ -2347,9 +2347,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       mrvByMuscle[m] = capMrv;
     }
   }
-  // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps, lower_back, abs).
+  // B6: расширяем mrvByMuscle для PRO-ключей (delt_front/mid/rear, forearms, traps, lower_back, abs, calves).
   // Раньше cap отсутствовал → normalizeWeekMrv игнорировал эти мышцы при `mrvByMuscle[m] || 0 = 0`.
-  const PRO_KEYS = ['delt_front', 'delt_mid', 'delt_rear', 'forearms', 'traps', 'lower_back', 'abs'];
+  const PRO_KEYS = ['delt_front', 'delt_mid', 'delt_rear', 'forearms', 'traps', 'lower_back', 'abs', 'calves'];
   for (const m of PRO_KEYS) {
     if (mrvByMuscle[m]) continue;
     // BUG-FIX: проверяем excludedMuscles для PRO-ключей (и их collapseKey).

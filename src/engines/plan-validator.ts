@@ -25,6 +25,13 @@ export interface ValidateInput {
   weakPoints: string[];
   /** Текущая готовность 0-100 (из профиля) */
   readiness?: number;
+  /** Подтверждённый стаж (лет) — для контекстного комментария. */
+  trainingYears?: number;
+  /** PED-множитель порогов (combinedMrvMultiplier) — расширяет MRV. */
+  mrvMultiplier?: number;
+  /** Фактические per-muscle MRV-капы плана (после стажевых/PED/recovery множителей).
+   *  Приоритетнее landmarks — enhanced-планы не получают ложных overflow. */
+  mrvByMuscle?: Record<string, number>;
 }
 
 function getAcwr(): { ratio: number; zone: string } | null {
@@ -41,8 +48,14 @@ function getAcwr(): { ratio: number; zone: string } | null {
 /** Главная функция валидации */
 export function validatePlan(input: ValidateInput): ValidationBanner[] {
   const banners: ValidationBanner[] = [];
-  const { weeklySets, level, goal, daysPerWeek, weakPoints, readiness } = input;
+  const { weeklySets, level, goal, daysPerWeek, weakPoints, readiness, trainingYears, mrvMultiplier, mrvByMuscle } = input;
   const landmarks = getAllVolumeLandmarks(level);
+
+  // Контекст: на основе каких параметров пользователя допустим объём.
+  const ctx: string[] = [];
+  if (trainingYears !== undefined) ctx.push(`стаж ${trainingYears} лет`);
+  if ((mrvMultiplier ?? 1) > 1) ctx.push(`PED ×${(mrvMultiplier as number).toFixed(2)}`);
+  const ctxSuffix = ctx.length > 0 ? ` (допустимо: ${ctx.join(', ')})` : '';
 
   // 1. MRV check — объем по каждой группе мышц
   for (const [muscle, sets] of Object.entries(weeklySets)) {
@@ -51,12 +64,16 @@ export function validatePlan(input: ValidateInput): ValidationBanner[] {
       banners.push({ level: 'info', category: 'coverage', title: muscle + ': нет ориентиров', detail: 'Для группы «' + muscle + '» нет данных MEV/MAV/MRV в базе.' });
       continue;
     }
-    if (sets > lm.mrv) {
-      banners.push({ level: 'error', category: 'mrv', title: '⚠ ' + muscle + ': превышен MRV (' + sets + ' > ' + lm.mrv + ')', detail: 'Снизьте объём на группу «' + muscle + '» до ' + lm.mrv + ' сетов/нед (превышение на ' + Math.round((sets - lm.mrv) / lm.mrv * 100) + '%).' });
+    // Фактический кап плана (стаж/PED/recovery) приоритетнее базовых landmarks.
+    const cap = mrvByMuscle?.[muscle] ?? Math.round(lm.mrv * (mrvMultiplier ?? 1));
+    // MAV масштабируется пропорционально факту (соотношение MAV/MRV из landmarks).
+    const scaledMav = mrvByMuscle?.[muscle] ? Math.round(lm.mav * cap / lm.mrv) : lm.mav;
+    if (sets > cap) {
+      banners.push({ level: 'error', category: 'mrv', title: '⚠ ' + muscle + ': превышен MRV (' + sets + ' > ' + cap + ')', detail: 'Снизьте объём на группу «' + muscle + '» до ' + cap + ' сетов/нед (превышение на ' + Math.round((sets - cap) / cap * 100) + '%)' + ctxSuffix + '.' });
     } else if (sets < lm.mev) {
       banners.push({ level: 'info', category: 'mrv', title: muscle + ': ниже MEV (' + sets + ' < ' + lm.mev + ')', detail: 'Объём на «' + muscle + '» ниже стимульного минимума. Добавьте ' + (lm.mev - sets) + ' сета/нед для роста.' });
-    } else if (sets > lm.mav) {
-      banners.push({ level: 'warning', category: 'mrv', title: muscle + ': выше MAV (' + sets + ' > ' + lm.mav + ')', detail: 'Объём выше зоны адаптации. Контролируйте восстановление.' });
+    } else if (sets > scaledMav) {
+      banners.push({ level: 'warning', category: 'mrv', title: muscle + ': выше MAV (' + sets + ' > ' + scaledMav + ')', detail: 'Объём выше зоны адаптации. Контролируйте восстановление.' + (cap > lm.mrv ? ` Фактический MRV ${cap}${ctxSuffix}.` : '') });
     }
   }
 
