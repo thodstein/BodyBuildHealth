@@ -811,10 +811,12 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   // Икры: в Legs-сессиях стоя (растянутая икроножная) + сидя (камбаловидная).
   if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag)) {
     const calves = working.filter((e: any) => e.muscle === 'calves');
+    const calvesSessions = weekCountOf('calves');
     const standing = calves.find((e: any) => /носк|calf/i.test(e.name || '') && !/сидя|sitting|seated/i.test(e.name || ''));
     if (standing) {
-      // Доводим стоячие до 5 сетов (stretch-позиция, задержка) — не 2-3.
-      const targetSets = isEnhanced ? 5 : 4;
+      // Доводим стоячие до 5-6 сетов (stretch-позиция, задержка): 6 при единственной
+      // calves-сессии в неделю (MEV enhanced 10 = 6 стоя + 4 сидя), 5 при двух.
+      const targetSets = isEnhanced ? (calvesSessions <= 1 ? 6 : 5) : 4;
       if (standing.sets < targetSets) {
         const sample = standing.workSets?.[standing.workSets.length - 1] || { reps: 15, rir: 3, weight: 0 };
         while (standing.sets < targetSets) { standing.workSets.push({ ...sample }); standing.sets += 1; }
@@ -822,10 +824,10 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
     } else {
       addEx('calves', /подъём.*носк|подъем.*носк|calf.*raise/i, isEnhanced ? 5 : 4, [12, 20], 'Малые группы: икры стоя (растянутая позиция)');
     }
-    // Сидячие (камбаловидная) — без ограничения по дню: вторая Lower/FullBody
-    // сессия получает seated (stretch soleus), если нет ни одного сидячего.
+    // Сидячие (камбаловидная): добираются, если нет ни одного сидячего
+    // (вторая сессия не обязательна — MEV enhanced 10 требует 6+4 в одной).
     const seated = calves.find((e: any) => /сидя|sitting|seated/i.test(e.name || ''));
-    if (!seated && !calves.some((e: any) => /сидя/i.test(e.name || '')) && weekCountOf('calves') >= 2) {
+    if (!seated && !calves.some((e: any) => /сидя/i.test(e.name || ''))) {
       addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|seated.*calf/i, isEnhanced ? 4 : 3, [15, 25], 'Малые группы: икры сидя (камбаловидная, stretch)');
     }
   }
