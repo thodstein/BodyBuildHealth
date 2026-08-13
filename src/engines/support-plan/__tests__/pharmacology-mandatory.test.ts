@@ -3,6 +3,8 @@ import { calculateSupportTZ } from '../engine';
 import { runSupportUnified } from '../index';
 import { buildMapperCtx } from '../mapper-ctx';
 import { resolvePlan, isDoctorControlled } from '../../tz-mapper-engine';
+import { findSeparationRules } from '../../../data/separation-timing-db';
+import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { canonId } from '../shared-constants';
 import { DEFAULT_STATE } from '../../../ui/screens/Calculator/Calc.types';
 
@@ -182,6 +184,20 @@ describe('course pharmacology mandatory rules', () => {
     expect(isDoctorControlled('cabergoline')).toBe(true);
     expect(isDoctorControlled('memantine')).toBe(true);
     expect(isDoctorControlled('hydration')).toBe(false);
+  });
+
+  it('разнесение приёма: конфликтующие пары в плане находят правила', () => {
+    const rules = findSeparationRules(['tadalafil', 'milk_thistle', 'iron', 'calcium', 'levothyroxine']);
+    const keys = rules.map(r => `${r.a}|${r.b}`);
+    expect(keys).toContain('tadalafil|milk_thistle');
+    expect(keys).toContain('iron|levothyroxine');
+    expect(rules.some(r => r.gap === '≥4 ч')).toBe(true);
+  });
+
+  it('преаналитика: полный список факторов и интерференции плана', () => {
+    expect(PREANALYTIC_EFFECTS_DB.map(f => f.factor).sort()).toEqual(['fasting', 'hydration', 'sleep', 'stress', 'time_of_day', 'training']);
+    expect(ASSAY_INTERFERENCE_DB.some(e => e.substanceId === 'biotin')).toBe(true);
+    expect(ASSAY_INTERFERENCE_DB.some(e => e.substanceId === 'creatine')).toBe(true);
   });
 
   it('процедурная эскалация по HCT', () => {

@@ -2,6 +2,10 @@
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
 import { calculateTzSpecRisk } from '../../../engines/risk-engine-tz-spec';
+import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
+import { findSeparationRules } from '../../../data/separation-timing-db';
+import { MINERAL_SEPARATION_HOURS } from '../../../engines/support-plan/types';
+import { detectActivePedClasses } from '../../../data/ped-class-matrix';
 import type { LabSlice } from '../../../engines/support-plan';
 import type { CalculatorState } from '../../../engines/support-plan';
 import { resolvePlan, isDoctorControlled, type SupportRisk } from '../../../engines/tz-mapper-engine';
@@ -697,6 +701,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const [showPrescription, setShowPrescription] = useState(true);
   const [showSynergy, setShowSynergy] = useState(true);
   const [showLifestyle, setShowLifestyle] = useState(true);
+  const [showPreanalytics, setShowPreanalytics] = useState(true);
+  const [showPedMatrix, setShowPedMatrix] = useState(true);
   const [removedSubs, setRemovedSubs] = useState<string[]>([]);
   const [addedSubs, setAddedSubs] = useState<string[]>([]);
   const [pendingBlockAdd, setPendingBlockAdd] = useState<{ ids: string[]; conflicts: { a: string; b: string; reason: string }[] } | null>(null);
@@ -3199,7 +3205,102 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <SafetyAssayWarnings rec={finalRecWithResidual ?? finalRec} />
                 <SafetyAlerts rec={finalRecWithResidual ?? finalRec} />
 
-                {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
+                {/* ===== ФАРМ-МАТРИЦА КУРСА (активные классы PED) ===== */}
+      {(() => {
+        const active = detectActivePedClasses(state);
+        if (active.length === 0) return null;
+        const rowStyle: React.CSSProperties = { padding: '5px 7px', borderRadius: 6, marginBottom: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 7, lineHeight: 1.5, color: 'rgba(255,255,255,0.8)' };
+        const lbl = (t: string) => <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>{t}: </span>;
+        return (
+          <div style={{ marginTop: 8 }}>
+            <div onClick={() => setShowPedMatrix(!showPedMatrix)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showPedMatrix ? '8px 8px 0 0' : 8, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.16)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🧪 Фарм-матрица курса
+                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(251,191,36,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(251,191,36,0.12)' }}>{active.length} классов</span>
+              </span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showPedMatrix ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showPedMatrix && (
+              <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(251,191,36,0.03)', border: '1px solid rgba(251,191,36,0.1)', borderTop: 'none' }}>
+                {active.map(cls => (
+                  <div key={cls.id} style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 8, fontWeight: 800, color: '#fbbf24', marginBottom: 3 }}>{cls.icon} {cls.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>· фаза: {cls.phase}</span></div>
+                    <div style={rowStyle}>{lbl('Механизмы')}{cls.mechs.join(', ')}</div>
+                    <div style={rowStyle}>{lbl('Анализы')}{cls.labs.join(', ')} <span style={{ color: 'rgba(255,255,255,0.45)' }}>({cls.freq})</span></div>
+                    <div style={{ ...rowStyle, color: '#4ade80' }}>{lbl('Обязательная поддержка')}{cls.mandatory.join(', ')}</div>
+                    {cls.conditional.length > 0 && <div style={{ ...rowStyle, color: '#fbbf24' }}>{lbl('Условная')}{cls.conditional.join(', ')}</div>}
+                    {cls.doctorOnly.length > 0 && <div style={{ ...rowStyle, color: '#fca5a5' }}>{lbl('👨‍⚕️ Под контролем врача')}{cls.doctorOnly.join(', ')}</div>}
+                    {cls.interactions.length > 0 && <div style={rowStyle}>{lbl('Взаимодействия')}{cls.interactions.join(' · ')}</div>}
+                    {cls.assayWarnings.length > 0 && <div style={{ ...rowStyle, color: '#93c5fd' }}>{lbl('Анализы: внимание')}{cls.assayWarnings.join(' · ')}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ===== ПРЕАНАЛИТИКА И РАЗНЕСЕНИЕ ПРИЁМА (полная карточка, сворачиваемая) ===== */}
+      {finalRec && (() => {
+        const planIds = finalRec.subs.map(s => s.substanceId);
+        const idSet = new Set(planIds.map(id => id.toLowerCase()));
+        const interferences = ASSAY_INTERFERENCE_DB.filter(e => idSet.has(e.substanceId));
+        const mineralPairs: string[] = [];
+        for (const [pair, hours] of Object.entries(MINERAL_SEPARATION_HOURS)) {
+          const [a, b] = pair.split('||');
+          if (idSet.has(a) && idSet.has(b)) mineralPairs.push(`${subNameRu(a)} + ${subNameRu(b)} → разнести на ${hours} ч`);
+        }
+        const sepRules = findSeparationRules(planIds);
+        const total = interferences.length + mineralPairs.length + sepRules.length;
+        if (total === 0) return null;
+        const rowStyle: React.CSSProperties = { padding: '4px 7px', borderRadius: 5, marginBottom: 3, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.16)', fontSize: 7, lineHeight: 1.45, color: 'rgba(255,255,255,0.8)' };
+        return (
+          <div style={{ marginTop: 8 }}>
+            <div onClick={() => setShowPreanalytics(!showPreanalytics)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '7px 9px', borderRadius: showPreanalytics ? '8px 8px 0 0' : 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.16)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: 5 }}>
+                🧪 Преаналитика и разнесение приёма
+                <span style={{ fontSize: 7, fontWeight: 600, color: 'rgba(96,165,250,0.6)', padding: '1px 5px', borderRadius: 4, background: 'rgba(96,165,250,0.12)' }}>{total} пунктов</span>
+              </span>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{showPreanalytics ? '▲ скрыть' : '▼ показать'}</span>
+            </div>
+            {showPreanalytics && (
+              <div style={{ padding: '7px 10px', borderRadius: '0 0 8px 8px', background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)', borderTop: 'none' }}>
+                <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '4px 0', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Преаналитические факторы (полный список)</div>
+                {PREANALYTIC_EFFECTS_DB.map(f => (
+                  <div key={f.factor} style={rowStyle}>
+                    <b style={{ color: '#93c5fd' }}>{f.factor}</b> — {f.marker}: {f.effect}. <span style={{ color: '#bfdbfe' }}>{f.advice}</span>
+                  </div>
+                ))}
+                {interferences.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '6px 0 4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Интерференции вашего плана</div>
+                    {interferences.map((e, i) => (
+                      <div key={`int-${i}`} style={rowStyle}>
+                        <b style={{ color: '#fca5a5' }}>{e.substanceId}</b>: {e.marker} — {e.effect === 'distorts' ? 'искажает assay' : e.effect === 'increases' ? 'может повышать' : 'может снижать'} ({e.mechanism}). <span style={{ color: '#bfdbfe' }}>{e.advice}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {(mineralPairs.length > 0 || sepRules.length > 0) && (
+                  <>
+                    <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.55)', margin: '6px 0 4px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>⏱ Разнесение приёма по времени (усвоение и конфликты)</div>
+                    {mineralPairs.map((p, i) => (
+                      <div key={`min-${i}`} style={{ ...rowStyle, color: '#fbbf24' }}>⏱ {p}</div>
+                    ))}
+                    {sepRules.map((r, i) => (
+                      <div key={`sep-${i}`} style={{ ...rowStyle, color: '#fbbf24' }}>
+                        ⏱ {subNameRu(r.a)} + {subNameRu(r.b)} → разнести на {r.gap} ({r.reason})
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Warnings: multi-oral, GH+insulin, winny+oxy */}
       {finalRec && (() => {
         const warnings: string[] = [];
         const flags = finalRec.pedFlags;
