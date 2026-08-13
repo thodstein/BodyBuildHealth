@@ -67,7 +67,6 @@ export function assignVertexSystems(positions: Float32Array, anchors: SystemAnch
   return out;
 }
 
-const BASE_HEX = new THREE.Color('#aebfd8');
 const WHITE = new THREE.Color('#ffffff');
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -216,18 +215,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         group.add(model);
         model.updateMatrixWorld(true);
 
-        // Тело: светлое, чтобы модель была видна
-        model.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            const mat = child.material as THREE.MeshStandardMaterial;
-            if (mat) {
-              mat.vertexColors = false;
-              mat.color = new THREE.Color('#8a97ab');
-              mat.roughness = 0.6;
-              mat.metalness = 0.05;
-            }
-          }
-        });
+        // Тело: оригинальная текстура модели (без перекраски) — подсветка систем идёт overlay-слоем
+        model.updateMatrixWorld(true);
 
         // Overlay: additive vertex colors — светящиеся системы
         colorAttr = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
@@ -256,9 +245,10 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           for (let i = 0; i < zoneIdx.length; i++) {
             const ai = zoneIdx[i];
             if (ai < 0) {
-              arr[i * 3] = BASE_HEX.r * 0.5;
-              arr[i * 3 + 1] = BASE_HEX.g * 0.5;
-              arr[i * 3 + 2] = BASE_HEX.b * 0.5;
+              // вне зон — чёрный: аддитивная подсветка ничего не добавляет, видна текстура
+              arr[i * 3] = 0;
+              arr[i * 3 + 1] = 0;
+              arr[i * 3 + 2] = 0;
               continue;
             }
             const sysId = anchorToSystem[ai];
