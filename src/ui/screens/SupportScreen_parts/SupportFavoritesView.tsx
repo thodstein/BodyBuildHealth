@@ -4,7 +4,7 @@ import { readSupportStacks } from '../../../engines/stack-storage';
 import { ALL_INTERACTIONS } from '../../../data/support-database';
 import { CATEGORY_LABELS } from './SupportScreenData';
 import { getMergedExternalSubIds } from '../TrainingScreen_parts/support-plan-bridge';
-import { readFavRecommendations, deleteFavRecommendation } from '../../../engines/training-plan-save.engine';
+import { readFavRecommendations, deleteFavRecommendation, queueMixToSupportPlan } from '../../../engines/training-plan-save.engine';
 
 export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const {
@@ -97,8 +97,15 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                 <div key={rec.id} style={{ padding: '8px 10px', background: 'rgba(139,92,246,0.06)', borderRadius: 8, border: '1px solid rgba(139,92,246,0.2)', marginBottom: 4 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{rec.title}</div>
-                    <button onClick={() => { deleteFavRecommendation(rec.id); setFavRefresh((prev: number) => prev + 1); }}
-                      style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>✕ Убрать</button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => {
+                        queueMixToSupportPlan(rec);
+                        setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('calculator');
+                      }}
+                        style={{ fontSize: 9, color: '#00e68a', background: 'none', border: '1px solid rgba(0,230,138,0.3)', borderRadius: 6, cursor: 'pointer', padding: '2px 8px', whiteSpace: 'nowrap' }}>🧮 В калькулятор</button>
+                      <button onClick={() => { deleteFavRecommendation(rec.id); setFavRefresh((prev: number) => prev + 1); }}
+                        style={{ fontSize: 9, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>✕ Убрать</button>
+                    </div>
                   </div>
                   <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>
                     {new Date(rec.ts).toLocaleDateString('ru-RU')} · {rec.substances.length} препаратов · конфликтов: {rec.interactions.length}

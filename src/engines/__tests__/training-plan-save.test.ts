@@ -1,4 +1,4 @@
-/** training-plan-save.test.ts — движок сохранения тренировочных миксов/пресетов:
+﻿/** training-plan-save.test.ts — движок сохранения тренировочных миксов/пресетов:
  *  анализ препаратов → рекомендации, дневник, избранное БАД, очередь в калькулятор. */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -15,6 +15,8 @@ import {
   readSupportPlanQueue,
   removeFromSupportPlanQueue,
   getSupportPlanQueueIds,
+  analyzePresetEffect,
+  subscribePlanQueueChanged,
   MIX_DIARY_KEY,
   FAVORITES_KEY,
   FAV_REC_KEY,
@@ -108,6 +110,31 @@ describe('analyzeMixUsage', () => {
   it('добавляет предупреждение о лаборатории', () => {
     const rec = analyzeMixUsage(jointInput());
     expect(rec.general.some(g => g.includes('лаборатори'))).toBe(true);
+  });
+
+  it('учитывает фарму курса: конфликт вещества микса с курсом попадает в warnings', () => {
+    const rec = analyzeMixUsage({
+      ...jointInput(),
+      substances: [{ id: 'zinc', name: 'Цинк', dose: '25', unit: 'мг', mg: 25 }],
+      course: [{ id: 'iron', name: 'Железо' }],
+    });
+    const zinc = rec.substances.find(x => x.id === 'zinc')!;
+    expect(zinc.warnings.some(w => w.includes('Железо'))).toBe(true);
+    expect(rec.general.some(g => g.includes('Учтена фарма курса'))).toBe(true);
+    expect(rec.general.some(g => g.includes('взаимодействия'))).toBe(true);
+  });
+
+  it('учитывает фарму курса без конфликтов', () => {
+    const rec = analyzeMixUsage({
+      ...jointInput(),
+      course: [{ id: 'zzz_unknown_drug', name: 'Тест' }],
+    });
+    expect(rec.general.some(g => g.includes('Учтена фарма курса (1 препарат.) — конфликтов с миксам не выявлено'))).toBe(true);
+  });
+
+  it('не добавляет блок про курс, если курс не передан', () => {
+    const rec = analyzeMixUsage(jointInput());
+    expect(rec.general.some(g => g.includes('Учтена фарма курса'))).toBe(false);
   });
 });
 
@@ -252,5 +279,72 @@ describe('saveMixToDiaryAndFavorites (комплексный флоу)', () => {
     expect(localStorage.getItem(FAV_REC_KEY)).toBeTruthy();
     expect(localStorage.getItem(MIX_DIARY_KEY)).toBeTruthy();
     expect(localStorage.getItem(FAVORITES_KEY)).toBeTruthy();
+  });
+
+  it('эмитит событие изменения очереди (для зеркала в he_general_plan)', () => {
+    let calls = 0;
+    const unsub = subscribePlanQueueChanged(() => calls++);
+    const rec = analyzeMixUsage(jointInput());
+    queueMixToSupportPlan(rec);
+    expect(calls).toBe(1);
+    removeFromSupportPlanQueue(rec.id);
+    expect(calls).toBe(2);
+    unsub();
+    queueMixToSupportPlan(rec);
+    expect(calls).toBe(2);
+  });
+});
+
+describe('analyzePresetEffect (эффект пресета через неделю)', () => {
+  const daysAgo = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  it('сон: среднее до и после пресета (goal=sleep)', () => {
+    localStorage.setItem('he_sleep_diary', JSON.stringify([
+      { date: daysAgo(10), hours: 6.5 },
+      { date: daysAgo(9), hours: 6.8 },
+      { date: daysAgo(8), hours: 7.0 },
+      { date: daysAgo(1), hours: 7.4 },
+      { date: daysAgo(0), hours: 7.6 },
+    ]));
+    const record = saveMixToDiary({ ...jointInput(), goal: 'sleep', kind: 'preset' }, daysAgo(3));
+    const eff = analyzePresetEffect(record);
+    expect(eff).not.toBeNull();
+    expect(eff!.type).toBe('sleep');
+    expect(eff!.before).toBeGreaterThan(0);
+    expect(eff!.delta).toBeGreaterThan(0);
+    expect(eff!.samplesBefore).toBeGreaterThanOrEqual(3);
+  });
+
+  it('вес: только для goal=fat_loss', () => {
+    localStorage.setItem('he_weight_log', JSON.stringify([
+      { date: daysAgo(10), weight: 82 },
+      { date: daysAgo(9), weight: 81.5 },
+      { date: daysAgo(8), weight: 81.2 },
+    ]));
+    const record = saveMixToDiary({ ...jointInput(), goal: 'fat_loss', kind: 'preset' }, daysAgo(3));
+    const eff = analyzePresetEffect(record);
+    expect(eff).not.toBeNull();
+    expect(eff!.type).toBe('weight');
+  });
+
+  it('возвращает null, если данных до пресета меньше 3', () => {
+    localStorage.setItem('he_sleep_diary', JSON.stringify([{ date: daysAgo(1), hours: 7.0 }]));
+    const record = saveMixToDiary({ ...jointInput(), goal: 'sleep', kind: 'preset' }, daysAgo(3));
+    expect(analyzePresetEffect(record)).toBeNull();
+  });
+
+  it('возвращает null для тренировочного микса (не пресет)', () => {
+    const record = saveMixToDiary({ ...jointInput(), kind: 'mix', goal: 'pump' });
+    expect(analyzePresetEffect(record)).toBeNull();
+  });
+
+  it('устойчив к битым дневникам', () => {
+    localStorage.setItem('he_sleep_diary', '{{{{');
+    const record = saveMixToDiary({ ...jointInput(), goal: 'sleep', kind: 'preset' }, daysAgo(3));
+    expect(analyzePresetEffect(record)).toBeNull();
   });
 });

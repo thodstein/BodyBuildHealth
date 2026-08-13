@@ -3,6 +3,7 @@ import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import { getSubstanceName } from '../../../engines/stack-optimizer.engine';
 import { ComplaintsTab } from './ComplaintsTab';
 import { SupplementComplianceCard } from './SupplementComplianceCard';
+import { readDiaryMixes } from '../../../engines/training-plan-save.engine';
 
 const DIARY_KEY = 'he_support_diary';
 
@@ -83,6 +84,8 @@ interface DiaryEntry {
   notes?: string;
   complianceNotes?: string;
   mood?: MoodLevel;
+  /** Приём тренировочных миксов/пресетов: mixId → фаза ('pre'|'intra'|'post') → принято */
+  mixIntake?: Record<string, Record<string, boolean>>;
 }
 
 function loadDiary(): DiaryEntry[] {
@@ -421,7 +424,19 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     if (todayEntry?.mood) setMood(mood => mood === 3 ? todayEntry.mood! : mood);
   }, [todayEntry?.notes, todayEntry?.complianceNotes, todayEntry?.mood]);
 
-  const planSubs: string[] = SUPPORT_LEVELS?.[supportLevel]?.subs || [];
+  // Активный план: legacy-уровень → результат калькулятора поддержки → общий план
+  const readActivePlanSubs = (): string[] => {
+    const legacy = SUPPORT_LEVELS?.[supportLevel]?.subs || [];
+    if (legacy.length > 0) return legacy;
+    try {
+      const calc = JSON.parse(localStorage.getItem('he_support_plan_result') || '[]');
+      if (Array.isArray(calc) && calc.length > 0) return calc;
+      const general = JSON.parse(localStorage.getItem('he_general_plan') || '[]');
+      if (Array.isArray(general) && general.length > 0) return general;
+    } catch {}
+    return [];
+  };
+  const planSubs: string[] = readActivePlanSubs();
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -486,6 +501,42 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
     const curr = todayEntry?.substances[subId]?.taken || false;
     setSubState(today, subId, { taken: !curr });
   };
+
+  // ── Комплаенс тренировочных миксов/пресетов (приём до/во время/после тренировки) ──
+  const toggleMixPhase = (mixId: string, phase: string) => {
+    setEntries(prev => {
+      const updated = [...prev];
+      let idx = updated.findIndex(e => e.date === today);
+      if (idx < 0) {
+        updated.unshift({ date: today, substances: {} });
+        idx = 0;
+      }
+      const cur = updated[idx].mixIntake || {};
+      const phases = { ...(cur[mixId] || {}) };
+      phases[phase] = !phases[phase];
+      updated[idx] = { ...updated[idx], mixIntake: { ...cur, [mixId]: phases } };
+      saveDiary(updated);
+      return updated;
+    });
+  };
+
+  /** Фазы микса, заданные в рецепте (pre/intra/post из substances). */
+  const mixPhasesOf = (mix: { substances: { timing?: string }[] }): string[] => {
+    const set = new Set<string>();
+    for (const s of mix.substances || []) if (s.timing) set.add(s.timing);
+    return ['pre', 'intra', 'post'].filter(p => set.has(p));
+  };
+
+  /** Дней за неделю с приёмом хотя бы одной фазы микса (0-7). */
+  const mixComplianceWeek = useMemo(() => {
+    const days = getLastNDays(7);
+    let withIntake = 0;
+    for (const d of days) {
+      const e = entries.find(x => x.date === d);
+      if (e?.mixIntake && Object.values(e.mixIntake).some(m => Object.values(m || {}).some(v => v))) withIntake++;
+    }
+    return Math.round((withIntake / Math.max(1, days.length)) * 100);
+  }, [entries]);
 
   const setMoodForToday = (m: MoodLevel) => {
     setMood(m);
@@ -904,6 +955,67 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                     cursor: 'pointer', fontFamily: 'inherit', minHeight: 40,
                   }}>📄 PDF</button>
                 </div>
+
+                {/* 🏋️ Комплаенс тренировочных миксов и пресетов (приём до/после тренировки) */}
+                {(() => {
+                  const mixes = readDiaryMixes().slice(0, 5);
+                  if (mixes.length === 0) return null;
+                  const todayMix = todayEntry?.mixIntake || {};
+                  const PHASE_META: Record<string, { label: string; icon: string }> = {
+                    pre: { label: 'До тренировки', icon: '🔥' },
+                    intra: { label: 'Во время', icon: '💧' },
+                    post: { label: 'После тренировки', icon: '🍗' },
+                  };
+                  return (
+                    <div style={sx.card}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={sx.sectionTitle}>🏋️ Миксы и пресеты — приём к тренировке</div>
+                        <span style={{ fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>неделя: {mixComplianceWeek}%</span>
+                      </div>
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+                        Отмечайте приём фаз микса, как указано в составе: до/во время/после тренировки.
+                      </div>
+                      {mixes.map(mix => {
+                        const phases = mixPhasesOf(mix);
+                        const taken = todayMix[mix.id] || {};
+                        const anyTaken = phases.some(p => taken[p]);
+                        return (
+                          <div key={mix.id} style={{
+                            padding: '8px 10px', borderRadius: 10, marginBottom: 4,
+                            background: anyTaken ? 'rgba(139,92,246,0.08)' : 'rgba(24,24,27,0.15)',
+                            border: '1px solid ' + (anyTaken ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'),
+                          }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+                              {mix.kind === 'preset' ? '🧪' : '💪'} {mix.title}
+                              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}> · {mix.date}</span>
+                            </div>
+                            {phases.length === 0 ? (
+                              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>Фазы приёма не указаны в составе</div>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                {phases.map(p => {
+                                  const meta = PHASE_META[p];
+                                  const active = !!taken[p];
+                                  return (
+                                    <button key={p} onClick={() => toggleMixPhase(mix.id, p)} style={{
+                                      padding: mobile ? '8px 14px' : '6px 12px', borderRadius: 10,
+                                      cursor: 'pointer', fontFamily: 'inherit', border: 'none', fontSize: mobile ? 11 : 9,
+                                      background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)',
+                                      color: active ? '#c4b5fd' : 'rgba(255,255,255,0.55)',
+                                      fontWeight: active ? 700 : 400, minHeight: mobile ? 36 : 24,
+                                    }}>
+                                      {active ? '✓ ' : ''}{meta.icon} {meta.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
                 {/* Цветовая легенда дней недели */}
                 <div style={{ ...sx.card, padding: '8px 12px' }}>

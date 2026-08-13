@@ -4,6 +4,7 @@
  *  REUSE: training-mix-scoring.engine (MIX_TEMPLATES, getDefaultTemplate, resolveTemplateItems),
  *  support-plan-bridge (pushSubsToPlan), training-profile, TrainingPopups (PopupNumber). */
 import React, { useState, useMemo } from 'react';
+import { useDataLink } from '../../../core/data-link';
 import {
   MIX_TEMPLATES, resolveTemplateItems, type MixTemplate, type MixRenderItem,
 } from '../../../engines/training-mix-scoring.engine';
@@ -26,6 +27,7 @@ const TIMING_RU: Record<string, string> = { pre: 'До тренировки', in
 const HEALTH_GOALS = ['fat_loss', 'joint', 'gut', 'sleep', 'hydration', 'antiinflammatory', 'immunity'];
 
 export const MixPresetsCard: React.FC = () => {
+  const linked = useDataLink();
   const prof = useMemo(() => loadTrainingProfile(), []);
   const [goal, setGoal] = useState<string>('fat_loss');
   const [bwInput, setBwInput] = useState<number>(prof.bodyWeight || 80);
@@ -167,6 +169,7 @@ export const MixPresetsCard: React.FC = () => {
                         label: undefined as string | undefined,
                         weightKg: bwInput,
                         substances: planSubstances,
+                        course: (linked.course || []).map((c: any) => ({ id: c.substanceId || '', name: c.name || c.substanceId })),
                       };
                       const result = saveMixToDiaryAndFavorites(input);
                       if (savePopup.toPlan) queueMixToSupportPlan(result.rec);

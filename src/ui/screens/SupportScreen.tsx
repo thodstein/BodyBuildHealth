@@ -49,6 +49,7 @@ import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from 
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { drainExternalSubsQueue, subscribeExternalSubs, getMergedExternalSubIds } from './TrainingScreen_parts/support-plan-bridge';
+import { getSupportPlanQueueIds, subscribePlanQueueChanged } from '../../engines/training-plan-save.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 // Force Vite to include SUPPORT_CATALOG_DATA and CANONICAL_ID_MAP (prevents tree-shaking)
 // @ts-ignore
@@ -574,18 +575,24 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     try { localStorage.setItem('he_support_plan_result', JSON.stringify(effectiveLevel.subs || [])); } catch {}
   }, [effectiveLevel]);
 
-    // ПЛАН 2 (общий): калькулятор ∪ внешние добавки (миксы/питание). Для удобства, без привязки к рискам.
+    // ПЛАН 2 (общий): калькулятор ∪ внешние добавки (миксы/питание) ∪ очередь тренировочных миксов.
+    // Для удобства, без привязки к рискам.
+  const [generalPlanTick, setGeneralPlanTick] = useState(0);
+  useEffect(() => {
+    const unsub = subscribePlanQueueChanged(() => setGeneralPlanTick(t => t + 1));
+    return unsub;
+  }, []);
   useEffect(() => {
     try {
       const calcSubs: string[] = effectiveLevel?.subs || [];
       const general = [...calcSubs];
-      for (const extId of externalSubs) {
+      for (const extId of [...externalSubs, ...getSupportPlanQueueIds()]) {
         const extCanon = canonId(extId);
         if (!general.some(s => canonId(s) === extCanon)) general.push(extId);
       }
       localStorage.setItem('he_general_plan', JSON.stringify(general));
     } catch {}
-  }, [effectiveLevel, externalSubs]);
+  }, [effectiveLevel, externalSubs, generalPlanTick]);
 
   const calcSupport = (overrideLevel?: 'basic' | 'mid' | 'max' | 'boost', overrideSubs?: string[]) => {
     try {

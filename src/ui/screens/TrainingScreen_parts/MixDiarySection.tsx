@@ -1,8 +1,8 @@
 /** MixDiarySection.tsx — секция «💊 Тренировочные миксы и пресеты здоровья» в дневнике тренировок.
  *  Показывает записи из he_training_mixes (сохраняются кнопкой «💾 Сохранить в дневник и избранное»
- *  в TrainingMixTab и MixPresetsCard), с удалением. */
+ *  в TrainingMixTab и MixPresetsCard), с удалением, эффектом пресета через неделю и напоминанием о приёме. */
 import React, { useState, useEffect } from 'react';
-import { readDiaryMixes, deleteDiaryMix, type DiaryMixRecord } from '../../../engines/training-plan-save.engine';
+import { readDiaryMixes, deleteDiaryMix, analyzePresetEffect, type DiaryMixRecord } from '../../../engines/training-plan-save.engine';
 
 const CARD: React.CSSProperties = {
   padding: 10, borderRadius: 12,
@@ -10,9 +10,26 @@ const CARD: React.CSSProperties = {
   marginBottom: 8,
 };
 
+/** Напоминание «Принять микс/пресет» через N минут (Notification API + localStorage pref). */
+export function scheduleMixReminder(title: string, minutes = 30): void {
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission === 'default') {
+    void Notification.requestPermission().then(p => { if (p === 'granted') scheduleMixReminder(title, minutes); });
+    return;
+  }
+  if (Notification.permission !== 'granted') return;
+  setTimeout(() => {
+    try { new Notification('💊 Принять: ' + title, { body: 'Тренировочный микс / пресет здоровья — не забудьте принять препараты.' }); } catch {}
+  }, minutes * 60000);
+  try {
+    localStorage.setItem('he_mix_reminder', JSON.stringify({ title, at: new Date().toISOString(), minutes }));
+  } catch {}
+}
+
 export const MixDiarySection: React.FC = () => {
   const [records, setRecords] = useState<DiaryMixRecord[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [reminderMsg, setReminderMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setRecords(readDiaryMixes());
@@ -42,10 +59,24 @@ export const MixDiarySection: React.FC = () => {
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                 {r.date} · {r.substances.length} веществ{r.score != null ? ` · скор ${r.score} (${r.label || ''})` : ''}
               </div>
+              {(() => {
+                const eff = analyzePresetEffect(r);
+                if (!eff) return null;
+                const better = eff.type === 'sleep' ? eff.delta > 0 : eff.delta < 0;
+                const arrow = eff.delta === 0 ? '→' : (better ? '↑' : '↓');
+                return (
+                  <div style={{ fontSize: 10, color: better ? '#00e68a' : eff.delta === 0 ? 'rgba(255,255,255,0.5)' : '#f59e0b', marginTop: 2 }}>
+                    📈 {eff.label}: {eff.before} → {eff.after} {eff.type === 'sleep' ? 'ч' : 'кг'} ({arrow} {Math.abs(eff.delta)}) {eff.samplesAfter === 0 ? `· данных после: ${eff.samplesBefore} зап. до` : ''}
+                  </div>
+                );
+              })()}
             </div>
+            <button onClick={() => { scheduleMixReminder(r.title, 30); setReminderMsg(`🔔 Напоминание «${r.title}» через 30 мин`); setTimeout(() => setReminderMsg(null), 3000); }}
+              title="Напомнить принять через 30 мин" style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🔔</button>
             <button onClick={() => { deleteDiaryMix(r.id); setRecords(readDiaryMixes()); }}
               style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🗑</button>
           </div>
+          {reminderMsg && <div style={{ fontSize: 10, color: '#60a5fa', marginTop: 4 }}>{reminderMsg}</div>}
           {r.substances.length > 0 && (
             <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginTop: 4 }}>
               {r.substances.slice(0, 6).map((s, i) => (

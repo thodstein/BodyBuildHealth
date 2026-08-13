@@ -762,6 +762,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   // Очередь «тренировочные миксы и пресеты здоровья» → план поддержки
   const [mixQueueRefresh, setMixQueueRefresh] = useState(0);
   const [showMixCard, setShowMixCard] = useState(true);
+  const mixPlanIds = useMemo(() => new Set(getSupportPlanQueueIds().map(canonIdLocal)), [mixQueueRefresh]);
 
   const ctx = useMemo(() => {
     const externalMixIds = getSupportPlanQueueIds();
@@ -2736,13 +2737,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     const isTitr = !!titrF && titrF > 1;
                     return (
                       <span key={i} style={{
-                        fontSize:7, padding:'2px 6px', borderRadius:5, fontWeight:600,
-                        background: isTitr ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)',
-                        border: isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)',
-                        color: isTitr ? '#fbbf24' : '#a5b4fc',
+                        fontSize: 7, padding: '2px 6px', borderRadius: 5, fontWeight: 600,
+                        background: mixPlanIds.has(canonIdLocal(s.substanceId)) ? 'rgba(139,92,246,0.12)' : (isTitr ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)'),
+                        border: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '1px solid rgba(139,92,246,0.3)' : (isTitr ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(99,102,241,0.12)'),
+                        color: mixPlanIds.has(canonIdLocal(s.substanceId)) ? '#c4b5fd' : '#a5b4fc',
                       }}>
                          {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${mg}мг` : ''}
-                        {isDoctorControlled(s.substanceId) && <span style={{ marginLeft:3, fontSize:6, color:'#fca5a5', fontWeight:800 }}>👨⚕️</span>}
+                        {mixPlanIds.has(canonIdLocal(s.substanceId)) && <span style={{ marginLeft: 3, fontSize: 6, color: '#c4b5fd', fontWeight: 800 }}>🏋️</span>}
+                        {isDoctorControlled(s.substanceId) && <span style={{ marginLeft: 3, fontSize: 6, color: '#fca5a5', fontWeight: 800 }}>👨⚕️</span>}
                         {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
                       </span>
                     );

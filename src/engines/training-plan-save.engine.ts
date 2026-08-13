@@ -97,6 +97,8 @@ export interface SaveMixInput {
   label?: string;
   weightKg?: number;
   substances: PlanSubstance[];
+  /** Активная фарма курса (AAS/инсулин/GH и т.д.) — учитывается в рекомендациях. */
+  course?: { id: string; name?: string }[];
 }
 
 export interface SaveMixResult {
@@ -246,6 +248,32 @@ export function analyzeMixUsage(input: SaveMixInput): TrainingPlanRecommendation
   if (uniqSyn.length > 0) {
     general.push(`✅ Полезные синергии набора: ${uniqSyn.join('; ')}.`);
   }
+
+  // ── взаимодействие с фармой курса ──
+  const courseList = (input.course || []).filter(c => c && c.id);
+  if (courseList.length > 0) {
+    const courseConflicts: string[] = [];
+    for (const sub of substances) {
+      const entry = findEntry(sub.id);
+      if (!entry) continue;
+      for (const c of [...(entry.conflicts || []), ...(entry.cautions || [])]) {
+        const cw = canonSubId(String(c.with || ''));
+        const hit = courseList.find(crs => canonSubId(crs.id) === cw);
+        if (!hit) continue;
+        const crsName = hit.name || hit.id;
+        const severityMark = (c.severity || 'MEDIUM') === 'HIGH' ? '⚠️' : 'ℹ️';
+        const msg = `${severityMark} ${sub.name} ↔ фарма курса (${crsName}): ${cut(c.effect || 'взаимодействие', 140)}`;
+        sub.warnings.push(msg);
+        courseConflicts.push(msg);
+      }
+    }
+    if (courseConflicts.length > 0) {
+      general.push(`⚠️ Учтена фарма курса (${courseList.length} препарат.): обнаружены взаимодействия — ${courseConflicts.slice(0, 3).join('; ')}.`);
+    } else {
+      general.push(`ℹ️ Учтена фарма курса (${courseList.length} препарат.) — конфликтов с миксам не выявлено.`);
+    }
+  }
+
   if (input.weightKg) {
     general.push(`Дозировки рассчитаны на вес ${input.weightKg} кг — при изменении веса на 10+ кг пересчитайте микс.`);
   }
@@ -275,8 +303,8 @@ export function readDiaryMixes(): DiaryMixRecord[] {
   return readJson<DiaryMixRecord>(MIX_DIARY_KEY);
 }
 
-/** Сохранить микс/пресет в дневник тренировок (prepend, cap 20). */
-export function saveMixToDiary(input: SaveMixInput): DiaryMixRecord {
+/** Сохранить микс/пресет в дневник тренировок (prepend, cap 20). date — опционально (тесты/бэкфилл). */
+export function saveMixToDiary(input: SaveMixInput, date?: string): DiaryMixRecord {
   const record: DiaryMixRecord = {
     id: `mix_${Date.now().toString(36)}`,
     title: input.title || `${input.kind === 'preset' ? 'Пресет' : 'Микс'}: ${input.goal}`,
@@ -287,7 +315,7 @@ export function saveMixToDiary(input: SaveMixInput): DiaryMixRecord {
     label: input.label,
     substances: input.substances,
     recommendations: null,
-    date: new Date().toISOString().slice(0, 10),
+    date: date || new Date().toISOString().slice(0, 10),
     ts: Date.now(),
   };
   const arr = readDiaryMixes();
@@ -360,12 +388,32 @@ export function queueMixToSupportPlan(rec: TrainingPlanRecommendation): SupportP
   const arr = readSupportPlanQueue().filter(x => x.recId !== entry.recId);
   arr.unshift(entry);
   writeJson(PLAN_QUEUE_KEY, arr.slice(0, PLAN_QUEUE_CAP));
+  notifyPlanQueueChanged();
   return entry;
 }
 
 export function removeFromSupportPlanQueue(recId: string): void {
   const arr = readSupportPlanQueue().filter(x => x.recId !== recId);
   writeJson(PLAN_QUEUE_KEY, arr);
+  notifyPlanQueueChanged();
+}
+
+/** Событие изменения очереди плана поддержки (для зеркала в he_general_plan и карточки калькулятора). */
+export const PLAN_QUEUE_EVENT = 'he-training-mix-plan-changed';
+
+function notifyPlanQueueChanged(): void {
+  try {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(PLAN_QUEUE_EVENT));
+  } catch { /* ignore */ }
+}
+
+export function subscribePlanQueueChanged(cb: () => void): () => void {
+  try {
+    window.addEventListener(PLAN_QUEUE_EVENT, cb);
+    return () => window.removeEventListener(PLAN_QUEUE_EVENT, cb);
+  } catch {
+    return () => {};
+  }
 }
 
 /** Плоский уникальный список id из очереди (для добавления в план поддержки). */
@@ -402,4 +450,62 @@ export function saveMixToDiaryAndFavorites(input: SaveMixInput): SaveMixResult {
   const addedFavCount = addSubstancesToFavorites(input.substances.map(x => x.id));
   saveRecommendationToFavorites(rec);
   return { record, rec, addedFavCount };
+}
+
+// ─── эффект пресета через неделю ───
+
+export interface PresetEffect {
+  type: 'sleep' | 'weight';
+  label: string;
+  before: number;
+  after: number;
+  delta: number;
+  samplesBefore: number;
+  samplesAfter: number;
+}
+
+interface SleepEntry { date: string; hours?: number }
+interface WeightEntry { date: string; weight?: number }
+
+/** Среднее за N дней до и после даты пресета по дневникам сна/веса.
+ *  sleep → часы сна (goal: sleep), weight → масса тела (goal: fat_loss). */
+export function analyzePresetEffect(record: DiaryMixRecord, windowDays = 7): PresetEffect | null {
+  const base = new Date(record.date + 'T00:00:00').getTime();
+  if (Number.isNaN(base)) return null;
+  const inWindow = (d: string) => {
+    const t = new Date(d + 'T00:00:00').getTime();
+    return !Number.isNaN(t);
+  };
+  const pick = record.kind === 'preset' && (record.goal === 'sleep' || record.goal === 'fat_loss' || record.goal === 'hydration');
+  if (!pick) return null;
+
+  const isSleep = record.goal === 'sleep';
+  try {
+    const raw: Array<SleepEntry | WeightEntry> = isSleep
+      ? (JSON.parse(localStorage.getItem('he_sleep_diary') || '[]') as SleepEntry[])
+      : (JSON.parse(localStorage.getItem('he_weight_log') || '[]') as WeightEntry[]);
+    if (!Array.isArray(raw)) return null;
+    const vals = raw
+      .filter(e => inWindow(e.date) && (isSleep ? typeof (e as SleepEntry).hours === 'number' : typeof (e as WeightEntry).weight === 'number'))
+      .map(e => ({ t: new Date(e.date + 'T00:00:00').getTime(), v: (isSleep ? (e as SleepEntry).hours : (e as WeightEntry).weight) as number }))
+      .filter(e => !Number.isNaN(e.t) && e.v > 0)
+      .sort((a, b) => a.t - b.t);
+    const before = vals.filter(e => e.t < base && e.t >= base - windowDays * 86400000).map(e => e.v);
+    const after = vals.filter(e => e.t > base && e.t <= base + windowDays * 86400000).map(e => e.v);
+    if (before.length < 3) return null;
+    const avg = (arr: number[]) => arr.reduce((s, x) => s + x, 0) / arr.length;
+    const bAvg = avg(before);
+    const aAvg = after.length > 0 ? avg(after) : bAvg;
+    return {
+      type: isSleep ? 'sleep' : 'weight',
+      label: isSleep ? 'сон' : 'вес',
+      before: Math.round(bAvg * 10) / 10,
+      after: Math.round(aAvg * 10) / 10,
+      delta: Math.round((aAvg - bAvg) * 10) / 10,
+      samplesBefore: before.length,
+      samplesAfter: after.length,
+    };
+  } catch {
+    return null;
+  }
 }

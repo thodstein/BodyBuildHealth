@@ -472,6 +472,7 @@ export const TrainingMixTab: React.FC = () => {
                 label: score.label,
                 weightKg: bw,
                 substances: planSubstances,
+                course: (linked.course || []).map((c: any) => ({ id: c.substanceId || '', name: c.name || c.substanceId })),
               };
               const result = saveMixToDiaryAndFavorites(input);
               if (savePopup.toPlan) queueMixToSupportPlan(result.rec);
