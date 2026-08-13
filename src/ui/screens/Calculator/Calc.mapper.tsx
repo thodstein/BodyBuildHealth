@@ -1732,6 +1732,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               <CalcSystemPanel
                 risk={systemRiskOf(genericEnhancementPopup)}
                 panel={SYSTEM_PANELS.find(p => p.id === SYSTEM_TO_PANEL[genericEnhancementPopup]) || null}
+                contra={finalRec?.contraindications || []}
               />
               {activeDomains.length > 0 && <button onClick={() => setGenericEnhancementSelected(new Set(autoIds))} style={{ width:'100%', padding:'8px', marginBottom:8, borderRadius:8, border:`1px solid ${cfg.color}66`, background:`${cfg.color}18`, color:'#fff', fontSize:8, fontWeight:800, cursor:'pointer', textAlign:'left' }}>⚡ AUTO по данным: {activeDomains.map(d => d.label).join(' · ')} ({autoIds.length} кандидатов)</button>}
               <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:5 }}>📊 Контрольные маркеры</div>
@@ -1903,6 +1904,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <CalcSystemPanel
                     risk={null}
                     panel={SYSTEM_PANELS.find(p => p.id === 'oda') || null}
+                    contra={finalRec?.contraindications || []}
                     note="ОДА (суставы/связки) не входит в 6 систем механизм-модели риска — контроль по маркерам и УЗИ, поддержка влияет на кардио/метаболический контур косвенно."
                   />
 
@@ -2010,7 +2012,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     {pedNeuroTier > 0 && <span style={{ color:'#818cf8', fontWeight:700 }}> · ⚡ PED AUTO LV{pedNeuroTier} ({pedNeuroRisk})</span>}
                   </div>
 
-                  <CalcSystemPanel risk={systemRiskOf('cns')} panel={SYSTEM_PANELS.find(p => p.id === 'cns') || null} />
+                  <CalcSystemPanel risk={systemRiskOf('cns')} panel={SYSTEM_PANELS.find(p => p.id === 'cns') || null}
+                    contra={finalRec?.contraindications || []} />
 
                   <DomainSymptomMap domains={NEURO_DOMAINS} checked={neuroSymptoms} onToggle={toggleNeuroSymptom} />
 
@@ -2224,6 +2227,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     <CalcSystemPanel
                       risk={systemRiskOf('hematologic')}
                       panel={SYSTEM_PANELS.find(p => p.id === 'hema') || null}
+                      contra={finalRec?.contraindications || []}
                       groups={[
                         { label: 'эритроцитоз', icon: '🩸', color: '#14b8a6', mechs: ['hem1'] },
                         { label: 'метаболизм', icon: '🍬', color: '#f97316', mechs: ['hem2', 'hem3'] },

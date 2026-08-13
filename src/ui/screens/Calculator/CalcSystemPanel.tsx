@@ -55,11 +55,13 @@ export const CalcSystemPanel: React.FC<{
   panel?: SystemPanelDef | null;
   groups?: SubRiskGroup[];
   note?: string;
-}> = ({ risk, panel, groups, note }) => {
+  contra?: Array<{ substanceId?: string; label?: string; severity?: string; message?: string }>;
+}> = ({ risk, panel, groups, note, contra }) => {
   const riskColor = (p: number) => (p >= 75 ? '#f87171' : p >= 50 ? '#f97316' : p >= 25 ? '#f59e0b' : '#22c55e');
   const sumPct = (mechs: string[]) => (risk ? mechs.reduce((s, m) => s + (risk.mechanisms.find(x => x.id === m)?.rawPercent ?? 0), 0) : 0);
   const sumAfter = (mechs: string[]) => (risk ? mechs.reduce((s, m) => s + (risk.mechanisms.find(x => x.id === m)?.afterPercent ?? 0), 0) : 0);
   const showSub = groups && groups.length > 0 && !!risk;
+  const contraList = (contra || []).filter(c => c?.label || c?.message);
   return (
     <div style={{ marginBottom: 8 }}>
       {risk && (
@@ -101,6 +103,17 @@ export const CalcSystemPanel: React.FC<{
             <div><span style={{ color: 'rgba(255,255,255,0.45)' }}>Цели: </span>{panel.targets}</div>
             <div style={{ color: panel.color }}>⚠ {panel.alert}</div>
           </div>
+        </div>
+      )}
+      {contraList.length > 0 && (
+        <div style={{ padding: '6px 8px', borderRadius: 7, marginBottom: 6, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div style={{ fontSize: 7, fontWeight: 700, color: '#f87171', marginBottom: 2 }}>🚫 Противопоказания и осторожности</div>
+          {contraList.slice(0, 6).map((c, i) => (
+            <div key={i} style={{ fontSize: 6, color: c.severity === 'absolute' ? '#fca5a5' : '#fbbf24', lineHeight: 1.5 }}>
+              {c.severity === 'absolute' ? '⛔ ' : '⚠ '}{c.substanceId ? `${c.substanceId}: ` : ''}{c.label || c.message}
+            </div>
+          ))}
+          {contraList.length > 6 && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.45)' }}>+ ещё {contraList.length - 6}</div>}
         </div>
       )}
       {note && <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.45)', marginTop: 4, lineHeight: 1.4 }}>{note}</div>}
