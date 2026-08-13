@@ -1315,6 +1315,50 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     </div>
                   </div>
                 )}
+                {pr.hepaticRisk !== 'none' && pr.hepaticRisk !== 'low' && (
+                  <div style={{ fontSize:8, color:'#fb923c', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>🫁</span>
+                    <div>
+                      <b>Печень — {pr.hepaticRisk === 'high' ? 'высокий риск' : 'умеренный риск'}</b>
+                      {pr.triggeredBy.filter(r => r.includes('епат') || r.includes('Гепат') || r.includes('17α') || r.includes('LFT')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {pr.cardioRisk !== 'none' && pr.cardioRisk !== 'low' && (
+                  <div style={{ fontSize:8, color:'#f87171', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>❤️</span>
+                    <div>
+                      <b>Сердечно-сосудистая — {pr.cardioRisk === 'high' ? 'высокий риск' : 'умеренный риск'}</b>
+                      {pr.triggeredBy.filter(r => r.includes('кардио') || r.includes('Кардио') || r.includes('дислипид') || r.includes('Дислипид') || r.includes('гипертроф') || r.includes('HCT') || r.includes('тромбоз') || r.includes('АД')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {pr.renalRisk !== 'none' && pr.renalRisk !== 'low' && (
+                  <div style={{ fontSize:8, color:'#60a5fa', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>🫘</span>
+                    <div>
+                      <b>Почки — {pr.renalRisk === 'high' ? 'высокий риск' : 'умеренный риск'}</b>
+                      {pr.triggeredBy.filter(r => r.includes('почк') || r.includes('Почк') || r.includes('гиперфильтр') || r.includes('креатинин') || r.includes('ренал')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {pr.reproductiveRisk !== 'none' && pr.reproductiveRisk !== 'low' && (
+                  <div style={{ fontSize:8, color:'#c084fc', lineHeight:1.4, marginBottom:3, display:'flex', alignItems:'flex-start', gap:4 }}>
+                    <span style={{ fontSize:10 }}>🧬</span>
+                    <div>
+                      <b>Репродуктивная/HPG — {pr.reproductiveRisk === 'high' ? 'высокий риск' : 'умеренный риск'}</b>
+                      {pr.triggeredBy.filter(r => r.includes('HPG') || r.includes('супресси') || r.includes('Супресси') || r.includes('19-нор') || r.includes('ароматиз') || r.includes('эстроген') || r.includes('прогестаг') || r.includes('GnRH')).slice(0,1).map((r,i) => (
+                        <div key={i} style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:1 }}>{r}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             );
           })()}

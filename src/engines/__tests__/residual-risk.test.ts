@@ -32,7 +32,8 @@ describe('computeResidualRisk: базовая логика', () => {
 
   it('полный план защиты → net tier 0 (полное покрытие)', () => {
     const gross = assessPedRisk([ped('boldenone_undecylenate', 400)], 'medium');  // hemato high (tier 3)
-    const recommended = getHematoBoosterSubstanceIds(gross.hematoBoosterTier);
+    // recommended = бустеры по тиру ∪ поддержка из правила (nattokinase/serrapeptase/bromelain/hesperidin/aspirin)
+    const recommended = [...getHematoBoosterSubstanceIds(gross.hematoBoosterTier), ...(gross.perSubstance[0]?.support ?? [])];
     // Все рекомендованные вещества в плане → 100% coverage → tier 0
     const net = computeResidualRisk(gross, recommended);
     expect(net.hematoBoosterTier).toBe(0);
@@ -40,9 +41,11 @@ describe('computeResidualRisk: базовая логика', () => {
   });
 
   it('частичный план → net tier снижается', () => {
-    const gross = assessPedRisk([ped('boldenone_undecylenate', 400)], 'medium');  // hemato tier 3 → 17 веществ
-    // 6 веществ из 17 → ~35% → -1 tier (3→2)
-    const net = computeResidualRisk(gross, ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain']);
+    const gross = assessPedRisk([ped('boldenone_undecylenate', 400)], 'medium');  // hemato tier 3
+    const recommended = [...getHematoBoosterSubstanceIds(3), ...(gross.perSubstance[0]?.support ?? [])];
+    // ~35% от recommended → -1 tier (3→2)
+    const plan = recommended.slice(0, Math.ceil(recommended.length * 0.35));
+    const net = computeResidualRisk(gross, plan);
     expect(net.hematoBoosterTier).toBe(2);
     expect(net.hematoCoverage).toBeGreaterThanOrEqual(30);
   });
@@ -55,25 +58,24 @@ describe('computeResidualRisk: границы покрытия 30/60/80%', () =>
   describe('HEMATO домен', () => {
     it('30% покрытие → -1 tier (3→2)', () => {
       const gross = assessPedRisk([ped('boldenone_undecylenate', 400)], 'medium');
-      // tier 3 → 17 веществ. 30% ≈ 6 вещества.
-      const recommended = getHematoBoosterSubstanceIds(3);
-      const plan = recommended.slice(0, 6);  // ~35%
+      const recommended = [...getHematoBoosterSubstanceIds(3), ...(gross.perSubstance[0]?.support ?? [])];
+      const plan = recommended.slice(0, Math.ceil(recommended.length * 0.3));
       const net = computeResidualRisk(gross, plan);
       expect(net.hematoBoosterTier).toBe(2);
     });
 
     it('60% покрытие → -2 tier (3→1)', () => {
       const gross = assessPedRisk([ped('boldenone_undecylenate', 400)], 'medium');
-      const recommended = getHematoBoosterSubstanceIds(3);
-      const plan = recommended.slice(0, 11);  // ~65%
+      const recommended = [...getHematoBoosterSubstanceIds(3), ...(gross.perSubstance[0]?.support ?? [])];
+      const plan = recommended.slice(0, Math.ceil(recommended.length * 0.6));
       const net = computeResidualRisk(gross, plan);
       expect(net.hematoBoosterTier).toBe(1);
     });
 
     it('80% покрытие → tier 0 (полное)', () => {
       const gross = assessPedRisk([ped('boldenone_undecylenate', 400)], 'medium');
-      const recommended = getHematoBoosterSubstanceIds(3);
-      const plan = recommended.slice(0, 14);  // ~82%
+      const recommended = [...getHematoBoosterSubstanceIds(3), ...(gross.perSubstance[0]?.support ?? [])];
+      const plan = recommended.slice(0, Math.ceil(recommended.length * 0.8));
       const net = computeResidualRisk(gross, plan);
       expect(net.hematoBoosterTier).toBe(0);
     });
@@ -89,7 +91,7 @@ describe('computeResidualRisk: границы покрытия 30/60/80%', () =>
 
     it('80% покрытие → tier 0', () => {
       const gross = assessPedRisk([ped('trenbolone_enanthate', 700)], 'medium');
-      const recommended = getNeuroBoosterSubstanceIds(3);
+      const recommended = [...getNeuroBoosterSubstanceIds(3), ...(gross.perSubstance[0]?.support ?? [])];
       const plan = recommended.slice(0, Math.ceil(recommended.length * 0.8));
       const net = computeResidualRisk(gross, plan);
       expect(net.neuroBoosterTier).toBe(0);
@@ -99,7 +101,7 @@ describe('computeResidualRisk: границы покрытия 30/60/80%', () =>
   describe('JOINTS домен', () => {
     it('станозолол → joints high, 30% покрытие → -1', () => {
       const gross = assessPedRisk([ped('stanozolol', 300, 'oral')], 'medium');
-      const recommended = getJointsBoosterSubstanceIds(gross.jointsBoosterTier);
+      const recommended = [...getJointsBoosterSubstanceIds(gross.jointsBoosterTier), ...(gross.perSubstance[0]?.support ?? [])];
       const plan = recommended.slice(0, Math.ceil(recommended.length * 0.3));
       const net = computeResidualRisk(gross, plan);
       expect(net.jointsBoosterTier).toBeLessThan(gross.jointsBoosterTier);
@@ -150,7 +152,8 @@ describe('computeResidualRisk: мульти-домен', () => {
     const neuroIds = getNeuroBoosterSubstanceIds(gross.neuroBoosterTier);
     const jointIds = getJointsBoosterSubstanceIds(gross.jointsBoosterTier);
     const hematoIds = getHematoBoosterSubstanceIds(gross.hematoBoosterTier);
-    const fullPlan = [...neuroIds, ...jointIds, ...hematoIds];
+    const support = (gross.perSubstance || []).flatMap(ps => ps.support ?? []);
+    const fullPlan = [...neuroIds, ...jointIds, ...hematoIds, ...support];
     const net = computeResidualRisk(gross, fullPlan);
     expect(net.neuroBoosterTier).toBe(0);
     expect(net.jointsBoosterTier).toBe(0);

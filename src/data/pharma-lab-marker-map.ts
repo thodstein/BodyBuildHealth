@@ -5,6 +5,8 @@
 //                lab-pharma-correlation.engine, RiskScreen
 // ════════════════════════════════════════════════════════════
 
+import { resolvePedAlias } from './ped-alias-map';
+
 export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   // ── AAS: Bases ──
   test_enan: ['TT','FT','E2','LH','FSH','SHBG','DHT','HCT','HGB','RBC','LDL','HDL','PSA','BP_SYSTOLIC','BP_DIASTOLIC','NT_PROBNP','D_DIMER'],
@@ -16,42 +18,59 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
 
   // ── AAS: 19-Nor ──
   tren_a:   ['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
+  tren_acet:['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
   tren_e:   ['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
+  tren_enan:['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
   tren_hex: ['LDL','HDL','PRL','ALT','AST','GGT','LH','FSH','HCT','CORTISOL','SHBG','NT_PROBNP','D_DIMER','K','SODIUM'],
   nand_dec: ['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
+  deca:     ['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
   nand_pp:  ['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
+  npp:      ['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
   nand_pheny:['HCT','LDL','HDL','PRL','LH','FSH','SHBG','E2','NT_PROBNP'],
   trest_acet: ['HCT','LDL','HDL','PRL','LH','FSH','E2','CORTISOL','ALT','AST'],
   trest_enan: ['HCT','LDL','HDL','PRL','LH','FSH','E2','CORTISOL','ALT','AST'],
+  trestolone: ['HCT','LDL','HDL','PRL','LH','FSH','E2','CORTISOL','ALT','AST'],
 
   // ── AAS: DHT derivatives ──
   oxan:     ['ALT','AST','GGT','HDL','LDL','SHBG','TT','FT','NT_PROBNP'],
   stanoz:   ['ALT','AST','GGT','ALP','HDL','LDL','SHBG','NT_PROBNP'],
+  stan:     ['ALT','AST','GGT','ALP','HDL','LDL','SHBG','NT_PROBNP'],
   drostanolone_prop: ['HDL','LDL','SHBG','DHT','E2'],
   drostanolone_enan: ['HDL','LDL','SHBG','DHT','E2','NT_PROBNP'],
   mesterolone: ['SHBG','DHT','PSA','FT'],
+  proviron: ['SHBG','DHT','PSA','FT'],
   anavar_dht:['ALT','AST','HDL','LDL','SHBG'],
 
   // ── AAS: Boldenone ──
   bolde_undecy: ['HCT','RBC','HGB','HDL','TT','E2','CREATININE','NT_PROBNP'],
+  bold_undec: ['HCT','RBC','HGB','HDL','TT','E2','CREATININE','NT_PROBNP'],
   dhb:      ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
   dhb_cyp:  ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
+  dhb_acetate: ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
+  dhb_propionate: ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
   dihydroboldenone: ['HCT','RBC','HGB','HDL','ALT','AST','NT_PROBNP'],
   boldenone_undecylenate: ['HCT','RBC','HGB','HDL','TT','E2','CREATININE','NT_PROBNP'],
 
   // ── AAS: Orals ──
   metandienone: ['ALT','AST','GGT','HDL','LDL','E2','SHBG','BP_SYSTOLIC','NT_PROBNP','D_DIMER'],
+  methand:  ['ALT','AST','GGT','HDL','LDL','E2','SHBG','BP_SYSTOLIC','NT_PROBNP','D_DIMER'],
   methandriol:  ['ALT','AST','HDL','E2'],
   oximetholone:  ['ALT','AST','GGT','HDL','LDL','HCT','BP_SYSTOLIC','NT_PROBNP','D_DIMER'],
+  oxymetholone:  ['ALT','AST','GGT','HDL','LDL','HCT','BP_SYSTOLIC','NT_PROBNP','D_DIMER'],
+  anadrol:  ['ALT','AST','GGT','HDL','LDL','HCT','BP_SYSTOLIC','NT_PROBNP','D_DIMER'],
   turinabol:   ['ALT','AST','HDL','LDL','SHBG'],
+  trena:    ['ALT','AST','HDL','LDL','SHBG'],
   halotestin:  ['ALT','AST','HDL','LDL'],
+  halo:     ['ALT','AST','HDL','LDL'],
   metenolon_oral: ['ALT','AST','HDL'],
   dimethazine: ['ALT','AST','GGT','HDL','LDL'],
   methyltestosterone: ['ALT','AST','HDL','E2'],
+  methyltest: ['ALT','AST','HDL','E2'],
 
   // ── AAS: Others ──
   mentbolone: ['HDL','LDL','LH','FSH'],
   prim_oral: ['ALT','AST','HDL','LDL'],
+  prim_enan: ['ALT','AST','HDL','LDL'],
   superdrol: ['ALT','AST','GGT','HDL','LDL','HCT','LH','FSH'],
   dimethandrosten: ['ALT','AST','GGT','HDL','LDL','HCT'],
 
@@ -77,7 +96,9 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
 
   // ── Peptides / GH / Insulin ──
   hgh:      ['IGF1','IGFBP3','GLU','INS','HCT','FT4','TSH','NT_PROBNP'],
+  somatropin: ['IGF1','IGFBP3','GLU','INS','HCT','FT4','TSH','NT_PROBNP'],
   igf1lr3:  ['GLU','INS','IGF1','IGFBP3','Creatinine','NT_PROBNP'],
+  igf1_lr3: ['GLU','INS','IGF1','IGFBP3','Creatinine','NT_PROBNP'],
   igf1_des: ['GLU','INS','IGF1','IGFBP3','Creatinine'],
   mgf:      ['IGF1','IGFBP3','GLU','INS'],
   humalog:  ['GLU','INS','HbA1c','K','MAGNESIUM','PHOSPHORUS'],
@@ -97,6 +118,7 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   // ── GLP-1 ──
   liraglutide: ['GLU','HbA1c','INS','HOMAIR','TRIGLYCERIDES','ALT'],
   semaglutide: ['GLU','HbA1c','INS','HOMAIR','TRIGLYCERIDES'],
+  tirzepatide: ['GLU','HbA1c','INS','HOMAIR','TRIGLYCERIDES'],
   dulaglutide: ['GLU','HbA1c','INS','HOMAIR'],
   exenatide:   ['GLU','HbA1c','INS','HOMAIR'],
   lixisenatide: ['GLU','HbA1c','INS'],
@@ -151,9 +173,9 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   adderall: ['HR','BP_SYSTOLIC','BP_DIASTOLIC','CORTISOL','TSH'],
 };
 
-/** Получить маркеры анализов для препарата */
+/** Получить маркеры анализов для препарата (резолвер алиасов: trenbolone_acetate → tren_acet → маркеры). */
 export function getPharmaLabMarkers(drugId: string): string[] {
-  return PHARMA_LAB_MARKERS[drugId] || [];
+  return PHARMA_LAB_MARKERS[resolvePedAlias(drugId)] || PHARMA_LAB_MARKERS[drugId] || [];
 }
 
 /** Проверить, влияет ли препарат на конкретный маркер */

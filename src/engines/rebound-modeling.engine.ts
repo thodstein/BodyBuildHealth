@@ -55,6 +55,8 @@ export interface ReboundInput {
   cycleWeeks: number;
   pctProtocol?: 'clomid' | 'nolva' | 'clomid+nolva' | 'hcg+clomid' | 'hcg+nolva' | 'none';
   pctStartWeek?: number;     // when PCT starts after last pin (default: based on esters)
+  /** Препараты поддержки из плана калькулятора — ускоряют восстановление отдельных маркеров. */
+  supportSubs?: string[];
   userProfile: {
     age: number;
     baselineTT: number;
@@ -202,6 +204,24 @@ export function calculateReboundTrajectory(input: ReboundInput): ReboundProfile 
   for (const [marker, baseHL] of Object.entries(RECOVERY_HALFLIFE)) {
     const enhFactor = pctEnh[marker] || 1.0;
     enhancedRecoveryHL[marker] = baseHL / enhFactor;
+  }
+
+  // Support substances from the support calculator plan accelerate marker recovery:
+  // cabergoline/P5P/vitex → PRL; AI (anastrozole/letrozole/exemestane) → E2; hCG → LH/FSH.
+  const supportSet = new Set((input.supportSubs || []).map(id => id.toLowerCase()));
+  const supportEnh: Record<string, number> = {};
+  if (supportSet.has('cabergoline') || supportSet.has('caberg') || supportSet.has('p5p') || supportSet.has('vitex') || supportSet.has('vitamin_b6')) {
+    supportEnh.PRL = 1.5;
+  }
+  if (supportSet.has('anastrozole') || supportSet.has('letrozole') || supportSet.has('exemestane')) {
+    supportEnh.E2 = 1.3;
+  }
+  if (supportSet.has('hcg')) {
+    supportEnh.LH = 1.2;
+    supportEnh.FSH = 1.2;
+  }
+  for (const [marker, f] of Object.entries(supportEnh)) {
+    if (enhancedRecoveryHL[marker]) enhancedRecoveryHL[marker] = enhancedRecoveryHL[marker] / f;
   }
 
   // Estrogen rebound specific: depends on AI use and aromatizable AAS

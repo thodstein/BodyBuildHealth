@@ -141,6 +141,42 @@ export const PED_CLASS_MATRIX: PedClassMatrixEntry[] = [
     assayWarnings: ['ТТГ <0.1 — гипертиреоз', 'костная резорбция — D3/кальций/K2'],
     phase: 'course',
   },
+  {
+    id: 'sarm', name: 'SARMs (RAD-140/LGD/ostarine)', icon: '🧪',
+    mechs: ['liv1', 'cv2', 'cns1', 'rep1'],
+    labs: ['АЛТ/АСТ/ГГТ', 'HDL/LDL', 'LH/FSH', 'TT'],
+    freq: 'LFT каждые 4 нед; липиды каждые 4 нед; HPTA после курса',
+    mandatory: ['tudca', 'nac', 'omega3'],
+    conditional: ['berberine (глюкоза)', 'magnesium (нейро)'],
+    doctorOnly: [],
+    interactions: ['SARM + оралы — гепатотоксичность', 'SARM + GH — глюкозный контроль'],
+    assayWarnings: ['HDL ↓ — контроль липидов', 'ALT ↑ — снизить/отменить'],
+    phase: 'course',
+  },
+  {
+    id: 'dht_inject', name: 'DHT-инъекционные (мастерон/DHB/примоболан)', icon: '🩹',
+    mechs: ['cv2', 'hem1', 'rep1', 'hem2'],
+    labs: ['HCT/HGB/RBC', 'HDL/LDL', 'LH/FSH', 'PSA'],
+    freq: 'ОАК каждые 4 нед; липиды каждые 4 нед',
+    mandatory: ['hesperidin', 'dandelion', 'omega3'],
+    conditional: ['nattokinase/serrapeptase/bromelain (DHB/болденон-класс, HCT)', 'tudca (DHB)'],
+    doctorOnly: [],
+    interactions: ['DHB + эритроцитоз — контроль HCT', 'мастерон + AI — снижение E2'],
+    assayWarnings: ['HCT ↑ (DHB) — контроль эритропоэза', 'PSA — контроль'],
+    phase: 'course',
+  },
+  {
+    id: 'glp1', name: 'GLP-1 (семаглутид/тирзепатид)', icon: '🍽️',
+    mechs: ['hem2', 'ren1'],
+    labs: ['глюкоза натощак', 'HbA1c', 'HOMA-IR', 'триглицериды'],
+    freq: 'глюкоза/HbA1c каждые 4 нед',
+    mandatory: ['berberine', 'alpha_lipoic'],
+    conditional: ['метформин (HbA1c, врач)'],
+    doctorOnly: ['метформин'],
+    interactions: ['GLP-1 + инсулин — гипогликемия', 'GLP-1 + GH — глюкозный контроль'],
+    assayWarnings: ['тошнота/аппетит — дневник', 'глюкоза — контроль'],
+    phase: 'course',
+  },
 ];
 
 /** Определить активные классы PED по состоянию фармы. */
@@ -149,12 +185,18 @@ export function detectActivePedClasses(state: any): PedClassMatrixEntry[] {
   const ids = (state?.pharma?.aas || []).map((a: { id?: string }) => String(a.id || '').toLowerCase());
   const has = (rx: RegExp) => ids.some((id: string) => rx.test(id));
   // порядок важен: 19-нор проверяем ДО тестостерона (nandrolone_propionate содержит 'prop')
-  if (has(/nand|deca|npp/)) out.push(PED_CLASS_MATRIX[2]);
+  if (has(/nand|deca|npp|trest|ment/)) out.push(PED_CLASS_MATRIX[2]);
   if (has(/test_|sust|omnadren/)) out.push(PED_CLASS_MATRIX[0]);
   if (has(/tren/)) out.push(PED_CLASS_MATRIX[1]);
   if (has(/bold|equipoise|dhb/)) out.push(PED_CLASS_MATRIX[3]);
   // полные имена оралов: без голых 'stan'/'meth' (sustanon содержит 'stan')
-  if (has(/oxand|anavar|stanozolol|winstrol|methandienone|dianabol|oxymetholone|anadrol|turinabol|superdrol|halotestin|methyltestosterone|cheque_drops/)) out.push(PED_CLASS_MATRIX[4]);
+  if (has(/oxand|anavar|stanozolol|winstrol|methand|methandienone|dianabol|oxymetholone|anadrol|turinabol|trena|superdrol|halotestin|methyltest|cheque_drops/)) out.push(PED_CLASS_MATRIX[4]);
+  // SARMs
+  if (has(/ostarine|lgd|rad140|s23|yk11|mk2866|andarine|sr9009|cardarine|mk677|testolone/)) out.push(PED_CLASS_MATRIX[10]);
+  // DHT-inject (мастерон/DHB/примоболан)
+  if (has(/masteron|drostanolone|dhb|primobolan|methenolone|mesterolone/)) out.push(PED_CLASS_MATRIX[11]);
+  // GLP-1
+  if (has(/semaglutide|tirzepatide|liraglutide|dulaglutide|glp/)) out.push(PED_CLASS_MATRIX[12]);
   if (state?.pharma?.ghIU > 0 || state?.pharma?.hasGH) out.push(PED_CLASS_MATRIX[5]);
   if (state?.pharma?.igfMcg > 0 || state?.pharma?.hasIGF) out.push(PED_CLASS_MATRIX[6]);
   if (state?.pharma?.insulinIU > 0 || state?.pharma?.hasInsulin) out.push(PED_CLASS_MATRIX[7]);

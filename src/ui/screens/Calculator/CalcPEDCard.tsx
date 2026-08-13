@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 import React, { useState } from 'react';
 import { classifyPed } from '../../../data/ped-potency-table';
+import { resolvePedAlias } from '../../../data/ped-alias-map';
 import { GLASS } from './Calc.types';
 
 interface Props {
@@ -14,11 +15,18 @@ const PED_LIST: Array<[string, string]> = [
   ['test_enan', 'Тестостерон энантат'],
   ['test_cyp', 'Тестостерон ципионат'],
   ['test_prop', 'Тестостерон пропионат'],
+  ['test_undec', 'Тестостерон ундеканоат'],
+  ['sustanon', 'Сустанон'],
   ['nandrolone_decanoate', 'Нандролон деканоат'],
   ['nandrolone_phenylprop', 'Нандролон фенилпроп'],
   ['trenbolone_enan', 'Тренболон энантат'],
   ['trenbolone_acetate', 'Тренболон ацетат'],
+  ['tren_hex', 'Тренболон гексагидробензилкарбонат'],
   ['boldenone_undecylenate', 'Болденон'],
+  ['dhb', 'Дигидроболденон (DHB)'],
+  ['dhb_acetate', 'DHB ацетат'],
+  ['dhb_propionate', 'DHB пропионат'],
+  ['dhb_cyp', 'DHB ципионат'],
   ['masteron_enan', 'Мастерон (ДГТ)'],
   ['masteron_prop', 'Мастерон проп'],
   ['primobolan_enan', 'Примоболан'],
@@ -29,8 +37,20 @@ const PED_LIST: Array<[string, string]> = [
   ['stanozolol_inj', 'Винстрол инж'],
   ['oxandrolone', 'Анавар (Oxandrolone)'],
   ['turinabol', 'Туинабол (орал)'],
+  ['superdrol', 'Superdrol'],
   ['halotestin', 'Голотестин'],
   ['trestolone', 'Трестолон (MENT)'],
+  ['mesterolone', 'Провирон (местеролон)'],
+  ['ostarine', 'Ostarine (SARM)'],
+  ['lgd', 'Ligandrol LGD-4033'],
+  ['rad140', 'RAD-140'],
+  ['s23', 'S-23'],
+  ['mk677', 'MK-677 (ибутаморен)'],
+  ['cjc1295', 'CJC-1295'],
+  ['ghrp6', 'GHRP-6'],
+  ['ipamorelin', 'Ipamorelin'],
+  ['semaglutide', 'Семаглутид (GLP-1)'],
+  ['tirzepatide', 'Тирзепатид (GLP-1)'],
   ['somatropin', 'ГР (somatropin)'],
   ['insulin_rapid', 'Инсулин (rapid)'],
   ['insulin_lantus', 'Инсулин (long)'],
@@ -73,9 +93,10 @@ export const CalcPEDCard: React.FC<Props> = ({ state, onStateChange }) => {
 
   const addAas = () => {
     if (!addPedId.trim()) return;
-    const pClass = classifyPed(addPedId);
+    const canonId = resolvePedAlias(addPedId);
+    const pClass = classifyPed(canonId);
     const formVal = pClass.includes('oral') ? 'oral' : addPedForm;
-    let entry: any = { id: addPedId.toLowerCase(), form: formVal };
+    let entry: any = { id: canonId, form: formVal };
     if (formVal === 'oral') entry.mgPerWeek = Number(addPedMg) || 50;
     else entry.mgPerWeek = Number(addPedMg) || 500;
     onStateChange({ ...state, pharma: { ...state.pharma, aas: [...aasList, entry] } });

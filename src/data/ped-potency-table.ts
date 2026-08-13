@@ -8,10 +8,12 @@
 //    - warnings (multi-oral, GH+insulin, winny+oxy стоп-комбо)
 // ════════════════════════════════════════════════════════════════════════════
 
+import { resolvePedAlias } from './ped-alias-map';
+
 export type PEDClass =
   | 'aas_test' | 'aas_nandrolone' | 'aas_tren' | 'aas_bold' | 'aas_dht_inject'
   | 'aas_oral_dbol' | 'aas_oral_oxy' | 'aas_oral_winny' | 'aas_oral_anavar' | 'aas_oral_tbol' | 'aas_oral_halo' | 'aas_oral_other'
-  | 'sarm' | 'gh' | 'igf' | 'mgf' | 'insulin' | 't3' | 't4' | 'clenbut' | 'ai' | 'serm' | '5ari' | 'other';
+  | 'sarm' | 'gh' | 'igf' | 'mgf' | 'insulin' | 'glp1' | 't3' | 't4' | 'clenbut' | 'ai' | 'serm' | '5ari' | 'other';
 
 export interface PEDDose {
   id: string;            // 'test_enan', 'tren_acetate', 'somatropin', ...
@@ -68,31 +70,36 @@ export const POTENCY_FACTORS: Record<string, number> = {
   // 19-нор (нандролоны)
   deca: 1.4, deca_durabolin: 1.4, nandrolone_decanoate: 1.4,
   npp: 1.3, nandrolone_phenylpropionate: 1.3,
+  trest_acet: 1.6, trest_enan: 1.6, trestolone: 1.6,
 
   // Тренболоны
   tren_ace: 3.0, trenbolone_acetate: 3.0, trenbolone: 3.0,
+  tren_acet: 3.0, trenbolone_acetat: 3.0,
   tren_enan: 3.5, trenbolone_enanthate: 3.5,
-  parabolan: 4.0, trenbolone_hexahydrobenzylcarbonate: 4.0,
+  tren_hex: 4.0, parabolan: 4.0, trenbolone_hexahydrobenzylcarbonate: 4.0,
 
-  // Болденон
-  boldenone: 0.7, eq: 0.7, equipoise: 0.7, boldenone_undecylenate: 0.7,
+  // Болденон / DHB
+  boldenone: 0.7, eq: 0.7, equipoise: 0.7, boldenone_undecylenate: 0.7, bold_undec: 0.7,
+  dhb: 0.8, dhb_cyp: 0.8, dhb_acetate: 0.8, dhb_propionate: 0.8,
 
   // ДГТ-derivatives (inject)
   masteron: 0.9, drostanolone: 0.9, drostanolone_propionate: 0.9,
-  primobolan: 0.5, methenolone: 0.5, methenolone_enanthate: 0.5,
+  drostanolone_prop: 0.9, drostanolone_enan: 0.9, drostanolone_enanthate: 0.9,
+  primobolan: 0.5, methenolone: 0.5, methenolone_enanthate: 0.5, prim_enan: 0.5,
   primobolan_acetate: 0.5, methenolone_acetate: 0.5,
 
   // Привидон (модель - oral но не 17α)
   proviron: 0.2, mesterolone: 0.2,
 
   // 17α-Оралы
-  anavar: 0.8, oxandrolone: 0.8,
-  winstrol: 2.0, stanozolol: 2.0, winny: 2.0,
-  dbol: 3.5, dianabol: 3.5, methandienone: 3.5, methandrostenolone: 3.5,
+  anavar: 0.8, oxandrolone: 0.8, oxan: 0.8,
+  winstrol: 2.0, stanozolol: 2.0, winny: 2.0, stan: 2.0,
+  dbol: 3.5, dianabol: 3.5, methandienone: 3.5, methandrostenolone: 3.5, methand: 3.5,
   anadrol: 4.0, oxymetholone: 4.0, oxy: 4.0,
-  tbol: 1.5, turinabol: 1.5, oral_turinabol: 1.5, chlorodehydromethyltestosterone: 1.5,
+  tbol: 1.5, turinabol: 1.5, oral_turinabol: 1.5, chlorodehydromethyltestosterone: 1.5, trena: 1.5,
   halo: 5.0, halotestin: 5.0, fluoxymesterone: 5.0,
-  methyltestosterone: 3.0,
+  methyltestosterone: 3.0, methyltest: 3.0,
+  superdrol: 4.0, methyldrostanolone: 4.0,
   cheque_drops: 6.0, mibolerone: 6.0,
 
   // SARMs
@@ -100,18 +107,24 @@ export const POTENCY_FACTORS: Record<string, number> = {
   lgd: 0.9, lgd4033: 0.9, ligandrol: 0.9,
   rad140: 1.2, testolone: 1.2,
   yk11: 1.5,
+  s23: 1.0,
   andarine: 0.5, s4: 0.5,
   sr9009: 0.3, stenabolic: 0.3,
   gw501516: 0.4, cardarine: 0.4,
 
   // GH
   somatropin: 0.4, gh: 0.4, hgh: 0.4, growth_hormone: 0.4, jintropin: 0.4, genotropin: 0.4, norditropin: 0.4,
+  mk677: 0.4, ibutamoren: 0.4, cjc1295: 0.4, cjc: 0.4, ghrp2: 0.4, ghrp6: 0.4, ipamorelin: 0.4, sermorelin: 0.4,
+
+  // GLP-1
+  semaglutide: 0.5, tirzepatide: 0.5, liraglutide: 0.5, dulaglutide: 0.5,
 
   // IGF / MGF
-  igf1_lr3: 3.0, igf1: 3.0, igf_lr3: 3.0, igf_des: 3.5, mgf: 1.5, peg_mgf: 1.5,
+  igf1_lr3: 3.0, igf1: 3.0, igf_lr3: 3.0, igf_des: 3.5, igf1_des: 3.5, mgf: 1.5, peg_mgf: 1.5,
 
   // Инсулин
   insulin_rapid: 1.0, insulin_lantus: 0.9, insulin_glargine: 0.9, insulin_detemir: 0.85, insulin: 1.0,
+  ins_short: 1.0, ins_long: 0.9, ins_aspart: 1.0, ins_detemir: 0.85,
   novorapid: 1.0, humalog: 1.0, lantus: 0.9, levemir: 0.85,
 
   // T3 / T4
@@ -124,12 +137,13 @@ export const POTENCY_FACTORS: Record<string, number> = {
 
 // Список оральных 17α (для гепаториска)
 export const ORAL_17ALPHA_IDS: Set<string> = new Set([
-  'anavar', 'winstrol', 'winny', 'stanozolol', 'oxandrolone',
-  'dbol', 'dianabol', 'methandienone', 'methandrostenolone',
+  'anavar', 'winstrol', 'winny', 'stanozolol', 'stan', 'stanoz', 'oxandrolone',
+  'dbol', 'dianabol', 'methandienone', 'methandrostenolone', 'methand',
   'anadrol', 'oxymetholone', 'oxy',
-  'tbol', 'turinabol', 'oral_turinabol',
+  'tbol', 'turinabol', 'oral_turinabol', 'trena',
   'halo', 'halotestin', 'fluoxymesterone',
-  'methyltestosterone', 'cheque_drops', 'mibolerone',
+  'methyltestosterone', 'methyltest', 'superdrol', 'methyldrostanolone',
+  'cheque_drops', 'mibolerone',
 ]);
 
 // Список не-17α оралов (Proviron)
@@ -141,34 +155,40 @@ export const ORAL_NON17_IDS: Set<string> = new Set([
 //  classifyPed — автоопределение класса по ID
 // ════════════════════════════════════════════════════════════════════════════
 export function classifyPed(id: string): PEDClass {
-  const k = id.toLowerCase();
+  const k = resolvePedAlias(id);
+  // Дигидроболденон (DHB) — 5α-восстановленный болденон, DHT-подобный профиль
+  if (k === 'dhb' || k === 'dhb_cyp' || k === 'dhb_acetate' || k === 'dhb_propionate' || k === 'dihydroboldenone') return 'aas_dht_inject';
+  // Трестолон (MENT) — 19-нор
+  if (k.includes('trest') || k === 'ment') return 'aas_nandrolone';
   // Тестостероны
   if (k.includes('test_') || k.includes('testosterone') || k.includes('sust')) return 'aas_test';
   // 19-нор
   if (k.includes('nandrolone') || k.includes('deca') || k.includes('npp')) return 'aas_nandrolone';
-  // Трен
-  if (k.includes('tren') || k.includes('parabolan')) return 'aas_tren';
+  // Трен (только trenbolone/tren_* — 'trena' (туринабол) не должен попадать сюда)
+  if (k.includes('tren_') || k.includes('trenbolone') || k === 'tren' || k.includes('parabolan')) return 'aas_tren';
   // Болденон
   if (k.includes('bold') || k.includes('equipoise') || k === 'eq' || k.startsWith('eq_')) return 'aas_bold';
   // ДГТ-inject
-  if (k.includes('masteron') || k.includes('drostanolone') || k.includes('primobolan') || k.includes('methenolone')) return 'aas_dht_inject';
+  if (k.includes('masteron') || k.includes('drostanolone') || k.includes('primobolan') || k.includes('methenolone') || k.includes('prim_') || k === 'primo') return 'aas_dht_inject';
   // 17α Оралы
-  if (k.includes('anavar') || k.includes('oxandrolone')) return 'aas_oral_anavar';
-  if (k.includes('winstrol') || k.includes('stanozolol') || k.includes('winny')) return 'aas_oral_winny';
-  if (k.includes('anadrol') || k.includes('oxymetholone') || k==='oxy') return 'aas_oral_oxy';
-  if (k.includes('dbol') || k.includes('dianabol') || k.includes('methandienone')) return 'aas_oral_dbol';
-  if (k.includes('tbol') || k.includes('turinabol')) return 'aas_oral_tbol';
+  if (k.includes('anavar') || k.includes('oxandrolone') || k === 'oxan') return 'aas_oral_anavar';
+  if (k.includes('winstrol') || k.includes('stanozolol') || k.includes('winny') || k === 'stan' || k.includes('stanoz')) return 'aas_oral_winny';
+  if (k.includes('anadrol') || k.includes('oxymetholone') || k === 'oxy') return 'aas_oral_oxy';
+  if (k.includes('dbol') || k.includes('dianabol') || k.includes('methandienone') || k.includes('methand') || k.includes('metandienone')) return 'aas_oral_dbol';
+  if (k.includes('tbol') || k.includes('turinabol') || k === 'trena') return 'aas_oral_tbol';
   if (k.includes('halo') || k.includes('fluoxymesterone')) return 'aas_oral_halo';
   if (ORAL_17ALPHA_IDS.has(k)) return 'aas_oral_other';
   // SARMs
-  if (k.includes('ostarine') || k.includes('lgd') || k.includes('rad') || k.includes('yk11') || k.includes('andarine') || k.includes('s4') || k.includes('sr9009') || k.includes('gw501516') || k.includes('cardarine')) return 'sarm';
+  if (k.includes('ostarine') || k.includes('lgd') || k.includes('rad') || k.includes('yk11') || k.includes('andarine') || k.includes('s4') || k.includes('sr9009') || k.includes('gw501516') || k.includes('cardarine') || k === 's23') return 'sarm';
   // GH
-  if (k.includes('somatropin') || k === 'gh' || k === 'hgh' || k.includes('growth_hormone') || k.includes('jintropin') || k.includes('genotropin') || k.includes('norditropin')) return 'gh';
+  if (k.includes('somatropin') || k === 'gh' || k === 'hgh' || k.includes('growth_hormone') || k.includes('jintropin') || k.includes('genotropin') || k.includes('norditropin') || k.includes('mk677') || k.includes('ibutamoren') || k.includes('cjc') || k.includes('ghrp') || k.includes('ipamorelin') || k.includes('sermorelin')) return 'gh';
+  // GLP-1
+  if (k.includes('semaglutide') || k.includes('tirzepatide') || k.includes('liraglutide') || k.includes('dulaglutide') || k.includes('glp')) return 'glp1';
   // IGF
   if (k.includes('igf') || k.includes('lr3') || k.includes('des')) return 'igf';
   if (k.includes('mgf') || k.includes('peg_mgf')) return 'mgf';
   // Insulin
-  if (k.includes('insulin') || k.includes('novorapid') || k.includes('humalog') || k.includes('lantus') || k.includes('levemir')) return 'insulin';
+  if (k.includes('insulin') || k.startsWith('ins_') || k.includes('novorapid') || k.includes('humalog') || k.includes('lantus') || k.includes('levemir')) return 'insulin';
   // T3/T4
   if (k.includes('t3') || k.includes('liothyronine') || k.includes('cytomel') || k.includes('triiodothyronine')) return 't3';
   if (k.includes('t4') || k.includes('levothyroxine')) return 't4';
@@ -202,7 +222,7 @@ export function computeIntensityFactor(peds: PEDDose[]): number {
   let intensityOther = 0;
 
   for (const p of peds) {
-    const potency = POTENCY_FACTORS[p.id.toLowerCase()] ?? 1.0;
+    const potency = POTENCY_FACTORS[resolvePedAlias(p.id)] ?? POTENCY_FACTORS[p.id.toLowerCase()] ?? 1.0;
     const pClass = p.pClass;
     if (pClass === 'gh' || pClass === 'igf' || pClass === 'mgf') {
       const iu = p.iuPerDay ?? (p.mcgPerDay ? p.mcgPerDay / 100 : 0);
@@ -213,6 +233,9 @@ export function computeIntensityFactor(peds: PEDDose[]): number {
     } else if (pClass === 't3' || pClass === 't4' || pClass === 'clenbut') {
       const mcg = p.mcgPerDay ?? 0;
       intensityOther += (mcg / 50) * potency;  // 50 мкг T3 = 1.0
+    } else if (pClass === 'glp1') {
+      const mg = p.mgPerWeek ?? 0;
+      intensityOther += (mg / 7) * potency;  // 7 мг/нед GLP-1 ≈ moderate
     } else if (pClass === 'sarm') {
       const mg = p.mgPerWeek ? p.mgPerWeek / 7 : 0;
       intensityAAS += (mg / 25) * potency;  // 25 мг/день sarm = 0.6 → 1 sarm test
@@ -257,19 +280,22 @@ export interface PEDFlags {
 
 export function derivePEDFlags(peds: PEDDose[]): PEDFlags {
   const ids = peds.map(p => p.id.toLowerCase());
-  const oral17Ids = ids.filter(id => ORAL_17ALPHA_IDS.has(id));
+  const canonIds = ids.map(resolvePedAlias);
+  const oral17Ids = ids.filter(id => ORAL_17ALPHA_IDS.has(resolvePedAlias(id)));
   const hasOral17 = oral17Ids.length > 0;
   const hasGH_ = peds.some(p => p.pClass === 'gh');
   const hasInsulin_ = peds.some(p => p.pClass === 'insulin');
+  // DHB — DHT-подобный, но с выраженным гемато-эффектом (как болденон)
+  const hasDhb = canonIds.some(id => id === 'dhb' || id === 'dhb_cyp' || id === 'dhb_acetate' || id === 'dhb_propionate');
   const flags: PEDFlags = {
     hasAAS: peds.some(p => p.pClass.startsWith('aas_')),
     hasTest: peds.some(p => p.pClass === 'aas_test'),
     hasNandrolone: peds.some(p => p.pClass === 'aas_nandrolone'),
     hasTren: peds.some(p => p.pClass === 'aas_tren'),
-    hasBold: peds.some(p => p.pClass === 'aas_bold'),
+    hasBold: peds.some(p => p.pClass === 'aas_bold') || hasDhb,
     hasDhtInject: peds.some(p => p.pClass === 'aas_dht_inject'),
     hasOral17, hasOral17Count: oral17Ids.length,
-    hasProviron: ids.includes('proviron') || ids.includes('mesterolone'),
+    hasProviron: canonIds.includes('proviron') || canonIds.includes('mesterolone'),
     hasSarm: peds.some(p => p.pClass === 'sarm'),
     hasGH: hasGH_,
     hasIGF: peds.some(p => p.pClass === 'igf'),
@@ -281,7 +307,7 @@ export function derivePEDFlags(peds: PEDDose[]): PEDFlags {
     has17AlphaAndGH: hasOral17 && hasGH_,
     isMultiOral: oral17Ids.length > 1,
     isGHPlusInsulin: hasGH_ && hasInsulin_,
-    isWinnyPlusOxy: ids.includes('winstrol') && (ids.includes('anadrol') || ids.includes('oxymetholone') || ids.includes('oxy')),
+    isWinnyPlusOxy: canonIds.includes('stan') && (canonIds.includes('anadrol') || canonIds.includes('oxy') || canonIds.includes('oxymetholone')),
     pedIds: ids,
   };
   return flags;

@@ -227,6 +227,30 @@ export const DRUG_DATABASE: Record<string, DrugRecord> = {
       { id: 'acromegalic_remodeling', triggerStrength: 1.0, requiredMarkers: ['IGF-1', 'IGFBP-3', 'CTX'] },
     ],
   },
+  turinabol: {
+    class: 'aas',
+    pathologies: [
+      { id: 'liver_stress',          triggerStrength: 0.5, requiredMarkers: ['ALT', 'AST', 'GGT'] },
+      { id: 'dyslipidemia',          triggerStrength: 0.4, requiredMarkers: ['HDL', 'LDL', 'Triglycerides'] },
+      { id: 'hpta_shutdown',         triggerStrength: 0.6, requiredMarkers: ['LH', 'FSH', 'Total Testosterone'] },
+    ],
+  },
+  superdrol: {
+    class: 'aas',
+    pathologies: [
+      { id: 'liver_stress',          triggerStrength: 1.0, requiredMarkers: ['ALT', 'AST', 'GGT', 'Total Bilirubin'] },
+      { id: 'dyslipidemia',          triggerStrength: 0.6, requiredMarkers: ['HDL', 'LDL', 'Triglycerides'] },
+      { id: 'hpta_shutdown',         triggerStrength: 0.7, requiredMarkers: ['LH', 'FSH', 'Total Testosterone'] },
+      { id: 'hyperfiltration',       triggerStrength: 0.5, requiredMarkers: ['Creatinine', 'eGFR', 'Urea'] },
+    ],
+  },
+  glp1: {
+    class: 'glp1',
+    pathologies: [
+      { id: 'insulin_resistance',    triggerStrength: 0.7, requiredMarkers: ['HOMA-IR', 'HbA1c', 'Glucose'] },
+      { id: 'pancreatic_stress',     triggerStrength: 0.3, requiredMarkers: ['Lipase', 'Amylase'] },
+    ],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -254,6 +278,7 @@ const ESTER_TO_GENERIC: Record<string, string> = {
   // Boldenone esters
   bold_undec: 'boldenone', boldenone_undecylenate: 'boldenone', eq: 'boldenone', equipoise: 'boldenone',
   dhb: 'boldenone', dihydroboldenone: 'boldenone', bolde_undecy: 'boldenone', dhb_cyp: 'boldenone',
+  dhb_acetate: 'boldenone', dhb_propionate: 'boldenone',
   // Drostanolone (Masteron) esters
   drostanolone_prop: 'masteron', drostanolone_enan: 'masteron',
   masteron_propionate: 'masteron', masteron_enanthate: 'masteron',
@@ -265,9 +290,9 @@ const ESTER_TO_GENERIC: Record<string, string> = {
   oxan: 'oxandrolone', anavar: 'oxandrolone', anavar_dht: 'oxandrolone',
   stan: 'stanozolol', stanozolol_oral: 'stanozolol', winstrol: 'stanozolol', stanoz: 'stanozolol',
   anadrol: 'anadrol', oxymetholone: 'anadrol', oximetholone: 'anadrol',
-  trena: 'dianabol', turinabol: 'dianabol',
+  trena: 'turinabol', turinabol: 'turinabol',
   halo: 'halotestin', fluoxymesterone: 'halotestin', halotestin_oral: 'halotestin',
-  superdrol: 'dianabol', methyltrienolone: 'methyltrienolone', metribolone: 'methyltrienolone',
+  superdrol: 'superdrol', methyldrostanolone: 'superdrol', methyltrienolone: 'methyltrienolone', metribolone: 'methyltrienolone',
   dimethazine: 'dianabol', methyltestosterone: 'testosterone', dimethandrosten: 'dianabol',
   mentbolone: 'nandrolone',
   // DHT derivatives
@@ -296,7 +321,7 @@ const ESTER_TO_GENERIC: Record<string, string> = {
   // Insulin
   humalog: 'insulin', humulin_r: 'insulin', lantus: 'insulin',
   // GLP-1
-  liraglutide: 'glp1', semaglutide: 'glp1', dulaglutide: 'glp1', exenatide: 'glp1', lixisenatide: 'glp1',
+  liraglutide: 'glp1', semaglutide: 'glp1', dulaglutide: 'glp1', exenatide: 'glp1', lixisenatide: 'glp1', tirzepatide: 'glp1',
   // Thyroid
   liothyronine: 'thyroid', levothyroxine: 'thyroid', thyroid_extract: 'thyroid',
   // Fat burners / CNS
@@ -326,12 +351,14 @@ const GENERIC_PATTERNS: [RegExp, string][] = [
   [/masteron|drostanolone/i, 'masteron'],
   [/prim|methenolone/i, 'primobolan'],
   [/proviron|mesterolone/i, 'proviron'],
-  [/dbol|methand|dianabol|turinabol/i, 'dianabol'],
+  [/dbol|methand|dianabol/i, 'dianabol'],
+  [/turinabol|^trena/i, 'turinabol'],
   [/anavar|oxan/i, 'oxandrolone'],
   [/winstrol|stan/i, 'stanozolol'],
   [/anadrol|oxymetholone/i, 'anadrol'],
   [/halo|fluoxymesterone/i, 'halotestin'],
-  [/superdrol/i, 'dianabol'],
+  [/superdrol|methyldrostanolone/i, 'superdrol'],
+  [/semaglutide|tirzepatide|liraglutide|dulaglutide|glp1/i, 'glp1'],
   [/methyltrien|metribolone/i, 'methyltrienolone'],
   [/hgh|somatropin|growth/i, 'growth_hormone'],
   [/insulin|^ins_/i, 'insulin'],

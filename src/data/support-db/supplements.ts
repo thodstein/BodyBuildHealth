@@ -407,4 +407,10 @@ export const SUPPLEMENTS_DB: Record<string, TzSupportEntry[]> = {
   dipyridamole: [{organId:'cardio',mechId:'cv4',k:0.20,q:'A',source:'Антиагрегант (PDE-ингиб → ↑cAMP), вазодилататор (ESPRIT 2006)'},{organId:'hematologic',mechId:'hem1',k:0.15,q:'A',source:'↓агрегации тромбоцитов, улучшение микроциркуляции'}],
   sulodexide: [{organId:'cardio',mechId:'cv4',k:0.25,q:'B',source:'Гепариноид: ↑фибринолиз, антикоагулянт, эндотелий (Coccheri 2014)'},{organId:'cardio',mechId:'cv1',k:0.10,q:'B',source:'↑эндотелиальной защиты, ↓проницаемости сосудов'}],
   warfarin: [{organId:'cardio',mechId:'cv4',k:0.40,q:'A',source:'Антикоагулянт (вит.K-антагонист) — ↓факторов II,VII,IX,X (по назначению врача, контроль МНО)'}],
+  // ── Бустеры без k-записей (добавлено для механизм-модели) ──
+  lamotrigine: [{organId:'cns',mechId:'cns1',k:0.20,q:'A',source:'Ламотриджин — негативный модулятор Na-каналов, стабилизация нейронов (статья: LV4)'},{organId:'cns',mechId:'cns3',k:0.15,q:'B',source:'Нормотимик — ↓нейровозбудимости, апоптоз-протекция'}],
+  p5p: [{organId:'cns',mechId:'cns4',k:0.10,q:'B',source:'P5P (пиридоксаль-5-фосфат) — кофактор дофамин-синтазы, ↓PRL'}],
+  vitex: [{organId:'cns',mechId:'cns4',k:0.10,q:'B',source:'Vitex (прутняк) — D2-агонизм, ↓пролактина'}],
+  tadalafil: [{organId:'cardio',mechId:'cv3',k:0.15,q:'B',source:'Тадалафил — PDE5-ингибитор, ↑эндотелий, ↓гемодинамической нагрузки'},{organId:'cardio',mechId:'cv1',k:0.10,q:'C',source:'Эндотелий-протекция'}],
+  niacin: [{organId:'cardio',mechId:'cv2',k:0.15,q:'B',source:'Ниацин — ↑HDL, ↓TG (AIM-HIGH: нет CV-выгоды, но липиды улучшает)'}],
 };

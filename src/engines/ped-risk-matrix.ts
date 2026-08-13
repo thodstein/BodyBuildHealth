@@ -23,6 +23,7 @@
 
 import type { PEDDose, PEDClass } from '../data/ped-potency-table';
 import { classifyPed } from '../data/ped-potency-table';
+import { resolvePedAlias } from '../data/ped-alias-map';
 import type { SupportLevel } from './tz-bridge-mechanism';
 import { getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from './tz-bridge-boosters';
 
@@ -34,9 +35,20 @@ export interface PedSubstanceRisk {
   neuro: PedRisk;
   joints: PedRisk;
   hemato: PedRisk;
+  /** Риски по системам (механизм-ориентированное расширение) */
+  hepatic: PedRisk;
+  cardio: PedRisk;
+  renal: PedRisk;
+  reproductive: PedRisk;
   neuroReason?: string;
   jointsReason?: string;
   hematoReason?: string;
+  hepaticReason?: string;
+  cardioReason?: string;
+  renalReason?: string;
+  reproductiveReason?: string;
+  /** Рекомендуемая поддержка из правила (для residual-покрытия по механизмам) */
+  support?: string[];
   dose: number;
   doseUnit: string;
 }
@@ -45,6 +57,10 @@ export interface PedRiskAssessment {
   neuroRisk: PedRisk;
   jointsRisk: PedRisk;
   hematoRisk: PedRisk;
+  hepaticRisk: PedRisk;
+  cardioRisk: PedRisk;
+  renalRisk: PedRisk;
+  reproductiveRisk: PedRisk;
   neuroBoosterTier: 0 | 1 | 2 | 3;
   jointsBoosterTier: 0 | 1 | 2 | 3;
   hematoBoosterTier: 0 | 1 | 2 | 3;
@@ -89,6 +105,10 @@ interface DoseTier {
   neuro: PedRisk;
   joints: PedRisk;
   hemato: PedRisk;
+  hepatic: PedRisk;
+  cardio: PedRisk;
+  renal: PedRisk;
+  reproductive: PedRisk;
 }
 
 interface SubstanceRule {
@@ -99,25 +119,49 @@ interface SubstanceRule {
   neuroReason?: string;
   jointsReason?: string;
   hematoReason?: string;
+  hepaticReason?: string;
+  cardioReason?: string;
+  renalReason?: string;
+  reproductiveReason?: string;
+  /** Рекомендуемая поддержка по механизмам (для residual-покрытия) */
+  support?: string[];
 }
 
 const INF = Infinity;
 
+/** Сокращённый конструктор тира (hepatic/cardio/renal/reproductive по умолчанию low). */
+function tier(
+  maxDose: number,
+  neuro: PedRisk,
+  joints: PedRisk,
+  hemato: PedRisk,
+  extra: Partial<Pick<DoseTier, 'hepatic' | 'cardio' | 'renal' | 'reproductive'>> = {},
+): DoseTier {
+  return { maxDose, neuro, joints, hemato, hepatic: 'low', cardio: 'low', renal: 'low', reproductive: 'moderate', ...extra };
+}
+
 // AAS — по substring-паттернам ID (надёжнее pClass, т.к. classifyPed
-// не распознаёт trestolone/superdrol/proviron)
+// не распознавал трестолон/superdrol/провирон — сейчас резолвится через ped-alias-map)
 const AAS_RULES: SubstanceRule[] = [
   // ── Тренболон (19-нор, MAX нейротоксичность по статье) ──
   {
-    patterns: ['tren', 'parabolan'],
+    // 'tren' отдельно НЕ матчим — 'trena' (туринабол) содержит 'tren'
+    patterns: ['tren_', 'trenbolone', 'parabolan', 'trenace', 'tren_acetate'],
     pClasses: ['aas_tren'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: 300,  neuro: 'moderate', joints: 'low',      hemato: 'moderate' },
-      { maxDose: 600,  neuro: 'high',     joints: 'low',      hemato: 'moderate' },
-      { maxDose: INF,  neuro: 'high',     joints: 'low',      hemato: 'high' },
+      tier(200, 'moderate', 'low', 'moderate', { hepatic: 'low', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(500, 'high', 'low', 'moderate', { hepatic: 'moderate', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
+      tier(800, 'high', 'low', 'high', { hepatic: 'moderate', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
+      tier(INF, 'high', 'low', 'high', { hepatic: 'high', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Тренболон — максимальная нейротоксичность (статья: рост нейритов ↓↓, 19-нор)',
     hematoReason: 'Тренболон ≥500 мг — стимуляция эритропоэза (HIF-1α)',
+    hepaticReason: 'Тренболон — гепатотоксичность (17α-замещённый эстрен), риск холестаза',
+    cardioReason: 'Тренболон — кардиотоксичность: гипертрофия ЛЖ, дислипидемия, ↑АД, тахикардия',
+    renalReason: 'Тренболон — гиперфильтрация, ↑креатинин, задержка K/Na',
+    reproductiveReason: '19-нор — максимальная супрессия HPG-оси (прогестаген)',
+    support: ['nebivolol', 'astragalus', 'magnesium_l_threonate', 'phosphatidylserine', 'vitamin_b12', 'theanine', 'glycine', 'tudca', 'nac'],
   },
   // ── Нандролон (19-нор, moderate нейро, PROTECTIVE суставы) ──
   {
@@ -125,66 +169,94 @@ const AAS_RULES: SubstanceRule[] = [
     pClasses: ['aas_nandrolone'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: 400,  neuro: 'low',       joints: 'protective', hemato: 'moderate' },
-      { maxDose: INF,  neuro: 'moderate',  joints: 'protective', hemato: 'high' },
+      tier(300, 'low', 'protective', 'moderate', { hepatic: 'none', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(500, 'moderate', 'protective', 'high', { hepatic: 'none', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(INF, 'moderate', 'protective', 'high', { hepatic: 'none', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Нандролон (19-нор) — moderate нейро при высоких дозах',
     jointsReason: '↑ COLLAGEN_SYNTHESIS, укрепление суставов/связок',
     hematoReason: 'Нандролон ≥300 мг — выраженный ЭПО-эффект (HIF-1α)',
+    cardioReason: 'Нандролон — дислипидемия (HDL↓↓), объёмная нагрузка, прогестиновая задержка',
+    renalReason: 'Нандролон — гиперфильтрация при высоких дозах',
+    reproductiveReason: '19-нор — сильная супрессия HPG-оси (прогестаген + эстроген)',
+    support: ['agmatine', 'hesperidin', 'dandelion', 'hcg', 'omega3'],
   },
-  // ── Трестолон / MENT (19-нор, progestogenic, classifyPed=other) ──
+  // ── Трестолон / MENT (19-нор, progestogenic) ──
   {
     patterns: ['trest', 'ment'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: 300,  neuro: 'moderate', joints: 'low', hemato: 'moderate' },
-      { maxDose: INF,  neuro: 'high',     joints: 'low', hemato: 'high' },
+      tier(300, 'moderate', 'low', 'moderate', { hepatic: 'none', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(INF, 'high', 'low', 'high', { hepatic: 'none', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Трестолон (MENT, 19-нор) — progestogenic, нейротоксичность',
     hematoReason: 'Трестолон — стимуляция эритропоэза (19-нор, progestogenic)',
+    cardioReason: 'Трестолон — высокая андрогенность, дислипидемия, ↑АД',
+    reproductiveReason: 'MENT — сильнейшая супрессия HPG (прогестаген)',
+    support: ['agmatine', 'hesperidin', 'dandelion', 'hcg'],
   },
-  // ── Станозолол (tendinopathy, дегенерация коллагена) ──
+  // ── Станозолол (tendinopathy, 17α) ──
   {
     patterns: ['stan', 'winstrol', 'winny', 'stanozolol'],
     pClasses: ['aas_oral_winny'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: 210,  neuro: 'low',  joints: 'moderate', hemato: 'moderate' },
-      { maxDose: INF,  neuro: 'low',  joints: 'high',     hemato: 'high' },
+      tier(210, 'low', 'moderate', 'moderate', { hepatic: 'high', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(INF, 'low', 'high', 'high', { hepatic: 'high', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
     ],
-    neuroReason: undefined,
     jointsReason: 'Станозолол — tendinopathy, дегенерация коллагена сухожилий',
     hematoReason: 'Станозолол — стимуляция эритропоэза + ↑факторы свёртывания',
+    hepaticReason: 'Станозолол — 17α-алкил: холестаз, ↑АЛТ/АСТ/ГГТ',
+    cardioReason: 'Станозолол — HDL↓↓ до 50%, ↓LDL',
+    reproductiveReason: '17α-орал — супрессия HPG-оси',
+    support: ['tudca', 'nac', 'milk_thistle', 'omega3', 'bpc157', 'collagen', 'glucosamine', 'msm'],
   },
-  // ── Halotestin (neurotoxicity + tendinopathy) ──
+  // ── Halotestin (17α, neurotoxicity + tendinopathy) ──
   {
     patterns: ['halo', 'halotestin', 'fluoxymesterone'],
     pClasses: ['aas_oral_halo'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'moderate', joints: 'moderate', hemato: 'high' },
+      tier(INF, 'moderate', 'moderate', 'high', { hepatic: 'high', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
     ],
     neuroReason: 'Halotestin — neurotoxicity (COMPOUND_RISK_MAP)',
     jointsReason: 'Halotestin — tendinopathy (COMPOUND_RISK_MAP)',
     hematoReason: 'Halotestin — выраженный эритропоэз (17α-алкил, DHT-производный)',
+    hepaticReason: 'Halotestin — токсичнейший 17α-орал (порог гепатотоксичности)',
+    support: ['tudca', 'nac', 'milk_thistle', 'omega3'],
   },
-  // ── Мастерон / дростанолон (tendinopathy) ──
+  // ── DHB / дигидроболденон (DHT-подобный, но выраженный гемато-эффект как у болденона) ──
+  {
+    patterns: ['dhb', 'dihydroboldenone'],
+    pClasses: ['aas_dht_inject'],
+    doseUnit: 'mgPerWeek',
+    tiers: [
+      tier(INF, 'low', 'low', 'high', { hepatic: 'moderate', cardio: 'moderate', renal: 'low', reproductive: 'moderate' }),
+    ],
+    hematoReason: 'DHB — выраженный ЭПО-эффект (как болденон, HCT↑), гипервязкость',
+    hepaticReason: 'DHB — гепатотоксичность 0.4 (зависит от индивидуальной реакции)',
+    cardioReason: 'DHB — HCT↑ → гипервязкость, тромбоз, ↑АД',
+    support: ['nattokinase', 'serrapeptase', 'bromelain', 'hesperidin', 'tudca', 'aspirin'],
+  },
+  // ── Мастерон / дростанолон (DHT-inject, tendinopathy) ──
   {
     patterns: ['masteron', 'drostanolone', 'master'],
     pClasses: ['aas_dht_inject'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'moderate', hemato: 'low' },
+      tier(INF, 'low', 'moderate', 'low', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'moderate' }),
     ],
     jointsReason: 'Мастерон — tendinopathy (COMPOUND_RISK_MAP pharmaTriggers)',
+    support: ['bpc157', 'collagen', 'glucosamine', 'msm', 'curcumin'],
   },
   // ── Примоболан / метенолон (мягкий) ──
   {
-    patterns: ['primobolan', 'methenolone', 'primo'],
+    patterns: ['primobolan', 'methenolone', 'primo', 'prim_'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'low', hemato: 'low' },
+      tier(INF, 'low', 'low', 'low', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'moderate' }),
     ],
+    support: ['hcg'],
   },
   // ── Тестостерон (базовый, дозозависимый) ──
   {
@@ -192,80 +264,99 @@ const AAS_RULES: SubstanceRule[] = [
     pClasses: ['aas_test'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: 500,  neuro: 'low',      joints: 'none', hemato: 'low' },
-      { maxDose: 1000, neuro: 'moderate', joints: 'none', hemato: 'moderate' },
-      { maxDose: INF,  neuro: 'moderate', joints: 'none', hemato: 'high' },
+      tier(500, 'low', 'none', 'low', { hepatic: 'low', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(1000, 'moderate', 'none', 'moderate', { hepatic: 'low', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
+      tier(INF, 'moderate', 'none', 'high', { hepatic: 'low', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Тестостерон ≥500 мг/нед — moderate нейронагрузка',
     hematoReason: 'Тестостерон ≥1000 мг/нед — выраженный эритропоэз (HIF-1α, EPO-независимый)',
+    cardioReason: 'Тестостерон — дозозависимая дислипидемия, ↑HCT, объёмная нагрузка',
+    reproductiveReason: 'Экзогенный тестостерон — супрессия HPG-оси (GnRH/LH/FSH↓↓)',
+    support: ['hcg', 'omega3', 'bergamot', 'telmisartan', 'tadalafil'],
   },
-  // ── Болденон / DHB (базовый, ВЫРАЖЕННЫЙ ЭПО-эффект) ──
+  // ── Болденон / DHB (выраженный ЭПО-эффект) ──
   {
     patterns: ['bold', 'equipoise', 'eq', 'dhb'],
     pClasses: ['aas_bold'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'none', hemato: 'high' },
+      tier(INF, 'low', 'none', 'high', { hepatic: 'low', cardio: 'moderate', renal: 'low', reproductive: 'moderate' }),
     ],
     hematoReason: 'Болденон — наиболее выраженный ЭПО-эффект среди AAS (HIF-1α, прямой стимул эритропоэза)',
+    cardioReason: 'Болденон/DHB — HCT↑ → гипервязкость, тромбоз, ↑АД',
+    support: ['nattokinase', 'serrapeptase', 'bromelain', 'hesperidin', 'aspirin'],
   },
-  // ── Метандиенон / dbol (базовый оральный) ──
+  // ── Метандиенон / dbol (17α) ──
   {
     patterns: ['dbol', 'dianabol', 'methand', 'methandrostenolone', 'methandienone'],
     pClasses: ['aas_oral_dbol'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'none', hemato: 'moderate' },
+      tier(INF, 'low', 'none', 'moderate', { hepatic: 'high', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
     ],
     hematoReason: 'Метандиенон ≥30 мг/день — moderate эритропоэз',
+    hepaticReason: 'Метандиенон — 17α-алкил: гепатотоксичность, холестаз',
+    reproductiveReason: '17α-орал — супрессия HPG + ароматизация (E2↑)',
+    support: ['tudca', 'nac', 'milk_thistle', 'omega3', 'anastrozole'],
   },
-  // ── Оксиметолон / anadrol (базовый оральный, MAX эритропоэз) ──
+  // ── Оксиметолон / anadrol (17α, MAX эритропоэз) ──
   {
     patterns: ['anadrol', 'oxy', 'oxymeth', 'oxymetholone'],
     pClasses: ['aas_oral_oxy'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'none', hemato: 'high' },
+      tier(INF, 'low', 'none', 'high', { hepatic: 'high', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
     ],
     hematoReason: 'Оксиметолон — клинически применяется при анемии, мощнейший эритропоэз',
+    hepaticReason: 'Оксиметолон — 17α-алкил: холестатическая желтуха, ↑АЛТ',
+    cardioReason: 'Оксиметолон — HCT↑↑, отёки (задержка Na), гипертония',
+    support: ['tudca', 'nac', 'milk_thistle', 'omega3', 'nattokinase', 'serrapeptase', 'telmisartan'],
   },
-  // ── Туранабол (базовый оральный) ──
+  // ── Туринабол (17α, мягкий) ──
   {
-    patterns: ['tbol', 'turinabol', 'chlorodehydro'],
+    patterns: ['tbol', 'turinabol', 'chlorodehydro', 'trena'],
     pClasses: ['aas_oral_tbol'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'none', hemato: 'low' },
+      tier(INF, 'low', 'none', 'low', { hepatic: 'moderate', cardio: 'low', renal: 'low', reproductive: 'moderate' }),
     ],
+    hepaticReason: 'Туринабол — 17α-алкил (мягкий), контроль LFT',
+    support: ['tudca', 'nac'],
   },
-  // ── Оксандролон / anavar (мягкий) ──
+  // ── Оксандролон / anavar (17α, мягкий) ──
   {
     patterns: ['oxan', 'anavar', 'oxandrolone'],
     pClasses: ['aas_oral_anavar'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'low',  joints: 'low', hemato: 'low' },
+      tier(INF, 'low', 'low', 'low', { hepatic: 'moderate', cardio: 'low', renal: 'low', reproductive: 'moderate' }),
     ],
+    hepaticReason: 'Анавар — 17α-алкил (мягкий), HDL↓↓',
+    support: ['tudca', 'nac', 'omega3'],
   },
-  // ── Superdrol / метилдростанолон (нет в potency-table, classifyPed=other) ──
+  // ── Superdrol / метилдростанолон (17α, токсичный) ──
   {
     patterns: ['superdrol', 'methyldrostanolone'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: 140,  neuro: 'moderate', joints: 'none', hemato: 'moderate' },
-      { maxDose: INF,  neuro: 'high',     joints: 'none', hemato: 'high' },
+      tier(140, 'moderate', 'none', 'moderate', { hepatic: 'high', cardio: 'moderate', renal: 'moderate', reproductive: 'high' }),
+      tier(INF, 'high', 'none', 'high', { hepatic: 'high', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Superdrol — гепатотоксичность MAX 3.5, нейротоксичность',
     hematoReason: 'Superdrol — выраженный эритропоэз (17α-алкил)',
+    hepaticReason: 'Superdrol — токсичнейший 17α-орал (порог гепатотоксичности 3.5)',
+    support: ['tudca', 'nac', 'milk_thistle', 'omega3', 'astragalus'],
   },
-  // ── Methyltestosterone ──
+  // ── Methyltestosterone (17α) ──
   {
-    patterns: ['methyltestosterone'],
+    patterns: ['methyltest'],
     pClasses: ['aas_oral_other'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'moderate', joints: 'none', hemato: 'moderate' },
+      tier(INF, 'moderate', 'none', 'moderate', { hepatic: 'high', cardio: 'moderate', renal: 'low', reproductive: 'high' }),
     ],
+    hepaticReason: 'Метилтестостерон — 17α-алкил: гепатотоксичность',
+    support: ['tudca', 'nac'],
   },
   // ── Mibolerone / cheque drops (крайне токсичный, potency 6.0) ──
   {
@@ -273,29 +364,34 @@ const AAS_RULES: SubstanceRule[] = [
     pClasses: ['aas_oral_other'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'high',  joints: 'moderate', hemato: 'high' },
+      tier(INF, 'high', 'moderate', 'high', { hepatic: 'high', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Mibolerone — potency 6.0, крайне токсичный',
     jointsReason: 'Mibolerone — tendinopathy',
     hematoReason: 'Mibolerone — крайне выраженный эритропоэз',
+    hepaticReason: 'Mibolerone — 17α-алкил, экстремальная гепатотоксичность',
+    support: ['tudca', 'nac', 'nebivolol'],
   },
-  // ── Methyltrienolone (neurotoxicity в COMPOUND_RISK_MAP) ──
+  // ── Methyltrienolone (19-нор, крайне токсичный) ──
   {
     patterns: ['methyltrienolone', 'metribolone'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'high',  joints: 'low', hemato: 'high' },
+      tier(INF, 'high', 'low', 'high', { hepatic: 'high', cardio: 'high', renal: 'moderate', reproductive: 'high' }),
     ],
     neuroReason: 'Methyltrienolone — neurotoxicity (COMPOUND_RISK_MAP)',
     hematoReason: 'Methyltrienolone — выраженный эритропоэз (19-нор)',
+    hepaticReason: 'Methyltrienolone — 17α-алкил + 19-нор: экстремальная гепатотоксичность',
+    support: ['tudca', 'nac', 'nebivolol', 'astragalus'],
   },
   // ── Провирон / местеролон (не AAS по classifyPed, нейро=0) ──
   {
     patterns: ['proviron', 'mesterolone'],
     doseUnit: 'mgPerWeek',
     tiers: [
-      { maxDose: INF,  neuro: 'none',  joints: 'none', hemato: 'none' },
+      tier(INF, 'none', 'none', 'none', { hepatic: 'none', cardio: 'none', renal: 'none', reproductive: 'low' }),
     ],
+    reproductiveReason: 'Провирон — лёгкая супрессия HPG (оральный DHT)',
   },
 ];
 
@@ -305,40 +401,52 @@ const SARM_RULES: SubstanceRule[] = [
     patterns: ['rad140', 'testolone'],
     pClasses: ['sarm'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'moderate', joints: 'none', hemato: 'none' }],
+    tiers: [tier(INF, 'moderate', 'none', 'none', { hepatic: 'moderate', cardio: 'low', renal: 'low', reproductive: 'moderate' })],
     neuroReason: 'RAD-140 — дофаминовый дисбаланс (DRUG_THRESHOLDS_V7 neuro{1:0.15})',
+    hepaticReason: 'RAD-140 — SARM: гепатотоксичность (↑АЛТ при высоких дозах)',
+    support: ['tudca', 'nac'],
   },
   {
     patterns: ['s23'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'moderate', joints: 'none', hemato: 'none' }],
+    tiers: [tier(INF, 'moderate', 'none', 'none', { hepatic: 'moderate', cardio: 'low', renal: 'low', reproductive: 'moderate' })],
     neuroReason: 'S-23 — самый агрессивный SARM, нейротоксичность 0.08',
+    support: ['tudca', 'nac'],
   },
   {
     patterns: ['lgd', 'ligandrol', 'lgd4033', 'lgd-4033'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'none', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'none', 'none', { hepatic: 'moderate', cardio: 'low', renal: 'low', reproductive: 'moderate' })],
+    hepaticReason: 'LGD-4033 — гепатотоксичность при дозах >5 мг/день',
+    support: ['tudca', 'nac'],
   },
   {
     patterns: ['ostarine', 'mk2866', 'enobosarm'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'protective', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'protective', 'none', { hepatic: 'low', cardio: 'low', renal: 'low', reproductive: 'moderate' })],
     jointsReason: 'Ostarine — терапевтически применяется для суставов/связок',
   },
   {
     patterns: ['andarine', 's4'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'none', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'none', 'none', { hepatic: 'low', cardio: 'low', renal: 'low', reproductive: 'moderate' })],
   },
   {
     patterns: ['sr9009', 'stenabolic'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'none', joints: 'none', hemato: 'none' }],
+    tiers: [tier(INF, 'none', 'none', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
   },
   {
     patterns: ['gw501516', 'cardarine'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'none', joints: 'none', hemato: 'none' }],
+    tiers: [tier(INF, 'none', 'none', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
+  },
+  {
+    patterns: ['yk11'],
+    doseUnit: 'any',
+    tiers: [tier(INF, 'low', 'none', 'none', { hepatic: 'moderate', cardio: 'low', renal: 'low', reproductive: 'moderate' })],
+    hepaticReason: 'YK-11 — SARM+стероидный гибрид, гепатотоксичность',
+    support: ['tudca', 'nac'],
   },
 ];
 
@@ -350,34 +458,38 @@ const PEPTIDE_RULES: SubstanceRule[] = [
     pClasses: ['gh'],
     doseUnit: 'iuPerDay',
     tiers: [
-      { maxDose: 4,  neuro: 'low',      joints: 'moderate', hemato: 'none' },
-      { maxDose: 8,  neuro: 'low',      joints: 'high',     hemato: 'none' },
-      { maxDose: INF, neuro: 'moderate', joints: 'high',     hemato: 'none' },
+      tier(4, 'low', 'moderate', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' }),
+      tier(8, 'low', 'high', 'none', { hepatic: 'none', cardio: 'moderate', renal: 'moderate', reproductive: 'none' }),
+      tier(INF, 'moderate', 'high', 'none', { hepatic: 'none', cardio: 'moderate', renal: 'moderate', reproductive: 'none' }),
     ],
     jointsReason: 'GH — туннельный синдром (tunnel_syndrome, COMPOUND_RISK_MAP)',
     neuroReason: 'GH >8 IU — нейроэндокринная нагрузка',
+    cardioReason: 'GH — задержка жидкости, ↑АД, кардиомегалия при высоких дозах',
+    renalReason: 'GH — гиперфильтрация, задержка Na',
+    support: ['berberine', 'alpha_lipoic', 'taurine'],
   },
   // IGF-1
   {
     patterns: ['igf1', 'igf-1', 'igf1_lr3', 'igf1_des'],
     pClasses: ['igf'],
     doseUnit: 'mcgPerDay',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'moderate', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'moderate', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
     jointsReason: 'IGF-1 — tunnel_syndrome (COMPOUND_RISK_MAP)',
+    support: ['glycine', 'taurine', 'alpha_lipoic'],
   },
   // MGF
   {
     patterns: ['mgf'],
     pClasses: ['mgf'],
     doseUnit: 'mcgPerDay',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'moderate', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'moderate', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
     jointsReason: 'MGF — аналог IGF-1, tunnel_syndrome',
   },
   // GHRP (ghrp6, ghrp2, ipamorelin) — neurotoxicity + tunnel
   {
     patterns: ['ghrp', 'ipamorelin'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'moderate', joints: 'moderate', hemato: 'none' }],
+    tiers: [tier(INF, 'moderate', 'moderate', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
     neuroReason: 'GHRP — neurotoxicity (COMPOUND_RISK_MAP)',
     jointsReason: 'GHRP — tunnel_syndrome (COMPOUND_RISK_MAP)',
   },
@@ -385,15 +497,29 @@ const PEPTIDE_RULES: SubstanceRule[] = [
   {
     patterns: ['cjc1295', 'cjc', 'ghrh'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'moderate', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'moderate', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
     jointsReason: 'GHRH — tunnel_syndrome (COMPOUND_RISK_MAP)',
   },
   // MK-677 (GHRP-аналог per os)
   {
     patterns: ['mk677', 'mk-677', 'ibutamoren'],
     doseUnit: 'any',
-    tiers: [{ maxDose: INF, neuro: 'low', joints: 'moderate', hemato: 'none' }],
+    tiers: [tier(INF, 'low', 'moderate', 'none', { hepatic: 'low', cardio: 'low', renal: 'low', reproductive: 'none' })],
     jointsReason: 'MK-677 — GHRP-аналог, tunnel_syndrome',
+  },
+  // Инсулины — правило для полноты (риски гипогликемии — в механизм-модели hem3/cns5)
+  {
+    patterns: ['ins_', 'insulin', 'novorapid', 'humalog', 'lantus', 'levemir', 'glargine', 'detemir', 'aspart'],
+    pClasses: ['insulin'],
+    doseUnit: 'iuPerDay',
+    tiers: [tier(INF, 'none', 'none', 'none', { hepatic: 'none', cardio: 'none', renal: 'none', reproductive: 'none' })],
+  },
+  // GLP-1 (semaglutide/tirzepatide) — low нейро (аппетит/ЖКТ-ось)
+  {
+    patterns: ['semaglutide', 'tirzepatide', 'liraglutide', 'dulaglutide', 'glp'],
+    pClasses: ['glp1'],
+    doseUnit: 'any',
+    tiers: [tier(INF, 'low', 'none', 'none', { hepatic: 'none', cardio: 'low', renal: 'low', reproductive: 'none' })],
   },
 ];
 
@@ -422,10 +548,10 @@ function normalizeDose(ped: PEDDose, rule: SubstanceRule): { dose: number; unit:
   return { dose: mg, unit: 'мг/нед' };
 }
 
-/** Поиск правила по ID (substring) с fallback на pClass */
+/** Поиск правила по ID (substring по канонизированному id) с fallback на pClass */
 function findRule(ped: PEDDose): { rule: SubstanceRule; matchedBy: string } | null {
-  const id = (ped.id || '').toLowerCase();
-  // 1. По substring-паттернам
+  const id = resolvePedAlias(ped.id || '');
+  // 1. По substring-паттернам (канон: tren_acet, deca, dhb, prim_enan...)
   for (const rule of ALL_RULES) {
     for (const pat of rule.patterns) {
       if (id.includes(pat)) {
@@ -444,16 +570,18 @@ function findRule(ped: PEDDose): { rule: SubstanceRule; matchedBy: string } | nu
   return null;
 }
 
-/** Применить дозовый tier */
-function applyDoseTier(rule: SubstanceRule, dose: number): { neuro: PedRisk; joints: PedRisk; hemato: PedRisk } {
-  for (const tier of rule.tiers) {
-    if (dose <= tier.maxDose) {
-      return { neuro: tier.neuro, joints: tier.joints, hemato: tier.hemato };
+/** Применить дозовый tier (все 7 измерений) */
+function applyDoseTier(rule: SubstanceRule, dose: number): {
+  neuro: PedRisk; joints: PedRisk; hemato: PedRisk;
+  hepatic: PedRisk; cardio: PedRisk; renal: PedRisk; reproductive: PedRisk;
+} {
+  for (const t of rule.tiers) {
+    if (dose <= t.maxDose) {
+      return { neuro: t.neuro, joints: t.joints, hemato: t.hemato, hepatic: t.hepatic, cardio: t.cardio, renal: t.renal, reproductive: t.reproductive };
     }
   }
-  // fallback — последний tier
   const last = rule.tiers[rule.tiers.length - 1];
-  return { neuro: last.neuro, joints: last.joints, hemato: last.hemato };
+  return { neuro: last.neuro, joints: last.joints, hemato: last.hemato, hepatic: last.hepatic, cardio: last.cardio, renal: last.renal, reproductive: last.reproductive };
 }
 
 const RISK_ORDER: Record<PedRisk, number> = {
@@ -492,6 +620,13 @@ function maxHematoRisk(a: PedRisk, b: PedRisk): PedRisk {
   return RISK_ORDER[an] >= RISK_ORDER[bn] ? an : bn;
 }
 
+/** max risk для системных измерений (hepatic/cardio/renal/reproductive): protective → none */
+function maxSystemRisk(a: PedRisk, b: PedRisk): PedRisk {
+  const an = a === 'protective' ? 'none' : a;
+  const bn = b === 'protective' ? 'none' : b;
+  return RISK_ORDER[an] >= RISK_ORDER[bn] ? an : bn;
+}
+
 /** risk → tier с учётом SupportLevel */
 function riskToTier(risk: PedRisk, level: SupportLevel, domain: 'neuro' | 'joints' | 'hemato'): 0 | 1 | 2 | 3 {
   if (risk === 'protective') return 0; // защита уже есть
@@ -520,6 +655,10 @@ export function assessPedRisk(
       neuroRisk: 'none',
       jointsRisk: 'none',
       hematoRisk: 'none',
+      hepaticRisk: 'none',
+      cardioRisk: 'none',
+      renalRisk: 'none',
+      reproductiveRisk: 'none',
       neuroBoosterTier: level === 'max' ? 1 : 0,
       jointsBoosterTier: level === 'max' ? 1 : 0,
       hematoBoosterTier: level === 'max' ? 1 : 0,
@@ -533,6 +672,10 @@ export function assessPedRisk(
   let aggNeuro: PedRisk = 'none';
   let aggJoints: PedRisk = 'none';
   let aggHemato: PedRisk = 'none';
+  let aggHepatic: PedRisk = 'none';
+  let aggCardio: PedRisk = 'none';
+  let aggRenal: PedRisk = 'none';
+  let aggRepro: PedRisk = 'none';
   let hasNandrolone = false;
   let hasWinny = false;
   let nineteenNorCount = 0; // трен + нандролон + трестолон
@@ -544,7 +687,7 @@ export function assessPedRisk(
     if (!found) continue;
     const { rule, matchedBy } = found;
     const { dose, unit } = normalizeDose(ped, rule);
-    const { neuro, joints, hemato } = applyDoseTier(rule, dose);
+    const { neuro, joints, hemato, hepatic, cardio, renal, reproductive } = applyDoseTier(rule, dose);
 
     perSubstance.push({
       substanceId: ped.id,
@@ -552,9 +695,18 @@ export function assessPedRisk(
       neuro,
       joints,
       hemato,
+      hepatic,
+      cardio,
+      renal,
+      reproductive,
       neuroReason: rule.neuroReason,
       jointsReason: rule.jointsReason,
       hematoReason: rule.hematoReason,
+      hepaticReason: rule.hepaticReason,
+      cardioReason: rule.cardioReason,
+      renalReason: rule.renalReason,
+      reproductiveReason: rule.reproductiveReason,
+      support: rule.support,
       dose,
       doseUnit: unit,
     });
@@ -562,6 +714,10 @@ export function assessPedRisk(
     aggNeuro = maxNeuroRisk(aggNeuro, neuro);
     aggJoints = maxJointsRisk(aggJoints, joints);
     aggHemato = maxHematoRisk(aggHemato, hemato);
+    aggHepatic = maxSystemRisk(aggHepatic, hepatic);
+    aggCardio = maxSystemRisk(aggCardio, cardio);
+    aggRenal = maxSystemRisk(aggRenal, renal);
+    aggRepro = maxSystemRisk(aggRepro, reproductive);
 
     // Маркеры для компенсации/эскалации
     if (rule.patterns.some(p => 'nandrolone'.includes(p) || p === 'deca' || p === 'npp' || p === 'nandrolone')) {
@@ -622,6 +778,18 @@ export function assessPedRisk(
     if (ps.hemato === 'high' || ps.hemato === 'moderate') {
       if (ps.hematoReason) reasons.push(`${ps.substanceId}: ${ps.hematoReason}`);
     }
+    if (ps.hepatic === 'high' || ps.hepatic === 'moderate') {
+      if (ps.hepaticReason) reasons.push(`${ps.substanceId}: ${ps.hepaticReason}`);
+    }
+    if (ps.cardio === 'high' || ps.cardio === 'moderate') {
+      if (ps.cardioReason) reasons.push(`${ps.substanceId}: ${ps.cardioReason}`);
+    }
+    if (ps.renal === 'high' || ps.renal === 'moderate') {
+      if (ps.renalReason) reasons.push(`${ps.substanceId}: ${ps.renalReason}`);
+    }
+    if (ps.reproductive === 'high' || ps.reproductive === 'moderate') {
+      if (ps.reproductiveReason) reasons.push(`${ps.substanceId}: ${ps.reproductiveReason}`);
+    }
   }
 
   // 4. risk → tier
@@ -633,6 +801,10 @@ export function assessPedRisk(
     neuroRisk: aggNeuro,
     jointsRisk: aggJoints,
     hematoRisk: aggHemato,
+    hepaticRisk: aggHepatic,
+    cardioRisk: aggCardio,
+    renalRisk: aggRenal,
+    reproductiveRisk: aggRepro,
     neuroBoosterTier: neuroTier,
     jointsBoosterTier: jointsTier,
     hematoBoosterTier: hematoTier,
@@ -646,8 +818,11 @@ export function assessPedRisk(
 // ────────────────────────────────────────────────────────────────────────────
 
 /** Краткое описание риска для UI-баннера */
-export function describePedRisk(a: PedRiskAssessment): { neuro: string; joints: string; hemato: string } {
-  const neuroLabels: Record<PedRisk, string> = {
+export function describePedRisk(a: PedRiskAssessment): {
+  neuro: string; joints: string; hemato: string;
+  hepatic: string; cardio: string; renal: string; reproductive: string;
+} {
+  const labels: Record<PedRisk, string> = {
     none: 'нет риска',
     low: 'низкий',
     moderate: 'умеренный',
@@ -655,23 +830,17 @@ export function describePedRisk(a: PedRiskAssessment): { neuro: string; joints: 
     protective: 'защита',
   };
   const jointsLabels: Record<PedRisk, string> = {
-    none: 'нет риска',
-    low: 'низкий',
-    moderate: 'умеренный',
-    high: 'высокий',
+    ...labels,
     protective: 'защита (нандролон)',
   };
-  const hematoLabels: Record<PedRisk, string> = {
-    none: 'нет риска',
-    low: 'низкий',
-    moderate: 'умеренный',
-    high: 'высокий',
-    protective: 'защита',
-  };
   return {
-    neuro: neuroLabels[a.neuroRisk],
+    neuro: labels[a.neuroRisk],
     joints: jointsLabels[a.jointsRisk],
-    hemato: hematoLabels[a.hematoRisk],
+    hemato: labels[a.hematoRisk],
+    hepatic: labels[a.hepaticRisk],
+    cardio: labels[a.cardioRisk],
+    renal: labels[a.renalRisk],
+    reproductive: labels[a.reproductiveRisk],
   };
 }
 
@@ -693,14 +862,30 @@ export function computeResidualRisk(
 ): PedRiskAssessment {
   const planIds = new Set(planSubstanceIds.map(id => id.toLowerCase()));
 
+  /** Рекомендуемая поддержка: бустеры по тиру ∪ протокольная поддержка из правил (по механизмам). */
+  const recommendedFor = (
+    grossTier: 0 | 1 | 2 | 3,
+    getBoosterIds: (tier: 1 | 2 | 3) => string[],
+  ): string[] => {
+    const set = new Set<string>();
+    if (grossTier > 0) for (const id of getBoosterIds(grossTier as 1 | 2 | 3)) set.add(id.toLowerCase());
+    for (const ps of gross.perSubstance || []) {
+      for (const id of ps.support || []) set.add(id.toLowerCase());
+    }
+    return [...set];
+  };
+
   const computeDomain = (
     grossTier: 0 | 1 | 2 | 3,
     getBoosterIds: (tier: 1 | 2 | 3) => string[]
   ): { netTier: 0 | 1 | 2 | 3; coverage: number; covered: number; recommended: number } => {
-    if (grossTier === 0) return { netTier: 0, coverage: 100, covered: 0, recommended: 0 };
-    const recommended = getBoosterIds(grossTier as 1 | 2 | 3);
-    const covered = recommended.filter((id: string) => planIds.has(id.toLowerCase())).length;
-    const coverage = recommended.length > 0 ? Math.round((covered / recommended.length) * 100) : 100;
+    if (grossTier === 0 && (gross.perSubstance || []).every(ps => (ps.support || []).length === 0)) {
+      return { netTier: 0, coverage: 100, covered: 0, recommended: 0 };
+    }
+    const recommended = recommendedFor(grossTier, getBoosterIds);
+    if (recommended.length === 0) return { netTier: grossTier, coverage: 100, covered: 0, recommended: 0 };
+    const covered = recommended.filter((id: string) => planIds.has(id)).length;
+    const coverage = Math.round((covered / recommended.length) * 100);
     let netTier: 0 | 1 | 2 | 3 = grossTier;
     if (coverage >= 80) netTier = 0;
     else if (coverage >= 60) netTier = Math.max(0, grossTier - 2) as 0 | 1 | 2 | 3;

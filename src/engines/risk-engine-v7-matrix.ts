@@ -851,6 +851,29 @@ const SUPPORT_REDUCTIONS: Record<string, Record<string, Record<number, number>>>
 
 // --- ULN-based Lab Factor (spec section 13.6) ---
 
+/** Алиасы id веществ поддержки → ключи SUPPORT_REDUCTIONS (каталог использует свои id). */
+const SUPPORT_REDUCTION_ALIAS: Record<string, string> = {
+  nac: 'NAC', n_acetylcysteine: 'NAC',
+  tudca: 'TUDCA', tauroursodeoxycholic: 'TUDCA',
+  vitamin_d3: 'vitaminD', vitamin_d: 'vitaminD', vitamin_d2: 'vitaminD', d3: 'vitaminD',
+  zinc: 'zinc_sup', zinc_picolinate: 'zinc_sup',
+  curcumin: 'curcumin_sup', turmeric: 'curcumin_sup',
+  selenium: 'selenium_sup',
+  taurine: 'taurine_sup',
+  anastrozole: 'anastro', anastro: 'anastro',
+  tamoxifen: 'tamox', tamox: 'tamox', nolvadex: 'tamox',
+  clomid: 'clomi', clomiphene: 'clomi', clomi: 'clomi',
+  cabergoline: 'caberg', caberg: 'caberg',
+  probiotics: 'probiotics_sup',
+  ginseng: 'ginseng_sup',
+  silymarin: 'milk_thistle', milk_thistle: 'milk_thistle',
+};
+
+function resolveSupportReductionId(id: string): string {
+  const c = String(id || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  return SUPPORT_REDUCTION_ALIAS[c] || c;
+}
+
 function computeLabFactorForMech(labs: LabPoint[], system: string, mechIdx: number): number {
   const labNames = LAB_MECH_MAP[system]?.[mechIdx];
   if (!labNames || !labNames.length) return 1.0;
@@ -913,8 +936,8 @@ function computeDrugContributions(course: CourseEntry[]): Record<string, Record<
 
 function computeSupportFactor(supportIds: string[], system: string, mechIdx: number): number {
   let factor = 1.0;
-  for (const id of supportIds) {
-    const reductions = SUPPORT_REDUCTIONS[id];
+  for (const rawId of supportIds) {
+    const reductions = SUPPORT_REDUCTIONS[resolveSupportReductionId(rawId)] || SUPPORT_REDUCTIONS[rawId];
     if (!reductions) continue;
     const sysReductions = reductions[system];
     if (!sysReductions) continue;
