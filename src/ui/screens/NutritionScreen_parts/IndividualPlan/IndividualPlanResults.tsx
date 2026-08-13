@@ -630,7 +630,7 @@ export const IndividualPlanResults: React.FC = () => {
             </div>
           )}
           {renderMealList(dayPlan, false, 0)}
-          <textarea value={dayPlanNotes} onChange={e => { const value = e.target.value; setDayPlanNotes(value); try { localStorage.setItem('he_day_notes', value); } catch {} }} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
+          <textarea value={dayPlanNotes} onChange={e => setDayPlanNotes(e.target.value)} onBlur={() => { try { localStorage.setItem('he_day_notes', dayPlanNotes); } catch {} }} maxLength={2000} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
           <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:8, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
             🔄 Перегенерировать день
           </button>
@@ -1053,11 +1053,11 @@ export const IndividualPlanResults: React.FC = () => {
                   <option value="breakfast">Завтрак</option><option value="lunch">Обед</option>
                   <option value="dinner">Ужин</option><option value="snack">Перекус</option>
                 </select>
-                <input type="number" value={newRecipe.prepTime} onChange={e => setNewRecipe({...newRecipe, prepTime: +e.target.value || 10})} placeholder="Мин" style={{ width:80, padding:'12px 10px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:500 }} />
+                <input type="number" min={0} value={newRecipe.prepTime} onChange={e => setNewRecipe({...newRecipe, prepTime: e.target.value === '' ? 10 : Math.max(0, +e.target.value)})} placeholder="Мин" style={{ width:80, padding:'12px 10px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:500 }} />
               </div>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>КБЖУ (на порцию)</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:5 }}>
-                {[{k:'kcal',l:'Ккал',c:'#22c55e'},{k:'protein',l:'Белки',c:'#3b82f6'},{k:'fat',l:'Жиры',c:'#f59e0b'},{k:'carbs',l:'Угл',c:'#f97316'}].map(f => <div key={f.k}><input type="number" value={(newRecipe as Record<string,number|string>)[f.k] as number} onChange={e => setNewRecipe({...newRecipe, [f.k]: +e.target.value || 0})} placeholder={f.l} style={{ width:'100%', padding:'14px 6px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:f.c, fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:700 }} /></div>)}
+                {[{k:'kcal',l:'Ккал',c:'#22c55e'},{k:'protein',l:'Белки',c:'#3b82f6'},{k:'fat',l:'Жиры',c:'#f59e0b'},{k:'carbs',l:'Угл',c:'#f97316'}].map(f => <div key={f.k}><input type="number" min={0} value={(newRecipe as Record<string,number|string>)[f.k] as number} onChange={e => setNewRecipe({...newRecipe, [f.k]: Math.max(0, +e.target.value || 0)})} placeholder={f.l} style={{ width:'100%', padding:'14px 6px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:f.c, fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:700 }} /></div>)}
               </div>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Ингредиенты</div>
               <textarea value={newRecipe.ingredients} onChange={e => setNewRecipe({...newRecipe, ingredients: e.target.value})} placeholder="Ингредиенты (каждый с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
@@ -1066,6 +1066,9 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Теги</div>
               <input value={newRecipe.tags} onChange={e => setNewRecipe({...newRecipe, tags: e.target.value})} placeholder="Теги (через запятую)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', fontSize:13 }} />
               <button onClick={() => {
+                // FIX input-audit: рецепт с kcal<=0 ломал масштабирование граммовок при замене
+                if (!Number.isFinite(newRecipe.kcal) || newRecipe.kcal <= 0) { setErrorMsg('Укажите калорийность рецепта больше 0'); return; }
+                if (!newRecipe.name.trim()) { setErrorMsg('Укажите название рецепта'); return; }
                 const recipe = { ...newRecipe, ingredients: newRecipe.ingredients.split('\n').filter(Boolean), instructions: newRecipe.instructions.split('\n').filter(Boolean), tags: newRecipe.tags.split(',').map((t: string) => t.trim()).filter(Boolean), userCreated: true };
                 const updated = [...userRecipes, recipe];
                 setUserRecipes(updated);

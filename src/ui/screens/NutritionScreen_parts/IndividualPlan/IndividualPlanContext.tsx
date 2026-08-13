@@ -432,7 +432,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // Legacy-зеркало для обратной совместимости
       localStorage.setItem('he_weight_log_entries', JSON.stringify(weightLogEntries));
     } catch {}
-    setWeightLogWeek(weightLogEntries.map(e => e.weight));
+    setWeightLogWeek(weightLogEntries.filter(e => Number.isFinite(e.weight) && e.weight > 0).map(e => e.weight));
   }, [weightLogEntries]);
   const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState<boolean>(!!_pf.metabolicAdaptEnabled);
   const [metabolicAdaptPct, setMetabolicAdaptPct] = useState<number>(typeof _pf.metabolicAdaptPct === 'number' ? _pf.metabolicAdaptPct : 10);

@@ -630,7 +630,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <div style={{ display:'flex', gap:4, marginBottom:8 }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Доза</div>
-                  <input type="number" value={injDose} onChange={e => setInjDose(+e.target.value || 0)} style={{ ...inputStyle, width:'100%', fontSize:12, padding:'8px 10px', boxSizing:'border-box' }} />
+                  <input type="number" min={0} step="any" value={injDose} onChange={e => setInjDose(Math.max(0, +e.target.value || 0))} style={{ ...inputStyle, width:'100%', fontSize:12, padding:'8px 10px', boxSizing:'border-box' }} />
                 </div>
                 <div style={{ width:60 }}>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Ед.</div>
@@ -666,6 +666,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 <button onClick={() => {
                   const name = injName.trim() || injType;
                   if (!name) return;
+                  // FIX input-audit: доза должна быть > 0 (0/отрицательная давала «На 0г углеводов»)
+                  if (!Number.isFinite(injDose) || injDose <= 0) { setErrorMsg('Укажите дозу больше 0'); return; }
                   const sub = PHARMA_DB[name]; const hl = sub?.pk?.halfLifeHours || 24;
                   let dt = injType, de = injEster;
                   if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
@@ -994,7 +996,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                       position:'relative', overflow:'hidden',
                     }}>
                       <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                      <input type="number" value={m.v === 0 ? 0 : m.v || ''} onChange={e => m.setter(e.target.value === '' ? null : +e.target.value)} style={{
+                      <input type="number" min={0} step="any" value={m.v === 0 ? 0 : m.v || ''} onChange={e => m.setter(e.target.value === '' ? null : Math.max(0, +e.target.value))} style={{
                         width:'100%', fontSize:18, fontWeight:800, color:m.c,
                         textAlign:'center', background:'transparent', border:'none',
                         outline:'none', padding:0, lineHeight:1.2, MozAppearance:'textfield',
@@ -1035,7 +1037,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                       position:'relative', overflow:'hidden',
                     }}>
                       <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                      <input type="number" step="0.1" value={m.v > 0 ? m.v : ''} onChange={e => m.setter(e.target.value === '' ? 0 : +e.target.value)} placeholder="0.0" style={{
+                      <input type="number" min={0} step="0.1" value={m.v > 0 ? m.v : ''} onChange={e => m.setter(e.target.value === '' ? 0 : Math.max(0, +e.target.value))} placeholder="0.0" style={{
                         width:'100%', fontSize:18, fontWeight:800, color:m.c,
                         textAlign:'center', background:'transparent', border:'none',
                         outline:'none', padding:0, lineHeight:1.2, MozAppearance:'textfield',
@@ -2071,7 +2073,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                       { key:'c', label:'🍚 Углеводы', val:specialMealCarbsG, set:setSpecialMealCarbsG, color:'#3b82f6' },
                     ].map(m => (
                       <div key={m.key}>
-                        <input type="number" value={m.val} onChange={e => m.set(parseInt(e.target.value) || 0)} style={{
+                        <input type="number" min={0} step="any" value={m.val} onChange={e => m.set(Math.max(0, Math.round(parseFloat(e.target.value) || 0)))} style={{
                           width:'100%', padding:'8px 6px', borderRadius:8, fontSize:11, fontWeight:700, textAlign:'center',
                           background:'#202023', border:`1px solid ${m.color}30`, color:m.color, outline:'none', boxSizing:'border-box',
                         }} />
@@ -2207,7 +2209,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.08)', marginBottom:14 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap' }}>🎯 Ожидаемое снижение:</span>
-                  <input type="number" step="0.1" value={expectedLossKgWeek} onChange={e => setExpectedLossKgWeek(+e.target.value || 0)} style={{ ...inputStyle, width:65, textAlign:'center', fontWeight:700 }} />
+                  <input type="number" min={0} step="0.1" value={expectedLossKgWeek} onChange={e => setExpectedLossKgWeek(Math.max(0, +e.target.value || 0))} style={{ ...inputStyle, width:65, textAlign:'center', fontWeight:700 }} />
                   <span style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>кг/нед</span>
                 </div>
               </div>
@@ -2224,8 +2226,10 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                     <input type="date" value={entry.date} onChange={e => {
                       const nw = [...weightLogEntries]; nw[idx] = { ...nw[idx], date: e.target.value }; setWeightLogEntries(nw);
                     }} style={{ ...inputStyle, flex:1, fontSize:10, padding:'6px 8px' }} />
-                    <input type="number" step="0.1" value={entry.weight} onChange={e => {
-                      const nw = [...weightLogEntries]; nw[idx] = { ...nw[idx], weight: +e.target.value || 0 }; setWeightLogEntries(nw);
+                    <input type="number" min={30} max={300} step="0.1" value={entry.weight} onChange={e => {
+                      // FIX input-audit: clamp 30-300 — вес 0/отрицательный давал ложный «сброс веса»
+                      // и молча поднимал калораж до +20%
+                      const nw = [...weightLogEntries]; nw[idx] = { ...nw[idx], weight: Math.max(30, Math.min(300, +e.target.value || 30)) }; setWeightLogEntries(nw);
                     }} placeholder="Вес" style={{ ...inputStyle, width:80, fontSize:12, fontWeight:700, textAlign:'center', padding:'6px 8px' }} />
                     <span style={{ fontSize:9, color:'rgba(255,255,255,0.25)' }}>кг</span>
                     {weightLogEntries.length > 1 && (

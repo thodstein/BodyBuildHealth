@@ -121,7 +121,7 @@ const ManualFields: React.FC<{
       {fields.map(f => (
         <div key={f.key} style={f.styleKey ? { gridColumn: '1/-1' } : undefined}>
           <div style={{ fontSize: 7, color: f.color, marginBottom: 1, fontWeight: 600 }}>{f.label}</div>
-          <input type="number" value={values[f.key] ?? ''} onChange={e => setters[f.key]?.(Number(e.target.value) || 0)}
+          <input type="number" min={0} value={values[f.key] ?? ''} onChange={e => setters[f.key]?.(f.key === 'weight' ? Math.max(20, Number(e.target.value) || 0) : Math.max(0, Number(e.target.value) || 0))}
             style={{ ...inputStyle, padding: '5px 8px', fontSize: 10 }} />
         </div>
       ))}

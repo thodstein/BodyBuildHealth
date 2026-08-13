@@ -106,18 +106,23 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   // approximately correct because we scale by the ratio 7/(n-1).
   let weightAdj = 1.0;
   if (weightAdaptMode && weightLogWeek.length >= 2) {
-    const actualLoss = weightLogWeek[0] - weightLogWeek[weightLogWeek.length - 1];
-    const intervals = Math.max(1, weightLogWeek.length - 1);
-    // kg per week = (total loss / intervals) * 7 (assume 1 interval = 1 day).
-    // If intervals span a different period, the caller's weightLogWeek is responsible
-    // for reflecting that; we only correct the double-division bug here.
-    const weeklyAvgLoss = actualLoss > 0 ? (actualLoss / intervals) * 7 : 0;
-    if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) {
-      weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight);
-    } else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) {
-      weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight);
+    // FIX input-audit: фильтруем 0/отрицательные записи — они давали ложный «сброс веса»
+    // (80 → 0 = «потеря 80кг») и молча поднимали калораж до +20%
+    const validW = weightLogWeek.filter(w => Number.isFinite(w) && w > 0);
+    if (validW.length >= 2) {
+      const actualLoss = validW[0] - validW[validW.length - 1];
+      const intervals = Math.max(1, validW.length - 1);
+      // kg per week = (total loss / intervals) * 7 (assume 1 interval = 1 day).
+      // If intervals span a different period, the caller's weightLogWeek is responsible
+      // for reflecting that; we only correct the double-division bug here.
+      const weeklyAvgLoss = actualLoss > 0 ? (actualLoss / intervals) * 7 : 0;
+      if (expectedLossKgWeek > 0 && weeklyAvgLoss < expectedLossKgWeek * 0.7) {
+        weightAdj = 1 - (expectedLossKgWeek - Math.max(0, weeklyAvgLoss)) * 2 / Math.max(1, weight);
+      } else if (weeklyAvgLoss > expectedLossKgWeek * 1.3) {
+        weightAdj = 1 + (weeklyAvgLoss - expectedLossKgWeek) * 2 / Math.max(1, weight);
+      }
+      weightAdj = Math.max(0.8, Math.min(1.2, weightAdj));
     }
-    weightAdj = Math.max(0.8, Math.min(1.2, weightAdj));
   }
 
   const targetsV2 = (() => {
