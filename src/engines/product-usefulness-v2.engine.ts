@@ -504,7 +504,7 @@ export function calcMealScoreV2(
     return { compositeScore: 0, maxPossible: 10, productScores: [], weakLinks: [], macros: { kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0 }, modifiers: [], label: 'Нет данных', color: '#666' };
   }
 
-  const totalW = entries.reduce((s, e) => s + e.weightG, 0);
+  const totalW = entries.reduce((s, e) => s + e.weightG, 0) || entries.length; // FIX save/calc-audit: guard от деления на 0 (веса 0 → NaN)
   const composite = entries.reduce((s, e) => s + e.score.total * e.weightG, 0) / totalW;
 
   // Macros

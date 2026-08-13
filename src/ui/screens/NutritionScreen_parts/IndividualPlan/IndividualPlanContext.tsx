@@ -710,6 +710,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try { const v = (s as any)?.nutrition?.dietNotes; if (typeof v === 'string') return v; } catch {}
     try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; }
   });
+  // FIX save-buttons: заметки читались, но не сохранялись — терялись при перезагрузке
+  useEffect(() => { try { safeWriteJSON('he_nutrition_notes', customNotes); } catch {} }, [customNotes]);
   // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
   const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => {
     try { const v = (s as any)?.nutrition?.preferredByMeal; if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
@@ -884,7 +886,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_planner_labs', JSON.stringify(v2Labs)); } catch {} }, [v2Labs]);
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
-  useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
+   useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
+   // FIX save-buttons: пользовательские рецепты читались из he_user_recipes, но НИКОГДА
+   // не сохранялись — созданный рецепт пропадал при перезагрузке.
+   useEffect(() => { try { safeWriteJSON('he_user_recipes', userRecipes); } catch {} }, [userRecipes]);
 
   // FIX: персистентность ручных целей КБЖУ и режима
   useEffect(() => { try { if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) localStorage.setItem('he_manual_g_per_kg', JSON.stringify(manualGPerKg)); else localStorage.removeItem('he_manual_g_per_kg'); } catch {} }, [manualGPerKg]);
