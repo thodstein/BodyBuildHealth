@@ -1,10 +1,13 @@
 ﻿/** CheckinMetricsCard.tsx — ежедневный чек-ин метрик тела + статистика.
  * REUSE profile-settings.engine (ранее 0% использования в UI).
- * Вес/сон/HRV/вода/шаги/субъективные + тренд веса, серия дней. */
-import React, { useState, useMemo, useCallback } from 'react';
+ * Вес/сон/HRV/вода/шаги/субъективные + тренд веса, серия дней.
+ * СИНХРОНИЗАЦИЯ с дневниками Профиля: вес → he_weight_log, сон → he_sleep_diary,
+ * пульс → he_bp_diary (при сохранении), и подтягивание оттуда при открытии. */
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   getTodayMetric, quickCheckin, loadMetrics, getRollingAverages,
-  weightTrend, getAllTimeStats, type DailyMetrics,
+  weightTrend, getAllTimeStats, pullFromProfileDiaries, pushToProfileDiaries,
+  type DailyMetrics,
 } from '../../../engines/profile-settings.engine';
 import { applyToPlanner } from './planner-bridge';
 
@@ -20,13 +23,30 @@ export const CheckinMetricsCard: React.FC = () => {
   const today = useMemo(() => getTodayMetric(), []);
   const [form, setForm] = useState<DailyMetrics>(today);
   const [saved, setSaved] = useState(false);
+  const [synced, setSynced] = useState(false);
   const stats = useMemo(() => getAllTimeStats(), [saved]);
   const rolling = useMemo(() => getRollingAverages(), [saved]);
   const trend = useMemo(() => weightTrend(7), [saved]);
   const last7 = useMemo(() => loadMetrics().slice(-7).reverse(), [saved]);
 
+  // Синхронизация: подтянуть сегодняшние вес/сон/пульс из дневников Профиля
+  const pullDiaries = useCallback(() => {
+    const pulled = pullFromProfileDiaries(getTodayMetric());
+    setForm(pulled);
+    const changed = pulled.weightKg !== getTodayMetric().weightKg || pulled.sleepHours !== getTodayMetric().sleepHours
+      || pulled.sleepQuality !== getTodayMetric().sleepQuality || pulled.restingHR !== getTodayMetric().restingHR;
+    if (changed) setSynced(true);
+    return changed;
+  }, []);
+  useEffect(() => { pullDiaries(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const set = useCallback(<K extends keyof DailyMetrics>(k: K, v: DailyMetrics[K]) => setForm(p => ({ ...p, [k]: v })), []);
-  const submit = useCallback(() => { quickCheckin(form); setSaved(s => !s); }, [form]);
+  const submit = useCallback(() => {
+    quickCheckin(form);
+    const pushed = pushToProfileDiaries(form);
+    if (pushed.weight || pushed.sleep || pushed.bp) setSynced(true);
+    setSaved(s => !s);
+  }, [form]);
 
   const trendColor = trend < 0 ? '#00e68a' : trend > 0 ? '#eab308' : DIM;
   const Metric = ({ label, value, unit, hint }: { label: string; value: number | string; unit?: string; hint?: string }) => (
@@ -40,8 +60,20 @@ export const CheckinMetricsCard: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>📋 Чек-ин метрик тела</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
-        Ежедневная фиксация веса, сна, HRV, воды, шагов и самочувствия. Данные хранятся локально и питают тренды и аналитику.
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 10, color: DIM }}>
+          Ежедневная фиксация веса, сна, HRV, воды, шагов и самочувствия. Данные хранятся локально и питают тренды и аналитику.
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {synced && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)', whiteSpace: 'nowrap' }}>
+              ↔ Синхронизировано с дневниками профиля
+            </span>
+          )}
+          <button onClick={pullDiaries} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(96,165,250,0.1)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            📥 Из дневников профиля
+          </button>
+        </div>
       </div>
 
       <div style={CARD}>
@@ -61,7 +93,7 @@ export const CheckinMetricsCard: React.FC = () => {
         <div style={LABEL}>Заметка</div>
         <input type="text" style={IN} value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="самочувствие, комментарий" />
         <button style={{ ...btn, marginTop: 10 }} onClick={submit}>💾 Сохранить чек-ин</button>
-        {saved && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6, textAlign: 'center' }}>✓ Сохранено. Сегодня: {today.date}</div>}
+        {saved && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6, textAlign: 'center' }}>✓ Сохранено. Сегодня: {today.date} {synced ? '· вес/сон/пульс записаны в дневники профиля' : ''}</div>}
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить готовность (из чек-ина) к планировщику: сон {form.sleepHours || 0}ч, HRV {form.hrvMs || 0}, боль {form.subjectiveSoreness || 0}/5, стресс {form.subjectiveStress || 0}/5 → корректировка объёма.</div>
           <button onClick={() => { const e = form.subjectiveEnergy || 3; const s = form.subjectiveSoreness || 1; const st = form.subjectiveStress || 1; const mult = (s >= 4 || st >= 4 || e <= 2) ? 0.85 : (s >= 3 || st >= 3 || e <= 3) ? 0.93 : 1; const rsh = s >= 4 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Чек-ин: готовность → объём ×' + mult + ', RIR +' + rsh, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить готовность к планировщику</button>

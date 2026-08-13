@@ -13,6 +13,8 @@
  * @module profile-settings-engine
  */
 
+import { getWeightLog, saveWeightLog, type WeightEntry } from './profile-store';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
@@ -217,4 +219,74 @@ export function getAllTimeStats(): {
     highestWeight: metrics.length > 0 ? Math.max(...metrics.map(m => m.weightKg)) : 0,
     longestStreak,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Синхронизация с дневниками профиля (Профиль → Дневники)
+// Канонические ключи: he_weight_log (вес), he_sleep_diary (сон), he_bp_diary (пульс).
+// Чек-ин пишет/читает ТЕ ЖЕ записи, что и модалки дневников Профиля — данные
+// не дублируются и видны в обоих местах.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SLEEP_DIARY_KEY = 'he_sleep_diary';
+const BP_DIARY_KEY = 'he_bp_diary';
+
+function readDiaryEntries<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+/** Подтянуть сегодняшние значения из дневников профиля (вес/сон/пульс).
+ *  Заполняет только те поля, для которых в дневниках есть запись на дату m.date. */
+export function pullFromProfileDiaries(m: DailyMetrics): DailyMetrics {
+  const merged = { ...m };
+  try {
+    const today = m.date;
+    const weight = getWeightLog().find(e => e.date === today);
+    if (weight && weight.weight > 0) merged.weightKg = weight.weight;
+    const sleep = readDiaryEntries<{ date: string; hours?: number; quality?: number }>(SLEEP_DIARY_KEY).find(e => e.date === today);
+    if (sleep && typeof sleep.hours === 'number' && sleep.hours > 0) merged.sleepHours = sleep.hours;
+    if (sleep && typeof sleep.quality === 'number' && sleep.quality > 0) merged.sleepQuality = sleep.quality;
+    const bp = readDiaryEntries<{ date: string; pulse?: number }>(BP_DIARY_KEY).find(e => e.date === today);
+    if (bp && typeof bp.pulse === 'number' && bp.pulse > 0) merged.restingHR = bp.pulse;
+  } catch { /* ignore */ }
+  return merged;
+}
+
+/** Записать чек-ин в дневники профиля: вес → he_weight_log, сон → he_sleep_diary,
+ *  пульс → he_bp_diary. Записи обновляются (upsert по дате), существующие поля
+ *  (замеры/пробуждения/АД) сохраняются. Возвращает, какие дневники затронуты. */
+export function pushToProfileDiaries(m: DailyMetrics): { weight: boolean; sleep: boolean; bp: boolean } {
+  const out = { weight: false, sleep: false, bp: false };
+  try {
+    if (m.weightKg > 0) {
+      const log = getWeightLog();
+      const idx = log.findIndex(e => e.date === m.date);
+      const merged: WeightEntry = idx >= 0
+        ? { ...log[idx], weight: m.weightKg }
+        : { date: m.date, weight: m.weightKg };
+      saveWeightLog([...log.filter((_, i) => i !== idx), merged]);
+      out.weight = true;
+    }
+    if (m.sleepHours > 0) {
+      const diary = readDiaryEntries<{ date: string; hours?: number; quality?: number }>(SLEEP_DIARY_KEY);
+      const idx = diary.findIndex(e => e && e.date === m.date);
+      const entry = { ...(idx >= 0 ? diary[idx] : {}), date: m.date, hours: m.sleepHours };
+      if (m.sleepQuality > 0) entry.quality = m.sleepQuality;
+      if (idx >= 0) diary[idx] = entry; else diary.push(entry);
+      localStorage.setItem(SLEEP_DIARY_KEY, JSON.stringify(diary));
+      out.sleep = true;
+    }
+    if (m.restingHR > 0) {
+      const bp = readDiaryEntries<{ date: string; pulse?: number }>(BP_DIARY_KEY);
+      const idx = bp.findIndex(e => e && e.date === m.date);
+      const entry = { ...(idx >= 0 ? bp[idx] : {}), date: m.date, pulse: m.restingHR };
+      if (idx >= 0) bp[idx] = entry; else bp.push(entry);
+      localStorage.setItem(BP_DIARY_KEY, JSON.stringify(bp));
+      out.bp = true;
+    }
+  } catch { /* ignore */ }
+  return out;
 }

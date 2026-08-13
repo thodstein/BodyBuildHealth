@@ -36,10 +36,10 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     tabs: ['runtime', 'timers'],
   },
   diary: {
-    title: '📊 Дневник и аналитика',
-    icon: '📊',
+    title: '📓 Дневник',
+    icon: '📓',
     color: '#a855f7',
-    subtitle: 'Дневник, история, аналитика, прогресс, календарь, отчёты',
+    subtitle: 'Дневник тренировок: запись, история, аналитика, прогресс, календарь, чек-ин',
     // Дневник — единственная навигация для hub. Не смешиваем её с
     // внутренним переключателем TrainingDiaryHub.
     tabs: ['diary', 'history', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'reports'],
