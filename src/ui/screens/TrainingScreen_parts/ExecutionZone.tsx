@@ -46,6 +46,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     diary, onRefresh: loadDiaryStats, onGoToTimers } = p;
   const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
   const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
+  const [dayDetailsOpen, setDayDetailsOpen] = React.useState(true);
   const [restTimer, setRestTimer] = React.useState(0);
   const [restTarget, setRestTarget] = React.useState(90);
   const restTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -122,6 +123,48 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                 Расчётный тоннаж: {trainingDaysList[safeRuntimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
               </div>
             </div>
+                  {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
+                  {(() => {
+                    const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                    if (!dayExercises.length) return null;
+                    const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
+                    const estMin = Math.round((totalSets * 60 + 300) / 60);
+                    return (
+                      <div style={{ marginBottom: 8, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', userSelect: 'none' }}
+                          onClick={() => setDayDetailsOpen(v => !v)}
+                          role="button"
+                          aria-expanded={dayDetailsOpen}
+                          aria-label="Детали плана дня"
+                        >
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
+                            📋 План дня — {dayExercises.length} упр. · {totalSets} подходов · ~{estMin} мин
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
+                        </div>
+                        {dayDetailsOpen && (
+                          <div style={{ padding: '0 10px 8px' }}>
+                            {dayExercises.map((ex: any, i: number) => (
+                              <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10 }}>
+                                <span style={{ color: 'var(--text-dim)', minWidth: 16 }}>{i + 1}</span>
+                                <span style={{ flex: 1, minWidth: 0, color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {ex.name}{ex.isCompound ? ' 🔴' : ''}
+                                </span>
+                                <span style={{ color: 'var(--accent)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ex.sets}×{ex.reps}</span>
+                                <span style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{ex.weight ? `${ex.weight}кг` : 'в/т'}</span>
+                                <span style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>RIR {ex.rir ?? '—'}</span>
+                                <span style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>~{ex.restSec ?? 90}с</span>
+                                {ex.technique && (
+                                  <span style={{ color: '#fbbf24', whiteSpace: 'nowrap' }} title={ex.technique}>🎯</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {/* Session difficulty estimate */}
                   {(() => {
                     const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];

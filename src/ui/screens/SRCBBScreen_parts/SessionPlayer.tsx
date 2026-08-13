@@ -100,8 +100,9 @@ export interface SessionPlayerProps {
 
 export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus, onSaved }) => {
   const [profile] = useTrainingProfile();
-  const [dayIdx, setDayIdx] = useState(0);
-  const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
+const [dayIdx, setDayIdx] = useState(0);
+const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
+const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
   // Защита от двойного сохранения (finish вызывается из «Завершить» и из exitSession)
@@ -715,6 +716,59 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
               )}
             </div>
           )}
+
+          {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
+          {day && Array.isArray(day.exercises) && day.exercises.length > 0 && (() => {
+            const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
+            const tonnage = day.exercises.reduce((s, ex) => s + ex.targetSets.reduce((ss, st) => ss + (st.weight || 0) * (st.reps || 0), 0), 0);
+            const avgRest = Math.round(day.exercises.reduce((s, ex) => s + (ex.restSec || 90), 0) / day.exercises.length);
+            return (
+              <div style={{ ...CARD, marginTop: 8 }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}
+                  onClick={() => setDayDetailsOpen(v => !v)}
+                  role="button"
+                  aria-expanded={dayDetailsOpen}
+                  aria-label={`Детали дня ${day.label}`}
+                >
+                  <div style={LABEL}>📋 Детали дня — {day.exercises.length} упр. · {totalSets} сетов · {tonnage.toLocaleString()} кг · ~{avgRest}с отдых</div>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{dayDetailsOpen ? '▲' : '▼'}</span>
+                </div>
+                {dayDetailsOpen && (
+                  <div style={{ marginTop: 2 }}>
+                    {day.exercises.map((ex, ei) => {
+                      const setsStr = ex.targetSets.map((s, si) => (si === 0 ? '' : si === ex.targetSets.length - 1 ? ' × ' : ' · ') + `${s.reps}`).join('');
+                      const firstW = ex.targetSets[0]?.weight;
+                      const rirStr = ex.targetSets[0]?.rir;
+                      const plates = firstW ? formatPlates(firstW) : '';
+                      return (
+                        <div key={ei} style={{ ...ROW, gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>{ex.name}</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
+                              {ex.muscleGroup || ex.group || ''}{plates ? ` · ${plates}` : ''}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            {ex.targetSets.length}×{setsStr}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+                            {firstW ? `${firstW} кг` : 'вес тела'}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>
+                            RIR {rirStr ?? '—'}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}>
+                            ~{ex.restSec || 90}с
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
