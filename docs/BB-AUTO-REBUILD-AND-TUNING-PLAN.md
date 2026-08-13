@@ -37,6 +37,18 @@
 - Улучшить качество построения: stretch-позиции (растянутая), pump-нагрузка, разнообразие паттернов, покрытие головок.
 - Икры: подъёмы с растянутой позицией (стоя/в наклоне) + сидячие; трапеции: шраги с задержкой (stretch) + Келсо при бюджете.
 
+## РАУНД 3 — MEV-guard по сессиям, 0 overflow, feeder-интеграция (2026-08-14)
+
+- **MEV-guard по СЕССИЯМ** (не упражнениям): sessionsWith считает сессии с мышцей — guard back 7 вместо 2; фит не резал ниже MEV.
+- **Глобальный cap 5 сетов/упражнение** в finalize (source-планы несли 8+ сетов из исходника); per-exercise минимум 2.
+- **Защита стимула**: последнее упражнение мышцы на повышенном MEV-флоре не удаляется; isFinite-фильтр removable-кандидатов.
+- **Повторный MRV-кап ПОСЛЕ fill** (builder-кап был до finalize; fill/ensureSmall добавляли сверх).
+- **Малые группы в FullBody**: calves (6+4 при 1 сессии), traps (5-6), forearms, abs (до 5); при лимите упражнений — замена accessory другой мышцы с дублем.
+- **Indirect смягчён** (EMG): triceps 0.45, glutes 0.45, shoulders 0.2 — убраны пограничные overflow fullbody/rolling/tpt.
+- **Feeder-интеграция** (остаток MAX-PLAN): максимум 2 слота/мышцу (4+3 вместо 2+2+2), скип дублей с builder-feeder.
+- **Итог: 0 MRV-overflow / 125 комбинаций (5 профилей x 25 сплитов); 875/875 тестов.**
+- Остаточные дефициты — честные info (лимиты natural 24/10: MEV-сумма 62 > 48; осознанное правило).
+
 ## Выполненные аудиты (последний раунд)
 
 - **Этапы 2/4 — подгруппы рук**: classifyArmExercise/annotateArmExercise (biceps_lengthened/shortened/hammer, triceps_overhead/pushdown/compound, forearm); ensureArmHeadCoverage заменяет изоляцию на растянутую позицию бицепса / overhead трицепса (уважает equipment); rationale «💪 Руки по паттернам» + armQualityIssues.

@@ -267,7 +267,10 @@
 
 - Проверены generation, SessionPlayer payload, manual replacement, save/load, export and plan-vs-fact boundaries.
 - Обновлены `AGENTS.md` и эта документация.
-- Остаточные риски: нет browser-level smoke suite; target-volume planner и feeder selection можно глубже объединить в одном allocation pass.
+- Остаточные риски: нет browser-level smoke suite (UI-смоук на уровне jsdom/unit покрыт: ProfileScreen_v2, TrainingScreen_parts, 875 BB-тестов).
+- Feeder-интеграция ВЫПОЛНЕНА (Aug 13 2026): максимум 2 feeder-слота/мышцу, deficit 4+3 (cap 5), скип дублей с builder-feeder; MEV-guard в buildSession и minSetsByMuscle в budget-фите гарантируют MEV-минимум на этапе распределения — feeders стали редкой добивкой.
+- MRV-overflow: 0 во всех 125 комбинациях (5 профилей x 25 сплитов).
+- Раунд 2 (Aug 13 2026): тяж/памп чередование (ноги 2x/нед: тяж quads/памп hams и наоборот), cap 5 сетов/упражнение (глобально), специализация по паттернам (WEAK_PATTERN_REQ), малые группы (calves 6+4, traps 5-6, forearms, abs), mid-delt с грудью, повторный MRV-кап после fill.
 
 ## Качественный review внешнего анализа
 
