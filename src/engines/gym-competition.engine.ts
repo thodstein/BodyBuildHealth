@@ -367,7 +367,9 @@ export function recommendWeightCut(currentWeight: number, targetWeight: number, 
     const weight = Math.min(targetWeight, Math.round((currentWeight + weeklyGain * w) * 10) / 10);
     const note = w === weeksToMeet
       ? 'Взвешивание. Набор остановить за 24-48ч — лишний вес/вода уйдут.'
-      : weeklyGain > 0 ? `+${weeklyGain.toFixed(1)} кг/нед` : 'поддержание';
+      : w === weeksToMeet - 1 && toGain > 0
+        ? 'Вода/соль в норме, обычная еда — взвешивание НАВЕРХ: жидкость не сгонять.'
+        : weeklyGain > 0 ? `+${weeklyGain.toFixed(1)} кг/нед` : 'поддержание';
     gainTimeline.push({ week: w, weight, note });
   }
   const gainRecommendations: string[] = [];
@@ -384,7 +386,7 @@ export function recommendWeightCut(currentWeight: number, targetWeight: number, 
     if (toGain >= 2) {
       gainRecommendations.push('Белок 1.8–2.2 г/кг, профицит 10-15% от TDEE, силовая прогрессия сохраняется — набирайте мышцы, а не жир.');
     }
-    gainRecommendations.push('Взвешивание в федерации обычно утром — взвесьтесь за 2-3 дня до, чтобы учесть запас (и вода, и пища).');
+    gainRecommendations.push('Взвешивание НАВЕРХ: за 24-48ч до — обычная еда и вода, лёгкий завтрак утром; жидкость не сгонять (в отличие от сброса), максимизируйте вес на взвешивании.');
   }
   return {
     currentWeight, targetWeight, toCut, safeWeeklyRate, weeksNeeded, feasible,

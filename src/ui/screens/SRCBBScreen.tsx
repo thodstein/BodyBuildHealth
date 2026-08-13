@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -48,8 +48,10 @@ import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycl
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
-import { competitionAttempts, MEET_STRATEGY_LABEL, type MeetStrategy } from '../../engines/lms/competition-attempts';
+import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../engines/lms/competition-attempts';
 import { recommendWeightCut } from '../../engines/gym-competition.engine';
+import { updateSection } from '../../core/profile-manager';
+import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 
@@ -206,6 +208,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [taperNote, setTaperNote] = useState<string>(_plSaved?.plTaperNote ?? '');
   // Стратегия прикидов соревновательного дня (выход на пик: агрессивная — 93/97/105%).
   const [attemptStrategy, setAttemptStrategy] = useState<MeetStrategy>(_plSaved?.plAttemptStrategy ?? 'balanced');
+  // Имитация соревнований (mock meet) — прикиды-синглы за 10-14 дней до старта.
+  const [mockMeetOn, setMockMeetOn] = useState<boolean>(_plSaved?.plMockMeet ?? false);
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
     if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
     if (!plan.weeks.every((week: any) => week && Number.isFinite(week.week) && Array.isArray(week.days))) return null;
@@ -219,7 +223,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
@@ -1201,6 +1205,21 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       { id: 'aggressive', label: MEET_STRATEGY_LABEL.aggressive, desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
                     ]}
                   />
+                  <button
+                    onClick={() => setMockMeetOn(v => !v)}
+                    style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: mockMeetOn ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: mockMeetOn ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: mockMeetOn ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
+                    title="Имитация соревнований за 10-14 дней до старта: неделя перед тапером с прикидами-синглами (опенер RIR2 → вторая RIR1 → третья RIR0)"
+                  >🎯 Имитация соревнований (mock meet){mockMeetOn ? ' ✓' : ''}</button>
+                  <button
+                    disabled={!builtSrc || !taperNote}
+                    onClick={() => {
+                      if (!builtSrc) return;
+                      setBuiltSrc(refreshMeetAttempts(builtSrc, attemptStrategy));
+                      setMethodNote(`🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]} (${MEET_STRATEGY_LABEL[attemptStrategy]}) — без повторного добавления тапера.`);
+                    }}
+                    style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#a78bfa' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(139,92,246,0.1)' : 'transparent' }}
+                    title="Пересчитать прикиды на финальной тапер-неделе (и mock meet) под выбранную стратегию"
+                  >🔄 Обновить прикиды</button>
                 </div>
                 {/* Рекомендации по сбросу ИЛИ набору (текущий вес ниже целевого — переход в более тяжёлую категорию) */}
                 <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -1225,6 +1244,22 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       ))}
                     </div>
                   )}
+                  {rec.toGain > 0 && (
+                    <button
+                      onClick={() => {
+                        try {
+                          // Профицит → питание: цель «Набор» + целевой вес + % суперкомпенсации (5-15%).
+                          const estTdee = Math.max(1500, bw * 30);
+                          const surplusPct = Math.max(5, Math.min(15, Math.round((rec.dailySurplusKcal / estTdee) * 100)));
+                          updateSection('goals', { primaryGoal: 'bulk', targetWeight: targetBw, goalTimelineWeeks: weeksToMeet });
+                          updateSection('nutrition', { surplusPct });
+                          setMethodNote(`🍽 Набор записан в профиль: цель «Набор массы» до ${targetBw} кг, профицит ≈${rec.dailySurplusKcal} ккал/день (~${surplusPct}%). Планировщик питания учтёт при генерации рациона.`);
+                        } catch (error) { setMethodNote(`⚠ Не удалось записать в профиль: ${(error as Error).message}`); }
+                      }}
+                      style={{ ...BTN_GHOST, marginTop: 6, minHeight: 40, fontSize: 11, border: '1px solid rgba(0,230,138,0.35)', color: '#00e68a', background: 'rgba(0,230,138,0.08)' }}
+                      title="Записать цель «Набор» + профицит в единый профиль (UnifiedSettings) — планировщик питания учтёт при генерации"
+                    >🍽 Применить к питанию: набор (+{rec.dailySurplusKcal} ккал/день)</button>
+                  )}
                 </div>
                 {/* Действия: тапер к активному циклу + авто-новый цикл */}
                 <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
@@ -1238,10 +1273,11 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         courseIntensity,
                         mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
                         peakExit: { strategy: attemptStrategy },
+                        mockMeet: mockMeetOn ? { strategy: attemptStrategy } : undefined,
                       });
                       setBuiltSrc(next);
-                      setTaperNote(`+${taperWeeksToAdd} нед${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''} · 🏁 пик ${attemptStrategy === 'aggressive' ? '105%' : attemptStrategy === 'conservative' ? '100%' : '102%'}`);
-                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005). 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''}`);
+                      setTaperNote(`+${mockMeetOn ? 1 + taperWeeksToAdd : taperWeeksToAdd} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''} · 🏁 пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
+                      setMethodNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''}`);
                     }}
                     style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
                     title={builtSrc ? `Добавить ${taperWeeksToAdd} тапер-недели в конец плана${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
@@ -1297,27 +1333,37 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
              };
              const sourceCycle = getCycleById(selectedCycleId);
-             // Тапер-неделя: добавленная (taperWeek) или legacy-разметка peak/competition.
+             // Тапер-неделя: добавленная (taperWeek) или legacy-разметка peak/competition
+             // (mock meet исключается — это отдельная неделя имитации соревнований).
              // ВАЖНО: проверяем ТОЛЬКО оригинальные недели — иначе добавление тапера
              // «перекрашивает» весь цикл (sourceCalendar обнуляется, все недели теряют свои цвета).
-             const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.taperWeek === true || (w.macroPhase === 'competition' && w.sourcePhase === 'peak');
-             const sourceCalendar = sourceCycle && !W.filter(w => !isTaperWeek(w)).some(w => w.macroPhase)
+             const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.taperWeek === true || (!w.mockMeet && w.macroPhase === 'competition' && w.sourcePhase === 'peak');
+             const isMockWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.mockMeet === true;
+             const sourceCalendar = sourceCycle && !W.filter(w => !isTaperWeek(w) && !isMockWeek(w)).some(w => w.macroPhase)
                  ? summarizeSourceCycleWeeks(sourceCycle.weeks && sourceCycle.weeks.length > 0
                  ? sourceCycle.weeks
                  : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1), sourceCycle.meta.period, sourceCycle.meta.sourcePhases, sourceCycle.meta.sourcePhaseSource ?? 'original')
                : undefined;
              const TAPER_COLOR = '#f59e0b';
+             const MOCK_COLOR = '#a78bfa';
              const sourceWeek = sourceCalendar?.[wk.week - 1];
-             const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase];
-             const calendarTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : (isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '14';
-             const calendarBorderTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : (isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '30';
-             const calendarBadgeTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : (isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '22';
-             const calendarLabel = isTaperWeek(wk)
+             const mockPctLabel = wk.meetAttempts ? (MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced) : 'прикиды-синглы';
+             const calendarColor = sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : isMockWeek(wk) ? MOCK_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase];
+             const calendarTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : (isMockWeek(wk) ? MOCK_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '14';
+             const calendarBorderTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : (isMockWeek(wk) ? MOCK_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '30';
+             const calendarBadgeTint = sourceWeek ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : (isMockWeek(wk) ? MOCK_COLOR : isTaperWeek(wk) ? TAPER_COLOR : PH_COLOR[phase]) + '22';
+             const calendarLabel = isMockWeek(wk)
+               ? `🎯 Имитация соревнований (mock meet) · ${mockPctLabel}`
+               : isTaperWeek(wk)
                ? `📉 Тапер · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма`
                : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]} · ${SOURCE_PHASE_LABEL[sourceWeek.phase]} · ${Math.round(sourceWeek.intensityPct * 100)}% · ${sourceWeek.volumeSets} сетов`
                : PH_RU[phase];
-             const calendarDescription = sourceWeek
+             const calendarDescription = isMockWeek(wk)
+               ? `Имитация соревнований за 10-14 дней до старта: основные движения — прикиды-синглы (опенер RIR2 → вторая RIR1 → третья RIR0, ${mockPctLabel} от ПМ), аксессуары — 50% объёма. Проверка стратегии прикидов перед реальным соревнованием.`
+               : isTaperWeek(wk)
+               ? `Тапер-неделя: объём снижен (×0.65/×0.45), RIR +1/+2, интенсивность сохранена (Bosquet 2005). Разгрузка перед соревнованием.`
+               : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]}: ${SOURCE_PHASE_LABEL[sourceWeek.phase]}. ${sourceWeek.volumeSets} рабочих сетов, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
                : PH_DESC[phase];
             return <div style={{ ...CARD, overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
@@ -1428,17 +1474,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : taper ? `📉 Тапер · ${Math.round(weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{taper ? '📉' : w.week}</button>; })}
+                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : mock ? MOCK_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : mock ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы` : taper ? `📉 Тапер · ${Math.round(weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{mock ? '🎯' : taper ? '📉' : w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
-                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (taper ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)') : 'transparent', border: active ? (taper ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (taper ? '#f59e0b' : 'var(--accent)') : 'rgba(255,255,255,0.7)', minWidth: 26 }}>{taper ? '📉' : 'Н' + w.week}</span>
-                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
+                    {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : mock ? MOCK_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const maxT = Math.max(1, ...W.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
+                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (mock ? 'rgba(167,139,250,0.12)' : taper ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)') : 'transparent', border: active ? (mock ? '1px solid rgba(167,139,250,0.45)' : taper ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (mock ? '#a78bfa' : taper ? '#f59e0b' : 'var(--accent)') : 'rgba(255,255,255,0.7)', minWidth: 26 }}>{mock ? '🎯' : taper ? '📉' : 'Н' + w.week}</span>
+                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : mock ? '🎯 Имитация соревнований: прикиды-синглы' : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                           {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${color}, ${colorFade})` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
                       </div>
@@ -1479,22 +1525,39 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   })}
                 </div>
               </MetricCard>}
-              {wk.meetAttempts && wk.meetAttempts.lifts.length > 0 && (
-                <MetricCard title={`🏁 Соревновательный день · прикиды ${wk.meetAttempts.strategy === 'aggressive' ? '93/97/105%' : wk.meetAttempts.strategy === 'conservative' ? '90/95.5/100%' : '92/96/102%'} (неделя ${wk.week})`} icon="🏁" accent="#f59e0b">
+              {(wk.meetAttempts && wk.meetAttempts.lifts.length > 0) && (
+                <MetricCard title={`${wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})`} icon={wk.mockMeet ? '🎯' : '🏁'} accent={wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
                     {wk.meetAttempts.lifts.map(l => (
-                      <div key={l.name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10 }}>
-                        <b style={{ color: '#f59e0b' }}>{l.name}</b>
+                      <div key={l.name} style={{ padding: 6, borderRadius: 6, background: wk.mockMeet ? 'rgba(167,139,250,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.2)'}`, fontSize: 10 }}>
+                        <b style={{ color: wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.name}</b>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
                           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>1-я</div><b style={{ fontSize: 12 }}>{l.opener}</b></div>
                           <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>2-я</div><b style={{ fontSize: 12 }}>{l.second}</b></div>
-                          <div style={{ textAlign: 'center', background: 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: '1px solid rgba(245,158,11,0.3)' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>3-я</div><b style={{ fontSize: 12, color: '#f59e0b' }}>{l.third}</b></div>
+                          <div style={{ textAlign: 'center', background: wk.mockMeet ? 'rgba(167,139,250,0.14)' : 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: `1px solid ${wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}` }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>3-я</div><b style={{ fontSize: 12, color: wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.third}</b></div>
                         </div>
                       </div>
                     ))}
                   </div>
+                  {/* Разминка по опенеру (как в тапер-калькуляторе) */}
+                  {(() => {
+                    const opener = wk.meetAttempts!.lifts[0]?.opener;
+                    if (!opener) return null;
+                    const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
+                    return (
+                      <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                        🔥 Разминка под опенер {opener} кг ({wk.meetAttempts!.lifts[0]?.name}): {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)
+                      </div>
+                    );
+                  })()}
+                  {/* Последние тяжёлые движения (тайминг разгрузки) */}
+                  <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                    ⏱ Последние тяжёлые: {([['Присед', LAST_HEAVY_DAYS.squat], ['Жим', LAST_HEAVY_DAYS.bench], ['Тяга', LAST_HEAVY_DAYS.deadlift]] as const).map(([n, d]) => `${n} — за ${d} дн.`).join(' · ')} до старта.
+                  </div>
                   <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
-                    📉 Разгрузка уже выполнена тапер-неделями (объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена — Bosquet 2005). Прикиды — план дня соревнований, не тренировочная нагрузка: разминка по опенеру, подходы строго по стратегии, между попытками 10-20 мин.
+                    {wk.mockMeet
+                      ? '🎯 Это ТРЕНИРОВОЧНАЯ неделя за 10-14 дней до старта: прикиды-синглы на 100% усилия (опенер RIR2 → вторая RIR1 → третья RIR0) — проверка стратегии. После неё — тапер-разгрузка, а затем реальные прикиды на соревнованиях.'
+                      : '📉 Разгрузка уже выполнена тапер-неделями (объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена — Bosquet 2005). Прикиды — план дня соревнований, не тренировочная нагрузка: разминка по опенеру, подходы строго по стратегии, между попытками 10-20 мин.'}
                   </div>
                 </MetricCard>
               )}
@@ -1817,7 +1880,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   const sourceCycle = getCycleById(selectedCycleId);
                   // Только оригинальные недели решают про исходный календарь: добавленные
                   // тапер-недели (macroPhase/taperWeek) не должны «перекрашивать» цикл.
-                  if (!sourceCycle || W.filter(w => !isTaperWeek(w)).some(week => week.macroPhase)) return undefined;
+                  if (!sourceCycle || W.filter(w => !isTaperWeek(w) && !isMockWeek(w)).some(week => week.macroPhase)) return undefined;
                   const layouts = sourceCycle.weeks && sourceCycle.weeks.length > 0
                     ? sourceCycle.weeks
                     : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1);
@@ -2198,19 +2261,24 @@ legs: [
                       const totalW = bridgeWeeks.length;
                       const ph = mesocyclePhaseForWeek(w, Math.max(totalW, w));
                       const active = w === bridgeWeek;
+                      const weekSessions = bridgeSessions.filter(s => s.weekNumber === w);
+                      const hasMock = weekSessions.some(s => s.mockMeet);
+                      const hasTaper = weekSessions.some(s => s.taperWeek && !s.mockMeet);
                       const PH_COLOR_B: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
                       const PH_RU_B: Record<string,string> = { base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' };
+                      const wkColor = hasMock ? '#a78bfa' : hasTaper ? '#f59e0b' : PH_COLOR_B[ph];
+                      const wkLabel = hasMock ? '🎯 Имитация соревнований (mock meet)' : hasTaper ? '📉 Тапер' : PH_RU_B[ph];
                       return (
                         <button key={w} onClick={() => setBridgeWeek(w)}
-                          title={`Неделя ${w}: ${PH_RU_B[ph] || ''}`}
+                          title={`Неделя ${w}: ${wkLabel}`}
                           style={{
                             padding: '7px 0', borderRadius: 7,
                             border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                            background: active ? PH_COLOR_B[ph] : (PH_COLOR_B[ph] || '#22c55e') + '1a',
+                            background: active ? wkColor : (wkColor || '#22c55e') + '1a',
                             color: active ? '#000' : '#fff',
                             fontSize: 10, fontWeight: 700, cursor: 'pointer'
                           }}
-                        >{w}</button>
+                        >{hasMock ? '🎯' : hasTaper ? '📉' : w}</button>
                       );
                     })}
                   </div>
@@ -2222,9 +2290,9 @@ legs: [
               </div>
               {bridgeWeekSessions.map((s, i) => (
                 <ExpandableCard key={i}
-                  title={`${s.focus} · ${s.exercises.length} упр.`}
+                  title={`${s.focus} · ${s.exercises.length} упр.${s.mockMeet ? ' · 🎯 Mock meet' : s.taperWeek ? ' · 📉 Тапер' : ''}`}
                   icon={s.source === 'SRC' ? '🏋️' : '💪'}
-                  short={`${s.totalSets} сетов · ${Math.round(s.totalVolume)} кг·пов${s.planned ? ' · запланировано' : ''}`}
+                  short={`${s.totalSets} сетов · ${Math.round(s.totalVolume)} кг·пов${s.planned ? ' · запланировано' : ''}${s.mockMeet ? ' · 🎯 прикиды-синглы' : s.taperWeek ? ' · 📉 разгрузка' : ''}`}
                   full={
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>
                       {s.exercises.map((e, ei) => (

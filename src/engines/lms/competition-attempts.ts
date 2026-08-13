@@ -29,6 +29,16 @@ export const MEET_STRATEGY_LABEL: Record<MeetStrategy, string> = {
   aggressive: 'Агрессивная',
 };
 
+/** Короткая метка процентов прикидов для UI (включая дефолтную «Сбалансированную»). */
+export const MEET_STRATEGY_PCT_LABEL: Record<MeetStrategy, string> = {
+  conservative: '90/95.5/100%',
+  balanced: '92/96/102%',
+  aggressive: '93/97/105%',
+};
+
+/** Проценты прикидов от опенера для разминочной последовательности (40→90%). */
+export const MEET_WARMUP_STEPS = [0.40, 0.55, 0.70, 0.80, 0.90];
+
 /** Suggested attempts from a tested max, rounded to the nearest 2.5 kg. */
 export function competitionAttempts(pm: number): CompetitionAttempts {
   const round = (value: number) => Math.round(value / 2.5) * 2.5;

@@ -27,3 +27,25 @@ describe('TaperPlannerTab — весовая категория (набор ве
     expect(screen.queryByText(/Сушка:/)).toBeNull();
   });
 });
+
+describe('TaperPlannerTab — прикиды по умолчанию («Сбалансированная»)', () => {
+  it('карточка прикидов рендерится с дефолтной сбалансированной стратегией', () => {
+    render(<TaperPlannerTab />);
+    expect(screen.getByText(/🏆 Прикиды \(Сбалансированная\)/)).toBeTruthy();
+  });
+
+  it('прикиды посчитаны по стратегии 92/96/102% от введённого ПМ (присед 180 кг)', () => {
+    render(<TaperPlannerTab />);
+    // 180 × 0.92 = 165.6 (опенер), 180 × 1.02 = 183.6 (цель/третья) — r05-округление калькулятора.
+    // «165.6» встречается и в разминке («опенер присед 165.6 кг») — допускаем несколько совпадений.
+    expect(screen.getAllByText(/165\.6/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/183\.6/).length).toBeGreaterThan(0);
+  });
+
+  it('все три лифта имеют карточки попыток (присед/жим/тяга)', () => {
+    render(<TaperPlannerTab />);
+    expect(screen.getAllByText(/Присед/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Жим лёжа/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Тяга/).length).toBeGreaterThan(0);
+  });
+});

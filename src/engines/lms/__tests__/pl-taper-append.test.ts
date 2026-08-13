@@ -4,7 +4,7 @@
  * 2. recommendWeightCut — рекомендации по сбросу веса перед соревнованием.
  */
 import { describe, expect, it } from 'vitest';
-import { buildLMSPlan, appendPLTaperWeeks, type LMSBuildOutput } from '../lms-builder.engine';
+import { buildLMSPlan, appendPLTaperWeeks, refreshMeetAttempts, type LMSBuildOutput } from '../lms-builder.engine';
 import { recommendWeightCut } from '../../gym-competition.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 
@@ -263,6 +263,91 @@ describe('appendPLTaperWeeks', () => {
     expect(next.progressionRationale).toContain('93/97/105%');
   });
 
+  // ── Имитация соревнований (mock meet) ──
+  it('mock meet: неделя вставляется ПЕРЕД тапер-неделями', () => {
+    const plan = buildBase(6);
+    const baseLen = plan.weeks.length;
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy: 'aggressive' } });
+    expect(next.weeks.length).toBe(baseLen + 3);
+    const mock = next.weeks[baseLen];
+    expect(mock.mockMeet).toBe(true);
+    expect(mock.taperWeek).not.toBe(true);
+    expect(mock.meetAttempts).toBeDefined();
+    expect(next.weeks[baseLen + 1].taperWeek).toBe(true);
+    expect(next.weeks[baseLen + 2].taperWeek).toBe(true);
+  });
+
+  it('mock meet: основные движения — прикиды-синглы (опенер/вторая/третья по 1 сету)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy: 'aggressive' } });
+    const mock = next.weeks[plan.weeks.length];
+    const squatEx = mock.days.flatMap(d => d.exercises).find(e => /присед/i.test(e.name));
+    expect(squatEx).toBeDefined();
+    const sets = squatEx!.workSets;
+    expect(sets).toHaveLength(3); // опенер, вторая, третья
+    expect(sets.every(s => s.reps === 1 && s.sets === 1)).toBe(true);
+    const attempts = mock.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
+    expect(sets[0].weight).toBe(attempts.opener);
+    expect(sets[2].weight).toBe(attempts.third);
+    expect(sets[2].rir).toBe(0);
+  });
+
+  it('mock meet: аксессуары — 50% объёма', () => {
+    const plan = buildBase(6);
+    const isComp = (name: string) => /присед|жим лежа|становая/i.test(name);
+    const baseAcc = plan.weeks[plan.weeks.length - 1].days.flatMap(d => d.exercises).filter(e => !isComp(e.name));
+    if (baseAcc.length === 0) return; // если аксессуаров нет в цикле — тест не применим
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy: 'aggressive' } });
+    const mock = next.weeks[plan.weeks.length];
+    const mockAcc = mock.days.flatMap(d => d.exercises).filter(e => !isComp(e.name));
+    for (let i = 0; i < mockAcc.length; i++) {
+      const base = baseAcc[i % baseAcc.length];
+      expect(mockAcc[i].workSets.reduce((s, ws) => s + ws.sets, 0)).toBeLessThanOrEqual(Math.max(1, Math.round(base.workSets.reduce((s, ws) => s + ws.sets, 0) * 0.6)));
+    }
+  });
+
+  it('mock meet: стратегия по умолчанию = сбалансированная (дефолт обработан)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: {} });
+    const mock = next.weeks[plan.weeks.length];
+    expect(mock.meetAttempts!.strategy).toBe('balanced');
+    expect(mock.meetAttempts!.lifts[0].third).toBeGreaterThan(0);
+  });
+
+  it('mock meet: rationale упоминает имитацию соревнований', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy: 'aggressive' } });
+    expect(next.progressionRationale).toContain('mock meet');
+  });
+
+  // ── Пересчёт прикидов (refreshMeetAttempts) ──
+  it('refreshMeetAttempts: меняет стратегию на всех неделях с прикидами', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'balanced' }, mockMeet: { strategy: 'balanced' } });
+    const refreshed = refreshMeetAttempts(next, 'aggressive');
+    for (const wk of refreshed.weeks) {
+      if (wk.meetAttempts) expect(wk.meetAttempts.strategy).toBe('aggressive');
+    }
+    // Исходный план не мутирован
+    expect(next.weeks.find(w => w.meetAttempts)!.meetAttempts!.strategy).toBe('balanced');
+  });
+
+  it('refreshMeetAttempts: третья попытка = 105% ПМ при агрессивной', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'balanced' } });
+    const refreshed = refreshMeetAttempts(next, 'aggressive');
+    const last = refreshed.weeks[refreshed.weeks.length - 1];
+    const squat = last.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
+    expect(squat.third).toBeGreaterThan(last.pmRow[squat.name]);
+  });
+
+  it('refreshMeetAttempts: та же стратегия → план без изменений (тот же объект)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { peakExit: { strategy: 'balanced' } });
+    const refreshed = refreshMeetAttempts(next, 'balanced');
+    expect(refreshed).toBe(next);
+  });
+
   it('applyPLTaper (авто при сборке): финальная неделя помечена taperWeek + прикиды', () => {
     // Non-faithful путь: авто-taper к финальным неделям применяется в buildLMSPlan.
     const plan = buildLMSPlan({
@@ -407,5 +492,13 @@ describe('recommendWeightCut', () => {
   it('набор: темп выше безопасного → предупреждение ⚠', () => {
     const rec = recommendWeightCut(80, 90, 4); // 10 кг за 4 нед = 2.5 кг/нед
     expect(rec.gainRecommendations.some(r => r.startsWith('⚠'))).toBe(true);
+  });
+
+  it('набор: предпоследняя неделя — вода/соль в норме (взвешивание НАВЕРХ)', () => {
+    const rec = recommendWeightCut(80, 84, 4);
+    expect(rec.gainTimeline[2].note).toContain('Вода/соль в норме');
+    expect(rec.gainTimeline[2].note).toContain('НАВЕРХ');
+    expect(rec.gainRecommendations.some(r => r.includes('Взвешивание НАВЕРХ'))).toBe(true);
+    expect(rec.gainRecommendations.some(r => r.includes('жидкость не сгонять'))).toBe(true);
   });
 });
