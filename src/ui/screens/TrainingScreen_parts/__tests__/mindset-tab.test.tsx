@@ -5,10 +5,11 @@
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { render, fireEvent, screen } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
-import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from '../../SRCBBScreen_parts/MindsetSessionPanels';
+import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
-import { buildPresetProtocol, upsertProtocol, setActiveProtocol, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY } from '../../../../engines/mindset-protocol.engine';
+import { buildPresetProtocol, upsertProtocol, setActiveProtocol, loadCheckins, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
 import type { DiaryHubCtx } from '../diary-hub-context';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
@@ -111,5 +112,56 @@ describe('Психо-панели SessionPlayer (SSR-смок)', () => {
     expect(html).toContain('Активация');
     expect(html).toContain('Фокус');
     expect(html).toContain('Протокол выполнен');
+  });
+});
+
+describe('MindsetCheckinInline (формы записи)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('SSR: рендерит компактный чек-ин со шкалами и протоколом', () => {
+    const html = renderToStaticMarkup(<MindsetCheckinInline date="2026-08-14" sessionId="w1" />);
+    expect(html).toContain('Психо-чек-ин');
+    expect(html).toContain('Уверенность');
+    expect(html).toContain('Активация');
+    expect(html).toContain('Фокус');
+    expect(html).toContain('Протокол');
+  });
+
+  it('CSR: сохранение пишет чек-ин в he_mindset_checks с датой и sessionId', () => {
+    render(<MindsetCheckinInline date="2026-08-14" sessionId="w1" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить психо-чек-ин' }));
+    const list = loadCheckins();
+    expect(list.length).toBe(1);
+    expect(list[0].date).toBe('2026-08-14');
+    expect(list[0].sessionId).toBe('w1');
+    expect(list[0].confidence).toBe(4);
+    expect(list[0].protocolFollowed).toBe(true);
+    expect(screen.getByText('✓ сохранено')).toBeTruthy();
+  });
+
+  it('CSR: повторное сохранение заменяет запись (без дублей)', () => {
+    render(<MindsetCheckinInline date="2026-08-14" sessionId="w1" />);
+    const btn = screen.getByRole('button', { name: 'Сохранить психо-чек-ин' });
+    fireEvent.click(btn);
+    expect(loadCheckins().length).toBe(1);
+  });
+
+  it('CSR: шкалы меняются перед сохранением', () => {
+    render(<MindsetCheckinInline date="2026-08-15" sessionId={undefined} />);
+    fireEvent.change(screen.getByLabelText('Уверенность'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Фокус'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: '✕ нет' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить психо-чек-ин' }));
+    const list = loadCheckins();
+    expect(list[0].confidence).toBe(2);
+    expect(list[0].focus).toBe(5);
+    expect(list[0].protocolFollowed).toBe(false);
+    expect(list[0].sessionId).toBeUndefined();
+  });
+
+  it('битый JSON чек-инов не роняет компонент', () => {
+    localStorage.setItem(MINDSET_CHECKS_KEY, '{{{');
+    const html = renderToStaticMarkup(<MindsetCheckinInline date="2026-08-14" />);
+    expect(html).toContain('Психо-чек-ин');
   });
 });

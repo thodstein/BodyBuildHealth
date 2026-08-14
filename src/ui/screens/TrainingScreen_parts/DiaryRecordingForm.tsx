@@ -5,6 +5,7 @@ import { epley1RM } from '../../../engines/e1rm';
 import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { loadReadinessHistory } from './readiness-history';
 import { MMCSetPanel } from './MMCSetPanel';
+import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -82,6 +83,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   const [searchResults, setSearchResults] = useState<typeof EXERCISE_CATALOG>([]);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedWid, setSavedWid] = useState<string | null>(null);
   const [savedSummary, setSavedSummary] = useState<{ exercises: number; sets: number; volume: number; date: string } | null>(null);
   const [nextSupersetGroup, setNextSupersetGroup] = useState(1);
   const [restTimer, setRestTimer] = useState(0);
@@ -367,6 +369,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       });
       for (const ex of exList) { await diary.saveStrengthLog(ex); }
       setSavedSummary({ exercises: exList.length, sets: totalSets, volume: totalVolume, date: logDate });
+      setSavedWid(wid);
       setSaved(true); setTimeout(() => { setSaved(false); setSavedSummary(null); }, 4000);
       undoRef.current = [];
       setExercises([]); setLogNotes(''); setLogDuration(60); setLogRPE(7);
@@ -795,6 +798,11 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
               }}>{sec}с</button>
           ))}
         </div>
+      )}
+
+      {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
+      {exercises.length > 0 && (
+        <MindsetCheckinInline date={logDate} sessionId={savedWid || undefined} />
       )}
 
       {/* Save */}

@@ -7,6 +7,7 @@ import { epley1RM } from '../../../engines/e1rm';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { isBodyweightExercise as isBW } from '../../../engines/workout-logger.engine';
 import { ACCENT } from './diary-tokens';
+import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 
 interface Props {
   workout: WorkoutLog;
@@ -170,6 +171,9 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
           <span>{log.exercises.length} упр. · {totalSets} подходов · {totalVolume.toLocaleString()} кг</span>
         </div>
+
+        {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
+        <MindsetCheckinInline date={log.date} sessionId={workout.id} />
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Отмена</button>

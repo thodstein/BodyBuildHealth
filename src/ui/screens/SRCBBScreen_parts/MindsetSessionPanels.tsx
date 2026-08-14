@@ -14,7 +14,7 @@ import React, { useMemo, useState } from 'react';
 import {
   loadActiveProtocol, detectDayType, itemsForDay,
   loadDayProgress, saveDayProgress,
-  upsertCheckin,
+  upsertCheckin, latestCheckin,
   KIND_LABELS, DAYTYPE_LABELS,
   type MindsetDayType,
 } from '../../../engines/mindset-protocol.engine';
@@ -181,6 +181,89 @@ export const MindsetCheckinCard: React.FC<{ sessionId?: string }> = ({ sessionId
           background: saved ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#a78bfa,#8b5cf6)', color: saved ? DIM : '#000', fontWeight: 700, fontSize: 11 }}>
         {saved ? '✓ Чек-ин сохранён' : '💾 Сохранить чек-ин'}
       </button>
+    </div>
+  );
+};
+
+/* ═══════════ 4. Компактный психо-чек-ин (формы записи/редактирования) ═══════════ */
+
+/**
+ * Компактная строка чек-ина для DiaryRecordingForm / SessionEditorModal.
+ * Три выпадающих шкалы 1-5 + выполнение протокола + сохранение.
+ * Записывается через upsertCheckin (замена по дате+sessionId).
+ */
+export const MindsetCheckinInline: React.FC<{ date: string; sessionId?: string; onSaved?: () => void }> = ({ date, sessionId, onSaved }) => {
+  const last = latestCheckin();
+  const [confidence, setConfidence] = useState(last?.confidence || 4);
+  const [arousal, setArousal] = useState(last?.arousal || 3);
+  const [focus, setFocus] = useState(last?.focus || 4);
+  const [followed, setFollowed] = useState<boolean | null>(last?.protocolFollowed ?? true);
+  const [saved, setSaved] = useState(false);
+
+  const save = () => {
+    upsertCheckin({
+      date: (date || todayKey()).slice(0, 10),
+      sessionId,
+      confidence, arousal, focus,
+      protocolFollowed: followed,
+    });
+    setSaved(true);
+    try { onSaved?.(); } catch { /* ignore */ }
+  };
+
+  const selectStyle: React.CSSProperties = {
+    width: '100%', padding: '5px 6px', borderRadius: 6, background: '#18181b',
+    border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, minHeight: 32, boxSizing: 'border-box',
+  };
+  const labelStyle: React.CSSProperties = { fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 3 };
+
+  return (
+    <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa' }}>🧠 Психо-чек-ин</span>
+        {saved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1, minWidth: 90 }}>
+          <div style={labelStyle}>Уверенность</div>
+          <select aria-label="Уверенность" value={confidence} onChange={e => { setConfidence(+e.target.value); setSaved(false); }} style={selectStyle}>
+            {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1, minWidth: 90 }}>
+          <div style={labelStyle}>Активация</div>
+          <select aria-label="Активация" value={arousal} onChange={e => { setArousal(+e.target.value); setSaved(false); }} style={selectStyle}>
+            {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1, minWidth: 90 }}>
+          <div style={labelStyle}>Фокус</div>
+          <select aria-label="Фокус" value={focus} onChange={e => { setFocus(+e.target.value); setSaved(false); }} style={selectStyle}>
+            {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1.4, minWidth: 150 }}>
+          <div style={labelStyle}>Протокол</div>
+          <div style={{ display: 'flex', gap: 3 }}>
+            {([true, false, null] as const).map(v => (
+              <button key={String(v)} type="button" onClick={() => { setFollowed(v); setSaved(false); }}
+                style={{
+                  flex: 1, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, minHeight: 32,
+                  border: followed === v ? (v === false ? '1px solid #ef4444' : '1px solid #a78bfa') : '1px solid rgba(255,255,255,0.08)',
+                  background: followed === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(167,139,250,0.15)') : 'rgba(255,255,255,0.03)',
+                  color: followed === v ? (v === false ? '#ef4444' : '#a78bfa') : 'rgba(255,255,255,0.5)',
+                }}>
+                {v === true ? '✓ да' : v === false ? '✕ нет' : '—'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button type="button" onClick={save} disabled={saved} aria-label="Сохранить психо-чек-ин"
+          style={{ padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', minHeight: 32, fontSize: 10, fontWeight: 700,
+            background: saved ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#a78bfa,#8b5cf6)', color: saved ? DIM : '#000' }}>
+          {saved ? '✓' : '💾'}
+        </button>
+      </div>
     </div>
   );
 };

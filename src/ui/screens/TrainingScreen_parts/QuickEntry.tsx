@@ -17,6 +17,7 @@ import { DiarySetRow } from './DiarySetRow';
 import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { useIsMobile } from './useIsMobile';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
+import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 
 const ACCENT = '#00e68a';
 
@@ -106,6 +107,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSummary, setSavedSummary] = useState<{ exercises: number; sets: number; volume: number } | null>(null);
+  const [savedWid, setSavedWid] = useState<string | null>(null);
   const [showPR, setShowPR] = useState<{ exercise: string; weight: number; reps: number; e1rm: number } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const prTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -302,6 +304,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         }
         if (mountedRef.current) {
           setSavedSummary({ exercises: strengthEntries.length, sets: totalSets, volume: totalVolume });
+          setSavedWid(wid);
           setSaved(true);
           setTimeout(() => { if (mountedRef.current) { setSaved(false); setSavedSummary(null); onSave(); } }, 3000);
         }
@@ -662,6 +665,8 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           {saved ? '✅ Сохранено!' : `💾 Сохранить (${totalSets} подходов)`}
         </button>
         {saveError && <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', marginTop: 4 }}>{saveError}</div>}
+        {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
+        <MindsetCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
         </>
       )}
     </div>
