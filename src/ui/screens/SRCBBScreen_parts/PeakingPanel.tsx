@@ -141,6 +141,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     } catch { return defaultBbCfg(); }
   });
   const [bbSaved, setBbSaved] = useState(false);
+  const [bbCopyFlash, setBbCopyFlash] = useState(false);
 
   // ── Автозаполнение из Профиля (однократная загрузка в локальный state) ──
   const autofillFromProfile = () => {
@@ -243,6 +244,38 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         const toast = (window as any).showToast;
         if (typeof toast === 'function') toast('✓ Тапер ББ сохранён в профиль — применится к плану ББ и питанию', 'success');
       } catch { /* ignore */ }
+    };
+    const bbCopySummary = () => {
+      if (!bbResult) return;
+      const lines: string[] = [
+        `🏁 Тапер ББ — сводка (шоу ${bbResult.config.showDate}, категория ${CONTEST_CATEGORY_LABELS[bbResult.config.category]}, ${bbResult.config.weightKg} кг)`,
+        `📉 Тапер тренировок (${bbResult.config.weeksOut} нед): ${bbResult.taper.map(t => `${t.label} ${Math.round(t.volumePct * 100)}%`).join(' → ')}`,
+        '— Пик-неделя —',
+        ...bbResult.peakWeek.map(d => `${d.day === 7 ? 'Шоу' : `D-${7 - d.day}`} (${d.date}) ${d.phaseLabel}: ${d.kcal} ккал · Б${d.proteinG}/У${d.carbsG}/Ж${d.fatG} · 💧${d.waterLiters}л · Na ${d.sodiumMg}мг · ${d.training.minutes ? d.training.type : 'отдых'} · позы ${d.posingMinutes}м`),
+        '— День шоу по часам —',
+        ...bbResult.showTimeline.map(t => `${t.time} — ${t.action}`),
+      ];
+      const text = lines.join('\n');
+      const done = () => { setBbCopyFlash(true); window.setTimeout(() => setBbCopyFlash(false), 1800); };
+      try {
+        if (navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); done(); } catch { /* ignore */ }
+            document.body.removeChild(ta);
+          });
+        } else { throw new Error('no clipboard'); }
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch { /* ignore */ }
+        document.body.removeChild(ta);
+      }
     };
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
@@ -370,6 +403,14 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             {bbSaved ? '✓ Сохранено в профиль' : '🏁 Сохранить и применить тапер ББ'}
           </button>
         </div>
+        {bbResult && (
+          <button
+            onClick={bbCopySummary}
+            style={{ width: '100%', padding: 11, borderRadius: 10, cursor: 'pointer', minHeight: 44, marginTop: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 11 }}
+          >
+            {bbCopyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
+          </button>
+        )}
         <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.5, textAlign: 'center' }}>
           Сохранение пишет конфиг в профиль (goals.bbPeakConfig): сборка плана ББ наложит тапер на последние недели,
           блок «Питание → 🏁 Тапер ББ» применит пик-неделю к рациону по дате шоу.
