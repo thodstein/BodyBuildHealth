@@ -847,6 +847,25 @@ const SUPPORT_REDUCTIONS: Record<string, Record<string, Record<number, number>>>
   bpc157: { hepatic: { 3: 0.15, 7: 0.1 }, neuro: { 4: 0.1 } },
   semax: { neuro: { 1: 0.15, 4: 0.1, 5: 0.1 } },
   selank: { neuro: { 3: 0.12, 7: 0.1 } },
+  // ── Основные назначения плана поддержки (добавлено для полноты) ──
+  agmatine: { neuro: { 1: 0.15, 3: 0.15 }, cardio: { 2: 0.05 } },
+  glycine: { neuro: { 3: 0.15, 7: 0.1 } },
+  hesperidin: { cardio: { 4: 0.1 }, hematologic: { 6: 0.1 } },
+  dandelion: { renal: { 1: 0.15, 4: 0.1 }, cardio: { 3: 0.1 } },
+  astragalus: { renal: { 1: 0.15, 2: 0.1 }, hepatic: { 3: 0.1 } },
+  lumbrokinase: { cardio: { 4: 0.15 }, hematologic: { 6: 0.2 } },
+  pentoxifylline: { cardio: { 4: 0.15 }, hematologic: { 7: 0.15 } },
+  dipyridamole: { cardio: { 4: 0.12 }, hematologic: { 6: 0.12 } },
+  sulodexide: { cardio: { 4: 0.15 }, renal: { 3: 0.1 } },
+  cordyceps: { cardio: { 6: 0.1 }, hepatic: { 3: 0.1 } },
+  citrulline: { cardio: { 2: 0.1 } },
+  nattokinase: { cardio: { 4: 0.15 }, hematologic: { 6: 0.2 } },
+  serrapeptase: { cardio: { 4: 0.1 }, hematologic: { 6: 0.1 } },
+  bromelain: { cardio: { 4: 0.08 }, hematologic: { 6: 0.08 } },
+  garlic: { cardio: { 2: 0.08, 4: 0.1 } },
+  pycnogenol: { cardio: { 2: 0.1 }, neuro: { 5: 0.08 } },
+  betaine: { hepatic: { 7: 0.08 } },
+  bergamot: { cardio: { 2: 0.15 } },
 };
 
 // --- ULN-based Lab Factor (spec section 13.6) ---

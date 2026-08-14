@@ -3730,6 +3730,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           cycleWeeks,
           pctProtocol,
           pctStartWeek: undefined,
+          // Препараты поддержки из плана ускоряют восстановление маркеров
+          // (каберголин/P5P → PRL, AI → E2, hCG → LH/FSH — см. rebound-modeling.engine)
+          supportSubs: finalRec.subs.map((s: any) => s.substanceId),
           userProfile: {
             age: state.profile?.age || 30,
             baselineTT: fp.TESTOSTERONE || 650,

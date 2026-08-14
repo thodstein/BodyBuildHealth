@@ -1,5 +1,44 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## PED-каталог аудит: единая система id + риски по 7 системам (Aug 14 2026, pushed 49b49fdf + 2574665f + 9871006d)
+
+### Единая система id — `src/data/ped-alias-map.ts` (resolvePedAlias)
+- 4 системы именования (pharma-db канон / POTENCY_FACTORS / PED_LIST калькулятора / lab-marker-map) сводятся к канону pharma-db: `tren_ace/trenbolone_acetate/tren_a→tren_acet`, `nandrolone_decanoate→deca`, `oxymetholone/oximetholone→anadrol`, `masteron→drostanolone_*`, `trestolone→trest_enan`, `somatropin→hgh`, `insulin_rapid→ins_short`, `igf1lr3→igf1_lr3`, `stanozolol→stan`, `methandienone→methand`, `turinabol→trena` и др.
+- Подключён во ВСЕ слои: classifyPed, POTENCY lookup (computeIntensityFactor), findRule (ped-risk-matrix), drug-mapper.engine, getPharmaLabMarkers, detectActivePedClasses, CalcPEDCard (id канонизируются при добавлении), mapper-ctx и buildTzInput (legacy id из старых сохранений резолвятся в DRUG_DB).
+
+### Категории и правила (0 'other' для PED)
+- classifyPed: `dhb→aas_dht_inject`, `ins_*→insulin`, `trest→aas_nandrolone`, `s23→sarm`, `superdrol→aas_oral_other`, `trena→aas_oral_tbol`, `methand→aas_oral_dbol`, `stan→aas_oral_winny`, `oxan→aas_oral_anavar`, GH-пептиды→gh, GLP-1→**новый класс glp1** (semaglutide/tirzepatide).
+- POTENCY_FACTORS: все канонические ключи (tren_acet 3.0 — было 1.0!, tren_hex 4.0, bold_undec 0.7, prim_enan 0.5, drostanolone 0.9, oxan 0.8, stan 2.0, trena 1.5, methand 3.5, superdrol 4.0, s23 1.0, igf1_des 3.5, ins_* 0.85-1.0, GH-пептиды 0.4, GLP-1 0.5, DHB 0.8).
+- ped-risk-matrix: правила для trena/prim_enan/methyltest/инсулинов/GLP-1/yk11; lab-marker-map: фикс опечатки `oximetholone→oxymetholone` + канонические ключи; drug-mapper: `trena→turinabol`, `superdrol→superdrol`, GLP-1→glp1 (+3 записи в DRUG_DATABASE); ped-class-matrix: +3 класса (sarm/dht_inject/glp1).
+
+### Дигидроболденон (DHB)
+- Категория → **`dht_inject`** (5α-восстановленный болденон, DHT-подобный). `derivePEDFlags.hasBold` сохранён для DHB (фибринолитики продолжают назначаться).
+- Новые эфиры: **`dhb_acetate`** (~48ч), **`dhb_propionate`** (~108ч) — pharma-db (PK), DRUG_DB (мехи+halfLife), POTENCY 0.8, PED_LIST, lab-markers, drug-mapper.
+- ped-risk DHB: hemato high + cardio moderate + hepatic moderate.
+- Класс `dht_inject` добавлен в PHARMA_CLASSES (каталог) и фильтр AutoCalculator (DHB попадает в курс).
+
+### PED-риски по 7 системам (тренболон/нандролон дают «реальные риски»)
+- `PedSubstanceRisk`/`PedRiskAssessment` += **hepatic/cardio/renal/reproductive** (в дополнение к neuro/joints/hemato), все 25 правил с дозовыми тирами:
+  - Трен 500: neuro high + cardio high + hepatic moderate + renal moderate + rep high; пороги 200/500/800 (AGENTS)
+  - Нанд 400: cardio moderate + rep high + hemato high + joints protective; пороги 300/500
+  - Оралы: hepatic high; DHB: hemato high + cardio moderate
+- UI: PED-баннер калькулятора показывает 🫁/❤️/🫘/🧬 измерения с причинами; баннер показывается при ЛЮБОМ gross-тире (был баг: только neuro).
+- ВАЖНО: новые риски систем — ТОЛЬКО отображение; бустер-тиры/покрытие/residual остаются для neuro/joints/hemato (по решению). «Вредная» поддержка (отрицательные k) НЕ вводится.
+
+### Остальные модели риска — поддержка учитывается
+- V7 `SUPPORT_REDUCTIONS`: алиасы canonId (nac→NAC, tudca→TUDCA, vitamin_d3→vitaminD, zinc/curcumin/selenium/taurine/anastrozole/cabergoline) + расширена основными назначениями плана (agmatine/hesperidin/dandelion/astragalus/фибринолитики/бергамот/бетаин/кордицепс/цитруллин/пикногенол/чеснок).
+- `computeResidualRisk`: recommended = бустеры по тиру ∪ поддержка из правил (perSubstance.support).
+- rebound-modeling: `ReboundInput.supportSubs` — каберголин/P5P→PRL, AI→E2, hCG→LH/FSH быстрее; UI карточки «Прогноз ребаунда» передаёт subs плана.
+- SUPPLEMENTS_DB: k-записи для lamotrigine/p5p/vitex/tadalafil/niacin (бустеры без мех-записей).
+
+### Тесты
+- `ped-catalog-audit.test.ts` (102): алиасы, категории всех препаратов, potency, 7-системные риски, residual, lab-маркеры, V7, rebound, мех-модель.
+- `support-calc-ped-e2e.test.ts` (13): сквозной конвейер калькулятора (трен/DHB/нанд/метан/SARM/GLP-1 → категории-риски-протокол-план).
+- `calc-ped-banner.test.tsx` (3): UI-баннер.
+- Полный прогон: **4434/4435** (падает только чужой bb-back-quality из-за незакоммиченного рефактора другого агента).
+
+---
+
 ## Current project state (Aug 12 2026)
 
 ### Build status

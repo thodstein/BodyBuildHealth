@@ -125,9 +125,15 @@ import { analyzePainEntries, getPainAlerts, getTodayPainStatus } from '../pain-i
    });
 
    describe('getTodayPainStatus', () => {
+     // Локальная дата (движок todayLocal() сравнивает с локальной датой, не UTC)
+     const todayLocal = (): string => {
+       const d = new Date();
+       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+     };
+
      it('returns alert for pain >= 7', () => {
        const entries = [
-         { date: new Date().toISOString().slice(0, 10), zones: { shoulders: 8 }, totalScore: 8 },
+         { date: todayLocal(), zones: { shoulders: 8 }, totalScore: 8 },
        ];
        const status = getTodayPainStatus(entries);
        expect(status?.status).toBe('alert');
@@ -135,7 +141,7 @@ import { analyzePainEntries, getPainAlerts, getTodayPainStatus } from '../pain-i
 
      it('returns watch for pain 4-6', () => {
        const entries = [
-         { date: new Date().toISOString().slice(0, 10), zones: { shoulders: 5 }, totalScore: 5 },
+         { date: todayLocal(), zones: { shoulders: 5 }, totalScore: 5 },
        ];
        const status = getTodayPainStatus(entries);
        expect(status?.status).toBe('watch');
@@ -143,7 +149,7 @@ import { analyzePainEntries, getPainAlerts, getTodayPainStatus } from '../pain-i
 
      it('returns ok for pain < 4', () => {
        const entries = [
-         { date: new Date().toISOString().slice(0, 10), zones: { shoulders: 2 }, totalScore: 2 },
+         { date: todayLocal(), zones: { shoulders: 2 }, totalScore: 2 },
        ];
        const status = getTodayPainStatus(entries);
        expect(status?.status).toBe('ok');

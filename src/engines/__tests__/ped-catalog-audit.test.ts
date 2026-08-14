@@ -288,6 +288,12 @@ describe('V7-модель — поддержка по каноническим i
     const withSupport = computeV7Matrix(baseInput(), ['vitamin_d3', 'zinc', 'curcumin', 'anastrozole', 'cabergoline', 'selenium', 'taurine']);
     expect(withSupport.overallNet).toBeLessThan(without.overallNet);
   });
+
+  it('основные назначения плана (agmatine/hesperidin/dandelion/astragalus/фибринолитики) снижают риск', () => {
+    const without = computeV7Matrix(baseInput(), []);
+    const withSupport = computeV7Matrix(baseInput(), ['agmatine', 'hesperidin', 'dandelion', 'astragalus', 'nattokinase', 'serrapeptase', 'bromelain', 'lumbrokinase', 'pentoxifylline', 'dipyridamole', 'cordyceps', 'citrulline', 'glycine', 'bergamot', 'betaine']);
+    expect(withSupport.overallNet).toBeLessThan(without.overallNet);
+  });
 });
 
 describe('rebound-modeling — поддержка ускоряет восстановление маркеров', () => {
