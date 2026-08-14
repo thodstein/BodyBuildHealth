@@ -11,6 +11,9 @@ import { computeV7Matrix, type MatrixInput } from '../risk-engine-v7-matrix';
 import { calculateReboundTrajectory } from '../rebound-modeling.engine';
 import { calculateTzSpecRisk } from '../risk-engine-tz-spec';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
+import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
+import { registerCatalogExtras } from '../../data/support-catalog-extras';
+registerCatalogExtras(SUPPORT_CATALOG_DATA);
 
 const ped = (id: string, pClass: string, mgPerWeek = 500, form: 'inject' | 'oral' = 'inject'): PEDDose => ({ id, pClass, mgPerWeek, form });
 
@@ -255,6 +258,14 @@ describe('getPharmaLabMarkers — резолвер алиасов + фикс о�
     expect(Array.isArray(SUPPLEMENTS_DB.exemestane)).toBe(true);
     expect(SUPPLEMENTS_DB.exemestane.length).toBeGreaterThan(0);
     expect(SUPPLEMENTS_DB.exemestane[0].mechId).toBe('rep4');
+  });
+  it('niacin/tadalafil — русские имена и дозировки в каталоге (ранее: английские и без доз)', () => {
+    expect(SUPPORT_CATALOG_DATA.niacin.nameRu).toContain('Ниацин');
+    expect(SUPPORT_CATALOG_DATA.niacin.dosage.mg).toBe(500);
+    expect(SUPPORT_CATALOG_DATA.tadalafil.nameRu).toContain('Тадалафил');
+    expect(SUPPORT_CATALOG_DATA.tadalafil.dosage.mg).toBe(5);
+    expect(SUPPORT_CATALOG_DATA.lamotrigine.nameRu).toContain('Ламотриджин');
+    expect(SUPPORT_CATALOG_DATA.exemestane.nameRu).toContain('Экземестан');
   });
 });
 

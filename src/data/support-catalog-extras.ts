@@ -12,6 +12,7 @@ import { PHARMACY_DB } from './support-db/pharmacy-db';
 import { TZ_MECH_TO_SUBS } from '../engines/tz-bridge-mechanism';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from './support-db';
 import { ADMINISTRATION_RULES_DB } from './administration-rules-db';
+import { DEFAULT_DOSAGES } from './support-meta';
 
 const ADMIN_RULES_BY_ID: Record<string, { timing: string; reason: string }> = {};
 for (const r of ADMINISTRATION_RULES_DB) ADMIN_RULES_BY_ID[r.substanceId] = r;
@@ -308,7 +309,9 @@ const RU_NAMES: Record<string, string> = {
   propylthiouracil: 'Пропилтиоурацил', pygeum: 'Пигеум африканский', quetiapine: 'Кветиапин', ramipril: 'Рамиприл',
   risperidone: 'Рисперидон', rivaroxaban: 'Ривароксабан', sertraline: 'Сертралин', tacrolimus: 'Такролимус',
   ticagrelor: 'Тикагрелор', uva_ursi: 'Толокнянка', valproate: 'Вальпроат', venlafaxine: 'Венлафаксин',
-  verapamil: 'Верапамил', pharma: 'Фармпрепарат', telmi: 'Тельмисартан',
+  verapamil: 'Верапамил', pharma: 'Препараты', telmi: 'Телмисартан',
+  niacin: 'Ниацин (витамин B3)', tadalafil: 'Тадалафил', lamotrigine: 'Ламотриджин',
+  p5p: 'P5P (пиридоксаль-5-фосфат)', vitex: 'Витекс (прутняк)', exemestane: 'Экземестан',
 };
 
 function humanName(id: string): string {
@@ -366,6 +369,7 @@ export function registerCatalogExtras(cat: Record<string, any>): void {
     const systems = Array.from(new Set(entries.map(e => e.organId)));
     const cat_ = categoryOf(id);
     const nameRu = RU_NAMES[key] || humanName(id);
+    const defaultDose = DEFAULT_DOSAGES[key] || DEFAULT_DOSAGES[id];
     const catDesc: Record<string, string> = {
       pharma: 'Рецептурный препарат — принимать только по назначению и под контролем врача.',
       vitamin: 'Витамин: применяется для профилактики/коррекции дефицитов, влияет на энергетику и метаболизм.',
@@ -392,7 +396,7 @@ export function registerCatalogExtras(cat: Record<string, any>): void {
       monitoring: organs.length > 0 ? [{ what: `контроль систем: ${organs.join(', ')}`, when: 'каждые 4-8 нед' }] : [],
       contraindications: cat_[0] === 'pharma' ? ['рецептурный — только по назначению врача'] : [],
       sideEffects: [],
-      dosage: { mg: 0, timing: '', form: '' },
+      dosage: { mg: defaultDose?.mg || 0, timing: defaultDose?.timing || '', form: '' },
       bestForCourse: false,
     };
   }
