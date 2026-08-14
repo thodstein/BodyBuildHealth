@@ -82,4 +82,13 @@ describe('Дневник тренировок — режим «Соревнов�
     expect(() => render(<TrainingDiaryHub {...props} initialMode="record" />)).not.toThrow();
     expect(screen.getByText(/Сегодня/)).toBeTruthy();
   });
+
+  it('подвкладка «Рекомендации»: SSR рендерится (ББ-секции) и не содержит ПЛ-текстов', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="recommendations" />);
+    expect(html).toContain('Рекомендации по тренировкам');
+    expect(html).toContain('Программа');
+    expect(html).toContain('Фарма и восстановление');
+    // ББ-подвкладка не должна показывать ПЛ-контент (жим лёжа/тяга/присед рекомендации ПЛ-стиля)
+    expect(html).not.toContain('Пауэрлифтинг');
+  });
 });

@@ -54,6 +54,7 @@ import { MixDiarySection } from './MixDiarySection';
 import { MixEffectivenessCard } from './MixEffectivenessCard';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 import { CompetitionPlansView } from './CompetitionPlansView';
+import { BBRecommendationsTab } from './BBRecommendationsTab';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -116,7 +117,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'competition';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'competition' | 'recommendations';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
@@ -447,6 +448,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => setMode('record')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись тренировки</button>
             <button onClick={() => setMode('competition')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
+            <button onClick={() => setMode('recommendations')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
           </div>
           <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
@@ -535,6 +537,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
       {/* ═══ MODE: COMPETITION ═══ — сохранённые соревновательные циклы */}
       {mode === 'competition' && <CompetitionPlansView onBack={() => setMode('record')} />}
+
+      {/* ═══ MODE: RECOMMENDATIONS ═══ — профессиональные рекомендации (ББ) */}
+      {mode === 'recommendations' && <BBRecommendationsTab hub={hub} />}
 
       {/* ═══ MODE: ANALYTICS ═══ */}
       {mode === 'analytics' && (

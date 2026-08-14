@@ -5,10 +5,8 @@ import { epley1RM } from '../../../engines/e1rm';
 import { LEVEL_VOLUMES } from '../../../engines/training.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
-import { loadReadinessHistory } from './readiness-history';
 import { clearStorageTrimWarning } from '../../../engines/workout-logger.engine';
 import { Sparkline } from './Sparkline';
-import { TrainingRecommendationsCard } from './TrainingRecommendationsCard';
 import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
@@ -27,16 +25,6 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   } = hub;
   return (
         <div>
-          {diaryProgress.length > 0 && <TrainingRecommendationsCard
-            historyWorkouts={historyWorkouts} level={level} weakPoints={tprofile.weakPoints}
-            readinessHistory={(() => { try { return loadReadinessHistory(); } catch { return []; } })()}
-            acwr={(() => { try { const _s = loadSRPESessions(); if (_s.length < 2) return undefined; return acuteChronicRatio(toDailyLoads(_s)).ratio; } catch { return undefined; } })()}
-            nutrition={{ kcal: linked.avgWeeklyKcal, protein: linked.avgWeeklyProtein, fat: linked.avgWeeklyFat, carbs: linked.avgWeeklyCarbs }}
-            bodyWeight={tprofile.bodyWeight}
-            labAnalysis={linked.labAnalysis ? { liverStress: linked.labAnalysis.liverStress, cardioRisk: linked.labAnalysis.cardioRisk, inflammation: linked.labAnalysis.inflammation, kidneyStress: linked.labAnalysis.kidneyStress, hormoneScore: linked.labAnalysis.hormoneScore, homaIR: linked.labAnalysis.homaIR } : undefined}
-            onCourse={tprofile.onCourse} courseIntensity={tprofile.courseIntensity} supportCoverage={linked.supportCoverage}
-          />}
-
           {/* Предупреждение о срезе истории из-за переполнения хранилища */}
           {trimWarning && (
             <div style={{ ...style.card, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.06)' }}>
