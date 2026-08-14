@@ -1400,14 +1400,58 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                    ⚠ {modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle)}
                  </div>
                )}
-               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: calendarTint, border:'1px solid '+calendarBorderTint }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+               <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background: calendarTint, border:'1px solid '+calendarBorderTint }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
                    <span style={{ width:8, height:8, borderRadius:'50%', background: calendarColor, flexShrink:0 }} />
                    <span style={{ fontSize:12, fontWeight:800, color: calendarColor }}>{calendarLabel}</span>
                   <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginLeft:'auto' }}>Неделя {wk.week} из {totalW}</span>
                 </div>
-                 <div style={{ fontSize:11, color:'rgba(255,255,255,0.7)', lineHeight:1.4, wordBreak:'break-word' }}>{calendarDescription}</div>
+                {(() => {
+                  const tiles: Array<{ l: string; v: string }> = isMeetWeek(wk)
+                    ? [{ l: 'Стратегия', v: mockPctLabel }, { l: 'Попытки', v: 'RIR2 → RIR1 → RIR0' }, { l: 'Формат', v: 'Разгрузка → прикиды' }]
+                    : isMockWeek(wk)
+                    ? [{ l: 'Формат', v: 'Прикиды-синглы' }, { l: 'Стратегия', v: mockPctLabel }, { l: 'Аксессуары', v: '50% объёма' }]
+                    : isTaperWeek(wk)
+                    ? [{ l: 'Объём', v: '×0.65 / ×0.45' }, { l: 'RIR', v: '+1 / +2' }, { l: 'Интенсивность', v: 'сохранена' }]
+                    : sourceWeek
+                    ? [{ l: 'Фаза', v: SOURCE_PHASE_LABEL[sourceWeek.phase] }, { l: 'Объём', v: `${sourceWeek.volumeSets} сетов` }, { l: 'Интенсивность', v: `${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ` }, { l: 'RIR', v: sourceWeek.rir.toFixed(1) }]
+                    : [{ l: 'Фаза', v: PH_RU[phase] }, { l: 'Характер', v: phase === 'deload' ? '50-60% объёма' : phase === 'peak' ? 'высокая интенсивность' : 'объёмная работа' }];
+                  return (
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
+                      {tiles.map((t, i) => <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
+                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
+                        <div style={{ fontSize:12, fontWeight:800, color: calendarColor, marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
+                      </div>)}
+                    </div>
+                  );
+                })()}
+                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', lineHeight:1.45, wordBreak:'break-word', marginTop:8 }}>{calendarDescription}</div>
               </div>
+              {/* 📊 Расчёты цикла (метрики микроцикла — Черняк) */}
+              {builtSrc.cycleMetrics && (() => {
+                const cm = builtSrc.cycleMetrics;
+                const tiles: Array<{ l: string; v: string }> = [
+                  { l: 'Тоннаж', v: Math.round(cm.tonnage).toLocaleString('ru-RU') + ' кг' },
+                  { l: 'КПШ', v: String(cm.kpsh) },
+                  { l: 'Средний вес', v: Math.round(cm.avgWeight) + ' кг' },
+                  { l: 'Отн. интенсивность', v: Math.round(cm.relIntensity * 100) + '%' },
+                  { l: 'УОИ', v: cm.uoi.toFixed(2) },
+                  { l: 'Сессий', v: String(cm.sessions) },
+                ];
+                return (
+                  <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'var(--accent)', marginBottom:6 }}>📊 Расчёты цикла</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
+                      {tiles.map((t, i) => (
+                        <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
+                          <div style={{ fontSize:12, fontWeight:800, color:'var(--accent)', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {methodHints.label && <div style={{ marginTop:4, fontSize:11, color:'var(--accent)', background:'var(--accent-dim)', border:'1px solid rgba(0,230,138,0.2)', padding:'3px 8px', borderRadius:8, display:'inline-block' }}>🧩 {methodHints.label}{methodHints.volumeMult !== 1 ? ' · объём×' + methodHints.volumeMult : ''}{methodHints.technique ? ' · ' + methodHints.technique : ''}</div>}
               {plWeakPoints.length > 0 && (
                 <div style={{ marginTop:8, fontSize:11, color:'#c4b5fd', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.25)', padding:'6px 8px', borderRadius:8 }}>

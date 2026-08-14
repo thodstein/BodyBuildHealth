@@ -12,7 +12,7 @@ import {
   diagnoseMovement, barPathAnalysis, barPathIssuesForLift, BAR_PATH_ISSUES,
   type BarPathIssue,
 } from '../../../engines/pro/lift-diagnostics.engine';
-import { analyzePhaseAssistance, analyzeBarPathAssistance, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
+import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
@@ -189,6 +189,9 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   // Анализ оптимальности по каждому параметру
   const phaseAnalysis = useMemo<AssistanceAnalysis | null>(() => (effectivePhase ? analyzePhaseAssistance(lift, effectivePhase as WeakPoint, template ?? undefined) : null), [lift, effectivePhase, template]);
   const issueAnalyses = useMemo(() => Object.fromEntries(issues.map(i => [i, analyzeBarPathAssistance(lift, i, template ?? undefined)])), [lift, issues, template]);
+  // Упражнения-коррекции мёртвой точки (секция 2)
+  const stickingAnalysis = useMemo<AssistanceAnalysis | null>(() => (effectivePhase ? analyzeStickingCorrections(lift, effectivePhase as WeakPoint, template ?? undefined) : null), [lift, effectivePhase, template]);
+  const stickingKey = `${lift}|sticking|${effectivePhase}`;
 
   const changeLift = (value: Lift) => { setLift(value); setPhase(''); setIssues([]); setSelected({}); };
   const toggleIssue = (issue: BarPathIssue) => setIssues(cur => cur.includes(issue) ? cur.filter(i => i !== issue) : [...cur, issue]);
@@ -309,6 +312,20 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>💪 Слабые мышцы: {movement.sticking.weakMuscles.join(', ')}</div>
             <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 3 }}>Коррекции: {movement.sticking.corrections.join(' · ')}</div>
             <div style={{ fontSize: 10, color: '#818cf8', marginTop: 3 }}>💡 Cue: {movement.sticking.loadCues}</div>
+            {/* Выбираемые упражнения-коррекции мёртвой точки */}
+            {stickingAnalysis && stickingAnalysis.items.length > 0 && (
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🏋️ Упражнения-коррекции (выберите и добавьте в план):</div>
+                {stickingAnalysis.items.map((item, idx) => (
+                  <ExerciseRow key={idx} item={item} selected={selected[stickingKey]?.includes(item.exercise.name) ?? false}
+                    onToggle={() => toggleExercise(stickingKey, item.exercise.name)} onAdd={() => addToPlan(stickingKey, [item.exercise.name])} />
+                ))}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button onClick={() => addToPlan(stickingKey, stickingAnalysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
+                  <button onClick={() => addToPlan(stickingKey, stickingAnalysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ marginTop: 6, fontSize: 10, color: DIM, lineHeight: 1.5 }}>

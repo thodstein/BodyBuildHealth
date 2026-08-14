@@ -212,19 +212,26 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [historyExerciseFilter, setHistoryExerciseFilter] = useState('');
   const [mesoFilter, setMesoFilter] = useState<string>('all');
   const mesoIds = useMemo(() => Array.from(new Set(historyWorkouts.map(w => (w as any).mesocycleId).filter((x): x is string => !!x))), [historyWorkouts]);
+  // Санитизация на входе: legacy-записи без exercises или с exercises={} (не-массив)
+  // приводим к [] — защищает ВСЕ подкомпоненты дневника (формы, историю, аналитику).
+  const safeHistoryWorkouts = useMemo(
+    () => historyWorkouts.map(w => ({ ...w, exercises: Array.isArray(w.exercises) ? w.exercises : [] })),
+    [historyWorkouts],
+  );
   const allExerciseNames = useMemo(() => {
     const names = new Set<string>();
-    historyWorkouts.forEach(w => w.exercises?.forEach((e: any) => names.add(e.exerciseName || e.exerciseId)));
+    safeHistoryWorkouts.forEach(w => (w.exercises ?? []).forEach((e: any) => names.add(e.exerciseName || e.exerciseId)));
     return Array.from(names).sort();
-  }, [historyWorkouts]);
+  }, [safeHistoryWorkouts]);
   const filteredHistoryWorkouts = useMemo(() => {
-    if (!historyExerciseFilter) return historyWorkouts;
-    return historyWorkouts.map(w => ({
+    if (!historyExerciseFilter) return safeHistoryWorkouts;
+    const safeExercises = (w: any): any[] => (Array.isArray(w.exercises) ? w.exercises : []);
+    return safeHistoryWorkouts.map(w => ({
       ...w,
-      // legacy-записи без exercises не должны ронять фильтр истории
-      exercises: (w.exercises ?? []).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(historyExerciseFilter.toLowerCase())),
-    })).filter(w => (w.exercises ?? []).length > 0);
-  }, [historyWorkouts, historyExerciseFilter]);
+      // legacy-записи без exercises или с exercises={} не должны ронять фильтр истории
+      exercises: safeExercises(w).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(historyExerciseFilter.toLowerCase())),
+    })).filter(w => safeExercises(w).length > 0);
+  }, [safeHistoryWorkouts, historyExerciseFilter]);
 
   useEffect(() => {
     const m = loadMeasurements();
@@ -242,14 +249,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const measureAnalytics = useMemo(() => analyzeMeasurements(linked?.profile?.settings?.personal?.height || 175), [measurements.length]);
 
   useEffect(() => {
-    if (historyWorkouts.length > 0) {
+    if (safeHistoryWorkouts.length > 0) {
       const logs: any[] = [];
-      historyWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+      safeHistoryWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
         (e.sets || []).forEach((s: any) => logs.push({ date: w.date, exercise: e.exerciseName || e.exerciseId, weight: s.weight, reps: s.reps, rpe: 7 }));
       }));
       if (logs.length > 0) setRepData(generateWeeklyReport(logs, logs.map((l: any) => ({ date: l.date, durationMin: 60 }))));
     }
-  }, [historyWorkouts]);
+  }, [safeHistoryWorkouts]);
 
   const saveMeasurementHandler = () => {
     const last = measurements.length > 0 ? measurements[measurements.length - 1] : null;
@@ -277,9 +284,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
   // Analytics
   const analytics = useMemo(() => {
-    if (historyWorkouts.length === 0) return null;
+    if (safeHistoryWorkouts.length === 0) return null;
     try {
-      const mapped = historyWorkouts.map(w => ({
+      const mapped = safeHistoryWorkouts.map(w => ({
         sessionId: w.id, date: w.date, focus: w.split || 'fullbody', durationMin: w.duration || 60,
         sets: (w.exercises || []).flatMap((ex: any) => (ex.sets || []).map((s: any, i: number) => ({
           exerciseId: ex.exerciseId || ex.name || 'unknown', exerciseName: ex.name || 'Exercise',
@@ -289,21 +296,21 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       if (!mapped.some(m => m.sets.length > 0)) return null;
       return computeAnalytics({ sessions: mapped, weeks: 4 });
     } catch { return null; }
-  }, [historyWorkouts]);
+  }, [safeHistoryWorkouts]);
 
-  const wsg = useMemo(() => weeklySetsByGroup(historyWorkouts, 8), [historyWorkouts]);
+  const wsg = useMemo(() => weeklySetsByGroup(safeHistoryWorkouts, 8), [safeHistoryWorkouts]);
   const groups = useMemo(() => Object.keys(wsg).sort((a, b) => (wsg[b]?.reduce((s: number, x: number) => s + x, 0) || 0) - (wsg[a]?.reduce((s: number, x: number) => s + x, 0) || 0)), [wsg]);
   const totals = useMemo(() => Array.from({ length: 8 }, (_, i) => groups.reduce((s, g) => s + (wsg[g]?.[i] || 0), 0)), [wsg, groups]);
 
   const groupedHistory = useMemo(() => {
     const map = new Map<string, WorkoutLog[]>();
-    for (const w of historyWorkouts) {
+    for (const w of safeHistoryWorkouts) {
       const week = w.weekNumber ? `Неделя ${w.weekNumber}` : w.date.slice(0, 7);
       if (!map.has(week)) map.set(week, []);
       map.get(week)!.push(w);
     }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [historyWorkouts]);
+  }, [safeHistoryWorkouts]);
   const filteredHistory = useMemo(() => {
     let result = search ? groupedHistory.filter(([week]) => week.toLowerCase().includes(search.toLowerCase())) : groupedHistory;
     if (filterGroup !== 'all') {
@@ -348,7 +355,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const PHASE_RU: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', recovery: 'Восстановление' };
 
   // Visual analytics
-  const vizSessions: VizSessionData[] = useMemo(() => historyWorkouts.map((s: any) => ({
+  const vizSessions: VizSessionData[] = useMemo(() => safeHistoryWorkouts.map((s: any) => ({
     week: s.weekNumber || 1, date: s.date || '',
     exercises: (s.exercises || []).map((e: any) => ({
       name: e.exerciseName || e.name || '', sets: e.sets?.length || 0,
@@ -356,8 +363,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       weight: Math.max(...(e.sets || [{ weight: 0 }]).map((st: any) => st.weight || 0), 0),
       rpe: 7, volume: e.totalVolume || 0,
     })),
-  })), [historyWorkouts]);
-  const visDashboard = useMemo(() => { try { return historyWorkouts.length > 2 ? buildVisualDashboard(vizSessions) : null; } catch { return null; } }, [vizSessions]);
+  })), [safeHistoryWorkouts]);
+  const visDashboard = useMemo(() => { try { return safeHistoryWorkouts.length > 2 ? buildVisualDashboard(vizSessions) : null; } catch { return null; } }, [vizSessions, safeHistoryWorkouts]);
   const visWeekly = useMemo(() => { try { return computeWeeklyChart(vizSessions); } catch { return []; } }, [vizSessions]);
   const visMuscleVol = useMemo(() => { try { return computeMuscleVolume(vizSessions); } catch { return []; } }, [vizSessions]);
   const visProg = useMemo(() => { try { return computeProgression(vizSessions); } catch { return []; } }, [vizSessions]);
@@ -368,7 +375,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertMono = useMemo(() => { try { return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0; } catch { return 0; } }, [expertSrpe]);
   const expertExercises = useMemo(() => {
     const exMap = new Map<string, { first: number; last: number }>();
-    for (const w of historyWorkouts) {
+    for (const w of safeHistoryWorkouts) {
       const exs: any[] = (w as any).exercises || [];
       for (const ex of exs) {
         const nm = ex.name || ex.exerciseId || '?';
@@ -381,14 +388,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     }
     return Array.from(exMap.entries()).filter(([, v]) => v.first > 0 && v.last > 0).slice(0, 10)
       .map(([name, v]) => ({ name, e1rmBefore: Math.round(v.first), e1rmAfter: Math.round(v.last) }));
-  }, [historyWorkouts]);
-  const expertRecentVol = useMemo(() => historyWorkouts.slice(-14).reduce((s: number, w: any) => s + ((w.exercises || []).length), 0), [historyWorkouts]);
+  }, [safeHistoryWorkouts]);
+  const expertRecentVol = useMemo(() => safeHistoryWorkouts.slice(-14).reduce((s: number, w: any) => s + ((w.exercises || []).length), 0), [safeHistoryWorkouts]);
   const expertRirStats = useMemo(() => { try { return loadRirCalibrationStats(); } catch { return { bias: 0, stdDev: 1, sessions: 0 }; } }, []);
   const clearTrimWarning = () => { clearStorageTrimWarning(); setTrimWarning(null); };
 
   const hub: DiaryHubCtx = {
     mode, setMode, onGoRecord, onRefresh, diary,
-    historyWorkouts, diaryProgress, diaryStats, level, tprofile, linked,
+    historyWorkouts: safeHistoryWorkouts, diaryProgress, diaryStats, level, tprofile, linked,
     trainingOutput, macrocycle, selectedWeek, mesoLength, curPhase,
     goal, daysPerWeek, splitType, periodizationType,
     trainingArchive, setTrainingArchive, trainingReportGenerated, setTrainingReportGenerated,
@@ -444,7 +451,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           {(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
-            const last = historyWorkouts[0];
+            const last = safeHistoryWorkouts[0];
             const weekVol = diaryProgress.length > 0 ? diaryProgress[diaryProgress.length - 1].totalVolume : 0;
             // Последний сон из дневника сна (синхронизация: дневник сна → готовность)
             const sleepEntries = (() => { try { return JSON.parse(localStorage.getItem('he_sleep_diary') || '[]') as Array<{ date: string; hours?: number }>; } catch { return []; } })();
@@ -503,8 +510,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 )}
                 {last && (
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                    {/* legacy-запись без exercises не должна ронять «Сегодня» */}
-                    Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {(last.exercises ?? []).length} упр. · {((last.exercises ?? []).reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
+                    {/* legacy-запись без exercises или с exercises={} не должна ронять «Сегодня» */}
+                    Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {(Array.isArray(last.exercises) ? last.exercises : []).length} упр. · {((Array.isArray(last.exercises) ? last.exercises : []).reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
                   </div>
                 )}
                 {sleepHours != null && sleepHours < 6 && (
@@ -515,8 +522,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               </div>
             );
           })()}
-          <MixDiarySection hasTrainingToday={historyWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} />
-          <RecordModeSelector diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
+          <MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} />
+          <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} />
         </div>

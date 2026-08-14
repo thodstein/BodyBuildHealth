@@ -65,4 +65,15 @@ describe('Дневник тренировок — режим «Соревнов�
     // «Сегодня» показывает 0 упр. вместо краша
     expect(screen.getByText(/0 упр\./)).toBeTruthy();
   });
+
+  it('legacy-запись с exercises={} (объект, не массив) НЕ роняет дневник при открытии', () => {
+    // exercises={} — самый опасный legacy-кейс: truthy, но не итерируемый (крашит .reduce/.forEach)
+    const legacy = { id: 'legacy_2', date: '2025-06-01', duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody', notes: 'старая запись', exercises: {} } as any;
+    const props = { ...baseProps, historyWorkouts: [legacy] as any };
+    expect(() => {
+      render(<TrainingDiaryHub {...props} initialMode="record" />);
+    }).not.toThrow();
+    expect(screen.getByText(/Последняя:/)).toBeTruthy();
+    expect(screen.getByText(/0 упр\./)).toBeTruthy();
+  });
 });

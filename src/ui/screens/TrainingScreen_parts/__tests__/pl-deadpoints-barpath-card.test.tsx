@@ -85,6 +85,28 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
   });
 
+  it('мёртвые точки дают выбираемые упражнения-коррекции (секция 2)', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    // squat/bottom — есть угловая диагностика → блок коррекций с кнопками
+    expect(screen.getByText(/Упражнения-коррекции \(выберите и добавьте в план\)/)).toBeTruthy();
+    expect(screen.getAllByText('➕ Рекомендуемые').length).toBeGreaterThanOrEqual(1);
+    // Клик «➕ Все» в коррекциях — счётчик на кнопке отправки растёт
+    const allBtns = screen.getAllByText('➕ Все');
+    fireEvent.click(allBtns[0]);
+    expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
+    // Для движений без угловой диагностики — пояснение вместо коррекций
+    fireEvent.click(screen.getByText('Жим стоя'));
+    expect(screen.getByText(/Угловая диагностика мёртвых точек есть для приседа/)).toBeTruthy();
+  });
+
+  it('bar-path отклонение даёт полный набор упражнений (кандидаты групп + пул)', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    fireEvent.click(screen.getByText('Уход штанги вперёд'));
+    expect(screen.getAllByText('📈 Bar-path').length).toBeGreaterThanOrEqual(3);
+    // Рекомендуемые/Все для bar-path
+    expect(screen.getAllByText('➕ Рекомендуемые').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('блок «Дни добавления» виден сразу (Авто по умолчанию)', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     expect(screen.getByText('📅 Дни добавления')).toBeTruthy();

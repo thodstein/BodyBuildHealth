@@ -1,5 +1,5 @@
 ﻿import { describe, expect, it } from 'vitest';
-import { analyzePhaseAssistance, analyzeBarPathAssistance } from '../lift-assistance.engine';
+import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections } from '../lift-assistance.engine';
 
 describe('lift-assistance: rationale и источник упражнений', () => {
   it('махи в стороны для слабой точки жима лёжа описывают дельты, а не грудные', () => {
@@ -35,7 +35,20 @@ describe('lift-assistance: rationale и источник упражнений', 
     const r = analyzeBarPathAssistance('squat', 'forward_drift');
     expect(r.items.length).toBeGreaterThan(0);
     expect(r.items.every(i => i.source === 'bar')).toBe(true);
-    expect(r.items[0].rationale).toContain('коррекция отклонения');
+    expect(r.items[0].rationale).toContain('отклонени');
+    // Полный набор: кандидаты групп + ассистенты пула (не менее 4 упражнений)
+    expect(r.items.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('мёртвые точки дают выбираемые упражнения-коррекции', () => {
+    const r = analyzeStickingCorrections('squat', 'bottom');
+    expect(r.items.length).toBeGreaterThanOrEqual(2);
+    expect(r.items.every(i => i.source === 'sticking')).toBe(true);
+    expect(r.items.some(i => i.optimal)).toBe(true);
+    expect(r.items[0].rationale).toContain('коррекция мёртвой точки');
+    // Для движений без угловой диагностики — пусто, не падает
+    const none = analyzeStickingCorrections('ohp', 'ohp_mid');
+    expect(none.items).toEqual([]);
   });
 
   it('все 7 движений × все фазы: у каждого упражнения есть валидный source', () => {
