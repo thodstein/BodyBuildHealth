@@ -1375,7 +1375,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 </div>
                 {/* 📋 ТАПЕР-ПЛАН: отдельная свёрнутая карточка (не встраивается в weeks цикла) */}
                 <ExpandableCard
-                  title={`📋 Тапер-план${taperPlan ? ` · ${taperPlan.weeks.length} нед${Object.values(taperActualPm).some(v => v > 0) ? ' · по факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · план федерации' : ''}` : ''}`}
+                  title={`📋 Тапер-план${taperPlan ? ` · ${peakMode === 'pl' ? '🏁 ПЛ-пик' : '📉 классика'} · ${taperPlan.weeks.length} нед${Object.values(taperActualPm).some(v => v > 0) ? ' · по факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · план федерации' : ''}` : ''}`}
                   icon="📋"
                   short={taperPlan
                     ? `${taperPlan.weeks.length} нед · ${mockMeetOn ? '🎯 mock · ' : ''}📉 тапер ×${taperWeeksToAdd}${meetWeekOn ? ' · 🏁 соревнования' : ''}${Object.values(taperActualPm).some(v => v > 0) ? ' · веса от факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · прикиды от плана' : ''} — раскройте для деталей`
@@ -1398,8 +1398,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         {/* Структура тапера */}
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                           {mockWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }}>🎯 Mock meet — нед {mockWk.week}</span>}
-                          {taperWeeks.map(w => <span key={w.week} style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>📉 Тапер — нед {w.week}</span>)}
-                          {peakWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.16)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.4)' }}>🏁 Пик/прикиды — нед {peakWk.week}</span>}
+                          {taperWeeks.map(w => {
+                            // Для pl-режима — подпись недели из протокола (taperNote: «Подводящая: ...»)
+                            const protoLabel = peakMode === 'pl' && w.taperNote ? w.taperNote.split(':')[0].trim() : '';
+                            const isFinal = w === peakWk;
+                            const bg = isFinal ? 'rgba(245,158,11,0.16)' : protoLabel ? 'rgba(96,165,250,0.12)' : 'rgba(245,158,11,0.1)';
+                            const color = isFinal ? '#fbbf24' : protoLabel ? '#93c5fd' : '#f59e0b';
+                            const bd = isFinal ? 'rgba(245,158,11,0.4)' : protoLabel ? 'rgba(96,165,250,0.3)' : 'rgba(245,158,11,0.25)';
+                            return <span key={w.week} style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: bg, color, border: `1px solid ${bd}` }}>{protoLabel ? `🏁 ${protoLabel} — нед ${w.week}` : `📉 Тапер — нед ${w.week}`}{isFinal ? ' · прикиды' : ''}</span>;
+                          })}
+                          {peakWk && taperWeeks.includes(peakWk) && null}
                           {meetWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(234,179,8,0.14)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)' }}>🏁 Соревнования — нед {meetWk.week}</span>}
                         </div>
                         {/* Данные к соревнованиям */}
@@ -1422,18 +1430,29 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             <div style={{ marginTop: 2 }}>{fedRu[taperFed] || taperFed} · стратегия {MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}</div>
                           </div>
                         </div>
-                        {/* Тапер-кривая */}
+                        {/* Тапер/пик-кривая */}
                         <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>📉 Тапер-кривая (Bosquet 2005): объём ↓, интенсивность сохранена</div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
+                            {peakMode === 'pl' ? '🏁 ПЛ-пик-кривая (протокол Библиотеки): объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR → 0' : '📉 Тапер-кривая (Bosquet 2005): объём ↓, интенсивность сохранена, RIR ↑'}
+                          </div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
                             {taperWeeks.map(w => {
                               const vol = w.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0);
                               const ref = Math.max(1, planRefVolume);
+                              // Интенсивность: max вес основных лифтов / ПМ недели
+                              const mainWs = w.days.flatMap(d => d.exercises.filter(e => e.load === 'main' || e.load === 'Тяжелая').flatMap(e => e.workSets));
+                              const mainW = mainWs.length ? Math.max(...mainWs.map(ws => ws.weight)) : 0;
+                              const pm = w.pmRow['Присед'] || w.pmRow['Жим лежа'] || w.pmRow['Становая тяга'] || 0;
+                              const intensity = mainW > 0 && pm > 0 ? Math.round((mainW / pm) * 100) : null;
+                              const rir = mainWs.length ? mainWs[0].rir : null;
+                              const protoLabel = peakMode === 'pl' && w.taperNote ? w.taperNote.split(':')[0].trim() : '';
+                              const isFinal = w === peakWk;
                               return (
-                                <div key={w.week} style={{ padding: 5, borderRadius: 7, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.14)', fontSize: 9, textAlign: 'center' }}>
-                                  <div style={{ fontWeight: 800, color: '#f59e0b' }}>Нед {w.week}</div>
+                                <div key={w.week} style={{ padding: 5, borderRadius: 7, background: isFinal ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.05)', border: `1px solid ${isFinal ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.14)'}`, fontSize: 9, textAlign: 'center' }}>
+                                  <div style={{ fontWeight: 800, color: isFinal ? '#fbbf24' : '#f59e0b' }}>{protoLabel ? protoLabel : `Нед ${w.week}`}</div>
                                   <div>объём ≈ {Math.round((vol / ref) * 100)}%</div>
-                                  <div>RIR +{w.days[0]?.exercises[0]?.rir ?? 2}</div>
+                                  {intensity != null && <div>инт. ≈ {intensity}% ПМ</div>}
+                                  <div>RIR {rir != null ? rir : '?'}{peakMode === 'pl' && rir != null && rir <= 0 ? ' · до отказа' : ''}</div>
                                   {w.meetAttempts && <div style={{ color: '#fbbf24', fontWeight: 800 }}>🏁 прикиды</div>}
                                 </div>
                               );
