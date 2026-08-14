@@ -1960,8 +1960,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 sourceWeeks={(() => {
                   const sourceCycle = getCycleById(selectedCycleId);
                   // Только оригинальные недели решают про исходный календарь: добавленные
-                  // тапер-недели (macroPhase/taperWeek) не должны «перекрашивать» цикл.
-                  if (!sourceCycle || W.filter(w => !isTaperWeek(w) && !isMockWeek(w)).some(week => week.macroPhase)) return undefined;
+                  // тапер/mock meet/неделя соревнований (macroPhase/taperWeek) не должны
+                  // «перекрашивать» цикл.
+                  if (!sourceCycle || W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).some(week => week.macroPhase)) return undefined;
                   const layouts = sourceCycle.weeks && sourceCycle.weeks.length > 0
                     ? sourceCycle.weeks
                     : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1);
