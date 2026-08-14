@@ -1483,17 +1483,87 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             })()}
                           </div>
                         ))}
-                        {/* Последние тяжёлые + таймлайн */}
+                        {/* Последние тяжёлые */}
                         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
                           ⏱ Последние тяжёлые до старта: присед — {LAST_HEAVY_DAYS.squat} дн. · жим — {LAST_HEAVY_DAYS.bench} дн. · тяга — {LAST_HEAVY_DAYS.deadlift} дн.
                         </div>
-                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, marginTop: 2 }}>
-                          📅 День старта: взвешивание → разминка по опенеру → попытки (опенер RIR2 → вторая RIR1 → третья RIR0), между попытками 10-20 мин.
+                        {/* 📅 Таймлайн дня соревнований (по регламенту федерации) */}
+                        <div style={{ marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(234,179,8,0.05)', border: '1px solid rgba(234,179,8,0.15)' }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: '#eab308', marginBottom: 4 }}>📅 День старта — таймлайн</div>
+                          {[
+                            ['Взвешивание', 'по регламенту (обычно 08:00-09:00). После — углеводный коктейль + лёгкий перекус за 1.5ч до старта'],
+                            ['Разминка', 'за 90 мин до подхода: по протоколу от опенера (50%×5 → 60%×4 → 70%×3 → 80%×2 → 90%×1)'],
+                            ['Присед', '3 попытки: опенер RIR2 → вторая RIR1 → третья RIR0. Между попытками 10-20 мин, дыхание 2-3 мин, активация'],
+                            ['Жим', '3 попытки по той же схеме. Перкуссионный массаж рабочих мышц между дисциплинами'],
+                            ['Тяга', '3 попытки. Контрастный душ/крио-пакет при необходимости'],
+                          ].map(([t, d], i) => (
+                            <div key={i} style={{ display: 'flex', gap: 6, fontSize: 9, lineHeight: 1.4, marginTop: 3 }}>
+                              <b style={{ color: '#eab308', width: 80, flexShrink: 0 }}>{t}</b>
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                            {[['🧠 Психо', 'визуализация успешного подхода + ключевое слово за 2 подхода до выхода'], ['🌬 Дыхание', 'квадрат: 4с вдох — 4с пауза — 4с выдох — 4с пауза'], ['💪 Активация', 'лёгкая разминка + целевая мобилизация'], ['🍽 Питание', 'углеводы+BCAA после взвешивания, перекус за 1.5ч'], ['❄ Восстановление', 'массаж/ролл между дисциплинами, крио-пакет при необходимости']].map(([l, d], i) => (
+                              <span key={i} title={d} style={{ padding: '3px 8px', borderRadius: 7, fontSize: 9, fontWeight: 700, background: 'rgba(234,179,8,0.08)', color: '#fbbf24', border: '1px solid rgba(234,179,8,0.2)', cursor: 'default' }}>{l}</span>
+                            ))}
+                          </div>
                         </div>
                         {/* Действия */}
                         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                           <button onClick={() => { setBuiltSrc(taperPlan); setTaperNote(`Встроено в weeks цикла: +${taperPlan.weeks.length - (builtSrc?.weeks.length ?? taperPlan.weeks.length)} нед тапера`); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Встроить тапер-недели в weeks активного плана (календарь покажет с тапером)">📌 Встроить в план (weeks)</button>
                           <button onClick={() => { if (taperPlan) setTaperPlan(refreshMeetAttempts(taperPlan, attemptStrategy)); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.08)' }} title="Пересчитать прикиды под выбранную стратегию">🔄 Обновить прикиды</button>
+                          <button
+                            onClick={() => {
+                              if (!taperPlan) return;
+                              try {
+                                const lastAttempts = [...taperPlan.weeks].reverse().find(w => w.meetAttempts)?.meetAttempts;
+                                const record: CompetitionPlanRecord = {
+                                  id: 'comp-' + Date.now(),
+                                  savedAt: new Date().toISOString(),
+                                  cycleTitle: taperPlan.template.meta.title + (peakMode === 'pl' ? ' (ПЛ-пик)' : ' (тапер)'),
+                                  cycleId: selectedCycleId,
+                                  strategy: attemptStrategy,
+                                  weekCount: taperPlan.weeks.length,
+                                  taperWeeks: taperWeeksToAdd,
+                                  mockMeet: mockMeetOn,
+                                  meetWeek: meetWeekOn,
+                                  weights: { squat: pmSquat, bench: pmBench, deadlift: pmDead },
+                                  meetAttempts: lastAttempts?.lifts ?? [],
+                                  plan: taperPlan,
+                                };
+                                const res = saveCompetitionPlan(record);
+                                setMethodNote(res.ok
+                                  ? `🏆 Тапер-план сохранён как соревновательный: «${record.cycleTitle}» — ${record.weekCount} нед, прикиды ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}. Дневник → «🏁 Соревнования».`
+                                  : `⚠ Не удалось сохранить: ${res.error ?? 'переполнение хранилища'}`);
+                              } catch (error) { setMethodNote(`⚠ Не удалось сохранить: ${(error as Error).message}`); }
+                            }}
+                            style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(234,179,8,0.45)', color: '#eab308', background: 'rgba(234,179,8,0.08)' }}
+                            title="Сохранить тапер-план как соревновательный — появится в дневнике (подвкладка «🏁 Соревнования») с прикидами"
+                          >🏆 Сохранить как соревновательный</button>
+                          <button
+                            onClick={() => {
+                              if (!taperPlan) return;
+                              const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                              const lines: string[] = [];
+                              lines.push('<h2>📋 Тапер-план: ' + esc(taperPlan.template.meta.title) + (peakMode === 'pl' ? ' (ПЛ-пик-протокол)' : ' (классика)') + '</h2>');
+                              lines.push('<p>Федерация: ' + esc(fedRu[taperFed] || taperFed) + ' · стратегия прикидов: ' + esc(MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? '') + ' · всего ' + taperPlan.weeks.length + ' нед</p>');
+                              lines.push('<table border="1" cellpadding="6" style="border-collapse:collapse;font-size:13px">');
+                              lines.push('<tr><th>Нед</th><th>Тип</th><th>Движение</th><th>1-я</th><th>2-я</th><th>3-я</th></tr>');
+                              for (const wk of taperPlan.weeks) {
+                                const attempts = wk.meetAttempts?.lifts;
+                                if (!attempts) continue;
+                                for (const l of attempts) {
+                                  lines.push(`<tr><td>${wk.week}</td><td>${wk.meetWeek ? '🏁 Соревнования' : wk.mockMeet ? '🎯 Mock' : '🏁 Пик'}</td><td>${esc(l.name)}</td><td><b>${scale(l.opener)}</b></td><td><b>${scale(l.second)}</b></td><td><b>${scale(l.third)}</b></td></tr>`);
+                                }
+                              }
+                              lines.push('</table>');
+                              lines.push('<p><b>Данные:</b> факт. ПМ: ' + ['Присед', 'Жим лежа', 'Становая тяга'].map(n => n.split(' ')[0] + ' ' + (taperActualPm[n] || '—')).join(' · ') + ' | план федерации: ' + ['Присед', 'Жим лежа', 'Становая тяга'].map(n => n.split(' ')[0] + ' ' + (taperPlannedPm[n] || '—')).join(' · ') + '</p>');
+                              const w = window.open('', '_blank', 'width=900,height=700');
+                              if (w) { w.document.write('<html><head><title>Тапер-план</title></head><body style="font-family:sans-serif">' + lines.join('') + '</body></html>'); w.document.close(); w.print(); }
+                            }}
+                            style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd', background: 'rgba(96,165,250,0.08)' }}
+                            title="Печать тапер-плана: прикиды по неделям + данные к соревнованиям"
+                          >🖨 Печать тапер-плана</button>
                         </div>
                       </div>
                     );
