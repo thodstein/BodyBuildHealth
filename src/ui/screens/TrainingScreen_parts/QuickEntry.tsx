@@ -443,7 +443,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
       {/* Recent exercises quick list */}
       {!searchQuery && exercises.length === 0 && (() => {
         const recentMap = new Map<string, { name: string; lastDate: string }>();
-        historyWorkouts.slice(-10).forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+        historyWorkouts.slice(-10).forEach((w: any) => (Array.isArray(w.exercises) ? w.exercises : []).forEach((e: any) => {
           const name = e.exerciseName || '';
           if (!name) return;
           const prev = recentMap.get(name);

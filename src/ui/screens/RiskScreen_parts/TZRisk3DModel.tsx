@@ -1,9 +1,15 @@
 /**
- * TZRisk3DModel.tsx — 3D-модель рисков (ТЗ) на модели Халка (hulk.glb).
- * Органы на Халке нарисовать нельзя (один меш) → 6 систем подсвечиваются
- * ЗОНАМИ на теле: каждому вертексу назначается система по якорной сфере,
- * подсветка через overlay-меш с additive vertex colors (часть тела светится
- * цветом риска). Клик по телу выбирает систему, hover — предпросмотр.
+ * TZRisk3DModel.tsx — 3D-модель рисков (ТЗ) на модели Халка (hulk.glb). ПЕРЕСБОРКА С НУЛЯ.
+ *
+ * Почему было «засветлено»: у hulk.glb материал, скорее всего, нереактивный к свету
+ * (MeshBasicMaterial / высокий emissive) — сколько ни уменьшай освещение, текстура
+ * рендерилась «выбеленной». Решение: при загрузке ВСЕ меши переводятся на
+ * MeshStandardMaterial с сохранением оригинальной текстуры (map) — свет начинает
+ * работать, тона подбираются мягкие (hemisphere + key + fill + rim).
+ *
+ * Подсветка систем: overlay-меш на геометрии тела с NORMAL-смешиванием и
+ * прозрачностью (не additive — additive давал клиппинг в белый при множителях >1).
+ * Вне зон — чёрный (текстура чистая). Клик по телу выбирает систему, hover — предпросмотр.
  */
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
@@ -22,10 +28,9 @@ const TZ_SYSTEM_ICONS: Record<string, string> = {
   cardio: '❤️', hepatic: '🫁', renal: '🫘', cns: '🧠', reproductive: '🧬', hematologic: '🩸',
 };
 
-// ── Якоря систем в мировых координатах hulk.glb (y: −1 стопы … +1 голова) ──
-// Измерены по фактической геометрии модели: фронт тела = +z.
+// ── Якоря систем в мировых координатах hulk.glb (y: −1 стопы … +1 голова, фронт = +z) ──
 export interface SystemAnchor {
-  id: string; // id системы ТЗ (cardio, hepatic, …)
+  id: string;
   label: string;
   pos: [number, number, number];
   r: number;
@@ -93,15 +98,12 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     colorAttr: THREE.BufferAttribute;
     zoneIdx: Int8Array;
     anchorToSystem: string[];
-    selectedRef: { current: string };
-    hoverRef: { current: string | null };
     applyColors: () => void;
   } | null>(null);
 
   const hoverRef = useRef<string | null>(null);
   const selectedRef = useRef('');
 
-  // Build organ lookup
   const organMap = useMemo(() => {
     const m: Record<string, TzSpecOrganResult> = {};
     for (const o of tzResult.organs) m[o.id] = o;
@@ -123,7 +125,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     })).sort((a, b) => b.riskPct - a.riskPct);
   }, [tzResult]);
 
-  // ── Init scene ──
+  // ── Init scene (пересборка: lit-материалы + мягкий свет + normal-blend overlay) ──
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -144,22 +146,24 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 30);
-    camera.position.set(0, 0.5, 3.6);
-    camera.lookAt(0, 0.25, 0);
+    const camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 30);
+    // Тело высотой 3.0 должно целиком влезать в кадр (голова+стопы) — камера дальше
+    camera.position.set(0, 0.5, 4.4);
+    camera.lookAt(0, 0.35, 0);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minDistance = 1.6;
-    controls.maxDistance = 8;
+    controls.minDistance = 2.2;
+    controls.maxDistance = 9;
     controls.maxPolarAngle = Math.PI * 0.92;
-    controls.target.set(0, 0.25, 0);
+    controls.target.set(0, 0.35, 0);
     controls.update();
 
-    const ambient = new THREE.AmbientLight('#aabbdd', 0.5);
-    scene.add(ambient);
-    const key = new THREE.DirectionalLight('#ffffff', 1.2);
+    // Мягкое «студийное» освещение: полусфера (небо/пол) + key + fill + rim
+    const hemi = new THREE.HemisphereLight('#cfe2ff', '#3a3f4a', 0.55);
+    scene.add(hemi);
+    const key = new THREE.DirectionalLight('#ffffff', 1.15);
     key.position.set(2.5, 4, 4);
     scene.add(key);
     const fill = new THREE.DirectionalLight('#99aacc', 0.4);
@@ -185,12 +189,35 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         const model = gltf.scene;
         model.updateMatrixWorld(true);
 
+        // 1) Все меши → MeshStandardMaterial с сохранением оригинальной текстуры.
+        //    Если материал GLB был unlit (MeshBasicMaterial/emissive) — свет наконец работает,
+        //    «выбеленность» исчезает, текстура остаётся родной.
+        const meshes: THREE.Mesh[] = [];
         model.traverse((child) => {
-          if (child instanceof THREE.Mesh) baseMesh = child;
+          if (!(child instanceof THREE.Mesh)) return;
+          meshes.push(child);
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          const converted = mats.map((m) => {
+            const src = m as THREE.MeshStandardMaterial;
+            const tex = src.map || null;
+            const n = new THREE.MeshStandardMaterial({
+              map: tex,
+              roughness: 0.65,
+              metalness: 0.05,
+              // ОБЯЗАТЕЛЬНО сохраняем двуслойность (в GLB doubleSided:true) —
+              // иначе задняя сторона тела становится невидимой
+              side: (src.side ?? THREE.DoubleSide) === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
+            });
+            if (src.color && src.color.getHex() !== 0xffffff) n.color.copy(src.color);
+            return n;
+          });
+          child.material = Array.isArray(child.material) ? converted : converted[0];
         });
-        if (!baseMesh) return;
+        if (meshes.length === 0) return;
+        // Базовая (тело) — самый большой меш по числу вершин; остальные меши не трогаем для зон
+        baseMesh = meshes.reduce((a, b) => (b.geometry.attributes.position.count > a.geometry.attributes.position.count ? b : a), meshes[0]);
 
-        // Системы считаются по ИСХОДНОЙ мировой матрице (якоря измерены на оригинале)
+        // 2) Системы по ИСХОДНОЙ мировой матрице
         const pos = baseMesh.geometry.attributes.position as THREE.BufferAttribute;
         const worldPos = new Float32Array(pos.count * 3);
         const v = new THREE.Vector3();
@@ -204,7 +231,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         zoneIdx = assignVertexSystems(worldPos);
         anchorToSystem = SYSTEM_ANCHORS.map((a) => a.id);
 
-        // Нормализация: высота → 3.0, центровка
+        // 3) Нормализация: высота → 3.0, центровка
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
@@ -215,10 +242,9 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         group.add(model);
         model.updateMatrixWorld(true);
 
-        // Тело: оригинальная текстура модели (без перекраски) — подсветка систем идёт overlay-слоем
-        model.updateMatrixWorld(true);
-
-        // Overlay: additive vertex colors — светящиеся системы
+        // 4) Overlay: ADDITIVE с множителями ≤1.0 — вне зон чёрный (ничего не добавляется,
+        //    текстура остаётся чистой), зоны добавляют цвет без клиппинга в белый.
+        //    depthTest выключен — тонировка всегда поверх силуэта тела.
         colorAttr = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
         colorAttr.setUsage(THREE.DynamicDrawUsage);
         (baseMesh.geometry as THREE.BufferGeometry).setAttribute('color', colorAttr);
@@ -228,11 +254,10 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           opacity: 1.0,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
+          depthTest: false,
         });
         overlay = new THREE.Mesh(baseMesh.geometry as THREE.BufferGeometry, overlayMat);
-        overlay.renderOrder = 1;
-        // ВАЖНО: overlay вешается на baseMesh (а не на group/model), иначе он НЕ наследует
-        // внутренние повороты/масштабы цепочки нод hulk.glb и рендерится второй, повёрнутой копией.
+        overlay.renderOrder = 10;
         baseMesh.add(overlay);
 
         const applyColors = () => {
@@ -245,7 +270,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           for (let i = 0; i < zoneIdx.length; i++) {
             const ai = zoneIdx[i];
             if (ai < 0) {
-              // вне зон — чёрный: аддитивная подсветка ничего не добавляет, видна текстура
               arr[i * 3] = 0;
               arr[i * 3 + 1] = 0;
               arr[i * 3 + 2] = 0;
@@ -256,24 +280,22 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             const [r, g, b] = hexToRgb(riskColor(pct));
             zoneColor.setRGB(r, g, b);
             if (sel === sysId) {
-              lerp.copy(zoneColor).lerp(WHITE, 0.3);
-              arr[i * 3] = lerp.r * 1.25;
-              arr[i * 3 + 1] = lerp.g * 1.25;
-              arr[i * 3 + 2] = lerp.b * 1.25;
+              lerp.copy(zoneColor).lerp(WHITE, 0.25);
+              arr[i * 3] = lerp.r * 1.15;
+              arr[i * 3 + 1] = lerp.g * 1.15;
+              arr[i * 3 + 2] = lerp.b * 1.15;
             } else if (hover === sysId) {
-              lerp.copy(zoneColor).lerp(WHITE, 0.35);
-              arr[i * 3] = lerp.r * 1.1;
-              arr[i * 3 + 1] = lerp.g * 1.1;
-              arr[i * 3 + 2] = lerp.b * 1.1;
-            } else if (sel) {
-              // другая система выбрана — приглушаем
-              arr[i * 3] = zoneColor.r * 0.35;
-              arr[i * 3 + 1] = zoneColor.g * 0.35;
-              arr[i * 3 + 2] = zoneColor.b * 0.35;
-            } else {
               arr[i * 3] = zoneColor.r * 1.0;
               arr[i * 3 + 1] = zoneColor.g * 1.0;
               arr[i * 3 + 2] = zoneColor.b * 1.0;
+            } else if (sel) {
+              arr[i * 3] = zoneColor.r * 0.4;
+              arr[i * 3 + 1] = zoneColor.g * 0.4;
+              arr[i * 3 + 2] = zoneColor.b * 0.4;
+            } else {
+              arr[i * 3] = zoneColor.r * 0.9;
+              arr[i * 3 + 1] = zoneColor.g * 0.9;
+              arr[i * 3 + 2] = zoneColor.b * 0.9;
             }
           }
           colorAttr.needsUpdate = true;
@@ -282,7 +304,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
         sceneRef.current = {
           camera, renderer, controls, animId: 0,
           colorAttr, zoneIdx, anchorToSystem,
-          selectedRef, hoverRef,
           applyColors,
         };
         applyColors();
@@ -292,10 +313,10 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       () => setFailed(true),
     );
 
-    // ── Raycast: hover + клик ──
+    // ── Raycast: hover + клик (по базовому мешу; overlay делит геометрию) ──
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    const rayTargets = () => (baseMesh ? [baseMesh, overlay].filter(Boolean) as THREE.Object3D[] : []);
+    const rayTargets = () => [baseMesh, overlay].filter(Boolean) as THREE.Object3D[];
 
     const systemAt = (event: MouseEvent): string | null => {
       if (!containerRef.current) return null;
@@ -379,8 +400,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry.dispose();
-          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-          else obj.material.dispose();
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(m => m.dispose());
         }
       });
     };
@@ -391,8 +412,6 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
   useEffect(() => {
     const ref = sceneRef.current;
     if (!ref) return;
-    ref.selectedRef.current = selectedSystem || '';
-    ref.hoverRef.current = hoveredSystem;
     ref.applyColors();
   }, [tzResult, selectedSystem, hoveredSystem, loaded, getSystemRiskPct]);
 
@@ -520,3 +539,5 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     </div>
   );
 };
+
+export default TZRisk3DModel;

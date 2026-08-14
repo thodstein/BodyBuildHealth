@@ -50,7 +50,9 @@ interface DiaryRecordingFormProps {
 function getPreviousWorkoutData(historyWorkouts: WorkoutLog[], exerciseName: string): { weight: number; reps: number; rir: number } | null {
   let best: { weight: number; reps: number; rir: number; e1rm: number } | null = null;
   for (const wl of historyWorkouts) {
-    for (const ex of wl.exercises) {
+    // legacy-записи могут не иметь exercises или иметь не-массив (например, {}) — не роняем форму
+    const wlExercises = Array.isArray(wl.exercises) ? wl.exercises : [];
+    for (const ex of wlExercises) {
       const score = exerciseMatchScore(ex.exerciseName, exerciseName);
       if (score >= 0.5) {
         for (const set of ex.sets || []) {
@@ -541,7 +543,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {/* Recent exercises quick list */}
       {!searchQuery && exercises.length === 0 && (() => {
         const recentMap = new Map<string, { name: string; lastDate: string }>();
-        historyWorkouts.slice(-10).forEach((w: any) => (w.exercises || []).forEach((e: any) => {
+        historyWorkouts.slice(-10).forEach((w: any) => (Array.isArray(w.exercises) ? w.exercises : []).forEach((e: any) => {
           const name = e.exerciseName || '';
           if (!name) return;
           const prev = recentMap.get(name);
