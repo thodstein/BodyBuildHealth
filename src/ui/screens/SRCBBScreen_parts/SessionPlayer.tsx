@@ -22,6 +22,7 @@ import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
 import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep-tempo.engine';
 import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
+import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from './MindsetSessionPanels';
 
   const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
@@ -769,6 +770,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               </div>
             );
           })()}
+
+          {/* Психология: протокол дня (до начала тренировки) */}
+          <MindsetPreSessionCard focus={focus} dayLabel={day.label} />
         </div>
       )}
 
@@ -923,11 +927,12 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                         transition: 'background 0.3s ease'
                       }} />
                     ))}
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
-                      {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
-                    </span>
-                   </div>
-                {ex.targetSets.map((t, si) => {
+                     <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+                       {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
+                     </span>
+                    </div>
+                   <MindsetApproachHint focus={focus} exerciseStarted={Object.keys(actual).some(k => k.startsWith(`${ei}_`))} />
+                 {ex.targetSets.map((t, si) => {
                  const k = keyFor(ei, si);
                  const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
                  const logged = !!actual[k];
@@ -1171,6 +1176,10 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
           <div style={H}>✅ Тренировка завершена</div>
           <div style={SMALL}>{done?.date} · {done?.startTime}–{done?.endTime} · фокус: {done?.focus}</div>
           <div style={ROW}><span>Сессий записано всего:</span><span style={{ color: ACCENT }}>{getLastSession() ? 'сохранено в дневник' : '—'}</span></div>
+
+          {/* Психология: чек-ин сессии (уверенность/активация/фокус) */}
+          <MindsetCheckinCard sessionId={done?.sessionId} />
+
           <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
           <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>
           <div style={{ ...SMALL, marginTop: 8 }}>Реализация объёма: {planned.volume > 0 ? Math.round(factVol.volume / planned.volume * 100) : 0}%</div>
