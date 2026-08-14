@@ -1571,12 +1571,23 @@ export function appendPLTaperWeeks(
       const exercises = d.exercises.map(e => {
         const isMain = e.load === 'main' || e.load === 'Тяжелая';
         const pm = pmRow[e.name] ?? e.pm;
+        // Финальная (соревновательная) неделя: основные лифты — только РАЗМИНКА
+        // (50/70/90% × 3/2/1) + прикиды (meetAttempts) отдельно: «разминка → открытие →
+        // 2-3 прохода», НЕ рабочие сеты на 100% (иначе перегрузка + дубль прикидов).
+        if (isFinal && isMain) {
+          const warmup = [
+            { sets: 1, reps: 3, weight: Math.round(workWeight(pm, 0.5) * 10) / 10, rir: 3, pct: 0.5 },
+            { sets: 1, reps: 2, weight: Math.round(workWeight(pm, 0.7) * 10) / 10, rir: 2, pct: 0.7 },
+            { sets: 1, reps: 1, weight: Math.round(workWeight(pm, 0.9) * 10) / 10, rir: 1, pct: 0.9 },
+          ];
+          return { ...e, rir: 0, workSets: warmup };
+        }
         return {
           ...e,
           rir: isMain ? pw.rirMin : e.rir + 1,
           workSets: e.workSets.map(ws => {
             // Интенсивность по протоколу для основных лифтов (90/95/100% ПМ);
-            // на интенсивной неделе — синглы (reps 1), на финальной — прикиды отдельно.
+            // на интенсивной неделе — синглы (reps 1).
             const pct = isMain ? pw.intensityPct : ws.pct;
             const reps = isMain && idx === 1 ? 1 : ws.reps;
             return {

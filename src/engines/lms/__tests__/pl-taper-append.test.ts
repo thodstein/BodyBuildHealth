@@ -175,10 +175,15 @@ describe('appendPLTaperWeeks', () => {
     const pm3 = w3.pmRow['Присед'] ?? 0;
     expect(mainOf(w1)!.weight).toBeCloseTo(Math.round(pm1 * 0.9 * 10) / 10, 0);
     expect(mainOf(w2)!.weight).toBeCloseTo(Math.round(pm2 * 0.95 * 10) / 10, 0);
-    expect(mainOf(w3)!.weight).toBeCloseTo(Math.round(pm3 * 1.0 * 10) / 10, 0);
-    // RIR падает: 1-2 → 0-1 → 0
+    // Финальная неделя: НЕ рабочие сеты на 100%, а разминка (макс 90%) + прикиды отдельно
+    const mainW3 = mainOf(w3)!.weight;
+    expect(mainW3).toBeLessThanOrEqual(Math.round(pm3 * 0.9 * 10) / 10 + 1);
+    // RIR падает: 1-2 → 0-1 (интенсивная); финальная — разминка (RIR 3) + прикиды RIR 2/1/0
     expect(mainOf(w1)!.rir).toBeLessThanOrEqual(2);
-    expect(mainOf(w3)!.rir).toBeLessThanOrEqual(mainOf(w2)!.rir);
+    expect(mainOf(w2)!.rir).toBeLessThanOrEqual(mainOf(w1)!.rir);
+    // Финальная неделя: первый разминочный сет 50% ПМ, RIR 3
+    expect(mainOf(w3)!.rir).toBe(3);
+    expect(mainOf(w3)!.weight).toBeCloseTo(Math.round(pm3 * 0.5 * 10) / 10, 0);
     // Синглы на интенсивной неделе (reps=1)
     expect(mainOf(w2)!.reps).toBe(1);
     // Финальная неделя — прикиды

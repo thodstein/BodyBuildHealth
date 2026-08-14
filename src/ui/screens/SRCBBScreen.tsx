@@ -1194,7 +1194,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       { id: 'aggressive', label: MEET_STRATEGY_LABEL.aggressive, desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
                     ]}
                   />
-                  <PopupSelect label="Режим пика" value={peakMode} onChange={v => setPeakMode(v as 'classic' | 'pl')} hint="ПЛ-пик: 3-нед протокол Библиотеки — объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0, синглы на интенсивной неделе. Classic: разгрузка Bosquet (интенсивность сохранена, RIR +1/+2)" options={[
+                  <PopupSelect label="Режим пика" value={peakMode} onChange={v => setPeakMode(v as 'classic' | 'pl')} hint={`ПЛ-пик: 3-нед протокол Библиотеки — объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0, синглы на интенсивной неделе, финал — разминка + прикиды. Classic: разгрузка Bosquet (интенсивность сохранена, RIR +1/+2).${peakMode === 'pl' && taperWeeksToAdd !== 3 ? ` ⚠ Протокол рассчитан на 3 недели (сейчас ${taperWeeksToAdd}) — будет использован сокращённый/повторный профиль.` : ''}`} options={[
                     { id: 'pl', label: '🏁 ПЛ-пик-протокол (3 нед, интенсификация)' },
                     { id: 'classic', label: '📉 Классический тапер (Bosquet, разгрузка)' },
                   ]} />
@@ -1593,7 +1593,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                : isMockWeek(wk)
                ? `🎯 Имитация соревнований (mock meet) · ${mockPctLabel}`
                : isTaperWeek(wk)
-               ? `📉 Тапер · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма`
+               ? (peakMode === 'pl' && wk.taperNote
+                 ? `🏁 ${wk.taperNote.split(':')[0].trim()} · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма${wk.meetAttempts ? ' · прикиды' : ''}`
+                 : `📉 Тапер · ${Math.round(weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100}% объёма`)
                : sourceWeek
                ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]} · ${SOURCE_PHASE_LABEL[sourceWeek.phase]} · ${Math.round(sourceWeek.intensityPct * 100)}% · ${sourceWeek.volumeSets} сетов`
                : PH_RU[phase];
