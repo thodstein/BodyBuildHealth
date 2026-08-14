@@ -96,7 +96,7 @@ describe('appendPLTaperWeeks', () => {
     expect(withAr.progressionRationale).toContain('Авторегуляция применена к таперу');
   });
 
-  it('autoReg масштабирует прикидки (meetAttempts) недели соревнований', () => {
+  it('meetAttempts не масштабируются в движке (единая точка — UI-рендер), workSets прикидов — масштабируются', () => {
     const plan = buildBase(6);
     const withMeet = appendPLTaperWeeks(plan, 2, {
       meetWeek: { strategy: 'balanced' },
@@ -107,10 +107,12 @@ describe('appendPLTaperWeeks', () => {
     expect(meetWk!.meetAttempts).toBeTruthy();
     const noAr = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' } });
     const meetNoAr = noAr.weeks.find(w => w.meetWeek)!;
-    const liftAr = meetWk!.meetAttempts!.lifts[0];
-    const liftNoAr = meetNoAr.meetAttempts!.lifts[0];
-    expect(liftAr.opener).toBeCloseTo(Math.round(liftNoAr.opener * 0.9 * 10) / 10, 1);
-    expect(liftAr.third).toBeCloseTo(Math.round(liftNoAr.third * 0.9 * 10) / 10, 1);
+    // meetAttempts (карточки прикидов) — без масштабирования в движке
+    expect(meetWk!.meetAttempts!.lifts[0].opener).toBe(meetNoAr.meetAttempts!.lifts[0].opener);
+    // workSets прикидочных синглов — масштабированы (×0.9)
+    const wsAr = meetWk!.days[0].exercises.find(e => e.workSets.some(ws => ws.reps === 1 && ws.sets === 1))!.workSets[0];
+    const wsNoAr = meetNoAr.days[0].exercises.find(e => e.workSets.some(ws => ws.reps === 1 && ws.sets === 1))!.workSets[0];
+    expect(wsAr.weight).toBeCloseTo(Math.round(wsNoAr.weight * 0.9 * 10) / 10, 1);
   });
 
   it('питание участвует в тапере: nutrition → rationale и больший объём аксессуаров (soft-cap)', () => {
@@ -133,22 +135,17 @@ describe('appendPLTaperWeeks', () => {
     expect(hasPrep(lastWeek)).toBe(false);
   });
 
-  it('refreshMeetAttempts сохраняет авторегуляцию при пересчёте прикидов', () => {
+  it('refreshMeetAttempts пересчитывает прикиды под стратегию (масштабирование — в UI-рендере)', () => {
     const plan = buildBase(6);
-    const withMeet = appendPLTaperWeeks(plan, 2, {
-      meetWeek: { strategy: 'balanced' },
-      autoReg: { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 0 },
-    });
+    const withMeet = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' } });
     const before = withMeet.weeks.find(w => w.meetWeek)!.meetAttempts!.lifts[0];
-    // Пересчёт под агрессивную стратегию: без авторегуляции и с ×0.9
-    const refPlain = refreshMeetAttempts(withMeet, 'aggressive');
-    const refreshed = refreshMeetAttempts(withMeet, 'aggressive', { topSetPctMultiplier: 0.9 });
+    const refreshed = refreshMeetAttempts(withMeet, 'aggressive');
     const meetWkAfter = refreshed.weeks.find(w => w.meetWeek)!;
     expect(meetWkAfter.meetAttempts!.strategy).toBe('aggressive');
-    const plain = refPlain.weeks.find(w => w.meetWeek)!.meetAttempts!.lifts[0];
     const after = meetWkAfter.meetAttempts!.lifts[0];
-    expect(after.opener).toBeCloseTo(Math.round(plain.opener * 0.9 * 10) / 10, 1);
-    expect(refreshed.progressionRationale).toContain('авторегуляция вес ×0.90');
+    // Агрессивная стратегия: опенер 93% против 92% — веса чуть выше
+    expect(after.opener).toBeGreaterThan(before.opener);
+    expect(refreshed.progressionRationale).toContain('Прикиды пересчитаны');
   });
 
   it('питание (как в ББ-авто): профицит+белок → MRV-множитель отражается в rationale плана', () => {

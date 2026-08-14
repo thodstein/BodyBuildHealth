@@ -1607,15 +1607,8 @@ export function appendPLTaperWeeks(
         }
       }
       if (wk.meetAttempts) {
-        wk.meetAttempts = {
-          ...wk.meetAttempts,
-          lifts: wk.meetAttempts.lifts.map(l => ({
-            ...l,
-            opener: Math.round(l.opener * ar.topSetPctMultiplier * 10) / 10,
-            second: Math.round(l.second * ar.topSetPctMultiplier * 10) / 10,
-            third: Math.round(l.third * ar.topSetPctMultiplier * 10) / 10,
-          })),
-        };
+        // meetAttempts НЕ масштабируются здесь — карточки прикидов показываются
+        // с авторегуляцией на лету (единая точка в UI-рендере).
       }
     }
   }
@@ -1673,22 +1666,15 @@ export function appendPLTaperWeeks(
  * неделях плана, где они есть (mock meet + финальная тапер-неделя), под выбранную
  * стратегию — без повторного добавления тапера. Не мутирует исходный план.
  */
-export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy = 'balanced', autoReg?: { topSetPctMultiplier: number }): LMSBuildOutput {
+export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy = 'balanced'): LMSBuildOutput {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   let changed = false;
-  const arMult = autoReg?.topSetPctMultiplier ?? 1;
-  const scale = (w: number) => Math.round(w * arMult * 10) / 10;
   const weeks = plan.weeks.map(wk => {
     if (!wk.meetAttempts || wk.meetAttempts.strategy === strategy) return wk;
     const attempts = computeMeetAttemptsFromPmRow(wk.pmRow, strategy);
     if (!attempts) return wk;
     changed = true;
-    // Авторегуляция применяется и к пересчитанным прикидам (режим «АВТО» — для всего).
-    const scaled = arMult === 1 ? attempts : {
-      ...attempts,
-      lifts: attempts.lifts.map(l => ({ ...l, opener: scale(l.opener), second: scale(l.second), third: scale(l.third) })),
-    };
-    return { ...wk, meetAttempts: scaled };
+    return { ...wk, meetAttempts: attempts };
   });
   if (!changed) return plan;
   const label = strategy === 'aggressive' ? 'агрессивная' : strategy === 'conservative' ? 'консервативная' : 'сбалансированная';
@@ -1696,7 +1682,7 @@ export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy
     ...plan,
     weeks,
     progressionRationale: plan.progressionRationale +
-      ` 🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (${label})${arMult !== 1 ? `, авторегуляция вес ×${arMult.toFixed(2)}` : ''}.`,
+      ` 🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (${label}).`,
   };
 }
 

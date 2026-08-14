@@ -1199,8 +1199,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     disabled={!builtSrc || !taperNote}
                     onClick={() => {
                       if (!builtSrc) return;
-                      setBuiltSrc(refreshMeetAttempts(builtSrc, attemptStrategy, autoRegMode === 'auto' && autoRegResult ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier } : undefined));
-                      setMethodNote(`🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]} (${MEET_STRATEGY_LABEL[attemptStrategy]})${autoRegMode === 'auto' ? ' · авторегуляция сохранена (вес ×' + autoRegResult.topSetPctMultiplier.toFixed(2) + ')' : ''} — без повторного добавления тапера.`);
+                      setBuiltSrc(refreshMeetAttempts(builtSrc, attemptStrategy));
+                      setMethodNote(`🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]} (${MEET_STRATEGY_LABEL[attemptStrategy]}) — без повторного добавления тапера.`);
                     }}
                     style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#a78bfa' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(139,92,246,0.1)' : 'transparent' }}
                     title="Пересчитать прикиды на финальной тапер-неделе (и mock meet) под выбранную стратегию"
@@ -1711,23 +1711,26 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 </MetricCard>
                 );
               })()}
-              {(wk.meetAttempts && wk.meetAttempts.lifts.length > 0) && (
-                <MetricCard title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})`} icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'} accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
+              {(wk.meetAttempts && wk.meetAttempts.lifts.length > 0) && (() => {
+                const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
+                const scale = (w: number) => Math.round(w * arMult * 10) / 10;
+                return (
+                <MetricCard title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})${arMult !== 1 ? ` · авторегуляция ×${arMult.toFixed(2)}` : ''}`} icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'} accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
                     {wk.meetAttempts.lifts.map(l => (
                       <div key={l.name} style={{ padding: 6, borderRadius: 6, background: wk.meetWeek ? 'rgba(234,179,8,0.08)' : wk.mockMeet ? 'rgba(167,139,250,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.3)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.2)'}`, fontSize: 10 }}>
                         <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.name}</b>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>1-я</div><b style={{ fontSize: 12 }}>{l.opener}</b></div>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>2-я</div><b style={{ fontSize: 12 }}>{l.second}</b></div>
-                          <div style={{ textAlign: 'center', background: wk.meetWeek ? 'rgba(234,179,8,0.14)' : wk.mockMeet ? 'rgba(167,139,250,0.14)' : 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.4)' : wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}` }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>3-я</div><b style={{ fontSize: 12, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.third}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>1-я</div><b style={{ fontSize: 12 }}>{scale(l.opener)}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>2-я</div><b style={{ fontSize: 12 }}>{scale(l.second)}</b></div>
+                          <div style={{ textAlign: 'center', background: wk.meetWeek ? 'rgba(234,179,8,0.14)' : wk.mockMeet ? 'rgba(167,139,250,0.14)' : 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.4)' : wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}` }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>3-я</div><b style={{ fontSize: 12, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{scale(l.third)}</b></div>
                         </div>
                       </div>
                     ))}
                   </div>
-                  {/* Разминка по опенеру (как в тапер-калькуляторе) */}
+                  {/* Разминка по опенеру (как в тапер-калькуляторе) — от масштабированного опенера */}
                   {(() => {
-                    const opener = wk.meetAttempts!.lifts[0]?.opener;
+                    const opener = scale(wk.meetAttempts!.lifts[0]?.opener);
                     if (!opener) return null;
                     const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     return (
@@ -1748,7 +1751,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       : '📉 Разгрузка уже выполнена тапер-неделями (объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена — Bosquet 2005). Прикиды — план дня соревнований, не тренировочная нагрузка: разминка по опенеру, подходы строго по стратегии, между попытками 10-20 мин.'}
                   </div>
                 </MetricCard>
-              )}
+                );
+                })()}
               {e1rmSeries.length > 0 && (() => {
                 const W = 300, H = 120, PADX = 26, PADY = 16;
                 const allVals = e1rmSeries.flatMap(s => s.pts.map(p => p.val));
