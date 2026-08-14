@@ -113,11 +113,23 @@ export const CalcPEDCard: React.FC<Props> = ({ state, onStateChange }) => {
   };
 
   return (
-    <div style={{ ...GLASS, padding: 10, marginBottom: 8 }}>
-      <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>💊 Курс (PED)</span>
-        <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>
-          {aasList.length} ААС · {extraPed.length} доп · {open ? '▲' : '▼'}
+    <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '1px solid rgba(0,230,138,0.25)' }}>
+      <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '4px 6px', borderRadius: 8, background: open ? 'rgba(0,230,138,0.05)' : 'transparent', transition: 'background 0.15s' }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          💊 Курс (PED)
+          {aasList.length > 0 && (
+            <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.15)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.35)' }}>
+              {aasList.length} ААС{extraPed.length > 0 ? ` + ${extraPed.length}` : ''}
+            </span>
+          )}
+          {aasList.length === 0 && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)' }}>
+              курс пуст
+            </span>
+          )}
+        </span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.06)' }}>
+          {open ? '▲ свернуть' : '▼ развернуть'}
         </span>
       </div>
 
@@ -128,7 +140,7 @@ export const CalcPEDCard: React.FC<Props> = ({ state, onStateChange }) => {
           {aasList.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               {aasList.map((a, i) => {
-                const ped = PED_LIST.find(([id]) => id === a.id.toLowerCase());
+                const ped = PED_LIST.find(([id]) => resolvePedAlias(id) === String(a.id || '').toLowerCase());
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
                     <span style={{ flex: 1, fontSize: 9, color: 'var(--text)', fontWeight: 600 }}>{ped ? ped[1] : a.id}</span>
@@ -142,15 +154,15 @@ export const CalcPEDCard: React.FC<Props> = ({ state, onStateChange }) => {
             </div>
           )}
 
-          {/* Доп PED (GH/insulin/IGF/clen/T3) — компактно */}
+          {/* Доп PED (GH/insulin/IGF/clen/T3) — выделены цветом */}
           {extraPed.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 7, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Дополнительные PED</div>
+            <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.35)' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, color: '#c4b5fd', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.3px' }}>💉 Дополнительные PED</div>
               {extraPed.map((p, i) => {
                 const labels: Record<string, string> = { gh: 'GH', insulin: 'Инсулин', igf: 'IGF-1 LR3', clenbut: 'Кленбут', t3: 'T3' };
                 const doseVal = p.iuPerDay ? `${p.iuPerDay} МЕ/день` : p.mcgPerDay ? `${p.mcgPerDay} мкг/день` : '';
                 return (
-                  <div key={i} style={{ fontSize: 8, padding: '2px 8px', color: 'var(--text-light)' }}>
+                  <div key={i} style={{ fontSize: 9, padding: '2px 8px', color: '#e9d5ff' }}>
                     • {labels[p.pClass] || p.id} {doseVal}
                   </div>
                 );
@@ -158,9 +170,16 @@ export const CalcPEDCard: React.FC<Props> = ({ state, onStateChange }) => {
             </div>
           )}
 
-          {/* Кнопка добавить препарат */}
-          <button onClick={() => setPedPopup(true)} style={{ width: '100%', padding: '8px', borderRadius: 8, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <span style={{fontSize:12}}>➕</span>
+          {/* Пустой курс — направляющий баннер */}
+          {aasList.length === 0 && extraPed.length === 0 && (
+            <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px dashed rgba(245,158,11,0.5)', fontSize: 10, color: '#fbbf24' }}>
+              Курс пуст — добавьте препараты кнопкой ниже, чтобы калькулятор подобрал поддержку и риски.
+            </div>
+          )}
+
+          {/* Кнопка добавить препарат — яркая, заметная */}
+          <button onClick={() => setPedPopup(true)} style={{ width: '100%', padding: '12px 10px', borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', border: 'none', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, boxShadow: '0 4px 14px rgba(0,230,138,0.35)' }}>
+            <span style={{ fontSize: 16 }}>➕</span>
             <span>Добавить препарат</span>
           </button>
 
