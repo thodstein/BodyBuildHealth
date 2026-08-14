@@ -527,6 +527,26 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     ⚠️ Менее 6 часов сна ({sleepHours} ч) — учтите в интенсивности сегодняшней тренировки
                   </div>
                 )}
+                {(() => {
+                  // Психо-чек-ин: сегодня была тренировка, но чек-ин не заполнен
+                  const today = new Date().toISOString().slice(0, 10);
+                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
+                  if (!trainedToday) return null;
+                  let checkinToday = false;
+                  try {
+                    const checks = JSON.parse(localStorage.getItem('he_mindset_checks') || '[]');
+                    checkinToday = Array.isArray(checks) && checks.some((c: any) => typeof c?.date === 'string' && c.date.slice(0, 10) === today);
+                  } catch { /* ignore */ }
+                  if (checkinToday) return null;
+                  return (
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <span>🧠 Сегодня тренировка без психо-чек-ина</span>
+                      <button onClick={() => setMode('mindset')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        Заполнить →
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}</>

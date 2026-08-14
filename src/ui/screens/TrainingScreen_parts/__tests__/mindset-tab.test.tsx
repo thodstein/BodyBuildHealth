@@ -9,8 +9,10 @@ import { render, fireEvent, screen } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
-import { buildPresetProtocol, upsertProtocol, setActiveProtocol, loadCheckins, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
+import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
 import type { DiaryHubCtx } from '../diary-hub-context';
+import { TrainingDiaryHub } from '../TrainingDiaryHub';
+import type { WorkoutLog } from '../../../../core/types';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -37,6 +39,7 @@ describe('MindsetTab (SSR-смок)', () => {
     expect(html).toContain('Тренды психики');
     expect(html).toContain('Персональные инсайты');
     expect(html).toContain('Библиотека ритуалов');
+    expect(html).toContain('🖨 Печать отчёта');
   });
 
   it('рендерится с чек-инами в хранилище (тренды/приверженность)', () => {
@@ -69,7 +72,20 @@ describe('Психо-панели SessionPlayer (SSR-смок)', () => {
 
   it('MindsetPreSessionCard скрыт без активного протокола', () => {
     const html = renderToStaticMarkup(<MindsetPreSessionCard focus="Тяжёлый жим" dayLabel="День 1" />);
-    expect(html).toBe('');
+    expect(html).toContain('Психо-протокол ещё не собран');
+    expect(html).toContain('Психология');
+  });
+
+  it('MindsetPreSessionCard показывает подсказку, если протокол не покрывает тип дня', () => {
+    const p = createProtocol('Только памп', 'bb', [
+      { id: 'x1', kind: 'pre', title: 'MMC-вход', script: 'фокус', durationMin: 1, targetDays: ['pump'] },
+    ]);
+    upsertProtocol(p);
+    setActiveProtocol(p.id);
+    // Шаг привязан только к пампу — для тяжёлого дня должна быть подсказка, а не панель
+    const html = renderToStaticMarkup(<MindsetPreSessionCard focus="Тяжёлая тяга" dayLabel="День 1" />);
+    expect(html).toContain('не покрывает этот тип дня');
+    expect(html).not.toContain('checkbox');
   });
 
   it('MindsetPreSessionCard показывает шаги тяжёлого дня с чекбоксами', () => {
@@ -163,5 +179,54 @@ describe('MindsetCheckinInline (формы записи)', () => {
     localStorage.setItem(MINDSET_CHECKS_KEY, '{{{');
     const html = renderToStaticMarkup(<MindsetCheckinInline date="2026-08-14" />);
     expect(html).toContain('Психо-чек-ин');
+  });
+});
+
+describe('Напоминание о психо-чек-ине в блоке «Сегодня»', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+  const mkWorkoutToday = (): WorkoutLog => ({
+    id: 'w_today', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
+    exercises: [{
+      id: `${today}_bench`, date: today, exerciseId: 'bench_press', exerciseName: 'Жим штанги лёжа', isCompound: true, weekNumber: 1,
+      sets: [{ weight: 80, reps: 8, rir: 2, rpe: 7 }], totalVolume: 640, estimated1RM: 101,
+    } as any],
+  });
+
+  const baseProps = {
+    diary: {} as any,
+    diaryStats: [],
+    diaryProgress: [],
+    historyWorkouts: [mkWorkoutToday()],
+    macrocycle: null,
+    selectedWeek: 1,
+    level: 'intermediate',
+    onRefresh: () => {},
+    trainingOutput: null,
+    goal: 'bulk',
+    daysPerWeek: 4,
+    splitType: 'auto',
+    periodizationType: 'auto',
+    mesoLength: 12,
+    tprofile: { weakPoints: [], bodyWeight: 80, onCourse: false, courseIntensity: 1, goal: 'bulk', level: 'intermediate' },
+    linked: { profile: { settings: { personal: { height: 175 } } } },
+  };
+
+  it('тренировка сегодня без чек-ина → напоминание с кнопкой «Заполнить»', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Сегодня тренировка без психо-чек-ина');
+    expect(html).toContain('Заполнить');
+  });
+
+  it('тренировка сегодня + чек-ин заполнен → напоминания нет', () => {
+    localStorage.setItem(MINDSET_CHECKS_KEY, JSON.stringify([{ id: 'c1', date: today, confidence: 4, arousal: 3, focus: 4, protocolFollowed: true }]));
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).not.toContain('без психо-чек-ина');
+  });
+
+  it('без тренировки сегодня → напоминания нет', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" historyWorkouts={[] as any} />);
+    expect(html).not.toContain('без психо-чек-ина');
   });
 });

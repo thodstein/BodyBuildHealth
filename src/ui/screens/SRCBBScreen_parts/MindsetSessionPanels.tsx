@@ -44,7 +44,21 @@ export const MindsetPreSessionCard: React.FC<{ focus: string; dayLabel: string }
   const items = useMemo(() => itemsForDay(protocol, dayType), [protocol, dayType, tick]);
   const progress = useMemo(() => loadDayProgress(todayKey()), [tick]);
 
-  if (!protocol || items.length === 0) return null;
+  if (!protocol || items.length === 0) {
+    // Подсказка вместо пустоты: протокол не собран или для этого типа дня шагов нет.
+    return (
+      <div style={{ ...CARD, border: '1px dashed rgba(167,139,250,0.35)', background: 'rgba(167,139,250,0.04)' }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: '#a78bfa' }}>
+          🧠 Психо-протокол {protocol ? 'не покрывает этот тип дня' : 'ещё не собран'}
+        </div>
+        <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>
+          {protocol
+            ? `Для «${DAYTYPE_LABELS[dayType]}» шагов нет — добавьте их в протоколе (вкладка «Психология» дневника) или привяжите к типу дня.`
+            : 'Соберите его во вкладке «Психология» дневника — пресеты ПЛ (активация/ритуалы 1RM) или ББ (MMC/фокус).'}
+        </div>
+      </div>
+    );
+  }
 
   const toggle = (itemId: string) => {
     const done = progress.doneItems.includes(itemId)

@@ -228,6 +228,46 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     });
   }, [libSearch, libKind]);
 
+  // ── Печатный отчёт психики ──
+  const printReport = useCallback(() => {
+    const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const checks = loadCheckins();
+    const adh = protocolAdherence(30);
+    const tr = mindsetTrends(14);
+    const link2 = correlateConfidenceWithPerformance(checks, perfs);
+    const rows = [...checks].reverse().slice(0, 60).map(c => `
+      <tr>
+        <td>${esc(c.date)}</td><td>${esc(c.sessionId || '—')}</td>
+        <td>${c.confidence}</td><td>${c.arousal}</td><td>${c.focus}</td>
+        <td>${c.protocolFollowed === null ? '—' : c.protocolFollowed ? 'да' : 'нет'}</td>
+        <td>${esc(c.note || '')}</td>
+      </tr>`).join('');
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Психология тренировок — отчёт</title>
+      <style>body{font-family:system-ui;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:11px}
+      th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f5f5f5}h1{font-size:18px}h2{font-size:14px;margin-top:20px}
+      .stats{display:flex;gap:20px;font-size:13px;margin:8px 0;flex-wrap:wrap}</style></head><body>
+      <h1>🧠 Психология тренировок — отчёт</h1>
+      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}${active ? ` · протокол: ${esc(active.name)} (${active.items.length} шагов)` : ' · протокол не собран'}</div>
+      <div class="stats">
+        <span>Чек-инов всего: <b>${checks.length}</b></span>
+        <span>За 14 дней: <b>${tr.count}</b></span>
+        <span>Приверженность (30д): <b>${adh.total > 0 ? adh.pct + '%' : '—'}</b></span>
+        <span>Ср. уверенность: <b>${tr.averages.confidence > 0 ? tr.averages.confidence.toFixed(1) : '—'}</b></span>
+        <span>Ср. активация: <b>${tr.averages.arousal > 0 ? tr.averages.arousal.toFixed(1) : '—'}</b></span>
+        <span>Ср. фокус: <b>${tr.averages.focus > 0 ? tr.averages.focus.toFixed(1) : '—'}</b></span>
+      </div>
+      ${link2.pearson !== null ? `<div class="stats"><span>Связь уверенности ↔ e1RM: <b>r = ${link2.pearson}</b> (${link2.n} пар)</span></div>` : ''}
+      <h2>Инсайты</h2>
+      <ul>${insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+      <h2>Чек-ины (последние 60)</h2>
+      <table><thead><tr><th>Дата</th><th>Сессия</th><th>Уверенность</th><th>Активация</th><th>Фокус</th><th>Протокол</th><th>Заметка</th></tr></thead><tbody>${rows}</tbody></table>
+      <script>window.print();</script></body></html>`;
+    try {
+      const win = window.open('', '_blank', 'width=900,height=700');
+      if (win) { win.document.write(html); win.document.close(); }
+    } catch { /* SSR/блокировка — игнор */ }
+  }, [active, insights, perfs]);
+
   const btn: React.CSSProperties = { padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 11, minHeight: 40 };
   const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
   const chip = (on: boolean, color = ACCENT): React.CSSProperties => ({
@@ -563,7 +603,10 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         </>
       )}
 
-      <button type="button" style={{ ...ghost, width: '100%', marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
+        <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта психики">🖨 Печать отчёта</button>
+      </div>
     </div>
   );
 };
