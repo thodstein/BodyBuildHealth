@@ -139,6 +139,33 @@ function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
   return weakPoints.includes(PARENT[muscle] ?? '');
 }
 
+/** Метка подгруппы спины (backSubgroup) для UI-бейджа. */
+export function backSubgroupLabel(sub: string): string {
+  switch (sub) {
+    case 'back_width': return '📐 Ширина (латы)';
+    case 'back_thickness': return '📐 Толщина';
+    case 'upper_back': return '📐 Верх спины';
+    case 'rear_delts': return '📐 Задние дельты';
+    case 'traps': return '📐 Трапеции';
+    case 'erectors': return '📐 Разгибатели';
+    default: return '';
+  }
+}
+
+/** Метка головки руки (movementPattern) для UI-бейджа. */
+export function armHeadLabel(pattern: string): string {
+  switch (pattern) {
+    case 'biceps_lengthened': return '🦴 Длинная гол. (растяжка)';
+    case 'biceps_shortened': return '🦴 Короткая гол.';
+    case 'biceps_hammer': return '🦴 Брахиалис (молот)';
+    case 'triceps_overhead': return '🦴 Длинная гол. (overhead)';
+    case 'triceps_pushdown': return '🦴 Латер./мед. (pushdown)';
+    case 'triceps_compound': return '🦴 Compound (жим узк.)';
+    case 'forearm': return '🦴 Предплечья';
+    default: return '';
+  }
+}
+
 /** Мини-чип для параметров упражнения (общий из training-ui). */
 
 function computePhases(totalWeeks: number): { week: number; phase: BBPhase }[] {
@@ -750,7 +777,7 @@ export const BbAutoConstructor: React.FC = () => {
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
            const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2 }));
-           return { name: e.name, muscleGroup: e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
+          return { name: e.name, muscleGroup: e.muscle, notes: [e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '', targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -1039,7 +1066,8 @@ export const BbAutoConstructor: React.FC = () => {
       const sessionsHtml = wk.sessions.map((s, si) => {
         const exsHtml = s.exercises.map(e => {
           const sets = (e.workSets || []).map(ws => `${ws.reps}×${ws.weight}кг @RIR${ws.rir ?? e.rir}`).join(', ');
-          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.comment || '')}</td></tr>`;
+          const sub = e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : '';
+          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}${sub ? ' · ' + esc(sub) : ''}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.comment || '')}</td></tr>`;
         }).join('');
         return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(s.sessionTag) : ''}</h3><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
       }).join('');
@@ -2227,6 +2255,21 @@ export const BbAutoConstructor: React.FC = () => {
                               <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background: charColor + '20', color: charColor, border: '0.5px solid ' + charColor + '30' }}>
                                 {e.character === 'тяж' ? '💪 Тяж' : e.character === 'памп' ? '🩸 Памп' : '🌿 Лёг'}
                               </span>
+                              {(e as any).warmupActivator && (
+                                <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', border:'0.5px solid rgba(148,163,184,0.3)' }}>
+                                  🔥 Разминка
+                                </span>
+                              )}
+                              {e.muscle === 'back' && backSubgroupLabel((e as any).backSubgroup) && (
+                                <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(45,212,191,0.15)', color:'#2dd4bf', border:'0.5px solid rgba(45,212,191,0.3)' }}>
+                                  {backSubgroupLabel((e as any).backSubgroup)}
+                                </span>
+                              )}
+                              {['biceps', 'triceps', 'forearms'].includes(e.muscle) && armHeadLabel((e as any).movementPattern) && (
+                                <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(232,121,249,0.15)', color:'#e879f9', border:'0.5px solid rgba(232,121,249,0.3)' }}>
+                                  {armHeadLabel((e as any).movementPattern)}
+                                </span>
+                              )}
                               {isWeakMuscle(e.muscle, weakPoints) && (
                                 <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(250,204,21,0.15)', color:'#facc15', border:'0.5px solid rgba(250,204,21,0.3)' }}>
                                   🔥 Отстающая
@@ -2978,7 +3021,11 @@ export const BbAutoConstructor: React.FC = () => {
                   const isComp = isCompoundEx(e);
                   const altExercises = getExercisesByGroup(e.muscle).filter(x => x.name !== e.name).slice(0, 5);
                   return <div key={ei} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontWeight:700, fontSize:11, color:'#fff', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color:'rgba(255,255,255,0.4)' }}>({e.muscle})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>${isComp?'База':'Изо'}</span></div>
+                    <div style={{ fontWeight:700, fontSize:11, color:'#fff', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color:'rgba(255,255,255,0.4)' }}>({e.muscle})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
+                      {(e as any).warmupActivator && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', marginLeft:6 }}>🔥 Разминка</span>}
+                      {e.muscle === 'back' && backSubgroupLabel((e as any).backSubgroup) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(45,212,191,0.15)', color:'#2dd4bf', marginLeft:6 }}>{backSubgroupLabel((e as any).backSubgroup)}</span>}
+                      {['biceps', 'triceps', 'forearms'].includes(e.muscle) && armHeadLabel((e as any).movementPattern) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(232,121,249,0.15)', color:'#e879f9', marginLeft:6 }}>{armHeadLabel((e as any).movementPattern)}</span>}
+                    </div>
                     <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
                       <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:45, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
                       <div><span style={{ ...SMALL, fontSize:11 }}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }))} style={{ width:45, ...IN }} /></div>

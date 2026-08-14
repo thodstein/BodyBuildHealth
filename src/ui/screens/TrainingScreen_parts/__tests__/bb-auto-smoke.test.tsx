@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BbAutoConstructor } from '../BbAutoConstructor';
+import { BbAutoConstructor, backSubgroupLabel, armHeadLabel } from '../BbAutoConstructor';
 
 /**
  * Browser-level smoke suite (остаток MAX-PLAN): SSR-рендер ключевых экранов
@@ -32,5 +32,16 @@ describe('BB-auto UI smoke', () => {
     const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
     expect(html).not.toContain('undefined');
     expect(html).not.toContain('NaN');
+  });
+
+  it('labels back subgroup and arm heads for exercise badges', () => {
+    expect(backSubgroupLabel('back_width')).toContain('Ширина');
+    expect(backSubgroupLabel('back_thickness')).toContain('Толщина');
+    expect(backSubgroupLabel('traps')).toContain('Трапеции');
+    expect(backSubgroupLabel('unknown')).toBe('');
+    expect(armHeadLabel('biceps_lengthened')).toContain('Длинная');
+    expect(armHeadLabel('triceps_pushdown')).toContain('pushdown');
+    expect(armHeadLabel('biceps_hammer')).toContain('Брахиалис');
+    expect(armHeadLabel('chest')).toBe('');
   });
 });
