@@ -1,5 +1,6 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections } from '../lift-assistance.engine';
+import { barPathIssuesForLift } from '../lift-diagnostics.engine';
 
 describe('lift-assistance: rationale и источник упражнений', () => {
   it('махи в стороны для слабой точки жима лёжа описывают дельты, а не грудные', () => {
@@ -46,9 +47,41 @@ describe('lift-assistance: rationale и источник упражнений', 
     expect(r.items.every(i => i.source === 'sticking')).toBe(true);
     expect(r.items.some(i => i.optimal)).toBe(true);
     expect(r.items[0].rationale).toContain('коррекция мёртвой точки');
-    // Для движений без угловой диагностики — пусто, не падает
-    const none = analyzeStickingCorrections('ohp', 'ohp_mid');
-    expect(none.items).toEqual([]);
+  });
+
+  it('ВСЕ 7 движений × фазы: коррекции мёртвых точек — полный выбор (не текст)', () => {
+    const LIFTS = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'] as const;
+    const WEAK: Record<string, string[]> = {
+      bench: ['off_chest', 'mid', 'lockout', 'start'],
+      squat: ['bottom', 'mid', 'lockout'],
+      deadlift: ['start', 'mid', 'lockout'],
+      ohp: ['ohp_start', 'ohp_mid', 'ohp_lockout'],
+      row: ['row_start', 'row_mid', 'row_squeeze'],
+      pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
+      incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
+    };
+    for (const l of LIFTS) {
+      for (const wp of WEAK[l]) {
+        const r = analyzeStickingCorrections(l, wp as any);
+        expect(r.items.length, `${l}/${wp}: коррекции пусты`).toBeGreaterThanOrEqual(2);
+        expect(r.items.every(i => i.source === 'sticking'), `${l}/${wp}: неверный source`).toBe(true);
+        expect(r.items.some(i => i.optimal), `${l}/${wp}: нет оптимального`).toBe(true);
+      }
+    }
+  });
+
+  it('ВСЕ 7 движений: bar-path на каждое отклонение — полный выбор (≥4)', () => {
+    const LIFTS = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'] as const;
+    for (const l of LIFTS) {
+      const issues = barPathIssuesForLift(l);
+      expect(issues.length, `${l}: нет bar-path отклонений`).toBeGreaterThan(0);
+      for (const issue of issues) {
+        const r = analyzeBarPathAssistance(l, issue);
+        expect(r.items.length, `${l}/${issue}: бар-пат пуст`).toBeGreaterThanOrEqual(4);
+        expect(r.items.every(i => i.source === 'bar')).toBe(true);
+        expect(r.items.some(i => i.optimal)).toBe(true);
+      }
+    }
   });
 
   it('все 7 движений × все фазы: у каждого упражнения есть валидный source', () => {

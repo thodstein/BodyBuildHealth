@@ -94,9 +94,18 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     const allBtns = screen.getAllByText('➕ Все');
     fireEvent.click(allBtns[0]);
     expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
-    // Для движений без угловой диагностики — пояснение вместо коррекций
+  });
+
+  it('для движений БЕЗ угловой диагностики (жим стоя) — тоже есть выбор коррекций, не только текст', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Жим стоя'));
-    expect(screen.getByText(/Угловая диагностика мёртвых точек есть для приседа/)).toBeTruthy();
+    // Пояснение про углы
+    expect(screen.getByText(/Угловая диагностика есть для приседа, жима лёжа и становой тяги/)).toBeTruthy();
+    // И при этом — полный блок упражнений-коррекций (по слабой точке)
+    expect(screen.getByText(/Упражнения-коррекции \(выберите и добавьте в план\)/)).toBeTruthy();
+    const allBtns = screen.getAllByText('➕ Все');
+    fireEvent.click(allBtns[0]);
+    expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
   });
 
   it('bar-path отклонение даёт полный набор упражнений (кандидаты групп + пул)', () => {
