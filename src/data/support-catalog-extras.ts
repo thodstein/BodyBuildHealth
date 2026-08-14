@@ -10,6 +10,30 @@
 import { SUPPLEMENTS_DB } from './support-db/supplements';
 import { PHARMACY_DB } from './support-db/pharmacy-db';
 import { TZ_MECH_TO_SUBS } from '../engines/tz-bridge-mechanism';
+
+// ════════════════════════════════════════════════════════════════════
+//  Фильтр «мусора» каталога: записи, которые НЕ являются реальными
+//  веществами для выбора (база образа жизни, классы препаратов *_drugs,
+//  служебные pharma_* дубли, фантомы) — не должны появляться в попапах
+//  добавления и каталоге как «фармпрепараты» без названия.
+// ════════════════════════════════════════════════════════════════════
+
+const JUNK_IDS = new Set([
+  // база курса (образ жизни / не таблетки)
+  'hydration', 'cardio_aerobic', 'electrolyte_balance', 'daily_steps', 'no_smoking', 'no_alcohol',
+  // служебные/фантомы
+  'pharma', 'glp1', 'gip', 'marker', 'insulin', 'testosterone', 'glutamate', 'histidine',
+  'endocannabinoid', 'vasopressin', 'follistatin', 'igf1', 'mgf', 'sodium', 'caffeine',
+]);
+
+/** Является ли id «мусорной» записью каталога (не реальным веществом для выбора). */
+export function isCatalogJunk(id: string): boolean {
+  const k = String(id || '').toLowerCase();
+  if (JUNK_IDS.has(k)) return true;
+  if (k.endsWith('_drugs')) return true;
+  if (k.startsWith('pharma_')) return true;
+  return false;
+}
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from './support-db';
 import { ADMINISTRATION_RULES_DB } from './administration-rules-db';
 import { DEFAULT_DOSAGES } from './support-meta';
@@ -312,6 +336,28 @@ const RU_NAMES: Record<string, string> = {
   verapamil: 'Верапамил', pharma: 'Препараты', telmi: 'Телмисартан',
   niacin: 'Ниацин (витамин B3)', tadalafil: 'Тадалафил', lamotrigine: 'Ламотриджин',
   p5p: 'P5P (пиридоксаль-5-фосфат)', vitex: 'Витекс (прутняк)', exemestane: 'Экземестан',
+  // ── Рецептурные из PHARMACY_DB (русские имена) ──
+  atorvastatin: 'Аторвастатин', rosuvastatin: 'Розувастатин', simvastatin: 'Симвастатин', pravastatin: 'Правастатин',
+  losartan: 'Лозартан', valsartan: 'Валсартан', metoprolol: 'Метопролол', bisoprolol: 'Бисопролол',
+  carvedilol: 'Карведилол', furosemide: 'Фуросемид', chlorthalidone: 'Хлорталидон',
+  levothyroxine: 'Левотироксин', metformin: 'Метформин', warfarin: 'Варфарин',
+  pentoxifylline: 'Пентоксифиллин', dipyridamole: 'Дипиридамол', sulodexide: 'Сулодексид',
+  // ── Бустеры/назначения плана ──
+  agmatine: 'Агматин', hesperidin: 'Гесперидин', dandelion: 'Одуванчик', astragalus: 'Астрагал',
+  nattokinase: 'Наттокиназа', serrapeptase: 'Серрапептаза', bromelain: 'Бромелайн',
+  lumbrokinase: 'Лумброкиназа', cordyceps: 'Кордицепс', citrulline: 'Цитруллин',
+  glycine: 'Глицин', theanine: 'L-Теанин', ashwagandha: 'Ашваганда', rhodiola: 'Родиола',
+  magnesium_l_threonate: 'Магний L-треонат', phosphatidylserine: 'Фосфатидилсерин',
+  pycnogenol: 'Пикногенол', bergamot: 'Бергамот', betaine: 'Бетаин', tmg: 'Бетаин (TMG)',
+  garlic: 'Чеснок', beetroot: 'Свёкла', arginine: 'Аргинин', taurine: 'Таурин',
+  milk_thistle: 'Расторопша', silymarin: 'Силимарин', semaglutide: 'Семаглутид',
+  tongkat_ali: 'Тонгкат али', dihexa: 'Дигекса', phenylpiracetam: 'Фенилпирацетам',
+  tropoflavin: 'Тропофлавин', fluvoxamine: 'Флувоксамин', amantadine: 'Амантадин',
+  naltrexone: 'Налтрексон', guanfacine: 'Гуанфацин', tizanidine: 'Тизанидин',
+  grandaxine: 'Грандаксин', fasoracetam: 'Фасорацетам', bromantane: 'Бромантан',
+  havinson_a4: 'Хавинсон A4', havinson_a19: 'Хавинсон A19', ligamentide: 'LigamenTIDE',
+  neovitin: 'Неовитин', voltaren_gel: 'Вольтарен гель', artra: 'Артра',
+  pregabalin: 'Прегабалин', valerian: 'Валериана', magnesium: 'Магний', zinc: 'Цинк',
 };
 
 function humanName(id: string): string {

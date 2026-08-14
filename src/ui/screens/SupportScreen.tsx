@@ -12,6 +12,7 @@ import { ALL_SUBSTANCES, ALL_INTERACTIONS, type SupportSubstance, type SupportIn
 import { INTERACTION_ENRICHMENT } from '../../data/support-interaction-enrichment';
 import { getBpRiskLevel } from '../../core/bp-hr-data';
 import { SUPPORT_CATALOG_DATA, CATALOG_ENRICHMENT, ORGAN_LABELS as CATALOG_ORGAN_LABELS, SYSTEM_LABELS_CATALOG, CATEGORY_LABELS as CATALOG_CATEGORY_LABELS, type SupportCatalogEntry } from '../../data/support-database';
+import { isCatalogJunk } from '../../data/support-catalog-extras';
 
 import { CANONICAL_ID_MAP } from '../../data/support-database';
 import { SUBSTANCE_ANALOGS, PHASE_MODS, DEFAULT_DOSAGES, getPhaseLevel, type SupportPhase } from '../../data/support-database';
@@ -1107,7 +1108,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     return Object.values(SUPPORT_CATALOG_DATA)
       .filter(entry => {
         const eid = entry.id || '';
-        if (CATALOG_BLACKLIST.has(eid)) return false;
+        if (CATALOG_BLACKLIST.has(eid) || isCatalogJunk(eid)) return false;
         const cats = entry.category || [];
         if (cats.includes('marker')) return false;
         if (eid.endsWith('_drugs')) return false;

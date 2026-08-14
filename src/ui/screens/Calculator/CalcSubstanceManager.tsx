@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import type { SupportRecommendation } from '../../../engines/tz-mapper-engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
-import { registerCatalogExtras } from '../../../data/support-catalog-extras';
+import { registerCatalogExtras, isCatalogJunk } from '../../../data/support-catalog-extras';
 registerCatalogExtras(SUPPORT_CATALOG_DATA);
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
@@ -94,6 +94,7 @@ export const CalcSubstanceManager: React.FC<Props> = ({ finalRec, onApplyChanges
   const catalogEntries = useMemo(() => {
     const all: { id: string; name: string }[] = [];
     for (const key of Object.keys(SUPPORT_CATALOG_DATA)) {
+      if (isCatalogJunk(key)) continue;
       const e = SUPPORT_CATALOG_DATA[key];
       if (e?.id || e?.name || e?.nameRu) {
         all.push({ id: e.id || key, name: subNameRu(e.id || key) });

@@ -12,7 +12,7 @@ import { calculateReboundTrajectory } from '../rebound-modeling.engine';
 import { calculateTzSpecRisk } from '../risk-engine-tz-spec';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
-import { registerCatalogExtras } from '../../data/support-catalog-extras';
+import { registerCatalogExtras, isCatalogJunk } from '../../data/support-catalog-extras';
 registerCatalogExtras(SUPPORT_CATALOG_DATA);
 
 const ped = (id: string, pClass: string, mgPerWeek = 500, form: 'inject' | 'oral' = 'inject'): PEDDose => ({ id, pClass, mgPerWeek, form });
@@ -266,6 +266,23 @@ describe('getPharmaLabMarkers — резолвер алиасов + фикс о�
     expect(SUPPORT_CATALOG_DATA.tadalafil.dosage.mg).toBe(5);
     expect(SUPPORT_CATALOG_DATA.lamotrigine.nameRu).toContain('Ламотриджин');
     expect(SUPPORT_CATALOG_DATA.exemestane.nameRu).toContain('Экземестан');
+    // рецептурные/бустеры — русские имена
+    expect(SUPPORT_CATALOG_DATA.atorvastatin.nameRu).toContain('Аторвастатин');
+    expect(SUPPORT_CATALOG_DATA.nattokinase.nameRu).toContain('Наттокиназа');
+    expect(SUPPORT_CATALOG_DATA.hesperidin.nameRu).toContain('Гесперидин');
+  });
+  it('isCatalogJunk: мусор каталога не попадает в попапы добавления', () => {
+    expect(isCatalogJunk('statin_drugs')).toBe(true);
+    expect(isCatalogJunk('beta_blocker_drugs')).toBe(true);
+    expect(isCatalogJunk('hydration')).toBe(true);
+    expect(isCatalogJunk('no_smoking')).toBe(true);
+    expect(isCatalogJunk('pharma_anastrozole')).toBe(true);
+    expect(isCatalogJunk('glp1')).toBe(true);
+    // реальные вещества — проходят
+    expect(isCatalogJunk('nac')).toBe(false);
+    expect(isCatalogJunk('tadalafil')).toBe(false);
+    expect(isCatalogJunk('tudca')).toBe(false);
+    expect(isCatalogJunk('exemestane')).toBe(false);
   });
 });
 
