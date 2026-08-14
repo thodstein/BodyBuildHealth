@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest';
+﻿import { describe, expect, it, afterEach } from 'vitest';
 import { render, fireEvent, screen, cleanup } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
@@ -15,6 +15,12 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(html).toContain('Движение штанги');
     expect(html).toContain('Присед');
     expect(html).toContain('Жим лёжа');
+    // Все 7 движений — кнопками
+    expect(html).toContain('Становая тяга');
+    expect(html).toContain('Жим стоя');
+    expect(html).toContain('Тяга в наклоне');
+    expect(html).toContain('Тяга верхнего блока');
+    expect(html).toContain('Жим на наклонной');
   });
 
   it('рендерится без template (дефолтный протокол)', () => {
@@ -30,25 +36,49 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(html).toContain('Упражнения (из раскладки цикла');
   });
 
-  it('выбор фазы работает: смена фазы обновляет секцию диагностики', () => {
+  it('выбор фазы работает: клик по чипу обновляет секцию диагностики и упражнения', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
-    const select = screen.getByText('Фаза (срыв / слабое место)').parentElement?.querySelector('select') as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    // Выбираем «Дожим» (lockout)
-    fireEvent.change(select, { target: { value: 'lockout' } });
-    expect(select.value).toBe('lockout');
-    // «Дожим» встречается в select и в заголовке диагноза — проверяем блок диагноза
+    // Клик по чипу «Дожим» (lockout) — только кнопка (в SVG-зоне текст не кнопка)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Дожим' })[0]);
+    // «Дожим» встречается в чипах и в заголовке диагноза
     expect(screen.getAllByText('Дожим').length).toBeGreaterThanOrEqual(2);
     // Секция диагноза обновилась: для lockout приседа показывается причина фазы
     expect(screen.getByText(/слабые мышцы/i)).toBeTruthy();
+    // Секция упражнений присутствует
+    expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
   });
 
-  it('выбор движения работает: смена движения меняет доступные фазы', () => {
+  it('выбор движения работает: смена движения меняет чипы фаз', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Жим лёжа'));
-    const select = screen.getByText('Фаза (срыв / слабое место)').parentElement?.querySelector('select') as HTMLSelectElement;
-    expect(select.value).toBe('off_chest');
+    // Для bench авто-фаза — «Сход со груди» (в чипах и в заголовке диагноза)
     expect(screen.getAllByText('Сход со груди').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('для движений без угловой диагностики (ohp/row/pulldown/incline) фазы дают упражнения', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    fireEvent.click(screen.getByText('Жим стоя'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Середина' })[0]);
+    expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
+    // Переключимся на тягу в наклоне — фаза «Сведение лопаток» тоже даёт упражнения
+    fireEvent.click(screen.getByText('Тяга в наклоне'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Сведение лопаток' })[0]);
+    expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
+  });
+
+  it('блок «Дни добавления» виден сразу (Авто по умолчанию)', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    expect(screen.getByText('📅 Дни добавления')).toBeTruthy();
+    expect(screen.getByText(/тяжёлый \+ памп-день/)).toBeTruthy();
+    // Дни Д1..Д3 появляются после выбора упражнения
+    fireEvent.click(screen.getAllByRole('button', { name: 'Дожим' })[0]);
+    const addButtons = screen.getAllByText('➕');
+    expect(addButtons.length).toBeGreaterThan(0);
+    fireEvent.click(addButtons[0]);
+    expect(screen.getByText('Д1')).toBeTruthy();
+    expect(screen.getByText('Д3')).toBeTruthy();
+    // Счётчик на кнопке добавления в ПЛ-авто увеличился
+    expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
   });
 
   it('показывает подсказку из дневника о частых срывах в фазе', () => {

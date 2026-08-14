@@ -19,6 +19,7 @@ import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 import { PL_WEAK_GROUP_ALLOWED_PATTERNS } from '../lms/lms-builder.engine';
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec } from '../../data/lms-cycles/lms-types';
 import { diagnoseLift, BAR_PATH_ISSUES, type BarPathIssue } from './lift-diagnostics.engine';
+import { diagnoseWeakPoint } from '../lms/weakpoint-pl';
 import type { Lift, WeakPoint } from '../lms/weakpoint-pl';
 
 /** Слабая мышца фазы (RU-название) → группа для PL-пула. */
@@ -36,12 +37,26 @@ function weakMuscleGroup(muscle: string): string | null {
 /** Ключи каталога, подходящие под группу из weakMuscles. */
 function groupsForLiftPhase(lift: Lift, phase: WeakPoint): string[] {
   const sticking = diagnoseLift(lift, phase);
-  if (!sticking) return [];
   const groups = new Set<string>();
-  for (const muscle of sticking.weakMuscles) {
-    const group = weakMuscleGroup(muscle);
-    if (group) groups.add(group);
+  if (sticking) {
+    for (const muscle of sticking.weakMuscles) {
+      const group = weakMuscleGroup(muscle);
+      if (group) groups.add(group);
+    }
   }
+  // Fallback: для движений без угловой диагностики (ohp/row/pulldown/incline_press)
+  // слабые мышцы не распознаются — используем типичные группы движения.
+  const LIFT_FALLBACK_GROUPS: Record<Lift, string[]> = {
+    bench: ['chest', 'arms'],
+    squat: ['legs'],
+    deadlift: ['back', 'legs'],
+    ohp: ['shoulders', 'arms'],
+    row: ['back', 'arms'],
+    pulldown: ['back', 'arms'],
+    incline_press: ['chest', 'arms'],
+  };
+  const fallback = LIFT_FALLBACK_GROUPS[lift] ?? [];
+  for (const g of fallback) groups.add(g);
   return [...groups];
 }
 
@@ -167,6 +182,34 @@ export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: 
         protocol: protocolFromCycle(template, group),
         pattern,
       });
+    });
+  }
+
+  // Дополнительно: упражнения фазы из weakpoint-pl (assistanceFromCatalog) —
+  // они специфичны именно для этой фазы и не обязаны входить в PL-пул групп.
+  const added = new Set(items.map(i => norm(i.exercise.name)));
+  const wp = diagnoseWeakPoint(lift, phase);
+  const allExercisesPool = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
+  const findByName = (name: string): Exercise | undefined => {
+    const n = norm(name);
+    return allExercisesPool.find(e => {
+      const en = norm(e.name);
+      return en === n || (en.length > 2 && (en.includes(n) || n.includes(en)));
+    });
+  };
+  for (const name of wp.assistance) {
+    if (added.has(norm(name))) continue;
+    const exercise = findByName(name);
+    if (!exercise) continue;
+    const group = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).find(g =>
+      getExercisesByGroup(g).some(e => norm(e.name) === norm(exercise.name))) ?? exercise.group;
+    items.push({
+      exercise,
+      targetGroup: group,
+      optimal: false,
+      rationale: `Специфично для фазы «${wp.label}» движения ${lift} (ассистент из раскладки слабой точки); устраняет причину срыва.`,
+      protocol: protocolFromCycle(template, group),
+      pattern: catalogPattern(exercise),
     });
   }
 

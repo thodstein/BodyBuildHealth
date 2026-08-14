@@ -239,12 +239,13 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       {/* ═══ 1. Слабые точки + 2. Мёртвые точки (единый якорь — фаза) ═══ */}
       <div style={CARD}>
         <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>1 · Слабые точки и мёртвые точки</div>
-        <label style={{ display: 'block', fontSize: 10, color: DIM, marginTop: 6 }}>
-          Фаза (срыв / слабое место)
-          <select value={effectivePhase} onChange={event => setPhase(event.target.value as WeakPoint)} style={{ display: 'block', width: '100%', marginTop: 4, minHeight: 40, borderRadius: 7, padding: 8, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
-            {phases.map(item => <option key={item} value={item}>{PHASE_RU[item] || item}</option>)}
-          </select>
-        </label>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 6, marginBottom: 4 }}>Фаза (срыв / слабое место) — выберите чип:</div>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          {phases.map(item => {
+            const on = effectivePhase === item;
+            return <button key={item} onClick={() => setPhase(item)} style={{ minHeight: 34, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', border: on ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(168,85,247,0.16)' : 'transparent', color: on ? '#c084fc' : DIM, fontWeight: 700, fontSize: 10 }}>{PHASE_RU[item] || item}</button>;
+          })}
+        </div>
         {diaryHint && (
           <div style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 10, color: '#fbbf24', lineHeight: 1.5 }}>
             📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов ({lift === 'squat' ? 'присед' : lift === 'bench' ? 'жим' : lift === 'deadlift' ? 'тяга' : LIFT_RU[lift]}) срываются в фазе «{PHASE_RU[diaryHint.phase]}». Присмотритесь к ней — подсказка, не авто-выбор.
@@ -319,23 +320,29 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         </div>
       )}
 
-      {/* Выбор дней для добавленных упражнений */}
-      {Object.keys(selected).length > 0 && (
-        <div style={CARD}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📅 Выбранные упражнения — дни добавления</div>
-          {Object.entries(selected).map(([key, names]) => names.length > 0 && (
-            <div key={key} style={{ marginTop: 6 }}>
-              <div style={{ fontSize: 10, color: DIM }}>{key}: {names.join(', ')}</div>
-              <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                <button onClick={() => setAutoDays(key)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: !days[key]?.length ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: !days[key]?.length ? 'rgba(168,85,247,.15)' : 'transparent', color: !days[key]?.length ? '#c084fc' : DIM }}>Авто</button>
-                {Array.from({ length: Math.max(1, dayCount) }, (_, index) => index + 1).map(day => (
-                  <button key={day} onClick={() => toggleDay(key, day)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: days[key]?.includes(day) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: days[key]?.includes(day) ? 'rgba(168,85,247,.15)' : 'transparent', color: days[key]?.includes(day) ? '#c084fc' : DIM }}>Д{day}</button>
-                ))}
-              </div>
-            </div>
-          ))}
+      {/* Выбор дней для добавленных упражнений (виден всегда; Авто = тяжёлый + памп-день) */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📅 Дни добавления</div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
+          По умолчанию — «Авто» (тяжёлый + памп-день). Для выбранных упражнений можно задать свои дни:
         </div>
-      )}
+        {Object.keys(selected).length === 0 && (
+          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+            Сначала отметьте упражнения кнопками «＋»/«➕» — появятся чипы дней.
+          </div>
+        )}
+        {Object.entries(selected).map(([key, names]) => names.length > 0 && (
+          <div key={key} style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 10, color: DIM }}>{key}: {names.join(', ')}</div>
+            <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button onClick={() => setAutoDays(key)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: !days[key]?.length ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: !days[key]?.length ? 'rgba(168,85,247,.15)' : 'transparent', color: !days[key]?.length ? '#c084fc' : DIM }}>Авто</button>
+              {Array.from({ length: Math.max(1, dayCount) }, (_, index) => index + 1).map(day => (
+                <button key={day} onClick={() => toggleDay(key, day)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: days[key]?.includes(day) ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: days[key]?.includes(day) ? 'rgba(168,85,247,.15)' : 'transparent', color: days[key]?.includes(day) ? '#c084fc' : DIM }}>Д{day}</button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
 
       <button onClick={applySelected} style={{ width: '100%', minHeight: 44, marginTop: 8, border: 'none', borderRadius: 9, cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }}>
         🛠 Добавить выбранные упражнения в ПЛ-авто ({Object.values(selected).reduce((s, n) => s + n.length, 0)})
