@@ -1196,6 +1196,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         peakExit: { strategy: attemptStrategy },
                         mockMeet: mockMeetOn ? { strategy: attemptStrategy } : undefined,
                         meetWeek: meetWeekOn ? { strategy: attemptStrategy } : undefined,
+                        autoReg: autoRegMode === 'auto' && autoRegResult
+                          ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift }
+                          : undefined,
                       });
                       setBuiltSrc(next);
                       const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0);

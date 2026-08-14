@@ -208,6 +208,14 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
         <Tile label="Углеводы пери-WO" value={carbsLabel} color="#f59e0b" />
       </div>
 
+      {/* 🧬 Почему достигается прибавка */}
+      <div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🧬 Почему достигается прибавка</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+          Андрогены ускоряют синтез мышечного белка и регенерацию соединительной ткани → мышца выдерживает и успевает восстановить <b>больший объём</b> (порог MRV растёт). ГР/инсулин улучшают усвоение нутриентов и восстановление между сессиями. Итог: можно тренироваться больше/чаще без перетренированности — план расширяется до нового потолка, а не «на глаз».
+        </div>
+      </div>
+
       {/* Разбивка по веществам */}
       {a.perPED.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
@@ -234,6 +242,22 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
           })}
         </div>
       )}
+
+      {/* 🚫 Почему больше установленного лимита нельзя */}
+      {(() => {
+        const totalCapped = a.combinedMrvMultiplier >= 1.99;
+        const overCapPeds = a.perPED.filter(pp => pp.dose > (PED_META_UI[pp.ped as PED] ? PED_META_UI[pp.ped as PED].cap : getPedCap(pp.ped as PED)));
+        if (!totalCapped && overCapPeds.length === 0) return null;
+        return (
+          <div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🚫 Почему больше нельзя</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+              {totalCapped && <>Суммарный потолок адаптации <b>×2.0</b> достигнут: рецепторное насыщение и предел регенерации сухожилий/ЦНС не масштабируются с дозой — дальнейшее повышение доз НЕ увеличивает MRV, добавляется только риск. </>}
+              {overCapPeds.length > 0 && <>Доза выше капа вещества ({overCapPeds.map(pp => PED_META_UI[pp.ped as PED]?.label ?? pp.ped).join(', ')}): кривая «доза→восстановление» выходит на плато — прибавка перестаёт расти, растёт побочная нагрузка.</>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Как считается */}
       {a.rationale.length > 0 && (

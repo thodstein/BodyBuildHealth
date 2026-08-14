@@ -79,6 +79,40 @@ describe('appendPLTaperWeeks', () => {
     expect(lastWkPm).toBeGreaterThan(basePm);
   });
 
+  it('autoReg применяется к тапер-неделям: вес ×множитель, объём ×множитель, RIR +сдвиг', () => {
+    const plan = buildBase(6);
+    const without = appendPLTaperWeeks(plan, 2);
+    const withAr = appendPLTaperWeeks(plan, 2, {
+      autoReg: { topSetPctMultiplier: 0.9, volumeMultiplier: 0.8, rirShift: 1 },
+    });
+    const lastNoAr = without.weeks[without.weeks.length - 1];
+    const lastAr = withAr.weeks[withAr.weeks.length - 1];
+    const wsNoAr = lastNoAr.days[0].exercises[0].workSets[0];
+    const wsAr = lastAr.days[0].exercises[0].workSets[0];
+    expect(wsAr.weight).toBeCloseTo(Math.round(wsNoAr.weight * 0.9 * 10) / 10, 1);
+    expect(wsAr.sets).toBe(Math.max(1, Math.round(wsNoAr.sets * 0.8)));
+    expect(wsAr.rir).toBe(wsNoAr.rir + 1);
+    // Rationale содержит отметку авторегуляции
+    expect(withAr.progressionRationale).toContain('Авторегуляция применена к таперу');
+  });
+
+  it('autoReg масштабирует прикидки (meetAttempts) недели соревнований', () => {
+    const plan = buildBase(6);
+    const withMeet = appendPLTaperWeeks(plan, 2, {
+      meetWeek: { strategy: 'balanced' },
+      autoReg: { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 0 },
+    });
+    const meetWk = withMeet.weeks.find(w => w.meetWeek);
+    expect(meetWk).toBeTruthy();
+    expect(meetWk!.meetAttempts).toBeTruthy();
+    const noAr = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' } });
+    const meetNoAr = noAr.weeks.find(w => w.meetWeek)!;
+    const liftAr = meetWk!.meetAttempts!.lifts[0];
+    const liftNoAr = meetNoAr.meetAttempts!.lifts[0];
+    expect(liftAr.opener).toBeCloseTo(Math.round(liftNoAr.opener * 0.9 * 10) / 10, 1);
+    expect(liftAr.third).toBeCloseTo(Math.round(liftNoAr.third * 0.9 * 10) / 10, 1);
+  });
+
   it('помечает добавленные недели sourcePhase=peak и macroPhase=competition', () => {
     const plan = buildBase(6);
     const next = appendPLTaperWeeks(plan, 2);

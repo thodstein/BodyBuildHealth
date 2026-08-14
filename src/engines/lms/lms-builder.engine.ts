@@ -1352,6 +1352,10 @@ export function appendPLTaperWeeks(
     /** Неделя соревнований В КОНЦЕ (после тапер-недель): прикиды как подходы дня
      *  старта (опенер/вторая/третья ×1), аксессуары — 50% объёма. */
     meetWeek?: { strategy?: MeetStrategy };
+    /** Авторегуляция (режим «АВТО»): масштабирование весов/объёма/RIR
+     *  применяется и к тапер-неделям, mock-неделе и неделе соревнований —
+     *  выбранный режим (нет/дневник/авто) работает для ВСЕХ недель плана. */
+    autoReg?: { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number };
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1539,6 +1543,38 @@ export function appendPLTaperWeeks(
     if (wk) extra.push(wk);
   }
 
+  // ── Авторегуляция («АВТО»): масштабирование применяется ко ВСЕМ добавленным
+  // неделям (тапер/mock/соревнования) — выбранный режим работает везде. ──
+  const autoRegNote = opts?.autoReg
+    ? ` 📡 Авторегуляция применена к таперу/прикидкам: вес ×${opts.autoReg.topSetPctMultiplier.toFixed(2)}, объём ×${opts.autoReg.volumeMultiplier.toFixed(2)}, RIR +${opts.autoReg.rirShift}.`
+    : '';
+  if (opts?.autoReg) {
+    const ar = opts.autoReg;
+    for (const wk of extra) {
+      for (const d of wk.days) {
+        for (const e of d.exercises) {
+          e.workSets = e.workSets.map(ws => ({
+            ...ws,
+            weight: Math.round(ws.weight * ar.topSetPctMultiplier * 10) / 10,
+            sets: Math.max(1, Math.round(ws.sets * ar.volumeMultiplier)),
+            rir: Math.max(0, (ws.rir ?? 2) + ar.rirShift),
+          }));
+        }
+      }
+      if (wk.meetAttempts) {
+        wk.meetAttempts = {
+          ...wk.meetAttempts,
+          lifts: wk.meetAttempts.lifts.map(l => ({
+            ...l,
+            opener: Math.round(l.opener * ar.topSetPctMultiplier * 10) / 10,
+            second: Math.round(l.second * ar.topSetPctMultiplier * 10) / 10,
+            third: Math.round(l.third * ar.topSetPctMultiplier * 10) / 10,
+          })),
+        };
+      }
+    }
+  }
+
   const weeks = [...plan.weeks, ...extra];
   const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({
     name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
@@ -1581,6 +1617,7 @@ export function appendPLTaperWeeks(
       meetNote +
       peakNote +
       pedNote +
+      autoRegNote +
       (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),
   };
 }
