@@ -8,6 +8,8 @@ import {
   buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
   buildBbMacrocycle, rebalanceBbMacrocycle, serializeBbMacro, deserializeBbMacro,
+  macroWeekStartDate, macroWeekEndDate, weeksUntilWeek, formatMacroDate,
+  projectPmGrowthMultiplier, taperWeeksForBlock,
   PHASE_COLOR, PHASE_LABEL_RU, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, BB_PHASE_ICON,
   type Macrocycle, type MacroBlock, type MacroPhase, type MacroInput, type BBMacrocycle, type BBMacroBlock, type BBMacroPhase, type CompetitionEvent,
 } from '../../../engines/lms/macrocycle.engine';
@@ -15,6 +17,160 @@ import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
+import { PopupNumber, PopupSelect } from './TrainingPopups';
+import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
+import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
+import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
+import { buildPeakWeekProtocol, applyPeakWeekToPlan } from '../../../engines/bb/bb-peak-week.engine';
+import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draft.engine';
+import { createFromBuild } from '../../../engines/user-program/program-store';
+import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
+import { getProfile } from '../../../core/profile-manager';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines/pro/training-load.engine';
+
+/** Маппинг названий категорий профиля → id категорий движка пик-недели. */
+const PEAK_CATEGORY_MAP: Record<string, string> = {
+  'mens_physique': 'mens_physique', "men's physique": 'mens_physique', 'менс физик': 'mens_physique',
+  'classic': 'classic', 'classic physique': 'classic', 'классик': 'classic',
+  'bb_212': 'bb_212', '212': 'bb_212',
+  'open': 'open', 'open bodybuilding': 'open',
+  'bikini': 'bikini', 'бикини': 'bikini',
+  'figure': 'figure', 'фигура': 'figure',
+  'wellness': 'wellness', 'велнес': 'wellness',
+};
+
+export const PEAK_CATEGORY_OPTIONS: { id: string; label: string }[] = [
+  { id: 'mens_physique', label: 'Men’s Physique' },
+  { id: 'classic', label: 'Classic Physique' },
+  { id: 'bb_212', label: '212' },
+  { id: 'open', label: 'Open Bodybuilding' },
+  { id: 'bikini', label: 'Bikini' },
+  { id: 'figure', label: 'Figure' },
+  { id: 'wellness', label: 'Wellness' },
+];
+
+/** Параметры пик-недели из профиля (вес/пол/категория) с безопасными дефолтами. */
+export function profilePeakDefaults(): { weight: number; category: string; sex: 'male' | 'female' } {
+  try {
+    const settings = getProfile()?.settings as (Record<string, any> | undefined);
+    const rawWeight = Number(settings?.personal?.weight);
+    const weight = Number.isFinite(rawWeight) && rawWeight > 30 ? rawWeight : 80;
+    const sex: 'male' | 'female' = settings?.personal?.sex === 'female' ? 'female' : 'male';
+    const rawCat = String(settings?.goals?.bbCategory ?? '').toLowerCase();
+    const category = PEAK_CATEGORY_MAP[rawCat] ?? 'mens_physique';
+    return { weight, category, sex };
+  } catch { return { weight: 80, category: 'mens_physique', sex: 'male' }; }
+}
+
+export interface MacroScenario {
+  id: string;
+  label: string;
+  ts: number;
+  data: Macrocycle | BBMacrocycle;
+}
+
+const SCENARIOS_KEY = 'he_macro_scenarios';
+const SCENARIOS_CAP = 6;
+
+function scenariosStorage(): MacroScenario[] {
+  try { const v = JSON.parse(localStorage.getItem(SCENARIOS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+
+/** Сохранить снимок текущего макро как сценарий (кап 6, новые первыми). */
+export function saveMacroScenario(label: string, src: Macrocycle | BBMacrocycle): MacroScenario[] {
+  const list: MacroScenario[] = [{ id: 'sc_' + Date.now().toString(36), label, ts: Date.now(), data: src }];
+  for (const s of scenariosStorage()) {
+    if (s && s.id && s.data && Array.isArray(s.data.blocks) && s.data.totalWeeks) list.push(s);
+  }
+  const capped = list.slice(0, SCENARIOS_CAP);
+  try { localStorage.setItem(SCENARIOS_KEY, JSON.stringify(capped)); } catch { /* ignore */ }
+  return capped;
+}
+
+export function loadMacroScenarios(): MacroScenario[] {
+  return scenariosStorage().filter(s => s && s.id && s.data && Array.isArray(s.data.blocks));
+}
+
+export function removeMacroScenario(id: string): MacroScenario[] {
+  const next = loadMacroScenarios().filter(s => s.id !== id);
+  try { localStorage.setItem(SCENARIOS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  return next;
+}
+
+export interface ScenarioPhaseDiff { phase: string; weeksA: number; weeksB: number; diff: number; }
+
+/** Сравнение двух макро по неделям фаз (для снапшотов-сценариев). */
+export function compareMacroScenarios(a: Macrocycle | BBMacrocycle, b: Macrocycle | BBMacrocycle): ScenarioPhaseDiff[] {
+  const sum = (src: Macrocycle | BBMacrocycle): Record<string, number> => {
+    const m: Record<string, number> = {};
+    for (const blk of src.blocks) {
+      const key = 'cycleId' in blk
+        ? (PHASE_LABEL_RU[blk.phase as MacroPhase] ?? blk.phase)
+        : (BB_PHASE_LABEL_RU[blk.phase as BBMacroPhase] ?? blk.phase);
+      m[key] = (m[key] || 0) + blk.weeks;
+    }
+    return m;
+  };
+  const ma = sum(a);
+  const mb = sum(b);
+  const keys = Array.from(new Set([...Object.keys(ma), ...Object.keys(mb)]));
+  return keys.map(k => ({ phase: k, weeksA: ma[k] || 0, weeksB: mb[k] || 0, diff: (mb[k] || 0) - (ma[k] || 0) }));
+}
+
+/** Сводная строка сценария: «Макроцикл: N нед · M соревн.». */
+export function scenarioSummary(src: Macrocycle | BBMacrocycle): string {
+  return `Макроцикл: ${src.totalWeeks} нед · ${(src.competitions ?? []).length} соревн.`;
+}
+
+export interface DiaryMacroStats {
+  sessions7: number;        // сессий за последние 7 дней
+  sessions28: number;       // за 28 дней
+  acwr: { ratio: number; zone: ACWRZone } | null;
+  lastSessionDate: string | null;
+  lastSessionWeek: number | null; // неделя макро по последней сессии (неделя 1 = reference/сегодня)
+}
+
+export const ACWR_ZONE_LABEL: Record<ACWRZone, string> = {
+  undertrained: 'недогруз',
+  optimal: 'норма',
+  caution: 'осторожно (1.3–1.5)',
+  dangerous: 'опасно (>1.5)',
+};
+
+/** Неделя макро для даты (неделя 1 = reference, по умолчанию сегодня). */
+export function macroWeekForDate(isoDate: string, reference?: Date | string): number | null {
+  const d = new Date(isoDate).getTime();
+  const ref = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
+  if (!Number.isFinite(d) || !Number.isFinite(ref)) return null;
+  const diffDays = (d - ref) / 86400000;
+  // Будущее: нед 1 = сегодня; прошлое: нед 2 = 7-13 дней назад и т.д.
+  const week = diffDays >= 0
+    ? Math.floor(diffDays / 7) + 1
+    : 1 + Math.floor(-diffDays / 7);
+  return Math.max(1, week);
+}
+
+/** Статистика дневника (sRPE) для макроцикла: сессии, ACWR, последняя неделя. */
+export function diaryMacroStats(reference?: Date | string): DiaryMacroStats {
+  const sessions = loadSRPESessions();
+  if (sessions.length === 0) return { sessions7: 0, sessions28: 0, acwr: null, lastSessionDate: null, lastSessionWeek: null };
+  const now = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
+  const dayMs = 86400000;
+  const last = sessions.reduce((a, b) => (a.date > b.date ? a : b));
+  return {
+    sessions7: sessions.filter(s => now - new Date(s.date).getTime() <= 7 * dayMs).length,
+    sessions28: sessions.filter(s => now - new Date(s.date).getTime() <= 28 * dayMs).length,
+    acwr: (() => {
+      try {
+        const r = acuteChronicRatio(toDailyLoads(sessions), undefined, 7, 28);
+        return r && Number.isFinite(r.ratio) && r.ratio > 0 ? { ratio: Math.round(r.ratio * 100) / 100, zone: r.zone } : null;
+      } catch { return null; }
+    })(),
+    lastSessionDate: last.date,
+    lastSessionWeek: macroWeekForDate(last.date, reference),
+  };
+}
 
 const SEL: React.CSSProperties = { ...IN, minHeight: 44 };
 const LABEL: React.CSSProperties = { ...SMALL, fontSize: 11, margin: '4px 0 2px' };
@@ -54,6 +210,108 @@ function loadUiPrefs(): MacrocycleUiPrefs {
     const parsed = JSON.parse(localStorage.getItem(UI_PREFS_KEY) || 'null');
     return normalizeMacrocycleUiPrefs(parsed);
   } catch { return DEFAULT_UI_PREFS; }
+}
+
+/**
+ * Текстовое «расписание» макроцикла: фазы с неделями и долями года, циклы, соревнования.
+ * Используется для карточки «📊 Итог года» и экспорта «📋 Копировать сводку».
+ */
+export function buildMacroSummary(src: Macrocycle | BBMacrocycle): string[] {
+  const total = Math.max(1, src.totalWeeks);
+  const lines: string[] = [];
+  lines.push(`🗓 Макроцикл: ${total} нед (${Math.round((total / 7) * 10) / 10} мес)`);
+  for (const b of src.blocks) {
+    const pct = Math.round((b.weeks / total) * 100);
+    const phaseLabel = 'cycleId' in b
+      ? (PHASE_LABEL_RU[b.phase as MacroPhase] ?? b.phase)
+      : (BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] ?? b.phase);
+    const cycleInfo = 'cycleId' in b && b.cycleId
+      ? ` · цикл «${getCycleById(b.cycleId)?.meta.title ?? b.cycleId}»`
+      : '';
+    lines.push(`  ${phaseLabel}: нед ${b.weekOffset}–${b.weekOffset + b.weeks - 1} (${b.weeks} нед, ${pct}%)${cycleInfo}`);
+  }
+  const comps = src.competitions ?? [];
+  if (comps.length > 0) {
+    lines.push(`🏁 Соревнования (${comps.length}):`);
+    for (const c of [...comps].sort((a, b) => a.week - b.week)) {
+      const v = COMPETITION_PRIORITY_VISUAL[c.priority];
+      lines.push(`  ${v.icon} [${c.priority}] ${c.name} — нед ${c.week}${c.date ? ` (${c.date})` : ''}`);
+    }
+  }
+  return lines;
+}
+
+/** HTML-экранирование пользовательского ввода (названия соревнований и т.п.) для печати. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** Экранирование значений ICS (запятая/точка с запятой/перевод строки). */
+function escapeIcs(value: string): string {
+  return value.replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+}
+
+/** Дата в формате ICS: YYYYMMDD (без часового пояса). */
+function icsDate(d: Date | null): string {
+  if (!d || !Number.isFinite(d.getTime())) return '';
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+/**
+ * Экспорт макроцикла в календарь (.ics): блоки фаз (диапазоны дат от «сегодня»)
+ * и соревнования (дата или воскресенье недели).
+ */
+export function buildMacroIcs(src: Macrocycle | BBMacrocycle, reference?: Date | string): string {
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BodyBuildHealth//Macrocycle//RU',
+    'CALSCALE:GREGORIAN',
+  ];
+  for (const b of src.blocks) {
+    const label = 'cycleId' in b
+      ? (PHASE_LABEL_RU[b.phase as MacroPhase] ?? b.phase)
+      : (BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] ?? b.phase);
+    const ds = icsDate(macroWeekStartDate(b.weekOffset, reference));
+    const de = icsDate(macroWeekEndDate(b.weekOffset + b.weeks - 1, reference));
+    if (!ds || !de) continue;
+    lines.push(
+      'BEGIN:VEVENT',
+      `SUMMARY:${escapeIcs(label)} (нед ${b.weekOffset}–${b.weekOffset + b.weeks - 1})`,
+      `DTSTART;VALUE=DATE:${ds}`,
+      `DTEND;VALUE=DATE:${de}`,
+      'END:VEVENT',
+    );
+  }
+  for (const c of (src.competitions ?? [])) {
+    const dd = c.date ? c.date.replace(/-/g, '') : icsDate(macroWeekEndDate(c.week, reference));
+    if (!dd) continue;
+    lines.push(
+      'BEGIN:VEVENT',
+      `SUMMARY:🏁 ${escapeIcs(c.name)} [${c.priority}]`,
+      `DTSTART;VALUE=DATE:${dd}`,
+      `DTEND;VALUE=DATE:${dd}`,
+      `DESCRIPTION:${escapeIcs(`Неделя ${c.week} макроцикла`)}`,
+      'END:VEVENT',
+    );
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+/** HTML-страница для печати макроцикла (фазы, циклы, соревнования, итог года). */
+export function buildMacroPrintHtml(src: Macrocycle | BBMacrocycle): string {
+  const lines = buildMacroSummary(src);
+  const body = lines.map(l => escapeHtml(l)).join('\n');
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Макроцикл — ${src.totalWeeks} нед</title>` +
+    `<style>body{font-family:system-ui,-apple-system,sans-serif;padding:24px;color:#111;max-width:720px;margin:0 auto}` +
+    `h1{font-size:18px;border-bottom:2px solid #00c853;padding-bottom:8px}` +
+    `.l{font-size:13px;line-height:1.65;white-space:pre-wrap}` +
+    `</style></head><body><h1>🗓 Годовой макроцикл (${src.totalWeeks} нед)</h1><div class="l">${body}</div></body></html>`;
 }
 
 /** Миграция storage: v1 → v2 (добавлен kind в массив блоков). */
@@ -131,11 +389,28 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [editWeeks, setEditWeeks] = useState<Record<string, number>>({});
   // Явное сохранение: кратковременный флеш «Сохранено» (автосохранение уже есть).
   const [macroSavedFlash, setMacroSavedFlash] = useState(false);
+  // Флеш «Сводка скопирована».
+  const [copyFlash, setCopyFlash] = useState(false);
+  // Статус «📦 Весь год → программа».
+  const [yearNote, setYearNote] = useState<string | null>(null);
+  // 🎭 Пик-неделя (тапер ББ): развёрнутый протокол в карточке prep-блока + применение в сборщике.
+  const [peakWeekOpen, setPeakWeekOpen] = useState(false);
+  const [builderPeakWeek, setBuilderPeakWeek] = useState(true);
+  const [builderCategory, setBuilderCategory] = useState<string>(profilePeakDefaults().category);
+  // 📸 Сценарии года (снапшоты макро для сравнения).
+  const [scenarios, setScenarios] = useState<MacroScenario[]>(loadMacroScenarios);
+  const [compareWith, setCompareWith] = useState<MacroScenario | null>(null);
   // Маркер текущей недели (1-индекс). По умолчанию неделя 1 = "сегодня" (начало макро).
   const [currentWeekIdx, setCurrentWeekIdx] = useState<number>(1);
   // Несколько соревнований: восстанавливаем из macro.competitions (если есть) или одиночное compWeek.
   const [competitions, setCompetitions] = useState<CompetitionEvent[]>(macro?.competitions ?? bbMacro?.competitions ?? []);
   const [buildError, setBuildError] = useState<string | null>(null);
+  // ⚙️ Сборка цикла ББ: индекс блока, выбранный сплит, недели фаз, собранный план.
+  const [builderForBlock, setBuilderForBlock] = useState<number>(-1);
+  const [builderSplit, setBuilderSplit] = useState<string>('');
+  const [builderWeeks, setBuilderWeeks] = useState<Record<BBMacroPhase, number>>({ hypertrophy: 0, strength: 0, contest_prep: 0, transition: 0 });
+  const [builderPlan, setBuilderPlan] = useState<{ plan: BBPlan; total: number; label: string } | null>(null);
+  const [builderMsg, setBuilderMsg] = useState<string | null>(null);
   const [uiPrefs, setUiPrefs] = useState<MacrocycleUiPrefs>(loadUiPrefs);
   const [showUiPrefs, setShowUiPrefs] = useState(false);
   const [activePopup, setActivePopup] = useState<'level' | 'goal' | 'duration' | 'focus' | 'competition' | null>(null);
@@ -323,6 +598,183 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     onApplyCycle(block.cycleId, block.weeks);
   };
 
+  // ── ⚙️ Сборка цикла ББ: сплит + фазы ББ-макроцикла → BBPlan → ручной режим / ББ-авто ──
+  const openBuilder = (blockIdx: number) => {
+    const src = bbMacro;
+    if (!src) return;
+    const block = src.blocks[blockIdx];
+    if (!block) return;
+    const ranked = rankBBSplits({ level: effLevel, goal: 'hypertrophy' as any, daysPerWeek: Math.min(6, Math.max(3, block.weeks)) });
+    setBuilderForBlock(blockIdx);
+    setBuilderSplit(ranked[0]?.pattern.id ?? SPLIT_PATTERNS[0].id);
+    setBuilderWeeks({ hypertrophy: 0, strength: 0, contest_prep: 0, transition: 0, [block.phase]: block.weeks });
+    setBuilderPlan(null);
+    setBuilderMsg(null);
+    setBuilderPeakWeek(block.phase === 'contest_prep');
+  };
+  const buildCycleFromBuilder = () => {
+    if (!bbMacro || builderForBlock < 0) return;
+    const block = bbMacro.blocks[builderForBlock];
+    if (!block) return;
+    const pattern = SPLIT_PATTERNS.find(p => p.id === builderSplit) ?? SPLIT_PATTERNS[0];
+    const total = BB_PHASES.reduce((s, phase) => s + (builderWeeks[phase] || 0), 0);
+    if (total < 4) { setBuilderMsg('Суммарно нужно минимум 4 недели — добавьте недели фазам.'); return; }
+    try {
+      const draft = autodraftBBPlan({
+        level: effLevel,
+        goal: 'hypertrophy',
+        daysPerWeek: pattern.sessionsPerRotation,
+        weeks: total,
+        splitPattern: pattern.id,
+        equipment: [],
+        weakPoints: [],
+        trainingFocus: block.trainingFocus ?? 'hypertrophy',
+      });
+      // Синтезируем ББ-макроцикл из настроенных фаз → объём/RIR по фазам (Helms 2022).
+      let offset = 1;
+      const phaseBlocks: BBMacrocycle['blocks'] = BB_PHASES
+        .filter(phase => (builderWeeks[phase] || 0) > 0)
+        .map(phase => {
+          const weeks = builderWeeks[phase] || 0;
+          const b = { phase, weeks, weekOffset: offset, description: '', trainingFocus: (phase === 'contest_prep' ? 'endurance' : phase) as BBTrainingFocus };
+          offset += weeks;
+          return b;
+        });
+      const phaseMacro: BBMacrocycle = { totalWeeks: total, trainingFocus: block.trainingFocus ?? 'hypertrophy', blocks: phaseBlocks, rationale: [] };
+      let plan = applyMacrocycleToBBPlan(draft, phaseMacro);
+      // 🎭 Пик-неделя (тапер ББ): применяем протокол к последней неделе contest_prep.
+      if (builderPeakWeek) {
+        const prepBlock = phaseBlocks.find(b => b.phase === 'contest_prep');
+        const lastPrepWeek = prepBlock ? prepBlock.weekOffset + prepBlock.weeks - 1 : null;
+        if (lastPrepWeek != null) {
+          const pk = profilePeakDefaults();
+          plan = applyPeakWeekToPlan(plan, buildPeakWeekProtocol(pk.weight, builderCategory || pk.category, pk.sex), lastPrepWeek);
+        }
+      }
+      const phasesLabel = phaseBlocks.map(b => `${BB_PHASE_LABEL_RU[b.phase]} ${b.weeks}н`).join(' → ');
+      setBuilderPlan({ plan, total, label: `${pattern.name} · ${phasesLabel}${builderPeakWeek && phaseBlocks.some(b => b.phase === 'contest_prep') ? ' · 🎭 пик-неделя' : ''}` });
+      setBuilderMsg(null);
+    } catch (error) {
+      setBuilderMsg(`Ошибка сборки: ${(error as Error).message}`);
+    }
+  };
+  const sendCycleToManual = () => {
+    if (!builderPlan) return;
+    try {
+      const prog = createFromBuild(builderPlan.plan, { goal: 'hypertrophy', level: effLevel, title: 'Сборка цикла ББ: ' + builderPlan.label });
+      applyToPlanner({ kind: 'program', label: builderPlan.label, data: { program: prog } });
+      setBuilderMsg('✅ Передано в ручной конструктор — подтвердите в баннере «Калькулятор рекомендует».');
+      setBuilderForBlock(-1);
+    } catch (error) {
+      setBuilderMsg(`Ошибка передачи: ${(error as Error).message}`);
+    }
+  };
+  const sendCycleToBbAuto = () => {
+    if (!builderPlan) return;
+    try {
+      localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: builderPlan.plan, date: new Date().toISOString() }));
+      window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
+      setBuilderMsg('🚀 План передан в ББ-авто — откройте шаг «План».');
+    } catch { setBuilderMsg('Не удалось сохранить план в ББ-авто.'); }
+  };
+
+  // 📋 Копировать текстовую сводку макроцикла (буфер обмена, фоллбэк execCommand).
+  const copyMacroSummary = () => {
+    const src = isBB ? bbMacro : macro;
+    if (!src) return;
+    const text = buildMacroSummary(src).join('\n');
+    const done = () => { setCopyFlash(true); window.setTimeout(() => setCopyFlash(false), 2000); };
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(done).catch(() => { /* fallback ниже */ });
+        return;
+      }
+    } catch { /* fallback ниже */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch { /* ignore */ }
+  };
+
+  // 🖨 Печать макроцикла в новом окне (window.print).
+  const printMacro = () => {
+    const src = isBB ? bbMacro : macro;
+    if (!src) return;
+    const win = window.open('', '_blank', 'width=760,height=920');
+    if (!win) return;
+    win.document.write(buildMacroPrintHtml(src));
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  // 📅 Экспорт макроцикла в календарь (.ics).
+  const downloadIcs = () => {
+    const src = isBB ? bbMacro : macro;
+    if (!src) return;
+    try {
+      const blob = new Blob([buildMacroIcs(src)], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'macrocycle.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+  };
+
+  // 📦 «Весь год в программу»: autodraftBBPlan (≤16 нед) → цикл недель до totalWeeks
+  // → applyMacrocycleToBBPlan (объём/RIR по фазам макроцикла).
+  const buildWholeYearPlan = (): { plan: BBPlan; total: number; label: string } | null => {
+    if (!bbMacro) return null;
+    const total = bbMacro.totalWeeks;
+    const pattern = SPLIT_PATTERNS.find(p => p.id === builderSplit) ?? SPLIT_PATTERNS[0];
+    const draft = autodraftBBPlan({
+      level: effLevel,
+      goal: 'hypertrophy',
+      daysPerWeek: pattern.sessionsPerRotation,
+      weeks: Math.min(total, 16),
+      splitPattern: pattern.id,
+      equipment: [],
+      weakPoints: [],
+      trainingFocus: bbMacro.trainingFocus ?? 'hypertrophy',
+    });
+    const weeks = Array.from({ length: total }, (_, i) => ({ ...draft.weeks[i % draft.weeks.length], week: i + 1 }));
+    const plan = applyMacrocycleToBBPlan({ ...draft, weeks }, bbMacro);
+    return { plan, total, label: `Весь год: ${pattern.name} · ${total} нед` };
+  };
+  const sendWholeYearToManual = () => {
+    try {
+      const built = buildWholeYearPlan();
+      if (!built) return;
+      const prog = createFromBuild(built.plan, { goal: 'hypertrophy', level: effLevel, title: 'Годовой план ББ: ' + built.label });
+      applyToPlanner({ kind: 'program', label: built.label, data: { program: prog } });
+      setYearNote('✅ Год отправлен в ручной конструктор — подтвердите в баннере «Калькулятор рекомендует».');
+    } catch (error) {
+      setYearNote(`Ошибка сборки года: ${(error as Error).message}`);
+    }
+  };
+  const sendWholeYearToBbAuto = () => {
+    try {
+      const built = buildWholeYearPlan();
+      if (!built) return;
+      localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: built.plan, date: new Date().toISOString() }));
+      window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
+      setYearNote('🚀 Год передан в ББ-авто — откройте шаг «План».');
+    } catch (error) {
+      setYearNote(`Ошибка передачи года: ${(error as Error).message}`);
+    }
+  };
+
   const activeBlock = useMemo(() => {
     const src = isBB ? bbMacro : macro;
     if (!src) return null;
@@ -457,12 +909,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               : 'A — главное (полный пик), B — контрольное (короткий пик), C — тренировочное (встроено в подготовку).'}
           </div>
           {competitions.length === 0 && (
-            <div>
-              <div style={LABEL}>Неделя соревнований</div>
-                <input aria-label="Неделя главного соревнования" style={IN} type="number" min={1} max={totalWeeks} value={compWeek} onChange={e => {
-                 const value = Number(e.target.value);
-                 setCompWeek(Number.isFinite(value) ? Math.max(1, Math.min(totalWeeks, Math.round(value))) : 1);
-               }} />
+            <div style={{ marginBottom: 6 }}>
+              <PopupNumber label="Неделя главного соревнования" value={compWeek} min={1} max={totalWeeks}
+                hint={`Неделя соревнований в макроцикле (1–${totalWeeks}). Пик подстраивается автоматически.`}
+                onChange={v => setCompWeek(Number.isFinite(v) ? Math.max(1, Math.min(totalWeeks, Math.round(v))) : compWeek)} />
             </div>
           )}
           {competitions.map((c, i) => {
@@ -475,118 +925,164 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               if (wantBB) return nd === 'bodybuilding';
               return true; // general — все
             });
-            // Проверка соответствия выбранного цикла уровню
-            const selectedCycle = c.cycleId ? getCycleById(c.cycleId) : undefined;
-            const levelMismatch = selectedCycle && selectedCycle.meta.level !== effLevel;
+            const setComp = (patch: Partial<CompetitionEvent>) => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, ...patch } : cc));
+            // Список слотов циклов: cycleIds[] (новое) или [cycleId] (legacy); пусто → один слот «Авто».
+            const slots: string[] = c.cycleIds && c.cycleIds.length > 0
+              ? [...c.cycleIds]
+              : (c.cycleId ? [c.cycleId] : ['']);
+            const setSlot = (k: number, val: string) => setCompetitions(competitions.map((cc, j) => {
+              if (j !== i) return cc;
+              const cur = cc.cycleIds && cc.cycleIds.length > 0
+                ? [...cc.cycleIds]
+                : (cc.cycleId ? [cc.cycleId] : ['']);
+              cur[k] = val;
+              // Не выкидываем пустые слоты («Авто»): иначе после выбора цикла
+              // в одном слоте остальные строки схлопывались в одну.
+              const hasCycle = cur.some(x => Boolean(x));
+              return { ...cc, cycleIds: hasCycle ? cur : undefined, cycleId: cur.find(x => Boolean(x)) ?? undefined };
+            }));
+            const removeSlot = (k: number) => setCompetitions(competitions.map((cc, j) => {
+              if (j !== i) return cc;
+              const cur = (cc.cycleIds && cc.cycleIds.length > 0 ? [...cc.cycleIds] : (cc.cycleId ? [cc.cycleId] : []));
+              cur.splice(k, 1);
+              const cleaned = cur.filter((x): x is string => Boolean(x));
+              return { ...cc, cycleIds: cleaned.length > 0 ? cleaned : undefined, cycleId: cleaned[0] };
+            }));
+            const cycleOptions = [
+              { id: '', label: 'Авто', desc: 'Авто-подбор цикла под фазу пика' },
+              // Сначала циклы с совпадающим уровнем, затем остальные (по алфавиту).
+              ...[...filteredCycles].sort((a, b) => {
+                const am = a.meta.level === effLevel ? 0 : 1;
+                const bm = b.meta.level === effLevel ? 0 : 1;
+                return am - bm || a.meta.title.localeCompare(b.meta.title, 'ru');
+              }).map(cyc => ({
+                id: cyc.meta.id,
+                label: cyc.meta.title,
+                desc: `${cyc.meta.level} · ${cyc.meta.sessionsPerWeek} д/нед · ${cyc.meta.weeks} нед · период «${cyc.meta.period}»`,
+              })),
+            ];
+            const chosenCycles = slots.filter(Boolean).length || (c.cycleId ? 1 : 0);
             return (
-            <div key={c.id}>
-              <div className="macrocycle-competition-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 50px 60px 28px', gap: 4, marginBottom: 3, alignItems: 'center' }}>
-                <input aria-label="Название соревнования" style={{ ...IN, padding: '4px 8px', fontSize: 10, minHeight: 44 }}
-                  value={c.name} placeholder="Название"
-                  onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, name: e.target.value } : cc))} />
-                <input aria-label={`Неделя соревнования ${c.name}`} style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 44, textAlign: 'center' }}
-                  type="number" min={1} max={totalWeeks} value={c.week} title="Неделя"
-                  onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, week: Math.max(1, Math.min(totalWeeks, +e.target.value || 1)) } : cc))} />
-                <select aria-label={`Приоритет соревнования ${c.name}`} style={{ ...IN, padding: '4px', fontSize: 10, minHeight: 44 }}
-                  value={c.priority} title="Приоритет"
-                  onChange={e => setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, priority: e.target.value as CompetitionEvent['priority'] } : cc))}>
-                  <option value="A">A — главное</option>
-                  <option value="B">B — контрольное</option>
-                  <option value="C">C — тренировочное</option>
-                </select>
-                <button aria-label={`Удалить соревнование ${c.name}`} onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
-                  style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 44, minWidth: 44 }}
-                  title="Удалить">✕</button>
-              </div>
-              {/* Мульти-цикл: список циклов для пика соревнования (только A и B).
-                  Пользователь может назначить несколько циклов — пик делится на под-блоки. */}
-              {c.priority !== 'C' && (
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
-                      Циклы на пик: {((c.cycleIds && c.cycleIds.length > 0) ? c.cycleIds.length : (c.cycleId ? 1 : 0))}
-                    </span>
-                    <button
-                      onClick={() => {
-                        // Добавить ещё один цикл (пустой = автоподбор).
-                        // ВАЖНО: если циклы ещё не выбраны — неявная строка «Авто»
-                        // становится явным слотом (''), иначе первый клик не давал
-                        // видимого результата (1 строка → 1 строка).
-                        const current = c.cycleIds && c.cycleIds.length > 0
-                          ? [...c.cycleIds]
-                          : (c.cycleId ? [c.cycleId] : ['']);
-                        setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleIds: [...current, ''] } : cc));
-                      }}
-                       style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 9, minHeight: 44, lineHeight: 1 }}
-                      title="Добавить ещё один цикл на пик"
-                    >+ Цикл</button>
+              <div key={c.id} style={{ marginBottom: 8, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                {/* Название + неделя (попап) + дублировать + удалить */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                  <input aria-label={`Название соревнования ${c.name}`} style={{ ...IN, flex: 1, padding: '4px 10px', fontSize: 12, minHeight: 44 }}
+                    value={c.name} placeholder="Название (например, «Первенство области»)"
+                    onChange={e => setComp({ name: e.target.value })} />
+                  <div style={{ width: 104, flexShrink: 0 }}>
+                    <PopupNumber label="Неделя" value={c.week} min={1} max={totalWeeks}
+                      hint={`Неделя соревнования в макроцикле (1–${totalWeeks}). При вводе даты неделя пересчитается автоматически.`}
+                      onChange={v => setComp({ week: Math.max(1, Math.min(totalWeeks, Math.round(v))), date: undefined })} />
                   </div>
-                  {(() => {
-                    // Список циклов: либо cycleIds[] (новое), либо [cycleId] (legacy) для отображения
-                    const list: string[] = c.cycleIds && c.cycleIds.length > 0
-                      ? c.cycleIds
-                      : (c.cycleId ? [c.cycleId] : []);
-                    // Если list пустой — показать один пустой селектор (автоподбор)
-                    const display = list.length > 0 ? list : [''];
-                    return display.map((cid, k) => {
+                  <button aria-label={`Дублировать соревнование ${c.name}`} onClick={() => {
+                    const used = new Set(competitions.map(x => x.week));
+                    let w = Math.min(totalWeeks, c.week + 8);
+                    while (used.has(w) && w < totalWeeks) w += 1;
+                    if (used.has(w)) w = Array.from({ length: totalWeeks }, (_, i) => i + 1).find(x => !used.has(x)) ?? 1;
+                    const dup: CompetitionEvent = {
+                      ...c,
+                      id: 'comp_' + Date.now().toString(36) + '_dup',
+                      name: c.name + ' (копия)',
+                      week: w,
+                      date: undefined,
+                      priority: c.priority === 'A' ? 'B' : c.priority,
+                    };
+                    setCompetitions([...competitions, dup]);
+                  }}
+                    style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 44, minWidth: 44, flexShrink: 0 }}
+                    title="Дублировать соревнование">⧉</button>
+                  <button aria-label={`Удалить соревнование ${c.name}`} onClick={() => setCompetitions(competitions.filter((_, j) => j !== i))}
+                    style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 14, padding: 4, minHeight: 44, minWidth: 44, flexShrink: 0 }}
+                    title="Удалить соревнование">✕</button>
+                </div>
+                {/* Дата → авто-расчёт недели */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>📅 Дата:</span>
+                  <input type="date" aria-label={`Дата соревнования ${c.name}`} value={c.date ?? ''}
+                    style={{ ...IN, flex: 1, padding: '4px 8px', fontSize: 11, minHeight: 44, color: c.date ? '#00e68a' : 'rgba(255,255,255,0.6)' }}
+                    onChange={e => {
+                      const d = e.target.value;
+                      if (!d) { setComp({ date: undefined }); return; }
+                      setComp({ date: d, week: Math.max(1, Math.min(totalWeeks, estimateCompetitionWeek(d, totalWeeks))) });
+                    }} />
+                  {c.date && <span style={{ fontSize: 10, color: '#00e68a', flexShrink: 0 }}>→ нед {c.week}</span>}
+                </div>
+                {/* ⏳ Обратный отсчёт до старта + дата недели */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+                  <span>{(() => {
+                    const left = weeksUntilWeek(c.week, currentWeekIdx);
+                    if (left < 0) return '⏳ старт прошёл';
+                    if (left === 0) return '⏳ эта неделя — старт!';
+                    return `⏳ до старта: ${left} нед`;
+                  })()}</span>
+                  <span>·</span>
+                  <span>📅 {c.date ?? `~ ${formatMacroDate(macroWeekStartDate(c.week))}`}</span>
+                </div>
+                {/* Приоритет — сегментные чипы с цветами */}
+                <div role="radiogroup" aria-label={`Приоритет соревнования ${c.name}`} style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                  {(['A', 'B', 'C'] as const).map(p => {
+                    const v = COMPETITION_PRIORITY_VISUAL[p];
+                    const active = c.priority === p;
+                    return (
+                      <button key={p} type="button" role="radio" aria-checked={active} aria-label={`Приоритет ${p} — ${v.label}`}
+                        onClick={() => setComp({ priority: p })}
+                        style={{ flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 11, textAlign: 'center',
+                          background: active ? v.color + '1f' : 'rgba(255,255,255,0.03)',
+                          border: active ? `1px solid ${v.color}` : '1px solid rgba(255,255,255,0.08)',
+                          color: active ? v.color : 'rgba(255,255,255,0.5)' }}>
+                        {v.icon} {p} — {v.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Циклы на пик (только A и B): карточки-попапы */}
+                {c.priority !== 'C' && (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700 }}>
+                        🔗 Циклы на пик: {chosenCycles} выбр.
+                      </span>
+                      <button type="button"
+                        onClick={() => {
+                          // Добавить ещё один цикл (пустой = автоподбор).
+                          // Неявная строка «Авто» становится явным слотом (''),
+                          // иначе первый клик не давал видимого результата.
+                          const current = c.cycleIds && c.cycleIds.length > 0
+                            ? [...c.cycleIds]
+                            : (c.cycleId ? [c.cycleId] : ['']);
+                          setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleIds: [...current, ''] } : cc));
+                        }}
+                        style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }}
+                        title="Добавить ещё один цикл на пик"
+                      >+ Цикл</button>
+                    </div>
+                    {slots.map((cid, k) => {
                       const sel = cid ? getCycleById(cid) : undefined;
                       const mismatch = sel && sel.meta.level !== effLevel;
                       return (
-                        <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 3, alignItems: 'center' }}>
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', minWidth: 14, textAlign: 'center' }}>{k + 1}.</span>
-                          <select
-                             style={{ ...IN, padding: '3px 6px', fontSize: 9, minHeight: 44, flex: 1 }}
-                            value={cid}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setCompetitions(competitions.map((cc, j) => {
-                                if (j !== i) return cc;
-                                const cur = cc.cycleIds && cc.cycleIds.length > 0
-                                  ? [...cc.cycleIds]
-                                  : (cc.cycleId ? [cc.cycleId] : ['']);
-                                cur[k] = val;
-                                // Не выкидываем пустые слоты («Авто»): иначе после
-                                // выбора цикла в одном слоте остальные строки
-                                // схлопывались в одну — выбор «не держался».
-                                const hasCycle = cur.some(x => Boolean(x));
-                                return { ...cc, cycleIds: hasCycle ? cur : undefined, cycleId: cur.find(x => Boolean(x)) ?? undefined };
-                              }));
-                            }}
-                            title={filteredCycles.length === 0 ? 'Нет циклов под выбранное направление' : 'Цикл на под-фазу пика'}
-                          >
-                            <option value="">Авто</option>
-                            {filteredCycles.map(cyc => (
-                              <option key={cyc.meta.id} value={cyc.meta.id}>
-                                {cyc.meta.title} ({cyc.meta.level}, {cyc.meta.sessionsPerWeek}д/нед, {cyc.meta.weeks}нед)
-                              </option>
-                            ))}
-                          </select>
-                          {mismatch && (
-                            <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}
-                              title={`Уровень цикла не совпадает с ${effLevel}`}>⚠</span>
-                          )}
-                          {display.length > 1 && (
-                            <button
-                              onClick={() => {
-                                setCompetitions(competitions.map((cc, j) => {
-                                  if (j !== i) return cc;
-                                  const cur = (cc.cycleIds && cc.cycleIds.length > 0 ? [...cc.cycleIds] : (cc.cycleId ? [cc.cycleId] : []));
-                                  cur.splice(k, 1);
-                                  const cleaned = cur.filter((x): x is string => Boolean(x));
-                                  return { ...cc, cycleIds: cleaned.length > 0 ? cleaned : undefined, cycleId: cleaned[0] };
-                                }));
-                              }}
-                               style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 2, minHeight: 44, minWidth: 44, lineHeight: 1 }}
-                              title="Удалить цикл"
-                            >✕</button>
+                        <div key={k} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <PopupSelect
+                              label={`Цикл ${k + 1}${mismatch ? ' ⚠' : ''}`}
+                              value={cid}
+                              options={cycleOptions}
+                              hint={mismatch
+                                ? `Уровень выбранного цикла (${sel?.meta.level}) не совпадает с уровнем ${effLevel}.`
+                                : 'Цикл для под-фазы пика соревнования. «Авто» — подбор по фазе и уровню.'}
+                              onChange={v => setSlot(k, v)}
+                            />
+                          </div>
+                          {slots.length > 1 && (
+                            <button aria-label={`Удалить цикл ${k + 1}`} onClick={() => removeSlot(k)}
+                              style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 2, minHeight: 44, minWidth: 44, lineHeight: 1, flexShrink: 0 }}
+                              title="Удалить цикл">✕</button>
                           )}
                         </div>
                       );
-                    });
-                  })()}
-                </div>
-              )}
-            </div>
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -611,6 +1107,41 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       {(isBB ? bbMacro : macro) && (
         <div style={CARD}>
           <div style={H}>📅 Таймлайн ({(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)} нед)</div>
+          {/* 🔔 «Что тренировать сегодня»: активный блок + ближайший старт + быстрые действия */}
+          {(() => {
+            const src = isBB ? bbMacro! : macro!;
+            const blockIdx = src.blocks.findIndex(b => currentWeekIdx >= b.weekOffset && currentWeekIdx < b.weekOffset + b.weeks);
+            const block = blockIdx >= 0 ? src.blocks[blockIdx] : null;
+            const nextComp = (src.competitions ?? []).filter(c => c.week >= currentWeekIdx).sort((a, b) => a.week - b.week)[0];
+            const blockLabel = block
+              ? ('cycleId' in block
+                  ? (PHASE_LABEL_RU[block.phase as MacroPhase] ?? block.phase)
+                  : (BB_PHASE_LABEL_RU[block.phase as BBMacroPhase] ?? block.phase))
+              : null;
+            const cycleTitle = block && 'cycleId' in block && block.cycleId
+              ? (getCycleById(block.cycleId)?.meta.title ?? block.cycleId)
+              : null;
+            return (
+              <div style={{ marginBottom: 8, padding: 10, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.18)' }} className="macrocycle-today-card">
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>
+                  🔔 Сегодня — нед {currentWeekIdx} ({formatMacroDate(macroWeekStartDate(currentWeekIdx))})
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
+                  {blockLabel ? `Фаза: ${blockLabel}${cycleTitle ? ` · цикл «${cycleTitle}»` : ''}` : 'Макроцикл ещё не покрывает эту неделю'}
+                  {nextComp ? ` · ⏳ до старта «${nextComp.name}»: ${Math.max(0, nextComp.week - currentWeekIdx)} нед` : ''}
+                </div>
+                {block && blockIdx >= 0 && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                    {isBB
+                      ? <button type="button" onClick={() => openBuilder(blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44 }}>⚙️ Собрать этот блок</button>
+                      : ('cycleId' in block && block.cycleId
+                          ? <button type="button" onClick={() => applyBlock(blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44 }}>✓ Применить цикл</button>
+                          : null)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {/* Горизонтальная полоса с блоками + маркер текущей недели */}
           <div className="macrocycle-timeline-scroll" style={{ borderRadius: 8, overflowX: 'auto', overflowY: 'hidden', border: `1px solid ${isHighContrast ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)'}`, marginBottom: 8, minWidth: 0 }}>
            <div className="macrocycle-timeline-track" style={{ display: 'flex', height: isCompact ? 48 : 64, position: 'relative', minWidth: Math.max(100, (isBB ? bbMacro!.totalWeeks : macro!.totalWeeks) * 56) }}>
@@ -657,7 +1188,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 >
                    {uiPrefs.showIcons && <span style={{ fontSize: isCompact ? 13 : 16 }}>{phaseIcon}</span>}
                     <span style={{ fontSize: 9, fontWeight: 700, color: isSel ? 'var(--accent-contrast, #06281c)' : 'var(--text, #fff)', textAlign: 'center', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{phaseLabel}</span>
-                   <span style={{ fontSize: 8, color: isSel ? 'var(--accent-contrast, #06281c)' : 'var(--text-dim, rgba(255,255,255,0.7))' }}>{b.weeks}н</span>
+                   <span style={{ fontSize: 8, color: isSel ? 'var(--accent-contrast, #06281c)' : 'var(--text-dim, rgba(255,255,255,0.7))' }}>{b.weeks}н · с {formatMacroDate(macroWeekStartDate(b.weekOffset))}</span>
                      {isComp && <span aria-label={compForThisBlock ? `Соревнование ${compForThisBlock.name}, приоритет ${compForThisBlock.priority}` : 'Соревновательный блок'} className="macrocycle-competition-badge" style={{ position: 'absolute', top: 2, right: 3, fontSize: 10, lineHeight: 1, color: compForThisBlock ? COMPETITION_PRIORITY_VISUAL[compForThisBlock.priority].color : '#ef4444' }} title={compForThisBlock?.name}>{compForThisBlock ? COMPETITION_PRIORITY_VISUAL[compForThisBlock.priority].icon : '🏁'}<b>{compForThisBlock?.priority ?? ''}</b></span>}
                  </div>
                );
@@ -680,7 +1211,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           </div>
 
           {/* Линейка недель — выровнена по границам блоков */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim, rgba(255,255,255,0.4))', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim, rgba(255,255,255,0.4))' }}>
             {(() => {
               const src = isBB ? bbMacro! : macro!;
               const total = src.totalWeeks;
@@ -688,13 +1219,44 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               return ticks.map((t, i) => <span key={i}>Нед {t}</span>);
             })()}
           </div>
-          {/* Маркер текущей недели — редактор */}
+          {/* Линейка дат (неделя 1 = сегодня) */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'var(--text-dim, rgba(255,255,255,0.3))', marginBottom: 8 }}>
+            {(() => {
+              const src = isBB ? bbMacro! : macro!;
+              const total = src.totalWeeks;
+              const ticks = [1, Math.ceil(total / 4), Math.ceil(total / 2), Math.ceil(total * 3 / 4), total];
+              return ticks.map((t, i) => <span key={i}>· {formatMacroDate(macroWeekStartDate(t))}</span>);
+            })()}
+          </div>
+          {/* Маркер текущей недели — редактор (степпер-кнопки) */}
           <div className="macrocycle-current-week" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
             <span>📍 Текущая неделя:</span>
-             <input aria-label="Текущая неделя макроцикла" style={{ ...IN, padding: '3px 6px', fontSize: 11, width: 60, minHeight: 44, textAlign: 'center' }}
-              type="number" min={1} max={(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)}
-              value={currentWeekIdx}
-               onChange={e => setCurrentWeekIdx(Math.max(1, Math.min(isBB ? (bbMacro?.totalWeeks ?? 1) : (macro?.totalWeeks ?? 1), +e.target.value || 1)))} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <button type="button" aria-label="Предыдущая неделя" title="Предыдущая неделя"
+                onClick={() => setCurrentWeekIdx(w => Math.max(1, w - 1))}
+                style={{ minHeight: 44, minWidth: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>−</button>
+              <span aria-label={`Текущая неделя ${currentWeekIdx}`} style={{ minWidth: 52, textAlign: 'center', fontWeight: 800, fontSize: 13, color: 'var(--accent, #00e68a)', padding: '10px 6px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)' }}>
+                {currentWeekIdx} / {(isBB ? bbMacro!.totalWeeks : macro!.totalWeeks)}
+              </span>
+              <button type="button" aria-label="Следующая неделя" title="Следующая неделя"
+                onClick={() => setCurrentWeekIdx(w => Math.min(isBB ? (bbMacro?.totalWeeks ?? 1) : (macro?.totalWeeks ?? 1), w + 1))}
+                style={{ minHeight: 44, minWidth: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 14 }}>+</button>
+              <button type="button" aria-label="К началу макроцикла" title="К началу макроцикла (неделя 1)"
+                onClick={() => setCurrentWeekIdx(1)}
+                style={{ minHeight: 44, minWidth: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 13 }}>⟲</button>
+            </div>
+            {(() => {
+              const d = diaryMacroStats();
+              if (!d.lastSessionWeek) return null;
+              return (
+                <button type="button" aria-label="По дневнику"
+                  onClick={() => { const w = diaryMacroStats().lastSessionWeek; if (w != null) setCurrentWeekIdx(w); }}
+                  title={`Последняя сессия: ${d.lastSessionDate ?? ''} — неделя ${d.lastSessionWeek}. Кнопка переведёт маркер на неё.`}
+                  style={{ minHeight: 44, padding: '0 10px', borderRadius: 10, border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.07)', color: '#a78bfa', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  📈 По дневнику (нед {d.lastSessionWeek})
+                </button>
+              );
+            })()}
             <span style={{ color: 'rgba(255,255,255,0.4)' }}>(маркер на таймлайне)</span>
           </div>
 
@@ -726,11 +1288,14 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             const abLabel = isBB ? (BB_PHASE_LABEL_RU[activeBlock.phase as BBMacroPhase] ?? '') : PHASE_LABEL_RU[activeBlock.phase as MacroPhase];
             return (
              <div className="macrocycle-active-block" style={{ padding: 10, borderRadius: 8, background: abColor + '15', border: `1px solid ${abColor}40`, marginBottom: 8 }}>
-               <div className="macrocycle-active-block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-light, #fff)', borderLeft: `3px solid ${abColor}`, paddingLeft: 6 }}>{abIcon} {abLabel}</span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Нед {activeBlock.weekOffset}–{activeBlock.weekOffset + activeBlock.weeks - 1} ({activeBlock.weeks} нед)</span>
+                <div className="macrocycle-active-block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-light, #fff)', borderLeft: `3px solid ${abColor}`, paddingLeft: 6 }}>{abIcon} {abLabel}</span>
+                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Нед {activeBlock.weekOffset}–{activeBlock.weekOffset + activeBlock.weeks - 1} ({activeBlock.weeks} нед · {Math.round((activeBlock.weeks / Math.max(1, (isBB ? bbMacro!.totalWeeks : macro!.totalWeeks))) * 100)}% года)</span>
               </div>
               <div className="macrocycle-active-block__description" style={{ ...SMALL, marginBottom: 6 }}>{activeBlock.description}</div>
+              <div style={{ ...SMALL, marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+                🗓 {formatMacroDate(macroWeekStartDate(activeBlock.weekOffset))}–{formatMacroDate(macroWeekEndDate(activeBlock.weekOffset + activeBlock.weeks - 1))}
+              </div>
               {'cycleId' in activeBlock && activeBlock.cycleId && (() => {
                 const cyc = getCycleById(activeBlock.cycleId);
                 return (
@@ -745,10 +1310,70 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   </div>
                 );
               })()}
+              {/* 🏁 Тапер к старту + 📈 прогрессия ПМ (ПЛ-блоки с циклом) */}
+              {!isBB && 'cycleId' in activeBlock && activeBlock.cycleId && (() => {
+                const cyc = getCycleById(activeBlock.cycleId);
+                if (!cyc) return null;
+                const taper = taperWeeksForBlock(activeBlock as MacroBlock);
+                const weeksToStart = Math.max(0, activeBlock.weekOffset + activeBlock.weeks - 1 - currentWeekIdx + 1);
+                const pmMult = projectPmGrowthMultiplier(cyc, weeksToStart);
+                return (
+                  <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+                    {taper.length > 0 && (
+                      <div>🏁 Тапер к старту: {taper.map(t => `нед ${t.week} — ${t.label}, объём ×${t.volumeMult}, RIR +${t.rirShift}`).join(' · ')}</div>
+                    )}
+                    <div>📈 Прогрессия цикла {Math.round((cyc.meta.correctionPct ?? 0.005) * 1000) / 10}%/нед → к старту ПМ ×{pmMult.toFixed(2)}</div>
+                  </div>
+                );
+              })()}
               {'cycleId' in activeBlock && activeBlock.cycleId && (
-                <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44 }}>
+                <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 2 }}>
                   ✓ Применить как активный цикл
                 </button>
+              )}
+              {!isBB && (
+                <div style={{ ...SMALL, marginTop: 6, color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
+                  ПЛ-цикл строится через ПЛ-авто; тапер и прикидки — вкладка «🏁 Пик/Соревнования».
+                </div>
+              )}
+              {isBB && activeBlock && (
+                <>
+                  <button type="button" onClick={() => openBuilder(selectedBlockIdx)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%', borderColor: 'rgba(0,230,138,0.3)', color: '#00e68a' }}>
+                    ⚙️ Собрать этот цикл (сплит + фазы)
+                  </button>
+                  {/* 🎭 Пик-неделя (тапер ББ): протокол для prep-блока */}
+                  {activeBlock.phase === 'contest_prep' && (() => {
+                    const pk = profilePeakDefaults();
+                    const proto = buildPeakWeekProtocol(pk.weight, pk.category, pk.sex);
+                    return (
+                      <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                        <button type="button" onClick={() => setPeakWeekOpen(v => !v)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: '#f59e0b' }}>
+                          {peakWeekOpen ? '▼' : '▶'} 🎭 Пик-неделя (тапер ББ) — 7 дней к сцене
+                        </button>
+                        {peakWeekOpen && (
+                          <>
+                            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {proto.days.map(d => (
+                                <div key={d.day} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                                  <span style={{ fontWeight: 700, minWidth: 34 }}>День {d.day}</span>
+                                  <span style={{ minWidth: 52, color: d.phase === 'show' ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>{d.phase}</span>
+                                  <span style={{ color: 'rgba(255,255,255,0.55)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    💧{d.waterLiters}л · 🧂{d.sodiumGrams}г · 🍚{d.carbGrams}г · {d.trainingMinutes ? `🏋️${d.trainingMinutes}м` : 'отдых'} · 🎭{d.poseMinutes}м
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.45)' }}>
+                              {proto.rationale.slice(0, 2).map((r, i) => <div key={i}>• {r}</div>)}
+                            </div>
+                            <div style={{ marginTop: 4, color: '#f59e0b' }}>⚠ {proto.warnings[0]}</div>
+                            <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.4)' }}>Протокол на {pk.weight} кг · {pk.category} — при сборке цикла применяется автоматически (галочка в попапе).</div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </>
               )}
             </div>
             );
@@ -760,8 +1385,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             </button>
           )}
 
-          {/* Действия годового плана: явное сохранение + «Начать работу по циклу» */}
+          {/* Действия годового плана: сохранить + сводка + «Начать работу по циклу» */}
           {(isBB ? bbMacro : macro) && (
+            <>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button
                 onClick={() => {
@@ -777,6 +1403,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 {macroSavedFlash ? '✅ Сохранено' : '💾 Сохранить'}
               </button>
               <button
+                onClick={copyMacroSummary}
+                style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                title="Скопировать текстовую сводку макроцикла"
+              >
+                {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
+              </button>
+              <button
                 onClick={() => {
                   const source = isBB ? bbMacro : macro;
                   if (!source) return;
@@ -788,7 +1421,169 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 ▶️ Начать работу по циклу
               </button>
             </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button onClick={printMacro} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                title="Открыть макроцикл в окне печати">
+                🖨 Печать макроцикла
+              </button>
+              <button onClick={downloadIcs} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                title="Скачать макроцикл как календарь (.ics)">
+                📅 Календарь (.ics)
+              </button>
+            </div>
+            {isBB && (
+              <>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button type="button" onClick={sendWholeYearToManual} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                    title="Собрать весь год в одну программу и отправить в ручной конструктор">
+                    📦 Год → ручной режим
+                  </button>
+                  <button type="button" onClick={sendWholeYearToBbAuto} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                    title="Собрать весь год в одну программу и передать в ББ-авто">
+                    📦 Год → ББ-авто
+                  </button>
+                </div>
+                {yearNote && (
+                  <div role="status" style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, fontSize: 11, lineHeight: 1.5,
+                    background: yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? 'rgba(0,230,138,0.08)' : 'rgba(245,158,11,0.08)',
+                    border: `1px solid ${yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? 'rgba(0,230,138,0.25)' : 'rgba(245,158,11,0.3)'}`,
+                    color: yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? '#00e68a' : '#f59e0b' }}>
+                    {yearNote}
+                  </div>
+                )}
+              </>
+            )}
+            </>
           )}
+
+          {/* 📊 Итог года: фазы с долями и прогресс-барами */}
+          {(isBB ? bbMacro : macro) && (() => {
+            const src = isBB ? bbMacro! : macro!;
+            const total = Math.max(1, src.totalWeeks);
+            const comps = src.competitions ?? [];
+            const blocks = src.blocks.map(b => {
+              const pct = Math.round((b.weeks / total) * 100);
+              const color = 'cycleId' in b ? (PHASE_COLOR[b.phase as MacroPhase] ?? '#888') : (BB_PHASE_COLOR[b.phase as BBMacroPhase] ?? '#888');
+              const label = 'cycleId' in b ? (PHASE_LABEL_RU[b.phase as MacroPhase] ?? b.phase) : (BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] ?? b.phase);
+              const icon = 'cycleId' in b ? (PHASE_ICON[b.phase as MacroPhase] ?? '') : (BB_PHASE_ICON[b.phase as BBMacroPhase] ?? '');
+              const cycleTitle = 'cycleId' in b && b.cycleId ? (getCycleById(b.cycleId)?.meta.title ?? b.cycleId) : '';
+              const isActive = currentWeekIdx >= b.weekOffset && currentWeekIdx < b.weekOffset + b.weeks;
+              return { ...b, pct, color, label, icon, cycleTitle, isActive };
+            });
+            const activeLabel = blocks.find(b => b.isActive)?.label ?? null;
+            return (
+              <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-year-stats">
+                <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
+                  📊 Итог года — {total} нед{comps.length > 0 ? ` · 🏁 ${comps.length} соревн.` : ''}{activeLabel ? ` · 📍 сейчас: ${activeLabel}` : ''}
+                </div>
+                {blocks.map((b, i) => (
+                  <div key={i} style={{ marginBottom: 4, padding: b.isActive ? '4px 6px' : 0, borderRadius: 6, background: b.isActive ? b.color + '14' : 'transparent', border: b.isActive ? `1px solid ${b.color}40` : '1px solid transparent' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, fontSize: 10 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: b.isActive ? 800 : 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {b.isActive ? '📍 ' : ''}{b.icon} {b.label}{b.cycleTitle ? ` — ${b.cycleTitle}` : ''}
+                      </span>
+                      <span style={{ color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>нед {b.weekOffset}–{b.weekOffset + b.weeks - 1} · {b.weeks}н · {b.pct}%</span>
+                    </div>
+                    <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 2 }}>
+                      <div style={{ width: `${b.pct}%`, height: '100%', background: b.color, borderRadius: 3 }} />
+                    </div>
+                  </div>
+                ))}
+                {comps.length > 0 && (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                    {[...comps].sort((a, b) => a.week - b.week).map(c => {
+                      const v = COMPETITION_PRIORITY_VISUAL[c.priority];
+                      return (
+                        <div key={c.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          <span>{v.icon}</span><span style={{ fontWeight: 700, color: v.color }}>[{c.priority}]</span>
+                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.4)' }}>нед {c.week}{c.date ? ` (${c.date})` : ''}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* 🗺 Heatmap фаз по неделям (интенсивность) */}
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 2 }} className="macro-week-heatmap">
+                  {Array.from({ length: total }, (_, i) => {
+                    const w = i + 1;
+                    const block = blocks.find(b => w >= b.weekOffset && w < b.weekOffset + b.weeks);
+                    const active = w === currentWeekIdx;
+                    return (
+                      <div key={w} className="macro-week-cell" aria-label={`Нед ${w}: ${block?.label ?? '—'}`}
+                        title={`Нед ${w}: ${block?.label ?? '—'}${block ? ` · ${block.weeks}н` : ''}`}
+                        style={{ width: 8, height: 8, borderRadius: 2, background: block?.color ?? 'rgba(255,255,255,0.05)', outline: active ? '1.5px solid #fff' : 'none' }} />
+                    );
+                  })}
+                </div>
+                {/* ⚡ ACWR из дневника (sRPE) + сессии */}
+                {(() => {
+                  const d = diaryMacroStats();
+                  if (!d.acwr && d.sessions7 === 0) {
+                    return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>🗺 Фазы по неделям (ACWR появится, когда в дневнике будут sRPE-сессии).</div>;
+                  }
+                  const zoneColor = d.acwr?.zone === 'dangerous' ? '#ef4444' : d.acwr?.zone === 'caution' ? '#f59e0b' : d.acwr?.zone === 'undertrained' ? 'rgba(255,255,255,0.45)' : '#00e68a';
+                  return (
+                    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                      <div>
+                        📈 Дневник: {d.sessions7} сессий (7д) · {d.sessions28} (28д){d.lastSessionDate ? ` · последняя ${d.lastSessionDate}` : ''}
+                      </div>
+                      {d.acwr && (
+                        <div style={{ color: zoneColor, fontWeight: 700 }}>
+                          ⚡ ACWR {d.acwr.ratio} — {ACWR_ZONE_LABEL[d.acwr.zone]}
+                          {d.acwr.zone === 'caution' && ' · перед пиком снизьте объём'}
+                          {d.acwr.zone === 'dangerous' && ' · обязателен делод перед стартом'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
+
+          {/* 📸 Сценарии года: снапшоты для сравнения планов */}
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-scenarios">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3 }}>📸 Сценарии года</span>
+              <button type="button" onClick={() => {
+                const src = isBB ? bbMacro : macro;
+                if (!src) return;
+                setScenarios(saveMacroScenario(`Сценарий ${scenarios.length + 1} · ${src.totalWeeks} нед`, src));
+              }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }} title="Снимок текущего макроцикла как сценарий">📸 Снимок</button>
+            </div>
+            {scenarios.length === 0 && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                Сохраните сценарий (например, соревнование в июне), перестройте план (например, сентябрь) — и сравните фазы.
+              </div>
+            )}
+            {scenarios.map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{new Date(s.ts).toLocaleDateString('ru-RU')}</span>
+                <button type="button" onClick={() => setCompareWith(compareWith?.id === s.id ? null : s)} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} title="Сравнить с текущим макроциклом">{compareWith?.id === s.id ? '✕ Закрыть' : '⇄ Сравнить'}</button>
+                <button type="button" aria-label={`Удалить сценарий ${s.label}`} onClick={() => setScenarios(removeMacroScenario(s.id))} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 4, minHeight: 44, minWidth: 44, flexShrink: 0 }}>✕</button>
+              </div>
+            ))}
+            {compareWith && (() => {
+              const src = isBB ? bbMacro : macro;
+              if (!src) return null;
+              const diffs = compareMacroScenarios(compareWith.data, src);
+              return (
+                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }} className="macrocycle-scenario-compare">
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>⇄ {compareWith.label} → текущий ({src.totalWeeks} нед)</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>{scenarioSummary(compareWith.data)} → {scenarioSummary(src)}</div>
+                  {diffs.map(d => (
+                    <div key={d.phase} style={{ display: 'flex', gap: 6, fontSize: 10, alignItems: 'baseline' }}>
+                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.75)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.phase}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{d.weeksA} → {d.weeksB} нед</span>
+                      <span style={{ fontWeight: 700, flexShrink: 0, color: d.diff > 0 ? '#00e68a' : d.diff < 0 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>{d.diff > 0 ? `+${d.diff}` : d.diff}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Правка длительности фаз */}
            <div className="macrocycle-phase-editor" style={{ marginTop: 10 }}>
@@ -803,18 +1598,17 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 const pl = isBB ? BB_PHASE_LABEL_RU[phase as BBMacroPhase] : PHASE_LABEL_RU[phase as MacroPhase];
                 return (
                 <div key={phase}>
-                  <div style={{ fontSize: 9, color: pc, textAlign: 'center', fontWeight: 700 }}>{pi} {pl}</div>
-                  <input
-                     aria-label={`Длительность фазы ${pl}`}
-                     style={{ ...IN, padding: '4px', fontSize: 11, textAlign: 'center', minHeight: 44, marginTop: 2 }}
-                     type="number" min={1} max={Math.max(1, src.totalWeeks)} inputMode="numeric"
+                  <div style={{ fontSize: 9, color: pc, textAlign: 'center', fontWeight: 700, marginBottom: 3 }}>{pi} {pl}</div>
+                  <PopupNumber
+                    label="Недель"
                     value={editWeeks[phase] ?? phaseWeeks}
-                     onChange={e => {
-                       const value = Number(e.target.value);
-                       if (Number.isFinite(value) && value >= 1) setEditWeeks(prev => ({ ...prev, [phase]: Math.min(src.totalWeeks, Math.round(value)) }));
-                     }}
+                    min={1}
+                    max={Math.max(1, src.totalWeeks)}
+                    suffix=" нед"
+                    hint={`Длительность фазы «${pl}» (сумма блоков сейчас: ${phaseWeeks})`}
+                    onChange={v => { if (Number.isFinite(v) && v >= 1) setEditWeeks(prev => ({ ...prev, [phase]: Math.min(src.totalWeeks, Math.round(v)) })); }}
                   />
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>сумма блоков</div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>сумма блоков: {phaseWeeks}</div>
                 </div>
                 );
               })}
@@ -829,6 +1623,107 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           </div>
         </div>
       )}
+
+      {/* ⚙️ Сборка цикла ББ: сплит + фазы → расписать в ручной режим / ББ-авто */}
+      {isBB && builderForBlock >= 0 && bbMacro && (() => {
+        const block = bbMacro.blocks[builderForBlock];
+        if (!block) return null;
+        const total = BB_PHASES.reduce((s, phase) => s + (builderWeeks[phase] || 0), 0);
+        const splitOptions = SPLIT_PATTERNS.map(p => ({
+          id: p.id,
+          label: p.name,
+          desc: `${p.sessionsPerRotation} дн/нед · ${p.description ?? ''}`,
+        }));
+        return (
+          <div role="dialog" aria-modal="true" aria-label="Сборка цикла ББ" onClick={() => setBuilderForBlock(-1)}
+            style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', padding: 12 }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '92%', maxWidth: 440, maxHeight: '84vh', overflow: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
+              <div style={{ padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>⚙️ Сборка цикла ББ</div>
+                  <button type="button" aria-label="Закрыть" onClick={() => setBuilderForBlock(-1)} style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 15 }}>✕</button>
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 10, lineHeight: 1.5 }}>
+                  Блок «{BB_PHASE_LABEL_RU[block.phase]}» ({block.weeks} нед). Выберите сплит, настройте фазы ББ-макроцикла и соберите цикл — затем отправьте его в ручной конструктор или ББ-авто.
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <PopupSelect
+                    label="Сплит (генератор сплитов)"
+                    value={builderSplit}
+                    options={splitOptions}
+                    hint="Раскладка тренировочных дней цикла. Рекомендуемый — первым в списке."
+                    onChange={v => { setBuilderSplit(v); setBuilderPlan(null); setBuilderMsg(null); }}
+                  />
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '8px 0 6px' }}>
+                  Фазы ББ-макроцикла (недель)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {BB_PHASES.map(phase => (
+                    <div key={phase}>
+                      <PopupNumber
+                        label={`${BB_PHASE_ICON[phase]} ${BB_PHASE_LABEL_RU[phase]}`}
+                        value={builderWeeks[phase] || 0}
+                        min={0}
+                        max={52}
+                        suffix=" нед"
+                        hint={`Недель фазы «${BB_PHASE_LABEL_RU[phase]}» в цикле (0 — фаза не входит).`}
+                        onChange={v => { setBuilderWeeks(prev => ({ ...prev, [phase]: Math.max(0, Math.round(v)) })); setBuilderPlan(null); setBuilderMsg(null); }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0' }}>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Итого недель:</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: total >= 4 ? '#00e68a' : '#f59e0b' }}>{total}</span>
+                </div>
+                {(builderWeeks.contest_prep || 0) > 0 && (
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <PopupSelect
+                        label="🎭 Категория шоу"
+                        value={builderCategory}
+                        options={PEAK_CATEGORY_OPTIONS}
+                        hint="Категория влияет на протокол пик-недели (лёгкие категории — меньше натрия/углеводов). Значение — из профиля."
+                        onChange={v => { setBuilderCategory(v); setBuilderPlan(null); setBuilderMsg(null); }}
+                      />
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.25)', cursor: 'pointer', fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                      <input type="checkbox" checked={builderPeakWeek} onChange={e => { setBuilderPeakWeek(e.target.checked); setBuilderPlan(null); setBuilderMsg(null); }} style={{ width: 18, height: 18, accentColor: '#f59e0b' }} />
+                      🎭 Применить пик-неделю (тапер ББ) к последней неделе contest prep — вода/натрий/карбы/позы
+                    </label>
+                  </>
+                )}
+                <button type="button" onClick={buildCycleFromBuilder} style={{ ...BTN, width: '100%', minHeight: 44, fontSize: 13 }}>
+                  ⚙️ Собрать и расписать ({total} нед)
+                </button>
+                {builderMsg && (
+                  <div role="status" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, fontSize: 11, lineHeight: 1.5,
+                    background: builderMsg.startsWith('✅') || builderMsg.startsWith('🚀') ? 'rgba(0,230,138,0.08)' : 'rgba(245,158,11,0.08)',
+                    border: `1px solid ${builderMsg.startsWith('✅') || builderMsg.startsWith('🚀') ? 'rgba(0,230,138,0.25)' : 'rgba(245,158,11,0.3)'}`,
+                    color: builderMsg.startsWith('✅') || builderMsg.startsWith('🚀') ? '#00e68a' : '#f59e0b' }}>
+                    {builderMsg}
+                  </div>
+                )}
+                {builderPlan && (
+                  <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>✅ Цикл собран:</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 8 }}>{builderPlan.label}</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button type="button" onClick={sendCycleToManual} style={{ ...BTN_GHOST, flex: 1, minHeight: 44, fontSize: 11 }}>📥 В ручной режим</button>
+                      <button type="button" onClick={sendCycleToBbAuto} style={{ ...BTN, flex: 1, minHeight: 44, fontSize: 11 }}>🚀 В ББ-авто</button>
+                    </div>
+                  </div>
+                )}
+                <div style={{ marginTop: 10, padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                  🏁 <b style={{ color: '#f59e0b' }}>Тапер для ББ (пик-неделя)</b> — применяется к последней неделе contest prep: вода/натрий/карбы/позы по дням (галочка выше). ПЛ-циклы строятся через ПЛ-авто + тапер.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

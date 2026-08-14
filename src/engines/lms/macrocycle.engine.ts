@@ -1155,3 +1155,68 @@ export function deserializeBbMacro(s: string): BBMacrocycle | null {
 }
 
 export { PHASE_COLOR, PHASE_LABEL_RU, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, BB_PHASE_ICON };
+
+// ─── Хелперы «подстройки под соревнования» (Раунд E) ─────────────────────────
+
+const DAY_MS = 86400000;
+
+/** Дата начала недели N макроцикла (неделя 1 = reference, по умолчанию — сегодня). */
+export function macroWeekStartDate(weekNumber: number, reference?: Date | string): Date | null {
+  if (!Number.isInteger(weekNumber) || weekNumber < 1) return null;
+  const base = reference == null ? new Date() : (reference instanceof Date ? reference : new Date(reference));
+  if (!Number.isFinite(base.getTime())) return null;
+  return new Date(base.getTime() + (weekNumber - 1) * 7 * DAY_MS);
+}
+
+/** Дата конца недели N (воскресенье). */
+export function macroWeekEndDate(weekNumber: number, reference?: Date | string): Date | null {
+  const start = macroWeekStartDate(weekNumber, reference);
+  return start ? new Date(start.getTime() + 6 * DAY_MS) : null;
+}
+
+/** Сколько недель осталось до недели N (0 = текущая неделя; отрицательное — уже прошла). */
+export function weeksUntilWeek(weekNumber: number, currentWeek = 1): number {
+  if (!Number.isInteger(weekNumber) || weekNumber < 1) return 0;
+  return weekNumber - currentWeek;
+}
+
+/** Компактная строка даты «dd.mm.yy». */
+export function formatMacroDate(d: Date | null): string {
+  if (!d || !Number.isFinite(d.getTime())) return '—';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}.${mm}.${String(d.getFullYear()).slice(2)}`;
+}
+
+/**
+ * Прогрессия ПМ к старту: множитель роста по коррекции цикла в неделю.
+ * `meta.correctionPct` (например 0.005 = +0.5%/нед) за `weeks` недель.
+ */
+export function projectPmGrowthMultiplier(cycle: SRCycleTemplate | undefined, weeks: number): number {
+  if (weeks <= 0) return 1;
+  const k = cycle?.meta?.correctionPct ?? 0.005;
+  const clamped = Number.isFinite(k) ? Math.min(0.02, Math.max(0.001, k)) : 0.005;
+  return Math.pow(1 + clamped, weeks);
+}
+
+export interface TaperWeekInfo {
+  week: number;          // неделя в макро (1-индекс)
+  weekInBlock: number;   // порядковый номер внутри блока
+  volumeMult: number;    // ×0.65 (N-1) / ×0.45 (N)
+  rirShift: number;      // +1 (N-1) / +2 (N)
+  label: string;         // «предпоследняя» / «финальная»
+}
+
+/**
+ * Тапер к старту в блоке: две финальные недели блока (объём ×0.65/RIR+1,
+ * затем ×0.45/RIR+2 — Bosquet 2005, паритет applyPLTaper/taperCurve).
+ * Блоки ≤ 2 недель тапер не получают (слишком короткие).
+ */
+export function taperWeeksForBlock(block: Pick<MacroBlock, 'phase' | 'weeks' | 'weekOffset'>): TaperWeekInfo[] {
+  if (!block || block.weeks <= 2) return [];
+  const last = block.weekOffset + block.weeks - 1;
+  return [
+    { week: last - 1, weekInBlock: block.weeks - 1, volumeMult: 0.65, rirShift: 1, label: 'предпоследняя' },
+    { week: last, weekInBlock: block.weeks, volumeMult: 0.45, rirShift: 2, label: 'финальная' },
+  ];
+}
