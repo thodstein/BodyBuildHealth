@@ -10,17 +10,18 @@
  */
 import React from 'react';
 import type { PED, PEDAdaptation, CourseIntensity } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { getPedCap } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { CARD } from './training-ui';
 
 const ACCENT = '#00e68a';
 
 /** Метаданные веществ для UI (единицы/подсказки/шаг). */
-export const PED_META_UI: Record<PED, { label: string; unit: string; hint: string; emoji: string; step: number; max: number }> = {
-  AAS: { label: 'ААС', unit: 'мг/нед', hint: 'Синтез белка ×2-3, восстановление ↑↑. Каждые +250 мг ≈ +5% MRV', emoji: '💉', step: 50, max: 3000 },
-  insulin: { label: 'Инсулин', unit: 'МЕ/день', hint: 'Суперкомпенсация гликогена. Требует высоких углеводов вокруг тренировки', emoji: '🧪', step: 5, max: 50 },
-  MGF: { label: 'MGF', unit: 'мкг/нед', hint: 'Локальная активация сателлитных клеток в тренируемых мышцах', emoji: '🧬', step: 50, max: 500 },
-  IGF1: { label: 'IGF-1', unit: 'мкг/день', hint: 'Системный анаболизм, гиперплазия', emoji: '🧬', step: 10, max: 500 },
-  GH: { label: 'ГР', unit: 'МЕ/день', hint: 'Ремонт соединительной ткани, липолиз. Синергия с инсулином', emoji: '🌙', step: 1, max: 20 },
+export const PED_META_UI: Record<PED, { label: string; unit: string; hint: string; emoji: string; step: number; max: number; cap: number }> = {
+  AAS: { label: 'ААС', unit: 'мг/нед', hint: 'Синтез белка ×2-3, восстановление ↑↑. Каждые +250 мг ≈ +5% MRV', emoji: '💉', step: 50, max: 3000, cap: 3000 },
+  insulin: { label: 'Инсулин', unit: 'МЕ/день', hint: 'Суперкомпенсация гликогена. Требует высоких углеводов вокруг тренировки', emoji: '🧪', step: 5, max: 50, cap: 40 },
+  MGF: { label: 'MGF', unit: 'мкг/нед', hint: 'Локальная активация сателлитных клеток в тренируемых мышцах', emoji: '🧬', step: 50, max: 500, cap: 400 },
+  IGF1: { label: 'IGF-1', unit: 'мкг/день', hint: 'Системный анаболизм, гиперплазия', emoji: '🧬', step: 10, max: 500, cap: 100 },
+  GH: { label: 'ГР', unit: 'МЕ/день', hint: 'Ремонт соединительной ткани, липолиз. Синергия с инсулином', emoji: '🌙', step: 1, max: 20, cap: 15 },
 };
 
 export const PED_ORDER: PED[] = ['AAS', 'insulin', 'MGF', 'IGF1', 'GH'];
@@ -123,6 +124,11 @@ export const PedInputPanel: React.FC<{
                     }}
                   />
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', lineHeight: 1.3 }}>{meta.hint}</span>
+                  {val > meta.cap && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', lineHeight: 1.3 }}>
+                      ⚠ Выше {meta.cap} {meta.unit} — кап: дальнейшее повышение дозы НЕ увеличивает MRV/восстановление
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -214,6 +220,11 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
                     {meta ? meta.label : pp.ped}
                     {pp.dose > 0 && <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}> · {pp.dose} {meta ? meta.unit : ''}</span>}
+                    {pp.dose > (meta ? meta.cap : getPedCap(pp.ped as PED)) && (
+                      <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 5, padding: '1px 5px' }}>
+                        кап
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#a855f7', whiteSpace: 'nowrap' }}>MRV ×{pp.mrvMult.toFixed(2)}</span>

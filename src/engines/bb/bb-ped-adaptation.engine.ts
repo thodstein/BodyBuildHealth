@@ -160,6 +160,13 @@ function interpolateDose(ped: PED, dose: number): { mrv: number; rec: number } {
   return { mrv: last.mrv, rec: last.rec };
 }
 
+/** Порог-кап дозы PED: выше него MRV/восстановление больше не растут
+ *  (последняя точка кривой). Экспортируется для UI-подсказок. */
+export function getPedCap(ped: PED): number {
+  const curve = PED_DOSE_CURVES[ped];
+  return curve && curve.length > 0 ? curve[curve.length - 1].threshold : 0;
+}
+
 /** Унифицированный парсер дозы: число → как есть; строка "500mg"/"1,5г" → число.
  *  P2-2: русская запятая "500,5" → "500.5" перед regex (иначе → 5005).
  *  P0-2: используется и для perPED.dose, и для aasDose (risk-threshold) —
@@ -245,6 +252,10 @@ export function adaptForPEDs(
     perPED.push({ ped, dose, mrvMult: doseMrv, recMult: doseRec });
     const doseStr = dose > 0 ? ` (${dose} ${ped === 'AAS' ? 'мг/нед' : ped === 'insulin' || ped === 'GH' ? 'МЕ/день' : 'мкг'})` : '';
     rationale.push(`${ped}${doseStr}: MRV ×${doseMrv.toFixed(2)}, восст ×${doseRec.toFixed(2)} — ${base.notes}`);
+    // Кап-пояснение: выше порога кривая не растёт — повышение дозы бестолку.
+    if (doseProvided && dose > getPedCap(ped)) {
+      rationale.push(`${ped}: доза ${dose} выше капа ${getPedCap(ped)} — дальнейшее повышение НЕ увеличивает MRV/восстановление (потолок кривой).`);
+    }
   }
 
   // GH + инсулин синергия: IGF-1 × инсулин = +15% к комбинированному эффекту

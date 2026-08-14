@@ -19,6 +19,7 @@
  *  - Section H: adjustedMrv per-muscle
  */
 import { describe, expect, it } from 'vitest';
+import { getPedCap } from '../bb-ped-adaptation.engine';
 import {
   adaptForPEDs,
   explainPEDAdaptation,
@@ -412,6 +413,31 @@ describe('F: Risk auto-generation', () => {
   it('no PED → no risks', () => {
     const a = adapt([], {}, 'moderate');
     expect(a.risks).toHaveLength(0);
+  });
+
+  it('доза выше капа: MRV = cap (AAS 4000 = AAS 3000), rationale поясняет потолок', () => {
+    const a = adapt(['AAS'], { AAS: 4000 }, 'moderate');
+    const cap = adapt(['AAS'], { AAS: 3000 }, 'moderate');
+    expect(a.perPED[0].mrvMult).toBe(cap.perPED[0].mrvMult);
+    expect(a.combinedMrvMultiplier).toBe(cap.combinedMrvMultiplier);
+    expect(a.rationale.some(r => r.includes('выше капа') && r.includes('3000'))).toBe(true);
+  });
+
+  it('кап-пороги: insulin 40, MGF 400, IGF1 100, GH 15 — выше них множитель не растёт', () => {
+    for (const [ped, cap, over] of [['insulin', 40, 60], ['MGF', 400, 600], ['IGF1', 100, 200], ['GH', 15, 25]] as const) {
+      const at = adapt([ped], { [ped]: cap }, 'moderate');
+      const above = adapt([ped], { [ped]: over }, 'moderate');
+      expect(above.perPED[0].mrvMult).toBe(at.perPED[0].mrvMult);
+      expect(above.rationale.some(r => r.includes('выше капа'))).toBe(true);
+    }
+  });
+
+  it('getPedCap возвращает последний порог кривой', () => {
+    expect(getPedCap('AAS')).toBe(3000);
+    expect(getPedCap('insulin')).toBe(40);
+    expect(getPedCap('MGF')).toBe(400);
+    expect(getPedCap('IGF1')).toBe(100);
+    expect(getPedCap('GH')).toBe(15);
   });
 });
 
