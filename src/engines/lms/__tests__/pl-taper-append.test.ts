@@ -162,6 +162,38 @@ describe('appendPLTaperWeeks', () => {
     expect(plainLast.pmRow['Присед']).not.toBe(200);
   });
 
+  it('peakMode=pl: ПЛ-пик-протокол — интенсивность растёт к финалу, RIR падает, синглы на интенсивной неделе', () => {
+    const plan = buildBase(6);
+    const pl = appendPLTaperWeeks(plan, 3, { peakMode: 'pl' });
+    const w1 = pl.weeks[pl.weeks.length - 3];
+    const w2 = pl.weeks[pl.weeks.length - 2];
+    const w3 = pl.weeks[pl.weeks.length - 1];
+    const mainOf = (wk: LMSBuildOutput['weeks'][number]) => wk.days.flatMap(d => d.exercises.filter(e => e.load === 'main' || e.load === 'Тяжелая').flatMap(e => e.workSets))[0];
+    // Интенсивность: подводящая 90% → интенсивная 95% → соревновательная 100% (от ПМ своей недели)
+    const pm1 = w1.pmRow['Присед'] ?? 0;
+    const pm2 = w2.pmRow['Присед'] ?? 0;
+    const pm3 = w3.pmRow['Присед'] ?? 0;
+    expect(mainOf(w1)!.weight).toBeCloseTo(Math.round(pm1 * 0.9 * 10) / 10, 0);
+    expect(mainOf(w2)!.weight).toBeCloseTo(Math.round(pm2 * 0.95 * 10) / 10, 0);
+    expect(mainOf(w3)!.weight).toBeCloseTo(Math.round(pm3 * 1.0 * 10) / 10, 0);
+    // RIR падает: 1-2 → 0-1 → 0
+    expect(mainOf(w1)!.rir).toBeLessThanOrEqual(2);
+    expect(mainOf(w3)!.rir).toBeLessThanOrEqual(mainOf(w2)!.rir);
+    // Синглы на интенсивной неделе (reps=1)
+    expect(mainOf(w2)!.reps).toBe(1);
+    // Финальная неделя — прикиды
+    expect(w3.meetAttempts).toBeTruthy();
+    expect(pl.progressionRationale).toContain('ПЛ-пик-протокол');
+  });
+
+  it('peakMode по умолчанию classic — RIR растёт (+1/+2), интенсивность сохранена', () => {
+    const plan = buildBase(6);
+    const classic = appendPLTaperWeeks(plan, 2);
+    const last = classic.weeks[classic.weeks.length - 1];
+    const baseRir = plan.weeks[plan.weeks.length - 1].days[0]?.exercises[0]?.rir ?? 2;
+    expect(last.days[0].exercises[0].rir).toBeGreaterThanOrEqual(baseRir + 2);
+  });
+
   it('meetData: прикиды от планируемого ПМ федерации', () => {
     const plan = buildBase(6);
     const withPlan = appendPLTaperWeeks(plan, 2, {

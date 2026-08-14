@@ -222,6 +222,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [taperActualPm, setTaperActualPm] = useState<Record<string, number>>(_plSaved?.plTaperActualPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperPlannedPm, setTaperPlannedPm] = useState<Record<string, number>>(_plSaved?.plTaperPlannedPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperFed, setTaperFed] = useState<string>(_plSaved?.plTaperFed ?? 'fpr');
+  // Режим пика: classic — разгрузка Bosquet; pl — 3-нед ПЛ-пик-протокол Библиотеки.
+  const [peakMode, setPeakMode] = useState<'classic' | 'pl'>(_plSaved?.plPeakMode ?? 'pl');
   // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
   const [taperPlan, setTaperPlan] = useState<LMSBuildOutput | null>(null);
   // Календарь мезоцикла: показывать оригинальный цикл или с учётом тапера.
@@ -1192,6 +1194,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       { id: 'aggressive', label: MEET_STRATEGY_LABEL.aggressive, desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
                     ]}
                   />
+                  <PopupSelect label="Режим пика" value={peakMode} onChange={v => setPeakMode(v as 'classic' | 'pl')} hint="ПЛ-пик: 3-нед протокол Библиотеки — объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0, синглы на интенсивной неделе. Classic: разгрузка Bosquet (интенсивность сохранена, RIR +1/+2)" options={[
+                    { id: 'pl', label: '🏁 ПЛ-пик-протокол (3 нед, интенсификация)' },
+                    { id: 'classic', label: '📉 Классический тапер (Bosquet, разгрузка)' },
+                  ]} />
                   {/* 🏁 Данные к соревнованиям: тапер строится под РАЗНИЦУ ПМ (факт после цикла vs план федерации) */}
                   <PopupSelect label="Федерация" value={taperFed} onChange={v => setTaperFed(v)} options={[
                     { id: 'ipf', label: 'IPF' }, { id: 'fpr', label: 'FPR' }, { id: 'wpc', label: 'WPC' }, { id: 'other', label: 'Другая' },
@@ -1225,11 +1231,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           : undefined,
                         nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
                         meetData,
+                        peakMode,
                       });
                       setTaperPlan(next);
                       const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0);
-                      setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
-                      setMethodNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
+                      setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${peakMode === 'pl' ? ' · 🏁 ПЛ-пик-протокол' : ' · 📉 классика' }${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
+                      setMethodNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${peakMode === 'pl' ? ' Режим: ПЛ-пик-протокол (объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR→0).' : ' Режим: классический тапер (Bosquet, интенсивность сохранена).'}${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
                     }}
                     style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
                     title="Сгенерировать тапер-план в ОТДЕЛЬНУЮ карточку (не встраивая в weeks цикла) — под разницу ПМ: факт после цикла / план федерации"
@@ -1312,6 +1319,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift }
                           : undefined,
                         nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
+                        peakMode,
                       });
                       setBuiltSrc(next);
                       const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0);
