@@ -1,5 +1,41 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## BB-auto Rebuild — Раунды 2-4 + финал (Aug 13-15 2026, pushed 28fc33c6 → 9241657c → b2a0b86d)
+
+### Раунд 2 — специализация, ноги 2x/нед, cap 5, баланс спины, качество малых групп (Aug 13)
+- `WEAK_PATTERN_REQ` (finalize): слабая подгруппа → обязательный функциональный паттерн (chest_upper→incline, back_width→vertical, quads→squat/leg press); `ensureWeakPatternCoverage`.
+- Ноги 2x/нед: день A — тяж quads + памп hams; день B — тяж hams + памп quads; 2-й паттерн quads = жим ногами (не второй присед); hams — leg curl/RDL без дубля движения.
+- Глобальный cap 5 сетов/упражнение + per-exercise минимум 2; недельный MRV-кап по trueMuscleOf; `lengthenedBonus` (растянутая позиция, Schoenfeld 2021) в выборе упражнений.
+- `ensureSmallMuscleQuality`: икры stretch (стоя) + сидя (камбаловидная), шраги до 5 с задержкой, пресс до 5; при лимите упражнений — замена accessory другой мышцы.
+- Связки мышц: mid-delt+грудь (Push), rear-delt+спина (Pull), бицепс+спина, трицепс+грудь; `diversifyExperiencedChestSession` (mid-delt гарант).
+
+### Раунд 3 — MEV-guard по сессиям, 0 overflow, feeder-интеграция (Aug 14)
+- MEV-guard по СЕССИЯМ: `sessionsForMuscle` считает сессии с мышцей — guard back 7 вместо 2; бюджет-фит не резал ниже MEV.
+- Повторный MRV-кап ПОСЛЕ fill (builder-кап был до finalize); фит не удаляет последний стимул мышцы с повышенным MEV-флором.
+- Indirect смягчён по EMG: triceps 0.45, glutes 0.45, shoulders 0.2, biceps 0.4 — убраны пограничные overflow (fullbody 5x/нед и др.).
+- **Итог Раунда 3: 0 MRV-overflow / 125 комбинаций (5 профилей × 25 сплитов), 875/875 BB-тестов.**
+
+### Раунд 4 — deep-дефициты, traps/glutes, баланс спины, головки рук (Aug 14)
+- **MEV-repair в finalize**: мышцы с direct < MEV получают подъём сетов изоляций/тяг (per-session back-стандарт 18/22 для enhanced 3+) в пределах cap 5, кап-запаса (≤MRV) и лимита сессии; compound-жимы/приседы исключены (indirect выталкивает за кап); мышцы на 80%+ капа не поднимаются.
+- natural traps/glutes: шраги до MEV (5-6), glutes-блок (hip thrust/отведение) в Legs/FullBody — natural-сплиты больше не теряют ягодицы.
+- Баланс ширины/толщины спины (Раунд 4.1): per-session width ≥ 0.6×thickness — подъём существующей вертикальной тяги (до 5, макс 1 vertical/сессию); при лимите — обмен сетов с горизонтальной тяги (с защитой back-стандарта 18/22 и 0.6-симметрии) и мелких изоляций; FullBody без back получает vertical pull (оборудование, bodyweightCapability, лимит упражнений — замена мелочи). **Итог: 0 несбалансированных недель спины (было 18).**
+- **Cap-adjust post-hoc**: triceps/shoulders/biceps с большим indirect (жимы 0.45/0.2, тяги 0.4) урезаются по фактическому effective против адаптированного MRV (изоляции первыми) — закрыт overflow, невидимый МЕV-гаранту (fullbody_2 enh-1-3: жим узким 5 + 8.1 indirect = 15.1 > кап 13×1.15).
+- Классификатор: «Скручивания в верхнем блоке» (пресс) не ловится vertical_pull; bb-safety-score: warmupActivator не входит в рабочий объём; mid-delt гарант считает жимы сидя (махи не дублируются в Pull с армейским жимом).
+
+### Раунд 4 финал — головки рук: планирование объёма (Aug 15, 9241657c)
+- `ensureArmHeadCoverage` (finalize) помимо покрытия планирует объём по головкам: длинная головка (lengthened/overhead) ≥ 3 сетов при бюджете ≥ 5 (перераспределение между упражнениями, лимиты не меняются); brachialis (hammer) / pushdown (lateral+medial) при бюджете ≥ 5 — замена дубля паттерна или не-must упражнения (brachialis приоритетнее стандартного curl, pushdown — close-grip); перегруженная mustHead (≥5) разгружается до 3 в пользу altHead (новый слот, сумма та же); Back-дни bro-сплита обрабатываются.
+- +5 тестов (bb-arm-quality: головки в Pull/Arms/Back-днях, cap 5, сумма не меняется, малый бюджет без слотов).
+
+### UI (Aug 15, b2a0b86d)
+- Бейджи в карточках упражнений BB-auto (шаг plan, редактор ExpandableCard, PDF, SessionPlayer notes): 🔥 Разминка (warmupActivator), 📐 подгруппа спины (backSubgroup), 🦴 головка руки (movementPattern). `backSubgroupLabel`/`armHeadLabel` экспортированы + тест.
+
+### Итоговое состояние BB-auto
+- **880/880 BB-тестов (98 файлов), 4459/4459 весь проект, tsc 0 (кроме чужого WIP PainZone3D), vite build OK.**
+- 125 комбинаций (5 профилей × 25 сплитов): **0 overflow, 0 несбалансированных недель спины, 0 >5 сетов/упражнение, 0 single-set**; 67/125 с дефицитами — все честные (лимит natural 24/10: MEV-сумма 62 > 48, осознанное правило).
+- План docs/BB-AUTO-REBUILD-AND-TUNING-PLAN.md — все этапы выполнены; остаётся только тюнинг по результатам реальных тренировок (Этап 10).
+
+---
+
 ## PED-каталог аудит: единая система id + риски по 7 системам (Aug 14 2026, pushed 49b49fdf + 2574665f + 9871006d)
 
 ### Единая система id — `src/data/ped-alias-map.ts` (resolvePedAlias)
