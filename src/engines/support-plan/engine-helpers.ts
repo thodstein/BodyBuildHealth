@@ -16,6 +16,7 @@ export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, 
 import { evaluateRecommendations } from '../recommendation-engine';
 import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
+import { resolvePedAlias } from '../../data/ped-alias-map';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
@@ -989,13 +990,13 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
   const aasList = state.pharma.aas;
 
   for (const a of aasList) {
-    const id = (a.id || '').toLowerCase();
-    const dbEntry = DRUG_DB[id] || DRUG_DB[a.id];
+    const canon = resolvePedAlias(a.id);
+    const dbEntry = DRUG_DB[canon] || DRUG_DB[a.id];
     const form = dbEntry?.form === 'oral' ? 'oral' as const : 'inject' as const;
     const dbClass = dbEntry?.class || 'aas';
     const drugClass: 'aas' | 'gh' | 'insulin' = dbClass === 'gh' ? 'gh' : dbClass === 'insulin' ? 'insulin' : 'aas';
     const safeDose = Number.isFinite(a.doseMgWeek) ? a.doseMgWeek : 0;
-    drugs.push({ drugClass, drugName: a.id, dose: safeDose, form, startWeek: a.startWeek, endWeek: a.endWeek });
+    drugs.push({ drugClass, drugName: canon, dose: safeDose, form, startWeek: a.startWeek, endWeek: a.endWeek });
   }
 
   if (state.pharma.hasGH && !drugs.some(d => d.drugName === 'mk677' || d.drugName === 'cjc1295')) {

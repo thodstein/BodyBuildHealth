@@ -12,6 +12,7 @@ import type { MapperCtx } from '../tz-mapper-engine';
 import type { PhaseContext, PhaseKey } from '../tz-bridge-phase';
 import type { BoosterTriggerCtx } from '../tz-bridge-boosters';
 import { classifyPed } from '../../data/ped-potency-table';
+import { resolvePedAlias } from '../../data/ped-alias-map';
 import { assessPedRisk } from '../ped-risk-matrix';
 
 const PANEL_KEYS = [
@@ -70,7 +71,9 @@ export function buildMapperCtx(
   const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
     .filter((a: any) => a && a.id)
     .map((a: any) => ({
-      id: (a.id as string).toLowerCase(),
+      // Канонический id pharma-db (trenbolone_acetate → tren_acet): DRUG_DB/пороги/potency
+      // резолвятся только по канону.
+      id: resolvePedAlias(a.id),
       pClass: classifyPed(a.id),
        mgPerWeek: Number(a.mgPerWeek ?? a.dosePerWeek ?? a.doseMgWeek ?? (a.dose ? Number(String(a.dose).replace(/\D/g,''))*7 : 500)) || 0,
       form: (a.form === 'oral' || a.route === 'oral' ? 'oral' : 'inject') as 'oral' | 'inject',
