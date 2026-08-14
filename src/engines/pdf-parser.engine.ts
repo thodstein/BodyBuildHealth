@@ -332,6 +332,18 @@ function extractResultNumber(text: string): number | null {
   return null;
 }
 
+// Gemotest PDF rows contain service/order codes before the actual result:
+// "... A09.05.023 ... 5.00 ммоль/л ...". The generic first-number rule
+// therefore used to return 09 or 023 instead of 5.00. Prefer the number
+// immediately preceding a laboratory unit, including a valid zero.
+function extractNumberBeforeUnit(text: string): number | null {
+  const unit = '(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|мкМЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|s\\b|meq\\/l';
+  const matches = [...text.matchAll(new RegExp(`(\\d+[.,]?\\d*)\\s*[+*]*\\s*(?=${unit})`, 'gi'))];
+  if (matches.length === 0) return null;
+  const value = Number(matches[matches.length - 1][1].replace(',', '.'));
+  return Number.isFinite(value) ? value : null;
+}
+
 function extractRefRange(text: string): { low?: number; high?: number } {
   // Handle "<N" and ">N" reference bounds common in Invitro/Gemotest formats
   const ltMatch = text.match(/<\s*(\d+[\.,]?\d*)/);
@@ -413,13 +425,20 @@ function detectProviderFromText(text: string): string | null {
 interface TextItem { str: string; x: number; y: number; width: number; height: number; }
 
 async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer): Promise<any> {
+  const pdfData = new Uint8Array(data);
+  // In SSR/Node test runners there is no browser Worker implementation. PDF.js
+  // otherwise tries to create a fake worker from the configured CDN URL, which
+  // fails before text extraction even starts (and made valid PDFs look empty).
+  if (typeof Worker === 'undefined') {
+    return pdfjsLib.getDocument({ data: pdfData, disableWorker: true }).promise;
+  }
   try {
-    return await pdfjsLib.getDocument({ data }).promise;
+    return await pdfjsLib.getDocument({ data: pdfData }).promise;
   } catch (workerError) {
     // Some WebViews and Telegram Mini App environments cannot load the CDN
     // worker. PDF.js can still extract/render pages in its main thread.
     console.warn('PDF.js worker failed, retrying without worker:', workerError);
-    return pdfjsLib.getDocument({ data, disableWorker: true }).promise;
+    return pdfjsLib.getDocument({ data: pdfData, disableWorker: true }).promise;
   }
 }
 
@@ -707,7 +726,8 @@ function tryParseLabFromLine(line: string): { code: string; name: string; value:
     // (all numbers were in ranges), try extractResultNumber as fallback —
     // it has the same logic but can catch edge cases where the value is
     // adjacent to a range without a clear separator.
-    let val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
+    let val = extractNumberBeforeUnit(valueText);
+    if (val === null) val = extractNumber(valueText.replace(/[^\d.,\s\-–]/g, ' '));
     if (val === null) {
       val = extractResultNumber(valueText);
     }
@@ -823,9 +843,15 @@ export function parseLabText(rawText: string): ParsedLabResult {
 
 export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<ParsedLabResult> {
   try {
-    const pdfjsLib = await import('pdfjs-dist');
-    const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+    // The modern PDF.js bundle accesses DOMMatrix during module evaluation.
+    // That crashes in WebViews/SSR-like runtimes before the fallback can run.
+    // The legacy bundle keeps the same browser API and is compatible with
+    // environments where those DOM globals are not exposed eagerly.
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    if (typeof Worker !== 'undefined') {
+      const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+    }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
@@ -880,16 +906,18 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
   let pdfjsLib: any;
   let Tesseract: any;
   try {
-    pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
     Tesseract = await import('tesseract.js') as any;
   } catch (initError: any) {
     console.error('ocrScannedPdf init failed:', initError);
     return '';
   }
   try {
-    const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
-    const workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    if (typeof Worker !== 'undefined') {
+      const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
+      const workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     const MAX_PAGE_PX = 8000000;
@@ -962,49 +990,34 @@ async function extractTextFromImage(file: File): Promise<string> {
       context.drawImage(bitmap, 0, 0);
       bitmap.close();
       const enhanced = enhanceOcrCanvas(canvas);
-      // Try English-first on mobile — rus+eng language pack is ~5MB and can OOM
+      // Lab forms in this app are predominantly Russian. English-first OCR can
+      // turn Cyrillic into Latin-looking garbage, so the old "retry only when
+      // Cyrillic was detected" check never retried the correct language pack.
+      // Use the bilingual worker first and keep English as a memory-friendly
+      // fallback for genuinely English forms.
       let ocrText = '';
-      let triedRusEng = false;
+      try {
+        const ruWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
+        try {
+          const { data } = await ruWorker.recognize(enhanced);
+          ocrText = data.text || '';
+        } finally {
+          await ruWorker.terminate();
+        }
+      } catch (ruError: any) {
+        errors.push(`rus+eng OCR failed: ${ruError?.message || String(ruError)}`);
+      }
+      if (ocrText.trim()) return ocrText;
       try {
         const engWorker = await Tesseract.createWorker('eng', 1, workerOptions);
         try {
           const { data } = await engWorker.recognize(enhanced);
-          ocrText = data.text || '';
+          if (data.text?.trim()) return data.text;
         } finally {
           await engWorker.terminate();
         }
-        // If English OCR found text with Cyrillic characters, retry with rus+eng
-        if (/[а-яё]/i.test(ocrText)) {
-          triedRusEng = true;
-          try {
-            const ruWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
-            try {
-              const { data } = await ruWorker.recognize(enhanced);
-              if (data.text?.trim()) return data.text;
-            } finally {
-              await ruWorker.terminate();
-            }
-          } catch (ruError: any) {
-            errors.push(`rus+eng upgrade failed, using English result: ${ruError?.message || String(ruError)}`);
-          }
-        }
       } catch (engError: any) {
         errors.push(`English OCR failed: ${engError?.message || String(engError)}`);
-      }
-      if (ocrText.trim()) return ocrText;
-      if (!triedRusEng) {
-        try {
-          const ruWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
-          try {
-            const { data } = await ruWorker.recognize(enhanced);
-            if (data.text?.trim()) return data.text;
-            errors.push('rus+eng OCR produced no text');
-          } finally {
-            await ruWorker.terminate();
-          }
-        } catch (ruError: any) {
-          errors.push(`rus+eng OCR failed: ${ruError?.message || String(ruError)}`);
-        }
       }
       errors.push('OCR completed but produced no text (image may be blank)');
     }
@@ -1032,8 +1045,9 @@ async function extractTextFromImage(file: File): Promise<string> {
       if (ctx) {
         ctx.drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(img.src);
-        // English-only for canvas fallback
-        const engWorker = await Tesseract.createWorker('eng', 1, workerOptions);
+        // Keep the fallback consistent with the primary path: Russian lab
+        // forms must not be sent through an English-only worker.
+        const engWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
         try {
           const { data } = await engWorker.recognize(c);
           return data.text || '';

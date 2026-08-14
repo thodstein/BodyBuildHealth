@@ -197,7 +197,19 @@ function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
   const byCode = new Map<string, ParsedLabValue>();
   for (const lab of labs) {
     const code = mapToUcumCode(lab.code);
-    if (!code || !Number.isFinite(lab.value) || lab.value <= 0) continue;
+    if (!code || !Number.isFinite(lab.value) || lab.value < 0) continue;
+    // Reject OCR fragments (units, footer words, order numbers) that are not
+    // canonical marker codes. Real canonical codes are ASCII identifiers;
+    // Cyrillic/space/slash fragments must never reach the diary.
+    if (!/^[A-Z][A-Z0-9_]*$/i.test(code)) continue;
+    // Zero is a valid result for urine microscopy and test-strip markers
+    // (e.g. "лейкоциты: 0", "белок: отрицательно"). It used to be removed
+    // here after the parsers had already recognized it.
+    const isUrineMarker = code.startsWith('URINE_') || code.startsWith('NECHIP_')
+      || code === 'UROBILINOGEN' || code === 'UROBILINOGEN_QR'
+      || code === 'PROTEIN_24H' || code === 'CREATININE_URINE';
+    const explicitZero = lab.value === 0 && /(?:^|\s)0(?:[.,]0*)?\s*[+*]*\s*(?:%|[а-яa-z]+\s*\/\s*[а-яa-z]+|[а-яa-z]+\s*[а-яa-z]+)/i.test(lab.raw || '');
+    if (lab.value === 0 && !isUrineMarker && !explicitZero) continue;
     // Skip false-positive codes from combined-line parsing: section headers
     // concatenated with marker names (e.g. "ОБЩИЙ АНАЛИЗ КРОВИ ГЕМОГЛОБИН")
     // produce codes that are clearly not canonical marker identifiers.

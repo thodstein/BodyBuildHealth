@@ -67,6 +67,32 @@ describe('nutrition-ocr-parser', () => {
       expect(item.kcal).toBeCloseTo(166.7, 0);
     });
 
+    it('reconstructs food rows split across OCR lines', () => {
+      const text = [
+        'Завтрак',
+        'Куриная грудка',
+        '200 г',
+        '330 ккал Б:40 Ж:10 У:0',
+        'Рис',
+        '150 г',
+        '195 ккал Б:4 Ж:1 У:42',
+      ].join('\n');
+      const items = parseNutritionText(text).flatMap(meal => meal.items);
+
+      expect(items).toHaveLength(2);
+      expect(items.map(item => item.qtyGrams)).toEqual([200, 150]);
+      expect(items.map(item => item.name)).toEqual(['Куриная грудка', 'Рис']);
+      expect(items[0].kcal).toBe(165);
+      expect(items[1].kcal).toBe(130);
+    });
+
+    it('keeps a food and its quantity when OCR has no calories row', () => {
+      const items = parseNutritionText('Обед\nОгурец\n100 г').flatMap(meal => meal.items);
+
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ name: 'Огурец', qtyGrams: 100 });
+    });
+
     it('parses decimal calories with a comma', () => {
       const meals = parseFatSecretText('Курица 150 г 247,5 ккал Б:46,5 Ж:5,4 У:0');
       const item = meals[0].items[0];

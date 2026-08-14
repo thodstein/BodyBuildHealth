@@ -375,6 +375,16 @@ function extractNumbers(text: string): number[] {
   return matches.map(Number).filter(n => !isNaN(n));
 }
 
+// Real Gemotest rows include service codes before the result. Prefer the
+// numeric token immediately before a laboratory unit, including zero.
+function extractResultBeforeUnit(text: string): number | null {
+  const unit = '(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|мкМЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|s\\b|meq\\/l';
+  const matches = [...text.matchAll(new RegExp(`(\\d+[.,]?\\d*)\\s*[+*]*\\s*(?=${unit})`, 'gi'))];
+  if (matches.length === 0) return null;
+  const value = Number(matches[matches.length - 1][1].replace(',', '.'));
+  return Number.isFinite(value) ? value : null;
+}
+
 /**
  * Полуколичественный парсинг для качественных тестов ОАМ (шкала 0-4):
  *   neg / отрицательно / нет / "не обн."  → 0
@@ -525,6 +535,7 @@ export function parseLabResults(
     if (seenCodes.has(match.code)) continue;
 
     // Extract numbers
+    const resultBeforeUnit = extractResultBeforeUnit(line);
     const numbers = extractNumbers(line);
 
     // Полуколичественный fallback для качественных тестов ОАМ.
@@ -551,9 +562,16 @@ export function parseLabResults(
     if (numbers.length === 0) continue;
 
     // Heuristics
-    const { value, ec50, refText } = extractValueAndEc50(line, numbers);
+    const { value: heuristicValue, ec50, refText } = extractValueAndEc50(line, numbers);
+    const value = resultBeforeUnit ?? heuristicValue;
 
-    if (value <= 0) continue;
+    // Zero is meaningful in urine reports: it denotes no cells/substance,
+    // not a missing OCR value. Keep it for urine markers and retain the
+    // existing guard for ordinary quantitative blood tests.
+    const isUrineMarker = match.code.startsWith('URINE_') || match.code.startsWith('NECHIP_')
+      || match.code === 'UROBILINOGEN' || match.code === 'UROBILINOGEN_QR'
+      || match.code === 'PROTEIN_24H' || match.code === 'CREATININE_URINE';
+    if (value < 0 || (value === 0 && !isUrineMarker)) continue;
 
     const unit = UNIT_MAP[match.code] || '';
 

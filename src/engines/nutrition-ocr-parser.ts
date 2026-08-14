@@ -19,6 +19,44 @@ function normalizeOcrArtifacts(text: string): string {
     .trim();
 }
 
+/**
+ * OCR often separates a food row into several visual lines:
+ *
+ *   Куриная грудка
+ *   200 г
+ *   330 ккал Б:40 Ж:10 У:0
+ *
+ * The row parsers expect these tokens together, so rebuild only the safe
+ * food-row shape before parsing. We deliberately require a quantity line and
+ * a calories/macros line; this prevents meal headings and nutrient labels from
+ * being accidentally joined into a food item.
+ */
+function reconstructFoodRows(lines: string[]): string[] {
+  const result: string[] = [];
+  const quantityOnly = /^\d+(?:[.,]\d+)?\s*(?:г|мл|g|ml|шт|pcs?|кус(?:ок|ка)?|порц(?:ия|ии)?|serving|slice|cup|tbsp|tsp|oz)$/i;
+  const nutritionOnly = /(?:\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal)|(?:белки?|жиры?|углевод|угл|protein|fat|carb|б|ж|у)\s*[:\-]?\s*\d)/i;
+  const foodHeading = /^(?!завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack|итого|всего|total|натрий|калий|магний|кальций|железо|цинк|фосфор|витамин|sodium|potassium|magnesium|calcium|iron|zinc|phosphorus|fiber|клетчатка)[^\d]{2,}$/i;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const current = lines[index].trim();
+    const next = lines[index + 1]?.trim() || '';
+    const afterNext = lines[index + 2]?.trim() || '';
+
+    if (foodHeading.test(current) && quantityOnly.test(next) && nutritionOnly.test(afterNext)) {
+      result.push(`${current} ${next} ${afterNext}`);
+      index += 2;
+      continue;
+    }
+    if (foodHeading.test(current) && quantityOnly.test(next)) {
+      result.push(`${current} ${next}`);
+      index += 1;
+      continue;
+    }
+    result.push(current);
+  }
+  return result;
+}
+
 const VERTICAL_NUTRIENT_LABELS: Array<[RegExp, string, string]> = [
   [/белки?|протеин|protein|\bp\b/i, 'p', 'г'],
   [/жиры?|fat|\bf\b/i, 'f', 'г'],
@@ -426,7 +464,7 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
 }
 
 export function parseNutritionScreenshot(text: string): ParsedMeal[] {
-  const lines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2);
+  const lines = reconstructFoodRows(text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2));
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];
@@ -542,7 +580,7 @@ function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | nul
 }
 
 export function parseFatSecretText(text: string): ParsedMeal[] {
-  const lines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1);
+  const lines = reconstructFoodRows(text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1));
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];

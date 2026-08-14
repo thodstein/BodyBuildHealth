@@ -240,6 +240,37 @@ describe('processUploadedFile: text input pipeline', () => {
     expect(alt).toBeDefined();
     expect(alt!.unit).toBeTruthy();
   });
+
+  it('keeps valid zero results from urine analysis', async () => {
+    const text = [
+      'Общий анализ мочи',
+      'Лейкоциты мочи 0 cells/uL 0-5',
+      'Эритроциты мочи 0 cells/uL 0-2',
+      'Белок мочи (кач) отрицательно',
+    ].join('\n');
+    const file = new File([text], 'urine-zero.txt', { type: 'text/plain' });
+    const result = await processUploadedFile(file);
+
+    expect(result.labs.find(l => l.code === 'URINE_LEU')?.value).toBe(0);
+    expect(result.labs.find(l => l.code === 'URINE_ERY')?.value).toBe(0);
+    expect(result.labs.find(l => l.code === 'URINE_PROTEIN_QR')?.value).toBe(0);
+  });
+
+  it('uses the result before the unit, not Gemotest service-code digits', async () => {
+    const text = [
+      'Гликированный гемоглобин A09.05.083(Приказ МЗ РФ № 804н) 4.6 % Смотри текст',
+      'Глюкоза A09.05.023(Приказ МЗ РФ № 804н) 5.00 ммоль/л 4.11 - 6.1',
+      'ТТГ A09.05.065(Приказ МЗ РФ № 804н) 0. мкМЕ/мл 0.27-4.2',
+      'Т4 свободный A09.05.063(Приказ МЗ РФ № 804н) 3.28++ нг/дл 0.80 - 2.10',
+    ].join('\n');
+    const result = await processUploadedFile(new File([text], 'gemotest-real-row.txt', { type: 'text/plain' }));
+
+    expect(result.labs.find(l => l.code === 'HbA1c')?.value).toBe(4.6);
+    expect(result.labs.find(l => l.code === 'GLU')?.value).toBe(5);
+    expect(result.labs.find(l => l.code === 'TSH')?.value).toBe(0);
+    expect(result.labs.find(l => l.code === 'FT4')?.value).toBe(3.28);
+    expect(result.labs.every(l => /^[A-Z][A-Z0-9_]*$/i.test(l.code))).toBe(true);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
