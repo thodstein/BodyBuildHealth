@@ -76,4 +76,10 @@ describe('Дневник тренировок — режим «Соревнов�
     expect(screen.getByText(/Последняя:/)).toBeTruthy();
     expect(screen.getByText(/0 упр\./)).toBeTruthy();
   });
+
+  it('битая история не-массивом НЕ роняет дневник при открытии', () => {
+    const props = { ...baseProps, historyWorkouts: {} as any };
+    expect(() => render(<TrainingDiaryHub {...props} initialMode="record" />)).not.toThrow();
+    expect(screen.getByText(/Сегодня/)).toBeTruthy();
+  });
 });

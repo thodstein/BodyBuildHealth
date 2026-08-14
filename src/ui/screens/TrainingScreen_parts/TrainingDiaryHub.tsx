@@ -212,13 +212,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // History exercise filter
   const [historyExerciseFilter, setHistoryExerciseFilter] = useState('');
   const [mesoFilter, setMesoFilter] = useState<string>('all');
-  const mesoIds = useMemo(() => Array.from(new Set(historyWorkouts.map(w => (w as any).mesocycleId).filter((x): x is string => !!x))), [historyWorkouts]);
   // Санитизация на входе: legacy-записи без exercises или с exercises={} (не-массив)
   // приводим к [] — защищает ВСЕ подкомпоненты дневника (формы, историю, аналитику).
   const safeHistoryWorkouts = useMemo(
-    () => historyWorkouts.map(w => ({ ...w, exercises: Array.isArray(w.exercises) ? w.exercises : [] })),
+    () => (Array.isArray(historyWorkouts) ? historyWorkouts : []).map(w => ({ ...w, exercises: Array.isArray(w.exercises) ? w.exercises : [] })),
     [historyWorkouts],
   );
+  const mesoIds = useMemo(() => Array.from(new Set(safeHistoryWorkouts.map(w => (w as any).mesocycleId).filter((x): x is string => !!x))), [safeHistoryWorkouts]);
   const allExerciseNames = useMemo(() => {
     const names = new Set<string>();
     safeHistoryWorkouts.forEach(w => (w.exercises ?? []).forEach((e: any) => names.add(e.exerciseName || e.exerciseId)));
