@@ -113,6 +113,17 @@ describe('appendPLTaperWeeks', () => {
     expect(liftAr.third).toBeCloseTo(Math.round(liftNoAr.third * 0.9 * 10) / 10, 1);
   });
 
+  it('питание (как в ББ-авто): профицит+белок → MRV-множитель отражается в rationale плана', () => {
+    const base = { template: CYCLE_01 as never, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 6, faithful: true } as never;
+    const good = buildLMSPlan({ ...base, nutrition: { calorieSurplus: 400, proteinPerKg: 2.2 } } as never);
+    expect(good.progressionRationale).toContain('Питание: MRV +');
+    const bad = buildLMSPlan({ ...base, nutrition: { calorieSurplus: -300, proteinPerKg: 0.8 } } as never);
+    expect(bad.progressionRationale).toContain('Питание: MRV -');
+    // Без эффекта питания (0 ккал, 1.5 г/кг → множитель 1.0) — заметки нет
+    const none = buildLMSPlan({ ...base, nutrition: { calorieSurplus: 0, proteinPerKg: 1.5 } } as never);
+    expect(none.progressionRationale).not.toContain('Питание: MRV');
+  });
+
   it('помечает добавленные недели sourcePhase=peak и macroPhase=competition', () => {
     const plan = buildBase(6);
     const next = appendPLTaperWeeks(plan, 2);

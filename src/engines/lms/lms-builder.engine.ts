@@ -71,6 +71,9 @@ export interface LMSBuildInput {
   hrvMs?: number;         // RMSSD в мс
   sleepHours?: number;    // часов сна/ночь
   stressLevel?: number;   // 1-10
+  /** Питание (Helms 2022): профицит калорий и белок г/кг → MRV soft-cap
+   *  (как в ББ-авто computeBBNutritionMultiplier). */
+  nutrition?: { calorieSurplus?: number; proteinPerKg?: number };
   /** Exact source mode: preserve source sets, reps, order and frequency. */
   faithful?: boolean;
 }
@@ -853,8 +856,20 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
     return r;
   })()));
-  // Итоговый MRV-множитель: PED × recovery (комбинированный soft-cap)
-  const combinedMrvMult = pedMrvMult * recoveryMult;
+  // Питание (Helms 2022): профицит калорий и белок → MRV soft-cap (паритет с ББ-авто).
+  const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
+    let n = 1;
+    const cal = input.nutrition?.calorieSurplus;
+    const pro = input.nutrition?.proteinPerKg;
+    if (cal != null) n *= cal > 300 ? 1.1 : cal > 100 ? 1.05 : cal < -200 ? 0.8 : 1.0;
+    if (pro != null) n *= pro >= 2.0 ? 1.1 : pro >= 1.6 ? 1.05 : pro < 1.0 ? 0.85 : 1.0;
+    return n;
+  })()));
+  const nutritionNote = nutritionMult !== 1
+    ? ` 🥗 Питание: MRV ${nutritionMult > 1 ? '+' : ''}${Math.round((nutritionMult - 1) * 100)}% (калории ${input.nutrition?.calorieSurplus ?? 0} ккал, белок ${input.nutrition?.proteinPerKg ?? 0} г/кг; Helms 2022).`
+    : '';
+  // Итоговый MRV-множитель: PED × recovery × питание (комбинированный soft-cap)
+  const combinedMrvMult = pedMrvMult * recoveryMult * nutritionMult;
 
   // ACWR-авто-делод: если передана ACWR-зона — корректируем объём/RIR для всех недель.
   const acwrZone = input.acwr?.zone;
@@ -1204,6 +1219,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const proRationale = [
     rationale,
     levelPmNote,
+    nutritionNote,
     input.volumeGoal ? `Объём аксессуаров: ${input.volumeGoal === 'mev' ? 'минимальный (MEV)' : input.volumeGoal === 'mrv' ? 'максимальный (MRV)' : 'оптимальный (MAV)'}.` : '',
     input.focusLift ? `Приоритет: акцент на ${input.focusLift === 'squat' ? 'присед' : input.focusLift === 'bench' ? 'жим' : 'тягу'} (+20% объёма).` : '',
     input.weakPoints?.length ? `Слабые группы: ${input.weakPoints.join(', ')} (+20% объёма для упражнений на эти группы).` : '',

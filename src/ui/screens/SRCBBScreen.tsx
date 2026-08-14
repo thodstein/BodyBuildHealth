@@ -51,7 +51,7 @@ import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../engines/lms/competition-attempts';
 import { recommendWeightCut } from '../../engines/gym-competition.engine';
-import { updateSection } from '../../core/profile-manager';
+import { updateSection, getProfile } from '../../core/profile-manager';
 import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
@@ -117,7 +117,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   // State для MacrocyclePanel (редактируемые level/goal в годовом плане)
   const [macroLevel, setMacroLevel] = useState<string>(level);
   const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
-    dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'
+    track === 'bb' || dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'
   );
   // Keep the annual planner aligned with the active PL level when it changes
   // outside the annual-planning view (profile/session restore).
@@ -125,8 +125,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setMacroLevel(level);
   }, [level]);
   useEffect(() => {
-    setMacroGoal(dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting');
-  }, [dir]);
+    // Годовой план в ББ-вкладке всегда строит ББ-макроцикл (4 фазы), иначе
+    // панель строила ПЛ-макроцикл, а «Применить» не находило цикл в блоке.
+    setMacroGoal(mainTab === 'bb' ? 'bodybuilding' : (dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'));
+  }, [dir, mainTab]);
   const [bw, setBw] = useState<number>(_plSaved?.plBw ?? _profPL.bodyWeight ?? 85);
   const [days, setDays] = useState<number>(_plSaved?.plDays ?? 3);
   const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
@@ -302,7 +304,12 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
   const buildSrc = (cycleId = selectedCycleId, weeks = cycleWeeks) => {
     const tpl = getCycleById(cycleId);
-    if (!tpl) return;
+    if (!tpl) {
+      // Раньше — тихий return: кнопка «Применить как активный цикл» молча
+      // ничего не делала, если cycleId блока не найден в каталоге.
+      setMethodNote(`⚠ Цикл «${cycleId}» не найден в каталоге — перестройте макроцикл`);
+      return;
+    }
     // The source cycle, not a generic UI mesocycle length, defines the calendar.
     const safeWeeks = originalCycleWeeks(tpl);
     const pmMap: Record<string, number> = { ...exercisePMs };
@@ -327,6 +334,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
        diagnosticDayMap,
       peds: peds.length ? peds : undefined,
       pedDoses,
+      nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
       autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
       // Original SRC cycles are self-calculating: preserve their source layout
@@ -373,6 +381,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
            diagnosticDayMap,
           peds: peds.length ? peds : undefined,
           pedDoses,
+          nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
            autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
            faithful: true,
@@ -438,6 +447,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [pedAuto, setPedAuto] = useState(_profPL.onCourse);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>(_plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(_plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate');
+  // 🥗 Питание (как в ББ-авто): профицит калорий и белок г/кг → MRV soft-cap (Helms 2022).
+  const [plCalorieSurplus, setPlCalorieSurplus] = useState<number>(() => Number((getProfile()?.settings?.nutrition as any)?.calorieSurplus ?? 0));
+  const [plProteinPerKg, setPlProteinPerKg] = useState<number>(() => Number((getProfile()?.settings?.nutrition as any)?.proteinPerKg ?? 1.8));
   const ranked = useMemo(() => rankCycles({
     goal: goal as any,
     level: level as any,
@@ -1091,6 +1103,38 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ включена: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} интенсивность → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
             {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
             <PedAdaptationCard adaptation={pedAdapt} />
+            {/* 🥗 Питание (как в ББ-авто): профицит калорий + белок → MRV soft-cap (Helms 2022) */}
+            <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>🥗 Питание</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <PopupNumber label="Профицит калорий (ккал/день)" value={plCalorieSurplus} onChange={v => setPlCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10%. Дефицит <-200 → -20% MRV (Helms 2022)" />
+                <PopupNumber label="Белок (г/кг)" value={plProteinPerKg} onChange={v => setPlProteinPerKg(v)} step={0.1} min={0.5} max={3} hint="≥2.0 → +10% MRV, ≥1.6 → +5%, <1.0 → -15% MRV" />
+              </div>
+              {(() => {
+                const nut: Record<string, { cal: string; pro: string; tip: string }> = {
+                  strength: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы 5-7 г/кг для силовой производительности. 4-6 приёмов пищи.' },
+                  mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
+                  cut: { cal: 'Дефицит 300-500 ккал/день', pro: '2.2-2.8 г/кг (≥180 г/день)', tip: 'Белок повышен для сохранения мышц. Клетчатка 30+ г/день.' },
+                  recomp: { cal: 'Поддержание ±100 ккал', pro: '2.0-2.4 г/кг', tip: 'Циклирование углеводов: высокие в дни тренировок, низкие в дни отдыха.' },
+                  maintenance: { cal: 'Поддержание (TDEE)', pro: '1.6-2.0 г/кг', tip: 'Стабильное питание, контроль веса 1 раз/нед.' },
+                };
+                const n = nut[goal] || nut.strength;
+                const calMult = (pedAdapt.combinedMrvMultiplier - 1) * 3 + 1;
+                const adjCal = n.cal.replace(/\d+/, m => String(Math.round(Number(m) * calMult)));
+                return (
+                  <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
+                    <div><span style={{ color: 'rgba(255,255,255,0.5)' }}>Рекомендация: </span><span style={{ fontWeight: 700, color: '#f59e0b' }}>{adjCal}</span></div>
+                    <div><span style={{ color: 'rgba(255,255,255,0.5)' }}>Белок: </span><span style={{ fontWeight: 700, color: '#22c55e' }}>{n.pro}</span></div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'rgba(255,255,255,0.5)' }}>💡 </span><span style={{ color: 'rgba(255,255,255,0.7)' }}>{n.tip}</span></div>
+                    {pedAdapt.combinedMrvMultiplier > 1 && (
+                      <div style={{ gridColumn: '1/-1', marginTop: 4, fontSize: 10, color: '#f59e0b' }}>
+                        💉 PED увеличивают потребность в калориях и белке — значения скорректированы.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
 
            <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
@@ -2419,9 +2463,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
            }
         } else {
           // ПЛ-авто: загрузить выбранный СРЦ-цикл
-           setSelectedCycleId(cycleId);
-           setCycleWeeks(weeks);
-           buildSrc(cycleId, weeks);
+          try {
+            setSelectedCycleId(cycleId);
+            setCycleWeeks(weeks);
+            buildSrc(cycleId, weeks);
+          } catch (error) {
+            setMethodNote(`⚠ Цикл не применён: ${(error as Error).message}`);
+          }
           setSubView('plan');
         }
       }} />}
