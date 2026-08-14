@@ -10,6 +10,7 @@ import { PEPTIDES_GH_SUBS } from './pharma-db/peptides-gh';
 import { IGF_MGF_SUBS } from './pharma-db/igf-mgf';
 import { INSULIN_SUBS } from './pharma-db/insulin';
 import { DROSTANOLONE_SUBS } from './pharma-db/drostanolone';
+import { AUX_SUBS } from './pharma-db/glp1-aux';
 import { CLASS_DEFAULTS } from './pharma-db/class-defaults';
 
 export const PHARMA_DB: Record<string, PharmaSubstance> = {
@@ -24,6 +25,7 @@ export const PHARMA_DB: Record<string, PharmaSubstance> = {
   ...IGF_MGF_SUBS,
   ...INSULIN_SUBS,
   ...DROSTANOLONE_SUBS,
+  ...AUX_SUBS,
 };
 
 export function getPharmaDetail(id: string): PharmaSubstance | null {
@@ -51,7 +53,7 @@ SUBSTANCE_LIST.forEach(s => {
 
 export const PHARMA_CLASSES = [
   'testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'oral_17aa',
-  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'glp1', 'insulin',
+  'sarm', 'peptide_ghrh', 'peptide_ghrp', 'igf1', 'mgf', 'glp1', 'insulin', 'gh', 'clenbuterol', 'thyroid',
   'drostanolone', 'dht_inject', 'dht_derivative', 'peptide_gnrh',
   'peptide_fat_loss', 'peptide_other'
 ] as const;

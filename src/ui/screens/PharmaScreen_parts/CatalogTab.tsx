@@ -412,6 +412,44 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
   );
 });
 
+/** Строка каталога — мемоизирована: не перерисовывается при смене выбора/коллапса других строк. */
+const CatalogRow = React.memo<{
+  s: PharmaSubstance;
+  selected: boolean;
+  flat?: boolean;
+  onSelect: () => void;
+  onAddCourse: (s: PharmaSubstance) => void;
+  onAddCart: (s: PharmaSubstance) => void;
+}>(({ s, selected, flat, onSelect, onAddCourse, onAddCart }) => {
+  const rowStyle: React.CSSProperties = flat
+    ? {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
+        background: selected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
+        border: selected ? '1px solid var(--accent)' : '1px solid transparent',
+      }
+    : {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
+        background: selected ? 'rgba(0,230,138,0.12)' : 'transparent',
+        borderLeft: selected ? '3px solid var(--accent)' : '3px solid transparent',
+        marginBottom: 1,
+      };
+  return (
+    <div style={rowStyle} onClick={onSelect}>
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
+        {flat && <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>}
+      </div>
+      <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
+        <button onClick={() => onAddCourse(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
+        <button onClick={() => onAddCart(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+      </div>
+    </div>
+  );
+});
+CatalogRow.displayName = 'CatalogRow';
+
 export const CatalogTab: React.FC = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterClass, setFilterClass] = useState<string>('all');
@@ -526,19 +564,14 @@ export const CatalogTab: React.FC = () => {
                   <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isCollapsed ? '▸' : '▾'}</span>
                 </div>
                 {!isCollapsed && substances.map(s => (
-                  <div key={s.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
-                    background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
-                    borderLeft: selectedId === s.id ? '3px solid var(--accent)' : '3px solid transparent',
-                    marginBottom: 1,
-                  }} onClick={() => setSelectedId(s.id)}>
-                    <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
-                    <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => addToCourse(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
-                      <button onClick={() => addToCart(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
-                    </div>
-                  </div>
+                  <CatalogRow
+                    key={s.id}
+                    s={s}
+                    selected={selectedId === s.id}
+                    onSelect={() => setSelectedId(s.id)}
+                    onAddCourse={addToCourse}
+                    onAddCart={addToCart}
+                  />
                 ))}
               </div>
             );
@@ -547,21 +580,15 @@ export const CatalogTab: React.FC = () => {
       ) : (
         /* Flat list when filter is specific class or search is active */
         filteredList.map(s => (
-          <div key={s.id} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
-            background: selectedId === s.id ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-            border: selectedId === s.id ? '1px solid var(--accent)' : '1px solid transparent',
-          }} onClick={() => setSelectedId(s.id)}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>
-            </div>
-            <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
-              <button onClick={() => addToCourse(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
-              <button onClick={() => addToCart(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
-            </div>
-          </div>
+          <CatalogRow
+            key={s.id}
+            s={s}
+            flat
+            selected={selectedId === s.id}
+            onSelect={() => setSelectedId(s.id)}
+            onAddCourse={addToCourse}
+            onAddCart={addToCart}
+          />
         ))
       )}
       {filteredList.length === 0 && (

@@ -4,15 +4,17 @@
 import { describe, it, expect } from 'vitest';
 import { PHARMA_DB, getPharmaDetail, PHARMA_CLASSES } from '../../core/pharma-database';
 import { CLASS_DEFAULTS } from '../../core/pharma-db/class-defaults';
+import { resolvePedAlias } from '../../data/ped-alias-map';
 
 describe('категории препаратов (class) — соответствие новой классификации', () => {
   const expected: Record<string, string> = {
     test_prop: 'testosterone', test_enan: 'testosterone', test_cyp: 'testosterone', test_undec: 'testosterone',
+    test_susp: 'testosterone', sustanon: 'testosterone',
     tren_acet: 'trenbolone', tren_enan: 'trenbolone', tren_hex: 'trenbolone',
     npp: 'nandrolone', deca: 'nandrolone', trest_acet: 'nandrolone', trest_enan: 'nandrolone',
     dhb: 'dht_inject', dhb_acetate: 'dht_inject', dhb_propionate: 'dht_inject', dhb_cyp: 'dht_inject',
     bold_undec: 'boldenone',
-    prim_enan: 'primobolan',
+    prim_enan: 'primobolan', methenolone_acetate: 'primobolan',
     drostanolone_prop: 'drostanolone', drostanolone_enan: 'drostanolone',
     mesterolone: 'dht_derivative',
     methand: 'oral_17aa', oxan: 'oral_17aa', stan: 'oral_17aa', trena: 'oral_17aa', halo: 'oral_17aa', superdrol: 'oral_17aa', anadrol: 'oral_17aa',
@@ -20,6 +22,7 @@ describe('категории препаратов (class) — соответст
     cjc1295: 'peptide_ghrh', ghrp6: 'peptide_ghrp', ipamorelin: 'peptide_ghrp', mk677: 'peptide_ghrh',
     igf1_lr3: 'igf1', igf1_des: 'igf1', mgf: 'mgf',
     ins_short: 'insulin', ins_long: 'insulin', ins_aspart: 'insulin', ins_detemir: 'insulin',
+    semaglutide: 'glp1', tirzepatide: 'glp1', hgh: 'gh', clenbuterol: 'clenbuterol', t3: 'thyroid', t4: 'thyroid',
   };
   for (const [id, cls] of Object.entries(expected)) {
     it(`${id} → ${cls}`, () => {
@@ -30,6 +33,16 @@ describe('категории препаратов (class) — соответст
   it('все классы препаратов есть в PHARMA_CLASSES (каталог показывает все категории)', () => {
     const classes = new Set(Object.values(PHARMA_DB).map(s => s.class));
     for (const c of classes) expect(PHARMA_CLASSES).toContain(c);
+  });
+
+  it('все препараты PED_LIST/фармакологии присутствуют в каталоге (включая DHB, GH, клен, T3/T4, GLP-1, сустанон)', () => {
+    const pedIds = ['test_susp','sustanon','methenolone_acetate','semaglutide','tirzepatide','somatropin','clenbuterol','t3','t4','dhb','dhb_acetate','dhb_propionate','dhb_cyp','tren_hex','superdrol','mesterolone','ostarine','lgd','rad140','s23','mk677','cjc1295','ghrp6','ipamorelin','igf1_des'];
+    for (const id of pedIds) {
+      const canon = resolvePedAlias(id);
+      expect(PHARMA_DB[canon] || PHARMA_DB[id], `каталог: ${id} (→ ${canon})`).toBeTruthy();
+    }
+    // DHB в каталоге виден под своим именем
+    expect(PHARMA_DB.dhb?.name).toContain('Дигидроболденон');
   });
 });
 
