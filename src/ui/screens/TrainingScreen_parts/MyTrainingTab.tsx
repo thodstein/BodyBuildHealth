@@ -84,39 +84,54 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
     if (!newExName.trim()) return;
     setCustomExercises(prev => [...prev, { name: newExName.trim(), sets: newExSets, reps: newExReps, rir: newExRir }]);
     setNewExName('');
+    showToast('Упражнение «' + newExName.trim() + '» добавлено в текущий список', 'ok');
+  };
+
+  /** Всплывающее уведомление: что/куда сохранилось или загрузилось. */
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
+    setToast({ msg, type });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
   };
 
   const savePlan = () => {
-    if (customExercises.length === 0) return;
+    if (customExercises.length === 0) { showToast('Список упражнений пуст — добавьте хотя бы одно', 'err'); return; }
     const plan = { id: 'plan_' + Date.now(), name: planName || 'План ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), exercises: [...customExercises] };
     const updated = [...savedPlans, plan];
     setSavedPlans(updated);
-    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+    try { localStorage.setItem('myTrainingPlans', JSON.stringify(updated)); } catch { showToast('Не удалось сохранить: хранилище переполнено', 'err'); return; }
     setPlanName('');
+    showToast('План «' + plan.name + '» (' + plan.exercises.length + ' упр.) сохранён во вкладке «Планы»', 'ok');
   };
 
   const deletePlan = (id: string) => {
     const updated = savedPlans.filter(p => p.id !== id);
     setSavedPlans(updated);
-    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+    try { localStorage.setItem('myTrainingPlans', JSON.stringify(updated)); } catch { showToast('Не удалось удалить: хранилище переполнено', 'err'); return; }
+    showToast('План удалён из «Мои тренировки»', 'ok');
   };
 
-  const loadPlan = (plan: { exercises: { name: string; sets: number; reps: number; rir: number }[] }) => {
+  const loadPlan = (plan: { name?: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }) => {
     setCustomExercises(plan.exercises);
+    showToast('План «' + (plan.name || '—') + '» загружен: ' + plan.exercises.length + ' упр. в список (вкладка «Упражнения»)', 'ok');
   };
 
   const saveCycle = () => {
     const cycle = { id: 'cycle_' + Date.now(), name: cycleName || 'Цикл ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), weeks: mesoLength, goal, level, days: daysPerWeek };
     const updated = [...savedCycles, cycle];
     setSavedCycles(updated);
-    localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
+    try { localStorage.setItem('myTrainingCycles', JSON.stringify(updated)); } catch { showToast('Не удалось сохранить: хранилище переполнено', 'err'); return; }
     setCycleName('');
+    showToast('Цикл «' + cycle.name + '» (' + cycle.weeks + ' нед) сохранён во вкладке «Циклы»', 'ok');
   };
 
   const deleteCycle = (id: string) => {
     const updated = savedCycles.filter(c => c.id !== id);
     setSavedCycles(updated);
-    localStorage.setItem('myTrainingCycles', JSON.stringify(updated));
+    try { localStorage.setItem('myTrainingCycles', JSON.stringify(updated)); } catch { showToast('Не удалось удалить: хранилище переполнено', 'err'); return; }
+    showToast('Цикл удалён из «Мои тренировки»', 'ok');
   };
 
   const groupOptions = [...new Set(EXERCISE_DB.map(e => e.group || '').filter(Boolean))].sort();
@@ -191,12 +206,13 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                 </div>
                 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                   <button onClick={()=>loadPlan(plan)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(0,230,138,0.2)',background:'rgba(0,230,138,0.08)',color:'#00e68a',fontSize:11,cursor:'pointer'}}>Загрузить</button>
-                  <button onClick={()=>setCustomExercises(prev=>[...prev, ...plan.exercises])} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:11,cursor:'pointer'}}>➕ В мою</button>
+                  <button onClick={()=>{ setCustomExercises(prev=>[...prev, ...plan.exercises]); showToast('Добавлено ' + plan.exercises.length + ' упр. к текущему списку', 'ok'); }} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(139,92,246,0.2)',background:'rgba(139,92,246,0.08)',color:'#8b5cf6',fontSize:11,cursor:'pointer'}}>➕ В мою</button>
                   <button onClick={() => {
                     const exs = Array.isArray((plan as any).exercises) ? (plan as any).exercises : (Array.isArray((plan as any).days) ? (plan as any).days.flatMap((d:any)=>d.exercises||[]) : []);
                     const data = exs.map((e:any) => ({ name: e.name, sets: e.sets || e.sets || 3, reps: e.reps || 10, rir: e.rir ?? 2 }));
                     applyToPlanner({ kind: 'split', label: plan.name, data });
-                    if (onLoadToConstructor) onLoadToConstructor({ name: plan.name, exercises: exs });
+                    if (onLoadToConstructor) { onLoadToConstructor({ name: plan.name, exercises: exs }); showToast('План «' + plan.name + '» (' + exs.length + ' упр.) загружен в конструктор', 'ok'); }
+                    else showToast('План «' + plan.name + '» готов — откройте Планировщик (ББ/Ручной) и нажмите «Применить»', 'ok');
                   }} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:11,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
                   <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>Удалить</button>
                 </div>
@@ -326,6 +342,13 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Всплывающее уведомление: что и куда сохранено/загружено */}
+      {toast && (
+        <div role="status" style={{ position:'fixed', bottom: 84, left:'50%', transform:'translateX(-50%)', zIndex: 400, maxWidth:'92%', padding:'10px 16px', borderRadius: 12, fontSize: 12, fontWeight: 700, lineHeight: 1.4, color: '#fff', background: toast.type === 'ok' ? 'rgba(0,230,138,0.16)' : 'rgba(239,68,68,0.18)', border: '1px solid ' + (toast.type === 'ok' ? 'rgba(0,230,138,0.45)' : 'rgba(239,68,68,0.5)'), boxShadow:'0 6px 24px rgba(0,0,0,0.45)', backdropFilter:'blur(8px)' }}>
+          {toast.type === 'ok' ? '✅ ' : '⚠️ '}{toast.msg}
         </div>
       )}
     </div>

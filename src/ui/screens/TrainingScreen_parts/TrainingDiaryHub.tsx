@@ -55,6 +55,7 @@ import { MixEffectivenessCard } from './MixEffectivenessCard';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 import { CompetitionPlansView } from './CompetitionPlansView';
 import { BBRecommendationsTab } from './BBRecommendationsTab';
+import { MyTrainingTab } from './MyTrainingTab';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -97,7 +98,7 @@ const RecordModeSelector: React.FC<{
 const style = diaryStyles;
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -117,7 +118,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'competition' | 'recommendations';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'competition' | 'recommendations' | 'mytraining';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
@@ -142,6 +143,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // Режим записи (быстро/подробно) + предзаполнение из плана дня
   const [recordSub, setRecordSub] = useState<'quick' | 'full'>('quick');
   const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
+  // «Мои тренировки» (перенесено из Библиотеки): рабочий список упражнений
+  const [myTrainingExs, setMyTrainingExs] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
 
   // Progress state
 
@@ -445,11 +448,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Подвкладки дневника: запись / соревнования (mode внутри record-блока сужен до 'record') */}
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setMode('record')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись тренировки</button>
-            <button onClick={() => setMode('history')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
-            <button onClick={() => setMode('competition')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
-            <button onClick={() => setMode('recommendations')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 100, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись</button>
+            <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
+            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
+            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
+            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
           </div>
           <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
@@ -541,6 +545,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
       {/* ═══ MODE: RECOMMENDATIONS ═══ — профессиональные рекомендации (ББ) */}
       {mode === 'recommendations' && <BBRecommendationsTab hub={hub} />}
+
+      {/* ═══ MODE: MY TRAINING ═══ — пользовательские упражнения/планы/циклы (перенесено из Библиотеки) */}
+      {mode === 'mytraining' && (
+        <InfoErrorBoundary label="Мои тренировки">
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <MyTrainingTab customExercises={myTrainingExs} setCustomExercises={setMyTrainingExs} goal={goal} level={level} daysPerWeek={daysPerWeek} mesoLength={mesoLength} />
+          </div>
+        </InfoErrorBoundary>
+      )}
 
       {/* ═══ MODE: ANALYTICS ═══ */}
       {mode === 'analytics' && (

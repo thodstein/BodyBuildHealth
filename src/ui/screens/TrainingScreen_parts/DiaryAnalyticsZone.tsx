@@ -13,7 +13,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -34,7 +34,7 @@ interface Props {
 }
 
 /** Map old external tabs and legacy mode names to hub modes */
-export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' {
+export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mytraining' {
   // Legacy initialDiaryMode values
   if (initialDiaryMode === 'reports') return 'tools';
   if (initialDiaryMode === 'diary') return 'record';
@@ -45,6 +45,7 @@ export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'reco
     case 'calendar': return 'calendar';
     case 'checkin': return 'checkin';
     case 'mmc_tracking': return 'mmc';
+    case 'mytraining': return 'mytraining';
     case 'reports':
     case 'import_data': return 'tools';
     case 'diary': return 'record';

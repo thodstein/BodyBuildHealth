@@ -627,7 +627,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       )}
 
       {/* ═══════════ Библиотека (зона) ═══════════ */}
-      {zone === 'library' && (tab === 'library' || tab === 'programs' || tab === 'methods' || tab === 'peaking' || tab === 'calc_taper' || tab === 'exercises' || tab === 'mytraining') && (
+      {zone === 'library' && (tab === 'library' || tab === 'programs' || tab === 'methods' || tab === 'peaking' || tab === 'calc_taper' || tab === 'exercises') && (
         <LibraryZone
           tab={tab}
           linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts}
@@ -645,7 +645,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
             {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {/* ═══════════ Дневник и аналитика (зона) ═══════════ */}
-      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'reports') && (
+      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'reports' || tab === 'mytraining') && (
         <DiaryAnalyticsZone
           tab={tab}
           initialDiaryMode={initialSubTab === 'diary' ? 'diary' : undefined}

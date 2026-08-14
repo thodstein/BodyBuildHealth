@@ -9,7 +9,6 @@ import type { TrainingOutput, WorkoutLog } from '../../../core/types';
 import type { StrengthStats } from '../../../engines/strength-diary.engine';
 import { MethodsTab } from './MethodsTab';
 import { ProgramsTab } from './ProgramsTab';
-import { MyTrainingTab } from './MyTrainingTab';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
 import { PeakingProtocolsTab } from './PeakingProtocolsTab';
 import { TaperPlannerTab } from './TaperPlannerTab';
@@ -92,13 +91,6 @@ export const LibraryZone: React.FC<Props> = (p) => {
       {p.tab === 'exercises' && (
         <InfoErrorBoundary label="Упражнения">
           <ExerciseLabCatalog />
-        </InfoErrorBoundary>
-      )}
-      {p.tab === 'mytraining' && (
-        <InfoErrorBoundary label="Мои тренировки">
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <MyTrainingTab customExercises={p.customExercises} setCustomExercises={p.setCustomExercises} goal={p.goal} level={p.level} daysPerWeek={p.daysPerWeek} mesoLength={p.mesoLength} onLoadToConstructor={p.onLoadToConstructor} />
-          </div>
         </InfoErrorBoundary>
       )}
     </>

@@ -63,9 +63,10 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '📖',
     color: '#f59e0b',
     subtitle: 'Каталог процессов: циклы, программы, методики, пик-протоколы, упражнения',
-    tabs: ['library', 'programs', 'methods', 'peaking', 'calc_taper', 'exercises', 'mytraining'],
+    // «Мои тренировки» перенесены в Дневник (подвкладка TrainingDiaryHub).
+    tabs: ['library', 'programs', 'methods', 'peaking', 'calc_taper', 'exercises'],
     categories: [
-      { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs', 'mytraining'] },
+      { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs'] },
       { label: 'Знания и методики', icon: '🧠', tabs: ['methods', 'peaking', 'calc_taper', 'exercises'] },
     ],
   },
