@@ -221,8 +221,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     if (!historyExerciseFilter) return historyWorkouts;
     return historyWorkouts.map(w => ({
       ...w,
-      exercises: w.exercises.filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(historyExerciseFilter.toLowerCase())),
-    })).filter(w => w.exercises.length > 0);
+      // legacy-записи без exercises не должны ронять фильтр истории
+      exercises: (w.exercises ?? []).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(historyExerciseFilter.toLowerCase())),
+    })).filter(w => (w.exercises ?? []).length > 0);
   }, [historyWorkouts, historyExerciseFilter]);
 
   useEffect(() => {
@@ -502,7 +503,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 )}
                 {last && (
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                    Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {last.exercises.length} упр. · {(last.exercises.reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
+                    {/* legacy-запись без exercises не должна ронять «Сегодня» */}
+                    Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {(last.exercises ?? []).length} упр. · {((last.exercises ?? []).reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
                   </div>
                 )}
                 {sleepHours != null && sleepHours < 6 && (

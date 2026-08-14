@@ -54,4 +54,15 @@ describe('Дневник тренировок — режим «Соревнов�
     fireEvent.click(btn);
     expect(await screen.findByText(/Пока нет сохранённых соревновательных циклов/)).toBeTruthy();
   });
+
+  it('legacy-запись без exercises НЕ роняет дневник при открытии («Сегодня») и при фильтре истории', () => {
+    const legacy = { id: 'legacy_1', date: '2025-01-01', duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody', notes: 'старая запись' } as any;
+    const props = { ...baseProps, historyWorkouts: [legacy] as any };
+    expect(() => {
+      render(<TrainingDiaryHub {...props} initialMode="record" />);
+    }).not.toThrow();
+    expect(screen.getByText(/Последняя:/)).toBeTruthy();
+    // «Сегодня» показывает 0 упр. вместо краша
+    expect(screen.getByText(/0 упр\./)).toBeTruthy();
+  });
 });
