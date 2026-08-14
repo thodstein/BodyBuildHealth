@@ -2248,19 +2248,23 @@ for (const week of next.weeks) {
   // Проф-методики (по выбору пользователя): суперсеты-антагонисты и схемы
   // объёма памп-дней (GVT 10×10 / FST-7 / 8×8). Применяются ПОСЛЕ всех
   // проходов — cap 5 и лимиты сессий сохраняются.
+  // Специализация (RIR/икры/частота) ДО cap-adjust: спец-частота добавляет
+  // изоляции, cap-adjust затем режет по фактическому effective (иначе
+  // спец-частота возвращала бы удалённое капом).
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    applySpecializationPass(next, options);
+  }
+
   if (!options.preserveSource && (next as any).pattern?.id) {
     if (options.supersetMode === 'antagonist') markAntagonistSupersets(next);
     if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
   }
   if (!options.preserveSource && (next as any).pattern?.id) {
-    // Post-hoc cap-adjust для мышц с косвенным объёмом (triceps/shoulders/biceps
-    // от жимов/тяг): МЕV-гарант и repair видят только прямой объём, а фактический
-    // effective = direct + indirect может превысить адаптированный MRV
-    // (fullbody_2 enh-1-3: жим узким 5 + 8.1 indirect = 15.1 > кап 13×1.15).
-    // Урезаем прямые сеты: сначала изоляции (памп), затем compound — до
-    // targetDirect = кап - косвенный вклад.
-    const CAP_MUSCLES = ['triceps', 'shoulders', 'biceps'] as const;
-    const isIsolationName = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив/i.test(n);
+    // Post-hoc cap-adjust для ВСЕХ мышц: фактический effective = direct +
+    // indirect от compound может превысить адаптированный MRV (GVT-изоляции
+    // + жимы/тяги/приседы). Раньше — только triceps/shoulders/biceps.
+    const CAP_MUSCLES = ['triceps', 'shoulders', 'biceps', 'quads', 'hamstrings', 'glutes', 'chest', 'back', 'calves', 'forearms', 'traps', 'abs'] as const;
+    const isIsolationName = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
     for (const week of next.weeks) {
       const w: any = week;
       if (w.phase === 'deload') continue;
@@ -2293,16 +2297,21 @@ for (const week of next.weeks) {
           }
         }
         // Если срез до 2 не хватил: удаляем лишние изоляции мышцы
-        // (дубли паттернов), оставляя минимум одно упражнение на сессию.
+        // (дубли паттернов по сессиям), оставляя минимум 1 упражнение
+        // мышцы на неделю (indirect от compound уже покрывает стимул).
         if (need > 0) {
+          let weekCount = week.sessions.flatMap(s => s.exercises).filter((x: any) => x.muscle === muscle && !(x as any).warmupActivator).length;
           for (const s2 of week.sessions) {
             for (const e of [...s2.exercises]) {
               if (need <= 0) break;
-              if ((e as any).warmupActivator || e.role === 'primary') continue;
+              if ((e as any).warmupActivator) continue;
               if (e.muscle !== muscle) continue;
-              const remaining = s2.exercises.filter((x: any) => !(x as any).warmupActivator && x.muscle === muscle);
-              if (remaining.length <= 1) break;
+              // Удаляем только изоляции (дубли паттернов: сгибания сидя +
+              // сгибания в тренажёре и т.п.); compound-движения не трогаем.
+              if (!isIsolationName(e.name || '')) continue;
+              if (weekCount <= 1) break;
               need -= e.sets || 0;
+              weekCount -= 1;
               s2.exercises = s2.exercises.filter((x: any) => x !== e);
             }
             if (need <= 0) break;
@@ -2313,11 +2322,6 @@ for (const week of next.weeks) {
 
 
   }
-  // Специализация: RIR-добивка изоляций, икры-темп, частота 2×/нед
-  if (!options.preserveSource && (next as any).pattern?.id) {
-    applySpecializationPass(next, options);
-  }
-
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
   // фактический объём, а не пустой/устаревший объект.
   next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
