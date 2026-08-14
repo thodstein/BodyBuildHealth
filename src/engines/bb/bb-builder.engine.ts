@@ -153,6 +153,10 @@ export interface BBBuilderInput {
    *  Если передан, buildBBPlan извлекает из него: peak-week веса → стартовые веса +2.5-5кг,
    *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
   previousPlan?: BBPlan;
+  /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
+  supersetMode?: 'none' | 'antagonist';
+  /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
+  volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
 }
 
 /**
@@ -228,6 +232,8 @@ export interface BBExercise {
   movementPattern?: string;
   /** Разминочное упражнение на целевую группу (3×10-15 лёгких). Не входит в объём/бюджет. */
   warmupActivator?: boolean;
+  /** Суперсет-антагонист: имя партнёра по паре (грудь↔спина, бицепс↔трицепс и т.д.). */
+  supersetWith?: string;
 }
 
 export interface BBSession {
@@ -3162,6 +3168,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     maxExercises: (level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10),
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
+    supersetMode: input.supersetMode,
+    volumeScheme: input.volumeScheme,
   });
 }
 

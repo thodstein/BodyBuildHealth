@@ -1248,6 +1248,82 @@ export interface BBFinalizeOptions {
     weightedPullUpLoad?: number;
     assistedPullUpLoad?: number;
   };
+  /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
+  supersetMode?: 'none' | 'antagonist';
+  /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
+  volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+}
+
+/** Суперсеты-антагонисты: пары грудь↔спина, бицепс↔трицепс, квадры↔хамсы.
+ *  Помечаем supersetWith + comment (лимиты не меняются), максимум 3 пары/сессию. */
+const ANTAGONIST_PAIRS: Array<[string, string]> = [
+  ['chest', 'back'], ['back', 'chest'],
+  ['biceps', 'triceps'], ['triceps', 'biceps'],
+  ['quads', 'hamstrings'], ['hamstrings', 'quads'],
+];
+export function markAntagonistSupersets(plan: BBPlan): void {
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue;
+    for (const session of week.sessions) {
+      const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      const paired = new Set<any>();
+      let pairs = 0;
+      for (const ex of working) {
+        if (paired.has(ex)) continue;
+        const mate = working.find((o: any) => !paired.has(o) && o !== ex && ANTAGONIST_PAIRS.some(([a, b]) => a === ex.muscle && b === o.muscle));
+        if (!mate) continue;
+        ex.supersetWith = mate.name;
+        mate.supersetWith = ex.name;
+        ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `🔗 Суперсет с «${mate.name}» (антагонист)`;
+        mate.comment = (mate.comment || '') + (mate.comment ? ' · ' : '') + `🔗 Суперсет с «${ex.name}» (антагонист)`;
+        paired.add(ex); paired.add(mate);
+        pairs++;
+        if (pairs >= 3) break;
+      }
+    }
+  }
+}
+
+/** Схемы объёма памп-дней: суммарный target на мышцу распределяется по
+ *  памп-изоляциям сессии (cap 5 сетов/упражнение сохраняется). */
+const VOLUME_SCHEMES: Record<string, { target: number; reps: [number, number]; rest: number; label: string }> = {
+  gvt: { target: 10, reps: [10, 12], rest: 75, label: 'GVT 10×10' },
+  fst7: { target: 7, reps: [8, 12], rest: 40, label: 'FST-7' },
+  gironda: { target: 8, reps: [8, 10], rest: 60, label: '8×8 Gironda' },
+};
+export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
+  const cfg = VOLUME_SCHEMES[scheme];
+  if (!cfg) return;
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue;
+    for (const session of week.sessions) {
+      const byMuscle: Record<string, any[]> = {};
+      for (const ex of session.exercises) {
+        if ((ex as any).warmupActivator) continue;
+        if (ex.role !== 'accessory' || ex.character !== 'памп') continue;
+        (byMuscle[ex.muscle] ||= []).push(ex);
+      }
+      for (const exs of Object.values(byMuscle)) {
+        let remaining = cfg.target;
+        for (const ex of exs) {
+          if (remaining <= 0) break;
+          const sets = Math.min(5, remaining);
+          if (sets < 2) break;
+          if (sets !== ex.sets || (ex.repsRange && ex.repsRange[0] !== cfg.reps[0])) {
+            ex.sets = sets;
+            ex.repsRange = cfg.reps;
+            ex.restSeconds = cfg.rest;
+            if (Array.isArray(ex.workSets) && ex.workSets.length > 0) {
+              const sample = ex.workSets[ex.workSets.length - 1];
+              ex.workSets = Array.from({ length: sets }, () => ({ ...sample, reps: cfg.reps[1], restSeconds: cfg.rest }));
+            }
+            ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `${cfg.label} (${sets}×${cfg.reps[0]}-${cfg.reps[1]}, отдых ${cfg.rest}с)`;
+          }
+          remaining -= sets;
+        }
+      }
+    }
+  }
 }
 
 function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
@@ -2152,6 +2228,13 @@ for (const week of next.weeks) {
     for (const week of next.weeks) for (const session of week.sessions) {
       ensureArmHeadCoverage(session, options);
     }
+  }
+  // Проф-методики (по выбору пользователя): суперсеты-антагонисты и схемы
+  // объёма памп-дней (GVT 10×10 / FST-7 / 8×8). Применяются ПОСЛЕ всех
+  // проходов — cap 5 и лимиты сессий сохраняются.
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    if (options.supersetMode === 'antagonist') markAntagonistSupersets(next);
+    if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
   }
   // Разминочное упражнение на целевую группу — в самом конце, после всех
   // проходов (budget/dedupe/taper не могут его удалить). Не входит в объём.

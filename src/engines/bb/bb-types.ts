@@ -48,6 +48,8 @@ export interface BBExercise {
   movementPattern?: string;
   /** Разминочное упражнение на целевую группу (3×10-15 лёгких). Не входит в объём/бюджет. */
   warmupActivator?: boolean;
+  /** Суперсет-антагонист: имя партнёра по паре (грудь↔спина, бицепс↔трицепс и т.д.). */
+  supersetWith?: string;
 }
 
 export interface BBSession {

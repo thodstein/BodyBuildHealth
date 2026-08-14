@@ -210,7 +210,7 @@ export function rirDrift(baseRir: [number, number], weekInPhase: number, phaseWe
  * pause_rep: +2-3с пауза в нижней точке (модифицирует tempo)
  * mechanical_drop: смена угла без отдыха
  */
-export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'none';
+export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'negative' | 'none';
 
 export interface IntensityTechniqueMeta {
   type: IntensityTechnique;
@@ -248,6 +248,11 @@ export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechnique
     type: 'mechanical_drop', label: 'Mechanical drop', appliesTo: ['compound','isolation'],
     phases: ['intensification','peaking'],
     description: 'Смена угла/хвата без отдыха: наклон → горизонт → снизу (для жима).',
+  },
+  negative: {
+    type: 'negative', label: 'Негативы (3-4с)', appliesTo: ['compound','isolation','accessory'],
+    phases: ['accumulation','intensification'],
+    description: 'Эксцентрик 3-4с на каждом повторении; последние 1-2 повтора — с полным контролем (Schoenfeld 2021: растянутая фаза → гипертрофия).',
   },
 };
 
@@ -327,6 +332,18 @@ function applyIntensityTechniqueToExercise(
       e.workSets.push({ reps: Math.max(6, baseReps - 4), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 });
       if (!e.comment || !e.comment.includes('Mechanical drop')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Mechanical drop (смена угла)';
+      }
+      break;
+    }
+    case 'negative': {
+      // Негативы: эксцентрик 3-4с на всех подходах (темп 4-2-1-0),
+      // последний подход — до «отказа» в растянутой фазе с контролем.
+      for (const ws of e.workSets) {
+        ws.tempo = '4-2-1-0';
+      }
+      lastSet.technique = 'negative';
+      if (!e.comment || !e.comment.includes('Негативы')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Негативы: 3-4с опускание, последние 1-2 повтора с контролем';
       }
       break;
     }

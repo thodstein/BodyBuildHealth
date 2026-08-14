@@ -19,9 +19,11 @@ import { EXERCISE_CATALOG, getExercisesByGroup, getExerciseById } from '../../..
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
-import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, buildBBPlanWithDUP, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
+import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
-import { finalizeBBPlan } from '../../../engines/bb/bb-finalize.engine';
+import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
@@ -229,6 +231,10 @@ export const BbAutoConstructor: React.FC = () => {
   // P6: выбор intensity technique (если не выбрана — дефолт по фазе)
   const [intensityTech, setIntensityTech] = useState<IntensityTechnique>('none');
   const [bbMethodology, setBbMethodology] = useState<SessionMethodology>('compound_first');
+  // Проф-методики (Библиотека → Методики): DUP, суперсеты-антагонисты, схемы объёма памп-дней
+  const [dupMode, setDupMode] = useState<DUPMode>('none');
+  const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist'>('none');
+  const [volumeScheme, setVolumeScheme] = useState<'standard' | 'gvt' | 'fst7' | 'gironda'>('standard');
 
   // P-ext: calorieSurplus (ккал/день) и eccentricMult (1.0=норма, 1.1-1.2=eccentric overload).
   // calorieSurplus: из профиля nutrition (если есть) или manual input. Нет в профиле → 0 (нейтрально).
@@ -735,6 +741,8 @@ export const BbAutoConstructor: React.FC = () => {
          mobilityRestrictions,
          // PRO: cross-mesocycle continuity — передаём последний сохранённый план
          previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+         supersetMode,
+         volumeScheme,
        }, pedAdapt);
     }
 
@@ -742,6 +750,18 @@ export const BbAutoConstructor: React.FC = () => {
       // BB-1 FIX: use applyMacrocycleToBBPlan for proper volume/RIR adjustments
       // (compound×accessory multipliers, RIR ranges, accessory removal in contest_prep)
       plan = applyMacrocycleToBBPlan(plan, bbAnnualMacrocycle);
+    }
+
+    // Проф-методики (Библиотека → Методики):
+    // - DUP (волновая периодизация) — поверх построенного плана, любые ветки;
+    // - суперсеты-антагонисты и схемы объёма — для cycle/program веток
+    //   (в generic-пути они применяются в finalize через BBBuilderInput).
+    if (dupMode !== 'none') {
+      plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2 });
+    }
+    if (planMode === 'bb_cycle') {
+      if (supersetMode === 'antagonist') markAntagonistSupersets(plan);
+      if (volumeScheme !== 'standard') applyVolumeScheme(plan, volumeScheme);
     }
 
     const modeLabel = bbAnnualMacrocycle
@@ -1315,6 +1335,41 @@ export const BbAutoConstructor: React.FC = () => {
                         { id: 'myo_reps', label: 'Myo-reps' },
                         { id: 'pause_rep', label: 'Пауза-репс' },
                         { id: 'mechanical_drop', label: 'Мех. дроп-сет' },
+                        { id: 'negative', label: 'Негативы (3-4с)' },
+                      ]}
+                    />
+                    <PopupSelect
+                      label='🌊 Волновая периодизация (DUP)'
+                      value={dupMode}
+                      onChange={v => setDupMode(v as DUPMode)}
+                      hint='Чередование тяж/гиперт/выносливость внутри недели (Schoenfeld 2017)'
+                      options={[
+                        { id: 'none', label: 'Выкл (стандартная периодизация)' },
+                        { id: 'heavy_light', label: 'Тяж/лёг (2 дня)' },
+                        { id: 'strength_hypertrophy', label: 'Сила/гипертрофия (2 дня)' },
+                        { id: 'full_dup', label: 'Полный DUP (3 дня)' },
+                      ]}
+                    />
+                    <PopupSelect
+                      label='🔗 Суперсеты'
+                      value={supersetMode}
+                      onChange={v => setSupersetMode(v as 'none' | 'antagonist')}
+                      hint='Пары антагонистов: грудь↔спина, бицепс↔трицепс, квадры↔хамсы'
+                      options={[
+                        { id: 'none', label: 'Выкл' },
+                        { id: 'antagonist', label: 'Антагонисты (пары)' },
+                      ]}
+                    />
+                    <PopupSelect
+                      label='📦 Схема объёма памп-дней'
+                      value={volumeScheme}
+                      onChange={v => setVolumeScheme(v as any)}
+                      hint='Методики набора массы для памп-изоляций (кап 5 сетов сохраняется)'
+                      options={[
+                        { id: 'standard', label: 'Стандартная (авто)' },
+                        { id: 'gvt', label: 'GVT 10×10 (10 сетов на мышцу)' },
+                        { id: 'fst7', label: 'FST-7 (7 сетов, 30-45с)' },
+                        { id: 'gironda', label: '8×8 Gironda (60с)' },
                       ]}
                     />
                     <PopupSelect
@@ -1404,11 +1459,60 @@ export const BbAutoConstructor: React.FC = () => {
            { id:'endurance', label:'Выносливость: RIR 3-4' },
          ]} />
          <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
-         <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[
-           { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' },
-           { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' },
-           { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция' },
-         ]} />
+          <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[ 
+            { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' }, 
+            { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' }, 
+            { id:'post_exhaust', label:'Post-exhaust: базовые → изоляция' }, 
+          ]} />
+          <PopupSelect
+            label='🔥 Интенсив-техника'
+            value={intensityTech}
+            onChange={v => setIntensityTech(v as IntensityTechnique)}
+            hint='Техника на последнем подходе primary-упражнений (фаза-уместная)'
+            options={[
+              { id: 'none', label: 'Авто по фазе' },
+              { id: 'rest_pause', label: 'Рест-пауза' },
+              { id: 'drop_set', label: 'Дроп-сет' },
+              { id: 'myo_reps', label: 'Myo-reps' },
+              { id: 'pause_rep', label: 'Пауза-репс' },
+              { id: 'mechanical_drop', label: 'Мех. дроп-сет' },
+              { id: 'negative', label: 'Негативы (3-4с)' },
+            ]}
+          />
+          <PopupSelect
+            label='🌊 Волновая периодизация (DUP)'
+            value={dupMode}
+            onChange={v => setDupMode(v as DUPMode)}
+            hint='Чередование тяж/гиперт/выносливость внутри недели (Schoenfeld 2017)'
+            options={[
+              { id: 'none', label: 'Выкл (стандартная периодизация)' },
+              { id: 'heavy_light', label: 'Тяж/лёг (2 дня)' },
+              { id: 'strength_hypertrophy', label: 'Сила/гипертрофия (2 дня)' },
+              { id: 'full_dup', label: 'Полный DUP (3 дня)' },
+            ]}
+          />
+          <PopupSelect
+            label='🔗 Суперсеты'
+            value={supersetMode}
+            onChange={v => setSupersetMode(v as 'none' | 'antagonist')}
+            hint='Пары антагонистов: грудь↔спина, бицепс↔трицепс, квадры↔хамсы'
+            options={[
+              { id: 'none', label: 'Выкл' },
+              { id: 'antagonist', label: 'Антагонисты (пары)' },
+            ]}
+          />
+          <PopupSelect
+            label='📦 Схема объёма памп-дней'
+            value={volumeScheme}
+            onChange={v => setVolumeScheme(v as any)}
+            hint='Методики набора массы для памп-изоляций (кап 5 сетов сохраняется)'
+            options={[
+              { id: 'standard', label: 'Стандартная (авто)' },
+              { id: 'gvt', label: 'GVT 10×10 (10 сетов на мышцу)' },
+              { id: 'fst7', label: 'FST-7 (7 сетов, 30-45с)' },
+              { id: 'gironda', label: '8×8 Gironda (60с)' },
+            ]}
+          />
          <PopupSelect label="⬇️ Eccentric overload" value={String(eccentricMult)} onChange={v => setEccentricMult(parseFloat(v))} hint="Множитель эксцентрической фазы. 1.0 = норма, 1.1-1.2 = eccentric overload (Schoenfeld 2021). Повышает вес primary-упражнений." options={[
            { id:'1.0', label:'1.0 — Норма (концентрическая = эксцентрическая)' },
            { id:'1.1', label:'1.1 — Лёгкий eccentric overload (+10%)' },

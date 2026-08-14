@@ -44,4 +44,14 @@ describe('BB-auto UI smoke', () => {
     expect(armHeadLabel('biceps_hammer')).toContain('Брахиалис');
     expect(armHeadLabel('chest')).toBe('');
   });
+
+  it('renderParams содержит выбор проф-методик: DUP, суперсеты, схема объёма, негативы', () => {
+    const html = renderToStaticMarkup(React.createElement(BbAutoConstructor));
+    expect(html).toContain('Волновая периодизация (DUP)');
+    expect(html).toContain('Выкл (стандартная периодизация)');
+    expect(html).toContain('Суперсеты');
+    expect(html).toContain('Схема объёма памп-дней');
+    expect(html).toContain('Интенсив-техника');
+    expect(html).toContain('Авто по фазе');
+  });
 });
