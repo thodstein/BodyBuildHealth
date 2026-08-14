@@ -368,7 +368,7 @@ describe('Прогресс протоколов в блоке «Сегодня»
   beforeEach(() => localStorage.clear());
 
   const baseProps = {
-    diary: {} as any,
+    diary: { checkProgressionAlerts: async () => [] } as any,
     diaryStats: [],
     diaryProgress: [],
     historyWorkouts: [],
@@ -440,6 +440,19 @@ describe('Прогресс протоколов в блоке «Сегодня»
     setActiveMobility(mob.id);
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
     expect(html).toContain('Рутина выполнена');
+  });
+
+  it('CSR: клик «✓ Рутина выполнена» отмечает все daily-шаги', () => {
+    const mob = buildPresetMobility('both');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const dailyIds = itemsForSlot(mob, 'daily').map(i => i.id);
+    expect(dailyIds.length).toBeGreaterThan(0);
+    render(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    fireEvent.click(screen.getByRole('button', { name: /Рутина выполнена/ }));
+    const saved = JSON.parse(localStorage.getItem('he_mobility_day_progress') || 'null');
+    expect(saved.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(saved.doneItems.sort()).toEqual([...dailyIds].sort());
   });
 });
 

@@ -155,6 +155,13 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const vol = month.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
               const sets = month.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + (e.sets?.length || 0), 0), 0);
               const prs = month.flatMap(w => (w.exercises || []).flatMap(e => (e.sets || []).filter((x: any) => x.isPR).map(() => ({ ex: e.exerciseName, w: w.date }))));
+              // Психо-чек-ины и мобильность за 30 дней
+              const cutoffStr = cutoff.toISOString().slice(0, 10);
+              const mind30 = loadCheckins().filter(c => c.date >= cutoffStr);
+              const mob30 = loadMobilityCheckins().filter(c => c.date >= cutoffStr);
+              const confAvg = mind30.length > 0 ? (mind30.reduce((s, c) => s + c.confidence, 0) / mind30.length).toFixed(1) : null;
+              const mobDone30 = mob30.filter(c => c.done).length;
+              const romAvg = (() => { const scored = mob30.filter(c => c.romScore !== null); return scored.length > 0 ? (scored.reduce((s, c) => s + (c.romScore || 0), 0) / scored.length).toFixed(1) : null; })();
               const rows = month.map(w => `
                 <tr>
                   <td>${esc(w.date)}</td><td>${esc(w.split || 'Тренировка')}</td>
@@ -168,6 +175,12 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 .stats{display:flex;gap:24px;font-size:13px;margin:8px 0}</style></head><body>
                 <h1>📊 Тренировочный дневник — 30 дней</h1>
                 <div class="stats"><span>Тренировок: <b>${month.length}</b></span><span>Подходов: <b>${sets}</b></span><span>Тоннаж: <b>${(vol / 1000).toFixed(1)} т</b></span></div>
+                ${mind30.length > 0 || mob30.length > 0 ? `
+                  <h2>🧠 Психология и мобильность</h2>
+                  <div class="stats">
+                    ${mind30.length > 0 ? `<span>Психо-чек-инов: <b>${mind30.length}</b></span><span>Ср. уверенность: <b>${confAvg}/5</b></span>` : ''}
+                    ${mob30.length > 0 ? `<span>Мобильность: <b>${mobDone30}/${mob30.length}</b> дней</span><span>Ср. ROM: <b>${romAvg !== null ? romAvg + '/5' : '—'}</b></span>` : ''}
+                  </div>` : ''}
                 ${prs.length > 0 ? `<h2>🏆 PR за период</h2><ul>${prs.slice(0, 10).map(p => `<li>${esc(p.ex)} — ${esc(p.w)}</li>`).join('')}</ul>` : ''}
                 <h2>📋 Сессии</h2>
                 <table><thead><tr><th>Дата</th><th>Сплит</th><th>Упр.</th><th>Сеты</th><th>Объём</th><th>Заметки</th></tr></thead><tbody>${rows}</tbody></table>
