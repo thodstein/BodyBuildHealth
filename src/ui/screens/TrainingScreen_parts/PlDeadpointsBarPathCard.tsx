@@ -12,7 +12,8 @@ import {
   diagnoseMovement, barPathAnalysis, barPathIssuesForLift, BAR_PATH_ISSUES,
   type BarPathIssue,
 } from '../../../engines/pro/lift-diagnostics.engine';
-import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
+import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections, protocolFromCycle, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
+import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
@@ -20,6 +21,11 @@ import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.55)';
+
+/** Слабые мышцы (группы) — как в верхней карточке ПЛ-авто. */
+const WEAK_GROUPS: Array<[string, string]> = [
+  ['chest', 'Грудь'], ['back', 'Спина'], ['legs', 'Ноги'], ['shoulders', 'Плечи'], ['arms', 'Руки'], ['core', 'Кор'],
+];
 
 const LIFT_RU: Record<Lift, string> = {
   bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга',
@@ -135,6 +141,31 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   const [savedFocus, setSavedFocus] = useState(false);
   // 🎯 Слабые точки, добавляемые в план ПЛ-авто (как бывшая верхняя карточка «Слабые точки СРЦ»).
   const [planWeakPoints, setPlanWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
+  // 💪 Слабые мышцы (группы) — по циклу, как бывшая верхняя карточка «Слабые группы мышц».
+  const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>([]);
+  const toggleWeakMuscle = (g: string) => setWeakMuscleGroups(cur => cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g]);
+
+  // Ассистенты слабых мышц по раскладке цикла (логика верхней карточки): 5 на выбор.
+  const muscleAnalyses = useMemo<Record<string, AssistanceAnalysis>>(() => {
+    if (!template) return {};
+    const out: Record<string, AssistanceAnalysis> = {};
+    for (const group of weakMuscleGroups) {
+      const candidates = getPLWeakGroupExerciseCandidates(template, group).slice(0, 5);
+      out[group] = {
+        lift, phase: null, issue: null,
+        items: candidates.map((exercise, index) => ({
+          exercise,
+          targetGroup: group,
+          optimal: index === 0,
+          rationale: `Слабая мышца «${group}» — ассистент из раскладки цикла, не дублирует основные лифты.`,
+          source: 'muscle' as const,
+          protocol: protocolFromCycle(template, group),
+          pattern: exercise.movementPattern || '',
+        })),
+      };
+    }
+    return out;
+  }, [template, weakMuscleGroups, lift]);
 
   // Авто-пресет из дневника: частые тяжёлые подходы (RPE≥8) в фазе движения — подсказка (не авто-выбор).
   const diaryHint = useMemo(() => {
@@ -223,10 +254,12 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   };
   const applySelected = () => applyToPlanner({
     kind: 'weakpoints',
-    label: 'Диагностика движения: выбранные ассистенты + слабые точки',
+    label: 'Диагностика движения: слабые мышцы + слабые точки + коррекции',
     data: {
-      groups: [...new Set(planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean))],
+      groups: [...new Set([...weakMuscleGroups, ...planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean)])],
       plWeakPoints: planWeakPoints.map(p => ({ lift: p.lift, weakPoint: p.weakPoint, days: days[`${p.lift}|${p.weakPoint}`] ?? [] })),
+      weakGroupExerciseMap: Object.fromEntries(weakMuscleGroups.map(g => [g, selected[`muscle|${g}`] ?? []])),
+      weakGroupDayMap: Object.fromEntries(weakMuscleGroups.map(g => [g, days[`muscle|${g}`] ?? []])),
       diagnosticExerciseMap: selected,
       diagnosticDayMap: days,
     },
@@ -241,7 +274,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT }}>🎯 Мёртвые точки → Слабые точки → Движение штанги</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT }}>🎯 Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги</div>
       <div style={{ fontSize: 10, color: DIM, marginTop: 3, lineHeight: 1.45 }}>
         Выберите движение, фазу срыва и отклонения траектории. Для каждого параметра — упражнения из раскладки цикла и анализ, какое оптимально.
       </div>
@@ -254,9 +287,45 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         ))}
       </div>
 
-      {/* ═══ 1. Слабые точки ═══ */}
+      {/* ═══ 1. Слабые мышцы (по циклу) ═══ */}
       <div style={CARD}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>1 · Слабые точки</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#4ade80' }}>1 · Слабые мышцы</div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
+          Выберите слабую мышцу — рекомендации тренера ПЛ: 5 ассистентов из раскладки цикла (%ПМ/повторы/подходы — как у аксессуара недели). Основные жим/присед/становая и их дубли исключены.
+        </div>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+          {WEAK_GROUPS.map(([id, label]) => {
+            const on = weakMuscleGroups.includes(id);
+            return <button key={id} onClick={() => toggleWeakMuscle(id)} style={{ minHeight: 32, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', border: on ? '1px solid #4ade80' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(74,222,128,0.15)' : 'transparent', color: on ? '#4ade80' : DIM, fontWeight: 700, fontSize: 10 }}>{label}{on ? ' ✓' : ''}</button>;
+          })}
+        </div>
+        {!template && (
+          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>
+        )}
+        {weakMuscleGroups.map(group => {
+          const analysis = muscleAnalyses[group];
+          if (!analysis || analysis.items.length === 0) return null;
+          const key = `muscle|${group}`;
+          const label = WEAK_GROUPS.find(([id]) => id === group)?.[1] || group;
+          return (
+            <div key={group} style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', marginBottom: 4 }}>🏋️ {label} — рекомендации тренера ПЛ (выберите и добавьте в план):</div>
+              {analysis.items.map((item, idx) => (
+                <ExerciseRow key={idx} item={item} selected={selected[key]?.includes(item.exercise.name) ?? false}
+                  onToggle={() => toggleExercise(key, item.exercise.name)} onAdd={() => addToPlan(key, [item.exercise.name])} />
+              ))}
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <button onClick={() => addToPlan(key, analysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
+                <button onClick={() => addToPlan(key, analysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ═══ 2. Слабые точки ═══ */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>2 · Слабые точки</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6, marginBottom: 4 }}>Фаза (срыв / слабое место) — выберите чип:</div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
           {phases.map(item => {
@@ -302,9 +371,9 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         </button>
       </div>
 
-      {/* ═══ 2. Мёртвые точки (та же фаза — углы суставов) ═══ */}
+      {/* ═══ 3. Мёртвые точки (та же фаза — углы суставов) ═══ */}
       <div style={CARD}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>2 · Мёртвые точки {effectivePhase ? `· ${LIFT_RU[lift]} / ${PHASE_RU[effectivePhase] || effectivePhase}` : ''}</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>3 · Мёртвые точки {effectivePhase ? `· ${LIFT_RU[lift]} / ${PHASE_RU[effectivePhase] || effectivePhase}` : ''}</div>
         {movement?.sticking ? (
           <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize: 10, color: DIM }}>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
@@ -316,7 +385,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         ) : (
           <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
-              📐 Угловая диагностика есть для приседа, жима лёжа и становой тяги. Для {LIFT_RU[lift]} — коррекции ниже строятся по слабой точке фазы (раздел 1).
+              📐 Угловая диагностика мёртвых точек есть для приседа, жима лёжа и становой тяги. Для {LIFT_RU[lift]} используйте слабые точки (раздел 1) и движение штанги (раздел 3).
             </div>
           </div>
         )}
@@ -341,10 +410,10 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         )}
       </div>
 
-      {/* ═══ 3. Движение штанги (bar-path) ═══ */}
+      {/* ═══ 4. Движение штанги (bar-path) ═══ */}
       {applicableIssues.length > 0 && (
         <div style={CARD}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>3 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
             {applicableIssues.map(issue => {
               const on = issues.includes(issue);
@@ -423,6 +492,47 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         ))}
       </div>
 
+      {/* 🏆 Рекомендация тренера ПЛ: итоговый оптимальный перечень под выбор пользователя */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24' }}>🏆 Рекомендация тренера ПЛ</div>
+        {(() => {
+          const recs: Array<{ key: string; name: string; label: string }> = [];
+          for (const g of weakMuscleGroups) {
+            const first = muscleAnalyses[g]?.items.find(i => i.optimal);
+            if (first) recs.push({ key: `muscle|${g}`, name: first.exercise.name, label: '💪 ' + (WEAK_GROUPS.find(([id]) => id === g)?.[1] || g) });
+          }
+          if (phaseAnalysis) {
+            const first = phaseAnalysis.items.find(i => i.optimal);
+            if (first) recs.push({ key: keyForPhase, name: first.exercise.name, label: '⚡ Слабая точка' });
+          }
+          if (stickingAnalysis) {
+            const first = stickingAnalysis.items.find(i => i.optimal);
+            if (first) recs.push({ key: stickingKey, name: first.exercise.name, label: '🩻 Мёртвая точка' });
+          }
+          for (const issue of issues) {
+            const first = issueAnalyses[issue]?.items.find(i => i.optimal);
+            if (first) recs.push({ key: `${lift}|barpath|${issue}`, name: first.exercise.name, label: '📈 ' + (ISSUE_RU[issue] || issue) });
+          }
+          if (recs.length === 0) {
+            return <div style={{ marginTop: 6, fontSize: 10, color: DIM }}>Отметьте слабые мышцы, точки и отклонения — здесь появится итоговый перечень тренера под ваш выбор.</div>;
+          }
+          return (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4 }}>Оптимальный перечень под ваш выбор (по одному лучшему на параметр):</div>
+              {recs.map((r, i) => (
+                <div key={i} style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: '5px 8px', borderRadius: 7, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)', display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span style={{ minWidth: 0, overflowWrap: 'break-word' }}>{r.label}: <b style={{ color: '#fbbf24' }}>{r.name}</b></span>
+                  <button onClick={() => addToPlan(r.key, [r.name])} style={{ ...btn, flexShrink: 0, background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>➕</button>
+                </div>
+              ))}
+              <button onClick={() => recs.forEach(r => addToPlan(r.key, [r.name]))} style={{ width: '100%', minHeight: 38, marginTop: 8, border: 'none', borderRadius: 8, cursor: 'pointer', background: 'rgba(251,191,36,0.14)', color: '#fbbf24', fontWeight: 800, fontSize: 11 }}>
+                🏆 Добавить весь рекомендованный перечень в план
+              </button>
+            </div>
+          );
+        })()}
+      </div>
+
       <button onClick={applySelected} style={{ width: '100%', minHeight: 44, marginTop: 8, border: 'none', borderRadius: 9, cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }}>
         🛠 Добавить выбранные упражнения в ПЛ-авто ({Object.values(selected).reduce((s, n) => s + n.length, 0)})
       </button>
@@ -437,6 +547,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
 const btn: React.CSSProperties = { padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 32 };
 
 const SOURCE_TAG: Record<string, { label: string; color: string; bg: string }> = {
+  muscle: { label: '💪 Слабая мышца', color: '#4ade80', bg: 'rgba(74,222,128,0.12)' },
   weak: { label: '⚡ Слабая точка', color: '#4ade80', bg: 'rgba(34,197,94,0.12)' },
   sticking: { label: '🩻 Мёртвая точка', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
   bar: { label: '📈 Bar-path', color: '#c084fc', bg: 'rgba(168,85,247,0.12)' },

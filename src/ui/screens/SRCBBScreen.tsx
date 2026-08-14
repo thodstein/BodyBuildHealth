@@ -746,6 +746,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           }
           setPlWeakPointDayMap(dm);
         }
+        if (p.data?.weakGroupExerciseMap) setWeakGroupExerciseMap(p.data.weakGroupExerciseMap);
+        if (p.data?.weakGroupDayMap) setWeakGroupDayMap(p.data.weakGroupDayMap);
        pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
@@ -1063,44 +1065,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся из исходной раскладки СРЦ.
             </div>;
           })()}
-          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ПЛ + ББ-акцент, сохраняются в профиль)</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
-            💪 PL-ассистенты добавляются по раскладке самого цикла: %ПМ/повторы/подходы — как у аксессуара этой недели, RIR — из матрицы по фазе. Основные жим/присед/становая и их дубли исключены; для каждой группы свой PL-пул.
-          </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
-          {/* 📅 Выбор дней для слабых групп — авто-распределение если не выбрано */}
-          {weakPoints.length > 0 && (() => {
-            const tpl = getCycleById(selectedCycleId);
-            const dayCount = tpl?.week1?.length || 3;
-            const WEAK_GROUP_LABELS_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
-            return (
-              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📅 Выбор дней недели для слабых групп (если не выбрать — авто)</div>
-                {weakPoints.map(wg => {
-                  const days = weakGroupDayMap[wg] || [];
-                  return (
-                    <div key={wg} style={{ marginBottom: 6 }}>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, minWidth: 0, overflowWrap: 'anywhere' }}>{WEAK_GROUP_LABELS_RU[wg] || wg}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (малые: 2 дня, крупные: 1 день)'}</div>
-          <div role="group" aria-label="Дни недели для слабых групп мышц" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
-                       {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
-                          const on = days.includes(d);
-                          return <button key={d} aria-label={`День ${d} для ${WEAK_GROUP_LABELS_RU[wg] || wg}${on ? ' (выбран)' : ''}`} onClick={() => toggleDayInMap(wg, d, 'wg')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
-                         })}
-                       </div>
-                       <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            {(tpl ? getPLWeakGroupExerciseCandidates(tpl, wg) : []).map(ex => {
-                           const selected = (weakGroupExerciseMap[wg] || []).includes(ex.name);
-                           return <button key={ex.id} onClick={() => toggleExerciseInMap(wg, ex.name, 'wg')} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: selected ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: selected ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: selected ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>{ex.name}{selected ? ' ✓' : ''}</button>;
-                         })}
-                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
           <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Мёртвые точки → Слабые точки → Движение штанги</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
               Выберите движение, фазу, отклонения траектории и упражнения. «➕ Слабая точка в план» добавит ассистентов в план при сборке (тяжёлый + памп-день). Исходный цикл не изменяется. Протокол упражнений — из раскладки этого цикла.
             </div>
@@ -2058,146 +2024,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 goal="strength"
                 title={calendarView === 'tapered' ? 'Календарь цикла с тапером (ПЛ)' : 'Календарь оригинального цикла (ПЛ)'}
               />
-              {/* ── ПРОФЕССИОНАЛЬНЫЕ ПЛ-РЕКОМЕНДАЦИИ для слабых групп ── */}
-              {weakPoints.length > 0 && (() => {
-                const GRP_RU: Record<string,string> = { chest:'Грудь', back:'Спина', legs:'Ноги', shoulders:'Плечи', arms:'Руки', core:'Кор' };
-                // какой день недели соответствует какой группе мышц (по главному упражнению дня)
-const FIND_DAY_FOR_GROUP = (group: string): number => {
-                  const keywords: Record<string,string[]> = {
-                    chest: ['жим'],
-                    shoulders: ['жим стоя', 'overhead', 'army press', 'army-press', 'overhead press', 'army press'],
-                    arms: ['жим узким', 'close grip', 'французский', 'разгибание', 'скотт', 'бицепс', 'curl'],
-                    legs: ['присед', 'жим ногами', 'лег пресс', 'разгибание ног', 'сгибание ног', 'румынская', 'рум', 'выступ', 'болгар', 'гоблет', 'гакк', 'сгиб'],
-                    back: ['становая', 'тяга', 'подтягив', 'пуло'],
-                    core: ['пресс', 'кор', 'скручиван', 'подъём', 'планк', 'флекс'],
-                  };
-                  const kws = keywords[group] || [];
-                  for (let di = 0; di < wk.days.length; di++) {
-                    const firstEx = wk.days[di].exercises[0]?.name.toLowerCase() || '';
-                    const allEx = wk.days[di].exercises.map(e => e.name.toLowerCase()).join(' ');
-                    if (kws.some(k => firstEx.includes(k) || allEx.includes(k))) return di;
-                  }
-                  return 0;
-                };
-                // схемы подходов по фазе цикла
-                const PHASE_SCHEMES: Record<string,{reps:number;pct:number;label:string}> = {
-                  base: { reps:10, pct:0.67, label:'гипертрофия (10П)' },
-                  build: { reps:8, pct:0.73, label:'силовая выносливость (8П)' },
-                  peak: { reps:5, pct:0.80, label:'специфическая сила (5П)' },
-                  deload: { reps:12, pct:0.50, label:'восстановление (12П)' },
-                };
-                 const scheme = PHASE_SCHEMES[sourceWeek?.phase || phase] || PHASE_SCHEMES.base;
-                // ПЛ-специфичные ассистентные упражнения (вариации соревновательных движений)
-                const PL_EXERCISES: Record<string,{name:string;note:string}[]> = {
-                  chest: [
-                    { name:'Жим с паузой 2 секунды', note:'убивает инерцию, усиливает старт' },
-                    { name:'Жим на наклонной скамье', note:'верх груди, помощь в средней фазе' },
-                    { name:'Дожим с 5 см', note:'трицепс + локдаун' },
-                    { name:'Французский жим', note:'изоляция длинной головки трицепса' },
-                    { name:'Жим гантелей лёжа', note:'дефицит стабильности → грудные+стабилизаторы' },
-                  ],
-                  shoulders: [
-                    { name:'Армейский жим', note:'передняя/средняя дельта, локдаун' },
-                    { name:'Жим штанги за голову', note:'плечевой пояс + трапеции' },
-                    { name:'Жим гантелей сидя', note:'стабильность плечевого пояса' },
-                    { name:'Махи гантелями в стороны', note:'средняя дельта, ширина' },
-                    { name:'Тяга к подбородку', note:'передняя дельта + трапеции' },
-                  ],
-arms: [
-                     { name:'Французский жим лёжа', note:'длинная головка трицепса' },
-                     { name:'Разгибание на блоке', note:'латеральная головка трицепса' },
-                     { name:'Скотт-бенч', note:'бицепс, пик' },
-                     { name:'Молотки', note:'брахиалис + предплечья' },
-                     { name:'Жим узким хватом', note:'трицепс + локдаун' },
-                   ],
-legs: [
-                       { name:'Присед на груди', note:'акцент квадрицепсов, улучшает старт' },
-                       { name:'Жим ногами', note:'объём квадрицепсов без нагрузки на позвоночник' },
-                       { name:'Болгарские сплит-приседания', note:'изолированная работа каждой ноги' },
-                       { name:'Разгибание ног в тренажере', note:'изоляция квадрицепсов' },
-                       { name:'Румынская тяга', note:'бицепс бедра + ягодичные, posterior chain' },
-                     ],
-                     back: [
-                       { name:'Тяга штанги в наклоне', note:'центр спины, фиксация лопаток' },
-                       { name:'Подтягивания (прямой хват)', note:'широчайшие, тянущая сила верха' },
-                       { name:'Тяга из ямы', note:'дефицит старта, работа с пола ниже обычного' },
-                     ],
-                     core: [
-                      { name:'Наклоны со штангой', note:'разгибатели спины, жёсткость корпуса в приседе' },
-                      { name:'Пресс в тренажере (скручивания)', note:'внутрибрюшное давление, защита поясницы' },
-                      { name:'Гиперэкстензия', note:'поясница + ягодицы, фиксация таза в тяге' },
-                    ],
-                };
-                const eq = loadTrainingProfile().equipment;
-                const eqOk = (ex: {name:string;note:string}): boolean => {
-                  if (eq.length === 0) return true;
-                  // допускаем штангу и вес тела всегда (подтягивания, наклоны со штангой)
-                  const nameLow = ex.name.toLowerCase();
-                  const hasBar = nameLow.includes('штанг') || nameLow.includes('гриф');
-                  const hasCable = nameLow.includes('блок') || nameLow.includes('кроссовер') || nameLow.includes('к лицу');
-                  const hasBW = nameLow.includes('подтягив') || nameLow.includes('гиперэкстенз');
-                  const hasDB = nameLow.includes('гантел') || nameLow.includes('разводк');
-                  // проверяем логически: если есть доступное оборудование, подходящее под упражнение
-                  if (hasBar && (eq.includes('barbell')||eq.includes('rack'))) return true;
-                  if (hasCable && eq.includes('cable')) return true;
-                  if (hasBW) return true;
-                  if (hasDB && eq.includes('dumbbell')) return true;
-                  // fallback: если ни одно упражнение не проходит — пускаем все (лучше показать, чем скрыть)
-                  return true;
-                };
-                return <MetricCard title='🎯 Рекомендации тренера: ПЛ-ассистенты по слабым группам' icon='🎯' accent='#ff9100'>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>
-                    Фаза: <b style={{color:'#ff9100'}}>{isMeetWeek(wk) ? '🏁 Соревнования (прикиды)' : isMockWeek(wk) ? '🎯 Имитация соревнований (mock meet)' : isTaperWeek(wk) ? '📉 Тапер (разгрузка)' : PH_RU[phase]}</b> · схема: <b style={{color:'#ff9100'}}>{scheme.label}</b> (вес ≈ {Math.round(scheme.pct*100)}% workMax)
-                   </div>
-                   {weakPoints.map(g => {
-                     const autoDi = FIND_DAY_FOR_GROUP(g);
-                     const selectedDayNumbers = (weakGroupDayMap[g] || [])
-                       .filter(day => day >= 1 && day <= wk.days.length);
-                     const targetDayIndices = selectedDayNumbers.length > 0
-                       ? selectedDayNumbers.map(day => day - 1)
-                       : [autoDi];
-                     const targetDayKeys = targetDayIndices.map(dayIndex => dayKey(wk.week, dayIndex));
-                     const pool = (PL_EXERCISES[g] || PL_EXERCISES.chest).filter(eqOk).slice(0, 3);
-                     const dayLabel = selectedDayNumbers.length > 0
-                       ? `выбрано: ${selectedDayNumbers.map(day => `Д${day}`).join(', ')}`
-                       : `авто → День ${autoDi + 1}`;
-                     return <div key={g} style={{ marginBottom: 8, padding:8, borderRadius:8, background:'rgba(255,145,0,0.04)', border:'1px solid rgba(255,145,0,0.1)' }}>
-                       <div style={{ fontSize:11, fontWeight:700, color:'#ff9100', marginBottom:3, display:'flex', justifyContent:'space-between' }}>
-                         <span>{GRP_RU[g] || g}</span>
-                         <span style={{ fontSize:10, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>→ {dayLabel}</span>
-                       </div>
-                       <div style={{ display:'flex', gap:3, flexWrap:'wrap', alignItems:'center', marginBottom:5 }}>
-                         <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>Куда добавлять:</span>
-                         <button onClick={() => setWeakGroupDayMap(current => {
-                           if (!(g in current)) return current;
-                           const next = { ...current };
-                           delete next[g];
-                           return next;
-                         })} style={{ padding:'3px 7px', borderRadius:6, fontSize:9, cursor:'pointer', border:selectedDayNumbers.length === 0 ? '1px solid #ff9100' : '1px solid rgba(255,255,255,0.1)', background:selectedDayNumbers.length === 0 ? 'rgba(255,145,0,0.15)' : 'transparent', color:selectedDayNumbers.length === 0 ? '#ff9100' : 'rgba(255,255,255,0.55)' }}>Авто</button>
-                         {wk.days.map((_, dayIndex) => {
-                           const dayNumber = dayIndex + 1;
-                           const selected = selectedDayNumbers.includes(dayNumber);
-                           return <button key={dayNumber} onClick={() => toggleDayInMap(g, dayNumber, 'wg')} style={{ padding:'3px 7px', borderRadius:6, fontSize:9, cursor:'pointer', border:selected ? '1px solid #ff9100' : '1px solid rgba(255,255,255,0.1)', background:selected ? 'rgba(255,145,0,0.15)' : 'transparent', color:selected ? '#ff9100' : 'rgba(255,255,255,0.55)' }}>Д{dayNumber}</button>;
-                         })}
-                       </div>
-                       {pool.map(ex => (
-                         <button key={ex.name} onClick={() => addAccessory(targetDayKeys, ex.name, g)}
-                           style={{ display:'block', width:'100%', marginBottom:3, padding:'5px 8px', borderRadius:6, fontSize:11, cursor:'pointer', textAlign:'left',
-                             border:'1px solid rgba(255,145,0,0.25)', background:'rgba(255,145,0,0.06)', color:'#ff9100', transition:'all 0.15s' }}>
-                          <span style={{fontWeight:700}}>＋ {ex.name}</span>
-                          <span style={{fontSize:10, color:'rgba(255,255,255,0.45)', marginLeft:6}}>— {ex.note}</span>
-                        </button>
-                      ))}
-                    </div>;
-                  })}
-                   <div style={{ ...SMALL, color: 'rgba(255,255,255,0.5)' }}>
-                     Ассистент добавляется в авто-день или все выбранные дни текущей недели: {scheme.reps}П × 3 подхода, вес {Math.round(scheme.pct*100)}% workMax (фазовая схема). Можно отредактировать в режиме правки.
-                  </div>
-                  <div style={{ fontSize:10, color:'rgba(255,145,0,0.5)', marginTop:4 }}>
-                    💡 Совет тренера: не ставьте изоляцию — для ПЛ слабая точка лечится вариациями соревновательного движения, а не махами гантелей. Каждое упражнение — это устранение конкретной фазы.
-                  </div>
-                </MetricCard>;
-              })()}
               <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
                 <div style={{ ...LABEL, color:'#60a5fa', margin:'0 0 4px' }}>➡️ Что дальше</div>
                 <div style={SMALL}>{phase === 'peak'

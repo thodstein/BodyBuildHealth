@@ -89,8 +89,8 @@ export interface AssistanceAnalysisItem {
   optimal: boolean;
   /** Почему это упражнение оптимально/подходит. */
   rationale: string;
-  /** Источник упражнения: слабая точка (weakpoint-pl) / мёртвая точка (PL-пул) / bar-path. */
-  source: 'weak' | 'sticking' | 'bar';
+  /** Источник упражнения: слабая мышца / слабая точка / мёртвая точка / bar-path. */
+  source: 'muscle' | 'weak' | 'sticking' | 'bar';
   /** Протокол из раскладки цикла (set-блоки аксессуара дня/недели). */
   protocol: { pct: number; reps: number; sets: number };
   /** Паттерн движения упражнения. */
@@ -122,6 +122,108 @@ function targetRu(group: string): string {
   return GROUP_TARGET_RU[group] ?? group;
 }
 
+/** Чистка названия для поиска: norm + скобки + числа/единицы («2 секунды», «3 см»). */
+function searchTokens(name: string): string[] {
+  return norm(name.replace(/\(.*?\)/g, ' '))
+    .split(/[^a-zа-яё0-9]+/i)
+    .filter(t => t.length >= 3 && !/^\d+$/.test(t) && !['сек', 'см', 'мин', 'секунд', 'секунды'].includes(t));
+}
+
+/** Префикс-совпадение токенов (пауза/паузой, дожим/дожимы, присед/приседания). */
+function tokenMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  const n = Math.min(a.length, b.length, 5);
+  if (n < 4) return false;
+  return a.slice(0, n) === b.slice(0, n);
+}
+
+/** LMS-группы СРЦ-пула («Жим», «Тяга», «Присед»…) → группа общего каталога. */
+function lmsGroupToCatalog(groups: string[]): string {
+  const g = groups.join(' ').toLowerCase();
+  if (/тяга|становая|гипер|наклон|шраги/.test(g)) return 'back';
+  if (/жим стоя|стоя|плеч|махи|дельт/.test(g)) return 'shoulders';
+  if (/жим/.test(g)) return 'chest';
+  if (/присед|выпад|разгибание ног|жим ногами/.test(g)) return 'legs';
+  if (/бицепс|сгибан|разгибание|подъем|подъём/.test(g)) return 'arms';
+  if (/пресс|скруч|кор/.test(g)) return 'core';
+  return 'accessory';
+}
+
+/** Псевдо-Exercise из записи СРЦ-пула (LMS_EXERCISES) для отображения в диагностике. */
+function lmsToExercise(lms: { name: string; groups: string[]; coef: number; mnosz: number; uses: number }): Exercise {
+  const catalogMatch = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g))
+    .find(e => norm(e.name) === norm(lms.name));
+  return {
+    id: 'lms_' + norm(lms.name).replace(/[^a-zа-яё0-9]+/gi, '_'),
+    name: lms.name,
+    group: catalogMatch ? catalogMatch.group : lmsGroupToCatalog(lms.groups),
+    type: 'compound',
+    equipment: 'barbell',
+    difficulty: 'intermediate',
+    jointStress: 'med',
+    fatigueCost: Math.round((lms.coef ?? 1) * 6),
+    movementPattern: catalogMatch?.movementPattern,
+    targetMuscle: lms.groups.join(', '),
+  };
+}
+
+/**
+ * Поиск упражнения в ПЛ-пуле: СНАЧАЛА общий каталог (точное/fuzzy имя) —
+ * это даёт полные метаданные; ЗАТЕМ СРЦ-пул LMS_EXERCISES (ПЛ-специфика:
+ * дожимы с плинтов, жимы в раме, жимы с паузой, скоростные и т.д.).
+ */
+function findExerciseInPool(name: string, pool: Exercise[]): Exercise | undefined {
+  const n = norm(name.replace(/\(.*?\)/g, ''));
+  const exact = pool.find(e => norm(e.name) === n);
+  if (exact) return exact;
+  // ПЛ-специфика: точное имя в СРЦ-пуле LMS_EXERCISES (дожимы, рамы, паузы, скоростные).
+  const lmsExact = LMS_EXERCISES.find(l => norm(l.name) === n);
+  if (lmsExact) return lmsToExercise(lmsExact);
+  const tokens = searchTokens(name);
+  if (tokens.length === 0) return undefined;
+  let best: Exercise | undefined;
+  let bestScore = 0;
+  for (const e of pool) {
+    const en = norm(e.name);
+    const eTokens = searchTokens(e.name);
+    let score = 0;
+    for (const t of tokens) {
+      if (eTokens.some(et => tokenMatch(et, t))) score += 1;
+      else if (t.length >= 5 && en.includes(t)) score += 1;
+    }
+    if (score >= 2 && score > bestScore) { best = e; bestScore = score; }
+  }
+  if (best) return best;
+  // Fallback: один длинный токен как substring («наклоны» → «наклоны со штангой»)
+  for (const t of tokens) {
+    if (t.length >= 5) {
+      const hit = pool.find(e => norm(e.name).includes(t));
+      if (hit) return hit;
+    }
+  }
+  // Fuzzy в СРЦ-пуле LMS
+  const lmsTokens = searchTokens(name);
+  let bestLms: (typeof LMS_EXERCISES)[number] | undefined;
+  let bestLmsScore = 0;
+  for (const l of LMS_EXERCISES) {
+    const lt = searchTokens(l.name);
+    let score = 0;
+    for (const t of lmsTokens) {
+      if (lt.some(et => tokenMatch(et, t))) score += 1;
+    }
+    if (score >= 2 && score > bestLmsScore) { bestLms = l; bestLmsScore = score; }
+  }
+  if (bestLms) return lmsToExercise(bestLms);
+  // Один длинный токен в LMS
+  for (const t of lmsTokens) {
+    if (t.length >= 5) {
+      const hit = LMS_EXERCISES.find(l => norm(l.name).includes(t));
+      if (hit) return lmsToExercise(hit);
+    }
+  }
+  return undefined;
+}
+
 /**
  * Протокол из раскладки цикла: берём set-блоки реального аксессуара (load !== 'Тяжелая')
  * из выбранного дня/недели шаблона. Приоритет — аксессуар на целевую группу.
@@ -146,172 +248,59 @@ export function protocolFromCycle(template: SRCycleTemplate | undefined, targetG
 }
 
 /**
- * Анализ оптимальности для слабой фазы движения.
+ * Анализ упражнений для СЛАБОЙ ТОЧКИ фазы движения:
+ * только специфичные ассистенты слабой точки (weakpoint-pl, assistanceFromCatalog).
+ * Без «слабых мышц» — это отдельная задача.
  */
 export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: SRCycleTemplate): AssistanceAnalysis {
-  const groups = groupsForLiftPhase(lift, phase);
   const items: AssistanceAnalysisItem[] = [];
-
-  const layouts = template?.weeks && template.weeks.length > 0 ? template.weeks : template ? [template.week1] : [];
-  const cycleNames = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises.map(spec => norm(spec.name)))));
-  const cyclePrimaryPatterns = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
-    .filter(spec => spec.load === 'Тяжелая' || (spec.coef ?? 0) >= 1)
-    .map(spec => exercisePatternByName(spec.name)))).filter(Boolean));
-  const cycleSubstitutionGroups = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
-    .map(spec => {
-      const all = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(group => getExercisesByGroup(group));
-      return all.find(e => norm(e.name) === norm(spec.name))?.substitutionGroup;
-    })
-    .filter((group): group is string => Boolean(group)))));
-
-  const sticking = diagnoseLift(lift, phase);
-  const weakMuscles = sticking?.weakMuscles ?? [];
-
-  for (const group of groups) {
-    const allowed = PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? [];
-    if (allowed.length === 0) continue;
-    const candidates = getExercisesByGroup(group)
-      .filter(ex => allowed.includes(catalogPattern(ex)))
-      .filter(ex => !cyclePrimaryPatterns.has(catalogPattern(ex)))
-      .filter(ex => !ex.substitutionGroup || !cycleSubstitutionGroups.has(ex.substitutionGroup))
-      .sort((a, b) => {
-        const aName = norm(a.name), bName = norm(b.name);
-        const aInCycle = cycleNames.has(aName), bInCycle = cycleNames.has(bName);
-        if (aInCycle !== bInCycle) return aInCycle ? -1 : 1;
-        const aUses = plCatalogUses(a.name), bUses = plCatalogUses(b.name);
-        if (aUses !== bUses) return bUses - aUses;
-        const aEq = String(a.equipment || '').toLowerCase(), bEq = String(b.equipment || '').toLowerCase();
-        const aRank = /band|резин|other/.test(aEq) ? 2 : /bodyweight|suspension/.test(aEq) ? 1 : 0;
-        const bRank = /band|резин|other/.test(bEq) ? 2 : /bodyweight|suspension/.test(bEq) ? 1 : 0;
-        if (aRank !== bRank) return aRank - bRank;
-        return (a.fatigueCost || 0) - (b.fatigueCost || 0);
-      });
-
-    candidates.slice(0, 4).forEach((exercise, index) => {
-      const inCycle = cycleNames.has(norm(exercise.name));
-      const pattern = catalogPattern(exercise);
-      const rationale = `Нагружает ${targetRu(group)} — поддержка мёртвой точки «${phase}» ${LIFT_RU[lift]} (слабые мышцы фазы: ${weakMuscles.join(', ') || '—'}); паттерн ${pattern}${inCycle ? ' совпадает с раскладкой цикла' : ''}; не дублирует основные лифты цикла.`;
-      items.push({
-        exercise,
-        targetGroup: group,
-        optimal: index === 0,
-        rationale,
-        source: 'sticking',
-        protocol: protocolFromCycle(template, group),
-        pattern,
-      });
-    });
-  }
-
-  // Дополнительно: упражнения фазы из weakpoint-pl (assistanceFromCatalog) —
-  // они специфичны именно для этой фазы и не обязаны входить в PL-пул групп.
-  const added = new Set(items.map(i => norm(i.exercise.name)));
-  const wp = diagnoseWeakPoint(lift, phase);
   const allExercisesPool = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
-  const findByName = (name: string): Exercise | undefined => {
-    const n = norm(name);
-    return allExercisesPool.find(e => {
-      const en = norm(e.name);
-      return en === n || (en.length > 2 && (en.includes(n) || n.includes(en)));
-    });
-  };
+  const added = new Set<string>();
+
+  // Специфичные ассистенты слабой точки (weakpoint-pl) — ПЛ-коррекции фазы.
+  const wp = diagnoseWeakPoint(lift, phase);
   for (const name of wp.assistance) {
-    if (added.has(norm(name))) continue;
-    const exercise = findByName(name);
+    const exercise = findExerciseInPool(name, allExercisesPool);
     if (!exercise) continue;
+    const en = norm(exercise.name);
+    if (added.has(en)) continue;
+    added.add(en);
     const group = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).find(g =>
-      getExercisesByGroup(g).some(e => norm(e.name) === norm(exercise.name))) ?? exercise.group;
+      getExercisesByGroup(g).some(e => norm(e.name) === en)) ?? exercise.group;
     items.push({
       exercise,
       targetGroup: group,
       optimal: false,
-      rationale: `Нагружает ${targetRu(group)} — специфичный ассистент слабой точки «${wp.label}» ${LIFT_RU[lift]}; устраняет причину срыва в этой фазе.`,
+      rationale: `Слабая точка «${wp.label}» (${LIFT_RU[lift]}): ${exercise.name} — ассистент фазы, устраняет причину срыва.`,
       source: 'weak',
       protocol: protocolFromCycle(template, group),
       pattern: catalogPattern(exercise),
     });
   }
 
+  if (items.length > 0) items[0] = { ...items[0], optimal: true };
   return { lift, phase, issue: null, items };
 }
 
 /**
- * Анализ оптимальности для отклонения bar-path: кандидаты по группам слабых
- * мышц связанной фазы (relatedWeakPoint) + специфичные ассистенты BAR_PATH_ISSUES.
+ * Анализ оптимальности для отклонения bar-path: ПЛ-коррекции из
+ * BAR_PATH_ISSUES.assistance (СРЦ-пул: скоростные, остановки, плинты и т.д.).
  */
 export function analyzeBarPathAssistance(lift: Lift, issue: BarPathIssue, template?: SRCycleTemplate): AssistanceAnalysis {
   const meta = BAR_PATH_ISSUES[issue];
-  const relatedPhase = meta.relatedWeakPoint[lift];
   const allExercises = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
-  // Fuzzy-поиск по каталогу: «Болгарские сплит-приседы» → «Болгарские сплит-приседания».
-  const findExercise = (name: string): Exercise | undefined => {
-    const clean = norm(name.replace(/\(.*?\)/g, ''));
-    return allExercises.find(e => {
-      const en = norm(e.name);
-      if (en === clean) return true;
-      return en.length > 2 && clean.length > 2 && (en.includes(clean) || clean.includes(en));
-    });
-  };
 
   const layouts = template?.weeks && template.weeks.length > 0 ? template.weeks : template ? [template.week1] : [];
   const cycleNames = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises.map(spec => norm(spec.name)))));
-  const cyclePrimaryPatterns = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
-    .filter(spec => spec.load === 'Тяжелая' || (spec.coef ?? 0) >= 1)
-    .map(spec => exercisePatternByName(spec.name)))).filter(Boolean));
-  const cycleSubstitutionGroups = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
-    .map(spec => {
-      const all = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(group => getExercisesByGroup(group));
-      return all.find(e => norm(e.name) === norm(spec.name))?.substitutionGroup;
-    })
-    .filter((group): group is string => Boolean(group)))));
 
   const items: AssistanceAnalysisItem[] = [];
   const added = new Set<string>();
 
-  // 1. Кандидаты PL-пула по группам слабых мышц связанной фазы (как в analyzePhaseAssistance).
-  const groups = relatedPhase ? groupsForLiftPhase(lift, relatedPhase) : groupsForLiftPhase(lift, lift as WeakPoint);
-  for (const group of groups) {
-    const allowed = PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? [];
-    if (allowed.length === 0) continue;
-    const candidates = getExercisesByGroup(group)
-      .filter(ex => allowed.includes(catalogPattern(ex)))
-      .filter(ex => !cyclePrimaryPatterns.has(catalogPattern(ex)))
-      .filter(ex => !ex.substitutionGroup || !cycleSubstitutionGroups.has(ex.substitutionGroup))
-      .sort((a, b) => {
-        const aName = norm(a.name), bName = norm(b.name);
-        const aInCycle = cycleNames.has(aName), bInCycle = cycleNames.has(bName);
-        if (aInCycle !== bInCycle) return aInCycle ? -1 : 1;
-        const aUses = plCatalogUses(a.name), bUses = plCatalogUses(b.name);
-        if (aUses !== bUses) return bUses - aUses;
-        const aEq = String(a.equipment || '').toLowerCase(), bEq = String(b.equipment || '').toLowerCase();
-        const aRank = /band|резин|other/.test(aEq) ? 2 : /bodyweight|suspension/.test(aEq) ? 1 : 0;
-        const bRank = /band|резин|other/.test(bEq) ? 2 : /bodyweight|suspension/.test(bEq) ? 1 : 0;
-        if (aRank !== bRank) return aRank - bRank;
-        return (a.fatigueCost || 0) - (b.fatigueCost || 0);
-      });
-
-    candidates.slice(0, 4).forEach(exercise => {
-      const n = norm(exercise.name);
-      if (added.has(n)) return;
-      added.add(n);
-      const inCycle = cycleNames.has(n);
-      items.push({
-        exercise,
-        targetGroup: group,
-        optimal: false,
-        rationale: `Нагружает ${targetRu(group)} — устраняет отклонение «${issue}» в ${LIFT_RU[lift]}; паттерн ${catalogPattern(exercise)}${inCycle ? ' совпадает с раскладкой цикла' : ''}; не дублирует основные лифты.`,
-        source: 'bar',
-        protocol: protocolFromCycle(template, group),
-        pattern: catalogPattern(exercise),
-      });
-    });
-  }
-
-  // 2. Специфичные ассистенты BAR_PATH_ISSUES (fuzzy из каталога).
+  // ПЛ-коррекции отклонения (BAR_PATH_ISSUES.assistance) — поиск в каталоге + СРЦ-пуле.
   for (const name of meta.assistance) {
     const n = norm(name);
     if (added.has(n)) continue;
-    const exercise = findExercise(name);
+    const exercise = findExerciseInPool(name, allExercises);
     if (!exercise) continue;
     added.add(norm(exercise.name));
     const group = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).find(g =>
@@ -321,7 +310,7 @@ export function analyzeBarPathAssistance(lift: Lift, issue: BarPathIssue, templa
       exercise,
       targetGroup: group,
       optimal: false,
-      rationale: `Нагружает ${targetRu(group)} — прямая коррекция отклонения «${issue}» (диагностический пул bar-path)${inCycle ? '; уже присутствует в раскладке цикла' : ''}.`,
+      rationale: `Коррекция отклонения «${issue}» (${LIFT_RU[lift]}): ${exercise.name}${inCycle ? '; уже присутствует в раскладке цикла' : ''}.`,
       source: 'bar',
       protocol: protocolFromCycle(template, group),
       pattern: catalogPattern(exercise),
@@ -334,69 +323,36 @@ export function analyzeBarPathAssistance(lift: Lift, issue: BarPathIssue, templa
 }
 
 /**
- * Анализ упражнений-коррекций мёртвой точки (sticking.corrections → каталог) —
- * для секции «2 · Мёртвые точки»: не только текст, но и выбираемые упражнения.
+ * Анализ упражнений-коррекций мёртвой точки (sticking.corrections → ПЛ-пул) —
+ * для секции «2 · Мёртвые точки»: коррекции углов становятся выбираемыми.
  * Для движений без угловой диагностики (ohp/row/pulldown/incline_press) —
- * полный набор из PL-пула слабых мышц фазы (выбор есть у КАЖДОГО движения).
+ * мёртвых точек нет → items пуст (в UI пояснение).
  */
 export function analyzeStickingCorrections(lift: Lift, phase: WeakPoint, template?: SRCycleTemplate): AssistanceAnalysis {
   const sticking = diagnoseLift(lift, phase);
-  const wpBase = diagnoseWeakPoint(lift, phase);
-  const phaseLabel = sticking?.phaseLabel ?? wpBase.label;
+  if (!sticking) return { lift, phase, issue: null, items: [] };
   const allExercises = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
-  const findExercise = (name: string): Exercise | undefined => {
-    const clean = norm(name.replace(/\(.*?\)/g, ''));
-    return allExercises.find(e => {
-      const en = norm(e.name);
-      if (en === clean) return true;
-      return en.length > 2 && clean.length > 2 && (en.includes(clean) || clean.includes(en));
-    });
-  };
   const items: AssistanceAnalysisItem[] = [];
   const added = new Set<string>();
 
-  // 1. Коррекции из биомеханической диагностики (STICKING_POINTS.corrections) — только для 3 классических.
-  if (sticking) {
-    for (const name of sticking.corrections) {
-      const clean = norm(name.replace(/\(.*?\)/g, ''));
-      if (added.has(clean)) continue;
-      const exercise = findExercise(name);
-      if (!exercise) continue;
-      added.add(norm(exercise.name));
-      const group = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).find(g =>
-        getExercisesByGroup(g).some(e => norm(e.name) === norm(exercise.name))) ?? exercise.group;
-      items.push({
-        exercise,
-        targetGroup: group,
-        optimal: false,
-        rationale: `Нагружает ${targetRu(group)} — коррекция мёртвой точки «${sticking.phaseLabel}» (${sticking.keyJoint}, угол ${sticking.angleRangeDeg[0]}°–${sticking.angleRangeDeg[1]}°).`,
-        source: 'sticking',
-        protocol: protocolFromCycle(template, group),
-        pattern: catalogPattern(exercise),
-      });
-    }
-  }
-
-  // 2. PL-пул слабых мышц фазы (для всех движений; для 4 без углов — основной источник).
-  for (const group of groupsForLiftPhase(lift, phase)) {
-    const allowed = PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? [];
-    if (allowed.length === 0) continue;
-    const candidates = getExercisesByGroup(group).filter(ex => allowed.includes(catalogPattern(ex)));
-    for (const exercise of candidates) {
-      if (items.length >= 6) break;
-      const n = norm(exercise.name);
-      if (added.has(n)) continue;
-      added.add(n);
-      items.push({
-        exercise,
-        targetGroup: group,
-        optimal: false,
-        rationale: `Нагружает ${targetRu(group)} — ${sticking ? 'дополнительный ассистент для слабых мышц мёртвой точки' : 'коррекция слабой точки'} «${phaseLabel}» ${LIFT_RU[lift]}.`,
-        source: 'sticking',
-        protocol: protocolFromCycle(template, group),
-        pattern: catalogPattern(exercise),
-      });
-    }
+  // Коррекции из биомеханической диагностики (STICKING_POINTS.corrections).
+  for (const name of sticking.corrections) {
+    const clean = norm(name.replace(/\(.*?\)/g, ''));
+    if (added.has(clean)) continue;
+    const exercise = findExerciseInPool(name, allExercises);
+    if (!exercise) continue;
+    added.add(norm(exercise.name));
+    const group = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).find(g =>
+      getExercisesByGroup(g).some(e => norm(e.name) === norm(exercise.name))) ?? exercise.group;
+    items.push({
+      exercise,
+      targetGroup: group,
+      optimal: false,
+      rationale: `Коррекция мёртвой точки «${sticking.phaseLabel}» (${sticking.keyJoint}, угол ${sticking.angleRangeDeg[0]}°–${sticking.angleRangeDeg[1]}°).`,
+      source: 'sticking',
+      protocol: protocolFromCycle(template, group),
+      pattern: catalogPattern(exercise),
+    });
   }
 
   if (items.length > 0) items[0] = { ...items[0], optimal: true };

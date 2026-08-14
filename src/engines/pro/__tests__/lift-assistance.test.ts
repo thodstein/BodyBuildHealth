@@ -12,22 +12,20 @@ describe('analyzePhaseAssistance — оптимальность упражнен
     expect(optimal.exercise.name.length).toBeGreaterThan(0);
   });
 
-  it('bench.lockout — трицепс/верх груди, не дублирует жим лёжа', () => {
+  it('bench.lockout — ПЛ-дожимы и рамы (специфика локаута)', () => {
     const analysis = analyzePhaseAssistance('bench', 'lockout', CYCLE_01);
     expect(analysis.items.length).toBeGreaterThan(0);
-    for (const item of analysis.items) {
-      // Основной жим лёжа (horizontal_push) исключён — не добавляем дубль основного лифта.
-      expect(item.pattern).not.toBe('horizontal_push');
-      expect(item.exercise.name.toLowerCase()).not.toMatch(/^жим штанги лёжа$|^жим лёжа$/);
-    }
+    const names = analysis.items.map(i => i.exercise.name.toLowerCase());
+    expect(names.some(n => n.includes('дожим') || n.includes('плинт') || n.includes('раме'))).toBe(true);
+    // Основной жим лёжа не дублируется
+    expect(names).not.toContain('жим штанги лёжа');
   });
 
-  it('deadlift.start — задняя цепь, не становая (hinge исключён)', () => {
+  it('deadlift.start — ПЛ-вариации старта (из ямы / дефицит / плинты)', () => {
     const analysis = analyzePhaseAssistance('deadlift', 'start', CYCLE_01);
     expect(analysis.items.length).toBeGreaterThan(0);
-    for (const item of analysis.items) {
-      expect(item.exercise.name.toLowerCase()).not.toMatch(/становая|румынская/);
-    }
+    const names = analysis.items.map(i => i.exercise.name.toLowerCase());
+    expect(names.some(n => /ямы|дефицит|плинт/.test(n))).toBe(true);
   });
 
   it('каждый item имеет протокол из раскладки цикла', () => {

@@ -104,7 +104,7 @@ export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
   bar_loops: {
     lifts: ['squat', 'bench', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'],
     relatedWeakPoint: { squat: 'mid', bench: 'mid', deadlift: 'mid', ohp: 'ohp_mid', row: 'row_mid', pulldown: 'pd_mid', incline_press: 'inc_mid' },
-    assistance: ['Скоростной жим', 'Присед с остановками', 'Тяга с остановками'],
+    assistance: ['Скоростной жим', 'Жим с остановками', 'Становая тяга с остановками', 'Присед с паузой'],
   },
   asymmetric: {
     lifts: ['squat', 'bench', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'],

@@ -36,13 +36,26 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(html).toContain('Упражнения (из раскладки цикла');
   });
 
-  it('секции пронумерованы 1 · Слабые точки, 2 · Мёртвые точки, 3 · Движение штанги с движением сверху', () => {
+  it('секции пронумерованы 1 · Слабые мышцы, 2 · Слабые точки, 3 · Мёртвые точки, 4 · Движение штанги', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
-    expect(screen.getByText('1 · Слабые точки')).toBeTruthy();
-    expect(screen.getByText(/2 · Мёртвые точки/)).toBeTruthy();
-    // В заголовке секции 3 — выбранное движение (жим лёжа → «3 · Движение штанги (bar-path) · жим лёжа»)
+    expect(screen.getByText('1 · Слабые мышцы')).toBeTruthy();
+    expect(screen.getByText('2 · Слабые точки')).toBeTruthy();
+    expect(screen.getByText(/3 · Мёртвые точки/)).toBeTruthy();
+    // В заголовке секции 4 — выбранное движение (жим лёжа → «4 · Движение штанги (bar-path) · Жим лёжа»)
     fireEvent.click(screen.getByText('Жим лёжа'));
-    expect(screen.getByText('3 · Движение штанги (bar-path) · Жим лёжа')).toBeTruthy();
+    expect(screen.getByText('4 · Движение штанги (bar-path) · Жим лёжа')).toBeTruthy();
+  });
+
+  it('слабые мышцы: выбор группы даёт 5 рекомендаций тренера ПЛ по циклу', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    fireEvent.click(screen.getByText('Грудь'));
+    // Рекомендации тренера ПЛ по слабой мышце
+    expect(screen.getByText(/Грудь — рекомендации тренера ПЛ/)).toBeTruthy();
+    expect(screen.getAllByText('💪 Слабая мышца').length).toBeGreaterThanOrEqual(1);
+    // Итоговая рекомендация тренера появилась (содержит выбранные параметры)
+    expect(screen.getByText('🏆 Рекомендация тренера ПЛ')).toBeTruthy();
+    fireEvent.click(screen.getByText('🏆 Добавить весь рекомендованный перечень в план'));
+    expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
   });
 
   it('упражнения имеют тег источника (⚡ Слабая точка / 🩻 Мёртвая точка / 📈 Bar-path)', () => {
@@ -96,16 +109,16 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
   });
 
-  it('для движений БЕЗ угловой диагностики (жим стоя) — тоже есть выбор коррекций, не только текст', () => {
+  it('для движений БЕЗ угловой диагностики (жим стоя) — пояснение, выбор в слабых точках и bar-path', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Жим стоя'));
-    // Пояснение про углы
-    expect(screen.getByText(/Угловая диагностика есть для приседа, жима лёжа и становой тяги/)).toBeTruthy();
-    // И при этом — полный блок упражнений-коррекций (по слабой точке)
-    expect(screen.getByText(/Упражнения-коррекции \(выберите и добавьте в план\)/)).toBeTruthy();
-    const allBtns = screen.getAllByText('➕ Все');
-    fireEvent.click(allBtns[0]);
-    expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
+    // Пояснение про углы (мёртвых точек нет у 4 движений)
+    expect(screen.getByText(/Угловая диагностика мёртвых точек есть для приседа, жима лёжа и становой тяги/)).toBeTruthy();
+    // Выбор упражнений есть: слабые точки (секция 2) и bar-path (секция 4)
+    expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
+    expect(screen.getByText('4 · Движение штанги (bar-path) · Жим стоя')).toBeTruthy();
+    fireEvent.click(screen.getByText('Уход штанги вперёд'));
+    expect(screen.getAllByText('📈 Bar-path').length).toBeGreaterThan(0);
   });
 
   it('bar-path отклонение даёт полный набор упражнений (кандидаты групп + пул)', () => {
