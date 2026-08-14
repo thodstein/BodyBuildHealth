@@ -268,6 +268,16 @@ export interface BBPlan {
    *  Используется валидатором вместо landmarks.mrv, который не учитывает
    *  enhanced/стажевые множители. */
   mrvByMuscle?: Record<string, number>;
+  /** PED-адаптация (дозы → MRV/восстановление) — сохраняется в плане для
+   *  injury-предупреждений: суставная нагрузка при PED-интенсификации выше
+   *  (сухожилия/связки не успевают за мышечным ростом). */
+  pedAdaptation?: {
+    combinedMrvMultiplier: number;
+    combinedRecoveryMultiplier: number;
+    activePEDs: string[];
+    pedDoses: Record<string, number>;
+    risks: string[];
+  };
   safetyConstraints?: {
     equipment?: string[];
     excludedExercises?: string[];
@@ -2781,6 +2791,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   ];
 
   const basePlan: BBPlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeTargets };
+  if (pedAdapt) {
+    basePlan.pedAdaptation = {
+      combinedMrvMultiplier: pedAdapt.combinedMrvMultiplier,
+      combinedRecoveryMultiplier: pedAdapt.combinedRecoveryMultiplier,
+      activePEDs: pedAdapt.activePEDs,
+      pedDoses: pedAdapt.pedDoses,
+      risks: pedAdapt.risks,
+    };
+  }
   let finalPlan = basePlan;
   // Применяем пост-обработку (техники/фидеры/авто-делод/загрузка/авторег) внутри buildBBPlan,
   // чтобы оба вызывающих пути (BbAutoConstructor и TrainingConstructor) получали результат.

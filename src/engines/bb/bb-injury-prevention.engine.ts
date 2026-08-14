@@ -46,7 +46,11 @@ function getJointStress(exercise: BBExercise): number {
   const base = stressMap[catalog.jointStress || 'med'] || 6;
   const rir = Math.max(0, Math.min(5, exercise.rir ?? 2));
   const proximityMultiplier = 1 + Math.max(0, 2 - rir) * 0.15;
-  return base * exercise.sets * proximityMultiplier;
+  // Весовой фактор: суставная нагрузка растёт с рабочим весом (не только с
+  // числом сетов). <60 кг — база; 200+ кг — ×1.5 (тяжёлые compound-нагрузки).
+  const weight = Number(exercise.workSets?.[0]?.weight) || 0;
+  const intensityMultiplier = weight > 0 ? 1 + Math.min(0.5, Math.max(0, (weight - 60) / 200)) : 1;
+  return base * exercise.sets * proximityMultiplier * intensityMultiplier;
 }
 
 function getJointsForMuscle(muscle: string): string[] {
@@ -164,6 +168,18 @@ export function analyzePlanStress(plan: BBPlan): {
 
   const validWeeks = weeklyReports.length || 1;
   const avgWeeklyStress = totalStress / validWeeks;
+
+  // PED-интенсификация: дозы повышают MRV → объём и рабочие веса выше,
+  // а сухожилия/связки адаптируются медленнее мышечной ткани (Schoenfeld 2021,
+  // Helms 2022). При совокупном множителе ≥1.3 предупреждаем явно.
+  const ped = (plan as any).pedAdaptation as
+    | { combinedMrvMultiplier?: number; combinedRecoveryMultiplier?: number; activePEDs?: string[]; pedDoses?: Record<string, number> }
+    | undefined;
+  if (ped && (ped.combinedMrvMultiplier ?? 1) >= 1.3) {
+    const aasDose = Number(ped.pedDoses?.AAS) || 0;
+    const dryJoints = aasDose >= 750 ? ' Высокие дозы ААС + эстрадиол-супрессия → сухость суставов; рассмотрите дозированный AI и добавки (коллаген/Омега-3/UC-II).' : '';
+    allIssues.push(`⚠ PED-интенсификация объёма ×${(ped.combinedMrvMultiplier ?? 1).toFixed(2)}: сухожилия/связки не успевают за мышечным ростом — контролируйте боли в суставах, при появлении — снижайте объём/веса (особенно на френч/жимах узким/тягах).${dryJoints}`);
+  }
 
   // Overall risk: high if any week is high, moderate if avg > moderate
   const hasHigh = weeklyReports.some(r => r.riskLevel === 'high');

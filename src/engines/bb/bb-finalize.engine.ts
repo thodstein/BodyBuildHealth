@@ -12,6 +12,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
+import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
@@ -2136,6 +2137,10 @@ for (const week of next.weeks) {
   const armSummary = Object.entries(armQuality).map(([k, v]) => `${k}=${v}`).join(', ') || 'нет прямой работы';
   next.rationale.push(`💪 Руки по паттернам: ${armSummary}`);
   next.rationale.push(...armQualityIssues(next.weeks).map(issue => `⚠ Качество рук: ${issue}`));
+  // Суставной стресс (объём × вес × RIR-проксимити + PED-интенсификация):
+  // предупреждения по суставам попадают в rationale плана.
+  const jointIssues = analyzePlanStress(next).issues;
+  if (jointIssues.length) next.rationale.push(`🦿 Суставы: ${jointIssues.join(' ')}`);
   const errors = validation.issues
     .filter(issue => issue.level === 'error')
     .slice(0, 20)

@@ -120,6 +120,44 @@ describe('bb-injury-prevention.engine', () => {
     const shoulderStress = analysis.weeklyReports.reduce((sum, r) => sum + (r.byJoint['shoulder'] || 0), 0);
     expect(shoulderStress).toBeGreaterThan(0);
   });
+
+  it('весовой фактор: тяжёлые рабочие веса повышают суставной стресс', () => {
+    const mkEx = (name: string, sets: number, weight: number) => ({
+      muscle: 'chest', name, role: 'primary' as const, character: 'тяж' as const,
+      sets, repsRange: [6, 8] as [number, number], rir: 1,
+      workSets: [{ weight, reps: 6, rir: 1, restSeconds: 120 }],
+    });
+    const light = calculateSessionStress({ day: 1, weekOffset: 1, character: 'тяж' as const, sessionTag: 'Push', exercises: [mkEx('Жим штанги лёжа', 4, 40)] });
+    const heavy = calculateSessionStress({ day: 1, weekOffset: 1, character: 'тяж' as const, sessionTag: 'Push', exercises: [mkEx('Жим штанги лёжа', 4, 180)] });
+    expect(heavy.sessionStress).toBeGreaterThan(light.sessionStress);
+  });
+
+  it('PED-интенсификация: high MRV-множитель даёт суставное предупреждение', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 4 }));
+    (plan as any).pedAdaptation = {
+      combinedMrvMultiplier: 1.45, combinedRecoveryMultiplier: 1.4,
+      activePEDs: ['AAS'], pedDoses: { AAS: 750 }, risks: [],
+    };
+    const analysis = analyzePlanStress(plan);
+    expect(analysis.issues.some(i => i.includes('PED-интенсификация'))).toBe(true);
+  });
+
+  it('без PED (натурал) суставное PED-предупреждение не появляется', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 4 }));
+    const analysis = analyzePlanStress(plan);
+    expect(analysis.issues.some(i => i.includes('PED-интенсификация'))).toBe(false);
+  });
+
+  it('PED-предупреждение с дозой AAS ≥750 упоминает сухость суставов', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 4 }));
+    (plan as any).pedAdaptation = {
+      combinedMrvMultiplier: 1.45, combinedRecoveryMultiplier: 1.4,
+      activePEDs: ['AAS'], pedDoses: { AAS: 1000 }, risks: [],
+    };
+    const analysis = analyzePlanStress(plan);
+    const issue = analysis.issues.find(i => i.includes('PED-интенсификация')) || '';
+    expect(issue).toContain('сухость суставов');
+  });
 });
 
 describe('bb-dup.engine', () => {

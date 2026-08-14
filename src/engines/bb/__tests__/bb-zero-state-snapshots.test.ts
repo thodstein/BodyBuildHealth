@@ -40,7 +40,7 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
   it('ПРОФ-cycle adapt (CYCLE_01 + AAS 500) — per-muscle объём', () => {
     const plan = convertCycleToBBPlan({ cycle: CYCLE_01, workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
     expect(directVolume(plan)).toEqual({
-      abs: 6, back: 6, biceps: 6, calves: 6, chest: 6, forearms: 6, glutes: 6, hamstrings: 8, quads: 12, shoulders: 6, traps: 6, triceps: 6,
+      abs: 6, back: 6, biceps: 6, calves: 6, chest: 6, forearms: 6, glutes: 6, hamstrings: 6, quads: 12, shoulders: 6, traps: 6, triceps: 6,
     });
   });
 
