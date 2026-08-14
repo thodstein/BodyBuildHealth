@@ -296,8 +296,9 @@ export function analyzeBarPathAssistance(lift: Lift, issue: BarPathIssue, templa
   const items: AssistanceAnalysisItem[] = [];
   const added = new Set<string>();
 
-  // ПЛ-коррекции отклонения (BAR_PATH_ISSUES.assistance) — поиск в каталоге + СРЦ-пуле.
-  for (const name of meta.assistance) {
+  // ПЛ-коррекции отклонения: per-lift пул (если задан) или общий assistance.
+  const poolNames = meta.assistanceByLift?.[lift] ?? meta.assistance;
+  for (const name of poolNames) {
     const n = norm(name);
     if (added.has(n)) continue;
     const exercise = findExerciseInPool(name, allExercises);

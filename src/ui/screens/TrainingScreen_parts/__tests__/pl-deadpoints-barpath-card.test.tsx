@@ -46,11 +46,14 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText('4 · Движение штанги (bar-path) · Жим лёжа')).toBeTruthy();
   });
 
-  it('слабые мышцы: выбор группы даёт 5 рекомендаций тренера ПЛ по циклу', () => {
+  it('слабые мышцы: выбор подгруппы даёт 5 рекомендаций тренера ПЛ по циклу', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Грудь'));
+    // Подгруппы раскрылись — выбираем «Верх груди»
+    expect(screen.getByText('Верх груди')).toBeTruthy();
+    fireEvent.click(screen.getByText('Верх груди'));
     // Рекомендации тренера ПЛ по слабой мышце
-    expect(screen.getByText(/Грудь — рекомендации тренера ПЛ/)).toBeTruthy();
+    expect(screen.getByText(/Верх груди — рекомендации тренера ПЛ/)).toBeTruthy();
     expect(screen.getAllByText('💪 Слабая мышца').length).toBeGreaterThanOrEqual(1);
     // Итоговая рекомендация тренера появилась (содержит выбранные параметры)
     expect(screen.getByText('🏆 Рекомендация тренера ПЛ')).toBeTruthy();

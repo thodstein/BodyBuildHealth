@@ -81,8 +81,10 @@ export interface BarPathIssueMeta {
   lifts: Lift[];
   /** С какой слабой фазой связано (по движению). null — универсальное отклонение. */
   relatedWeakPoint: Partial<Record<Lift, WeakPoint>>;
-  /** Ассистентные упражнения (PL-пул коррекции отклонения). */
+  /** Ассистентные упражнения (PL-пул коррекции отклонения) — fallback. */
   assistance: string[];
+  /** Per-lift пулы коррекций: для каждого движения свой набор (жим ≠ присед ≠ тяга). */
+  assistanceByLift?: Partial<Record<Lift, string[]>>;
 }
 
 export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
@@ -90,6 +92,11 @@ export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
     lifts: ['squat', 'deadlift', 'bench', 'ohp', 'incline_press'],
     relatedWeakPoint: { squat: 'bottom', deadlift: 'start', bench: 'off_chest', ohp: 'ohp_mid', incline_press: 'inc_mid' },
     assistance: ['Румынская тяга', 'Наклоны', 'Гиперэкстензия'],
+    assistanceByLift: {
+      bench: ['Жим с паузой', 'Жим с остановками', 'Отжимания с дефицитом'],
+      ohp: ['Армейский жим', 'Жим гантелей', 'Жим с остановками'],
+      incline_press: ['Жим с паузой', 'Жим гантелей на наклонной', 'Жим с остановками'],
+    },
   },
   hips_shoot_up: {
     lifts: ['squat'],
@@ -105,11 +112,28 @@ export const BAR_PATH_ISSUES: Record<BarPathIssue, BarPathIssueMeta> = {
     lifts: ['squat', 'bench', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'],
     relatedWeakPoint: { squat: 'mid', bench: 'mid', deadlift: 'mid', ohp: 'ohp_mid', row: 'row_mid', pulldown: 'pd_mid', incline_press: 'inc_mid' },
     assistance: ['Скоростной жим', 'Жим с остановками', 'Становая тяга с остановками', 'Присед с паузой'],
+    assistanceByLift: {
+      squat: ['Присед с паузой', 'Присед с остановками', 'Присед на груди'],
+      bench: ['Скоростной жим', 'Жим с остановками', 'Жим с паузой'],
+      deadlift: ['Становая тяга с остановками', 'Становая тяга с паузой ниже колен', 'Тяга с плинтов (rack pull)'],
+      ohp: ['Скоростной жим', 'Армейский жим', 'Жим с остановками'],
+      row: ['Тяга штанги в наклоне', 'Тяга гантели в наклоне', 'Становая тяга с остановками'],
+      pulldown: ['Тяга верхнего блока (прямой)', 'Подтягивания (прямой хват)', 'Тяга верхнего блока одной рукой'],
+      incline_press: ['Жим с остановками', 'Жим с паузой', 'Жим гантелей на наклонной'],
+    },
   },
   asymmetric: {
     lifts: ['squat', 'bench', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'],
     relatedWeakPoint: {},
     assistance: ['Выпады', 'Болгарские сплит-приседы', 'Тяга гантели одной рукой'],
+    assistanceByLift: {
+      bench: ['Жим гантелей лёжа', 'Отжимания с дефицитом', 'Жим гантелей на наклонной'],
+      deadlift: ['Тяга гантели в наклоне', 'Выпады', 'Болгарские сплит-приседы'],
+      ohp: ['Жим гантелей', 'Армейский жим', 'Махи гантелями в стороны'],
+      row: ['Тяга гантели в наклоне', 'Тяга гантели одной рукой', 'Тяга штанги в наклоне'],
+      pulldown: ['Тяга верхнего блока одной рукой', 'Тяга верхнего блока (прямой)', 'Подтягивания (прямой хват)'],
+      incline_press: ['Жим гантелей на наклонной', 'Жим гантелей лёжа', 'Армейский жим'],
+    },
   },
 };
 

@@ -22,9 +22,54 @@ import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.55)';
 
-/** Слабые мышцы (группы) — как в верхней карточке ПЛ-авто. */
-const WEAK_GROUPS: Array<[string, string]> = [
-  ['chest', 'Грудь'], ['back', 'Спина'], ['legs', 'Ноги'], ['shoulders', 'Плечи'], ['arms', 'Руки'], ['core', 'Кор'],
+/** Слабые мышцы: группы → подробные подгруппы (по паттернам ПЛ-пула). */
+const WEAK_MUSCLE_DETAIL: Array<{ id: string; label: string; subs: Array<{ sub: string; label: string; patterns: string[]; nameRe?: RegExp }> }> = [
+  {
+    id: 'chest', label: 'Грудь',
+    subs: [
+      { sub: 'upper', label: 'Верх груди', patterns: ['incline_push'] },
+      { sub: 'lower', label: 'Низ груди', patterns: ['dip_push', 'decline_push'] },
+      { sub: 'mid', label: 'Середина (изоляция)', patterns: ['isolation_chest'] },
+    ],
+  },
+  {
+    id: 'back', label: 'Спина',
+    subs: [
+      { sub: 'width', label: 'Широчайшие (ширина)', patterns: ['vertical_pull'] },
+      { sub: 'thickness', label: 'Толщина (ромбовидные)', patterns: ['horizontal_pull'] },
+      { sub: 'lats', label: 'Изоляция широчайших', patterns: ['isolation_back'] },
+      { sub: 'rear_delt', label: 'Задние дельты', patterns: ['isolation_shoulders'] },
+    ],
+  },
+  {
+    id: 'legs', label: 'Ноги',
+    subs: [
+      { sub: 'quads', label: 'Квадрицепсы', patterns: ['lunge', 'isolation_legs_quad'] },
+      { sub: 'hams', label: 'Бицепс бедра', patterns: ['isolation_legs_ham'] },
+      { sub: 'glutes', label: 'Ягодицы', patterns: ['glute_squat'] },
+      { sub: 'calves', label: 'Икры', patterns: ['isolation_calves'] },
+    ],
+  },
+  {
+    id: 'shoulders', label: 'Плечи',
+    subs: [
+      { sub: 'delts', label: 'Дельты', patterns: ['isolation_shoulders'] },
+    ],
+  },
+  {
+    id: 'arms', label: 'Руки',
+    subs: [
+      { sub: 'biceps', label: 'Бицепс', patterns: ['isolation_arms'], nameRe: /бицепс|сгибан|молот|скотт|брахи|curl/i },
+      { sub: 'triceps', label: 'Трицепс', patterns: ['isolation_arms'], nameRe: /трицепс|разгибан|француз|узким хватом|tricep/i },
+    ],
+  },
+  {
+    id: 'core', label: 'Кор',
+    subs: [
+      { sub: 'abs', label: 'Пресс', patterns: ['core'] },
+      { sub: 'obliques', label: 'Косые/антиротация', patterns: ['rotation', 'anti_rotation'] },
+    ],
+  },
 ];
 
 const LIFT_RU: Record<Lift, string> = {
@@ -141,23 +186,35 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   const [savedFocus, setSavedFocus] = useState(false);
   // 🎯 Слабые точки, добавляемые в план ПЛ-авто (как бывшая верхняя карточка «Слабые точки СРЦ»).
   const [planWeakPoints, setPlanWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
-  // 💪 Слабые мышцы (группы) — по циклу, как бывшая верхняя карточка «Слабые группы мышц».
+  // 💪 Слабые мышцы (подгруппы) — по циклу, как бывшая верхняя карточка «Слабые группы мышц».
   const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>([]);
-  const toggleWeakMuscle = (g: string) => setWeakMuscleGroups(cur => cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g]);
+  const [weakMuscleSubs, setWeakMuscleSubs] = useState<string[]>([]);
+  const toggleWeakMuscle = (g: string) => setWeakMuscleGroups(cur => {
+    if (cur.includes(g)) return cur.filter(x => x !== g);
+    return [...cur, g];
+  });
+  const toggleWeakMuscleSub = (key: string) => setWeakMuscleSubs(cur => cur.includes(key) ? cur.filter(x => x !== key) : [...cur, key]);
 
-  // Ассистенты слабых мышц по раскладке цикла (логика верхней карточки): 5 на выбор.
+  // Ассистенты слабых подгрупп мышц по раскладке цикла: 5 на выбор.
   const muscleAnalyses = useMemo<Record<string, AssistanceAnalysis>>(() => {
     if (!template) return {};
     const out: Record<string, AssistanceAnalysis> = {};
-    for (const group of weakMuscleGroups) {
-      const candidates = getPLWeakGroupExerciseCandidates(template, group).slice(0, 5);
-      out[group] = {
+    for (const key of weakMuscleSubs) {
+      const [group, subId] = key.split('|');
+      const detail = WEAK_MUSCLE_DETAIL.find(d => d.id === group);
+      const sub = detail?.subs.find(s => s.sub === subId);
+      if (!detail || !sub) continue;
+      const candidates = getPLWeakGroupExerciseCandidates(template, group)
+        .filter(ex => sub.patterns.includes(ex.movementPattern || ''))
+        .filter(ex => !sub.nameRe || sub.nameRe.test(`${ex.name} ${ex.targetMuscle || ''}`))
+        .slice(0, 5);
+      out[key] = {
         lift, phase: null, issue: null,
         items: candidates.map((exercise, index) => ({
           exercise,
           targetGroup: group,
           optimal: index === 0,
-          rationale: `Слабая мышца «${group}» — ассистент из раскладки цикла, не дублирует основные лифты.`,
+          rationale: `Слабая мышца «${sub.label}» — ассистент из раскладки цикла, не дублирует основные лифты.`,
           source: 'muscle' as const,
           protocol: protocolFromCycle(template, group),
           pattern: exercise.movementPattern || '',
@@ -165,7 +222,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       };
     }
     return out;
-  }, [template, weakMuscleGroups, lift]);
+  }, [template, weakMuscleSubs, lift]);
 
   // Авто-пресет из дневника: частые тяжёлые подходы (RPE≥8) в фазе движения — подсказка (не авто-выбор).
   const diaryHint = useMemo(() => {
@@ -256,10 +313,10 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
     kind: 'weakpoints',
     label: 'Диагностика движения: слабые мышцы + слабые точки + коррекции',
     data: {
-      groups: [...new Set([...weakMuscleGroups, ...planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean)])],
+      groups: [...new Set([...weakMuscleSubs.map(k => k.split('|')[0]), ...planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean)])],
       plWeakPoints: planWeakPoints.map(p => ({ lift: p.lift, weakPoint: p.weakPoint, days: days[`${p.lift}|${p.weakPoint}`] ?? [] })),
-      weakGroupExerciseMap: Object.fromEntries(weakMuscleGroups.map(g => [g, selected[`muscle|${g}`] ?? []])),
-      weakGroupDayMap: Object.fromEntries(weakMuscleGroups.map(g => [g, days[`muscle|${g}`] ?? []])),
+      weakGroupExerciseMap: Object.fromEntries(weakMuscleSubs.map(k => [k.split('|')[0], selected[k] ?? []])),
+      weakGroupDayMap: Object.fromEntries(weakMuscleSubs.map(k => [k.split('|')[0], days[k] ?? []])),
       diagnosticExerciseMap: selected,
       diagnosticDayMap: days,
     },
@@ -294,30 +351,45 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           Выберите слабую мышцу — рекомендации тренера ПЛ: 5 ассистентов из раскладки цикла (%ПМ/повторы/подходы — как у аксессуара недели). Основные жим/присед/становая и их дубли исключены.
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
-          {WEAK_GROUPS.map(([id, label]) => {
-            const on = weakMuscleGroups.includes(id);
-            return <button key={id} onClick={() => toggleWeakMuscle(id)} style={{ minHeight: 32, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', border: on ? '1px solid #4ade80' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(74,222,128,0.15)' : 'transparent', color: on ? '#4ade80' : DIM, fontWeight: 700, fontSize: 10 }}>{label}{on ? ' ✓' : ''}</button>;
+          {WEAK_MUSCLE_DETAIL.map(d => {
+            const on = weakMuscleGroups.includes(d.id);
+            return <button key={d.id} onClick={() => toggleWeakMuscle(d.id)} style={{ minHeight: 32, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', border: on ? '1px solid #4ade80' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(74,222,128,0.15)' : 'transparent', color: on ? '#4ade80' : DIM, fontWeight: 700, fontSize: 10 }}>{d.label}{on ? ' ✓' : ''}</button>;
           })}
         </div>
         {!template && (
           <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>
         )}
         {weakMuscleGroups.map(group => {
-          const analysis = muscleAnalyses[group];
-          if (!analysis || analysis.items.length === 0) return null;
-          const key = `muscle|${group}`;
-          const label = WEAK_GROUPS.find(([id]) => id === group)?.[1] || group;
+          const detail = WEAK_MUSCLE_DETAIL.find(d => d.id === group);
+          if (!detail) return null;
           return (
-            <div key={group} style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', marginBottom: 4 }}>🏋️ {label} — рекомендации тренера ПЛ (выберите и добавьте в план):</div>
-              {analysis.items.map((item, idx) => (
-                <ExerciseRow key={idx} item={item} selected={selected[key]?.includes(item.exercise.name) ?? false}
-                  onToggle={() => toggleExercise(key, item.exercise.name)} onAdd={() => addToPlan(key, [item.exercise.name])} />
-              ))}
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <button onClick={() => addToPlan(key, analysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
-                <button onClick={() => addToPlan(key, analysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+            <div key={group} style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(74,222,128,0.04)', border: '1px solid rgba(74,222,128,0.12)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', marginBottom: 4 }}>{detail.label} — выберите мышцу:</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {detail.subs.map(s => {
+                  const key = `${group}|${s.sub}`;
+                  const on = weakMuscleSubs.includes(key);
+                  return <button key={s.sub} onClick={() => toggleWeakMuscleSub(key)} style={{ minHeight: 28, padding: '4px 9px', borderRadius: 10, cursor: 'pointer', fontSize: 9, border: on ? '1px solid #4ade80' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(74,222,128,0.18)' : 'transparent', color: on ? '#4ade80' : DIM, fontWeight: 700 }}>{s.label}{on ? ' ✓' : ''}</button>;
+                })}
               </div>
+              {detail.subs.filter(s => weakMuscleSubs.includes(`${group}|${s.sub}`)).map(s => {
+                const key = `${group}|${s.sub}`;
+                const analysis = muscleAnalyses[key];
+                if (!analysis || analysis.items.length === 0) return null;
+                return (
+                  <div key={key} style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', marginBottom: 4 }}>🏋️ {s.label} — рекомендации тренера ПЛ (выберите и добавьте в план):</div>
+                    {analysis.items.map((item, idx) => (
+                      <ExerciseRow key={idx} item={item} selected={selected[key]?.includes(item.exercise.name) ?? false}
+                        onToggle={() => toggleExercise(key, item.exercise.name)} onAdd={() => addToPlan(key, [item.exercise.name])} />
+                    ))}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button onClick={() => addToPlan(key, analysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
+                      <button onClick={() => addToPlan(key, analysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -497,9 +569,13 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24' }}>🏆 Рекомендация тренера ПЛ</div>
         {(() => {
           const recs: Array<{ key: string; name: string; label: string }> = [];
-          for (const g of weakMuscleGroups) {
-            const first = muscleAnalyses[g]?.items.find(i => i.optimal);
-            if (first) recs.push({ key: `muscle|${g}`, name: first.exercise.name, label: '💪 ' + (WEAK_GROUPS.find(([id]) => id === g)?.[1] || g) });
+          for (const key of weakMuscleSubs) {
+            const first = muscleAnalyses[key]?.items.find(i => i.optimal);
+            if (first) {
+              const [g, subId] = key.split('|');
+              const label = WEAK_MUSCLE_DETAIL.find(d => d.id === g)?.subs.find(s => s.sub === subId)?.label || g;
+              recs.push({ key, name: first.exercise.name, label: '💪 ' + label });
+            }
           }
           if (phaseAnalysis) {
             const first = phaseAnalysis.items.find(i => i.optimal);

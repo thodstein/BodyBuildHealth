@@ -70,6 +70,44 @@ describe('lift-assistance: пулы разделены (слабые мышцы 
     }
   });
 
+  it('bar-path per-lift: для жима — жимовые коррекции, для приседа — приседовые (не смешиваются)', () => {
+    const bench = analyzeBarPathAssistance('bench', 'forward_drift');
+    const benchNames = bench.items.map(i => i.exercise.name.toLowerCase());
+    expect(benchNames.some(n => /жим|пауз|остановк/.test(n))).toBe(true);
+    expect(benchNames.some(n => /румынск|наклон|гипер/.test(n))).toBe(false);
+
+    const squat = analyzeBarPathAssistance('squat', 'forward_drift');
+    const squatNames = squat.items.map(i => i.exercise.name.toLowerCase());
+    expect(squatNames.some(n => /румынск|наклон|гипер/.test(n))).toBe(true);
+
+    const ohp = analyzeBarPathAssistance('ohp', 'bar_loops');
+    const ohpNames = ohp.items.map(i => i.exercise.name.toLowerCase());
+    expect(ohpNames.some(n => /жим|армейск/.test(n))).toBe(true);
+
+    const row = analyzeBarPathAssistance('row', 'bar_loops');
+    const rowNames = row.items.map(i => i.exercise.name.toLowerCase());
+    expect(rowNames.some(n => /тяга|тяг/.test(n))).toBe(true);
+
+    const pulldown = analyzeBarPathAssistance('pulldown', 'asymmetric');
+    const pulldownNames = pulldown.items.map(i => i.exercise.name.toLowerCase());
+    expect(pulldownNames.some(n => /тяга верхнего|подтягив/.test(n))).toBe(true);
+  });
+
+  it('слабые точки: фазы одного движения дают РАЗНЫЕ наборы упражнений', () => {
+    const liftSets: Array<[string, string[]]> = [
+      ['squat', ['bottom', 'mid', 'lockout']],
+      ['deadlift', ['start', 'mid', 'lockout']],
+      ['ohp', ['ohp_start', 'ohp_mid', 'ohp_lockout']],
+      ['row', ['row_start', 'row_mid', 'row_squeeze']],
+      ['pulldown', ['pd_top', 'pd_mid', 'pd_squeeze']],
+      ['incline_press', ['inc_off', 'inc_mid', 'inc_lockout']],
+    ];
+    for (const [lift, phases] of liftSets) {
+      const sets = phases.map(wp => analyzePhaseAssistance(lift as any, wp as any).items.map(i => i.exercise.name).join('|'));
+      expect(new Set(sets).size, `${lift}: фазы дают одинаковые наборы`).toBe(phases.length);
+    }
+  });
+
   it('пулы не смешиваются по источнику: weak-список не содержит sticking/bar и наоборот', () => {
     const phase = analyzePhaseAssistance('bench', 'mid');
     expect(phase.items.some(i => i.source !== 'weak')).toBe(false);
