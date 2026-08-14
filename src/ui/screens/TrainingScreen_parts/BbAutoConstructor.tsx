@@ -63,7 +63,11 @@ import { PlanExportCard } from './PlanExportCard';
 import { BBMetricsSummaryCard } from './BBMetricsSummaryCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
-import { buildPeakWeekProtocol, applyPeakWeekToPlan, type PeakWeekProtocol } from '../../../engines/bb/bb-peak-week.engine';
+import {
+  buildBBContestPrep, applyPeakWeekOverlayToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile,
+  isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU,
+  type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory,
+} from '../../../engines/bb/bb-contest-prep.engine';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
@@ -294,11 +298,52 @@ export const BbAutoConstructor: React.FC = () => {
   const [showTools, setShowTools] = useState(false);
   // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
   const [usePreviousPlan, setUsePreviousPlan] = useState(true);
-  // PRO: peak week protocol для BB-соревнований
+  // PRO: peak week — единая система тапера ББ (bb-contest-prep.engine)
   const [showPeakWeek, setShowPeakWeek] = useState(false);
-  const [peakWeekProtocol, setPeakWeekProtocol] = useState<PeakWeekProtocol | null>(null);
+  const [peakPrep, setPeakPrep] = useState<BBContestPrepResult | null>(null);
   // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
-  const [peakWeekCategory, setPeakWeekCategory] = useState<string>('mens_physique');
+  const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
+
+  /** Конфиг тапера для кнопки «🎭 Peak week»: профиль (goals.bbPeakConfig/legacy)
+   *  с переопределением категории выбранной в UI; пол следует категории. */
+  const buildPeakConfig = (): BBContestPrepConfig => {
+    const prof = (linked.profile?.settings ?? {}) as any;
+    const catProfile = CATEGORY_PROFILES[peakWeekCategory] ?? CATEGORY_PROFILES.mens_physique;
+    const sex: 'male' | 'female' = catProfile.sex;
+    const stored = prof?.goals?.bbPeakConfig ? deserializeBBPrepConfig(prof.goals.bbPeakConfig) : null;
+    const legacy = stored ? null : legacyConfigFromProfile(prof?.goals, prof?.personal);
+    const base = stored ?? legacy;
+    if (base) return { ...base, category: peakWeekCategory, sex };
+    return {
+      sex,
+      category: peakWeekCategory,
+      weightKg: Math.max(40, Math.min(200, Number(prof?.personal?.weight) || 80)),
+      bodyFatPct: Number(prof?.personal?.bodyFat) > 0 ? Number(prof?.personal?.bodyFat) : undefined,
+      experienceLevel: 'intermediate',
+      enhanced: false,
+      prepCount: 0,
+      showDate: isoAddDays(isoToday(), 7),
+      weeksOut: 3,
+      trainingProtocol: 'bb',
+      carbLoadStrategy: 'moderate',
+      waterStrategy: 'minimal',
+      sodiumStrategy: 'constant',
+    };
+  };
+
+  const applyPeakWeekToCurrentPlan = (category: BBContestCategory) => {
+    setPeakWeekCategory(category);
+    if (!builtPlan) return;
+    try {
+      const cfg = buildPeakConfig();
+      const res = buildBBContestPrep({ ...cfg, category, sex: (CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.mens_physique).sex });
+      setPeakPrep(res);
+      setBuiltPlan(applyPeakWeekOverlayToBBPlan(builtPlan, res.config));
+      setShowPeakWeek(true);
+    } catch (e) {
+      flash(`Не удалось построить пик-неделю: ${(e as Error).message}`);
+    }
+  };
   // PRO: per-muscle frequency optimization
   const [freqOptResult, setFreqOptResult] = useState<FrequencyOptimizationResult | null>(null);
   const refreshSavedPlans = useCallback(() => setSavedPlans(loadSavedBBPlans()), []);
@@ -3010,44 +3055,31 @@ export const BbAutoConstructor: React.FC = () => {
              <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
              <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
               <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
-             <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => {
-               if (!builtPlan) return;
-               const weight = linked.profile?.settings?.personal?.weight || 80;
-               const sex = linked.profile?.settings?.personal?.sex || 'male';
-                const proto = buildPeakWeekProtocol(weight, peakWeekCategory, sex);
-               setPeakWeekProtocol(proto);
-               const updated = applyPeakWeekToPlan(builtPlan, proto);
-               setBuiltPlan(updated);
-               setShowPeakWeek(true);
-             }}>🎭 Peak week</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
              <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
            </div>
 
-          {/* Peak week протокол */}
-          {showPeakWeek && peakWeekProtocol && (
+          {/* Пик-неделя: единая система тапера ББ */}
+          {showPeakWeek && peakPrep && (
             <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Peak Week протокол (7 дней)</div>
+              <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Пик-неделя (тапер ББ) · шоу {peakPrep.config.showDate}</div>
               <div style={{ marginBottom:10, fontSize:11 }}>
                 <span style={{ color:'rgba(255,255,255,0.6)', marginRight:6 }}>Категория:</span>
-                <select value={peakWeekCategory} onChange={e => {
-                  setPeakWeekCategory(e.target.value);
-                  if (builtPlan) {
-                    const weight = linked.profile?.settings?.personal?.weight || 80;
-                    const sex = linked.profile?.settings?.personal?.sex || 'male';
-                    const proto = buildPeakWeekProtocol(weight, e.target.value, sex);
-                    setPeakWeekProtocol(proto);
-                    setBuiltPlan(applyPeakWeekToPlan(builtPlan, proto));
-                  }
-                }} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
-                  <option value="mens_physique">Men's Physique</option>
-                  <option value="classic">Classic Physique</option>
-                  <option value="bb_212">212 Bodybuilding</option>
-                  <option value="open">Open Bodybuilding</option>
-                  <option value="bikini">Bikini</option>
-                  <option value="figure">Figure</option>
-                  <option value="wellness">Wellness</option>
+                <select value={peakWeekCategory} onChange={e => applyPeakWeekToCurrentPlan(e.target.value as BBContestCategory)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
+                  <option value="mens_physique">{CONTEST_CATEGORY_LABELS.mens_physique}</option>
+                  <option value="classic_physique">{CONTEST_CATEGORY_LABELS.classic_physique}</option>
+                  <option value="bb_212">{CONTEST_CATEGORY_LABELS.bb_212}</option>
+                  <option value="mens_bb">{CONTEST_CATEGORY_LABELS.mens_bb}</option>
+                  <option value="bikini">{CONTEST_CATEGORY_LABELS.bikini}</option>
+                  <option value="figure">{CONTEST_CATEGORY_LABELS.figure}</option>
+                  <option value="wellness">{CONTEST_CATEGORY_LABELS.wellness}</option>
+                  <option value="womens_physique">{CONTEST_CATEGORY_LABELS.womens_physique}</option>
+                  <option value="womens_bb">{CONTEST_CATEGORY_LABELS.womens_bb}</option>
                 </select>
+                <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.5)' }}>
+                  {peakPrep.config.carbLoadStrategy} загрузка · вода {peakPrep.config.waterStrategy} · Na {peakPrep.config.sodiumStrategy} · {peakPrep.config.weightKg} кг
+                </div>
               </div>
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse' }}>
@@ -3055,33 +3087,38 @@ export const BbAutoConstructor: React.FC = () => {
                     <tr style={{ color:'rgba(255,255,255,0.5)', textAlign:'left' }}>
                       <th style={{ padding:'4px 6px' }}>День</th>
                       <th style={{ padding:'4px 6px' }}>Фаза</th>
+                      <th style={{ padding:'4px 6px', textAlign:'right' }}>Ккал</th>
+                      <th style={{ padding:'4px 6px', textAlign:'right' }}>Б/У/Ж</th>
                       <th style={{ padding:'4px 6px' }}>💧 Вода</th>
-                      <th style={{ padding:'4px 6px' }}>🧂 Натрий</th>
-                      <th style={{ padding:'4px 6px' }}>🍚 Carbs</th>
+                      <th style={{ padding:'4px 6px', textAlign:'right' }}>Na мг</th>
                       <th style={{ padding:'4px 6px' }}>🏋️ Трен.</th>
                       <th style={{ padding:'4px 6px' }}>🎭 Позы</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {peakWeekProtocol.days.map(d => (
+                    {peakPrep.peakWeek.map(d => (
                       <tr key={d.day} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding:'4px 6px', fontWeight:700 }}>{d.day === 7 ? '🎬 Show' : `Д${d.day}`}</td>
-                        <td style={{ padding:'4px 6px', color:'#ec4899' }}>{d.phase}</td>
+                        <td style={{ padding:'4px 6px', color:'#ec4899' }}>{PHASE_LABELS_RU[d.phase]}</td>
+                        <td style={{ padding:'4px 6px', textAlign:'right' }}>{d.kcal}</td>
+                        <td style={{ padding:'4px 6px', textAlign:'right' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
                         <td style={{ padding:'4px 6px' }}>{d.waterLiters}л</td>
-                        <td style={{ padding:'4px 6px' }}>{d.sodiumGrams}г</td>
-                        <td style={{ padding:'4px 6px' }}>{d.carbGrams}г</td>
-                        <td style={{ padding:'4px 6px' }}>{d.trainingMinutes > 0 ? `${d.trainingMinutes}'` : '—'}</td>
-                        <td style={{ padding:'4px 6px' }}>{d.poseMinutes}'</td>
+                        <td style={{ padding:'4px 6px', textAlign:'right' }}>{d.sodiumMg}</td>
+                        <td style={{ padding:'4px 6px' }}>{d.training.minutes > 0 ? `${d.training.minutes}'` : '—'}</td>
+                        <td style={{ padding:'4px 6px' }}>{d.posingMinutes}'</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div style={{ marginTop:8, fontSize:11, color:'rgba(255,255,255,0.6)' }}>
-                {peakWeekProtocol.rationale.map((r, i) => <div key={i}>{r}</div>)}
+                {peakPrep.rationale.map((r, i) => <div key={i}>{r}</div>)}
+              </div>
+              <div style={{ marginTop:4, fontSize:9, color:'rgba(255,255,255,0.45)' }}>
+                Наложено на финальную неделю плана: памп-режим (15–20 повт, ~60% веса), сессии 4+ → отдых. K {peakPrep.peakWeek[0]?.potassiumMg} мг — не снижать.
               </div>
               <div style={{ marginTop:6 }}>
-                {peakWeekProtocol.warnings.map((w, i) => (
+                {peakPrep.warnings.map((w, i) => (
                   <div key={i} style={{ fontSize:10, color:'#f87171', marginTop:2 }}>{w}</div>
                 ))}
               </div>
