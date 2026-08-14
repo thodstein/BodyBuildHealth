@@ -240,6 +240,7 @@ export const SUPPLEMENTS_DB: Record<string, TzSupportEntry[]> = {
   anastrozole: [{organId:'reproductive',mechId:'rep4',k:0.60,q:'A',source:'Ингибитор ароматазы, ↓E2'}],
   tamoxifen: [{organId:'reproductive',mechId:'rep4',k:0.40,q:'A',source:'Блокада ER'},{organId:'reproductive',mechId:'rep5',k:0.35,q:'A',source:'PCT: восстановление HPG-оси'}],
   letrozole: [{organId:'reproductive',mechId:'rep4',k:0.70,q:'A',source:'Ингибитор ароматазы, ↓E2'}],
+  exemestane: [{organId:'reproductive',mechId:'rep4',k:0.65,q:'A',source:'Необратимый ингибитор ароматазы, ↓E2'}],
   cabergoline: [{organId:'cns',mechId:'cns1',k:0.30,q:'B',source:'D2-агонист, ↓пролактина'},{organId:'reproductive',mechId:'rep2',k:0.15,q:'C',source:'↓пролактина → ↑T'}],
   bromocriptine: [{organId:'cns',mechId:'cns1',k:0.25,q:'B',source:'D2-агонист, ↓пролактина'},{organId:'reproductive',mechId:'rep2',k:0.10,q:'C',source:'↓пролактина → ↑T'}],
   clomi: [{organId:'reproductive',mechId:'rep5',k:0.30,q:'A',source:'PCT: SERM'}],

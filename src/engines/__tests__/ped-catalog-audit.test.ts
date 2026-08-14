@@ -10,6 +10,7 @@ import { getPharmaLabMarkers } from '../../data/pharma-lab-marker-map';
 import { computeV7Matrix, type MatrixInput } from '../risk-engine-v7-matrix';
 import { calculateReboundTrajectory } from '../rebound-modeling.engine';
 import { calculateTzSpecRisk } from '../risk-engine-tz-spec';
+import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 
 const ped = (id: string, pClass: string, mgPerWeek = 500, form: 'inject' | 'oral' = 'inject'): PEDDose => ({ id, pClass, mgPerWeek, form });
 
@@ -247,6 +248,13 @@ describe('getPharmaLabMarkers — резолвер алиасов + фикс о�
   it('DHB-эфиры дают маркеры', () => {
     expect(getPharmaLabMarkers('dhb_acetate').length).toBeGreaterThan(0);
     expect(getPharmaLabMarkers('dhb_propionate').length).toBeGreaterThan(0);
+  });
+  it('exemestane (AI, ранее отсутствовал во всей кодовой базе) — маркеры и мех-записи', () => {
+    expect(getPharmaLabMarkers('exemestane').length).toBeGreaterThan(0);
+    // в SUPPLEMENTS_DB (каталог автогенерируется из него)
+    expect(Array.isArray(SUPPLEMENTS_DB.exemestane)).toBe(true);
+    expect(SUPPLEMENTS_DB.exemestane.length).toBeGreaterThan(0);
+    expect(SUPPLEMENTS_DB.exemestane[0].mechId).toBe('rep4');
   });
 });
 

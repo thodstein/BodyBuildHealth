@@ -80,6 +80,7 @@ export const PHARMA_LAB_MARKERS: Record<string, string[]> = {
   tamox:    ['LH','FSH','TT','E2','HDL','DHT'],
   anastro:  ['E2','TT','LH','FSH','HDL'],
   letrozole: ['E2','TT','LH','FSH','HDL'],
+  exemestane: ['E2','TT','LH','FSH','HDL'],
   hcg:      ['TT','E2','LH','FSH'],
   caberg:   ['PRL','LH','FSH','TT'],
   pramipex: ['PRL','LH','FSH'],
