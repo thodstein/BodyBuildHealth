@@ -9,13 +9,13 @@ import { render, fireEvent, screen } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
-import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
+import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, itemsForDay, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
 import type { DiaryHubCtx } from '../diary-hub-context';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog } from '../../../../core/types';
 import { MobilityTab } from '../MobilityTab';
 import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
-import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility } from '../../../../engines/mobility-protocol.engine';
+import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot } from '../../../../engines/mobility-protocol.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -351,7 +351,8 @@ describe('Напоминание о мобильности в блоке «Се�
     const p = buildPresetMobility('both');
     upsertMobilityProtocol(p);
     setActiveMobility(p.id);
-    localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: ['cars_morning'] }));
+    const dailyIds = itemsForSlot(p, 'daily').map(i => i.id);
+    localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: dailyIds }));
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
     expect(html).not.toContain('рутина мобильности не выполнена');
   });
@@ -359,5 +360,84 @@ describe('Напоминание о мобильности в блоке «Се�
   it('без активного протокола → напоминания нет', () => {
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
     expect(html).not.toContain('рутина мобильности не выполнена');
+  });
+});
+
+describe('Прогресс протоколов в блоке «Сегодня»', () => {
+  beforeEach(() => localStorage.clear());
+
+  const baseProps = {
+    diary: {} as any,
+    diaryStats: [],
+    diaryProgress: [],
+    historyWorkouts: [],
+    macrocycle: null,
+    selectedWeek: 1,
+    level: 'intermediate',
+    onRefresh: () => {},
+    trainingOutput: null,
+    goal: 'bulk',
+    daysPerWeek: 4,
+    splitType: 'auto',
+    periodizationType: 'auto',
+    mesoLength: 12,
+    tprofile: { weakPoints: [], bodyWeight: 80, onCourse: false, courseIntensity: 1, goal: 'bulk', level: 'intermediate' },
+    linked: { profile: { settings: { personal: { height: 175 } } } },
+  };
+
+  it('активны оба протокола → чипы прогресса 0%', () => {
+    const mp = buildPresetProtocol('both');
+    upsertProtocol(mp);
+    setActiveProtocol(mp.id);
+    const mob = buildPresetMobility('both');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Психо-протокол: 0%');
+    expect(html).toContain('Рутина: 0%');
+  });
+
+  it('полностью выполненный прогресс → чипы 100%', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const mp = buildPresetProtocol('both');
+    upsertProtocol(mp);
+    setActiveProtocol(mp.id);
+    const allItems = itemsForDay(mp, 'all');
+    localStorage.setItem('he_mindset_day_progress', JSON.stringify({ date: today, doneItems: allItems.map(i => i.id) }));
+    const mob = buildPresetMobility('both');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const dailyIds = itemsForSlot(mob, 'daily').map(i => i.id);
+    localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: dailyIds }));
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Психо-протокол: 100%');
+    expect(html).toContain('Рутина: 100%');
+  });
+
+  it('нет тренировки сегодня + rest_day блоки → кнопка «Сессия мобильности»', () => {
+    const mob = buildPresetMobility('pl');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Сессия мобильности');
+  });
+
+  it('тренировка сегодня + rest_day блоки → сессии мобильности нет', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const mob = buildPresetMobility('pl');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" historyWorkouts={[{
+      id: 'w1', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody', exercises: [],
+    } as any]} />);
+    expect(html).not.toContain('Сессия мобильности');
+  });
+
+  it('daily-рутина не выполнена → кнопка «✓ Рутина выполнена»', () => {
+    const mob = buildPresetMobility('both');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Рутина выполнена');
   });
 });

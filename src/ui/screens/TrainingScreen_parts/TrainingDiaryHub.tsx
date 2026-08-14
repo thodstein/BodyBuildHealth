@@ -58,6 +58,8 @@ import { BBRecommendationsTab } from './BBRecommendationsTab';
 import { MyTrainingTab } from './MyTrainingTab';
 import { MindsetTab } from './MindsetTab';
 import { MobilityTab } from './MobilityTab';
+import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins } from '../../../engines/mindset-protocol.engine';
+import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -147,6 +149,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
   // «Мои тренировки» (перенесено из Библиотеки): рабочий список упражнений
   const [myTrainingExs, setMyTrainingExs] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
+  // Принудительная перерисовка блока «Сегодня» (быстрые отметки рутин/протоколов)
+  const [, forceHub] = useState(0);
 
   // Progress state
 
@@ -533,11 +537,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   const today = new Date().toISOString().slice(0, 10);
                   const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                   if (!trainedToday) return null;
-                  let checkinToday = false;
-                  try {
-                    const checks = JSON.parse(localStorage.getItem('he_mindset_checks') || '[]');
-                    checkinToday = Array.isArray(checks) && checks.some((c: any) => typeof c?.date === 'string' && c.date.slice(0, 10) === today);
-                  } catch { /* ignore */ }
+                  const checkinToday = loadCheckins().some(c => (c.date || '').slice(0, 10) === today);
                   if (checkinToday) return null;
                   return (
                     <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -551,26 +551,71 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 {(() => {
                   // Мобильность: ежедневная рутина не выполнена
                   const today = new Date().toISOString().slice(0, 10);
-                  let mobProtocol: any = null;
-                  try {
-                    const list = JSON.parse(localStorage.getItem('he_mobility_protocols') || '[]');
-                    const activeId = localStorage.getItem('he_mobility_active_protocol_id');
-                    mobProtocol = (Array.isArray(list) ? list : []).find((p: any) => p.id === activeId) || (Array.isArray(list) ? list[0] : null) || null;
-                  } catch { /* ignore */ }
-                  if (!mobProtocol || !Array.isArray(mobProtocol.items)) return null;
-                  const hasDaily = mobProtocol.items.some((it: any) => it && it.slot === 'daily');
-                  if (!hasDaily) return null;
-                  let doneToday = false;
-                  try {
-                    const prog = JSON.parse(localStorage.getItem('he_mobility_day_progress') || 'null');
-                    doneToday = !!(prog && prog.date === today && Array.isArray(prog.doneItems) && prog.doneItems.length > 0);
-                  } catch { /* ignore */ }
+                  const mobProtocol = loadActiveMobility();
+                  if (!mobProtocol || !hasDailyRoutine(mobProtocol)) return null;
+                  const dailyIds = itemsForSlot(mobProtocol, 'daily').map(it => it.id);
+                  const progress = loadMobilityDayProgress(today);
+                  const doneToday = dailyIds.length > 0 && dailyIds.every(id => progress.doneItems.includes(id));
                   if (doneToday) return null;
+                  const markDailyDone = () => {
+                    try {
+                      localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: dailyIds }));
+                    } catch { /* ignore */ }
+                    forceHub(h => h + 1);
+                  };
                   return (
-                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span>🧘 Ежедневная рутина мобильности не выполнена</span>
-                      <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        К рутине →
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={markDailyDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          ✓ Рутина выполнена
+                        </button>
+                        <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          К рутине →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  // Прогресс протоколов сегодня (чипы-ссылки на вкладки)
+                  const today = new Date().toISOString().slice(0, 10);
+                  const mindProto = loadActiveProtocol();
+                  const mobProto = loadActiveMobility();
+                  if (!mindProto && !mobProto) return null;
+                  const mindItems = mindProto ? itemsForDay(mindProto, 'all') : [];
+                  const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
+                  const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
+                  const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
+                  const mindPct = mindItems.length > 0 ? Math.round(mindItems.filter(i => mindDone.includes(i.id)).length / mindItems.length * 100) : null;
+                  const mobPct = mobDaily.length > 0 ? Math.round(mobDaily.filter(i => mobDone.includes(i.id)).length / mobDaily.length * 100) : null;
+                  return (
+                    <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {mindPct !== null && (
+                        <button onClick={() => setMode('mindset')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)', color: mindPct === 100 ? '#22c55e' : '#a78bfa', border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`, whiteSpace: 'nowrap' }}>
+                          🧠 Психо-протокол: {mindPct}%
+                        </button>
+                      )}
+                      {mobPct !== null && (
+                        <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mobPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(96,165,250,0.12)', color: mobPct === 100 ? '#22c55e' : '#60a5fa', border: `1px solid ${mobPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(96,165,250,0.35)'}`, whiteSpace: 'nowrap' }}>
+                          🧘 Рутина: {mobPct}%
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  // День отдыха: сессия мобильности (rest_day-блоки)
+                  const today = new Date().toISOString().slice(0, 10);
+                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
+                  if (trainedToday) return null;
+                  const mobProtocol = loadActiveMobility();
+                  if (!mobProtocol || itemsForSlot(mobProtocol, 'rest_day').length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span>🧘 Сегодня нет тренировки — день отдыха: выполните сессию мобильности</span>
+                      <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        Сессия мобильности →
                       </button>
                     </div>
                   );
