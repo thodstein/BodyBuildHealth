@@ -1294,16 +1294,37 @@ const VOLUME_SCHEMES: Record<string, { target: number; reps: [number, number]; r
 export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
   const cfg = VOLUME_SCHEMES[scheme];
   if (!cfg) return;
+  const caps = (plan as any).mrvByMuscle || {};
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue;
+    // Недельный прямой объём по мышцам (до схемы) — схема не должна
+    // выталкивать мышцу за её адаптированный MRV-кап.
+    const weekDirect: Record<string, number> = {};
+    for (const s of week.sessions) for (const e of s.exercises) {
+      if ((e as any).warmupActivator) continue;
+      weekDirect[e.muscle] = (weekDirect[e.muscle] || 0) + (e.sets || 0);
+    }
+    const schemeApplied = new Set<string>();
     for (const session of week.sessions) {
       const byMuscle: Record<string, any[]> = {};
       for (const ex of session.exercises) {
         if ((ex as any).warmupActivator) continue;
         if (ex.role !== 'accessory' || ex.character !== 'памп') continue;
+        // Схемы объёма — для крупных мышц: мелкие (икры/предплечья/пресс/трапеции)
+        // имеют малые капы MRV, и 7-10 сетов изоляций туда не влезают.
+        if (['forearms', 'abs', 'calves', 'traps'].includes(ex.muscle)) continue;
         (byMuscle[ex.muscle] ||= []).push(ex);
       }
       for (const exs of Object.values(byMuscle)) {
+        const muscle = exs[0].muscle;
+        if (schemeApplied.has(muscle)) continue;
+        const cap = caps[muscle];
+        if (cap) {
+          const oldIsolation = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+          const newTotal = (weekDirect[muscle] || 0) - oldIsolation + cfg.target;
+          if (newTotal > cap) continue; // не влезает в MRV — схему не применяем
+        }
+        schemeApplied.add(muscle);
         let remaining = cfg.target;
         for (const ex of exs) {
           if (remaining <= 0) break;
@@ -1945,48 +1966,8 @@ for (const week of next.weeks) {
         }
       }
     }
-    // Post-hoc cap-adjust для мышц с косвенным объёмом (triceps/shoulders/biceps
-    // от жимов/тяг): МЕV-гарант и repair видят только прямой объём, а фактический
-    // effective = direct + indirect может превысить адаптированный MRV
-    // (fullbody_2 enh-1-3: жим узким 5 + 8.1 indirect = 15.1 > кап 13×1.15).
-    // Урезаем прямые сеты: сначала изоляции (памп), затем compound — до
-    // targetDirect = кап - косвенный вклад.
-    const CAP_MUSCLES = ['triceps', 'shoulders', 'biceps'] as const;
-    const isIsolationName = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив/i.test(n);
-    for (const week of next.weeks) {
-      const w: any = week;
-      if (w.phase === 'deload') continue;
-      const caps = (next as any).mrvByMuscle || {};
-      const volume = aggregateBBVolume(week.sessions);
-      for (const muscle of CAP_MUSCLES) {
-        const cap = caps[muscle];
-        if (!cap) continue;
-        const eff = volume[muscle]?.effectiveSets || 0;
-        if (eff <= cap * 1.05) continue;
-        let indirectTotal = 0;
-        for (const s of week.sessions) for (const e of s.exercises) {
-          if ((e as any).warmupActivator) continue;
-          for (const c of indirectMuscleContributions(e)) if (c.muscle === muscle) indirectTotal += (e.sets || 0) * c.coefficient;
-        }
-        const directTotal = volume[muscle]?.directSets || 0;
-        const targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
-        let need = Math.max(0, directTotal - targetDirect);
-        if (need <= 0) continue;
-        // Изоляции в первую очередь (памп-сеты ценности ниже), по всем сессиям.
-        const candidates = week.sessions.flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle && e.sets > 2));
-        const isolations = candidates.filter(e => isIsolationName(e.name || '')).sort((a, b) => (a.sets || 0) - (b.sets || 0));
-        const others = candidates.filter(e => !isIsolationName(e.name || '')).sort((a, b) => (a.sets || 0) - (b.sets || 0));
-        for (const e of [...isolations, ...others]) {
-          if (need <= 0) break;
-          while (need > 0 && e.sets > 2) {
-            e.sets -= 1;
-            if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
-            need -= 1;
-          }
-        }
-      }
-    }
-    syncBBPlanSetShape(next);
+
+    syncBBPlanSetShape(next);    syncBBPlanSetShape(next);
   }
   // Taper is a source-independent final phase pass. It is deliberately here
   // rather than in the generic builder so cycle/program outputs get it too.
@@ -2152,6 +2133,74 @@ for (const week of next.weeks) {
       }
     }
   }
+  // Проф-методики (по выбору пользователя): суперсеты-антагонисты и схемы
+  // объёма памп-дней (GVT 10×10 / FST-7 / 8×8). Применяются ПОСЛЕ всех
+  // проходов — cap 5 и лимиты сессий сохраняются.
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    if (options.supersetMode === 'antagonist') markAntagonistSupersets(next);
+    if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
+  }
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    // Post-hoc cap-adjust для мышц с косвенным объёмом (triceps/shoulders/biceps
+    // от жимов/тяг): МЕV-гарант и repair видят только прямой объём, а фактический
+    // effective = direct + indirect может превысить адаптированный MRV
+    // (fullbody_2 enh-1-3: жим узким 5 + 8.1 indirect = 15.1 > кап 13×1.15).
+    // Урезаем прямые сеты: сначала изоляции (памп), затем compound — до
+    // targetDirect = кап - косвенный вклад.
+    const CAP_MUSCLES = ['triceps', 'shoulders', 'biceps'] as const;
+    const isIsolationName = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив/i.test(n);
+    for (const week of next.weeks) {
+      const w: any = week;
+      if (w.phase === 'deload') continue;
+      const caps = (next as any).mrvByMuscle || {};
+      const volume = aggregateBBVolume(week.sessions);
+      for (const muscle of CAP_MUSCLES) {
+        const cap = caps[muscle];
+        if (!cap) continue;
+        const eff = volume[muscle]?.effectiveSets || 0;
+        if (eff <= cap * 1.05) continue;
+        let indirectTotal = 0;
+        for (const s of week.sessions) for (const e of s.exercises) {
+          if ((e as any).warmupActivator) continue;
+          for (const c of indirectMuscleContributions(e)) if (c.muscle === muscle) indirectTotal += (e.sets || 0) * c.coefficient;
+        }
+        const directTotal = volume[muscle]?.directSets || 0;
+        const targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
+        let need = Math.max(0, directTotal - targetDirect);
+        if (need <= 0) continue;
+        // Изоляции в первую очередь (памп-сеты ценности ниже), по всем сессиям.
+        const candidates = week.sessions.flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle && e.sets > 2));
+        const isolations = candidates.filter(e => isIsolationName(e.name || '')).sort((a, b) => (a.sets || 0) - (b.sets || 0));
+        const others = candidates.filter(e => !isIsolationName(e.name || '')).sort((a, b) => (a.sets || 0) - (b.sets || 0));
+        for (const e of [...isolations, ...others]) {
+          if (need <= 0) break;
+          while (need > 0 && e.sets > 2) {
+            e.sets -= 1;
+            if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+            need -= 1;
+          }
+        }
+        // Если срез до 2 не хватил: удаляем лишние изоляции мышцы
+        // (дубли паттернов), оставляя минимум одно упражнение на сессию.
+        if (need > 0) {
+          for (const s2 of week.sessions) {
+            for (const e of [...s2.exercises]) {
+              if (need <= 0) break;
+              if ((e as any).warmupActivator || e.role === 'primary') continue;
+              if (e.muscle !== muscle) continue;
+              const remaining = s2.exercises.filter((x: any) => !(x as any).warmupActivator && x.muscle === muscle);
+              if (remaining.length <= 1) break;
+              need -= e.sets || 0;
+              s2.exercises = s2.exercises.filter((x: any) => x !== e);
+            }
+            if (need <= 0) break;
+          }
+        }
+      }
+    }
+
+
+  }
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
   // фактический объём, а не пустой/устаревший объект.
   next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
@@ -2228,13 +2277,6 @@ for (const week of next.weeks) {
     for (const week of next.weeks) for (const session of week.sessions) {
       ensureArmHeadCoverage(session, options);
     }
-  }
-  // Проф-методики (по выбору пользователя): суперсеты-антагонисты и схемы
-  // объёма памп-дней (GVT 10×10 / FST-7 / 8×8). Применяются ПОСЛЕ всех
-  // проходов — cap 5 и лимиты сессий сохраняются.
-  if (!options.preserveSource && (next as any).pattern?.id) {
-    if (options.supersetMode === 'antagonist') markAntagonistSupersets(next);
-    if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
   }
   // Разминочное упражнение на целевую группу — в самом конце, после всех
   // проходов (budget/dedupe/taper не могут его удалить). Не входит в объём.
