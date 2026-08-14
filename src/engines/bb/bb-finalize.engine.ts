@@ -796,26 +796,114 @@ function ensureRearDeltInPull(session: any, options: BBFinalizeOptions): void {
  * Головки рук (Этап 2/4): biceps обязан иметь растянутую позицию (длинная
  * головка), triceps — overhead (длинная головка). Не добавляем слоты —
  * заменяем одну изоляцию того же слота (лимиты не меняются).
+ *
+ * Планирование объёма по головкам (остаток Раунда 4): при бюджете ≥5 сетов
+ * длинная головка получает ≥3 сета (перераспределение между упражнениями той
+ * же мышцы, без изменения лимитов); при ≥6 сетов и дубле паттерна — дубль
+ * заменяется на brachialis (hammer) / pushdown (lateral+medial головки).
  */
 function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   const tag = session.sessionTag || '';
-  if (!/Upper|Pull|Push|Arms/.test(tag) && tag !== '') return;
+  if (!/Upper|Pull|Push|Arms|Back/.test(tag) && tag !== '') return;
+  const arms = () => session.exercises.filter((e: any) => ['biceps', 'triceps'].includes(e.muscle) && !(e as any).warmupActivator);
+  const trimSets = (e: any, sets: number): void => {
+    e.sets = sets;
+    if (Array.isArray(e.workSets) && e.workSets.length > sets) e.workSets = e.workSets.slice(0, sets);
+  };
+  const findCatalog = (muscle: string, pattern: RegExp): any => {
+    return EXERCISE_CATALOG.find((x: any) => {
+      if (trueMuscleOf(x) !== muscle) return false;
+      if (!pattern.test(x.name || '')) return false;
+      if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (options.equipment?.length) {
+        const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+        if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+      }
+      return true;
+    });
+  };
+  /** Баланс головок мышцы: mustHead ≥ 3 при total ≥ 5; altHead — замена дубля
+   * паттерна (total ≥ 5) или разгружение перегруженной mustHead (≥4 сетов,
+   * total ≥ 6) в пользу altHead (brachialis/lateral+medial). */
+  const balanceHeads = (muscle: 'biceps' | 'triceps', mustHead: string, altHead: string, altPattern: RegExp, altNote: string): void => {
+    const exs = arms().filter((e: any) => e.muscle === muscle);
+    if (exs.length < 2) return;
+    const total = exs.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+    const must = exs.find((e: any) => classifyArmExercise(e.name).pattern === mustHead);
+    if (must) {
+      // 1) Длинная головка получает ≥3 сетов за счёт остальных (не ниже 2).
+      if (must.sets < 3 && total >= 5) {
+        const donors = exs.filter((e: any) => e !== must && (e.sets || 0) > 2).sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0));
+        for (const d of donors) {
+          while (must.sets < 3 && d.sets > 2) {
+            d.sets -= 1;
+            if (Array.isArray(d.workSets) && d.workSets.length > d.sets) d.workSets = d.workSets.slice(0, d.sets);
+            must.sets += 1;
+            if (Array.isArray(must.workSets)) must.workSets.push({ ...must.workSets[must.workSets.length - 1] });
+          }
+        }
+      }
+    }
+    if (exs.some((e: any) => classifyArmExercise(e.name).pattern === altHead)) return;
+    // 2) Нет altHead при бюджете ≥5: сначала дубль паттерна, иначе — любое
+    // не-must упражнение (brachialis приоритетнее стандартного curl, pushdown
+    // приоритетнее close-grip compound — Этап 4 плана).
+    if (total >= 5) {
+      const counts = new Map<string, number>();
+      for (const e of exs) {
+        const p = classifyArmExercise(e.name).pattern;
+        counts.set(p, (counts.get(p) || 0) + 1);
+      }
+      const dup = exs.find((e: any) => (counts.get(classifyArmExercise(e.name).pattern) || 0) > 1 && e !== must);
+      const slot = dup || exs.find((e: any) => e !== must);
+      if (slot) {
+        const candidate = findCatalog(muscle, altPattern);
+        if (candidate) {
+          slot.name = candidate.name;
+          slot.exerciseName = candidate.name;
+          slot.rationale = altNote;
+        }
+        return;
+      }
+    }
+    // 3) Перегруженная mustHead (≥5 сетов) при бюджете ≥5: часть сетов
+    // уходит в altHead (новый слот, сумма сессии не меняется).
+    if (total >= 5 && must && must.sets >= 5) {
+      const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
+      if (working.length < maxEx) {
+        const candidate = findCatalog(muscle, altPattern);
+        if (candidate) {
+          const take = Math.min(must.sets - 3, 2);
+          must.sets -= take;
+          if (Array.isArray(must.workSets) && must.workSets.length > must.sets) must.workSets = must.workSets.slice(0, must.sets);
+          const template = session.exercises[0];
+          const sample = must.workSets?.[0] || { reps: 12, rir: 3, weight: 0, restSeconds: 60 };
+          session.exercises.push({
+            ...template,
+            muscle,
+            name: candidate.name,
+            exerciseName: candidate.name,
+            role: 'accessory',
+            character: 'памп',
+            sets: take,
+            repsRange: [12, 18],
+            rir: 3,
+            restSeconds: 60,
+            workSets: Array.from({ length: take }, () => ({ ...sample })),
+            rationale: altNote,
+          });
+        }
+      }
+    }
+  };
   // Biceps: растянутая позиция (incline curl).
   const biceps = session.exercises.filter((e: any) => e.muscle === 'biceps' && !(e as any).warmupActivator);
   if (biceps.length > 0 && !biceps.some((e: any) => classifyArmExercise(e.name).pattern === 'biceps_lengthened')) {
     const slot = biceps.find((e: any) => classifyArmExercise(e.name).pattern === 'biceps_shortened' || classifyArmExercise(e.name).pattern === 'other');
     if (slot) {
-      const candidate = EXERCISE_CATALOG.find((x: any) => {
-        if (trueMuscleOf(x) !== 'biceps') return false;
-        if (!/наклон.*скам|incline/i.test(x.name || '')) return false;
-        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
-        if (options.equipment?.length) {
-          const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
-          if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
-        }
-        return true;
-      });
+      const candidate = findCatalog('biceps', /наклон.*скам|incline/i);
       if (candidate) {
         slot.name = candidate.name;
         slot.exerciseName = candidate.name;
@@ -823,21 +911,13 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
       }
     }
   }
+  balanceHeads('biceps', 'biceps_lengthened', 'biceps_hammer', /молот|hammer/i, 'Brachialis (hammer): распределение объёма по головкам');
   // Triceps: overhead (длинная головка).
   const triceps = session.exercises.filter((e: any) => e.muscle === 'triceps' && !(e as any).warmupActivator);
   if (triceps.length > 0 && !triceps.some((e: any) => classifyArmExercise(e.name).pattern === 'triceps_overhead')) {
     const slot = triceps.find((e: any) => classifyArmExercise(e.name).pattern === 'triceps_pushdown' || classifyArmExercise(e.name).pattern === 'triceps_compound' || classifyArmExercise(e.name).pattern === 'other');
     if (slot) {
-      const candidate = EXERCISE_CATALOG.find((x: any) => {
-        if (trueMuscleOf(x) !== 'triceps') return false;
-        if (!/француз|french|из.?за.*голов|overhead/i.test(x.name || '')) return false;
-        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
-        if (options.equipment?.length) {
-          const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
-          if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
-        }
-        return true;
-      });
+      const candidate = findCatalog('triceps', /француз|french|из.?за.*голов|overhead/i);
       if (candidate) {
         slot.name = candidate.name;
         slot.exerciseName = candidate.name;
@@ -845,6 +925,7 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
       }
     }
   }
+  balanceHeads('triceps', 'triceps_overhead', 'triceps_pushdown', /разгибан.*блок|pushdown|канат.*рукоят|трицепс.*блок/i, 'Lateral/medial головки трицепса (pushdown): распределение объёма по головкам');
 }
 
 /**

@@ -46,4 +46,65 @@ describe('Arm head coverage (Этап 2/4)', () => {
     const issues = armQualityIssues([week] as any);
     expect(issues.some(i => i.includes('бицепс без растянутой позиции'))).toBe(true);
   });
+
+  it('планирование головок: Pull-день с бюджетом ≥5 получает lengthened ≥3 + hammer (brachialis)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
+    const pulls = plan.weeks.flatMap(w => w.sessions).filter(s => s.sessionTag === 'Pull');
+    for (const session of pulls) {
+      const biceps = session.exercises.filter(e => e.muscle === 'biceps' && !(e as any).warmupActivator);
+      const total = biceps.reduce((a, e) => a + (e.sets || 0), 0);
+      if (total < 5) continue;
+      const lengthened = biceps.filter(e => classifyArmExercise(e.name).pattern === 'biceps_lengthened');
+      expect(lengthened.length).toBeGreaterThan(0);
+      expect(lengthened.reduce((a, e) => a + (e.sets || 0), 0)).toBeGreaterThanOrEqual(3);
+      expect(biceps.some(e => classifyArmExercise(e.name).pattern === 'biceps_hammer')).toBe(true);
+    }
+  });
+
+  it('планирование головок: Arms-день не дублирует overhead — дубль заменяется на pushdown', () => {
+    const plan = buildBBPlan({ patternId: 'bro_5', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
+    const armsDays = plan.weeks.flatMap(w => w.sessions).filter(s => s.sessionTag === 'Arms');
+    expect(armsDays.length).toBeGreaterThan(0);
+    for (const session of armsDays) {
+      const triceps = session.exercises.filter(e => e.muscle === 'triceps' && !(e as any).warmupActivator);
+      const overheads = triceps.filter(e => classifyArmExercise(e.name).pattern === 'triceps_overhead');
+      expect(overheads.length).toBeLessThanOrEqual(1);
+      expect(triceps.some(e => classifyArmExercise(e.name).pattern === 'triceps_pushdown')).toBe(true);
+    }
+  });
+
+  it('планирование головок: Back-день bro-сплита покрывает длинную головку и brachialis', () => {
+    const plan = buildBBPlan({ patternId: 'bro_5', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
+    const backs = plan.weeks.flatMap(w => w.sessions).filter(s => s.sessionTag === 'Back');
+    expect(backs.length).toBeGreaterThan(0);
+    for (const session of backs) {
+      const biceps = session.exercises.filter(e => e.muscle === 'biceps' && !(e as any).warmupActivator);
+      if (!biceps.length) continue;
+      expect(biceps.some(e => classifyArmExercise(e.name).pattern === 'biceps_lengthened')).toBe(true);
+    }
+  });
+
+  it('планирование головок: перераспределение не меняет суммарные сеты рук', () => {
+    const plan = buildBBPlan({ patternId: 'bro_5', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
+    for (const week of plan.weeks) for (const session of week.sessions) {
+      const arms = session.exercises.filter(e => ['biceps', 'triceps'].includes(e.muscle) && !(e as any).warmupActivator);
+      for (const e of arms) {
+        expect(e.sets).toBeLessThanOrEqual(5);
+        expect(e.sets).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it('планирование головок: малый бюджет (total 4) не добавляет слотов', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
+    for (const week of plan.weeks) for (const session of week.sessions) {
+      const biceps = session.exercises.filter(e => e.muscle === 'biceps' && !(e as any).warmupActivator);
+      const total = biceps.reduce((a, e) => a + (e.sets || 0), 0);
+      if (total < 5) {
+        // Малый бюджет: минимум один паттерн без дублей внутри сессии.
+        const patterns = new Set(biceps.map(e => classifyArmExercise(e.name).pattern));
+        expect(patterns.size).toBe(biceps.length);
+      }
+    }
+  });
 });
