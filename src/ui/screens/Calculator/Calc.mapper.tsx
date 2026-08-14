@@ -1264,7 +1264,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       , document.body)}
       
       {/* ===== PED-RISK БАННЕР: авто-активация нейро/суставы/гемато по стеку PED (gross→net) ===== */}
-      {finalRecWithResidual?.pedRisk && (finalRecWithResidual.pedRisk.grossNeuroTier !== undefined ? finalRecWithResidual.pedRisk.grossNeuroTier! > 0 : finalRecWithResidual.pedRisk.neuroBoosterTier > 0 || finalRecWithResidual.pedRisk.jointsBoosterTier > 0 || finalRecWithResidual.pedRisk.hematoBoosterTier > 0) && (
+      {finalRecWithResidual?.pedRisk && (() => {
+        const pr = finalRecWithResidual.pedRisk;
+        const gN = pr.grossNeuroTier ?? pr.neuroBoosterTier;
+        const gJ = pr.grossJointsTier ?? pr.jointsBoosterTier;
+        const gH = pr.grossHematoTier ?? pr.hematoBoosterTier;
+        return gN > 0 || gJ > 0 || gH > 0;
+      })() && (
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:12, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.15)' }}>
           <div style={{ fontSize:9, fontWeight:800, color:'#a5b4fc', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.3px' }}>
             ⚡ Авто-защита по стеку PED (gross→net)

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+﻿import React, { useMemo, useState, useCallback } from 'react';
 import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engines/support-plan';
 import { calculateSupportTZ, hydrateState } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
@@ -53,7 +53,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   React.useEffect(() => {
     if (!courseLinked || courseLinked.length === 0) return;
     // Расширяем: AAS + SARM + пептиды (ghrh/ghrp/gnrh/fat_loss/other) + IGF/MGF + insulin
-    const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm','drostanolone','boldenone','primobolan','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf','insulin'];
+    const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','dht_inject','dht_derivative','sarm','drostanolone','boldenone','primobolan','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf','insulin'];
     const linkedAas = courseLinked
       .filter(c => c && typeof c.substanceId === 'string')
       .filter(c => {
@@ -181,7 +181,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const fillPharma = () => {
     try {
       if (!courseLinked || courseLinked.length === 0) { setFillStatus('❌ Нет активного курса'); setTimeout(() => setFillStatus(''), 2000); return; }
-      const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','sarm','drostanolone','boldenone','primobolan','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf','insulin'];
+      const aasClasses = ['testosterone','nandrolone','trenbolone','oral_17aa','dht','dht_inject','dht_derivative','sarm','drostanolone','boldenone','primobolan','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other','igf1','mgf','insulin'];
       const linkedAas = courseLinked.filter(c => c && typeof c.substanceId === 'string').filter(c => {
         const ph = PHARMA_DB[c.substanceId];
         if (ph?.class && aasClasses.includes(ph.class)) return true;

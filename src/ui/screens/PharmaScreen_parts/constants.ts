@@ -21,6 +21,7 @@ export const CLASS_LABELS: Record<string, string> = {
   mgf: 'МГФ',
   insulin: 'Инсулин',
   drostanolone: 'Дростанолон',
+  dht_inject: 'DHT-инъекционные (DHB)',
   peptide_gnrh: 'GnRH',
   peptide_fat_loss: 'Жиросжигающие',
   peptide_other: 'Прочие',
