@@ -142,7 +142,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
+    renderer.toneMappingExposure = 0.85;
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -209,6 +209,8 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
               side: (src.side ?? THREE.DoubleSide) === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
             });
             if (src.color && src.color.getHex() !== 0xffffff) n.color.copy(src.color);
+            // Лёгкое приглушение — если сама JPEG-текстура яркая, модель не «выбелена»
+            n.color.multiplyScalar(0.88);
             return n;
           });
           child.material = Array.isArray(child.material) ? converted : converted[0];
@@ -281,21 +283,21 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             zoneColor.setRGB(r, g, b);
             if (sel === sysId) {
               lerp.copy(zoneColor).lerp(WHITE, 0.25);
-              arr[i * 3] = lerp.r * 1.15;
-              arr[i * 3 + 1] = lerp.g * 1.15;
-              arr[i * 3 + 2] = lerp.b * 1.15;
+              arr[i * 3] = lerp.r * 0.8;
+              arr[i * 3 + 1] = lerp.g * 0.8;
+              arr[i * 3 + 2] = lerp.b * 0.8;
             } else if (hover === sysId) {
-              arr[i * 3] = zoneColor.r * 1.0;
-              arr[i * 3 + 1] = zoneColor.g * 1.0;
-              arr[i * 3 + 2] = zoneColor.b * 1.0;
+              arr[i * 3] = zoneColor.r * 0.65;
+              arr[i * 3 + 1] = zoneColor.g * 0.65;
+              arr[i * 3 + 2] = zoneColor.b * 0.65;
             } else if (sel) {
-              arr[i * 3] = zoneColor.r * 0.4;
-              arr[i * 3 + 1] = zoneColor.g * 0.4;
-              arr[i * 3 + 2] = zoneColor.b * 0.4;
+              arr[i * 3] = zoneColor.r * 0.3;
+              arr[i * 3 + 1] = zoneColor.g * 0.3;
+              arr[i * 3 + 2] = zoneColor.b * 0.3;
             } else {
-              arr[i * 3] = zoneColor.r * 0.9;
-              arr[i * 3 + 1] = zoneColor.g * 0.9;
-              arr[i * 3 + 2] = zoneColor.b * 0.9;
+              arr[i * 3] = zoneColor.r * 0.5;
+              arr[i * 3 + 1] = zoneColor.g * 0.5;
+              arr[i * 3 + 2] = zoneColor.b * 0.5;
             }
           }
           colorAttr.needsUpdate = true;
