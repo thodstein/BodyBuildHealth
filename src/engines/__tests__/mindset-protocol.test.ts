@@ -15,7 +15,7 @@ import {
   mindsetTrends, protocolAdherence,
   sessionsBestE1RM, correlateConfidenceWithPerformance,
   buildMindsetInsights,
-  loadDayProgress, saveDayProgress,
+  loadDayProgress, saveDayProgress, exportMindsetCheckinsCSV,
   MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY, MINDSET_DAY_PROGRESS_KEY,
   type MindsetProtocol, type ProtocolItem, type MindsetCheckin,
 } from '../mindset-protocol.engine';
@@ -451,5 +451,31 @@ describe('Метки (полнота UI-контрактов)', () => {
     for (const k of KIND_ORDER) expect(KIND_LABELS[k]).toBeTruthy();
     for (const d of ['all', 'heavy', 'pump', 'competition', 'deload'] as const) expect(DAYTYPE_LABELS[d]).toBeTruthy();
     for (const d of ['pl', 'bb', 'both'] as const) expect(DIRECTION_LABELS[d]).toBeTruthy();
+  });
+});
+
+describe('Экспорт CSV', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('пустое хранилище → только заголовок', () => {
+    expect(exportMindsetCheckinsCSV()).toBe('date,session_id,confidence,arousal,focus,protocol_followed,note');
+  });
+
+  it('содержит все чек-ины с экранированием заметок и кавычек', () => {
+    upsertCheckin({ date: '2026-08-10', sessionId: 'w_1', confidence: 4, arousal: 3, focus: 5, protocolFollowed: true, note: 'отлично "работал"' });
+    upsertCheckin({ date: '2026-08-12', confidence: 2, arousal: 2, focus: 3, protocolFollowed: false, note: 'плохо' });
+    upsertCheckin({ date: '2026-08-14', sessionId: 'w_3', confidence: 5, arousal: 4, focus: 5, protocolFollowed: null, note: 'не отмечал' });
+    const csv = exportMindsetCheckinsCSV();
+    const lines = csv.split('\n');
+    expect(lines.length).toBe(4);
+    expect(lines[0]).toBe('date,session_id,confidence,arousal,focus,protocol_followed,note');
+    expect(lines[1]).toBe('2026-08-10,"w_1",4,3,5,1,"отлично ""работал"""');
+    expect(lines[2]).toBe('2026-08-12,,2,2,3,0,"плохо"');
+    expect(lines[3]).toBe('2026-08-14,"w_3",5,4,5,,"не отмечал"');
+  });
+
+  it('устойчив к битому JSON чек-инов', () => {
+    localStorage.setItem(MINDSET_CHECKS_KEY, '{{{');
+    expect(exportMindsetCheckinsCSV()).toBe('date,session_id,confidence,arousal,focus,protocol_followed,note');
   });
 });

@@ -729,3 +729,28 @@ export function loadDayProgress(date?: string): DayProgress {
 export function saveDayProgress(progress: DayProgress): void {
   try { localStorage.setItem(MINDSET_DAY_PROGRESS_KEY, JSON.stringify(progress)); } catch { /* ignore */ }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Экспорт
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * CSV психо-чек-инов для экспорта из дневника (совместим с Excel/таблицами).
+ * Колонки: date, session_id, confidence, arousal, focus, protocol_followed (1/0/пусто), note.
+ */
+export function exportMindsetCheckinsCSV(): string {
+  const esc = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
+  const rows: string[] = ['date,session_id,confidence,arousal,focus,protocol_followed,note'];
+  for (const c of loadCheckins()) {
+    rows.push([
+      c.date,
+      c.sessionId ? esc(c.sessionId) : '',
+      c.confidence,
+      c.arousal,
+      c.focus,
+      c.protocolFollowed === null ? '' : c.protocolFollowed ? 1 : 0,
+      c.note ? esc(c.note) : '',
+    ].join(','));
+  }
+  return rows.join('\n');
+}

@@ -6,6 +6,7 @@ import { LEVEL_VOLUMES } from '../../../engines/training.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { clearStorageTrimWarning } from '../../../engines/workout-logger.engine';
+import { loadCheckins, protocolAdherence, mindsetTrends } from '../../../engines/mindset-protocol.engine';
 import { Sparkline } from './Sparkline';
 import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
@@ -672,6 +673,40 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}% к предыдущему e1RM
                   </div>
                 )}
+              </div>
+            );
+          })()}
+          {/* Психо-чек-ины: сводка (из вкладки «Психология») */}
+          {loadCheckins().length > 0 && (() => {
+            const adh = protocolAdherence(30);
+            const trends = mindsetTrends(14);
+            const checks = loadCheckins();
+            const last = checks[checks.length - 1];
+            const avg = (v: number) => v > 0 ? v.toFixed(1) : '—';
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label} >🧠 Психо-чек-ины</div>
+                  <span style={{ fontSize: 9, color: 'rgba(167,139,250,0.8)' }}>последний: {last.date.slice(5).replace('-', '.')} · уверенность {last.confidence}/5</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Чек-инов · 14д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{trends.count}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: adh.pct >= 80 ? '#22c55e' : adh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{adh.total > 0 ? `${adh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Фокус · 14д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{avg(trends.averages.focus)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Уверенность · 14д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{avg(trends.averages.confidence)}</div>
+                  </div>
+                </div>
               </div>
             );
           })()}
