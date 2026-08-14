@@ -23,6 +23,7 @@ import {
   serializeBBPrepConfig,
   deserializeBBPrepConfig,
   legacyConfigFromProfile,
+  normalizeContestCategory,
   CATEGORY_PROFILES,
   type BBContestPrepConfig,
   type BBPlanWithPrep,
@@ -571,6 +572,30 @@ describe('applyPeakWeekOverlayToBBPlan', () => {
     const once = applyPeakWeekOverlayToBBPlan(plan, baseConfig());
     expect(applyPeakWeekOverlayToBBPlan(once, baseConfig())).toBe(once);
   });
+
+  it('weekNumber: применяет пик-неделю к указанной неделе (1-индекс)', () => {
+    const plan = makePlan(8);
+    const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig(), { weekNumber: 6 }) as BBPlanWithPrep;
+    expect(out.weeks[5].peakWeek).toBe(true);
+    expect(out.weeks[7].peakWeek).toBeUndefined();
+    expect(out.weeks[5].phase).toBe('peaking');
+  });
+
+  it('weekNumber клампится к краям', () => {
+    const plan = makePlan(8);
+    const hi = applyPeakWeekOverlayToBBPlan(plan, baseConfig(), { weekNumber: 99 }) as BBPlanWithPrep;
+    expect(hi.weeks[7].peakWeek).toBe(true);
+    const loPlan = makePlan(8);
+    const lo = applyPeakWeekOverlayToBBPlan(loPlan, baseConfig(), { weekNumber: 0 }) as BBPlanWithPrep;
+    expect(lo.weeks[0].peakWeek).toBe(true);
+  });
+
+  it('комментарий содержит маркер [Peak week: …] (совместимость со старым движком)', () => {
+    const plan = makePlan(8);
+    const out = applyPeakWeekOverlayToBBPlan(plan, baseConfig()) as BBPlanWithPrep;
+    const comment = String(out.weeks[7].sessions[0].exercises[0].comment || '');
+    expect(comment).toContain('[Peak week:');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -626,8 +651,26 @@ describe('сериализация', () => {
   });
 });
 
-describe('legacyConfigFromProfile', () => {
-  it('включённый старый peak-week → консервативный конфиг с датой шоу', () => {
+describe('normalizeContestCategory', () => {
+  it('legacy id «classic» → classic_physique, «open» → mens_bb', () => {
+    expect(normalizeContestCategory('classic', 'male')).toBe('classic_physique');
+    expect(normalizeContestCategory('open', 'male')).toBe('mens_bb');
+    expect(normalizeContestCategory('bb_212', 'male')).toBe('bb_212');
+  });
+
+  it('несоответствие полу → дефолт по полу', () => {
+    expect(normalizeContestCategory('bikini', 'male')).toBe('mens_physique');
+    expect(normalizeContestCategory('mens_bb', 'female')).toBe('bikini');
+  });
+
+  it('мусор/null → дефолт по полу', () => {
+    expect(normalizeContestCategory('мусор', 'male')).toBe('mens_physique');
+    expect(normalizeContestCategory(null, 'female')).toBe('bikini');
+    expect(normalizeContestCategory(undefined, 'male')).toBe('mens_physique');
+  });
+});
+
+describe('legacyConfigFromProfile', () => {  it('включённый старый peak-week → консервативный конфиг с датой шоу', () => {
     const showDate = addDaysIso(todayIso(), 30);
     const cfg = legacyConfigFromProfile(
       { peakWeek: true, peakShowDay: showDate, bbCategory: 'bikini' },

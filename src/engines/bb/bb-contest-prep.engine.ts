@@ -736,7 +736,7 @@ function toPeakWeekSession(
         tempo: '2-1-1-0',
         restSeconds: 60,
       })),
-      comment: `🎭 Пик-неделя (${training.type.toLowerCase()}): памп 15–20 повт, без отказа, ~60% веса.`,
+      comment: `🎭 Пик-неделя (${training.type.toLowerCase()}): памп 15–20 повт, без отказа, ~60% веса. [Peak week: ${training.type}]`,
       rationale: `Пик-неделя: деплеция гликогена, памп-режим. ${training.details[0] ?? ''}`,
     };
   });
@@ -835,9 +835,14 @@ export function applyTrainingTaperToBBPlan(plan: BBPlan, rawCfg: BBContestPrepCo
 }
 
 /**
- * Оверлей только пик-недели (без недельного тапера) — финальная неделя плана.
+ * Оверлей только пик-недели (без недельного тапера) — на конкретную неделю плана
+ * (по умолчанию финальная; `opts.weekNumber` — 1-индекс, клампится к краям).
  */
-export function applyPeakWeekOverlayToBBPlan(plan: BBPlan, rawCfg: BBContestPrepConfig): BBPlanWithPrep {
+export function applyPeakWeekOverlayToBBPlan(
+  plan: BBPlan,
+  rawCfg: BBContestPrepConfig,
+  opts?: { weekNumber?: number },
+): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
@@ -846,21 +851,22 @@ export function applyPeakWeekOverlayToBBPlan(plan: BBPlan, rawCfg: BBContestPrep
   if (existing) return plan as BBPlanWithPrep;
 
   const weeks = plan.weeks.map(w => ({ ...w, sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: (e.workSets || []).map(ws => ({ ...ws })) })) })) })) as any[];
-  const last = weeks[weeks.length - 1];
+  const targetIdx = clamp((opts?.weekNumber ?? weeks.length) - 1, 0, weeks.length - 1);
+  const target = weeks[targetIdx];
   const peakWeek = buildPeakWeek(cfg);
-  last.phase = 'peaking';
-  last.deload = false;
-  last.taper = true;
-  last.peakWeek = true;
-  last.sessions = last.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
-  last.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
+  target.phase = 'peaking';
+  target.deload = false;
+  target.taper = true;
+  target.peakWeek = true;
+  target.sessions = target.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
+  target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
 
   const result = {
     ...plan,
     weeks,
     rationale: [
       ...(plan.rationale || []),
-      `🎭 Пик-неделя наложена на финальную неделю (шоу ${cfg.showDate}): деплеция → загрузка → отдых → памп.`,
+      `🎭 Пик-неделя наложена на неделю ${targetIdx + 1} (шоу ${cfg.showDate}): деплеция → загрузка → отдых → памп.`,
     ],
   };
   (result as BBPlanWithPrep).contestPrep = {
@@ -927,6 +933,17 @@ const LEGACY_CATEGORY_MAP: Record<string, BBContestCategory> = {
   womens_physique: 'womens_physique',
   womens_bb: 'womens_bb',
 };
+
+/**
+ * Нормализовать категорию из произвольного источника (профиль bbCategory,
+ * legacy id «classic»/«open» и т.п.) в канонический id движка с проверкой пола.
+ */
+export function normalizeContestCategory(raw: string | null | undefined, sex: 'male' | 'female'): BBContestCategory {
+  const key = String(raw || '').trim().toLowerCase();
+  const mapped = LEGACY_CATEGORY_MAP[key];
+  if (mapped && CATEGORY_PROFILES[mapped].sex === sex) return mapped;
+  return sex === 'female' ? 'bikini' : 'mens_physique';
+}
 
 /**
  * Back-compat: старые поля профиля (goals.peakWeek + goals.peakShowDay ISO +
