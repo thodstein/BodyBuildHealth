@@ -54,6 +54,7 @@ import { MixDiarySection } from './MixDiarySection';
 import { MixEffectivenessCard } from './MixEffectivenessCard';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 import { CompetitionPlansView } from './CompetitionPlansView';
+import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
 const RecordModeSelector: React.FC<{
@@ -447,8 +448,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             <button onClick={() => setMode('record')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись тренировки</button>
             <button onClick={() => setMode('competition')} style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
           </div>
-          {/* Сегодня: план + последняя тренировка + сон */}
-          {(() => {
+          <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
             const last = safeHistoryWorkouts[0];
@@ -521,11 +521,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 )}
               </div>
             );
-          })()}
-          <MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} />
-          <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
+          })()}</>
+          </InfoErrorBoundary>
+          <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} /></InfoErrorBoundary>
+          <InfoErrorBoundary label="Форма записи"><RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
-            pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} />
+            pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} /></InfoErrorBoundary>
         </div>
       )}
 
