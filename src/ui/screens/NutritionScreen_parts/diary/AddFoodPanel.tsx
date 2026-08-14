@@ -172,8 +172,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
               opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500 }}>
-            {ocrFileLoading ? '⏳' : '📸 Фото/файл'}
-          </button>
+             {ocrFileLoading ? '⏳' : '📸 Фото/файл'}
+           </button>
+           <button onClick={() => ocrCameraRef.current?.click()} disabled={ocrFileLoading} aria-label="Камера"
+             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
+               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
+               opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500 }}>
+             📷 Камера
+           </button>
           <button onClick={onShowOCR} aria-label="Текст"
             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
               background: showOCR ? 'rgba(0,230,138,0.12)' : '#202023',
@@ -183,10 +189,10 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           </button>
         </div>
 
-        <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }} 
-          onChange={e => { const f = e.target.files?.[0]; if (f) onOcrFile(f); }} />
-        <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; if (f) onOcrFile(f); }} />
+         <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }} 
+           onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) onOcrFile(f); }} />
+         <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+           onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) onOcrFile(f); }} />
       </div>
 
       {showBarcode && (

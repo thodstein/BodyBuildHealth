@@ -1026,10 +1026,11 @@ async function extractTextFromImage(file: File): Promise<string> {
     // Fallback: try canvas-based resize if createImageBitmap failed
     try {
       const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error('Image failed to load'));
-        img.src = URL.createObjectURL(file);
+        img.src = objectUrl;
       });
       const MAX_DIM = 1600;
       let w = img.width, h = img.height;
@@ -1044,7 +1045,7 @@ async function extractTextFromImage(file: File): Promise<string> {
       const ctx = c.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(img.src);
+        URL.revokeObjectURL(objectUrl);
         // Keep the fallback consistent with the primary path: Russian lab
         // forms must not be sent through an English-only worker.
         const engWorker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
@@ -1059,6 +1060,9 @@ async function extractTextFromImage(file: File): Promise<string> {
       errors.push(`Fallback resize OCR also failed: ${fallbackError?.message || String(fallbackError)}`);
     }
   }
+  // Telegram WebView/старые мобильные браузеры могут не иметь ни
+  // createImageBitmap, ни рабочего canvas Image. Последняя попытка — передать
+  // исходный Blob напрямую Tesseract, если Worker уже инициализирован.
   // Direct OCR as last resort
   try {
     const worker = await Tesseract.createWorker('rus+eng', 1, workerOptions);
