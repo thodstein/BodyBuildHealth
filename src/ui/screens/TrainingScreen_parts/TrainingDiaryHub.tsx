@@ -58,7 +58,7 @@ import { BBRecommendationsTab } from './BBRecommendationsTab';
 import { MyTrainingTab } from './MyTrainingTab';
 import { MindsetTab } from './MindsetTab';
 import { MobilityTab } from './MobilityTab';
-import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins } from '../../../engines/mindset-protocol.engine';
+import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins, detectDayType } from '../../../engines/mindset-protocol.engine';
 import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
@@ -583,7 +583,18 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   const mindProto = loadActiveProtocol();
                   const mobProto = loadActiveMobility();
                   if (!mindProto && !mobProto) return null;
-                  const mindItems = mindProto ? itemsForDay(mindProto, 'all') : [];
+                  // Тип дня из сегодняшнего плана (для точного % психо-протокола)
+                  const todayIdx = (new Date().getDay() + 6) % 7;
+                  const plannedToday = trainingOutput?.plan?.[todayIdx];
+                  let track: string | undefined;
+                  try {
+                    const raw = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
+                    track = raw && typeof raw.track === 'string' ? raw.track : undefined;
+                  } catch { /* ignore */ }
+                  const dayType = plannedToday && plannedToday.exercises && plannedToday.exercises.length > 0
+                    ? detectDayType(plannedToday.name || '', track)
+                    : 'all';
+                  const mindItems = mindProto ? itemsForDay(mindProto, dayType) : [];
                   const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
                   const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
                   const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
@@ -592,7 +603,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   return (
                     <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {mindPct !== null && (
-                        <button onClick={() => setMode('mindset')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)', color: mindPct === 100 ? '#22c55e' : '#a78bfa', border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => setMode('mindset')} title={dayType === 'all' ? 'Все шаги протокола' : `Шаги для типа дня: ${dayType}`} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)', color: mindPct === 100 ? '#22c55e' : '#a78bfa', border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`, whiteSpace: 'nowrap' }}>
                           🧠 Психо-протокол: {mindPct}%
                         </button>
                       )}

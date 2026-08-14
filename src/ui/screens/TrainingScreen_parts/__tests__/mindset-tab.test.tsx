@@ -9,14 +9,14 @@ import { render, fireEvent, screen } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
-import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, itemsForDay, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
+import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, loadProtocols, loadActiveProtocol, itemsForDay, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
 import type { DiaryHubCtx } from '../diary-hub-context';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog } from '../../../../core/types';
 import { MobilityTab } from '../MobilityTab';
 import { WorkoutWeekCard } from '../diary-cards';
 import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
-import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot } from '../../../../engines/mobility-protocol.engine';
+import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -564,5 +564,40 @@ describe('Импорт протокола JSON', () => {
   it('MobilityTab рендерит кнопку «Импорт JSON»', () => {
     const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
     expect(html).toContain('📥 Импорт JSON');
+  });
+
+  it('CSR: импорт психо-протокола сохраняет и делает активным', () => {
+    render(<MindsetTab hub={mkHub()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Импорт протокола из JSON' }));
+    fireEvent.change(screen.getByLabelText('JSON протокола'), {
+      target: { value: JSON.stringify({ name: 'Импорт-тест', direction: 'both', items: [{ id: 'x1', kind: 'pre', title: 'Т', script: 'С', durationMin: 1, targetDays: ['all'] }] }) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Импортировать протокол/ }));
+    const list = loadProtocols();
+    expect(list.length).toBe(1);
+    expect(list[0].name).toBe('Импорт-тест');
+    expect(loadActiveProtocol()?.id).toBe(list[0].id);
+  });
+
+  it('CSR: импорт мобильности сохраняет и делает активным', () => {
+    render(<MobilityTab hub={mkHub()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Импорт протокола из JSON' }));
+    fireEvent.change(screen.getByLabelText('JSON протокола'), {
+      target: { value: JSON.stringify({ name: 'Импорт-тест', direction: 'both', items: [{ id: 'x1', slot: 'daily', title: 'Т', script: 'С', durationMin: 5 }] }) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Импортировать протокол/ }));
+    const list = loadMobilityProtocols();
+    expect(list.length).toBe(1);
+    expect(list[0].name).toBe('Импорт-тест');
+    expect(loadActiveMobility()?.id).toBe(list[0].id);
+  });
+
+  it('CSR: битый JSON показывает ошибку и ничего не сохраняет', () => {
+    render(<MindsetTab hub={mkHub()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Импорт протокола из JSON' }));
+    fireEvent.change(screen.getByLabelText('JSON протокола'), { target: { value: '{broken' } });
+    fireEvent.click(screen.getByRole('button', { name: /Импортировать протокол/ }));
+    expect(screen.getByText(/Не удалось разобрать JSON/)).toBeTruthy();
+    expect(loadProtocols().length).toBe(0);
   });
 });
