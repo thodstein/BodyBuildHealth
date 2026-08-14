@@ -508,10 +508,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     </span>
                     <button
                       onClick={() => {
-                        // Добавить ещё один цикл (по умолчанию — пустой = автоподбор)
+                        // Добавить ещё один цикл (пустой = автоподбор).
+                        // ВАЖНО: если циклы ещё не выбраны — неявная строка «Авто»
+                        // становится явным слотом (''), иначе первый клик не давал
+                        // видимого результата (1 строка → 1 строка).
                         const current = c.cycleIds && c.cycleIds.length > 0
-                          ? c.cycleIds
-                          : (c.cycleId ? [c.cycleId] : []);
+                          ? [...c.cycleIds]
+                          : (c.cycleId ? [c.cycleId] : ['']);
                         setCompetitions(competitions.map((cc, j) => j === i ? { ...cc, cycleIds: [...current, ''] } : cc));
                       }}
                        style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 9, minHeight: 44, lineHeight: 1 }}
@@ -542,8 +545,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                                   ? [...cc.cycleIds]
                                   : (cc.cycleId ? [cc.cycleId] : ['']);
                                 cur[k] = val;
-                                const cleaned = cur.filter((x): x is string => Boolean(x));
-                                return { ...cc, cycleIds: cleaned.length > 0 ? cleaned : undefined, cycleId: cleaned[0] };
+                                // Не выкидываем пустые слоты («Авто»): иначе после
+                                // выбора цикла в одном слоте остальные строки
+                                // схлопывались в одну — выбор «не держался».
+                                const hasCycle = cur.some(x => Boolean(x));
+                                return { ...cc, cycleIds: hasCycle ? cur : undefined, cycleId: cur.find(x => Boolean(x)) ?? undefined };
                               }));
                             }}
                             title={filteredCycles.length === 0 ? 'Нет циклов под выбранное направление' : 'Цикл на под-фазу пика'}

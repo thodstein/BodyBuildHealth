@@ -3169,7 +3169,12 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           </div>
           <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} storageKey="he_bb_macro" onApplyMacrocycle={source => {
-            if (!('trainingFocus' in source)) return;
+            if (!('trainingFocus' in source)) {
+              // Раньше — тихий return: кнопка «Начать работу по циклу» молча
+              // ничего не делала, если в he_bb_macro лежал ПЛ-макроцикл.
+              flash('⚠ В хранилище ПЛ-макроцикл. Постройте ББ-макроцикл заново (кнопка «Построить макроцикл»)');
+              return;
+            }
             setBbAnnualMacrocycle(source as BBMacrocycle);
             setPlanMode('generic_split');
             setBbWeeks(source.totalWeeks);
