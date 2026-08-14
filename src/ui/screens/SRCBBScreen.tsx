@@ -857,7 +857,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
      const wk = builtBb.weeks[Math.min(Math.max(bbWeekSel - 1, 0), builtBb.weeks.length - 1)];
     return wk.sessions.map((sess, i) => ({
-      label: `Д${i + 1} ${sess.character}`,
+      label: `Д${i + 1} ${sess.character}${(sess as any).peakWeekTraining ? ' 🎭' : ''}${sess.exercises.length === 0 ? ' 😴 отдых' : ''}`,
       exercises: sess.exercises.map(e => {
         const sourceSets = e.workSets.length > 0
           ? e.workSets
@@ -2562,9 +2562,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               {builtBb.rationale.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4 }}>{r}</div>)}
               {/* Выбор недели */}
               <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}{(wk as any).peakWeek ? ' · 🎭 пик-неделя' : ''}</div>
+                {(wk as any).peakWeek && (
+                  <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.3)', fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                    🎭 <b style={{ color: '#ec4899' }}>Пик-неделя (тапер ББ)</b>{(builtBb as any)?.contestPrep?.showDate ? ` · шоу ${(builtBb as any).contestPrep.showDate}` : ''}
+                    {(wk as any).prepProtocol ? <div style={{ color: 'rgba(255,255,255,0.55)' }}>{(wk as any).prepProtocol}</div> : null}
+                    <div style={{ color: 'rgba(255,255,255,0.55)' }}>День 1–2: памп-деплеция (верх/низ) · день 3: лёгкий full-body · далее отдых и позы. Питание по дням (карбс/вода/натрий) — блок «Питание → 🏁 Тапер ББ».</div>
+                  </div>
+                )}
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                  {W.map(w => { const active = w.week === wk.week; return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent),#00c853)' : 'rgba(255,255,255,0.02)', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{w.week}</button>; })}
+                  {W.map(w => { const active = w.week === wk.week; const isPeak = (w as any).peakWeek === true; return <button key={w.week} onClick={() => setBbWeekSel(w.week)} title={isPeak ? ((w as any).prepProtocol || 'Пик-неделя') : `Неделя ${w.week}`} style={{ padding:'7px 0', borderRadius:7, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent),#00c853)' : isPeak ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.02)', color: active ? '#000' : '#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>{isPeak ? '🎭' : ''}{w.week}</button>; })}
                 </div>
               </div>
               {/* Визуальный календарь ББ: недели × дни (объём по сетам) */}
@@ -2587,9 +2594,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 {wk.sessions.map((s, si) => (
                   <div key={si} style={{ background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', background:'var(--accent-dim)', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-                      <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🏋️ День {si + 1} · {s.character}</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🏋️ День {si + 1} · {s.character}{(s as any).peakWeekTraining ? ' · 🎭 памп' : ''}{(s as any).peakWeekRest ? ' · 😴 отдых' : ''}</span>
                       <span style={{ fontSize:10, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
                     </div>
+                    {s.exercises.length === 0 ? (
+                      <div style={{ padding: '10px 12px', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                        😴 Полный отдых — позирование {(s as any).peakWeekRest ? '60 мин' : '—'}, растяжка, сон 8–9 ч.{(s as any).comment ? ` ${(s as any).comment}` : ''}
+                      </div>
+                    ) : (
                     <div style={{ padding: '4px 0', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
                       <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'4px 10px', fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
                         <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Темп</span>
@@ -2613,6 +2625,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         );
                       })}
                     </div>
+                    )}
                   </div>
                 ))}
               </div>
