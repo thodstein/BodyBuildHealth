@@ -48,7 +48,7 @@ export type TrainingTab =
   | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
   | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'deload_scheduler' | 'meso_progression'
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
-  | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset'
+  | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
   | 'training_mix_hub' | 'mix_presets';
@@ -87,6 +87,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
 
   mmc_tracking: '🔄 MMC/Пампинг/Суставы',
   mindset: '🧠 Психология',
+  mobility: '🧘 Мобильность',
   checkin: '📋 Чек-ин метрик',
   strength: '💪 Аналитика силы',
   bb_tools: '💪 ББ-инструменты',

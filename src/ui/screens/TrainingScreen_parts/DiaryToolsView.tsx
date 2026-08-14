@@ -11,6 +11,7 @@ import { WorkoutComparisonCard, ExerciseSubstitutionCard, WarmupRampCard } from 
 import { diaryStyles as style } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset-protocol.engine';
+import { exportMobilityCheckinsCSV, loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -72,6 +73,23 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               URL.revokeObjectURL(url);
             }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)', cursor: 'pointer' }}>
               🧠 Скачать психо-чек-ины CSV
+            </button>
+          </div>
+          {/* Mobility check-ins CSV export */}
+          <div style={style.card}>
+            <div style={style.label}>🧘 Мобильность CSV</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({loadMobilityCheckins().length} записей)</div>
+            <button onClick={() => {
+              const csv = exportMobilityCheckinsCSV();
+              const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `mobility_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', cursor: 'pointer' }}>
+              🧘 Скачать чек-ины мобильности CSV
             </button>
           </div>
           {/* Workout templates from history */}

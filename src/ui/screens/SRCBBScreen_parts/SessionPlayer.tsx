@@ -23,6 +23,7 @@ import { recommendTempo, formatTempo, TEMPO_PRESETS } from '../../../engines/rep
 import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from './MindsetSessionPanels';
+import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel';
 
   const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
@@ -773,6 +774,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
           {/* Психология: протокол дня (до начала тренировки) */}
           <MindsetPreSessionCard focus={focus} dayLabel={day.label} />
+
+          {/* Мобильность: ежедневная рутина + подготовка зон (до разминки) */}
+          <MobilitySessionPanel />
         </div>
       )}
 
@@ -1179,6 +1183,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
           {/* Психология: чек-ин сессии (уверенность/активация/фокус) */}
           <MindsetCheckinCard sessionId={done?.sessionId} />
+
+          {/* Мобильность: растяжка после тренировки + чек-ин ROM */}
+          <MobilityPostPanel sessionId={done?.sessionId} />
 
           <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
           <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>

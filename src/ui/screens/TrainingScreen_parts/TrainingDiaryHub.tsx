@@ -57,6 +57,7 @@ import { CompetitionPlansView } from './CompetitionPlansView';
 import { BBRecommendationsTab } from './BBRecommendationsTab';
 import { MyTrainingTab } from './MyTrainingTab';
 import { MindsetTab } from './MindsetTab';
+import { MobilityTab } from './MobilityTab';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -99,7 +100,7 @@ const RecordModeSelector: React.FC<{
 const style = diaryStyles;
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mytraining';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -119,7 +120,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'competition' | 'recommendations' | 'mytraining';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'competition' | 'recommendations' | 'mytraining';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
@@ -547,6 +548,33 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     </div>
                   );
                 })()}
+                {(() => {
+                  // Мобильность: ежедневная рутина не выполнена
+                  const today = new Date().toISOString().slice(0, 10);
+                  let mobProtocol: any = null;
+                  try {
+                    const list = JSON.parse(localStorage.getItem('he_mobility_protocols') || '[]');
+                    const activeId = localStorage.getItem('he_mobility_active_protocol_id');
+                    mobProtocol = (Array.isArray(list) ? list : []).find((p: any) => p.id === activeId) || (Array.isArray(list) ? list[0] : null) || null;
+                  } catch { /* ignore */ }
+                  if (!mobProtocol || !Array.isArray(mobProtocol.items)) return null;
+                  const hasDaily = mobProtocol.items.some((it: any) => it && it.slot === 'daily');
+                  if (!hasDaily) return null;
+                  let doneToday = false;
+                  try {
+                    const prog = JSON.parse(localStorage.getItem('he_mobility_day_progress') || 'null');
+                    doneToday = !!(prog && prog.date === today && Array.isArray(prog.doneItems) && prog.doneItems.length > 0);
+                  } catch { /* ignore */ }
+                  if (doneToday) return null;
+                  return (
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <span>🧘 Ежедневная рутина мобильности не выполнена</span>
+                      <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        К рутине →
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}</>
@@ -593,6 +621,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'checkin' && <CheckinMetricsCard />}
       {mode === 'mmc' && <MMCTrackingCard />}
       {mode === 'mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
+      {mode === 'mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
       {mode === 'tools' && <DiaryToolsView hub={hub} />}

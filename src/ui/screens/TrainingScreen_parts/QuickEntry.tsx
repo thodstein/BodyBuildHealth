@@ -18,6 +18,7 @@ import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exer
 import { useIsMobile } from './useIsMobile';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
+import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
 
 const ACCENT = '#00e68a';
 
@@ -667,6 +668,8 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         {saveError && <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', marginTop: 4 }}>{saveError}</div>}
         {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
         <MindsetCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
+        {/* Чек-ин мобильности (опционально): рутина/сессия + ROM */}
+        <MobilityCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
         </>
       )}
     </div>

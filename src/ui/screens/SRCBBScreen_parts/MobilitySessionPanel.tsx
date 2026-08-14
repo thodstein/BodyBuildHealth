@@ -1,0 +1,223 @@
+/**
+ * MobilitySessionPanel.tsx — панель мобильности экрана выполнения сессии (SessionPlayer).
+ *
+ * 1. MobilitySessionPanel (фаза 'ready'): ежедневная рутина (daily) + подготовка
+ *    проблемных зон (pre) с чекбоксами. Прогресс дня — he_mobility_day_progress.
+ * 2. MobilityPostPanel (фаза 'done'): блоки «после тренировки» (статика/PNF/
+ *    нагруженная) с чекбоксами + компактный чек-ин (выполнено + ROM) →
+ *    he_mobility_checks.
+ *
+ * Панели НЕ дублируют warmup/cooldown (те генерируются отдельно) и не влияют
+ * на план/авторегуляцию.
+ */
+import React, { useMemo, useState } from 'react';
+import {
+  loadActiveMobility, itemsForSlot,
+  loadMobilityDayProgress, saveMobilityDayProgress,
+  upsertMobilityCheckin,
+  SLOT_LABELS,
+  type MobilitySlot,
+} from '../../../engines/mobility-protocol.engine';
+
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
+const ACCENT = '#00e68a';
+const DIM = 'rgba(255,255,255,0.55)';
+const SLOT_ICON: Record<string, string> = { daily: '🌅', pre: '🏋️', post: '🧘', rest_day: '🛌' };
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function CheckboxList({ items, progress, onToggle }: {
+  items: ReturnType<typeof itemsForSlot>;
+  progress: { date: string; doneItems: string[] };
+  onToggle: (id: string) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      {items.map(it => {
+        const done = progress.doneItems.includes(it.id);
+        return (
+          <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <input type="checkbox" checked={done} onChange={() => onToggle(it.id)} aria-label={`Шаг мобильности: ${it.title}`}
+              style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
+                {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({it.durationMin} мин)</span>
+              </div>
+              {!done && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════ 1. Ready-фаза: ежедневная рутина + подготовка ═══════════ */
+
+export const MobilitySessionPanel: React.FC = () => {
+  const [tick, setTick] = useState(0);
+  const protocol = useMemo(() => loadActiveMobility(), [tick]);
+  const daily = useMemo(() => itemsForSlot(protocol, 'daily'), [protocol, tick]);
+  const pre = useMemo(() => itemsForSlot(protocol, 'pre'), [protocol, tick]);
+  const progress = useMemo(() => loadMobilityDayProgress(todayKey()), [tick]);
+
+  if (!protocol || (daily.length === 0 && pre.length === 0)) return null;
+
+  const toggle = (id: string) => {
+    const done = progress.doneItems.includes(id)
+      ? progress.doneItems.filter(x => x !== id)
+      : [...progress.doneItems, id];
+    saveMobilityDayProgress({ date: todayKey(), doneItems: done });
+    setTick(t => t + 1);
+  };
+
+  const total = daily.length + pre.length;
+  const doneCount = [...daily, ...pre].filter(it => progress.doneItems.includes(it.id)).length;
+  const pct = total > 0 ? Math.round(doneCount / total * 100) : 0;
+
+  return (
+    <div style={{ ...CARD, border: '1px solid rgba(96,165,250,0.35)', background: 'rgba(96,165,250,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>🧘 Мобильность: {protocol.name}</div>
+        <span style={{ fontSize: 9, color: pct === 100 ? '#22c55e' : DIM }}>{doneCount}/{total} шагов · {pct}%</span>
+      </div>
+      <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', margin: '6px 0 8px' }}>
+        <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : '#60a5fa', transition: 'width 0.3s ease' }} />
+      </div>
+      {daily.length > 0 && <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', margin: '4px 0' }}>🌅 {SLOT_LABELS.daily}</div>}
+      <CheckboxList items={daily} progress={progress} onToggle={toggle} />
+      {pre.length > 0 && <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', margin: '6px 0 4px' }}>🏋️ {SLOT_LABELS.pre}</div>}
+      <CheckboxList items={pre} progress={progress} onToggle={toggle} />
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+        Разминка/заминка тренировки генерируются отдельно — здесь только рутина и подготовка проблемных зон.
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════ 2. Done-фаза: растяжка после + чек-ин ═══════════ */
+
+export const MobilityPostPanel: React.FC<{ sessionId?: string }> = ({ sessionId }) => {
+  const [tick, setTick] = useState(0);
+  const protocol = useMemo(() => loadActiveMobility(), [tick]);
+  const post = useMemo(() => itemsForSlot(protocol, 'post'), [protocol, tick]);
+  const progress = useMemo(() => loadMobilityDayProgress(todayKey()), [tick]);
+  const [romScore, setRomScore] = useState<number | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  if (!protocol || post.length === 0) return null;
+
+  const toggle = (id: string) => {
+    const done = progress.doneItems.includes(id)
+      ? progress.doneItems.filter(x => x !== id)
+      : [...progress.doneItems, id];
+    saveMobilityDayProgress({ date: todayKey(), doneItems: done });
+    setTick(t => t + 1);
+  };
+
+  const save = () => {
+    const allDone = post.every(it => progress.doneItems.includes(it.id));
+    upsertMobilityCheckin({
+      date: todayKey(),
+      sessionId,
+      done: allDone,
+      romScore,
+      note: undefined,
+    });
+    setSaved(true);
+  };
+
+  return (
+    <div style={{ ...CARD, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.05)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>🧘 Растяжка после тренировки</div>
+        {saved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено</span>}
+      </div>
+      <div style={{ fontSize: 9, color: DIM, margin: '4px 0 8px' }}>Статика/PNF/нагруженная — после сессии, до ухода из зала.</div>
+      <CheckboxList items={post} progress={progress} onToggle={toggle} />
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>ROM / ощущения в суставах (1-5):</div>
+        <div style={{ display: 'flex', gap: 4 }} role="radiogroup" aria-label="ROM">
+          {[1, 2, 3, 4, 5].map(v => (
+            <button key={v} type="button" role="radio" aria-checked={romScore === v} aria-label={`ROM ${v}`} onClick={() => setRomScore(v)}
+              style={{
+                flex: 1, minHeight: 32, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                border: romScore === v ? '1px solid rgba(96,165,250,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                background: romScore === v ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
+                color: romScore === v ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+              }}>
+              {v}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button type="button" onClick={save} disabled={saved}
+        style={{ width: '100%', marginTop: 8, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', minHeight: 40,
+          background: saved ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: saved ? DIM : '#000', fontWeight: 700, fontSize: 11 }}>
+        {saved ? '✓ Чек-ин мобильности сохранён' : '💾 Сохранить чек-ин мобильности'}
+      </button>
+    </div>
+  );
+};
+
+/* ═══════════ 3. Компактный чек-ин для форм записи ═══════════ */
+
+export const MobilityCheckinInline: React.FC<{ date: string; sessionId?: string }> = ({ date, sessionId }) => {
+  const [done, setDone] = useState<boolean>(true);
+  const [romScore, setRomScore] = useState<number | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const save = () => {
+    upsertMobilityCheckin({
+      date: (date || todayKey()).slice(0, 10),
+      sessionId,
+      done,
+      romScore,
+      note: undefined,
+    });
+    setSaved(true);
+  };
+
+  return (
+    <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa' }}>🧘 Чек-ин мобильности</span>
+        {saved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>Рутина/сессия</div>
+          <div style={{ display: 'flex', gap: 3 }}>
+            {([true, false] as const).map(v => (
+              <button key={String(v)} type="button" onClick={() => { setDone(v); setSaved(false); }}
+                style={{
+                  flex: 1, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, minHeight: 32,
+                  border: done === v ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
+                  background: done === v ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
+                  color: done === v ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+                }}>
+                {v ? '✓ выполнено' : '✕ нет'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>ROM (1-5)</div>
+          <select aria-label="ROM" value={romScore ?? ''} onChange={e => { setRomScore(e.target.value ? +e.target.value : null); setSaved(false); }}
+            style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, minHeight: 32 }}>
+            <option value="">—</option>
+            {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <button type="button" onClick={save} disabled={saved} aria-label="Сохранить чек-ин мобильности"
+          style={{ padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', minHeight: 32, fontSize: 10, fontWeight: 700,
+            background: saved ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: saved ? DIM : '#000' }}>
+          {saved ? '✓' : '💾'}
+        </button>
+      </div>
+    </div>
+  );
+};

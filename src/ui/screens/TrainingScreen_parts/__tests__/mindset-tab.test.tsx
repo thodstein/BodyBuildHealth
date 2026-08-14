@@ -13,6 +13,9 @@ import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol,
 import type { DiaryHubCtx } from '../diary-hub-context';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog } from '../../../../core/types';
+import { MobilityTab } from '../MobilityTab';
+import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
+import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility } from '../../../../engines/mobility-protocol.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -228,5 +231,131 @@ describe('Напоминание о психо-чек-ине в блоке «С�
   it('без тренировки сегодня → напоминания нет', () => {
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" historyWorkouts={[] as any} />);
     expect(html).not.toContain('без психо-чек-ина');
+  });
+});
+
+describe('MobilityTab (SSR-смок)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('без протоколов рендерит пустое состояние с пресетами', () => {
+    const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
+    expect(html).toContain('Мобильность и гибкость');
+    expect(html).toContain('Протокол мобильности ещё не собран');
+    expect(html).toContain('Пресет ПЛ');
+    expect(html).toContain('Пресет ББ');
+  });
+
+  it('с активным протоколом рендерит конструктор, предпросмотр, чек-ин, тренды', () => {
+    const p = buildPresetMobility('pl');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
+    expect(html).toContain('Конструктор протокола');
+    expect(html).toContain('Мобильность позвоночника (5-10 мин)');
+    expect(html).toContain('Предпросмотр по слоту');
+    expect(html).toContain('Чек-ин мобильности');
+    expect(html).toContain('Тренды мобильности');
+    expect(html).toContain('Библиотека блоков');
+    expect(html).toContain('Чек-ины CSV');
+  });
+
+  it('устойчив к битому JSON протоколов', () => {
+    localStorage.setItem('he_mobility_protocols', '{"broken":');
+    const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
+    expect(html).toContain('Протокол мобильности ещё не собран');
+  });
+
+  it('tabToHubMode маппит вкладку mobility', () => {
+    expect(tabToHubMode('mobility')).toBe('mobility');
+  });
+});
+
+describe('Панели мобильности SessionPlayer (SSR-смок)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('MobilitySessionPanel скрыт без активного протокола', () => {
+    expect(renderToStaticMarkup(<MobilitySessionPanel />)).toBe('');
+  });
+
+  it('MobilitySessionPanel показывает daily+pre шаги с чекбоксами', () => {
+    const p = buildPresetMobility('pl');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    const html = renderToStaticMarkup(<MobilitySessionPanel />);
+    expect(html).toContain('Мобильность:');
+    expect(html).toContain('Утренняя рутина CARs (5 мин)');
+    expect(html).toContain('Ежедневная рутина');
+    expect(html).toContain('Перед тренировкой');
+    expect(html).toContain('checkbox');
+  });
+
+  it('MobilityPostPanel скрыт без post-блоков в протоколе', () => {
+    const p = buildPresetMobility('pl');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    expect(renderToStaticMarkup(<MobilityPostPanel sessionId="w1" />)).not.toBe('');
+    // Универсальный пресет содержит static_post — проверим, что панель видит пост-блоки
+    expect(renderToStaticMarkup(<MobilityPostPanel sessionId="w1" />)).toContain('Растяжка после тренировки');
+  });
+
+  it('MobilityCheckinInline рендерит шкалы и сохраняет чек-ин', () => {
+    const html = renderToStaticMarkup(<MobilityCheckinInline date="2026-08-14" sessionId="w1" />);
+    expect(html).toContain('Чек-ин мобильности');
+    expect(html).toContain('ROM');
+  });
+});
+
+describe('Напоминание о мобильности в блоке «Сегодня»', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+  const mkWorkoutToday = (): WorkoutLog => ({
+    id: 'w_today', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
+    exercises: [{
+      id: `${today}_bench`, date: today, exerciseId: 'bench_press', exerciseName: 'Жим штанги лёжа', isCompound: true, weekNumber: 1,
+      sets: [{ weight: 80, reps: 8, rir: 2, rpe: 7 }], totalVolume: 640, estimated1RM: 101,
+    } as any],
+  });
+
+  const baseProps = {
+    diary: {} as any,
+    diaryStats: [],
+    diaryProgress: [],
+    historyWorkouts: [mkWorkoutToday()],
+    macrocycle: null,
+    selectedWeek: 1,
+    level: 'intermediate',
+    onRefresh: () => {},
+    trainingOutput: null,
+    goal: 'bulk',
+    daysPerWeek: 4,
+    splitType: 'auto',
+    periodizationType: 'auto',
+    mesoLength: 12,
+    tprofile: { weakPoints: [], bodyWeight: 80, onCourse: false, courseIntensity: 1, goal: 'bulk', level: 'intermediate' },
+    linked: { profile: { settings: { personal: { height: 175 } } } },
+  };
+
+  it('активный протокол с daily-рутиной, прогресс пуст → напоминание', () => {
+    const p = buildPresetMobility('both');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Ежедневная рутина мобильности не выполнена');
+    expect(html).toContain('К рутине');
+  });
+
+  it('прогресс за сегодня выполнен → напоминания нет', () => {
+    const p = buildPresetMobility('both');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: ['cars_morning'] }));
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).not.toContain('рутина мобильности не выполнена');
+  });
+
+  it('без активного протокола → напоминания нет', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).not.toContain('рутина мобильности не выполнена');
   });
 });

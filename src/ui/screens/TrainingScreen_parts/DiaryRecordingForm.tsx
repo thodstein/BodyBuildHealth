@@ -6,6 +6,7 @@ import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exer
 import { loadReadinessHistory } from './readiness-history';
 import { MMCSetPanel } from './MMCSetPanel';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
+import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -803,6 +804,11 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
       {exercises.length > 0 && (
         <MindsetCheckinInline date={logDate} sessionId={savedWid || undefined} />
+      )}
+
+      {/* Чек-ин мобильности (опционально): рутина/сессия + ROM */}
+      {exercises.length > 0 && (
+        <MobilityCheckinInline date={logDate} sessionId={savedWid || undefined} />
       )}
 
       {/* Save */}

@@ -44,7 +44,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     // внутренним переключателем TrainingDiaryHub.
     // «История тренировок» и «Сводка недели» — ТОЛЬКО подвкладка дневника
     // (не дублируются на экранах ББ-авто/ПЛ-авто).
-    tabs: ['diary', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'mindset', 'reports'],
+    tabs: ['diary', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'mindset', 'mobility', 'reports'],
   },
   calculators: {
     title: '⚡ Интеллект тренировки',
