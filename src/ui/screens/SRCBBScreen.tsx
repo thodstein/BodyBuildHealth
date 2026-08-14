@@ -53,6 +53,7 @@ import { recommendWeightCut } from '../../engines/gym-competition.engine';
 import { updateSection } from '../../core/profile-manager';
 import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
+import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { loadSessions } from '../../engines/workout-logger.engine';
 
@@ -1248,6 +1249,36 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', display: taperNote ? 'inline-flex' : 'none' }}
                     title="Тапер уже добавлен — пересоберите план, чтобы начать заново"
                   >ℹ️ в плане</button>
+                  <button
+                    disabled={!builtSrc || !taperNote}
+                    onClick={() => {
+                      if (!builtSrc) return;
+                      try {
+                        const lastAttempts = [...builtSrc.weeks].reverse().find(w => w.meetAttempts)?.meetAttempts;
+                        const record: CompetitionPlanRecord = {
+                          id: 'comp-' + Date.now(),
+                          savedAt: new Date().toISOString(),
+                          cycleTitle: builtSrc.template.meta.title,
+                          cycleId: selectedCycleId,
+                          strategy: attemptStrategy,
+                          weekCount: builtSrc.weeks.length,
+                          taperWeeks: taperWeeksToAdd,
+                          mockMeet: mockMeetOn,
+                          meetWeek: meetWeekOn,
+                          weights: { squat: pmSquat, bench: pmBench, deadlift: pmDead },
+                          meetAttempts: lastAttempts?.lifts ?? [],
+                          plan: builtSrc,
+                        };
+                        const res = saveCompetitionPlan(record);
+                        const pct = MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced;
+                        setMethodNote(res.ok
+                          ? `🏆 Соревновательный цикл сохранён: «${record.cycleTitle}» — ${record.weekCount} нед с тапером, прикиды ${pct}. Открыть: Дневник тренировок → подвкладка «🏁 Соревнования».`
+                          : `⚠ Не удалось сохранить соревновательный цикл: ${res.error ?? 'переполнение хранилища'}`);
+                      } catch (error) { setMethodNote(`⚠ Не удалось сохранить: ${(error as Error).message}`); }
+                    }}
+                    style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(234,179,8,0.45)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#eab308' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(234,179,8,0.1)' : 'transparent' }}
+                    title="Сохранить цикл с тапером как соревновательный — появится в дневнике тренировок (подвкладка «🏁 Соревнования») с прикидами и составом мезоцикла"
+                  >🏆 Сохранить как соревновательный</button>
                 </div>
                 <div style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.16)' }}>
                   {/* Шапка */}
