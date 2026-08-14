@@ -381,7 +381,17 @@ function extractResultBeforeUnit(text: string): number | null {
   const unit = '(?:мк\s*моль|ммоль|моль|мг|нг|пг|мкг|мкМЕ|м\s*[ЕEеe]д|мМЕ|МЕ|ЕД|Е|ед|г|мл|л)\\s*\\/\\s*(?:дл|мл|л)|(?:umol|mmol|nmol|pmol|mg|ng|pg|ug|mIU|MIU|IU|U|g)\\s*\\/\\s*(?:dL|mL|L)|%|сек|s\\b|meq\\/l';
   const matches = [...text.matchAll(new RegExp(`(\\d+[.,]?\\d*)\\s*[+*]*\\s*(?=${unit})`, 'gi'))];
   if (matches.length === 0) return null;
-  const value = Number(matches[matches.length - 1][1].replace(',', '.'));
+  const selected = matches[matches.length - 1];
+  // In a laboratory row like "АЛТ 35 7-40 Е/л", the token immediately
+  // before the unit is the upper reference bound, not the result. Prefer the
+  // value before the complete reference range when the selected token is the
+  // right-hand side of `low-high`.
+  const prefix = text.slice(0, selected.index ?? 0);
+  const range = prefix.match(/(\d+[.,]?\d*)\s*[-–]\s*$/);
+  const valueToken = range
+    ? (prefix.slice(0, prefix.length - range[0].length).match(/(\d+[.,]?\d*)\s*$/)?.[1] ?? selected[1])
+    : selected[1];
+  const value = Number(valueToken.replace(',', '.'));
   return Number.isFinite(value) ? value : null;
 }
 
