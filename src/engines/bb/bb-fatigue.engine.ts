@@ -93,10 +93,12 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     if ((exercise as any).warmupActivator) return -Infinity;
     // Мышца с повышенным MEV-флором (guard > базового minSets): её ПОСЛЕДНЕЕ
     // упражнение не удаляется — иначе план получает deficit (0 сетов мышцы).
-    // Дубли удалять можно: стимул сохраняется, лимит сессии соблюдается.
+    // Малые группы + glutes: константный guard может быть сжат масштабированием
+    // sessionGuard под лимит — защищаем последний стимул независимо от floor.
     const floorRaised = floorFor(exercise.muscle) > minSets;
     const lastForMuscle = session.exercises.filter(e => e.muscle === exercise.muscle).length <= 1;
-    if (floorRaised && lastForMuscle) return -Infinity;
+    const smallGuarded = ['calves', 'traps', 'forearms', 'abs', 'glutes'].includes(exercise.muscle);
+    if (lastForMuscle && (floorRaised || smallGuarded)) return -Infinity;
     const cost = estimateBBExerciseCost(exercise);
     const finisher = exercise.character === 'памп' || exercise.repsRange?.[0] >= 15 ? 20 : 0;
     const accessory = exercise.role === 'accessory' ? 10 : 0;

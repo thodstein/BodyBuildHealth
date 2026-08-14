@@ -21,6 +21,8 @@ export function verticalPullProfile(name: string): string | null {
 
 export function classifyBackExercise(name: string): { pattern: BackPattern; subgroup: BBExercise['backSubgroup'] } {
   const n = String(name || '').toLowerCase();
+  // «Скручивания в верхнем блоке» — пресс, не вертикальная тяга (не back).
+  if (/скручиван|crunch/i.test(n)) return { pattern: 'other', subgroup: 'upper_back' };
   if (/подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун|vertical/i.test(n)) return { pattern: 'vertical_pull', subgroup: 'back_width' };
   if (/пуловер|прям.*рук|straight.?arm/i.test(n)) return { pattern: 'lat_isolation', subgroup: 'back_width' };
   if (/тяга.*одной|one.?arm|single.?arm|одноруч|гантел.*наклон/i.test(n)) return { pattern: 'unilateral_row', subgroup: 'back_thickness' };

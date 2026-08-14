@@ -158,13 +158,13 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
   }
   if (hasAny(name, /присед|squat|leg.?press|жим.*ног|выпад|lunge/i)) {
     return [
-      { muscle: 'glutes', coefficient: 0.45 },
+      { muscle: 'glutes', coefficient: 0.4 },
       { muscle: 'hamstrings', coefficient: 0.25 },
     ];
   }
   if (hasAny(name, /румын|rdl|гудморнинг|good.?morning|гиперэкстенз/i)) {
     return [
-      { muscle: 'glutes', coefficient: 0.45 },
+      { muscle: 'glutes', coefficient: 0.4 },
       { muscle: 'back', coefficient: 0.25 },
     ];
   }

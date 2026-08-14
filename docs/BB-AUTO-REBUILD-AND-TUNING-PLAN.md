@@ -49,6 +49,20 @@
 - **Итог: 0 MRV-overflow / 125 комбинаций (5 профилей x 25 сплитов); 875/875 тестов.**
 - Остаточные дефициты — честные info (лимиты natural 24/10: MEV-сумма 62 > 48; осознанное правило).
 
+## РАУНД 4 — ОСТАТКИ: deep-дефициты natural, traps, баланс спины, головки рук (2026-08-14)
+
+### Остатки на старте (полное выполнение)
+1. **Глубокие natural-дефициты** (109 случаев <60% MEV): calves 46, abs 23, quads 22, hams 21, back 15, forearms 15, glutes 11 — из-за лимита 24/10 (MEV-сумма 62 > 48) и распыления (10 упражнений x 2 сета).
+2. **natural traps 3-4 < MEV 5-6**.
+3. **1 несбалансированная неделя спины** (push_pull_2 width 0.55 vs 0.6).
+4. **Головки рук**: только покрытие (замена), не планирование объёма по головкам.
+5. **UI-проверка** новых полей (armSubgroup/backSubgroup/warmupActivator) в карточках.
+6. **AGENTS.md** — обновить статусом Раундов 2-4.
+
+### План работ
+- **MEV-repair в finalize** (после fill, до normalize): мышцы с direct < MEV получают подъём сетов до ceil(MEV/частота) в пределах cap 5 и лимита сессии (24/40/60) — закрывает deep-дефициты без сокращения объёма.
+- Проверка 125 комбинаций после repair; traps через repair; баланс спины; головки рук — оценка планирования; UI-проверка; AGENTS.md.
+
 ## Выполненные аудиты (последний раунд)
 
 - **Этапы 2/4 — подгруппы рук**: classifyArmExercise/annotateArmExercise (biceps_lengthened/shortened/hammer, triceps_overhead/pushdown/compound, forearm); ensureArmHeadCoverage заменяет изоляцию на растянутую позицию бицепса / overhead трицепса (уважает equipment); rationale «💪 Руки по паттернам» + armQualityIssues.

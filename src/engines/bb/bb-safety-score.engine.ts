@@ -116,6 +116,8 @@ export function calculatePlanSafetyScore(
     const muscleSets: Record<string, number> = {};
     for (const s of w.sessions) {
       for (const ex of s.exercises) {
+        // Разминочные упражнения (warmupActivator) не входят в рабочий объём.
+        if ((ex as any).warmupActivator) continue;
         muscleSets[ex.muscle] = (muscleSets[ex.muscle] || 0) + ex.sets;
       }
     }
