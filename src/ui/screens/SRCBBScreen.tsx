@@ -1134,6 +1134,26 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   </div>
                 );
               })()}
+              {/* 🏁 Тапер/соревнование: питание по фазе (сброс веса или набор к старту) */}
+              {(taperNote || mockMeetOn || meetWeekOn) && (() => {
+                const losing = bw > targetBw + 0.5;
+                return (
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
+                      🏁 Тапер{taperNote ? ' применён' : ' включён'}{mockMeetOn ? ' · 🎯 mock meet' : ''}{meetWeekOn ? ' · 🏁 соревнования' : ''} — питание по фазе
+                    </div>
+                    {losing ? (
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                        <b style={{ color: '#f59e0b' }}>Сброс веса к старту</b> ({bw} → {targetBw} кг): дефицит 300-500 ккал, белок 2.2-2.8 г/кг (сохранить мышцы), клетчатка 30+ г. За 48-24ч — сгонка воды: вода+натрий → вода-натрий, взвешивание утром. MRV ниже при дефиците — объём ассистентов уже скорректирован.
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                        <b style={{ color: '#f59e0b' }}>Набор к старту</b> (вес в категории): профицит 200-400 ккал, белок 1.8-2.2 г/кг. За 48-72ч до прикидок — углеводная нагрузка 4-7 г/кг (гликоген к попыткам), соль по плану. Тапер = разгрузка, питание = заправка.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1243,6 +1263,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         autoReg: autoRegMode === 'auto' && autoRegResult
                           ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift }
                           : undefined,
+                        nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
                       });
                       setBuiltSrc(next);
                       const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0);

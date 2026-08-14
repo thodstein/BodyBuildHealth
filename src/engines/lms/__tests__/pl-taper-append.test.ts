@@ -113,6 +113,16 @@ describe('appendPLTaperWeeks', () => {
     expect(liftAr.third).toBeCloseTo(Math.round(liftNoAr.third * 0.9 * 10) / 10, 1);
   });
 
+  it('питание участвует в тапере: nutrition → rationale и больший объём аксессуаров (soft-cap)', () => {
+    const plan = buildBase(6);
+    const withNutr = appendPLTaperWeeks(plan, 2, { nutrition: { calorieSurplus: 400, proteinPerKg: 2.2 } });
+    expect(withNutr.progressionRationale).toContain('Питание в taper-неделях: MRV +');
+    const weekVol = (p: LMSBuildOutput) => p.weeks[p.weeks.length - 1].days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0);
+    const poor = appendPLTaperWeeks(plan, 2, { nutrition: { calorieSurplus: -300, proteinPerKg: 0.8 } });
+    expect(poor.progressionRationale).toContain('Питание в taper-неделях: MRV -');
+    expect(weekVol(withNutr)).toBeGreaterThan(weekVol(poor));
+  });
+
   it('питание (как в ББ-авто): профицит+белок → MRV-множитель отражается в rationale плана', () => {
     const base = { template: CYCLE_01 as never, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 6, faithful: true } as never;
     const good = buildLMSPlan({ ...base, nutrition: { calorieSurplus: 400, proteinPerKg: 2.2 } } as never);

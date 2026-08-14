@@ -1372,6 +1372,9 @@ export function appendPLTaperWeeks(
      *  применяется и к тапер-неделям, mock-неделе и неделе соревнований —
      *  выбранный режим (нет/дневник/авто) работает для ВСЕХ недель плана. */
     autoReg?: { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number };
+    /** Питание (как в buildLMSPlan): профицит калорий и белок г/кг →
+     *  MRV soft-cap в тапер-неделях (Helms 2022). */
+    nutrition?: { calorieSurplus?: number; proteinPerKg?: number };
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1409,7 +1412,19 @@ export function appendPLTaperWeeks(
   }
   // На курсе объём аксессуаров в taper-неделях не режем ниже PED-адаптированного
   // уровня (как buildLMSPlan:784 применяет Math.min(1.5, pedMrvMult) к аксессуарам).
-  const pedVolFloor = Math.min(1.5, pedMrvMult);
+  // Питание (как в buildLMSPlan nutritionMult) участвует в том же soft-cap.
+  const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
+    let n = 1;
+    const cal = opts?.nutrition?.calorieSurplus;
+    const pro = opts?.nutrition?.proteinPerKg;
+    if (cal != null) n *= cal > 300 ? 1.1 : cal > 100 ? 1.05 : cal < -200 ? 0.8 : 1.0;
+    if (pro != null) n *= pro >= 2.0 ? 1.1 : pro >= 1.6 ? 1.05 : pro < 1.0 ? 0.85 : 1.0;
+    return n;
+  })()));
+  const nutritionTaperNote = nutritionMult !== 1
+    ? ` 🥗 Питание в taper-неделях: MRV ${nutritionMult > 1 ? '+' : ''}${Math.round((nutritionMult - 1) * 100)}% (калории ${opts?.nutrition?.calorieSurplus ?? 0} ккал, белок ${opts?.nutrition?.proteinPerKg ?? 0} г/кг; Helms 2022).`
+    : '';
+  const pedVolFloor = Math.min(1.5, pedMrvMult * nutritionMult);
 
   const refVolume = (() => {
     // Эталон объёма: последняя НЕ-deload неделя (иначе делод станет базой тапера).
@@ -1633,6 +1648,7 @@ export function appendPLTaperWeeks(
       meetNote +
       peakNote +
       pedNote +
+      nutritionTaperNote +
       autoRegNote +
       (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),
   };
