@@ -26,6 +26,20 @@ describe('PeakWeekTab smoke', () => {
     clickTab('Тапер ББ');
     expect(screen.getAllByText(/Применить тапер-план ББ/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Сохранить в профиль/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Сводка/).length).toBeGreaterThan(0);
+  });
+
+  it('«📋 Сводка» копирует протокол в буфер (fallback execCommand)', () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickTab('Тапер ББ');
+    let execCalled = false;
+    const origExec = (document as any).execCommand;
+    (document as any).execCommand = (() => { execCalled = true; return true; }) as any;
+    const btn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Сводка'));
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn!);
+    expect(execCalled).toBe(true);
+    (document as any).execCommand = origExec;
   });
 
   it('вкладка показывает пик-неделю из движка (деплеция → загрузка → шоу)', () => {

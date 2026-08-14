@@ -114,6 +114,38 @@ export const PeakWeekTab: React.FC = () => {
   };
   const removePrep = () => { applyBBPeakToPlan(null); setDraft(defaultConfig(sex, weight, bbCategory)); };
 
+  const [copyFlash, setCopyFlash] = useState(false);
+  const fallbackCopy = (text: string) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); setCopyFlash(true); window.setTimeout(() => setCopyFlash(false), 1800); } catch { /* ignore */ }
+    document.body.removeChild(ta);
+  };
+  const copySummary = () => {
+    if (!result) return;
+    const cfg = result.config;
+    const lines: string[] = [
+      `🏁 Тапер ББ — сводка (шоу ${cfg.showDate}, категория ${CONTEST_CATEGORY_LABELS[cfg.category]}, ${cfg.weightKg} кг)`,
+      `📉 Тапер тренировок (${cfg.weeksOut} нед): ${result.taper.map(t => `${t.label} ${Math.round(t.volumePct * 100)}%`).join(' → ')}`,
+      '— Пик-неделя —',
+      ...result.peakWeek.map(d => {
+        const dayLabel = d.day === 7 ? 'Шоу' : `D-${7 - d.day}`;
+        return `${dayLabel} (${d.date}) ${d.phaseLabel}: ${d.kcal} ккал · Б${d.proteinG}/У${d.carbsG}/Ж${d.fatG} · 💧${d.waterLiters}л · Na ${d.sodiumMg}мг · ${d.training.minutes ? d.training.type : 'отдых'} · позы ${d.posingMinutes}м`;
+      }),
+      '— День шоу по часам —',
+      ...result.showTimeline.map(t => `${t.time} — ${t.action}`),
+      ...(result.warnings.length ? ['— Предупреждения —', ...result.warnings] : []),
+    ];
+    const text = lines.join('\n');
+    try {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).then(() => { setCopyFlash(true); window.setTimeout(() => setCopyFlash(false), 1800); }).catch(() => fallbackCopy(text));
+      } else { fallbackCopy(text); }
+    } catch { fallbackCopy(text); }
+  };
+
   const catsFor = draft.sex === 'female' ? FEMALE_CATS : MALE_CATS;
 
   return (
@@ -348,6 +380,11 @@ export const PeakWeekTab: React.FC = () => {
         <button disabled={!validation.ok} onClick={saveToProfile} style={{ ...BTN_GHOST, opacity: validation.ok ? 1 : 0.4 }}>
           {savedFlash ? '✅ Сохранено' : '💾 Сохранить в профиль'}
         </button>
+        {result && (
+          <button onClick={copySummary} style={BTN_GHOST}>
+            {copyFlash ? '✅ Скопировано' : '📋 Сводка'}
+          </button>
+        )}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button disabled={!validation.ok} onClick={applyConfigured} style={{ ...BTN_PRIMARY, opacity: validation.ok ? 1 : 0.45 }}>
