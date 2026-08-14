@@ -46,9 +46,23 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
   const [reminderMsg, setReminderMsg] = useState<string | null>(null);
   const [intakeTick, setIntakeTick] = useState(0);
 
+  // Старые записи миксов могли содержать substances={} или повреждённые
+  // recommendations. Нормализуем их до рендера, иначе блок миксов роняет
+  // весь дневник на .length/.slice/.interactions.
+  const readSafeRecords = (): DiaryMixRecord[] => readDiaryMixes().map((raw: any) => ({
+    ...raw,
+    id: String(raw?.id ?? `legacy_mix_${Math.random().toString(36).slice(2)}`),
+    title: String(raw?.title ?? 'Сохранённый микс'),
+    date: String(raw?.date ?? ''),
+    substances: Array.isArray(raw?.substances) ? raw.substances : [],
+    recommendations: raw?.recommendations && typeof raw.recommendations === 'object'
+      ? { ...raw.recommendations, interactions: Array.isArray(raw.recommendations.interactions) ? raw.recommendations.interactions : [] }
+      : null,
+  }));
+
   useEffect(() => {
-    setRecords(readDiaryMixes());
-    const onRefresh = () => setRecords(readDiaryMixes());
+    setRecords(readSafeRecords());
+    const onRefresh = () => setRecords(readSafeRecords());
     window.addEventListener('he-training-mix-saved', onRefresh as EventListener);
     return () => window.removeEventListener('he-training-mix-saved', onRefresh as EventListener);
   }, []);
@@ -91,7 +105,8 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
                 {r.date} · {r.substances.length} веществ{r.score != null ? ` · скор ${r.score} (${r.label || ''})` : ''}
               </div>
               {(() => {
-                const eff = analyzePresetEffect(r);
+                let eff: ReturnType<typeof analyzePresetEffect> = null;
+                try { eff = analyzePresetEffect(r); } catch { eff = null; }
                 if (!eff) return null;
                 const better = eff.type === 'sleep' ? eff.delta > 0 : eff.delta < 0;
                 const arrow = eff.delta === 0 ? '→' : (better ? '↑' : '↓');
@@ -104,7 +119,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
             </div>
             <button onClick={() => { scheduleMixReminder(r.title, 30); setReminderMsg(`🔔 Напоминание «${r.title}» через 30 мин`); setTimeout(() => setReminderMsg(null), 3000); }}
               title="Напомнить принять через 30 мин" style={{ fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🔔</button>
-            <button onClick={() => { deleteDiaryMix(r.id); setRecords(readDiaryMixes()); }}
+            <button onClick={() => { deleteDiaryMix(r.id); setRecords(readSafeRecords()); }}
               style={{ fontSize: 10, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 6px' }}>🗑</button>
           </div>
           {phases.length > 0 && (
