@@ -53,6 +53,16 @@ const TAB_LABELS: Record<string, string> = {
   tz_3d: '🧊 3D модель',
 };
 
+/** ⚠️ Дисклеймер расчётов — ознакомительная информация, не медицинский инструмент. */
+const RiskDisclaimer: React.FC = () => (
+  <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}>
+    <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', marginBottom: 4 }}>⚠️ Ознакомительная информация</div>
+    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+      Расчёты не являются медицинским инструментом и не заменяют врачебную оценку. Риски ориентировочные: они учитывают только текущее введённое состояние и построены на математических моделях и обобщённых данных — врачебного заключения они не дают. Для более точного расчёта добавьте результаты анализов (лабораторные показатели). Все действия и рекомендации выполняйте только под контролем врача.
+    </div>
+  </div>
+);
+
 export const RiskScreen: React.FC = () => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
@@ -1012,6 +1022,8 @@ export const RiskScreen: React.FC = () => {
           </button>
         ))}
               </div>
+              {/* ⚠️ Дисклеймер — вверху «Другие методы расчёта» и «Механизм-ориентированной модели» */}
+              {(mainTab === 'calculations' || mainTab === 'tz_spec') && <RiskDisclaimer />}
               {/* BASIC CALC — multi-page */}
               {mainTab === 'calculations' && calcPage === 'basic' && riskResult && renderBasicCalc()}
               {/* MONTE CARLO — multi-page */}
