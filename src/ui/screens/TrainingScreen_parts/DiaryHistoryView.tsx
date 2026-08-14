@@ -134,11 +134,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const prevVol = prevWeek.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
             const volDelta = prevVol > 0 ? Math.round(((vol - prevVol) / prevVol) * 100) : 0;
             const best = lastWeek.flatMap(w => w.exercises.map(e => ({ name: e.exerciseName, e1rm: e.estimated1RM || 0 }))).sort((a, b) => b.e1rm - a.e1rm)[0];
+            // Психо-чек-ины и мобильность за неделю (для сводки)
+            const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+            const mindWeek = loadCheckins().filter(c => c.date >= weekAgoStr);
+            const confAvg = mindWeek.length > 0 ? (mindWeek.reduce((s, c) => s + c.confidence, 0) / mindWeek.length).toFixed(1) : '';
+            const mobWeek = loadMobilityCheckins().filter(c => c.date >= weekAgoStr);
+            const mobDoneWeek = mobWeek.filter(c => c.done).length;
             const summary = [
               `📅 Неделя: ${lastWeek[0].date.slice(8, 10)}.${lastWeek[0].date.slice(5, 7)} — ${lastWeek[lastWeek.length - 1].date.slice(8, 10)}.${lastWeek[lastWeek.length - 1].date.slice(5, 7)}`,
               `🏋️ Тренировок: ${lastWeek.length} (${prevWeek.length ? `прошлая: ${prevWeek.length}` : 'прошлая: —'})`,
               `⚖️ Объём: ${(vol / 1000).toFixed(1)} т (${volDelta >= 0 ? '+' : ''}${volDelta}%) · подходов: ${sets}`,
               best && best.e1rm > 0 ? `🏆 Лучший e1RM: ${best.name} — ${Math.round(best.e1rm)} кг` : '',
+              mindWeek.length > 0 ? `🧠 Психо: ${mindWeek.length} чек-ин(а) · уверенность ${confAvg}/5` : '',
+              mobWeek.length > 0 ? `🧘 Мобильность: ${mobDoneWeek}/${mobWeek.length} дней выполнено` : '',
               lastWeek[0].notes ? `📝 ${lastWeek[0].notes}` : '',
             ].filter(Boolean).join('\n');
             return (

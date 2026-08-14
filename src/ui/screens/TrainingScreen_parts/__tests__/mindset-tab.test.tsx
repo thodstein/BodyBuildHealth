@@ -441,3 +441,75 @@ describe('Прогресс протоколов в блоке «Сегодня»
     expect(html).toContain('Рутина выполнена');
   });
 });
+
+describe('Сводка недели с психо/мобильностью', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  // Дата гарантированно ВНЕ окна последних 7 дней (на сутки раньше)
+  const oldDate = new Date(weekAgo.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const baseProps = {
+    diary: {} as any,
+    diaryStats: [],
+    diaryProgress: [],
+    historyWorkouts: [{
+      id: 'w1', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
+      exercises: [{ id: 'e1', date: today, exerciseId: 'bench_press', exerciseName: 'Жим штанги лёжа', isCompound: true, weekNumber: 1, sets: [{ weight: 80, reps: 8, rir: 2, rpe: 7 }], totalVolume: 640, estimated1RM: 101 } as any],
+    } as any],
+    macrocycle: null,
+    selectedWeek: 1,
+    level: 'intermediate',
+    onRefresh: () => {},
+    trainingOutput: null,
+    goal: 'bulk',
+    daysPerWeek: 4,
+    splitType: 'auto',
+    periodizationType: 'auto',
+    mesoLength: 12,
+    tprofile: { weakPoints: [], bodyWeight: 80, onCourse: false, courseIntensity: 1, goal: 'bulk', level: 'intermediate' },
+    linked: { profile: { settings: { personal: { height: 175 } } } },
+  };
+
+  it('чек-ины за неделю попадают в копируемую сводку', () => {
+    localStorage.setItem(MINDSET_CHECKS_KEY, JSON.stringify([
+      { id: 'c1', date: today, confidence: 4, arousal: 3, focus: 5, protocolFollowed: true },
+      { id: 'c2', date: oldDate, confidence: 5, arousal: 4, focus: 4, protocolFollowed: true },
+    ]));
+    localStorage.setItem('he_mobility_checks', JSON.stringify([
+      { id: 'm1', date: today, done: true, romScore: 4 },
+      { id: 'm2', date: oldDate, done: false, romScore: null },
+    ]));
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="history" />);
+    // Только чек-ин за последние 7 дней (c1/m1)
+    expect(html).toContain('Психо: 1 чек-ин(а) · уверенность 4.0/5');
+    expect(html).toContain('Мобильность: 1/1 дней выполнено');
+  });
+
+  it('без чек-инов за неделю → строки психо/мобильности отсутствуют', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="history" />);
+    expect(html).not.toContain('Психо:');
+    expect(html).not.toContain('Мобильность:');
+  });
+});
+
+describe('Кнопки экспорта протокола JSON', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('MindsetTab рендерит кнопку JSON', () => {
+    const p = buildPresetProtocol('pl');
+    upsertProtocol(p);
+    setActiveProtocol(p.id);
+    const html = renderToStaticMarkup(<MindsetTab hub={mkHub()} />);
+    expect(html).toContain('⬇ JSON');
+  });
+
+  it('MobilityTab рендерит кнопку JSON', () => {
+    const p = buildPresetMobility('pl');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
+    expect(html).toContain('⬇ JSON');
+  });
+});

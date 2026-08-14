@@ -536,10 +536,22 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
         </>
       )}
 
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} onClick={downloadCSV} aria-label="Скачать CSV чек-инов мобильности">⬇ Чек-ины CSV</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта мобильности">🖨 Отчёт</button>
+        <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={() => {
+          if (!active) return;
+          try {
+            const blob = new Blob([JSON.stringify(active, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mobility_protocol_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch { /* ignore */ }
+        }} aria-label="Скачать протокол JSON">⬇ JSON</button>
       </div>
     </div>
   );
