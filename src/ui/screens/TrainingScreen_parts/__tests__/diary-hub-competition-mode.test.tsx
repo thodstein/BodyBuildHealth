@@ -91,4 +91,14 @@ describe('Дневник тренировок — режим «Соревнов�
     // ББ-подвкладка не должна показывать ПЛ-контент (жим лёжа/тяга/присед рекомендации ПЛ-стиля)
     expect(html).not.toContain('Пауэрлифтинг');
   });
+
+  it('подвкладки дневника: «История» доступна и имеет кнопку «← В запись»', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('📜 История');
+    const history = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="history" />);
+    expect(history).toContain('История тренировок');
+    expect(history).toContain('← В запись');
+    const recs = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="recommendations" />);
+    expect(recs).toContain('← В запись');
+  });
 });

@@ -322,7 +322,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   // Держим активную вкладку валидной для текущей зоны
   useEffect(() => {
     if (!zone) return;
-    if (zone === 'planner') { if (tab !== 'history') setTab('history'); return; }
+    if (zone === 'planner') { setTab('constructor'); return; }
     if (zone === 'calculators') return; // Не переключаем — дашборд рендерится при tab вне CALC_TABS
     const visible = ZONES[zone].tabs;
     if (!visible.includes(tab)) setTab(visible[0]);
@@ -627,7 +627,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       )}
 
       {/* ═══════════ Библиотека (зона) ═══════════ */}
-      {(tab === 'library' || tab === 'programs' || tab === 'methods' || tab === 'peaking' || tab === 'calc_taper' || tab === 'exercises' || tab === 'mytraining') && (
+      {zone === 'library' && (tab === 'library' || tab === 'programs' || tab === 'methods' || tab === 'peaking' || tab === 'calc_taper' || tab === 'exercises' || tab === 'mytraining') && (
         <LibraryZone
           tab={tab}
           linked={linked} trainingOutput={trainingOutput} diaryStats={diaryStats} historyWorkouts={historyWorkouts}
@@ -645,7 +645,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
             {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {/* ═══════════ Дневник и аналитика (зона) ═══════════ */}
-      {(tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'reports') && (
+      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'reports') && (
         <DiaryAnalyticsZone
           tab={tab}
           initialDiaryMode={initialSubTab === 'diary' ? 'diary' : undefined}
