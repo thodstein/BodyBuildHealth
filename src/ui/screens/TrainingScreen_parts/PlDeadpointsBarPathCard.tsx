@@ -45,15 +45,17 @@ const WEAK_MUSCLE_DETAIL: Array<{ id: string; label: string; subs: Array<{ sub: 
     id: 'legs', label: 'Ноги',
     subs: [
       { sub: 'quads', label: 'Квадрицепсы', patterns: ['lunge', 'isolation_legs_quad'] },
-      { sub: 'hams', label: 'Бицепс бедра', patterns: ['isolation_legs_ham'] },
-      { sub: 'glutes', label: 'Ягодицы', patterns: ['glute_squat'] },
+      { sub: 'hams', label: 'Бицепс бедра', patterns: ['isolation_legs_ham', 'hinge'] },
+      { sub: 'glutes', label: 'Ягодицы', patterns: ['glute_squat', 'hinge'] },
       { sub: 'calves', label: 'Икры', patterns: ['isolation_calves'] },
     ],
   },
   {
     id: 'shoulders', label: 'Плечи',
     subs: [
-      { sub: 'delts', label: 'Дельты', patterns: ['isolation_shoulders'] },
+      { sub: 'front', label: 'Передние дельты', patterns: ['isolation_shoulders'], nameRe: /передн|фронтальные|фронт|жим стоя|армейск/i },
+      { sub: 'side', label: 'Средние дельты', patterns: ['isolation_shoulders'], nameRe: /средн|в сторону|в стороны|махи|подбородку/i },
+      { sub: 'rear', label: 'Задние дельты', patterns: ['isolation_shoulders'], nameRe: /задн|в наклоне|к лицу|разведен/i },
     ],
   },
   {
@@ -348,7 +350,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       <div style={CARD}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#4ade80' }}>1 · Слабые мышцы</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
-          Выберите слабую мышцу — рекомендации тренера ПЛ: 5 ассистентов из раскладки цикла (%ПМ/повторы/подходы — как у аксессуара недели). Основные жим/присед/становая и их дубли исключены.
+          Выберите слабую мышцу — 5 ассистентов из раскладки цикла (%ПМ/повторы/подходы — как у аксессуара недели). Основные жим/присед/становая и их дубли исключены.
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
           {WEAK_MUSCLE_DETAIL.map(d => {
@@ -378,7 +380,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                 if (!analysis || analysis.items.length === 0) return null;
                 return (
                   <div key={key} style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.15)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', marginBottom: 4 }}>🏋️ {s.label} — рекомендации тренера ПЛ (выберите и добавьте в план):</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', marginBottom: 4 }}>🏋️ {s.label} — ассистенты по циклу (выберите и добавьте в план):</div>
                     {analysis.items.map((item, idx) => (
                       <ExerciseRow key={idx} item={item} selected={selected[key]?.includes(item.exercise.name) ?? false}
                         onToggle={() => toggleExercise(key, item.exercise.name)} onAdd={() => addToPlan(key, [item.exercise.name])} />

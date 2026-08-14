@@ -52,11 +52,11 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
   squat: {
     bottom: { weakPoint: 'bottom', label: 'Низ (выход из ямы)', description: 'Не выходит из нижней точки — слабые квадрицепсы/ягодицы.', assistanceFromCatalog: ['Приседание до параллели', 'Присед на груди', 'Жим ногами'], intensityPct: 0.7, rationale: 'Присед на груди акцентирует квадрицепсы; жим ногами — объём без нагрузки на поясницу.' },
     mid: { weakPoint: 'mid', label: 'Средняя фаза', description: 'Зависание в середине.', assistanceFromCatalog: ['Присед с остановками', 'Присед с паузой', 'Жим ногами'], intensityPct: 0.7, rationale: 'Остановки и паузы тренируют удержание позиции в переходе.' },
-    lockout: { weakPoint: 'lockout', label: 'Дожим вверх', description: 'Не дожимает — слабые ягодицы/разгибатели.', assistanceFromCatalog: ['Наклоны', 'Присед в широкой постановке', 'Тяга сумо'], intensityPct: 0.65, rationale: 'Наклоны укрепляют разгибатели спины; широкая постановка и сумо — ягодицы/приводящие.' },
+    lockout: { weakPoint: 'lockout', label: 'Дожим вверх', description: 'Не дожимает — слабые ягодицы/разгибатели.', assistanceFromCatalog: ['Наклоны', 'Румынская тяга', 'Присед в широкой постановке'], intensityPct: 0.65, rationale: 'Наклоны укрепляют разгибатели спины; РДЛ и широкая постановка — ягодицы/задняя цепь.' },
   },
   deadlift: {
     start: { weakPoint: 'start', label: 'Старт (с пола)', description: 'Не отрывает от пола — слабые ноги/спина в стартовой позиции.', assistanceFromCatalog: ['Становая тяга из ямы', 'Становая тяга с плинтов', 'Присед'], intensityPct: 0.7, rationale: 'Тяга из ямы (ниже обычного старта) + присед для силы ног в старте.' },
-    mid: { weakPoint: 'mid', label: 'Середина (колени)', description: 'Зависание на коленях — слабая спина/переход.', assistanceFromCatalog: ['Становая тяга с остановками', 'Тяга на прямых ногах', 'Становая тяга с паузой ниже колен'], intensityPct: 0.7, rationale: 'Остановки/пауза тренируют удержание позиции; RDL — бицепс бедра/разгибатели.' },
+    mid: { weakPoint: 'mid', label: 'Середина (колени)', description: 'Зависание на коленях — слабая спина/переход.', assistanceFromCatalog: ['Становая тяга с остановками', 'Румынская тяга', 'Становая тяга с паузой ниже колен'], intensityPct: 0.7, rationale: 'Остановки/пауза тренируют удержание позиции; РДЛ — бицепс бедра/разгибатели.' },
     lockout: { weakPoint: 'lockout', label: 'Дожим (локдаун)', description: 'Не дожимает — слабые ягодицы/верх спины.', assistanceFromCatalog: ['Тяга с плинтов (rack pull)', 'Румынская тяга', 'Шраги'], intensityPct: 0.75, rationale: 'Тяга с плинтов (выше колен) — изолированный дожим; шраги — жёсткость верха.' },
   },
   ohp: {

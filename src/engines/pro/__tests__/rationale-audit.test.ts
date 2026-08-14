@@ -56,6 +56,37 @@ describe('lift-assistance: пулы разделены (слабые мышцы 
     expect(offChest.items.map(i => i.exercise.name.toLowerCase()).some(n => n.includes('пауз'))).toBe(true);
   });
 
+  it('Румынская тяга присутствует в фазах задней цепи (присед-дожим, становая-середина)', () => {
+    const squatLockout = analyzePhaseAssistance('squat', 'lockout');
+    expect(squatLockout.items.map(i => i.exercise.name.toLowerCase()).some(n => n.includes('румын'))).toBe(true);
+    const dlMid = analyzePhaseAssistance('deadlift', 'mid');
+    expect(dlMid.items.map(i => i.exercise.name.toLowerCase()).some(n => n.includes('румын'))).toBe(true);
+  });
+
+  it('если упражнение перекрывает несколько фаз — rationale это поясняет', () => {
+    // Для каждого движения ищем упражнения, встречающиеся в нескольких фазах,
+    // и проверяем пометку «Перекрывает также фазу» в их rationale.
+    let checked = 0;
+    for (const [lift, phases] of Object.entries(WEAK)) {
+      const perPhase = phases.map(wp => ({
+        wp,
+        names: analyzePhaseAssistance(lift as any, wp as any).items.map(i => i.exercise.name.toLowerCase()),
+      }));
+      for (const { wp, names } of perPhase) {
+        const r = analyzePhaseAssistance(lift as any, wp as any);
+        for (const item of r.items) {
+          const n = item.exercise.name.toLowerCase();
+          const overlapping = perPhase.filter(p => p.wp !== wp && p.names.includes(n)).map(p => p.wp);
+          if (overlapping.length > 0) {
+            expect(item.rationale, `${lift}/${wp}: ${n}`).toContain('Перекрывает также фазу');
+            checked += 1;
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it('bar-path: только пул отклонений (source=bar), у каждого отклонения есть выбор', () => {
     for (const l of Object.keys(WEAK)) {
       const issues = barPathIssuesForLift(l as any);

@@ -250,12 +250,23 @@ export function protocolFromCycle(template: SRCycleTemplate | undefined, targetG
 /**
  * Анализ упражнений для СЛАБОЙ ТОЧКИ фазы движения:
  * только специфичные ассистенты слабой точки (weakpoint-pl, assistanceFromCatalog).
- * Без «слабых мышц» — это отдельная задача.
+ * Если упражнение перекрывает несколько фаз движения — пояснение об этом.
  */
 export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: SRCycleTemplate): AssistanceAnalysis {
   const items: AssistanceAnalysisItem[] = [];
   const allExercisesPool = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
   const added = new Set<string>();
+
+  // Карта «имя упражнения → фазы движения, где оно рекомендовано» (для пояснений перекрытий).
+  const phases = LIFT_PHASES_ALL[lift] ?? [];
+  const overlapMap: Record<string, string[]> = {};
+  for (const p of phases) {
+    const base = diagnoseWeakPoint(lift, p);
+    for (const n of base.assistance) {
+      const key = norm(n.replace(/\(.*?\)/g, ''));
+      (overlapMap[key] = overlapMap[key] || []).push(p);
+    }
+  }
 
   // Специфичные ассистенты слабой точки (weakpoint-pl) — ПЛ-коррекции фазы.
   const wp = diagnoseWeakPoint(lift, phase);
@@ -267,11 +278,15 @@ export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: 
     added.add(en);
     const group = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).find(g =>
       getExercisesByGroup(g).some(e => norm(e.name) === en)) ?? exercise.group;
+    const overlaps = (overlapMap[norm(name.replace(/\(.*?\)/g, ''))] || []).filter(p => p !== phase);
+    const overlapNote = overlaps.length > 0
+      ? ` Перекрывает также фазу${overlaps.length > 1 ? 'ы' : ''}: ${overlaps.join(', ')} — одно упражнение закрывает несколько фаз.`
+      : '';
     items.push({
       exercise,
       targetGroup: group,
       optimal: false,
-      rationale: `Слабая точка «${wp.label}» (${LIFT_RU[lift]}): ${exercise.name} — ассистент фазы, устраняет причину срыва.`,
+      rationale: `Слабая точка «${wp.label}» (${LIFT_RU[lift]}): ${exercise.name} — ассистент фазы, устраняет причину срыва.${overlapNote}`,
       source: 'weak',
       protocol: protocolFromCycle(template, group),
       pattern: catalogPattern(exercise),
@@ -281,6 +296,17 @@ export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: 
   if (items.length > 0) items[0] = { ...items[0], optimal: true };
   return { lift, phase, issue: null, items };
 }
+
+/** Все фазы каждого движения (для карты перекрытий). */
+const LIFT_PHASES_ALL: Record<Lift, WeakPoint[]> = {
+  bench: ['off_chest', 'mid', 'lockout', 'start'],
+  squat: ['bottom', 'mid', 'lockout'],
+  deadlift: ['start', 'mid', 'lockout'],
+  ohp: ['ohp_start', 'ohp_mid', 'ohp_lockout'],
+  row: ['row_start', 'row_mid', 'row_squeeze'],
+  pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
+  incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
+};
 
 /**
  * Анализ оптимальности для отклонения bar-path: ПЛ-коррекции из

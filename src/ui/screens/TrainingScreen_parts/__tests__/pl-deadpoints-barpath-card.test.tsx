@@ -46,16 +46,20 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText('4 · Движение штанги (bar-path) · Жим лёжа')).toBeTruthy();
   });
 
-  it('слабые мышцы: выбор подгруппы даёт 5 рекомендаций тренера ПЛ по циклу', () => {
+  it('слабые мышцы: выбор подгруппы даёт ассистентов по циклу; плечи — передние/средние/задние дельты', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Грудь'));
     // Подгруппы раскрылись — выбираем «Верх груди»
     expect(screen.getByText('Верх груди')).toBeTruthy();
     fireEvent.click(screen.getByText('Верх груди'));
-    // Рекомендации тренера ПЛ по слабой мышце
-    expect(screen.getByText(/Верх груди — рекомендации тренера ПЛ/)).toBeTruthy();
+    expect(screen.getByText(/Верх груди — ассистенты по циклу/)).toBeTruthy();
     expect(screen.getAllByText('💪 Слабая мышца').length).toBeGreaterThanOrEqual(1);
-    // Итоговая рекомендация тренера появилась (содержит выбранные параметры)
+    // Плечи: три дельты, без «Дельты»-пустышки
+    fireEvent.click(screen.getByText('Плечи'));
+    expect(screen.getByText('Передние дельты')).toBeTruthy();
+    expect(screen.getByText('Средние дельты')).toBeTruthy();
+    expect(screen.getByText('Задние дельты')).toBeTruthy();
+    // Итоговая рекомендация тренера появилась
     expect(screen.getByText('🏆 Рекомендация тренера ПЛ')).toBeTruthy();
     fireEvent.click(screen.getByText('🏆 Добавить весь рекомендованный перечень в план'));
     expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
