@@ -42,6 +42,9 @@ export interface MesocycleProgressionCardProps {
   title?: string;
   /** Исходная недельная раскладка СРЦ. При наличии отключает типовую кривую. */
   sourceWeeks?: SourceWeekSnapshot[];
+  /** Кастомные подписи/цвета отдельных недель (например, тапер/mock/соревнования):
+   *  key = номер недели → label + цвет. Применяется к таблице и таймлайну. */
+  weekOverrides?: Record<number, { label: string; color: string }>;
 }
 
 export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> = ({
@@ -53,6 +56,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
   fatigueTrajectory,
   title,
   sourceWeeks,
+  weekOverrides,
 }) => {
   const effectiveWeeks = sourceWeeks?.length ?? weeks;
   const config: MesocycleConfig = { weeks: effectiveWeeks, startVolumeSets, startIntensityPct, startRIR, goal, fatigueTrajectory };
@@ -113,7 +117,8 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
         <div style={{ display: 'flex', gap: 3, minWidth: 'max-content', alignItems: 'flex-end' }}>
           {progression.map((p, i) => {
             const phase = phaseFor(p);
-            const color = isSourceCalendar ? ACCENT : PHASE_COLORS[phase!];
+            const ov = weekOverrides?.[p.week];
+            const color = ov ? ov.color : isSourceCalendar ? ACCENT : PHASE_COLORS[phase!];
             const barH = Math.max(12, (p.volumeSets / maxVolSets) * 60);
             const isDeload = phase === 'deload';
             return (
@@ -123,10 +128,10 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
                 </div>
                 <div style={{
                   width: 16, height: barH, borderRadius: '3px 3px 0 0',
-                  background: !isSourceCalendar && isDeload ? `repeating-linear-gradient(45deg, ${color}, ${color} 2px, ${color}33 2px, ${color}33 4px)` : color,
+                  background: ov ? color : (!isSourceCalendar && isDeload ? `repeating-linear-gradient(45deg, ${color}, ${color} 2px, ${color}33 2px, ${color}33 4px)` : color),
                   border: !isSourceCalendar && isDeload ? '1px solid #60a5fa55' : 'none',
                 }} />
-                <div style={{ fontSize: 10, color: isSourceCalendar ? ACCENT : (isDeload ? '#60a5fa' : color), fontWeight: 700 }}>{p.week}</div>
+                <div style={{ fontSize: 10, color: ov ? ov.color : isSourceCalendar ? ACCENT : (isDeload ? '#60a5fa' : color), fontWeight: 700 }}>{p.week}</div>
               </div>
             );
           })}
@@ -146,19 +151,20 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
         </div>
         {progression.map((p, i) => {
           const phase = phaseFor(p);
-          const color = isSourceCalendar ? ACCENT : PHASE_COLORS[phase!];
+          const ov = weekOverrides?.[p.week];
+          const color = ov ? ov.color : isSourceCalendar ? ACCENT : PHASE_COLORS[phase!];
           const isDeload = phase === 'deload';
           return (
             <div key={i} style={{
               display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2,
               padding: '4px 8px', fontSize: 10, color: 'rgba(255,255,255,0.85)',
               borderTop: '1px solid rgba(255,255,255,0.04)',
-              background: !isSourceCalendar && isDeload ? 'rgba(96,165,250,0.06)' : !isSourceCalendar && (p as WeekProgression).fatigueAdjusted ? 'rgba(245,158,11,0.04)' : 'transparent',
+              background: ov ? `${ov.color}12` : (!isSourceCalendar && isDeload ? 'rgba(96,165,250,0.06)' : !isSourceCalendar && (p as WeekProgression).fatigueAdjusted ? 'rgba(245,158,11,0.04)' : 'transparent'),
               borderLeft: `3px solid ${color}55`,
               minWidth: 340,
             }}>
               <span style={{ fontWeight: 700, color }}>{p.week}</span>
-              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{isSourceCalendar ? `${SOURCE_PHASE_ORIGIN_LABEL[(p as SourceWeekSnapshot).phaseOrigin]} · ${SOURCE_PHASE_LABEL[(p as SourceWeekSnapshot).phase]}` : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
+              <span style={{ color, fontWeight: 600, fontSize: 10 }}>{ov ? ov.label : isSourceCalendar ? `${SOURCE_PHASE_ORIGIN_LABEL[(p as SourceWeekSnapshot).phaseOrigin]} · ${SOURCE_PHASE_LABEL[(p as SourceWeekSnapshot).phase]}` : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
               <span style={{ color: 'rgba(255,255,255,0.7)' }}>{volumeMultiplierFor(p).toFixed(2)}</span>
               <span style={{ fontWeight: 600 }}>{p.volumeSets}</span>
               <span style={{ color: p.intensityPct > 0.85 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{Math.round(p.intensityPct * 100)}%</span>

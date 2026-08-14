@@ -1457,6 +1457,19 @@ export function appendPLTaperWeeks(
     const attempts = computeMeetAttemptsFromPmRow(last.pmRow, strategy);
     if (!attempts) return null;
     const liftByName = new Map(attempts.lifts.map(l => [norm(l.name), l]));
+    // Соответствие упражнения → прикиды: точное совпадение имени, иначе fuzzy
+    // по regex соревновательных движений (как computeMeetAttemptsFromPmRow) —
+    // чтобы прикиды попадали в правильные упражнения ЛЮБОГО цикла
+    // (например, «Приседания со штангой», «Жим штанги лёжа узким хватом»).
+    const matchLift = (name: string) => {
+      const exact = liftByName.get(norm(name));
+      if (exact) return exact;
+      const n = norm(name);
+      if (/присед|сквот/.test(n)) return attempts.lifts.find(l => /присед|сквот/.test(norm(l.name)));
+      if (/жим.*леж|леж.*жим/.test(n)) return attempts.lifts.find(l => /жим.*леж|леж.*жим/.test(norm(l.name)));
+      if (/станов/.test(n)) return attempts.lifts.find(l => /станов/.test(norm(l.name)));
+      return undefined;
+    };
     // Прогрессия ПМ продолжается по курсу (как тапер-недели): +k за неделю.
     const pmGrowth = Math.pow(1 + k, idx + 1);
     const pmRow: Record<string, number> = {};
@@ -1465,9 +1478,10 @@ export function appendPLTaperWeeks(
     }
     const days = last.days.map(d => {
       const exercises = d.exercises.map(e => {
-        const lift = liftByName.get(norm(e.name));
+        const lift = matchLift(e.name);
         if (lift) {
           // Прикиды-синглы: опенер RIR2 → вторая RIR1 → третья RIR0 (как день соревнований).
+          // pct — процент прикидки от ПМ недели (93/97/105% по стратегии).
           const mk = (weight: number, rir: number) => ({
             pct: Math.round((weight / Math.max(1, pmRow[e.name] ?? e.pm)) * 1000) / 1000,
             reps: 1,

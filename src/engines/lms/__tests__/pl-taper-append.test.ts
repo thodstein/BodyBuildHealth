@@ -386,6 +386,51 @@ describe('appendPLTaperWeeks', () => {
     expect(next.progressionRationale).toContain('Неделя соревнований');
   });
 
+  // ── Прикиды в упражнениях: процентовка по стратегии (93/97/105%) ──
+  it('прикиды: процентовка подходов соответствует стратегии (опенер ~93%, третья ~105%)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'aggressive' } });
+    const meet = next.weeks[next.weeks.length - 1];
+    const squatEx = meet.days.flatMap(d => d.exercises).find(e => /присед/i.test(e.name))!;
+    const pm = meet.pmRow[squatEx.name];
+    // pct вычисляется от ПМ недели: опенер ≈ 93%, третья ≈ 105% (округление до 2.5 кг)
+    expect(squatEx.workSets[0].pct).toBeCloseTo(0.93, 1);
+    expect(squatEx.workSets[2].pct).toBeCloseTo(1.05, 1);
+    // Проценты растут: опенер < вторая < третья
+    expect(squatEx.workSets[0].pct).toBeLessThan(squatEx.workSets[1].pct);
+    expect(squatEx.workSets[1].pct).toBeLessThan(squatEx.workSets[2].pct);
+    expect(pm).toBeGreaterThan(0);
+  });
+
+  it('прикиды: упражнения с нестандартными именами получают прикиды (regex-маппинг)', () => {
+    const tpl = {
+      ...CYCLE_01,
+      week1: CYCLE_01.week1.map(day => ({
+        ...day,
+        exercises: day.exercises.map(ex => ({
+          ...ex,
+          name: ex.name === 'Присед' ? 'Приседания со штангой' : ex.name === 'Жим лежа' ? 'Жим штанги лёжа' : ex.name === 'Становая тяга' ? 'Становая тяга с плинтов' : ex.name,
+        })),
+      })),
+    } as never;
+    const plan = buildLMSPlan({
+      template: tpl,
+      pmMap: { 'Приседания со штангой': 180, 'Жим штанги лёжа': 120, 'Становая тяга с плинтов': 220 },
+      fallbackPm: 80,
+      mode: 'natural',
+      weeksOverride: 6,
+      faithful: true,
+    } as never);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'aggressive' } });
+    const meet = next.weeks[next.weeks.length - 1];
+    const comp = meet.days.flatMap(d => d.exercises).filter(e => /присед|жим.*леж|станов/i.test(e.name));
+    expect(comp.length).toBeGreaterThan(0);
+    const squat = comp.find(e => /присед/i.test(e.name))!;
+    expect(squat.workSets).toHaveLength(3);
+    expect(squat.workSets.every(s => s.reps === 1 && s.sets === 1)).toBe(true);
+    expect(squat.workSets[2].pct).toBeCloseTo(1.05, 1);
+  });
+
   // ── Паритет стратегий: «Сбалансированная» (дефолт) не хуже новых ──
   it('все 3 стратегии: mock meet имеет одинаковую структуру (неделя/прикиды-синглы/аксессуары ×0.5)', () => {
     for (const strategy of ['conservative', 'balanced', 'aggressive'] as const) {
