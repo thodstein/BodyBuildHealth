@@ -217,6 +217,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [mockMeetOn, setMockMeetOn] = useState<boolean>(_plSaved?.plMockMeet ?? false);
   // Неделя соревнований в конце тапера — прикиды как подходы дня старта (по умолчанию ВКЛ: план готов полностью).
   const [meetWeekOn, setMeetWeekOn] = useState<boolean>(_plSaved?.plMeetWeek ?? true);
+  // 🏁 Данные к соревнованиям (тапер строится под РАЗНИЦУ ПМ):
+  // фактический ПМ после цикла (реально поднятый) и планируемый ПМ в федерации.
+  const [taperActualPm, setTaperActualPm] = useState<Record<string, number>>(_plSaved?.plTaperActualPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
+  const [taperPlannedPm, setTaperPlannedPm] = useState<Record<string, number>>(_plSaved?.plTaperPlannedPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
+  const [taperFed, setTaperFed] = useState<string>(_plSaved?.plTaperFed ?? 'fpr');
+  // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
+  const [taperPlan, setTaperPlan] = useState<LMSBuildOutput | null>(null);
   // Календарь мезоцикла: показывать оригинальный цикл или с учётом тапера.
   const [calendarView, setCalendarView] = useState<'original' | 'tapered'>('tapered');
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
@@ -1185,8 +1192,49 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       { id: 'aggressive', label: MEET_STRATEGY_LABEL.aggressive, desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
                     ]}
                   />
+                  {/* 🏁 Данные к соревнованиям: тапер строится под РАЗНИЦУ ПМ (факт после цикла vs план федерации) */}
+                  <PopupSelect label="Федерация" value={taperFed} onChange={v => setTaperFed(v)} options={[
+                    { id: 'ipf', label: 'IPF' }, { id: 'fpr', label: 'FPR' }, { id: 'wpc', label: 'WPC' }, { id: 'other', label: 'Другая' },
+                  ]} />
+                  <div style={{ gridColumn: '1/-1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 6 }}>
+                    {(['Присед', 'Жим лежа', 'Становая тяга'] as const).map(name => (
+                      <PopupNumber key={name + '_act'} label={`Факт. ПМ после цикла · ${name === 'Присед' ? 'присед' : name === 'Жим лежа' ? 'жим' : 'тяга'}`} value={taperActualPm[name] || 0} min={0} max={500} suffix=" кг" hint="Реально поднятый ПМ — от него строятся тренировочные веса тапера" onChange={v => setTaperActualPm(p => ({ ...p, [name]: v }))} />
+                    ))}
+                    {(['Присед', 'Жим лежа', 'Становая тяга'] as const).map(name => (
+                      <PopupNumber key={name + '_plan'} label={`План ПМ в федерации · ${name === 'Присед' ? 'присед' : name === 'Жим лежа' ? 'жим' : 'тяга'}`} value={taperPlannedPm[name] || 0} min={0} max={500} suffix=" кг" hint="Целевые веса соревнования — от них считаются прикиды/попытки" onChange={v => setTaperPlannedPm(p => ({ ...p, [name]: v }))} />
+                    ))}
+                  </div>
                   <button
-                    onClick={() => setMockMeetOn(v => !v)}
+                    disabled={!builtSrc}
+                    onClick={() => {
+                      if (!builtSrc) return;
+                      const meetData = {
+                        actualPm: Object.fromEntries(Object.entries(taperActualPm).filter(([, v]) => v > 0)),
+                        plannedPm: Object.fromEntries(Object.entries(taperPlannedPm).filter(([, v]) => v > 0)),
+                      };
+                      const next = appendPLTaperWeeks(builtSrc, taperWeeksToAdd, {
+                        peds: peds.length ? peds : undefined,
+                        pedDoses,
+                        courseIntensity,
+                        mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+                        peakExit: { strategy: attemptStrategy },
+                        mockMeet: mockMeetOn ? { strategy: attemptStrategy } : undefined,
+                        meetWeek: meetWeekOn ? { strategy: attemptStrategy } : undefined,
+                        autoReg: autoRegMode === 'auto' && autoRegResult
+                          ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift }
+                          : undefined,
+                        nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
+                        meetData,
+                      });
+                      setTaperPlan(next);
+                      const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0);
+                      setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
+                      setMethodNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
+                    }}
+                    style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
+                    title="Сгенерировать тапер-план в ОТДЕЛЬНУЮ карточку (не встраивая в weeks цикла) — под разницу ПМ: факт после цикла / план федерации"
+                  >📋 Сгенерировать тапер-план</button>
+                  <button
                     style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: mockMeetOn ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: mockMeetOn ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: mockMeetOn ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
                     title="Имитация соревнований за 10-14 дней до старта: неделя перед тапером с прикидами-синглами (опенер RIR2 → вторая RIR1 → третья RIR0)"
                   >🎯 Имитация соревнований (mock meet){mockMeetOn ? ' ✓' : ''}</button>
@@ -1317,6 +1365,113 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     title="Сохранить цикл с тапером как соревновательный — появится в дневнике тренировок (подвкладка «🏁 Соревнования») с прикидами и составом мезоцикла"
                   >🏆 Сохранить как соревновательный</button>
                 </div>
+                {/* 📋 ТАПЕР-ПЛАН: отдельная свёрнутая карточка (не встраивается в weeks цикла) */}
+                <ExpandableCard
+                  title={`📋 Тапер-план${taperPlan ? ` · ${taperPlan.weeks.length} нед${Object.values(taperActualPm).some(v => v > 0) ? ' · по факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · план федерации' : ''}` : ''}`}
+                  icon="📋"
+                  short={taperPlan
+                    ? `${taperPlan.weeks.length} нед · ${mockMeetOn ? '🎯 mock · ' : ''}📉 тапер ×${taperWeeksToAdd}${meetWeekOn ? ' · 🏁 соревнования' : ''}${Object.values(taperActualPm).some(v => v > 0) ? ' · веса от факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · прикиды от плана' : ''} — раскройте для деталей`
+                    : 'Не сгенерирован — кнопка «📋 Сгенерировать тапер-план» выше. Отдельная карточка, weeks цикла не изменяются.'}
+                  full={!taperPlan ? (
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+                      Сгенерируйте тапер-план кнопкой выше — он появится здесь отдельной карточкой, не изменяя weeks цикла (календарь не захламится). Тапер строится под разницу ПМ: тренировочные веса — от фактического ПМ после цикла, прикиды/попытки — от планируемого ПМ в федерации.
+                    </div>
+                  ) : (() => {
+                    const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
+                    const scale = (w: number) => Math.round(w * arMult * 10) / 10;
+                    const mockWk = taperPlan.weeks.find(w => w.mockMeet);
+                    const meetWk = taperPlan.weeks.find(w => w.meetWeek);
+                    const peakWk = [...taperPlan.weeks].reverse().find(w => w.taperWeek && w.meetAttempts);
+                    const taperWeeks = taperPlan.weeks.filter(w => w.taperWeek);
+                    const planRefVolume = Math.max(1, (builtSrc?.weeks[builtSrc.weeks.length - 1]?.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0)) ?? 1);
+                    const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
+                    return (
+                      <div>
+                        {/* Структура тапера */}
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                          {mockWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }}>🎯 Mock meet — нед {mockWk.week}</span>}
+                          {taperWeeks.map(w => <span key={w.week} style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>📉 Тапер — нед {w.week}</span>)}
+                          {peakWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.16)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.4)' }}>🏁 Пик/прикиды — нед {peakWk.week}</span>}
+                          {meetWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(234,179,8,0.14)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)' }}>🏁 Соревнования — нед {meetWk.week}</span>}
+                        </div>
+                        {/* Данные к соревнованиям */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6, marginBottom: 8 }}>
+                          {(['Присед', 'Жим лежа', 'Становая тяга'] as const).map(name => {
+                            const actual = taperActualPm[name] || 0;
+                            const planned = taperPlannedPm[name] || 0;
+                            const diff = actual > 0 && planned > 0 ? planned - actual : 0;
+                            return (
+                              <div key={name} style={{ padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10 }}>
+                                <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{name === 'Присед' ? 'Присед' : name === 'Жим лежа' ? 'Жим' : 'Тяга'}</div>
+                                <div style={{ marginTop: 2 }}><span style={{ color: 'rgba(255,255,255,0.45)' }}>факт: </span><b style={{ color: actual > 0 ? '#22c55e' : 'rgba(255,255,255,0.4)' }}>{actual > 0 ? actual : '—'}</b></div>
+                                <div><span style={{ color: 'rgba(255,255,255,0.45)' }}>план: </span><b style={{ color: planned > 0 ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{planned > 0 ? planned : '—'}</b></div>
+                                {diff !== 0 && <div style={{ fontSize: 9, fontWeight: 800, color: diff > 0 ? '#fbbf24' : '#60a5fa' }}>{diff > 0 ? '▲ +' + diff : '▼ ' + diff} кг к старту</div>}
+                              </div>
+                            );
+                          })}
+                          <div style={{ padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10 }}>
+                            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>Федерация</div>
+                            <div style={{ marginTop: 2 }}>{fedRu[taperFed] || taperFed} · стратегия {MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}</div>
+                          </div>
+                        </div>
+                        {/* Тапер-кривая */}
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>📉 Тапер-кривая (Bosquet 2005): объём ↓, интенсивность сохранена</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
+                            {taperWeeks.map(w => {
+                              const vol = w.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0);
+                              const ref = Math.max(1, planRefVolume);
+                              return (
+                                <div key={w.week} style={{ padding: 5, borderRadius: 7, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.14)', fontSize: 9, textAlign: 'center' }}>
+                                  <div style={{ fontWeight: 800, color: '#f59e0b' }}>Нед {w.week}</div>
+                                  <div>объём ≈ {Math.round((vol / ref) * 100)}%</div>
+                                  <div>RIR +{w.days[0]?.exercises[0]?.rir ?? 2}</div>
+                                  {w.meetAttempts && <div style={{ color: '#fbbf24', fontWeight: 800 }}>🏁 прикиды</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {/* Прикиды */}
+                        {[peakWk, mockWk, meetWk].filter(Boolean).map(wk => wk && (
+                          <div key={wk.week} style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: wk.meetWeek ? 'rgba(234,179,8,0.06)' : wk.mockMeet ? 'rgba(167,139,250,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.25)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24', marginBottom: 4 }}>
+                              {wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Mock meet' : '🏁 Выход на пик'} · нед {wk.week} · {MEET_STRATEGY_PCT_LABEL[wk.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}
+                              {arMult !== 1 ? ` · авторегуляция ×${arMult.toFixed(2)}` : ''}
+                            </div>
+                            {wk.taperNote && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 4 }}>⚠ {wk.taperNote}</div>}
+                            {wk.meetAttempts?.lifts.map(l => (
+                              <div key={l.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, marginTop: 3 }}>
+                                <b style={{ width: 70, flexShrink: 0 }}>{l.name}</b>
+                                <span>1-я <b>{scale(l.opener)}</b></span>
+                                <span>2-я <b>{scale(l.second)}</b></span>
+                                <span>3-я <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24' }}>{scale(l.third)}</b></span>
+                              </div>
+                            ))}
+                            {wk.meetAttempts?.lifts[0] && (() => {
+                              const opener = scale(wk.meetAttempts!.lifts[0].opener);
+                              if (!opener) return null;
+                              const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
+                              return <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>;
+                            })()}
+                          </div>
+                        ))}
+                        {/* Последние тяжёлые + таймлайн */}
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+                          ⏱ Последние тяжёлые до старта: присед — {LAST_HEAVY_DAYS.squat} дн. · жим — {LAST_HEAVY_DAYS.bench} дн. · тяга — {LAST_HEAVY_DAYS.deadlift} дн.
+                        </div>
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, marginTop: 2 }}>
+                          📅 День старта: взвешивание → разминка по опенеру → попытки (опенер RIR2 → вторая RIR1 → третья RIR0), между попытками 10-20 мин.
+                        </div>
+                        {/* Действия */}
+                        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                          <button onClick={() => { setBuiltSrc(taperPlan); setTaperNote(`Встроено в weeks цикла: +${taperPlan.weeks.length - (builtSrc?.weeks.length ?? taperPlan.weeks.length)} нед тапера`); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Встроить тапер-недели в weeks активного плана (календарь покажет с тапером)">📌 Встроить в план (weeks)</button>
+                          <button onClick={() => { if (taperPlan) setTaperPlan(refreshMeetAttempts(taperPlan, attemptStrategy)); }} style={{ ...BTN_GHOST, minHeight: 38, fontSize: 10, border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.08)' }} title="Пересчитать прикиды под выбранную стратегию">🔄 Обновить прикиды</button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                />
                 <div style={{ marginTop: 10, padding: 12, borderRadius: 12, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.16)' }}>
                   {/* Шапка */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>

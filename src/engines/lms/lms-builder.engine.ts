@@ -120,6 +120,8 @@ export interface LMSPlanWeek {
   meetWeek?: boolean;
   /** Прикиды соревновательного дня (выход на пик до 105%) — вешается на финальную тапер-неделю. */
   meetAttempts?: MeetAttemptsInfo;
+  /** Пометка недели тапера/прикидов (напр. «план федерации выше факта — прикиды от потолка»). */
+  taperNote?: string;
 }
 
 export interface LMSBuildOutput {
@@ -1375,6 +1377,14 @@ export function appendPLTaperWeeks(
     /** Питание (как в buildLMSPlan): профицит калорий и белок г/кг →
      *  MRV soft-cap в тапер-неделях (Helms 2022). */
     nutrition?: { calorieSurplus?: number; proteinPerKg?: number };
+    /** Данные к соревнованиям: фактический ПМ после цикла (реально поднятый)
+     *  и планируемый ПМ в федерации. Тапер строится под РАЗНИЦУ ПМ:
+     *  тренировочные веса тапера — от фактического ПМ, прикиды/попытки — от
+     *  планируемого (целевые веса соревнования). Ключи — имена упражнений. */
+    meetData?: {
+      actualPm?: Record<string, number>;
+      plannedPm?: Record<string, number>;
+    };
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1438,12 +1448,51 @@ export function appendPLTaperWeeks(
     return 0;
   })();
 
+  // ── Прикиды под РАЗНИЦУ ПМ (проф. правило): ──
+  // 1) Если задан планируемый ПМ федерации — от него (цель), НО не выше
+  //    фактического ПМ × 1.02 (реалистичный потолок: нельзя планировать попытки,
+  //    которых физически нет — опенер обязан «садиться»).
+  // 2) Если плана нет — от фактического ПМ после цикла.
+  // 3) Если ничего не задано — от прогноза недели (pmRow).
+  const resolveAttemptRow = (pmRow: Record<string, number>): { row: Record<string, number>; capped: string[] } => {
+    const capped: string[] = [];
+    const actual = opts?.meetData?.actualPm ?? {};
+    const planned = opts?.meetData?.plannedPm ?? {};
+    const hasActual = Object.values(actual).some(v => v > 0);
+    const hasPlanned = Object.values(planned).some(v => v > 0);
+    let row = { ...pmRow };
+    if (hasPlanned) {
+      for (const [name, plan] of Object.entries(planned)) {
+        if (!(plan > 0)) continue;
+        const fact = actual[name];
+        if (hasActual && fact > 0 && plan > fact * 1.02) {
+          // План выше факта — прикиды от реалистичного потолка (факт × 1.02),
+          // иначе опенер будет заведомо неподъёмным.
+          row[name] = Math.round(fact * 1.02 * 10) / 10;
+          capped.push(name);
+        } else {
+          row[name] = plan;
+        }
+      }
+    } else if (hasActual) {
+      for (const [name, fact] of Object.entries(actual)) {
+        if (fact > 0) row[name] = Math.round(fact * 10) / 10;
+      }
+    }
+    return { row, capped };
+  };
+
   const buildTaperWeek = (idx: number, volumeMult: number, rirAdd: number): LMSPlanWeek => {
-    // Прогрессия ПМ продолжается по курсу (как buildLMSPlan:757-762): +k за неделю.
-    const pmGrowth = Math.pow(1 + k, idx + 1);
+    // Прогрессия ПМ продолжается по курсу (как buildLMSPlan:757-762): +k за неделю,
+    // НО если задан ФАКТИЧЕСКИЙ ПМ после цикла (реально поднятый) — тапер строится
+    // от него (разница ПМ: факт вместо прогноза), прогрессия в тапере = 0.
+    const pmGrowth = opts?.meetData?.actualPm ? 1 : Math.pow(1 + k, idx + 1);
     const pmRow: Record<string, number> = {};
     for (const [name, pm] of Object.entries(last.pmRow)) {
-      pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
+      const actual = opts?.meetData?.actualPm?.[name];
+      pmRow[name] = actual != null && actual > 0
+        ? Math.round(actual * 10) / 10
+        : Math.round(pm * pmGrowth * 10) / 10;
     }
     const days = last.days.map(d => {
       const exercises = d.exercises.map(e => {
@@ -1489,11 +1538,15 @@ export function appendPLTaperWeeks(
       taperWeek: true,
     };
     // Выход на пик 105% (или выбранной стратегии): прикиды дня соревнований
-    // от ПМ финальной тапер-недели — как в тапер-калькуляторе. Тренировочная
-    // нагрузка остаётся разгрузочной (×0.45, RIR+2); прикиды — план соревнований.
+    // от ПМ финальной тапер-недели (или планируемого ПМ федерации — если задан).
+    // Тренировочная нагрузка остаётся разгрузочной (×0.45, RIR+2); прикиды — план соревнований.
     if (idx === taperWeeks - 1) {
-      const attempts = computeMeetAttemptsFromPmRow(week.pmRow, peakStrategy);
-      if (attempts) week.meetAttempts = attempts;
+      const { row, capped } = resolveAttemptRow(week.pmRow);
+      const attempts = computeMeetAttemptsFromPmRow(row, peakStrategy);
+      if (attempts) {
+        week.meetAttempts = attempts;
+        if (capped.length > 0) week.taperNote = `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`;
+      }
     }
     return week;
   };
@@ -1502,14 +1555,19 @@ export function appendPLTaperWeeks(
   const buildAttemptsWeek = (idx: number, kind: 'mock' | 'meet'): LMSPlanWeek | null => {
     const strategy = kind === 'mock' ? mockStrategy : meetStrategy;
     // Прогрессия ПМ продолжается по курсу (как тапер-недели): +k за неделю.
-    const pmGrowth = Math.pow(1 + k, idx + 1);
+    // Если задан ФАКТИЧЕСКИЙ ПМ после цикла — используем его (разница ПМ).
+    const pmGrowth = opts?.meetData?.actualPm ? 1 : Math.pow(1 + k, idx + 1);
     const pmRow: Record<string, number> = {};
     for (const [name, pm] of Object.entries(last.pmRow)) {
-      pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
+      const actual = opts?.meetData?.actualPm?.[name];
+      pmRow[name] = actual != null && actual > 0
+        ? Math.round(actual * 10) / 10
+        : Math.round(pm * pmGrowth * 10) / 10;
     }
-    // Прикиды считаются от ПМ СВОЕЙ недели (с прогрессией) — масштабируются по неделям.
-    // Для meet — от ПМ финальной тапер-недели (пик цикла): idx == mock + taperWeeks.
-    const attempts = computeMeetAttemptsFromPmRow(pmRow, strategy);
+    // Прикиды считаются от ПЛАНИРУЕМОГО ПМ в федерации (если задан) — целевые
+    // веса соревнования; иначе от фактического ПМ; иначе от ПМ своей недели.
+    const { row: attemptRow, capped } = resolveAttemptRow(pmRow);
+    const attempts = computeMeetAttemptsFromPmRow(attemptRow, strategy);
     if (!attempts) return null;
     const liftByName = new Map(attempts.lifts.map(l => [norm(l.name), l]));
     // Соответствие упражнения → прикиды: точное совпадение имени, иначе fuzzy
@@ -1561,6 +1619,7 @@ export function appendPLTaperWeeks(
       macroPhase: 'competition' as const,
       [kind === 'mock' ? 'mockMeet' : 'meetWeek']: true,
       meetAttempts: attempts,
+      ...(capped.length > 0 ? { taperNote: `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` } : {}),
     };
   };
 

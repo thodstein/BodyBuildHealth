@@ -148,6 +148,50 @@ describe('appendPLTaperWeeks', () => {
     expect(refreshed.progressionRationale).toContain('Прикиды пересчитаны');
   });
 
+  it('meetData: фактический ПМ после цикла — тренировочные веса тапера от факта (разница ПМ)', () => {
+    const plan = buildBase(6);
+    const withData = appendPLTaperWeeks(plan, 2, {
+      meetData: { actualPm: { 'Присед': 200, 'Жим лежа': 130, 'Становая тяга': 240 } },
+    });
+    const last = withData.weeks[withData.weeks.length - 1];
+    expect(last.pmRow['Присед']).toBe(200);
+    expect(last.pmRow['Жим лежа']).toBe(130);
+    // Без meetData — прогноз (растёт от базы)
+    const plain = appendPLTaperWeeks(plan, 2);
+    const plainLast = plain.weeks[plain.weeks.length - 1];
+    expect(plainLast.pmRow['Присед']).not.toBe(200);
+  });
+
+  it('meetData: прикиды от планируемого ПМ федерации', () => {
+    const plan = buildBase(6);
+    const withPlan = appendPLTaperWeeks(plan, 2, {
+      meetWeek: { strategy: 'balanced' },
+      meetData: { plannedPm: { 'Присед': 220, 'Жим лежа': 140, 'Становая тяга': 260 } },
+    });
+    const meetWk = withPlan.weeks.find(w => w.meetWeek)!;
+    const squat = meetWk.meetAttempts!.lifts.find(l => /присед/.test(l.name.toLowerCase()))!;
+    // balanced: опенер 92% от плана 220 = 202.4
+    expect(squat.opener).toBeGreaterThanOrEqual(202);
+    expect(squat.third).toBeGreaterThanOrEqual(224);
+  });
+
+  it('meetData: план федерации выше факта — прикиды от потолка (факт ×1.02), taperNote предупреждает', () => {
+    const plan = buildBase(6);
+    const withData = appendPLTaperWeeks(plan, 2, {
+      meetWeek: { strategy: 'balanced' },
+      meetData: {
+        actualPm: { 'Присед': 200 },
+        plannedPm: { 'Присед': 300 }, // план сильно выше факта
+      },
+    });
+    const meetWk = withData.weeks.find(w => w.meetWeek)!;
+    const squat = meetWk.meetAttempts!.lifts.find(l => /присед/.test(l.name.toLowerCase()))!;
+    // Потолок: 200 × 1.02 = 204, опенер 92% от 204 ≈ 187.7 — НЕ от плана 300 (276)
+    expect(squat.opener).toBeLessThan(250);
+    expect(squat.opener).toBeGreaterThanOrEqual(187);
+    expect(meetWk.taperNote).toContain('выше факта');
+  });
+
   it('питание (как в ББ-авто): профицит+белок → MRV-множитель отражается в rationale плана', () => {
     const base = { template: CYCLE_01 as never, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 6, faithful: true } as never;
     const good = buildLMSPlan({ ...base, nutrition: { calorieSurplus: 400, proteinPerKg: 2.2 } } as never);
