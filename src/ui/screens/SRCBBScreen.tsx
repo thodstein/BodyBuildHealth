@@ -223,6 +223,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [taperActualPm, setTaperActualPm] = useState<Record<string, number>>(_plSaved?.plTaperActualPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperPlannedPm, setTaperPlannedPm] = useState<Record<string, number>>(_plSaved?.plTaperPlannedPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
   const [taperFed, setTaperFed] = useState<string>(_plSaved?.plTaperFed ?? 'fpr');
+  // Ручная корректировка прикидов: { имя лифта: [опенер, вторая, третья] } (если задано — перекрывает расчёт)
+  const [taperAttemptOverride, setTaperAttemptOverride] = useState<Record<string, number[]>>({});
   // Режим пика: classic — разгрузка Bosquet; pl — 3-нед ПЛ-пик-протокол Библиотеки.
   const [peakMode, setPeakMode] = useState<'classic' | 'pl'>(_plSaved?.plPeakMode ?? 'pl');
   // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
@@ -1433,12 +1435,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             const actual = taperActualPm[name] || 0;
                             const planned = taperPlannedPm[name] || 0;
                             const diff = actual > 0 && planned > 0 ? planned - actual : 0;
+                            // Прогноз цикла: последняя неделя builtSrc (ПМ до тапера)
+                            const lastCycleWk = builtSrc?.weeks[builtSrc.weeks.length - 1];
+                            const forecast = lastCycleWk?.pmRow[name] ?? 0;
+                            const vsForecast = actual > 0 && forecast > 0 ? actual - forecast : 0;
                             return (
                               <div key={name} style={{ padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10 }}>
                                 <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{name === 'Присед' ? 'Присед' : name === 'Жим лежа' ? 'Жим' : 'Тяга'}</div>
                                 <div style={{ marginTop: 2 }}><span style={{ color: 'rgba(255,255,255,0.45)' }}>факт: </span><b style={{ color: actual > 0 ? '#22c55e' : 'rgba(255,255,255,0.4)' }}>{actual > 0 ? actual : '—'}</b></div>
                                 <div><span style={{ color: 'rgba(255,255,255,0.45)' }}>план: </span><b style={{ color: planned > 0 ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{planned > 0 ? planned : '—'}</b></div>
                                 {diff !== 0 && <div style={{ fontSize: 9, fontWeight: 800, color: diff > 0 ? '#fbbf24' : '#60a5fa' }}>{diff > 0 ? '▲ +' + diff : '▼ ' + diff} кг к старту</div>}
+                                {vsForecast !== 0 && <div style={{ fontSize: 9, fontWeight: 800, color: vsForecast > 0 ? '#22c55e' : '#f87171' }}>vs прогноз цикла {vsForecast > 0 ? '▲ +' + Math.round(vsForecast) : '▼ ' + Math.round(vsForecast)} кг</div>}
                               </div>
                             );
                           })}
@@ -1484,14 +1491,54 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                               {arMult !== 1 ? ` · авторегуляция ×${arMult.toFixed(2)}` : ''}
                             </div>
                             {wk.taperNote && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 4 }}>⚠ {wk.taperNote}</div>}
-                            {wk.meetAttempts?.lifts.map(l => (
-                              <div key={l.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, marginTop: 3 }}>
-                                <b style={{ width: 70, flexShrink: 0 }}>{l.name}</b>
-                                <span>1-я <b>{scale(l.opener)}</b></span>
-                                <span>2-я <b>{scale(l.second)}</b></span>
-                                <span>3-я <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24' }}>{scale(l.third)}</b></span>
-                              </div>
-                            ))}
+                            {wk.meetAttempts?.lifts.map(l => {
+                              const ov = taperAttemptOverride[l.name];
+                              const opener = ov ? ov[0] : scale(l.opener);
+                              const second = ov ? ov[1] : scale(l.second);
+                              const third = ov ? ov[2] : scale(l.third);
+                              return (
+                                <div key={l.name} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, marginTop: 3, flexWrap: 'wrap' }}>
+                                  <b style={{ width: 70, flexShrink: 0 }}>{l.name}</b>
+                                  {ov ? (
+                                    <>
+                                      <span>1-я <b>{opener}</b></span>
+                                      <span>2-я <b>{second}</b></span>
+                                      <span>3-я <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24' }}>{third}</b></span>
+                                      <button onClick={() => setTaperAttemptOverride(cur => { const n = { ...cur }; delete n[l.name]; return n; })} style={{ ...BTN_GHOST, minHeight: 28, fontSize: 9, padding: '3px 8px', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>↺ расчёт</button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>1-я <b>{opener}</b></span>
+                                      <span>2-я <b>{second}</b></span>
+                                      <span>3-я <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24' }}>{third}</b></span>
+                                      <button onClick={() => setTaperAttemptOverride(cur => ({ ...cur, [l.name]: [Math.round(opener), Math.round(second), Math.round(third)] }))} style={{ ...BTN_GHOST, minHeight: 28, fontSize: 9, padding: '3px 8px', background: 'rgba(96,165,250,0.1)', color: '#93c5fd', border: '1px solid rgba(96,165,250,0.3)' }}>✏️ свои</button>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {wk.meetAttempts?.lifts[0] && taperAttemptOverride[wk.meetAttempts.lifts[0].name] && (() => {
+                              const ov = taperAttemptOverride[wk.meetAttempts!.lifts[0].name];
+                              return (
+                                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                                  {['опенер', 'вторая', 'третья'].map((label, i) => (
+                                    <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9 }}>
+                                      {label}:
+                                      <input type="number" value={ov[i] || 0} min={0} max={500} step={2.5}
+                                        onChange={e => {
+                                          const v = Number(e.target.value);
+                                          setTaperAttemptOverride(cur => {
+                                            const next = [...(cur[wk.meetAttempts!.lifts[0].name] || [0, 0, 0])];
+                                            next[i] = Number.isFinite(v) && v >= 0 ? Math.min(v, 500) : 0;
+                                            return { ...cur, [wk.meetAttempts!.lifts[0].name]: next };
+                                          });
+                                        }}
+                                        style={{ width: 60, padding: '3px 5px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontWeight: 700, minHeight: 26, boxSizing: 'border-box' }} />
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                             {wk.meetAttempts?.lifts[0] && (() => {
                               const opener = scale(wk.meetAttempts!.lifts[0].opener);
                               if (!opener) return null;

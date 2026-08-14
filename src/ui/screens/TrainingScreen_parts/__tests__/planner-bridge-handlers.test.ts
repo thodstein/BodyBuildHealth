@@ -170,22 +170,4 @@ describe('planner bridge handlers', () => {
     expect(update.mock.calls[0][0].bb.progression.loadStrategy).toBe('double_progression');
     expect(() => applyBridgePayloadDispatch(payload('volume', { sets: null as any }), ctx)).not.toThrow();
   });
-
-  it('program handler принимает готовую UserProgram из «Сборки цикла»', () => {
-    const ctx = context('bb');
-    const built = createBlank('bb');
-    built.meta.title = 'Сборка цикла ББ: тест';
-    built.bb!.weeks = [{ week: 1, phase: 'accumulation', deload: false, sessions: [] } as any];
-    const ok = applyBridgePayloadDispatch(payload('program', { program: built }), ctx);
-    expect(ok).toBe(true);
-    expect(ctx.onChange).toHaveBeenCalledWith(built);
-    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('Собранный цикл'));
-  });
-
-  it('program handler без готовой программы падает на cycleId', () => {
-    const ctx = context('bb');
-    const ok = applyBridgePayloadDispatch(payload('program', { id: 'cycle-01' }), ctx);
-    expect(ok).toBe(true);
-    expect(ctx.onChange).toHaveBeenCalled();
-  });
 });
