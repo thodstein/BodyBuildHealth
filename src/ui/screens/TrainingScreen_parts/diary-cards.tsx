@@ -4,6 +4,8 @@ import type { WorkoutLog } from '../../../core/types';
 import { epley1RM } from '../../../engines/e1rm';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logger.engine';
+import { loadCheckins } from '../../../engines/mindset-protocol.engine';
+import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { diaryStyles as style, ACCENT, DIM } from './diary-tokens';
 
@@ -29,6 +31,11 @@ export const WorkoutWeekCard: React.FC<{
   const totalSets = workouts.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.sets.length, 0), 0);
   const prevVol = (prevWorkouts || []).reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
   const isDeload = prevVol > 0 && totalVol > 0 && totalVol / prevVol < 0.55;
+  // Бейджи психо-чек-инов и мобильности (ключ: sessionId (id записи) или дата)
+  const mindBadge = new Map<string, number>();
+  loadCheckins().forEach(c => { if (c.confidence > 0) mindBadge.set(c.sessionId || c.date, c.confidence); });
+  const mobBadge = new Set<string>();
+  loadMobilityCheckins().forEach(c => { if (c.done) mobBadge.add(c.sessionId || c.date); });
   return (
     <div style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
       <div onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
@@ -46,7 +53,20 @@ export const WorkoutWeekCard: React.FC<{
       {expanded && workouts.map(workout => (
         <div key={workout.id} style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: '#fff' }}>{workout.split || 'Тренировка'}</span></span>
+            <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: '#fff' }}>{workout.split || 'Тренировка'}</span>
+              {(() => {
+                const key = workout.id || workout.date;
+                const m = mindBadge.get(key);
+                const mb = mobBadge.has(key);
+                if (!m && !mb) return null;
+                return (
+                  <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
+                    {m && <span title={`Психо-чек-ин: уверенность ${m}/5`} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', fontWeight: 700 }}>🧠 {m}/5</span>}
+                    {mb && <span title="Мобильность: рутина/сессия выполнена" style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', fontWeight: 700 }}>🧘 ✓</span>}
+                  </span>
+                );
+              })()}
+            </span>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <span style={{ fontSize: 10, color: '#fff' }}>{Math.round(workout.exercises.reduce((sum, e) => sum + e.totalVolume, 0)).toLocaleString()} кг</span>
               <button onClick={e => { e.stopPropagation(); onEdit?.(workout); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Редактировать">✏️</button>

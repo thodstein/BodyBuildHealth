@@ -47,6 +47,9 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
     return { done: last?.done ?? true, romScore: last?.romScore ?? 4, note: '' };
   });
   const [checkinSaved, setCheckinSaved] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState<string | null>(null);
 
   const active = useMemo(() => protocols.find(p => p.id === activeId) || null, [protocols, activeId]);
 
@@ -94,6 +97,23 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   const dupProtocol = useCallback((id: string) => {
     setProtocols(duplicateMobilityProtocol(id));
   }, []);
+
+  // ── Импорт протокола из JSON (бэкап/перенос) ──
+  const importProtocol = useCallback(() => {
+    setImportError(null);
+    try {
+      const raw = JSON.parse(importText);
+      const list = upsertMobilityProtocol({ ...raw, id: `mob_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      const imported = list[list.length - 1];
+      setProtocols(list);
+      setActiveId(imported.id);
+      setActiveMobility(imported.id);
+      setImportOpen(false);
+      setImportText('');
+    } catch {
+      setImportError('Не удалось разобрать JSON — проверьте содержимое файла');
+    }
+  }, [importText]);
 
   // ── Правка активного протокола ──
   const patchProtocol = useCallback((patch: Partial<MobilityProtocol>) => {
@@ -270,7 +290,15 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
           <button type="button" style={ghost} onClick={() => applyPreset('bb')} aria-label="Пресет ББ">💪 Пресет ББ</button>
           <button type="button" style={ghost} onClick={() => applyPreset('both')} aria-label="Универсальный пресет">🌐 Универсал</button>
           <button type="button" style={ghost} onClick={createEmpty} aria-label="Новый пустой протокол">＋ Пустой</button>
+          <button type="button" style={ghost} onClick={() => { setImportOpen(v => !v); setImportError(null); }} aria-expanded={importOpen} aria-label="Импорт протокола из JSON">📥 Импорт JSON</button>
         </div>
+        {importOpen && (
+          <div style={{ marginTop: 8 }}>
+            <textarea aria-label="JSON протокола" style={{ ...IN, minHeight: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 10 }} placeholder='Вставьте JSON протокола (экспорт «⬇ JSON» из этой вкладки)…' value={importText} onChange={e => setImportText(e.target.value)} />
+            {importError && <div style={{ fontSize: 10, color: '#ef4444', marginTop: 4 }}>{importError}</div>}
+            <button type="button" style={{ ...btn, width: '100%', marginTop: 6 }} onClick={importProtocol} disabled={importText.trim() === ''}>📥 Импортировать протокол</button>
+          </div>
+        )}
         {active && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
             {SLOT_ORDER.map(s => {

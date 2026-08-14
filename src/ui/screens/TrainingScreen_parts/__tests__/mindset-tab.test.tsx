@@ -14,6 +14,7 @@ import type { DiaryHubCtx } from '../diary-hub-context';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog } from '../../../../core/types';
 import { MobilityTab } from '../MobilityTab';
+import { WorkoutWeekCard } from '../diary-cards';
 import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot } from '../../../../engines/mobility-protocol.engine';
 
@@ -511,5 +512,57 @@ describe('Кнопки экспорта протокола JSON', () => {
     setActiveMobility(p.id);
     const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
     expect(html).toContain('⬇ JSON');
+  });
+});
+
+describe('Бейджи психо/мобильности в карточках истории', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+  const workout = {
+    id: 'w_badge', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
+    exercises: [{ id: 'e1', date: today, exerciseId: 'bench_press', exerciseName: 'Жим штанги лёжа', isCompound: true, weekNumber: 1, sets: [{ weight: 80, reps: 8, rir: 2, rpe: 7 }], totalVolume: 640, estimated1RM: 101 } as any],
+  } as WorkoutLog;
+
+  const renderCard = () => renderToStaticMarkup(
+    <WorkoutWeekCard weekLabel="Неделя 1" workouts={[workout]} expanded onToggle={() => {}} />,
+  );
+
+  it('чек-ин по sessionId записи → бейдж 🧠 с уверенностью', () => {
+    localStorage.setItem(MINDSET_CHECKS_KEY, JSON.stringify([{ id: 'c1', date: today, sessionId: 'w_badge', confidence: 4, arousal: 3, focus: 5, protocolFollowed: true }]));
+    expect(renderCard()).toContain('🧠 4/5');
+  });
+
+  it('мобильность выполнена по sessionId → бейдж 🧘 ✓', () => {
+    localStorage.setItem('he_mobility_checks', JSON.stringify([{ id: 'm1', date: today, sessionId: 'w_badge', done: true, romScore: 4 }]));
+    expect(renderCard()).toContain('🧘 ✓');
+  });
+
+  it('оба чек-ина → оба бейджа', () => {
+    localStorage.setItem(MINDSET_CHECKS_KEY, JSON.stringify([{ id: 'c1', date: today, sessionId: 'w_badge', confidence: 4, arousal: 3, focus: 5, protocolFollowed: true }]));
+    localStorage.setItem('he_mobility_checks', JSON.stringify([{ id: 'm1', date: today, sessionId: 'w_badge', done: true, romScore: 4 }]));
+    const html = renderCard();
+    expect(html).toContain('🧠 4/5');
+    expect(html).toContain('🧘 ✓');
+  });
+
+  it('без чек-инов → бейджей нет', () => {
+    const html = renderCard();
+    expect(html).not.toContain('🧠 4/5');
+    expect(html).not.toContain('🧘 ✓');
+  });
+});
+
+describe('Импорт протокола JSON', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('MindsetTab рендерит кнопку «Импорт JSON»', () => {
+    const html = renderToStaticMarkup(<MindsetTab hub={mkHub()} />);
+    expect(html).toContain('📥 Импорт JSON');
+  });
+
+  it('MobilityTab рендерит кнопку «Импорт JSON»', () => {
+    const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
+    expect(html).toContain('📥 Импорт JSON');
   });
 });
