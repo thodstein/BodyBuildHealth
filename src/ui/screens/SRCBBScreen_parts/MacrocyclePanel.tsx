@@ -129,6 +129,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [trainingFocus, setTrainingFocus] = useState<BBTrainingFocus>('hypertrophy');
   const [selectedBlockIdx, setSelectedBlockIdx] = useState<number>(-1);
   const [editWeeks, setEditWeeks] = useState<Record<string, number>>({});
+  // Явное сохранение: кратковременный флеш «Сохранено» (автосохранение уже есть).
+  const [macroSavedFlash, setMacroSavedFlash] = useState(false);
   // Маркер текущей недели (1-индекс). По умолчанию неделя 1 = "сегодня" (начало макро).
   const [currentWeekIdx, setCurrentWeekIdx] = useState<number>(1);
   // Несколько соревнований: восстанавливаем из macro.competitions (если есть) или одиночное compWeek.
@@ -750,6 +752,36 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
               🗓 Применить весь макроцикл
             </button>
+          )}
+
+          {/* Действия годового плана: явное сохранение + «Начать работу по циклу» */}
+          {(isBB ? bbMacro : macro) && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button
+                onClick={() => {
+                  try {
+                    if (isBB && bbMacro) { localStorage.setItem(bbKey, serializeBbMacro(bbMacro)); }
+                    else if (macro) { localStorage.setItem(plKey, serializeMacro(macro)); }
+                    setMacroSavedFlash(true);
+                    window.setTimeout(() => setMacroSavedFlash(false), 2000);
+                  } catch { /* ignore */ }
+                }}
+                style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+              >
+                {macroSavedFlash ? '✅ Сохранено' : '💾 Сохранить'}
+              </button>
+              <button
+                onClick={() => {
+                  const source = isBB ? bbMacro : macro;
+                  if (!source) return;
+                  if (onApplyMacrocycle) onApplyMacrocycle(source);
+                  else if (onApplyCycle) onApplyCycle((source as any).blocks?.[0]?.cycleId || '', source.totalWeeks);
+                }}
+                style={{ ...BTN, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+              >
+                ▶️ Начать работу по циклу
+              </button>
+            </div>
           )}
 
           {/* Правка длительности фаз */}

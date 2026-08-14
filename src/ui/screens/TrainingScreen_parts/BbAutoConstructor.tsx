@@ -1120,10 +1120,22 @@ export const BbAutoConstructor: React.FC = () => {
   const renderStepNav = () => (
     <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
       {stepList.map(s => {
-        return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust') && !builtPlan) return; setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
+        return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust') && !builtPlan) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
       })}
     </div>
   );
+
+  // Переход на «Годовой план»: построенный цикл сохраняется автоматически
+  // (возврат — через шаг «Коррекция»/«План»), чтобы не потерять работу.
+  const goAnnual = () => {
+    if (builtPlan && step !== 'annual') {
+      try {
+        localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: applyEditsToPlan(builtPlan), date: new Date().toISOString() }));
+        flash('Построенный цикл сохранён — годовой план можно строить и возвращаться');
+      } catch { flash('Не удалось автосохранить цикл'); }
+    }
+    setStep('annual');
+  };
 
   // Общий блок действий: «Начать работу по циклу/программе» + сохранение.
   // На шаге «План» кнопка старта уже в шапке, поэтому там рендерится только сохранение.
@@ -3093,7 +3105,7 @@ export const BbAutoConstructor: React.FC = () => {
           title="Библиотека инструментов"
           style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
         >⚙️</button>
-        <button onClick={() => setStep('annual')} title="Годовое планирование" aria-label="Открыть годовой план" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:44, minHeight:44, flexShrink:0 }}>🗓</button>
+        <button onClick={goAnnual} title="Годовое планирование" aria-label="Открыть годовой план" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:44, minHeight:44, flexShrink:0 }}>🗓</button>
       </div>
       {showTools && (
         <div className="bb-tools-modal-backdrop" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
@@ -3149,9 +3161,12 @@ export const BbAutoConstructor: React.FC = () => {
           <div className="bb-annual-planner-page__header">
             <div>
               <div style={H}>🗓 Годовое планирование ББ</div>
-              <div style={SMALL}>Отдельная вкладка годового планировщика. Постройте макроцикл и примените его к BB-auto.</div>
+              <div style={SMALL}>Постройте макроцикл и начните работу по нему — или стройте план с нуля, как раньше.</div>
             </div>
-            <button style={BTN_GHOST} onClick={() => setStep('params')}>← К параметрам</button>
+            <div style={{ display:'flex', gap:6 }}>
+              <button style={BTN_GHOST} onClick={() => { setStep('params'); flash('Строим с нуля — без годового плана'); }}>🆕 Строить с нуля</button>
+              <button style={BTN_GHOST} onClick={() => setStep('params')}>← К параметрам</button>
+            </div>
           </div>
           <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} storageKey="he_bb_macro" onApplyMacrocycle={source => {
             if (!('trainingFocus' in source)) return;
