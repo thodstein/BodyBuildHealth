@@ -251,9 +251,9 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         ))}
       </div>
 
-      {/* ═══ 1. Слабые точки + 2. Мёртвые точки (единый якорь — фаза) ═══ */}
+      {/* ═══ 1. Слабые точки ═══ */}
       <div style={CARD}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>1 · Слабые точки и мёртвые точки</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>1 · Слабые точки</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6, marginBottom: 4 }}>Фаза (срыв / слабое место) — выберите чип:</div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
           {phases.map(item => {
@@ -270,21 +270,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           <div style={{ marginTop: 10 }}>
             <div style={{ fontWeight: 800, color: '#ef4444', fontSize: 12 }}>⚠ {movement.weakPoint.label}</div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{movement.weakPoint.description}</div>
-            {movement.sticking && (
-              <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
-                <div style={{ fontSize: 10, color: DIM }}>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
-                <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>🧠 {movement.sticking.biomechanicalReason}</div>
-                <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>💪 Слабые мышцы: {movement.sticking.weakMuscles.join(', ')}</div>
-                <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 3 }}>Коррекции: {movement.sticking.corrections.join(' · ')}</div>
-                <div style={{ fontSize: 10, color: '#818cf8', marginTop: 3 }}>💡 Cue: {movement.sticking.loadCues}</div>
-              </div>
-            )}
-            {movement.barPathRelated.length > 0 && (
-              <div style={{ marginTop: 6, fontSize: 10, color: '#c084fc' }}>
-                🔗 Связанные отклонения траектории: {movement.barPathRelated.map(i => ISSUE_RU[i]).join(', ')}
-              </div>
-            )}
-            {/* Результат: упражнения с анализом оптимальности */}
+            {/* Результат: упражнения с анализом оптимальности (слабые + мёртвые точки) */}
             {phaseAnalysis && phaseAnalysis.items.length > 0 && (
               <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>🏋️ Упражнения (из раскладки цикла, %ПМ/повторы/подходы):</div>
@@ -313,10 +299,33 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         </button>
       </div>
 
+      {/* ═══ 2. Мёртвые точки (та же фаза — углы суставов) ═══ */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>2 · Мёртвые точки {effectivePhase ? `· ${LIFT_RU[lift]} / ${PHASE_RU[effectivePhase] || effectivePhase}` : ''}</div>
+        {movement?.sticking ? (
+          <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <div style={{ fontSize: 10, color: DIM }}>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>🧠 {movement.sticking.biomechanicalReason}</div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>💪 Слабые мышцы: {movement.sticking.weakMuscles.join(', ')}</div>
+            <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 3 }}>Коррекции: {movement.sticking.corrections.join(' · ')}</div>
+            <div style={{ fontSize: 10, color: '#818cf8', marginTop: 3 }}>💡 Cue: {movement.sticking.loadCues}</div>
+          </div>
+        ) : (
+          <div style={{ marginTop: 6, fontSize: 10, color: DIM, lineHeight: 1.5 }}>
+            Угловая диагностика мёртвых точек есть для приседа, жима лёжа и становой тяги. Для {LIFT_RU[lift]} доступна только слабая точка (раздел 1) — выберите другую фазу или движение.
+          </div>
+        )}
+        {movement && movement.barPathRelated.length > 0 && (
+          <div style={{ marginTop: 6, fontSize: 10, color: '#c084fc' }}>
+            🔗 Связанные отклонения траектории: {movement.barPathRelated.map(i => ISSUE_RU[i]).join(', ')}
+          </div>
+        )}
+      </div>
+
       {/* ═══ 3. Движение штанги (bar-path) ═══ */}
       {applicableIssues.length > 0 && (
         <div style={CARD}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>3 · Движение штанги (bar-path)</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>3 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
             {applicableIssues.map(issue => {
               const on = issues.includes(issue);
@@ -408,17 +417,27 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
 
 const btn: React.CSSProperties = { padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 32 };
 
-const ExerciseRow: React.FC<{ item: any; selected: boolean; onToggle: () => void; onAdd: () => void }> = ({ item, selected, onToggle, onAdd }) => (
+const SOURCE_TAG: Record<string, { label: string; color: string; bg: string }> = {
+  weak: { label: '⚡ Слабая точка', color: '#4ade80', bg: 'rgba(34,197,94,0.12)' },
+  sticking: { label: '🩻 Мёртвая точка', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  bar: { label: '📈 Bar-path', color: '#c084fc', bg: 'rgba(168,85,247,0.12)' },
+};
+
+const ExerciseRow: React.FC<{ item: any; selected: boolean; onToggle: () => void; onAdd: () => void }> = ({ item, selected, onToggle, onAdd }) => {
+  const tag = SOURCE_TAG[item.source] || SOURCE_TAG.sticking;
+  return (
   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', marginTop: 3, borderRadius: 6, background: selected ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: selected ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.05)' }}>
     <button onClick={onToggle} style={{ minWidth: 24, height: 24, borderRadius: 5, cursor: 'pointer', border: 'none', background: selected ? ACCENT : 'rgba(255,255,255,0.1)', color: selected ? '#000' : DIM, fontWeight: 800, fontSize: 12 }}>{selected ? '✓' : '＋'}</button>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
-        {item.optimal ? '⭐ ' : ''}{item.exercise.name} <span style={{ color: ACCENT, fontWeight: 800 }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}%</span>
+        {item.optimal ? '⭐ ' : ''}{item.exercise.name} <span style={{ color: ACCENT, fontWeight: 800 }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}%</span>{' '}
+        <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, color: tag.color, background: tag.bg, fontWeight: 700 }}>{tag.label}</span>
       </div>
       <div style={{ fontSize: 9, color: DIM, lineHeight: 1.3, marginTop: 1 }}>{item.rationale}</div>
     </div>
     <button onClick={onAdd} style={{ ...btn, background: 'rgba(0,230,138,0.12)', color: ACCENT, border: '1px solid rgba(0,230,138,0.25)' }}>➕</button>
   </div>
-);
+  );
+};
 
 export default PlDeadpointsBarPathCard;

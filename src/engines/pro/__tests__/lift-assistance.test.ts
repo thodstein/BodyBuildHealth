@@ -8,7 +8,7 @@ describe('analyzePhaseAssistance — оптимальность упражнен
     expect(analysis.items.length).toBeGreaterThan(0);
     expect(analysis.items.some(i => i.optimal)).toBe(true);
     const optimal = analysis.items.find(i => i.optimal)!;
-    expect(optimal.rationale).toContain('squat');
+    expect(optimal.rationale).toContain('присед');
     expect(optimal.exercise.name.length).toBeGreaterThan(0);
   });
 

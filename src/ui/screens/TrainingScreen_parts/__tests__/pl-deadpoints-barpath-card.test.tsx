@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach } from 'vitest';
 import { render, fireEvent, screen, cleanup } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
@@ -36,6 +36,25 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(html).toContain('Упражнения (из раскладки цикла');
   });
 
+  it('секции пронумерованы 1 · Слабые точки, 2 · Мёртвые точки, 3 · Движение штанги с движением сверху', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    expect(screen.getByText('1 · Слабые точки')).toBeTruthy();
+    expect(screen.getByText(/2 · Мёртвые точки/)).toBeTruthy();
+    // В заголовке секции 3 — выбранное движение (жим лёжа → «3 · Движение штанги (bar-path) · жим лёжа»)
+    fireEvent.click(screen.getByText('Жим лёжа'));
+    expect(screen.getByText('3 · Движение штанги (bar-path) · Жим лёжа')).toBeTruthy();
+  });
+
+  it('упражнения имеют тег источника (⚡ Слабая точка / 🩻 Мёртвая точка / 📈 Bar-path)', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    // Для squat/bottom в списке фазы есть и ассистенты слабой точки, и PL-пул мёртвой точки
+    fireEvent.click(screen.getAllByRole('button', { name: 'Дожим' })[0]);
+    expect(screen.getAllByText('🩻 Мёртвая точка').length).toBeGreaterThan(0);
+    // Bar-path: включим отклонение — появится тег 📈
+    fireEvent.click(screen.getByText('Уход штанги вперёд'));
+    expect(screen.getAllByText('📈 Bar-path').length).toBeGreaterThan(0);
+  });
+
   it('выбор фазы работает: клик по чипу обновляет секцию диагностики и упражнения', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     // Клик по чипу «Дожим» (lockout) — только кнопка (в SVG-зоне текст не кнопка)
@@ -43,7 +62,7 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     // «Дожим» встречается в чипах и в заголовке диагноза
     expect(screen.getAllByText('Дожим').length).toBeGreaterThanOrEqual(2);
     // Секция диагноза обновилась: для lockout приседа показывается причина фазы
-    expect(screen.getByText(/слабые мышцы/i)).toBeTruthy();
+    expect(screen.getAllByText(/слабые мышцы/i).length).toBeGreaterThan(0);
     // Секция упражнений присутствует
     expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
   });

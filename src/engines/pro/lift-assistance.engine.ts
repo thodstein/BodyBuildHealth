@@ -89,6 +89,8 @@ export interface AssistanceAnalysisItem {
   optimal: boolean;
   /** Почему это упражнение оптимально/подходит. */
   rationale: string;
+  /** Источник упражнения: слабая точка (weakpoint-pl) / мёртвая точка (PL-пул) / bar-path. */
+  source: 'weak' | 'sticking' | 'bar';
   /** Протокол из раскладки цикла (set-блоки аксессуара дня/недели). */
   protocol: { pct: number; reps: number; sets: number };
   /** Паттерн движения упражнения. */
@@ -103,6 +105,22 @@ export interface AssistanceAnalysis {
 }
 
 const DEFAULT_PROTOCOL = { pct: 0.6, reps: 10, sets: 3 };
+
+/** Русское имя движения (для rationale). */
+const LIFT_RU: Record<Lift, string> = {
+  bench: 'жим лёжа', squat: 'присед', deadlift: 'становая тяга',
+  ohp: 'жим стоя', row: 'тяга в наклоне', pulldown: 'тяга верхнего блока', incline_press: 'жим на наклонной',
+};
+
+/** Группа упражнения → что она нагружает (для rationale по тренерски). */
+const GROUP_TARGET_RU: Record<string, string> = {
+  chest: 'грудные', shoulders: 'дельты (плечи)', back: 'спину', legs: 'ноги',
+  arms: 'руки (бицепс/трицепс)', core: 'кор',
+};
+
+function targetRu(group: string): string {
+  return GROUP_TARGET_RU[group] ?? group;
+}
 
 /**
  * Протокол из раскладки цикла: берём set-блоки реального аксессуара (load !== 'Тяжелая')
@@ -170,15 +188,15 @@ export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: 
       });
 
     candidates.slice(0, 4).forEach((exercise, index) => {
-      const muscles = weakMuscles.join(', ');
       const inCycle = cycleNames.has(norm(exercise.name));
       const pattern = catalogPattern(exercise);
-      const rationale = `Нагружает ${muscles || group} (${lift}, фаза ${phase}); паттерн ${pattern}${inCycle ? ' совпадает с раскладкой цикла' : ''}; не дублирует основные лифты цикла.`;
+      const rationale = `Нагружает ${targetRu(group)} — поддержка мёртвой точки «${phase}» ${LIFT_RU[lift]} (слабые мышцы фазы: ${weakMuscles.join(', ') || '—'}); паттерн ${pattern}${inCycle ? ' совпадает с раскладкой цикла' : ''}; не дублирует основные лифты цикла.`;
       items.push({
         exercise,
         targetGroup: group,
         optimal: index === 0,
         rationale,
+        source: 'sticking',
         protocol: protocolFromCycle(template, group),
         pattern,
       });
@@ -207,7 +225,8 @@ export function analyzePhaseAssistance(lift: Lift, phase: WeakPoint, template?: 
       exercise,
       targetGroup: group,
       optimal: false,
-      rationale: `Специфично для фазы «${wp.label}» движения ${lift} (ассистент из раскладки слабой точки); устраняет причину срыва.`,
+      rationale: `Нагружает ${targetRu(group)} — специфичный ассистент слабой точки «${wp.label}» ${LIFT_RU[lift]}; устраняет причину срыва в этой фазе.`,
+      source: 'weak',
       protocol: protocolFromCycle(template, group),
       pattern: catalogPattern(exercise),
     });
@@ -243,7 +262,8 @@ export function analyzeBarPathAssistance(lift: Lift, issue: BarPathIssue, templa
       exercise,
       targetGroup: group,
       optimal: false,
-      rationale: `Коррекция отклонения «${issue}» для ${lift}; упражнение из диагностического пула bar-path${inCycle ? '; уже присутствует в раскладке цикла' : ''}.`,
+      rationale: `Нагружает ${targetRu(group)} — коррекция отклонения «${issue}» для ${LIFT_RU[lift]}; упражнение из диагностического пула bar-path${inCycle ? '; уже присутствует в раскладке цикла' : ''}.`,
+      source: 'bar',
       protocol: protocolFromCycle(template, group),
       pattern: catalogPattern(exercise),
     });
