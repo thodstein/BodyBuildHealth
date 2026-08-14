@@ -42,6 +42,7 @@ import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, 
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
 import { MesocycleProgressionCard, SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL, sourceWeekColor, summarizeSourceCycleWeeks } from './TrainingScreen_parts/MesocycleProgressionCard';
+import { parseProgressionRationale, progressionTiles, splitDescriptionPoints } from './TrainingScreen_parts/plan-card-helpers';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
@@ -1360,7 +1361,37 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                    <div style={{ ...H, margin:0, minWidth:0, overflowWrap:'break-word' }}>План: {builtSrc.template.meta.title}</div>
                  <span style={{ fontSize:11, fontWeight:700, color: calendarColor, background: calendarBadgeTint, padding:'3px 8px', borderRadius:10, flexShrink:0 }}>{calendarLabel}</span>
               </div>
-               <div style={{ ...SMALL, marginTop:4, wordBreak:'break-word' }}>{builtSrc.progressionRationale}</div>
+                {/* ⚙️ Как собран план — структурированная карточка (PED-стиль) */}
+                {(() => {
+                  const info = parseProgressionRationale(builtSrc.progressionRationale || '');
+                  const tiles = progressionTiles(info);
+                  if (tiles.length === 0) return null;
+                  return (
+                    <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(56,189,248,0.05)', border:'1px solid rgba(56,189,248,0.16)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                        <span style={{ fontSize:13 }}>⚙️</span>
+                        <span style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>Как собран план</span>
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
+                        {tiles.map((t, i) => (
+                          <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
+                            <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
+                            <div style={{ fontSize:12, fontWeight:800, color:'#38bdf8', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {info.notes.length > 0 && (
+                        <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
+                          {info.notes.map((n, i) => (
+                            <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.6)', padding:'5px 8px', borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.12)', lineHeight:1.4 }}>
+                              {n}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                {autoRegMode === 'off' && best && modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle) && (
                  <div role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:7, color:'#f59e0b', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:11 }}>
                    ⚠ {modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle)}
@@ -1391,7 +1422,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     </div>
                   );
                 })()}
-                 <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', lineHeight:1.45, wordBreak:'break-word', marginTop:8 }}>{calendarDescription}</div>
+                 <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
+                   {splitDescriptionPoints(calendarDescription).map((point, i) => (
+                     <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
+                       <span style={{ color: calendarColor, fontWeight:800 }}>•</span> {point}
+                     </div>
+                   ))}
+                 </div>
               </div>
               {/* 📊 Расчёты цикла (метрики микроцикла — Черняк) */}
               {builtSrc.cycleMetrics && (() => {
@@ -1544,7 +1581,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                   ); })}
                 </div>
               </div>
-              <div style={{ ...SMALL, marginTop:6, color:'rgba(255,255,255,0.7)' }}>{calendarDescription}</div>
+              <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>
+                {splitDescriptionPoints(calendarDescription).map((point, i) => (
+                  <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
+                    <span style={{ color: calendarColor, fontWeight:800 }}>•</span> {point}
+                  </div>
+                ))}
+              </div>
               <MetricCard title={'ПМ на неделю '+wk.week+' (прогрессия)'} icon="📈" accent="#60a5fa">
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff', background:'rgba(96,165,250,0.08)', padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.15)' }}><b>{n}:</b> {pm.toFixed(1)} кг</span>)}</div>
               </MetricCard>
