@@ -123,6 +123,34 @@ describe('appendPLTaperWeeks', () => {
     expect(weekVol(withNutr)).toBeGreaterThan(weekVol(poor));
   });
 
+  it('подготовительные прикиды на тапер-неделях: пробный сингл 80% на основных лифтах (кроме финальной)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2);
+    const prepWeek = next.weeks[next.weeks.length - 2];
+    const lastWeek = next.weeks[next.weeks.length - 1];
+    const hasPrep = (wk: LMSBuildOutput['weeks'][number]) => wk.days.some(d => d.exercises.some(e => e.workSets.some(ws => ws.reps === 1 && ws.pct === 0.8)));
+    expect(hasPrep(prepWeek)).toBe(true);
+    expect(hasPrep(lastWeek)).toBe(false);
+  });
+
+  it('refreshMeetAttempts сохраняет авторегуляцию при пересчёте прикидов', () => {
+    const plan = buildBase(6);
+    const withMeet = appendPLTaperWeeks(plan, 2, {
+      meetWeek: { strategy: 'balanced' },
+      autoReg: { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 0 },
+    });
+    const before = withMeet.weeks.find(w => w.meetWeek)!.meetAttempts!.lifts[0];
+    // Пересчёт под агрессивную стратегию: без авторегуляции и с ×0.9
+    const refPlain = refreshMeetAttempts(withMeet, 'aggressive');
+    const refreshed = refreshMeetAttempts(withMeet, 'aggressive', { topSetPctMultiplier: 0.9 });
+    const meetWkAfter = refreshed.weeks.find(w => w.meetWeek)!;
+    expect(meetWkAfter.meetAttempts!.strategy).toBe('aggressive');
+    const plain = refPlain.weeks.find(w => w.meetWeek)!.meetAttempts!.lifts[0];
+    const after = meetWkAfter.meetAttempts!.lifts[0];
+    expect(after.opener).toBeCloseTo(Math.round(plain.opener * 0.9 * 10) / 10, 1);
+    expect(refreshed.progressionRationale).toContain('авторегуляция вес ×0.90');
+  });
+
   it('питание (как в ББ-авто): профицит+белок → MRV-множитель отражается в rationale плана', () => {
     const base = { template: CYCLE_01 as never, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 6, faithful: true } as never;
     const good = buildLMSPlan({ ...base, nutrition: { calorieSurplus: 400, proteinPerKg: 2.2 } } as never);

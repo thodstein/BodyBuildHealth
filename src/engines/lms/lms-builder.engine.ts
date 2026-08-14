@@ -1446,21 +1446,33 @@ export function appendPLTaperWeeks(
       pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
     }
     const days = last.days.map(d => {
-      const exercises = d.exercises.map(e => ({
-        ...e,
-        rir: e.rir + rirAdd,
-        workSets: e.workSets.map(ws => {
-          const pm = pmRow[e.name] ?? e.pm;
-          // Вес пересчитывается от нового ПМ — ровно как workWeight(pm, pct) в buildLMSPlan.
-          const weight = Math.round(workWeight(pm, ws.pct) * 10) / 10;
-          return {
-            ...ws,
-            sets: Math.max(1, Math.round(ws.sets * volumeMult * (e.load === 'main' ? 1 : pedVolFloor))),
-            weight,
-            rir: ws.rir + rirAdd,
-          };
-        }),
-      }));
+      const exercises = d.exercises.map(e => {
+        // Подготовительные прикиды на тапер-неделях (кроме финальной):
+        // пробный сингл ~80% от ПМ недели для основных движений — «прощупать»
+        // траекторию перед соревнованием, не нагружая (разгрузка сохраняется).
+        const isMain = e.load === 'main' || e.load === 'Тяжелая';
+        const prepSets = (!(idx === taperWeeks - 1) && isMain)
+          ? [{ sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.8) * 10) / 10, rir: 2, pct: 0.8 }]
+          : [];
+        return {
+          ...e,
+          rir: e.rir + rirAdd,
+          workSets: [
+            ...prepSets,
+            ...e.workSets.map(ws => {
+              const pm = pmRow[e.name] ?? e.pm;
+              // Вес пересчитывается от нового ПМ — ровно как workWeight(pm, pct) в buildLMSPlan.
+              const weight = Math.round(workWeight(pm, ws.pct) * 10) / 10;
+              return {
+                ...ws,
+                sets: Math.max(1, Math.round(ws.sets * volumeMult * (e.load === 'main' ? 1 : pedVolFloor))),
+                weight,
+                rir: ws.rir + rirAdd,
+              };
+            }),
+          ],
+        };
+      });
       const metricsEx: SRExercise[] = exercises.map(pe => ({
         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
         sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
@@ -1489,7 +1501,15 @@ export function appendPLTaperWeeks(
   // ── Неделя прикидов (mock meet ИЛИ соревнования): прикиды как подходы ──
   const buildAttemptsWeek = (idx: number, kind: 'mock' | 'meet'): LMSPlanWeek | null => {
     const strategy = kind === 'mock' ? mockStrategy : meetStrategy;
-    const attempts = computeMeetAttemptsFromPmRow(last.pmRow, strategy);
+    // Прогрессия ПМ продолжается по курсу (как тапер-недели): +k за неделю.
+    const pmGrowth = Math.pow(1 + k, idx + 1);
+    const pmRow: Record<string, number> = {};
+    for (const [name, pm] of Object.entries(last.pmRow)) {
+      pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
+    }
+    // Прикиды считаются от ПМ СВОЕЙ недели (с прогрессией) — масштабируются по неделям.
+    // Для meet — от ПМ финальной тапер-недели (пик цикла): idx == mock + taperWeeks.
+    const attempts = computeMeetAttemptsFromPmRow(pmRow, strategy);
     if (!attempts) return null;
     const liftByName = new Map(attempts.lifts.map(l => [norm(l.name), l]));
     // Соответствие упражнения → прикиды: точное совпадение имени, иначе fuzzy
@@ -1505,12 +1525,6 @@ export function appendPLTaperWeeks(
       if (/станов/.test(n)) return attempts.lifts.find(l => /станов/.test(norm(l.name)));
       return undefined;
     };
-    // Прогрессия ПМ продолжается по курсу (как тапер-недели): +k за неделю.
-    const pmGrowth = Math.pow(1 + k, idx + 1);
-    const pmRow: Record<string, number> = {};
-    for (const [name, pm] of Object.entries(last.pmRow)) {
-      pmRow[name] = Math.round(pm * pmGrowth * 10) / 10;
-    }
     const days = last.days.map(d => {
       const exercises = d.exercises.map(e => {
         const lift = matchLift(e.name);
@@ -1659,15 +1673,22 @@ export function appendPLTaperWeeks(
  * неделях плана, где они есть (mock meet + финальная тапер-неделя), под выбранную
  * стратегию — без повторного добавления тапера. Не мутирует исходный план.
  */
-export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy = 'balanced'): LMSBuildOutput {
+export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy = 'balanced', autoReg?: { topSetPctMultiplier: number }): LMSBuildOutput {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   let changed = false;
+  const arMult = autoReg?.topSetPctMultiplier ?? 1;
+  const scale = (w: number) => Math.round(w * arMult * 10) / 10;
   const weeks = plan.weeks.map(wk => {
     if (!wk.meetAttempts || wk.meetAttempts.strategy === strategy) return wk;
     const attempts = computeMeetAttemptsFromPmRow(wk.pmRow, strategy);
     if (!attempts) return wk;
     changed = true;
-    return { ...wk, meetAttempts: attempts };
+    // Авторегуляция применяется и к пересчитанным прикидам (режим «АВТО» — для всего).
+    const scaled = arMult === 1 ? attempts : {
+      ...attempts,
+      lifts: attempts.lifts.map(l => ({ ...l, opener: scale(l.opener), second: scale(l.second), third: scale(l.third) })),
+    };
+    return { ...wk, meetAttempts: scaled };
   });
   if (!changed) return plan;
   const label = strategy === 'aggressive' ? 'агрессивная' : strategy === 'conservative' ? 'консервативная' : 'сбалансированная';
@@ -1675,7 +1696,7 @@ export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy
     ...plan,
     weeks,
     progressionRationale: plan.progressionRationale +
-      ` 🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (${label}).`,
+      ` 🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (${label})${arMult !== 1 ? `, авторегуляция вес ×${arMult.toFixed(2)}` : ''}.`,
   };
 }
 

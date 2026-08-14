@@ -43,10 +43,15 @@ export function parseProgressionRationale(text: string): ProgressionInfo {
     if (weeksMatch) info.weeks = parseInt(weeksMatch[1], 10);
   }
   // Заметки: предложения после основного (первого) — отдельными пунктами.
+  // Отсекаем дубли того, что уже показано плитками (режим/прирост/ПМ0/недели).
   const sentences = t.split(/\.\s+|!\s+|\?\s+/).map(s => s.trim()).filter(Boolean);
   const first = sentences[0] || '';
+  const covered = (s: string): boolean =>
+    /%\/нед/.test(s) || /ПМ0=/.test(s) || /к\s+\d+\s+нед/.test(s) ||
+    (info.mode != null && s.startsWith(info.mode)) ||
+    (info.explicitSource && /дословно/.test(s));
   for (const s of sentences.slice(1)) {
-    if (s && s !== first) info.notes.push(s.replace(/[.;]+$/, ''));
+    if (s && s !== first && !covered(s)) info.notes.push(s.replace(/[.;]+$/, ''));
   }
   return info;
 }

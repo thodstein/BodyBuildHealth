@@ -1199,8 +1199,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     disabled={!builtSrc || !taperNote}
                     onClick={() => {
                       if (!builtSrc) return;
-                      setBuiltSrc(refreshMeetAttempts(builtSrc, attemptStrategy));
-                      setMethodNote(`🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]} (${MEET_STRATEGY_LABEL[attemptStrategy]}) — без повторного добавления тапера.`);
+                      setBuiltSrc(refreshMeetAttempts(builtSrc, attemptStrategy, autoRegMode === 'auto' && autoRegResult ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier } : undefined));
+                      setMethodNote(`🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]} (${MEET_STRATEGY_LABEL[attemptStrategy]})${autoRegMode === 'auto' ? ' · авторегуляция сохранена (вес ×' + autoRegResult.topSetPctMultiplier.toFixed(2) + ')' : ''} — без повторного добавления тапера.`);
                     }}
                     style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#a78bfa' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(139,92,246,0.1)' : 'transparent' }}
                     title="Пересчитать прикиды на финальной тапер-неделе (и mock meet) под выбранную стратегию"
