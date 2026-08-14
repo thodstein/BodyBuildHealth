@@ -69,7 +69,7 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
   it('блок «Дни добавления» виден сразу (Авто по умолчанию)', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     expect(screen.getByText('📅 Дни добавления')).toBeTruthy();
-    expect(screen.getByText(/тяжёлый \+ памп-день/)).toBeTruthy();
+    expect(screen.getAllByText(/тяжёлый \+ памп-день/).length).toBeGreaterThanOrEqual(1);
     // Дни Д1..Д3 появляются после выбора упражнения
     fireEvent.click(screen.getAllByRole('button', { name: 'Дожим' })[0]);
     const addButtons = screen.getAllByText('➕');
@@ -79,6 +79,40 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText('Д3')).toBeTruthy();
     // Счётчик на кнопке добавления в ПЛ-авто увеличился
     expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
+  });
+
+  it('«➕ Слабая точка в план» добавляет точку с днями и счётчик в кнопке отправки', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    // По умолчанию squat/bottom — добавляем в план
+    fireEvent.click(screen.getByText(/Добавить слабую точку в план ПЛ/));
+    expect(screen.getByText('🎯 Слабые точки плана (СРЦ)')).toBeTruthy();
+    expect(screen.getByText(/Присед · Низ \(выход из ямы\)/)).toBeTruthy();
+    // Дни для точки: Д2 + Авто
+    fireEvent.click(screen.getByText('Д2'));
+    expect(screen.getByText('Д2')).toBeTruthy();
+    // Кнопка «убрать» есть
+    expect(screen.getByText('✕ убрать')).toBeTruthy();
+    // Повторный клик на той же фазе убирает
+    fireEvent.click(screen.getByText(/Слабая точка в плане ПЛ — убрать/));
+    expect(screen.queryByText('🎯 Слабые точки плана (СРЦ)')).toBeNull();
+  });
+
+  it('отправляет plWeakPoints и группы в applyToPlanner', () => {
+    const dispatched: any[] = [];
+    const origDispatch = window.dispatchEvent.bind(window);
+    window.dispatchEvent = (e: Event) => { if (e instanceof CustomEvent && e.type === 'planner-apply') dispatched.push(e.detail); return origDispatch(e); };
+    try {
+      render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+      fireEvent.click(screen.getByText(/Добавить слабую точку в план ПЛ/));
+      fireEvent.click(screen.getByText('Д2'));
+      fireEvent.click(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто/));
+      const payload = dispatched.find((d: any) => d?.kind === 'weakpoints');
+      expect(payload).toBeTruthy();
+      expect(payload.data.plWeakPoints).toEqual([{ lift: 'squat', weakPoint: 'bottom', days: [2] }]);
+      expect(payload.data.groups).toEqual(['legs']);
+    } finally {
+      window.dispatchEvent = origDispatch;
+    }
   });
 
   it('показывает подсказку из дневника о частых срывах в фазе', () => {

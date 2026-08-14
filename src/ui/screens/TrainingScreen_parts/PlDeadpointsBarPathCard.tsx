@@ -133,6 +133,8 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [days, setDays] = useState<Record<string, number[]>>({});
   const [savedFocus, setSavedFocus] = useState(false);
+  // 🎯 Слабые точки, добавляемые в план ПЛ-авто (как бывшая верхняя карточка «Слабые точки СРЦ»).
+  const [planWeakPoints, setPlanWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
 
   // Авто-пресет из дневника: частые тяжёлые подходы (RPE≥8) в фазе движения — подсказка (не авто-выбор).
   const diaryHint = useMemo(() => {
@@ -190,6 +192,14 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
 
   const changeLift = (value: Lift) => { setLift(value); setPhase(''); setIssues([]); setSelected({}); };
   const toggleIssue = (issue: BarPathIssue) => setIssues(cur => cur.includes(issue) ? cur.filter(i => i !== issue) : [...cur, issue]);
+  const togglePlanWeakPoint = () => {
+    if (!effectivePhase) return;
+    setPlanWeakPoints(cur => {
+      const idx = cur.findIndex(x => x.lift === lift && x.weakPoint === effectivePhase);
+      if (idx >= 0) return cur.filter((_, i) => i !== idx);
+      return [...cur, { lift, weakPoint: effectivePhase as WeakPoint }];
+    });
+  };
 
   const keyForPhase = `${lift}|${effectivePhase}`;
   const toggleExercise = (key: string, name: string) => setSelected(cur => {
@@ -210,8 +220,13 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   };
   const applySelected = () => applyToPlanner({
     kind: 'weakpoints',
-    label: 'Диагностика движения: выбранные ассистенты',
-    data: { diagnosticExerciseMap: selected, diagnosticDayMap: days },
+    label: 'Диагностика движения: выбранные ассистенты + слабые точки',
+    data: {
+      groups: [...new Set(planWeakPoints.map(p => LIFT_TO_GROUP[p.lift]).filter(Boolean))],
+      plWeakPoints: planWeakPoints.map(p => ({ lift: p.lift, weakPoint: p.weakPoint, days: days[`${p.lift}|${p.weakPoint}`] ?? [] })),
+      diagnosticExerciseMap: selected,
+      diagnosticDayMap: days,
+    },
   });
   const saveFocus = () => {
     const group = LIFT_TO_GROUP[lift];
@@ -285,6 +300,14 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             )}
           </div>
         )}
+        {(() => {
+          const inPlan = planWeakPoints.some(x => x.lift === lift && x.weakPoint === effectivePhase);
+          return (
+            <button onClick={togglePlanWeakPoint} disabled={!effectivePhase} style={{ width: '100%', minHeight: 40, marginTop: 10, border: 'none', borderRadius: 8, cursor: effectivePhase ? 'pointer' : 'not-allowed', background: inPlan ? 'rgba(34,197,94,0.15)' : 'rgba(139,92,246,0.15)', color: inPlan ? '#4ade80' : '#8b5cf6', fontWeight: 700, fontSize: 11, opacity: effectivePhase ? 1 : 0.5 }}>
+              {inPlan ? '✓ Слабая точка в плане ПЛ — убрать' : '➕ Добавить слабую точку в план ПЛ (ассистенты при сборке: тяжёлый + памп-день)'}
+            </button>
+          );
+        })()}
         <button onClick={saveFocus} style={{ width: '100%', minHeight: 40, marginTop: 10, border: 'none', borderRadius: 8, cursor: 'pointer', background: 'rgba(168,85,247,0.15)', color: '#c084fc', fontWeight: 700, fontSize: 11 }}>
           {savedFocus ? '✓ Фокус-группа сохранена в профиль' : '💾 Сохранить фокус-группу в профиль'}
         </button>
@@ -317,6 +340,34 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 🎯 Слабые точки плана ПЛ (ассистенты при сборке; дни — свои или Авто) */}
+      {planWeakPoints.length > 0 && (
+        <div style={CARD}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#8b5cf6' }}>🎯 Слабые точки плана (СРЦ)</div>
+          <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
+            Добавятся в план при сборке: тяжёлый (3×8 RIR 2) + памп-день (3×12 @60% RIR 3). Выберите дни или оставьте «Авто».
+          </div>
+          {planWeakPoints.map(p => {
+            const key = `${p.lift}|${p.weakPoint}`;
+            const inPlanDays = days[key] || [];
+            return (
+              <div key={key} style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+                  {LIFT_RU[p.lift]} · {PHASE_RU[p.weakPoint] || p.weakPoint}
+                  <button onClick={() => setPlanWeakPoints(cur => cur.filter(x => !(x.lift === p.lift && x.weakPoint === p.weakPoint)))} style={{ marginLeft: 8, padding: '2px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>✕ убрать</button>
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button onClick={() => setAutoDays(key)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: !inPlanDays.length ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.1)', background: !inPlanDays.length ? 'rgba(139,92,246,.15)' : 'transparent', color: !inPlanDays.length ? '#a78bfa' : DIM }}>Авто (тяжёлый+памп)</button>
+                  {Array.from({ length: Math.max(1, dayCount) }, (_, index) => index + 1).map(day => (
+                    <button key={day} onClick={() => toggleDay(key, day)} style={{ padding: '3px 7px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: inPlanDays.includes(day) ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.1)', background: inPlanDays.includes(day) ? 'rgba(139,92,246,.15)' : 'transparent', color: inPlanDays.includes(day) ? '#a78bfa' : DIM }}>Д{day}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

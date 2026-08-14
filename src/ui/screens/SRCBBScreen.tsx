@@ -454,13 +454,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [weakPoints, setWeakPoints] = useState<string[]>(_profPL.weakPoints || []);
   const toggleWeak = (g: string) => setWeakPoints(p => p.includes(g) ? p.filter(x => x !== g) : [...p, g]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), weakPoints }); } catch {} }, [weakPoints]);
-  // 🎯 Слабые точки СРЦ-движений (профи-диагностика weakpoint-pl)
+  // 🎯 Слабые точки СРЦ-движений (профи-диагностика weakpoint-pl) — заполняются из единого калькулятора движения (PlDeadpointsBarPathCard, weakpoints-событие)
   const [plWeakPoints, setPlWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
-  const togglePlWeak = (lift: Lift, weakPoint: WeakPoint) => setPlWeakPoints(p => {
-    const idx = p.findIndex(x => x.lift === lift && x.weakPoint === weakPoint);
-    if (idx >= 0) return p.filter((_, i) => i !== idx);
-    return [...p, { lift, weakPoint }];
-  });
   // 📅 Ручной выбор дней недели для слабых групп и слабых точек (1-based)
   const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>({});
   const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>({});
@@ -740,6 +735,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         if (Array.isArray(p.data?.orthopedic?.blockedPatterns)) setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
         if (p.data?.diagnosticExerciseMap) setDiagnosticExerciseMap(p.data.diagnosticExerciseMap);
         if (p.data?.diagnosticDayMap) setDiagnosticDayMap(p.data.diagnosticDayMap);
+        if (Array.isArray(p.data?.plWeakPoints)) {
+          setPlWeakPoints(p.data.plWeakPoints.map((x: any) => ({ lift: x.lift, weakPoint: x.weakPoint })));
+          const dm: Record<string, number[]> = {};
+          for (const x of p.data.plWeakPoints) {
+            if (Array.isArray(x.days) && x.days.length > 0) dm[`${x.lift}|${x.weakPoint}`] = x.days;
+          }
+          setPlWeakPointDayMap(dm);
+        }
        pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
@@ -1093,71 +1096,10 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
               </div>
             );
           })()}
-          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🏋️ Слабые точки СРЦ-движений (ПЛ-диагностика: проценты уклонений в амплитуде)</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
-            📐 Каждая слабая точка добавляется в 2 дня: тяжёлый (3×8 RIR 2) + памп-день (3×12 @ 60% RIR 3).
-          </div>
-          {(() => {
-            const WP_LABELS: Record<string, string> = {
-              off_chest: 'Сход со груди', mid: 'Середина', lockout: 'Дожим',
-              bottom: 'Низ (яма)', start: 'Старт (с пола)',
-              ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим вверх',
-              row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
-              pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
-              inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
-            };
-            const PL_WEAKPOINT_OPTIONS = Object.entries(WEAK_POINTS_BY_LIFT).map(([lift, wps]) => ({
-              lift,
-              weakPoints: (wps as string[]).map((wp: string) => ({ id: wp, label: WP_LABELS[wp] || wp })),
-            }));
-            return PL_WEAKPOINT_OPTIONS.map((opt) => (
-            <div key={opt.lift} style={{ marginTop: 4 }}>
-               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2, minWidth: 0, overflowWrap: 'anywhere' }}>{opt.lift === 'bench' ? 'Жим лёжа' : opt.lift === 'squat' ? 'Присед' : opt.lift === 'deadlift' ? 'Становая' : opt.lift === 'ohp' ? 'Жим стоя' : opt.lift === 'row' ? 'Тяга в наклоне' : opt.lift === 'pulldown' ? 'Тяга верхн. блока' : opt.lift === 'incline_press' ? 'Жим на наклонной' : opt.lift}</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", minWidth: 0, maxWidth: '100%' }}>
-                {opt.weakPoints.map((wp) => {
-                  const on = plWeakPoints.some(x => x.lift === opt.lift && x.weakPoint === wp.id);
-                  return <button key={wp.id} onClick={() => togglePlWeak(opt.lift as Lift, wp.id as WeakPoint)} style={{ padding: "5px 9px", borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid #8b5cf6" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.02)", color: on ? "#8b5cf6" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{wp.label}{on ? " ✓" : ""}</button>;
-                })}
-              </div>
-            </div>
-            ));
-          })()}
-          {/* 📅 Выбор дней недели для каждой выбранной слабой точки СРЦ */}
-          {plWeakPoints.length > 0 && (() => {
-            const tpl = getCycleById(selectedCycleId);
-            const dayCount = tpl?.week1?.length || 3;
-            const liftLabelMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
-            return (
-              <div style={{ marginTop:6, padding:'8px 10px', borderRadius:10, background:'rgba(139,92,246,0.05)', border:'1px solid rgba(139,92,246,0.15)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', marginBottom: 6 }}>📅 Дни недели для слабых точек СРЦ (если пусто — авто: тяжёлый+памп-день)</div>
-                {plWeakPoints.map(wp => {
-                  const mapKey = `${wp.lift}|${wp.weakPoint}`;
-                  const days = plWeakPointDayMap[mapKey] || [];
-                  return (
-                    <div key={mapKey} style={{ marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis' }}>{liftLabelMap[wp.lift] || wp.lift} · {wp.weakPoint}{days.length > 0 ? ` → день ${days.join(', ')}` : ' → авто (2 дня: тяжёлый + памп)'}</div>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
-                         {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
-                          const on = days.includes(d);
-                          return <button key={d} onClick={() => toggleDayInMap(mapKey, d, 'pw')} style={{ padding:'4px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border: on ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>{'Д' + d}{on ? ' ✓' : ''}</button>;
-                         })}
-                       </div>
-                       <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                         {diagnoseWeakPoint(wp.lift as Lift, wp.weakPoint as WeakPoint).assistance.map(name => {
-                           const selected = (plWeakPointExerciseMap[mapKey] || []).includes(name);
-                           return <button key={name} onClick={() => toggleExerciseInMap(mapKey, name, 'pw')} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: selected ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)', background: selected ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: selected ? '#8b5cf6' : 'rgba(255,255,255,0.6)' }}>{name}{selected ? ' ✓' : ''}</button>;
-                         })}
-                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
           <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Мёртвые точки → Слабые точки → Движение штанги</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
-              Выберите фазу, отклонения траектории, упражнения из диагностики и дни добавления. Исходный цикл не изменяется. Протокол упражнений — из раскладки этого цикла.
+              Выберите движение, фазу, отклонения траектории и упражнения. «➕ Слабая точка в план» добавит ассистентов в план при сборке (тяжёлый + памп-день). Исходный цикл не изменяется. Протокол упражнений — из раскладки этого цикла.
             </div>
             <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
           </div>
