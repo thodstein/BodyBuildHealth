@@ -240,20 +240,34 @@ export const SliderInput: React.FC<{
   label?: string;
   unit?: string;
   color?: string;
-}> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color }) => {
+  /** Куда направлена шкала: 'good' = выше лучше (↑ хорошо), 'bad' = выше хуже (↓ плохо). */
+  direction?: 'good' | 'bad';
+}> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color, direction }) => {
   const c = color || colors.primary;
   const value = (rawValue !== undefined && rawValue !== null && !isNaN(rawValue)) ? rawValue : min;
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+  const dirColor = direction === 'good' ? '#22c55e' : direction === 'bad' ? '#ef4444' : null;
   return (
     <div>
       {label && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}>{label}</span>
-          <span style={{
-            fontSize: 11, fontWeight: 700, color: c,
-            background: `${c}1a`, border: `1px solid ${c}33`,
-            padding: '1px 8px', borderRadius: 8, minWidth: 36, textAlign: 'center',
-          }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {direction && dirColor && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: dirColor,
+                background: `${dirColor}1a`, border: `1px solid ${dirColor}44`,
+                padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
+              }}>
+                {direction === 'good' ? '↑ хорошо' : '↓ плохо'}
+              </span>
+            )}
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: c,
+              background: `${c}1a`, border: `1px solid ${c}33`,
+              padding: '1px 8px', borderRadius: 8, minWidth: 36, textAlign: 'center',
+            }}>{rawValue != null ? `${value}${unit || ''}` : '—'}</span>
+          </span>
         </div>
       )}
       <div style={{ position: 'relative', height: 26, display: 'flex', alignItems: 'center' }}>

@@ -149,7 +149,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.9;
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -166,15 +166,15 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     controls.target.set(0, 0.25, 0);
     controls.update();
 
-    const ambient = new THREE.AmbientLight('#aabbdd', 1.0);
+    const ambient = new THREE.AmbientLight('#aabbdd', 0.5);
     scene.add(ambient);
-    const key = new THREE.DirectionalLight('#ffffff', 1.8);
+    const key = new THREE.DirectionalLight('#ffffff', 1.2);
     key.position.set(2.5, 4, 4);
     scene.add(key);
-    const fill = new THREE.DirectionalLight('#99aacc', 0.7);
+    const fill = new THREE.DirectionalLight('#99aacc', 0.4);
     fill.position.set(-2.5, 0.5, -2);
     scene.add(fill);
-    const rim = new THREE.DirectionalLight('#dde6ff', 0.5);
+    const rim = new THREE.DirectionalLight('#dde6ff', 0.3);
     rim.position.set(0, 0, 3);
     scene.add(rim);
 
@@ -284,18 +284,18 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           zoneColor.setRGB(r, g, b);
           if (sel === zoneId || hover === zoneId) {
             lerp.copy(zoneColor).lerp(WHITE, 0.35);
-            arr[i * 3] = lerp.r * 1.6;
-            arr[i * 3 + 1] = lerp.g * 1.6;
-            arr[i * 3 + 2] = lerp.b * 1.6;
+            arr[i * 3] = lerp.r * 1.2;
+            arr[i * 3 + 1] = lerp.g * 1.2;
+            arr[i * 3 + 2] = lerp.b * 1.2;
           } else if (sel) {
             // другая зона выбрана — приглушаем
-            arr[i * 3] = zoneColor.r * 0.45;
-            arr[i * 3 + 1] = zoneColor.g * 0.45;
-            arr[i * 3 + 2] = zoneColor.b * 0.45;
+            arr[i * 3] = zoneColor.r * 0.35;
+            arr[i * 3 + 1] = zoneColor.g * 0.35;
+            arr[i * 3 + 2] = zoneColor.b * 0.35;
           } else {
-            arr[i * 3] = zoneColor.r * 1.5;
-            arr[i * 3 + 1] = zoneColor.g * 1.5;
-            arr[i * 3 + 2] = zoneColor.b * 1.5;
+            arr[i * 3] = zoneColor.r * 1.0;
+            arr[i * 3 + 1] = zoneColor.g * 1.0;
+            arr[i * 3 + 2] = zoneColor.b * 1.0;
           }
         } else {
           // зона без боли — чёрный (текстура остаётся чистой)
