@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { TzSpecResult, TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
+import { buildZoneMapping } from '../../../engines/mesh-zone-mapping';
 
 const riskColor = (pct: number): string => {
   if (pct < 25) return '#22c55e';
@@ -178,6 +179,7 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
 
     let colorAttr: THREE.BufferAttribute | null = null;
     let zoneIdx: Int8Array = new Int8Array(0);
+    let zoneWeights: Float32Array = new Float32Array(0);
     let anchorToSystem: string[] = [];
     let baseMesh: THREE.Mesh | null = null;
     let overlay: THREE.Mesh | null = null;
@@ -230,7 +232,17 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
           worldPos[i * 3 + 1] = v.y;
           worldPos[i * 3 + 2] = v.z;
         }
-        zoneIdx = assignVertexSystems(worldPos);
+        // 2) Зоны растут ПО ПОВЕРХНОСТИ меша (геодезика) — не протекают сквозь тело,
+        //    границы мягкие (smoothstep-вес у каждой вершины).
+        //    Радиус по поверхности > евклидова (путь огибает тело) → ×1.4.
+        const geoIndex = baseMesh.geometry.index ? (baseMesh.geometry.index.array as Uint32Array) : null;
+        const mapping = buildZoneMapping(
+          worldPos,
+          geoIndex,
+          SYSTEM_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
+        );
+        zoneIdx = mapping.zoneIdx;
+        zoneWeights = mapping.weights;
         anchorToSystem = SYSTEM_ANCHORS.map((a) => a.id);
 
         // 3) Нормализация: высота → 3.0, центровка
@@ -281,23 +293,25 @@ export const TZRisk3DModel: React.FC<Props> = ({ tzResult }) => {
             const pct = getSystemRiskPct(sysId);
             const [r, g, b] = hexToRgb(riskColor(pct));
             zoneColor.setRGB(r, g, b);
+            // Мягкий вес вершины (smoothstep от центра зоны) — края зон плавные
+            const wgt = zoneWeights[i] || 0;
             if (sel === sysId) {
               lerp.copy(zoneColor).lerp(WHITE, 0.25);
-              arr[i * 3] = lerp.r * 0.8;
-              arr[i * 3 + 1] = lerp.g * 0.8;
-              arr[i * 3 + 2] = lerp.b * 0.8;
+              arr[i * 3] = lerp.r * 0.85 * wgt;
+              arr[i * 3 + 1] = lerp.g * 0.85 * wgt;
+              arr[i * 3 + 2] = lerp.b * 0.85 * wgt;
             } else if (hover === sysId) {
-              arr[i * 3] = zoneColor.r * 0.65;
-              arr[i * 3 + 1] = zoneColor.g * 0.65;
-              arr[i * 3 + 2] = zoneColor.b * 0.65;
+              arr[i * 3] = zoneColor.r * 0.7 * wgt;
+              arr[i * 3 + 1] = zoneColor.g * 0.7 * wgt;
+              arr[i * 3 + 2] = zoneColor.b * 0.7 * wgt;
             } else if (sel) {
-              arr[i * 3] = zoneColor.r * 0.3;
-              arr[i * 3 + 1] = zoneColor.g * 0.3;
-              arr[i * 3 + 2] = zoneColor.b * 0.3;
+              arr[i * 3] = zoneColor.r * 0.32 * wgt;
+              arr[i * 3 + 1] = zoneColor.g * 0.32 * wgt;
+              arr[i * 3 + 2] = zoneColor.b * 0.32 * wgt;
             } else {
-              arr[i * 3] = zoneColor.r * 0.5;
-              arr[i * 3 + 1] = zoneColor.g * 0.5;
-              arr[i * 3 + 2] = zoneColor.b * 0.5;
+              arr[i * 3] = zoneColor.r * 0.55 * wgt;
+              arr[i * 3 + 1] = zoneColor.g * 0.55 * wgt;
+              arr[i * 3 + 2] = zoneColor.b * 0.55 * wgt;
             }
           }
           colorAttr.needsUpdate = true;

@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PAIN_ZONES, painZoneColor } from '../../diary-modals';
+import { buildZoneMapping } from '../../../../../engines/mesh-zone-mapping';
 
 export interface ZoneAnchor {
   id: string; // уникальный: shoulders_l, shoulders_r, …
@@ -185,6 +186,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
     let overlay: THREE.Mesh | null = null;
     let colorAttr: THREE.BufferAttribute | null = null;
     let zoneIdx: Int8Array = new Int8Array(0);
+    let zoneWeights: Float32Array = new Float32Array(0);
     let anchorToZone: string[] = [];
     let baseMesh: THREE.Mesh | null = null;
 
@@ -211,7 +213,16 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
           worldPos[i * 3 + 1] = v.y;
           worldPos[i * 3 + 2] = v.z;
         }
-        zoneIdx = assignVertexZones(worldPos);
+        // Зоны растут ПО ПОВЕРХНОСТИ меша (геодезика) — не протекают сквозь тело,
+        // границы мягкие (smoothstep-вес у каждой вершины). Радиус по поверхности ×1.4.
+        const geoIndex = baseMesh.geometry.index ? (baseMesh.geometry.index.array as Uint32Array) : null;
+        const mapping = buildZoneMapping(
+          worldPos,
+          geoIndex,
+          ZONE_ANCHORS.map((a) => ({ id: a.id, pos: a.pos, radius: a.r * 1.4 })),
+        );
+        zoneIdx = mapping.zoneIdx;
+        zoneWeights = mapping.weights;
         anchorToZone = ZONE_ANCHORS.map((a) => a.id);
 
         // Нормализация для отображения: высота → 3.0, центровка
@@ -282,20 +293,22 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         if (val > 0) {
           const [r, g, b] = hexToRgb(painZoneColor(val));
           zoneColor.setRGB(r, g, b);
+          // Мягкий вес вершины — края зон плавные, без зубцов треугольников
+          const wgt = zoneWeights[i] || 0;
           if (sel === zoneId || hover === zoneId) {
             lerp.copy(zoneColor).lerp(WHITE, 0.35);
-            arr[i * 3] = lerp.r * 1.2;
-            arr[i * 3 + 1] = lerp.g * 1.2;
-            arr[i * 3 + 2] = lerp.b * 1.2;
+            arr[i * 3] = Math.min(1, lerp.r * 1.15) * wgt;
+            arr[i * 3 + 1] = Math.min(1, lerp.g * 1.15) * wgt;
+            arr[i * 3 + 2] = Math.min(1, lerp.b * 1.15) * wgt;
           } else if (sel) {
             // другая зона выбрана — приглушаем
-            arr[i * 3] = zoneColor.r * 0.35;
-            arr[i * 3 + 1] = zoneColor.g * 0.35;
-            arr[i * 3 + 2] = zoneColor.b * 0.35;
+            arr[i * 3] = zoneColor.r * 0.4 * wgt;
+            arr[i * 3 + 1] = zoneColor.g * 0.4 * wgt;
+            arr[i * 3 + 2] = zoneColor.b * 0.4 * wgt;
           } else {
-            arr[i * 3] = zoneColor.r * 1.0;
-            arr[i * 3 + 1] = zoneColor.g * 1.0;
-            arr[i * 3 + 2] = zoneColor.b * 1.0;
+            arr[i * 3] = zoneColor.r * wgt;
+            arr[i * 3 + 1] = zoneColor.g * wgt;
+            arr[i * 3 + 2] = zoneColor.b * wgt;
           }
         } else {
           // зона без боли — чёрный (текстура остаётся чистой)
