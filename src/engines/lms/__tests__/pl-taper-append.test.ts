@@ -199,6 +199,26 @@ describe('appendPLTaperWeeks', () => {
     expect(last.days[0].exercises[0].rir).toBeGreaterThanOrEqual(baseRir + 2);
   });
 
+  it('pl-режим при taperWeeks<3: берутся ПОСЛЕДНИЕ недели протокола (1 нед = соревновательная 100% + прикиды)', () => {
+    const plan = buildBase(6);
+    const one = appendPLTaperWeeks(plan, 1, { peakMode: 'pl' });
+    const w1 = one.weeks[one.weeks.length - 1];
+    // Финальная (и единственная) неделя — соревновательная: разминка + прикиды
+    expect(w1.meetAttempts).toBeTruthy();
+    expect(w1.taperNote).toContain('Соревновательная');
+    const mainWs = w1.days.flatMap(d => d.exercises.filter(e => e.load === 'main' || e.load === 'Тяжелая').flatMap(e => e.workSets));
+    // Разминка, не рабочие 100%
+    expect(mainWs.length).toBeGreaterThan(0);
+    expect(Math.max(...mainWs.map(ws => ws.weight))).toBeLessThanOrEqual(Math.round((w1.pmRow['Присед'] ?? 0) * 0.9 * 10) / 10 + 1);
+    // 2 недели: интенсивная (95%, синглы) + соревновательная (прикиды)
+    const two = appendPLTaperWeeks(plan, 2, { peakMode: 'pl' });
+    const t1 = two.weeks[two.weeks.length - 2];
+    const t2 = two.weeks[two.weeks.length - 1];
+    expect(t1.taperNote).toContain('Интенсивная');
+    expect(t2.taperNote).toContain('Соревновательная');
+    expect(t2.meetAttempts).toBeTruthy();
+  });
+
   it('meetData: прикиды от планируемого ПМ федерации', () => {
     const plan = buildBase(6);
     const withPlan = appendPLTaperWeeks(plan, 2, {

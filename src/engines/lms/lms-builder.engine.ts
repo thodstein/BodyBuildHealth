@@ -1712,10 +1712,13 @@ export function appendPLTaperWeeks(
   }
   // Режим пика: 'classic' — разгрузка Bosquet (интенсивность сохранена);
   // 'pl' — 3-нед ПЛ-пик-протокол Библиотеки (объём 85/75/60%, интенсивность 90/95/100%, RIR→0).
+  // При taperWeeks < 3 берём ПОСЛЕДНИЕ N недель протокола (финал всегда — соревновательная
+  // 100% с прикидами; при 1 нед — только соревновательная, при 2 — интенсивная + соревновательная).
   const plPeakProto = opts?.peakMode === 'pl' ? getPeakingProtocol('pl') : null;
+  const plOffset = plPeakProto ? Math.max(0, plPeakProto.weeks.length - taperWeeks) : 0;
   for (let i = 0; i < taperWeeks; i++) {
     if (plPeakProto) {
-      const pw = plPeakProto.weeks[Math.min(i, plPeakProto.weeks.length - 1)];
+      const pw = plPeakProto.weeks[Math.min(plOffset + i, plPeakProto.weeks.length - 1)];
       extra.push(buildPeakWeek(i, pw));
       continue;
     }
