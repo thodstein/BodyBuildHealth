@@ -4,6 +4,7 @@ import { getBloodMarkersDeep, getCriticalMarkers, getSupplementStacks, calculate
 import { getPeriodizationModels, getBBContestPrep, getPCTProtocols, generateMeetStrategy, type MeetStrategy } from '../../engines/periodization-meet-pct.engine';
 import { predictStrength, computePRI, type PredictionInput } from '../../engines/prediction-models-engine';
 import { getProfile, updateSection } from '../../core/profile-manager';
+import { BBContestPrepCard } from './SRCBBScreen_parts/BBContestPrepCard';
 
 export const PerformanceScreen: React.FC = () => {
   const linked = useDataLink();
@@ -175,6 +176,7 @@ export const PerformanceScreen: React.FC = () => {
 
     {tab==='bbprep' && <div>
       <h4 style={{ fontSize:12, marginBottom:8 }}>💪 Подготовка к соревнованиям</h4>
+      <BBContestPrepCard compact />
       {bbPrep.map((p,i)=><div key={i} className="card" style={{ marginBottom:6, padding:10 }}>
         <div style={{ fontWeight:600, fontSize:12 }}>{p.phase} (нед {p.weeksOut} до старта)</div>
         <div style={{ fontSize:9, color:'var(--text-light)', marginTop:2 }}>Тренировки: {p.training} | Кардио: {p.cardio} | Углеводы: {p.carbs}</div>

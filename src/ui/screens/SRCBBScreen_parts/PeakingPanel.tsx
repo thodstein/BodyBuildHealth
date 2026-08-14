@@ -311,7 +311,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
                   <tbody>
                     {bbResult.peakWeek.map(d => (
                       <tr key={d.day} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: d.day === 7 ? 'rgba(236,72,153,0.08)' : undefined }}>
-                        <td style={{ padding: '3px 4px', fontWeight: 700, color: d.day === 7 ? '#ec4899' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}</td>
+                        <td style={{ padding: '3px 4px', fontWeight: 700, color: d.day === 7 ? '#ec4899' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}<div style={{ fontSize: 8, color: 'var(--text-dim)', fontWeight: 400 }}>{d.date.slice(5).replace('-', '.')}</div></td>
                         <td style={{ padding: '3px 4px', color: '#ec4899' }}>{PHASE_LABELS_RU[d.phase]}</td>
                         <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.kcal}</td>
                         <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--text-dim)' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
