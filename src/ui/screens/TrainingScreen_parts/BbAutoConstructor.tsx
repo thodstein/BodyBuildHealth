@@ -505,6 +505,24 @@ export const BbAutoConstructor: React.FC = () => {
     } catch {}
   }, []);
 
+  // ⚙️ Живой приём плана из «Сборки цикла» Годового планировщика (he-bb-plan-saved)
+  useEffect(() => {
+    const onExternalPlan = () => {
+      try {
+        const saved = localStorage.getItem('he_bb_plan_saved');
+        if (!saved) return;
+        const parsed = JSON.parse(saved);
+        if (parsed.plan) {
+          setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
+          setBbWeekSel(1);
+          setStep('plan');
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('he-bb-plan-saved', onExternalPlan);
+    return () => window.removeEventListener('he-bb-plan-saved', onExternalPlan);
+  }, []);
+
   const revalidateEditedPlan = (plan: BBPlan): BBPlan => {
     const edited = structuredClone(plan) as BBPlan;
     return finalizeBBPlan(edited, {
@@ -1335,8 +1353,9 @@ export const BbAutoConstructor: React.FC = () => {
                         { id: 'myo_reps', label: 'Myo-reps' },
                         { id: 'pause_rep', label: 'Пауза-репс' },
                         { id: 'mechanical_drop', label: 'Мех. дроп-сет' },
-                        { id: 'negative', label: 'Негативы (3-4с)' },
-                      ]}
+                      { id: 'negative', label: 'Негативы (3-4с)' },
+                      { id: 'twenty_ones', label: '21s (7-7-7)' },
+                    ]}
                     />
                     <PopupSelect
                       label='🌊 Волновая периодизация (DUP)'

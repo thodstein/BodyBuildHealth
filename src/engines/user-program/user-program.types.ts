@@ -36,7 +36,7 @@ export type LoadStrategy = 'double_progression' | 'linear' | 'wave' | 'rpe_based
 export type DeloadProtocol = 'pump' | 'neural' | 'full_rest' | 'mini';
 
 /** Интенсив-техника (зеркалирует IntensityTechnique из bb-autocoach). */
-export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'negative' | 'none';
+export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'negative' | 'twenty_ones' | 'none';
 
 /** Роль блока в сессии. compound/accessory/isolation/finisher — ББ; power_* — ПЛ-вкладка в гибриде. */
 export type BlockType = 'compound' | 'accessory' | 'isolation' | 'finisher' | 'power_main' | 'power_accessory';

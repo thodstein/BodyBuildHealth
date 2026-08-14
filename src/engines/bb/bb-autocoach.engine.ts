@@ -210,7 +210,7 @@ export function rirDrift(baseRir: [number, number], weekInPhase: number, phaseWe
  * pause_rep: +2-3с пауза в нижней точке (модифицирует tempo)
  * mechanical_drop: смена угла без отдыха
  */
-export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'negative' | 'none';
+export type IntensityTechnique = 'rest_pause' | 'drop_set' | 'myo_reps' | 'pause_rep' | 'mechanical_drop' | 'negative' | 'twenty_ones' | 'none';
 
 export interface IntensityTechniqueMeta {
   type: IntensityTechnique;
@@ -253,6 +253,11 @@ export const INTENSITY_TECHNIQUES: Record<IntensityTechnique, IntensityTechnique
     type: 'negative', label: 'Негативы (3-4с)', appliesTo: ['compound','isolation','accessory'],
     phases: ['accumulation','intensification'],
     description: 'Эксцентрик 3-4с на каждом повторении; последние 1-2 повтора — с полным контролем (Schoenfeld 2021: растянутая фаза → гипертрофия).',
+  },
+  twenty_ones: {
+    type: 'twenty_ones', label: '21s (7-7-7)', appliesTo: ['isolation'],
+    phases: ['accumulation','intensification'],
+    description: 'Один подход = 21 повтор: 7 нижних частичных + 7 верхних частичных + 7 полных. Классика для бицепса (пик и объём).',
   },
 };
 
@@ -344,6 +349,18 @@ function applyIntensityTechniqueToExercise(
       lastSet.technique = 'negative';
       if (!e.comment || !e.comment.includes('Негативы')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Негативы: 3-4с опускание, последние 1-2 повтора с контролем';
+      }
+      break;
+    }
+    case 'twenty_ones': {
+      // 21s: только бицепс-изоляции (7 нижних + 7 верхних + 7 полных).
+      // На другие мышцы техника не навешивается (методика бицепса).
+      if (e.muscle !== 'biceps') break;
+      lastSet.technique = 'twenty_ones';
+      lastSet.reps = 21;
+      lastSet.tempo = '2-1-1-0';
+      if (!e.comment || !e.comment.includes('21s')) {
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 21s: 7 нижних + 7 верхних + 7 полных повторов';
       }
       break;
     }

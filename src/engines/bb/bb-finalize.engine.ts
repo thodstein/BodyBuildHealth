@@ -1254,6 +1254,118 @@ export interface BBFinalizeOptions {
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
 }
 
+/** Специализация (методики Библиотеки): RIR-профиль (изоляции целевой мышцы
+ *  добиваются до RIR 0-1), икры-спец (темп 2-2-1-0, сеты ≥4), спец-частота
+ *  (целевая мышца ≥2×/нед — добавляем изоляции во вторую подходящую сессию). */
+const SPEC_FREQ_TAGS: Record<string, string[]> = {
+  chest: ['Push', 'Upper'], back: ['Pull', 'Upper', 'FullBody'],
+  shoulders: ['Push', 'Upper', 'Arms'], quads: ['Legs', 'Lower', 'FullBody'],
+  hamstrings: ['Legs', 'Lower', 'FullBody'], glutes: ['Legs', 'Lower', 'FullBody'],
+  biceps: ['Pull', 'Arms', 'FullBody'], triceps: ['Push', 'Arms', 'FullBody'],
+  calves: ['Legs', 'Lower', 'FullBody'], abs: ['FullBody', 'Torso'], traps: ['Pull', 'Upper'],
+};
+export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions): void {
+  const priority = options.priorityMuscles || [];
+  if (!priority.length) return;
+  const focus = priority[priority.length - 1];
+  const collapse = (k: string) => WEAK_TO_MUSCLE[k] || k;
+  const targetMuscles = new Set(priority.map(collapse));
+  const focusMuscle = focus ? collapse(focus) : '';
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+  };
+
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue;
+    // Спец-частота ≥2×/нед: целевая мышца получает изоляции во второй сессии.
+    if (focusMuscle && focusMuscle !== '') {
+      const freq = week.sessions.filter(s => s.exercises.some((e: any) => e.muscle === focusMuscle && !(e as any).warmupActivator)).length;
+      if (freq < 2) {
+        const tags = SPEC_FREQ_TAGS[focusMuscle];
+        if (tags) {
+          const target = week.sessions.find(s =>
+            !s.exercises.some((e: any) => e.muscle === focusMuscle && !(e as any).warmupActivator) &&
+            tags.some(t => (s.sessionTag || '').includes(t)),
+          );
+          if (target) {
+            const working = target.exercises.filter((e: any) => !(e as any).warmupActivator);
+            const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
+            const maxSessionSets = options.maxWorkingSets ?? (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 40 : 24);
+            const sessionSets = working.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+            const cap = (plan as any).mrvByMuscle?.[focusMuscle];
+            const weekDirect = week.sessions.flatMap(s => s.exercises).filter((e: any) => e.muscle === focusMuscle && !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);
+            const template = target.exercises[0];
+            if (template && working.length < maxEx && sessionSets + 3 <= maxSessionSets && (!cap || weekDirect + 3 <= cap)) {
+              const candMuscle = (c: any) => trueMuscleOf(c)
+                || (/отведен.*бедр|abduction/i.test(c.name || '') ? 'glutes' : null)
+                || (/подъём.*носк|подъем.*носк|calf/i.test(c.name || '') ? 'calves' : null);
+              const candidate = EXERCISE_CATALOG.find((c: any) => candMuscle(c) === focusMuscle && c.type === 'isolation' && equipmentOk(c) && !working.some((e: any) => e.name === c.name));
+              if (candidate) {
+                const baseWeight = options.workMax?.[focusMuscle] || 40;
+                target.exercises.push({
+                  ...template,
+                  muscle: focusMuscle,
+                  name: candidate.name,
+                  exerciseName: candidate.name,
+                  role: 'accessory',
+                  character: 'памп',
+                  sets: 3,
+                  repsRange: [12, 15],
+                  rir: 1,
+                  restSeconds: 60,
+                  workSets: Array.from({ length: 3 }, () => ({ reps: 15, rir: 1, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 60 })),
+                  comment: `Спец-частота 2×/нед: ${candidate.name} (вторая сессия целевой мышцы)`,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+    for (const session of week.sessions) {
+      for (const ex of session.exercises) {
+        if ((ex as any).warmupActivator) continue;
+        const m = collapse(ex.muscle);
+        if (!targetMuscles.has(m)) continue;
+        // RIR-профиль специализации: изоляции целевой мышцы — RIR 0-1
+        // (добивка до отказа, как в методиках массонабора). Определяем по
+        // названию, а не по role: при специализации изоляции становятся
+        // primary (сведение/махи/разгибания и т.д.), но всё равно добиваются.
+        const isIso = /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|сведен|отведен|подъём.*бицепс|подъем.*бицепс/i.test(ex.name || '');
+        if (isIso && (ex.rir ?? 2) > 0) {
+          // Добивка до RIR 0-1 (методика: изоляции — до отказа).
+          const newRir = Math.min(1, Math.max(0, ex.rir ?? 2));
+          ex.rir = newRir;
+          if (Array.isArray(ex.workSets)) for (const ws of ex.workSets) ws.rir = Math.max(0, newRir);
+          if (!ex.comment || !ex.comment.includes('Спец-добивка')) {
+            ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + 'Спец-добивка: RIR 0-1';
+          }
+        }
+        // Икры-спец: пауза 2с внизу + 2с вверху, сеты ≥4 (12-20 подходов/нед).
+        if (ex.muscle === 'calves' && (ex.sets ?? 0) < 4) {
+          const cap = (plan as any).mrvByMuscle?.calves;
+          const weekDirect = week.sessions.flatMap(s => s.exercises).filter((e: any) => e.muscle === 'calves' && !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);
+          if (!cap || weekDirect + (4 - (ex.sets ?? 0)) <= cap) {
+            ex.sets = 4;
+            if (Array.isArray(ex.workSets)) {
+              const sample = ex.workSets[ex.workSets.length - 1] || { reps: 12, rir: 1, weight: 0, restSeconds: 60 };
+              ex.workSets = Array.from({ length: 4 }, () => ({ ...sample, tempo: '2-2-1-0' }));
+            }
+            if (!ex.comment || !ex.comment.includes('Икры-спец')) {
+              ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + 'Икры-спец: пауза 2с внизу + 2с вверху';
+            }
+          }
+        }
+        if (ex.muscle === 'calves') {
+          for (const ws of ex.workSets || []) ws.tempo = '2-2-1-0';
+        }
+      }
+    }
+  }
+}
+
 /** Суперсеты-антагонисты: пары грудь↔спина, бицепс↔трицепс, квадры↔хамсы.
  *  Помечаем supersetWith + comment (лимиты не меняются), максимум 3 пары/сессию. */
 const ANTAGONIST_PAIRS: Array<[string, string]> = [
@@ -2106,7 +2218,7 @@ for (const week of next.weeks) {
   // Проф-тренер назначает: cable fly → dropset, leg extension → myo_rep,
   // curl → rest_pause. Без этого 0% планов имеют intensity techniques.
   if (!options.preserveSource) {
-    autoAssignIntensityTechniques(next, options.level || 'intermediate');
+    autoAssignIntensityTechniques(next, options.level || 'intermediate', options.priorityMuscles);
   }
   const rotation = analyzeBBRotation(next);
   next.rotationReport = rotation;
@@ -2201,6 +2313,11 @@ for (const week of next.weeks) {
 
 
   }
+  // Специализация: RIR-добивка изоляций, икры-темп, частота 2×/нед
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    applySpecializationPass(next, options);
+  }
+
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
   // фактический объём, а не пустой/устаревший объект.
   next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
@@ -2306,8 +2423,9 @@ for (const week of next.weeks) {
  * Только для level >= intermediate. Только для accessory/памп упражнений.
  * Не более 1 техники на упражнение, не более 2-3 на сессию.
  */
-function autoAssignIntensityTechniques(plan: BBPlan, level: string): void {
+function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[]): void {
   if (level === 'beginner') return; // новички не используют intensity techniques
+  const bicepsPriority = (priorityMuscles || []).some(m => (WEAK_TO_MUSCLE[m] || m) === 'biceps');
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue; // deload — без intensity techniques
     for (const session of week.sessions) {
@@ -2330,9 +2448,9 @@ function autoAssignIntensityTechniques(plan: BBPlan, level: string): void {
         else if (/разгибан.*ног|leg.?extension/i.test(name)) {
           technique = 'myo_rep';
         }
-        // Biceps curl → rest_pause
+        // Biceps curl → rest_pause (или 21s при специализации бицепса)
         else if (/сгибан.*бицепс|curl|подъём.*бицепс|подъем.*бицепс/i.test(name) && !/молот|hammer/i.test(name)) {
-          technique = 'rest_pause';
+          technique = bicepsPriority ? 'twenty_ones' : 'rest_pause';
         }
         // Triceps pushdown → dropset
         else if (/разгибан.*рук|разгибан.*блок|pushdown|трицепс.*блок/i.test(name)) {
@@ -2353,7 +2471,7 @@ function autoAssignIntensityTechniques(plan: BBPlan, level: string): void {
           techniquesInSession++;
           // Добавить комментарий
           const techNames: Record<string, string> = {
-            dropset: 'Дроп-сет', rest_pause: 'Rest-pause', myo_rep: 'Myo-reps',
+            dropset: 'Дроп-сет', rest_pause: 'Rest-pause', myo_rep: 'Myo-reps', twenty_ones: '21s (7-7-7)',
           };
           ex.comment = (ex.comment || '') + ` | 💥 ${techNames[technique] || technique} на последнем подходе.`;
         }
