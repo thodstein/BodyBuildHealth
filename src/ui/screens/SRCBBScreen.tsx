@@ -10,6 +10,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
+import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile } from '../../engines/bb/bb-contest-prep.engine';
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
@@ -678,7 +679,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     const bodyFat = profData?.bodyFat;
     const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
     // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan
-    const plan = buildBBPlan({
+    let plan: BBPlan = buildBBPlan({
       patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
       workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
       trainingFocus: bbTrainingFocus,
@@ -690,6 +691,14 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       proteinPerKg: nutrData?.proteinPerKg,
       calorieSurplus: nutrData?.calorieSurplus ?? 0,
     }, pedAdapt);
+    // 🏁 Единая система тапера ББ: оверлей на собранный план из профиля
+    // (goals.bbPeakConfig с legacy-fallback) — накладывается СВЕРХУ цикла.
+    try {
+      const goals = (linked.profile?.settings as any)?.goals;
+      const rawCfg = goals?.bbPeakConfig;
+      const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, profData);
+      if (prepCfg) plan = applyTrainingTaperToBBPlan(plan, prepCfg);
+    } catch { /* оверлей не блокирует сборку */ }
     setBuiltBb(plan); setBbWeekSel(1);
     // TRAINING INTEGRATION: конвертировать BB план в сессии
     try { const sessions = bbPlanToSessions(plan); saveBridgeSessions(sessions); } catch { /* ignore */ }
@@ -728,10 +737,18 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       calorieSurplus: nutrData?.calorieSurplus ?? 0,
     }, pedAdapt);
     const phased = applyMacrocycleToBBPlan(plan, macro);
+    // 🏁 Тапер ББ: оверлей на макроцикл-план из профиля (goals.bbPeakConfig).
+    let finalPlan: BBPlan = phased;
+    try {
+      const goals = (linked.profile?.settings as any)?.goals;
+      const rawCfg = goals?.bbPeakConfig;
+      const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, profData);
+      if (prepCfg) finalPlan = applyTrainingTaperToBBPlan(phased, prepCfg);
+    } catch { /* оверлей не блокирует сборку */ }
     setBbWeeks(macro.totalWeeks);
-    setBuiltBb(phased);
+    setBuiltBb(finalPlan);
     setBbWeekSel(1);
-    try { saveBridgeSessions(bbPlanToSessions(phased)); } catch { /* ignore */ }
+    try { saveBridgeSessions(bbPlanToSessions(finalPlan)); } catch { /* ignore */ }
     setSubView('plan');
   };
   // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ)

@@ -56,7 +56,7 @@ export const IndividualPlanSettings: React.FC = () => {
     trainType, setTrainType, trainIntensity, setTrainIntensity,
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
     sleepHours, setSleepHours, sleepQuality, setSleepQuality,
-    stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, lifeStage, setLifeStage,
+    stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, applyBBPeakToPlan, planTab, setPlanTab, lifeStage, setLifeStage,
     hungerLevel, setHungerLevel,
     weightAdaptMode, setWeightAdaptMode, weightLogWeek, setWeightLogWeek,
     expectedLossKgWeek, setExpectedLossKgWeek,
@@ -351,6 +351,39 @@ export const IndividualPlanSettings: React.FC = () => {
         )}
         <PopupNumber label="🍽 Голод/сытость (1–сыт, 10–голоден)" value={hungerLevel} min={1} max={10} suffix="/10" onChange={setHungerLevel} />
       </GlassCard>
+      )}
+
+      {/* 🏁 Тапер ББ — единая система пикинга (для обоих полов) */}
+      {true && (
+        <GlassCard title="Тапер ББ (пик-неделя)" icon="🏁" color="#f59e0b">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 6, lineHeight: 1.45 }}>
+            Пикинг к шоу: тренировочный тапер + 7-дневная пик-неделя (карбс/вода/натрий по дням).
+            {bbPrepConfig
+              ? ` Активен: шоу ${bbPrepConfig.showDate} · категория ${bbPrepConfig.category}.`
+              : ' Конфиг не задан — настройте во вкладке «🏁 Тапер ББ».'}
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => { if (bbPrepConfig) applyBBPeakToPlan(bbPrepConfig); else setPlanTab('peak'); }}
+              style={{
+                flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 800, minHeight: 44,
+                border: 'none', background: bbPrepConfig ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'rgba(255,255,255,0.08)',
+                color: bbPrepConfig ? '#000' : 'rgba(255,255,255,0.75)',
+              }}
+            >
+              🏁 Применить тапер-план ББ
+            </button>
+            <button
+              onClick={() => setPlanTab('peak')}
+              style={{
+                flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
+              }}
+            >
+              ⚙ Настроить
+            </button>
+          </div>
+        </GlassCard>
       )}
 
         {/* 💧 Electrolytes — quick settings (фарма перенесена в «🧬 v2 Скоринг», здесь только электролиты во избежание дубля) */}

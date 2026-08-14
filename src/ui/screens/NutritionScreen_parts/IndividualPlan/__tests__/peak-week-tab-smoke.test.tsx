@@ -1,0 +1,51 @@
+/**
+ * peak-week-tab-smoke.test.tsx — smoke-тесты вкладки «🏁 Тапер ББ» (PeakWeekTab).
+ *
+ * Проверяем: вкладка рендерится в планировщике, кнопки «Применить тапер-план ББ»
+ * и «Сохранить в профиль» присутствуют, выбор пола переключает список категорий.
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import React from 'react';
+import { IndividualPlan } from '../index';
+
+const clickTab = (label: string) => {
+  const tab = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes(label));
+  if (!tab) throw new Error(`Tab not found: ${label}`);
+  fireEvent.click(tab);
+};
+
+describe('PeakWeekTab smoke', () => {
+  beforeEach(() => {
+    try { localStorage.clear(); } catch {}
+  });
+
+  it('вкладка «Тапер ББ» открывается и содержит кнопку применить', () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickTab('Тапер ББ');
+    expect(screen.getAllByText(/Применить тапер-план ББ/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Сохранить в профиль/).length).toBeGreaterThan(0);
+  });
+
+  it('вкладка показывает пик-неделю из движка (деплеция → загрузка → шоу)', () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickTab('Тапер ББ');
+    // Таблица пик-недели: фазы из PHASE_LABELS_RU
+    expect(screen.getAllByText(/Деплеция 1/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Загрузка 3/).length).toBeGreaterThan(0);
+  });
+
+  it('смена пола переключает список категорий (bikini для женщин)', () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickTab('Тапер ББ');
+    const selects = document.querySelectorAll('select');
+    const sexSelect = Array.from(selects).find(s => Array.from(s.options).some(o => o.value === 'male' && o.textContent === 'Мужской'));
+    expect(sexSelect).toBeTruthy();
+    fireEvent.change(sexSelect!, { target: { value: 'female' } });
+    const catSelect = Array.from(document.querySelectorAll('select')).find(s => Array.from(s.options).some(o => o.value === 'bikini'));
+    expect(catSelect).toBeTruthy();
+    fireEvent.change(catSelect!, { target: { value: 'bikini' } });
+    expect((catSelect as HTMLSelectElement).value).toBe('bikini');
+  });
+});

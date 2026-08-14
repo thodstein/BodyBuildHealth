@@ -6,9 +6,10 @@ import { IndividualPlanSettings } from "./IndividualPlanSettings";
 import { IndividualPlanResults } from "./IndividualPlanResults";
 import { MealComposer } from "./MealComposer";
 import { OrganLoadCalculator } from "./OrganLoadCalculator";
+import { PeakWeekTab } from "./PeakWeekTab";
 import { usePlanCtx } from "./IndividualPlanContext";
 
-type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload';
+type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload' | 'peak';
 
 type PlannerBoundaryState = { error: Error | null };
 
@@ -44,6 +45,7 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
   { key: 'composer', label: 'Компоновщик', icon: '🍳' },
   { key: 'report', label: 'Отчёт', icon: '📊' },
   { key: 'organload', label: 'Нагрузка БЖУ', icon: '🧬' },
+  { key: 'peak', label: 'Тапер ББ', icon: '🏁' },
 ];
 
 const IndividualPlanInner: React.FC = () => {
@@ -77,6 +79,7 @@ const IndividualPlanInner: React.FC = () => {
         {tab === 'composer' && <MealComposer />}
         {tab === 'report' && <ReportTab />}
         {tab === 'organload' && <OrganLoadCalculator />}
+        {tab === 'peak' && <PeakWeekTab />}
       </div>
     </>
   );

@@ -690,6 +690,8 @@ export interface UnifiedSettings {
     peakWeek?: boolean;
     /** Дата шоу (для peak week) */
     peakShowDay?: string;
+    /** JSON-конфиг тапера ББ (bb-contest-prep.engine) — единая система пикинга. */
+    bbPeakConfig?: string;
     /** Этап жизни (детокс/набор/поддержание/сушка) */
     lifeStage?: string;
   };

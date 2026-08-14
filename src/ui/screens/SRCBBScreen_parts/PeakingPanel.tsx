@@ -5,6 +5,11 @@ import React, { useState, useMemo } from 'react';
 import { PopupNumber, PopupSelect, PopupToggle, ExpandableCard, MetricCard, CalcSection, CalcResult } from './TrainingPopups';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile, updateSection } from '../../../core/profile-manager';
+import {
+  buildBBContestPrep, validateBBContestPrepConfig, deserializeBBPrepConfig, serializeBBPrepConfig,
+  isoAddDays, isoToday, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU,
+  type BBContestPrepConfig, type BBContestCategory,
+} from '../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 10px' };
@@ -16,6 +21,9 @@ const FED_OPTS = [
   { id: 'wpc', label: 'WPC', desc: 'World Powerlifting Congress' },
   { id: 'other', label: 'Другая', desc: 'Иная федерация' },
 ];
+
+const MALE_BB_CATS: BBContestCategory[] = ['mens_physique', 'classic_physique', 'mens_bb', 'bb_212'];
+const FEMALE_BB_CATS: BBContestCategory[] = ['bikini', 'figure', 'wellness', 'womens_physique', 'womens_bb'];
 
 function genTaperCurve(weeks: number, fatigue: number): { week: number; volumePct: number; intensityPct: number; rirTarget: number }[] {
   const taper: { week: number; volumePct: number; intensityPct: number; rirTarget: number }[] = [];
@@ -103,11 +111,36 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   const [startTime, setStartTime] = useState('10:00');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
-  // BB state
-  const [showDate, setShowDate] = useState('');
-  const [carbLoadDays, setCarbLoadDays] = useState(3);
-  const [sodiumManip, setSodiumManip] = useState(true);
-  const [waterLoadDays, setWaterLoadDays] = useState(2);
+  // BB state — единая система тапера ББ (bb-contest-prep.engine)
+  const defaultBbCfg = (): BBContestPrepConfig => {
+    const p = (() => { try { return getProfile().settings || {}; } catch { return {} as any; } })();
+    const sx: 'male' | 'female' = (p as any)?.personal?.sex === 'female' ? 'female' : 'male';
+    const catRaw = String((p as any)?.goals?.bbCategory || '');
+    const known = (sx === 'female' ? FEMALE_BB_CATS : MALE_BB_CATS).find(c => c === catRaw);
+    return {
+      sex: sx,
+      category: known ?? (sx === 'female' ? 'bikini' : 'mens_physique'),
+      weightKg: Math.max(40, Math.min(200, Number((p as any)?.personal?.weight) || 80)),
+      bodyFatPct: Number((p as any)?.personal?.bodyFat) > 0 ? Number((p as any)?.personal?.bodyFat) : undefined,
+      experienceLevel: 'intermediate',
+      enhanced: false,
+      prepCount: 0,
+      showDate: isoAddDays(isoToday(), 28),
+      weeksOut: 3,
+      trainingProtocol: 'bb',
+      carbLoadStrategy: 'moderate',
+      waterStrategy: 'minimal',
+      sodiumStrategy: 'constant',
+    };
+  };
+  const [bbCfg, setBbCfg] = useState<BBContestPrepConfig>(() => {
+    try {
+      const raw = (getProfile().settings as any)?.goals?.bbPeakConfig;
+      const cfg = raw ? deserializeBBPrepConfig(raw) : null;
+      return cfg ?? defaultBbCfg();
+    } catch { return defaultBbCfg(); }
+  });
+  const [bbSaved, setBbSaved] = useState(false);
 
   // ── Автозаполнение из Профиля (однократная загрузка в локальный state) ──
   const autofillFromProfile = () => {
@@ -190,17 +223,156 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   };
 
   if (kind === 'bb') {
+    const bbPatch = (p: Partial<BBContestPrepConfig>) => setBbCfg(prev => ({ ...prev, ...p }));
+    const bbValidation = validateBBContestPrepConfig(bbCfg);
+    let bbResult: ReturnType<typeof buildBBContestPrep> | null = null;
+    if (bbValidation.ok) {
+      try { bbResult = buildBBContestPrep({ ...bbCfg, ...bbValidation.forced }); } catch { bbResult = null; }
+    }
+    const bbCats = bbCfg.sex === 'female' ? FEMALE_BB_CATS : MALE_BB_CATS;
+    const saveBbConfig = () => {
+      if (!bbValidation.ok) return;
+      try {
+        updateSection('goals', {
+          bbPeakConfig: serializeBBPrepConfig({ ...bbCfg, ...bbValidation.forced }),
+          peakWeek: true,
+          peakShowDay: bbCfg.showDate,
+        });
+        setBbSaved(true);
+        window.setTimeout(() => setBbSaved(false), 2000);
+        const toast = (window as any).showToast;
+        if (typeof toast === 'function') toast('✓ Тапер ББ сохранён в профиль — применится к плану ББ и питанию', 'success');
+      } catch { /* ignore */ }
+    };
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-        <CalcSection icon="🏆" title="Шоу-пик (ББ)" accent="#ec4899" desc="Подготовка к сцене: углеводная загрузка, водная манипуляция, натрий">
-          <PopupNumber label="Дата шоу (дд.мм)" value={0} hint="Введите дату соревнования" onChange={() => {}} />
-          <PopupNumber label="Дней карб-загрузки" value={carbLoadDays} min={1} max={7} step={1} onChange={setCarbLoadDays} />
-          <PopupToggle label="Натриевая манипуляция" value={sodiumManip} onChange={setSodiumManip} icon="🧂" />
-          <PopupNumber label="Водная загрузка (дней)" value={waterLoadDays} min={0} max={7} step={1} onChange={setWaterLoadDays} />
+        <CalcSection icon="🏆" title="Шоу-пик (ББ) — единая система тапера" accent="#ec4899" desc="Тренировочный тапер (Библиотека методик) + пик-неделя 7 дней: карбс, вода, натрий, позы">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>📅 Дата шоу</div>
+              <input type="date" value={bbCfg.showDate} onChange={e => bbPatch({ showDate: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, minHeight: 40, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }} />
+            </div>
+            <PopupSelect label="Категория" value={bbCfg.category} options={bbCats.map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))} onChange={v => bbPatch({ category: v as BBContestCategory })} />
+            <PopupNumber label="Вес тела" value={bbCfg.weightKg} min={40} max={200} suffix="кг" onChange={v => bbPatch({ weightKg: v })} />
+            <PopupNumber label="% жира сейчас" value={bbCfg.bodyFatPct ?? 0} min={0} max={60} step={0.5} suffix="%" hint="0 = не указан" onChange={v => bbPatch({ bodyFatPct: v > 0 ? v : undefined })} />
+            <PopupSelect label="Тренировочный протокол" value={bbCfg.trainingProtocol} options={[{ id: 'bb', label: 'ББ (4 нед)' }, { id: 'classic', label: 'Classic WF (4 нед)' }, { id: 'pl', label: 'ПЛ (3 нед)' }]} onChange={v => bbPatch({ trainingProtocol: v as any })} />
+            <PopupSelect label="Недель тапера" value={String(bbCfg.weeksOut)} options={[1, 2, 3, 4].map(n => ({ id: String(n), label: `${n} нед` }))} onChange={v => bbPatch({ weeksOut: Number(v) })} />
+            <PopupSelect label="🍚 Карб-загрузка" value={bbCfg.carbLoadStrategy} options={[{ id: 'moderate', label: 'Классика 3/3' }, { id: 'front', label: 'Front-load (раньше)' }, { id: 'back', label: 'Back-load (поздно)' }]} onChange={v => bbPatch({ carbLoadStrategy: v as any })} />
+            <PopupSelect label="💧 Вода" value={bbCfg.waterStrategy} options={[{ id: 'minimal', label: 'Minimal (безопасно)' }, { id: 'moderate', label: 'Moderate (мягкий cut)' }, { id: 'classic', label: 'Classic (load+cut)' }]} onChange={v => bbPatch({ waterStrategy: v as any })} />
+            <PopupSelect label="🧂 Натрий" value={bbCfg.sodiumStrategy} options={[{ id: 'constant', label: 'Constant (не трогаем)' }, { id: 'cut_2d', label: 'Cut за 2 дня' }, { id: 'cut_3d', label: 'Cut за 3 дня' }]} onChange={v => bbPatch({ sodiumStrategy: v as any })} />
+          </div>
+          {!bbValidation.ok && (
+            <div style={{ marginTop: 6, fontSize: 10, color: '#ef4444' }}>
+              {bbValidation.errors.map((e, i) => <div key={i}>✕ {e}</div>)}
+            </div>
+          )}
+          {bbValidation.warnings.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              {bbValidation.warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: 9, color: '#fbbf24', lineHeight: 1.4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', marginBottom: 3 }}>{w}</div>
+              ))}
+            </div>
+          )}
         </CalcSection>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: 10, textAlign: 'center' }}>
-          🎯 Рекомендации: карб-загрузка {carbLoadDays} дня, {sodiumManip ? 'натрий снизить за 2 дня до шоу' : 'без натриевой манипуляции'}, вода {waterLoadDays > 0 ? `${waterLoadDays} дня + сушка` : 'без водной загрузки'}.<br />
-          Детальный протокол — в разделе «Периодизация» → «Taper» (режим BB).
+
+        {bbResult && (
+          <>
+            <CalcSection icon="📊" title="Готовность" accent="#60a5fa">
+              <div style={{ fontSize: 11, color: bbResult.readiness.verdict === 'behind' ? '#f87171' : bbResult.readiness.verdict === 'ahead' ? '#4ade80' : '#60a5fa', lineHeight: 1.5 }}>
+                {bbResult.readiness.note}
+              </div>
+            </CalcSection>
+
+            <CalcSection icon="📉" title="Тапер тренировок" accent="#a855f7" desc="Кривая из Библиотеки методик — накладывается на последние недели плана ББ">
+              {bbResult.taper.map(t => (
+                <div key={t.weekOffset} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11, alignItems: 'center' }}>
+                  <span style={{ color: '#a855f7', fontWeight: 700 }}>Нед {t.weekOffset}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.8)' }}>{t.label}</span>
+                  <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>объём {Math.round(t.volumePct * 100)}% · вес {Math.round(t.intensityPct * 100)}% · RIR {t.rirMin}–{t.rirMax}</span>
+                </div>
+              ))}
+            </CalcSection>
+
+            <CalcSection icon="🍚" title="Пик-неделя (7 дней)" accent="#ec4899" desc={`Шоу ${bbCfg.showDate} · карбс ${bbCfg.carbLoadStrategy} · вода ${bbCfg.waterStrategy} · Na ${bbCfg.sodiumStrategy}`}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, minWidth: 440 }}>
+                  <thead>
+                    <tr style={{ color: 'var(--text-dim)', textAlign: 'left' }}>
+                      <th style={{ padding: '3px 4px' }}>День</th>
+                      <th style={{ padding: '3px 4px' }}>Фаза</th>
+                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>Ккал</th>
+                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>Б/У/Ж</th>
+                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>💧л</th>
+                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>Na</th>
+                      <th style={{ padding: '3px 4px' }}>Тренировка</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bbResult.peakWeek.map(d => (
+                      <tr key={d.day} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: d.day === 7 ? 'rgba(236,72,153,0.08)' : undefined }}>
+                        <td style={{ padding: '3px 4px', fontWeight: 700, color: d.day === 7 ? '#ec4899' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}</td>
+                        <td style={{ padding: '3px 4px', color: '#ec4899' }}>{PHASE_LABELS_RU[d.phase]}</td>
+                        <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.kcal}</td>
+                        <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--text-dim)' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
+                        <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.waterLiters}</td>
+                        <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.sodiumMg}</td>
+                        <td style={{ padding: '3px 4px', color: 'var(--text-dim)' }}>{d.training.type === 'Отдых' ? '—' : d.training.type.split(' ')[0]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CalcSection>
+
+            <CalcSection icon="⏰" title="День шоу по часам" accent="#f59e0b">
+              {bbResult.showTimeline.map((t, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '52px 1fr', gap: 8, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10 }}>
+                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>{t.time}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.8)' }}><b style={{ color: '#fff' }}>{t.action}</b> — {t.detail}</span>
+                </div>
+              ))}
+            </CalcSection>
+
+            {bbResult.warnings.length > 0 && (
+              <CalcSection icon="⚠" title="Предупреждения" accent="#ef4444">
+                {bbResult.warnings.map((w, i) => <div key={i} style={{ fontSize: 9, color: '#f87171', lineHeight: 1.45, marginBottom: 2 }}>{w}</div>)}
+              </CalcSection>
+            )}
+          </>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              try {
+                const p = getProfile().settings as any;
+                const sx: 'male' | 'female' = p?.personal?.sex === 'female' ? 'female' : 'male';
+                const catRaw = String(p?.goals?.bbCategory || '');
+                const known = (sx === 'female' ? FEMALE_BB_CATS : MALE_BB_CATS).find(c => c === catRaw);
+                bbPatch({
+                  sex: sx,
+                  category: known ?? bbCfg.category,
+                  weightKg: Number(p?.personal?.weight) || bbCfg.weightKg,
+                  bodyFatPct: Number(p?.personal?.bodyFat) > 0 ? Number(p?.personal?.bodyFat) : bbCfg.bodyFatPct,
+                });
+              } catch { /* ignore */ }
+            }}
+            style={{ flex: 1, padding: 12, borderRadius: 10, cursor: 'pointer', minHeight: 44, background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 800, fontSize: 12, border: '1px solid rgba(99,102,241,0.3)' }}
+          >
+            📋 Из профиля
+          </button>
+          <button
+            onClick={saveBbConfig}
+            disabled={!bbValidation.ok}
+            style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', cursor: bbValidation.ok ? 'pointer' : 'not-allowed', minHeight: 44, background: bbSaved ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff', fontWeight: 800, fontSize: 12, opacity: bbValidation.ok ? 1 : 0.4 }}
+          >
+            {bbSaved ? '✓ Сохранено в профиль' : '🏁 Сохранить и применить тапер ББ'}
+          </button>
+        </div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.5, textAlign: 'center' }}>
+          Сохранение пишет конфиг в профиль (goals.bbPeakConfig): сборка плана ББ наложит тапер на последние недели,
+          блок «Питание → 🏁 Тапер ББ» применит пик-неделю к рациону по дате шоу.
         </div>
       </div>
     );
