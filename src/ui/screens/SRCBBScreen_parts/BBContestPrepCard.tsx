@@ -7,8 +7,12 @@
  *
  *   <BBContestPrepCard
  *     competition={{ name: c.name, week: c.week, date: c.date }}
- *     onOpenConfig={() => { /* переход на вкладку питания «🏁 Тапер ББ» или «🏆 Шоу ББ» * / }}
+ *     onOpenConfig={() => { /* переход на «🏁 Тапер ББ» в питании или «🏆 Шоу ББ» * / }}
  *   />
+ *
+ * Без onOpenConfig кнопка использует дефолт: переключает активную вкладку
+ * планировщика питания на «🏁 Тапер ББ» (he_plan_active_tab) и уведомляет
+ * пользователя тостом.
  */
 import React, { useMemo } from 'react';
 import { getProfile } from '../../../core/profile-manager';
@@ -17,6 +21,17 @@ import {
   buildBBContestPrep, CONTEST_CATEGORY_LABELS,
   type BBContestPrepConfig,
 } from '../../../engines/bb/bb-contest-prep.engine';
+
+const defaultOpenConfig = () => {
+  try {
+    localStorage.setItem('he_plan_active_tab', 'peak');
+    try { window.dispatchEvent(new StorageEvent('storage', { key: 'he_plan_active_tab' })); } catch {}
+  } catch {}
+  const toast = (window as any).showToast;
+  if (typeof toast === 'function') {
+    toast('Откройте блок «Питание» → планировщик → вкладка «🏁 Тапер ББ»', 'info');
+  }
+};
 
 export const BBContestPrepCard: React.FC<{
   competition?: { name: string; week: number; date?: string };
@@ -82,18 +97,16 @@ export const BBContestPrepCard: React.FC<{
           а план питания получит карбс/воду/натрий по дням до шоу.
         </div>
       )}
-      {onOpenConfig && (
-        <button
-          type="button"
-          onClick={onOpenConfig}
-          style={{
-            width: '100%', marginTop: 6, padding: '8px 10px', minHeight: 44, borderRadius: 8, cursor: 'pointer',
-            fontSize: 10, fontWeight: 700, border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-          }}
-        >
-          ⚙ {cfg ? 'Настроить тапер ББ' : 'Создать тапер ББ'}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onOpenConfig || defaultOpenConfig}
+        style={{
+          width: '100%', marginTop: 6, padding: '8px 10px', minHeight: 44, borderRadius: 8, cursor: 'pointer',
+          fontSize: 10, fontWeight: 700, border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+        }}
+      >
+        ⚙ {cfg ? 'Настроить тапер ББ' : 'Создать тапер ББ'}
+      </button>
     </div>
   );
 };
