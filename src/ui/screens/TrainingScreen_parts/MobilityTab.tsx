@@ -19,7 +19,7 @@ import {
   loadMobilityProtocols, upsertMobilityProtocol, deleteMobilityProtocol, duplicateMobilityProtocol,
   createMobilityProtocol, loadActiveMobility, setActiveMobility,
   loadMobilityCheckins, upsertMobilityCheckin, latestMobilityCheckin,
-  mobilityAdherence, mobilityTrends, exportMobilityCheckinsCSV,
+  mobilityAdherence, mobilityTrends, exportMobilityCheckinsCSV, buildMobilityInsights,
   type MobilityProtocol, type MobilityItem, type MobilitySlot, type MobilityDirection,
 } from '../../../engines/mobility-protocol.engine';
 
@@ -157,6 +157,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   // ── Аналитика ──
   const adherence = useMemo(() => mobilityAdherence(30), [tick]);
   const trends = useMemo(() => mobilityTrends(30), [tick]);
+  const insights = useMemo(() => buildMobilityInsights(active), [active, tick]);
 
   const slotItems = useMemo(() => itemsForSlot(active, previewSlot), [active, previewSlot]);
   const filteredLibrary = useMemo(() => {
@@ -189,6 +190,45 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
       URL.revokeObjectURL(url);
     } catch { /* ignore */ }
   };
+
+  // ── Печатный отчёт мобильности ──
+  const printReport = useCallback(() => {
+    const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const checks = loadMobilityCheckins();
+    const adh = mobilityAdherence(30);
+    const tr = mobilityTrends(30);
+    const rows = [...checks].reverse().slice(0, 60).map(c => `
+      <tr>
+        <td>${esc(c.date)}</td><td>${esc(c.sessionId || '—')}</td>
+        <td>${c.done ? 'да' : 'нет'}</td><td>${c.romScore === null ? '—' : c.romScore}</td>
+        <td>${esc(c.note || '')}</td>
+      </tr>`).join('');
+    const itemsHtml = active && active.items.length > 0
+      ? `<h2>Протокол</h2><ul>${active.items.map(it => `<li>${esc(it.title)} — ${SLOT_LABELS[it.slot]}, ${it.durationMin} мин</li>`).join('')}</ul>`
+      : '';
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Мобильность — отчёт</title>
+      <style>body{font-family:system-ui;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:11px}
+      th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f5f5f5}h1{font-size:18px}h2{font-size:14px;margin-top:20px}
+      .stats{display:flex;gap:20px;font-size:13px;margin:8px 0;flex-wrap:wrap}</style></head><body>
+      <h1>🧘 Мобильность и гибкость — отчёт</h1>
+      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}${active ? ` · протокол: ${esc(active.name)} (${active.items.length} блоков)` : ' · протокол не собран'}</div>
+      <div class="stats">
+        <span>Чек-инов всего: <b>${checks.length}</b></span>
+        <span>За 30 дней: <b>${tr.count}</b></span>
+        <span>Приверженность (30д): <b>${adh.total > 0 ? adh.pct + '%' : '—'}</b></span>
+        <span>Средний ROM: <b>${tr.avgRom > 0 ? tr.avgRom.toFixed(1) : '—'}</b></span>
+      </div>
+      ${itemsHtml}
+      <h2>Инсайты</h2>
+      <ul>${insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+      <h2>Чек-ины (последние 60)</h2>
+      <table><thead><tr><th>Дата</th><th>Сессия</th><th>Выполнено</th><th>ROM</th><th>Заметка</th></tr></thead><tbody>${rows}</tbody></table>
+      <script>window.print();</script></body></html>`;
+    try {
+      const win = window.open('', '_blank', 'width=900,height=700');
+      if (win) { win.document.write(html); win.document.close(); }
+    } catch { /* SSR/блокировка — игнор */ }
+  }, [active, insights]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
@@ -481,12 +521,25 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
               </>
             )}
           </div>
+
+          {/* ── Инсайты ── */}
+          <div style={CARD}>
+            <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 8 }}>
+              💡 Персональные инсайты
+            </div>
+            {insights.map((s, i) => (
+              <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(96,165,250,0.04)', borderLeft: '2px solid rgba(96,165,250,0.4)', marginBottom: 4 }}>
+                {s}
+              </div>
+            ))}
+          </div>
         </>
       )}
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} onClick={downloadCSV} aria-label="Скачать CSV чек-инов мобильности">⬇ Чек-ины CSV</button>
+        <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта мобильности">🖨 Отчёт</button>
       </div>
     </div>
   );

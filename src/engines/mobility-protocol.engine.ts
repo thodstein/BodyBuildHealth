@@ -516,3 +516,42 @@ export function exportMobilityCheckinsCSV(): string {
   }
   return rows.join('\n');
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Insights
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Персональные инсайты мобильности: приверженность, ROM-тренд, покрытие слотов.
+ * Отображение-онли — рекомендации не меняют план.
+ */
+export function buildMobilityInsights(protocol: MobilityProtocol | null): string[] {
+  const out: string[] = [];
+  if (!protocol) {
+    out.push('Протокол мобильности ещё не собран. Начните с пресета (ПЛ / ББ / универсал) — рутина появится в сессии перед тренировкой.');
+    return out;
+  }
+  if (protocol.items.length === 0) {
+    out.push('Протокол пуст. Добавьте блоки из библиотеки или примените пресет.');
+    return out;
+  }
+  const adherence = mobilityAdherence(30);
+  if (adherence.total >= 3) {
+    if (adherence.pct >= 70) out.push(`Рутина выполняется в ${adherence.pct}% дней — отличная последовательность. Держите ритм: эффект CARs/позвоночника накопительный.`);
+    else if (adherence.pct >= 35) out.push(`Рутина выполняется в ${adherence.pct}% дней. Сократите протокол до 1-2 самых ценных блоков в день — короткая рутина выполняется чаще.`);
+    else out.push(`Рутина выполняется только в ${adherence.pct}% дней. Начните с одного ежедневного блока (например, CARs 5 мин) и закрепите его неделю.`);
+  }
+  const trends = mobilityTrends(30);
+  if (trends.count >= 3 && trends.avgRom > 0) {
+    if (trends.avgRom <= 2.5) out.push(`Средняя оценка ROM ${trends.avgRom}/5 — суставы «жёсткие». Добавьте ежедневную рутину и проверьте объём: возможно, нужен делод или больше растяжки после тренировок.`);
+    else if (trends.avgRom >= 4) out.push(`Средняя оценка ROM ${trends.avgRom}/5 — отличная подвижность. Поддерживайте её рутиной, при необходимости усложняйте (PNF, нагруженная).`);
+  }
+  const hasDaily = hasDailyRoutine(protocol);
+  const hasRest = itemsForSlot(protocol, 'rest_day').length > 0;
+  const hasPost = itemsForSlot(protocol, 'post').length > 0;
+  if (!hasDaily) out.push('В протоколе нет ежедневной рутины (слот «Ежедневная рутина») — добавьте CARs или мобильность позвоночника: эффект накопительный, без ежедневности он теряется.');
+  if (!hasRest) out.push('Нет сессий в дни отдыха — добавьте поток (бёдра/позвоночник) в слот «День отдыха»: дни без тренировки — лучшее время для глубокой мобильности.');
+  if (!hasPost) out.push('Нет растяжки после тренировки — статика/PNF после сессии дают ROM без потери силы и снижают DOMS.');
+  if (out.length === 0) out.push('Протокол сбалансирован. Отмечайте выполнение и ROM — появятся персональные рекомендации.');
+  return out;
+}

@@ -15,7 +15,7 @@ import {
   itemsForSlot, hasDailyRoutine,
   loadMobilityCheckins, upsertMobilityCheckin, latestMobilityCheckin,
   mobilityAdherence, mobilityTrends,
-  loadMobilityDayProgress, saveMobilityDayProgress, exportMobilityCheckinsCSV,
+  loadMobilityDayProgress, saveMobilityDayProgress, exportMobilityCheckinsCSV, buildMobilityInsights,
   MOBILITY_PROTOCOLS_KEY, MOBILITY_ACTIVE_KEY, MOBILITY_CHECKS_KEY, MOBILITY_DAY_PROGRESS_KEY,
   type MobilityProtocol, type MobilityItem, type MobilityCheckin,
 } from '../mobility-protocol.engine';
@@ -285,5 +285,60 @@ describe('Метки', () => {
     expect(PRESET_LABELS.pl).toBeTruthy();
     expect(PRESET_LABELS.bb).toBeTruthy();
     expect(PRESET_LABELS.both).toBeTruthy();
+  });
+});
+
+describe('Инсайты мобильности', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('без протокола — подсказка собрать пресет', () => {
+    const out = buildMobilityInsights(null);
+    expect(out.length).toBe(1);
+    expect(out[0]).toContain('пресет');
+  });
+
+  it('пустой протокол — подсказка добавить блоки', () => {
+    const out = buildMobilityInsights(createMobilityProtocol('Пусто', 'both'));
+    expect(out.some(s => s.includes('пуст'))).toBe(true);
+  });
+
+  it('нет daily-слота → рекомендация добавить рутину', () => {
+    const p = createMobilityProtocol('П', 'both', [{ id: 'i', slot: 'post', title: 'т', script: '', durationMin: 1 }]);
+    const out = buildMobilityInsights(p);
+    expect(out.some(s => s.includes('Ежедневная рутина'))).toBe(true);
+  });
+
+  it('нет rest_day/post → рекомендации по слотам', () => {
+    const p = createMobilityProtocol('П', 'both', [{ id: 'i', slot: 'daily', title: 'т', script: '', durationMin: 1 }]);
+    const out = buildMobilityInsights(p);
+    expect(out.some(s => s.includes('дни отдыха'))).toBe(true);
+    expect(out.some(s => s.includes('после тренировки'))).toBe(true);
+  });
+
+  it('низкий ROM за 30 дней → рекомендация', () => {
+    const p = buildPresetMobility('both');
+    const day = new Date();
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(day); d.setDate(day.getDate() - i);
+      upsertMobilityCheckin({ id: '', date: d.toISOString().slice(0, 10), done: true, romScore: 2 });
+    }
+    const out = buildMobilityInsights(p);
+    expect(out.some(s => s.includes('ROM') && s.includes('жёсткие'))).toBe(true);
+  });
+
+  it('высокая приверженность → поощрение', () => {
+    const p = buildPresetMobility('both');
+    const day = new Date();
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(day); d.setDate(day.getDate() - i);
+      upsertMobilityCheckin({ id: '', date: d.toISOString().slice(0, 10), done: true, romScore: 4 });
+    }
+    const out = buildMobilityInsights(p);
+    expect(out.some(s => s.includes('последовательность'))).toBe(true);
+  });
+
+  it('сбалансированный протокол без данных → нейтральная подсказка', () => {
+    const out = buildMobilityInsights(buildPresetMobility('both'));
+    expect(out.some(s => s.includes('сбалансирован'))).toBe(true);
   });
 });

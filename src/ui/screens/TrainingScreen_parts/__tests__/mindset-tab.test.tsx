@@ -257,6 +257,8 @@ describe('MobilityTab (SSR-смок)', () => {
     expect(html).toContain('Тренды мобильности');
     expect(html).toContain('Библиотека блоков');
     expect(html).toContain('Чек-ины CSV');
+    expect(html).toContain('🖨 Отчёт');
+    expect(html).toContain('Персональные инсайты');
   });
 
   it('устойчив к битому JSON протоколов', () => {

@@ -7,6 +7,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { clearStorageTrimWarning } from '../../../engines/workout-logger.engine';
 import { loadCheckins, protocolAdherence, mindsetTrends } from '../../../engines/mindset-protocol.engine';
+import { loadMobilityCheckins, mobilityAdherence, mobilityTrends } from '../../../engines/mobility-protocol.engine';
 import { Sparkline } from './Sparkline';
 import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
@@ -677,8 +678,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             );
           })()}
           {/* Психо-чек-ины: сводка (из вкладки «Психология») */}
-          {loadCheckins().length > 0 && (() => {
-            const adh = protocolAdherence(30);
+          {loadCheckins().length > 0 && (() => {            const adh = protocolAdherence(30);
             const trends = mindsetTrends(14);
             const checks = loadCheckins();
             const last = checks[checks.length - 1];
@@ -705,6 +705,41 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Уверенность · 14д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{avg(trends.averages.confidence)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Мобильность: сводка (из вкладки «Мобильность») */}
+          {loadMobilityCheckins().length > 0 && (() => {
+            const madh = mobilityAdherence(30);
+            const mtr = mobilityTrends(30);
+            const mchecks = loadMobilityCheckins();
+            const mlast = mchecks[mchecks.length - 1];
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label}>🧘 Мобильность</div>
+                  <span style={{ fontSize: 9, color: 'rgba(96,165,250,0.8)' }}>
+                    последний: {mlast.date.slice(5).replace('-', '.')} · ROM {mlast.romScore === null ? '—' : `${mlast.romScore}/5`}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Чек-инов · 30д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{mtr.count}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: madh.pct >= 70 ? '#22c55e' : madh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{madh.total > 0 ? `${madh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Средний ROM</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{mtr.avgRom > 0 ? mtr.avgRom.toFixed(1) : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{madh.done}</div>
                   </div>
                 </div>
               </div>
