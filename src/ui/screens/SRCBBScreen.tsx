@@ -740,12 +740,21 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     }, pedAdapt);
     const phased = applyMacrocycleToBBPlan(plan, macro);
     // 🏁 Тапер ББ: оверлей на макроцикл-план из профиля (goals.bbPeakConfig).
+    // Таргет — последняя неделя блока contest_prep (не обязательно конец плана).
     let finalPlan: BBPlan = phased;
     try {
       const goals = (linked.profile?.settings as any)?.goals;
       const rawCfg = goals?.bbPeakConfig;
       const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, profData);
-      if (prepCfg) finalPlan = applyTrainingTaperToBBPlan(phased, prepCfg);
+      if (prepCfg) {
+        const blocks = Array.isArray((macro as any)?.blocks) ? (macro as any).blocks : [];
+        const lastPrepWeek = blocks
+          .filter((b: any) => b.phase === 'contest_prep')
+          .reduce((max: number, b: any) => Math.max(max, (b.weekOffset ?? 0) + (b.weeks ?? 0) - 1), 0);
+        finalPlan = lastPrepWeek > 0
+          ? applyTrainingTaperToBBPlan(phased, prepCfg, { weekNumber: lastPrepWeek })
+          : applyTrainingTaperToBBPlan(phased, prepCfg);
+      }
     } catch { /* оверлей не блокирует сборку */ }
     setBbWeeks(macro.totalWeeks);
     setBuiltBb(finalPlan);

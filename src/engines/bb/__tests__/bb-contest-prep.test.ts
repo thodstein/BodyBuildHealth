@@ -556,6 +556,30 @@ describe('applyTrainingTaperToBBPlan', () => {
     expect(out.weeks).toHaveLength(2);
     expect(out.weeks[1].peakWeek).toBe(true);
   });
+
+  it('weekNumber: тапер заканчивается на указанной неделе (пик-неделя там же)', () => {
+    const plan = makePlan(8);
+    const out = applyTrainingTaperToBBPlan(plan, baseConfig({ weeksOut: 3 }), { weekNumber: 5 }) as BBPlanWithPrep;
+    // Пик-неделя = неделя 5; недели 6-8 не тронуты.
+    expect(out.weeks[4].peakWeek).toBe(true);
+    expect(out.weeks[4].phase).toBe('peaking');
+    expect(out.weeks[7].peakWeek).toBeUndefined();
+    expect(out.weeks[7].sessions[0].exercises[0].sets).toBe(plan.weeks[7].sessions[0].exercises[0].sets);
+    // Тапер-недели: 3, 4 (до недели шоу) — их объём ниже исходного.
+    const setsOf = (w: any) => w.sessions.reduce((s: number, ss: any) => s + ss.exercises.reduce((x: number, e: any) => x + e.sets, 0), 0);
+    expect(setsOf(out.weeks[2])).toBeLessThan(setsOf(plan.weeks[2]));
+    expect(setsOf(out.weeks[3])).toBeLessThan(setsOf(plan.weeks[3]));
+  });
+
+  it('weekNumber клампится к краям плана', () => {
+    const plan = makePlan(8);
+    const hi = applyTrainingTaperToBBPlan(plan, baseConfig({ weeksOut: 3 }), { weekNumber: 99 }) as BBPlanWithPrep;
+    expect(hi.weeks[7].peakWeek).toBe(true);
+    const loPlan = makePlan(8);
+    const lo = applyTrainingTaperToBBPlan(loPlan, baseConfig({ weeksOut: 3 }), { weekNumber: 1 }) as BBPlanWithPrep;
+    expect(lo.weeks[0].peakWeek).toBe(true);
+    expect(lo.weeks[7].peakWeek).toBeUndefined();
+  });
 });
 
 describe('applyPeakWeekOverlayToBBPlan', () => {

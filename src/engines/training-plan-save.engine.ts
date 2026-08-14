@@ -303,10 +303,13 @@ export function readDiaryMixes(): DiaryMixRecord[] {
   return readJson<DiaryMixRecord>(MIX_DIARY_KEY);
 }
 
+/** Счётчик для гарантированной уникальности id (Date.now может совпасть в одной мс). */
+let mixIdCounter = 0;
+
 /** Сохранить микс/пресет в дневник тренировок (prepend, cap 20). date — опционально (тесты/бэкфилл). */
 export function saveMixToDiary(input: SaveMixInput, date?: string): DiaryMixRecord {
   const record: DiaryMixRecord = {
-    id: `mix_${Date.now().toString(36)}`,
+    id: `mix_${Date.now().toString(36)}_${(mixIdCounter++).toString(36)}`,
     title: input.title || `${input.kind === 'preset' ? 'Пресет' : 'Микс'}: ${input.goal}`,
     kind: input.kind,
     goal: input.goal,

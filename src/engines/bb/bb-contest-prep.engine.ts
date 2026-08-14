@@ -744,11 +744,16 @@ function toPeakWeekSession(
 }
 
 /**
- * Наложить тренировочный тапер (кривая Библиотеки) на последние недели плана
- * и превратить финальную неделю в пик-неделю. НЕ мутирует исходный план.
+ * Наложить тренировочный тапер (кривая Библиотеки) на недели плана, предшествующие
+ * неделе шоу, и превратить неделю шоу в пик-неделю. НЕ мутирует исходный план.
  * Идемпотентен: повторный вызов на уже обработанном плане возвращает его как есть.
+ * `opts.weekNumber` — 1-индекс недели шоу (по умолчанию последняя; клампится к краям).
  */
-export function applyTrainingTaperToBBPlan(plan: BBPlan, rawCfg: BBContestPrepConfig): BBPlanWithPrep {
+export function applyTrainingTaperToBBPlan(
+  plan: BBPlan,
+  rawCfg: BBContestPrepConfig,
+  opts?: { weekNumber?: number },
+): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
@@ -760,13 +765,16 @@ export function applyTrainingTaperToBBPlan(plan: BBPlan, rawCfg: BBContestPrepCo
   const n = taper.length;
   const weeks = plan.weeks.map(w => ({ ...w, sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: (e.workSets || []).map(ws => ({ ...ws })) })) })) })) as any[];
   const total = weeks.length;
-  const startIdx = Math.max(0, total - n);
+  const endIdx = clamp((opts?.weekNumber ?? total) - 1, 0, total - 1);
+  const startIdx = Math.max(0, endIdx - n + 1);
+  const windowLen = endIdx - startIdx + 1;
+  const usedTaper = taper.slice(n - windowLen);
 
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < windowLen; i++) {
     const idx = startIdx + i;
-    if (idx >= total) break;
     const wk = weeks[idx];
-    const t = taper[i];
+    const t = usedTaper[i];
+    if (!t) break;
 
     // Guard: не резать уже разгруженные недели (anti-двойное снижение, как PL-taper).
     const isDeload = wk.deload === true || wk.phase === 'deload'
@@ -804,10 +812,9 @@ export function applyTrainingTaperToBBPlan(plan: BBPlan, rawCfg: BBContestPrepCo
     wk.prepProtocol = `${getPeakingProtocol(cfg.trainingProtocol).name} — ${t.label}`;
   }
 
-  // Финальная неделя → пик-неделя (памп/деплеция, отдых).
-  if (n > 0) {
-    const lastIdx = Math.min(total - 1, startIdx + n - 1);
-    const wk = weeks[lastIdx];
+  // Неделя шоу → пик-неделя (памп/деплеция, отдых).
+  if (windowLen > 0) {
+    const wk = weeks[endIdx];
     const peakWeek = buildPeakWeek(cfg);
     wk.phase = 'peaking';
     wk.taper = true;
