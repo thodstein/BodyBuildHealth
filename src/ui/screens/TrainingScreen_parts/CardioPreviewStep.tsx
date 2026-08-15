@@ -4,7 +4,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
+  cardioCycleSummary, cardioQualityReport, CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
   type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
@@ -30,9 +30,13 @@ const PHASE_COLOR: Record<string, string> = {
 export const CardioPreviewStep: React.FC<{
   cycle: CardioCycle | null;
   onBuild: () => void;
-}> = ({ cycle, onBuild }) => {
+  onRename: (name: string) => void;
+  daysAvailable: number;
+}> = ({ cycle, onBuild, onRename, daysAvailable }) => {
   const [showWeeks, setShowWeeks] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
+  const quality = useMemo(() => (cycle ? cardioQualityReport(cycle, daysAvailable) : null), [cycle, daysAvailable]);
 
   if (!cycle || !summary) {
     return (
@@ -70,6 +74,36 @@ export const CardioPreviewStep: React.FC<{
         </div>
         <button style={BTN_PRIMARY} onClick={onBuild}>🔄 Пересобрать цикл</button>
       </div>
+
+      {/* Качество цикла */}
+      {quality && (
+        <div style={CARD}>
+          <div style={ROW}>
+            <span style={LABEL}>📊 Качество цикла</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }}>{quality.score}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>/100</span>
+          </div>
+          <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <div style={{ width: quality.score + '%', height: '100%', borderRadius: 3, background: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }} />
+          </div>
+          {quality.findings.map((f, i) => (
+            <div key={i} style={{ fontSize: 10, lineHeight: 1.4, color: f.level === 'warn' ? '#fbbf24' : f.level === 'ok' ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.5)' }}>
+              {f.level === 'warn' ? '⚠ ' : f.level === 'ok' ? '✅ ' : '💡 '}{f.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Переименование */}
+      {cycle && (
+        <div style={CARD}>
+          <div style={LABEL}>✏️ Название цикла</div>
+          <div style={ROW}>
+            <input value={nameDraft || cycle.name} onChange={e => setNameDraft(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Название цикла" />
+            <button style={BTN_PRIMARY} onClick={() => { if (nameDraft.trim()) { onRename(nameDraft.trim()); setNameDraft(''); } }}>💾 Переименовать</button>
+          </div>
+        </div>
+      )}
 
       <CardioVolumeChart cycle={cycle} />
 

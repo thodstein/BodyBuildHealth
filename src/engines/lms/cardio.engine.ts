@@ -931,3 +931,94 @@ export function autoTuneCardioCycle(
     : { action: 'keep', reason: 'Данные дневника соответствуют плану — изменений нет.' };
   return { cycle: cycle2, changes, advice };
 }
+
+// ─── Качество цикла (диагностика) ───
+
+export interface CardioQualityFinding {
+  level: 'ok' | 'warn' | 'info';
+  text: string;
+}
+
+export interface CardioQualityReport {
+  score: number;
+  findings: CardioQualityFinding[];
+}
+
+function weekMaxFreq(w: CardioWeek): number {
+  return w.sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+}
+
+/**
+ * Диагностика качества кардио-цикла: объём под цель, прогрессия, делоды,
+ * HIIT, taper у стартов, пустые недели, перегруз дней. Возвращает score 0-100.
+ */
+export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): CardioQualityReport {
+  const findings: CardioQualityFinding[] = [];
+  let penalty = 0;
+  const s = cardioCycleSummary(cycle);
+  const add = (level: CardioQualityFinding['level'], text: string, pts: number) => {
+    findings.push({ level, text });
+    if (level === 'warn') penalty += pts;
+  };
+
+  // 1. Объём под цель
+  const avg = s.avgMinutesPerWeek;
+  if (cycle.goal === 'cut') {
+    if (avg < 90) add('warn', `Сушка: ${avg} мин/нед — маловато для липолиза (ориентир 90-210).`, 15);
+    else if (avg > 210) add('warn', `Сушка: ${avg} мин/нед — высокий объём, следите за восстановлением.`, 10);
+    else add('ok', `Объём ${avg} мин/нед соответствует сушке.`, 0);
+  } else if (cycle.goal === 'mass') {
+    if (avg > 60) add('warn', `Массонабор: ${avg} мин/нед может конкурировать с ростом (ориентир ≤60).`, 15);
+    else add('ok', `Объём ${avg} мин/нед не мешает массонабору.`, 0);
+  } else if (cycle.goal === 'health') {
+    if (avg < 90) add('warn', `Здоровье: ${avg} мин/нед — меньше рекомендаций ВОЗ (150 мин/нед умеренной).`, 15);
+    else add('ok', `Объём ${avg} мин/нед закрывает базовую рекомендацию.`, 0);
+  } else if (cycle.goal === 'recovery') {
+    if (avg > 150) add('warn', `Восстановление: ${avg} мин/нед — много для разгрузочного режима.`, 10);
+  }
+
+  // 2. Прогрессия объёма (вторая половина > первой) для cut/health/recomp
+  //    Сравниваем только рабочие недели (без taper/peak/transition/делодов —
+  //    они по определению снижают объём в конце).
+  if (['cut', 'health', 'recomp'].includes(cycle.goal) && cycle.totalWeeks >= 6) {
+    const work = cycle.weeks.filter(w => !w.taper && !w.deload && w.phase !== 'transition' && w.phase !== 'peak');
+    if (work.length >= 4) {
+      const half = Math.floor(work.length / 2);
+      const first = work.slice(0, half).reduce((sum, w) => sum + w.totalMinutes, 0);
+      const second = work.slice(half).reduce((sum, w) => sum + w.totalMinutes, 0);
+      if (second <= first) add('warn', 'Нет прогрессии объёма: вторая половина рабочих недель не тяжелее первой.', 15);
+      else add('ok', 'Прогрессия объёма нарастает по ходу цикла.', 0);
+    }
+  }
+
+  // 3. Делоды
+  if (cycle.totalWeeks >= 8 && ['cut', 'health', 'recomp'].includes(cycle.goal)) {
+    if (!cycle.weeks.some(w => w.deload)) add('warn', 'В длинном цикле нет делод-недель.', 10);
+    else add('ok', 'Делод-недели присутствуют.', 0);
+  }
+
+  // 4. HIIT для сушки
+  if (cycle.goal === 'cut') {
+    if (s.hiitWeeks === 0) add('info', 'HIIT отсутствует — для сушки можно добавить 1×15 мин (при достаточном восстановлении).', 0);
+    else add('ok', `HIIT на ${s.hiitWeeks} неделях — метаболический стимул есть.`, 0);
+  }
+
+  // 5. Taper у стартов
+  if ((cycle.linkedCompetitionIds?.length ?? 0) > 0) {
+    const taperWeeksCount = cycle.weeks.filter(w => w.phase === 'taper').length;
+    if (taperWeeksCount === 0) add('warn', 'Есть старты, но нет ни одной taper-недели.', 10);
+    else add('ok', `Taper построен (${taperWeeksCount} нед).`, 0);
+    const peak = cycle.weeks.find(w => w.phase === 'peak');
+    if (peak && peak.sessions.some(s => s.type === 'hiit')) add('warn', 'Пик-неделя содержит HIIT.', 10);
+  }
+
+  // 6. Пустые недели и перегруз дней
+  const emptyWeeks = cycle.weeks.filter(w => weekMaxFreq(w) === 0).length;
+  if (emptyWeeks > 0) add('warn', `${emptyWeeks} недель без сессий.`, 10);
+  const maxFreq = Math.max(1, ...cycle.weeks.map(weekMaxFreq));
+  if (daysAvailable > 0 && daysAvailable < 7 && maxFreq > daysAvailable) {
+    add('info', `Максимальная частота недели (${maxFreq}) больше доступных дней (${daysAvailable}) — часть сессий сгруппируется.`, 0);
+  }
+
+  return { score: Math.max(0, Math.min(100, 100 - penalty)), findings };
+}

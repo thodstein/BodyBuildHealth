@@ -15,6 +15,7 @@ const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
 const LINK_KEY = 'he_cardio_link';
 const BB_MACRO_KEY = 'he_bb_macro';
+const WIZARD_KEY = 'he_cardio_wizard_state';
 
 beforeEach(() => {
   try {
@@ -22,6 +23,7 @@ beforeEach(() => {
     localStorage.removeItem(ACTIVE_KEY);
     localStorage.removeItem(LINK_KEY);
     localStorage.removeItem(BB_MACRO_KEY);
+    localStorage.removeItem(WIZARD_KEY);
     clearCardioLink();
   } catch { /* ignore */ }
 });
@@ -141,5 +143,25 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getByRole('button', { name: /Подстроить сейчас/ })).toBeTruthy();
     expect(screen.getByText(/Дневник выполнения кардио/)).toBeTruthy();
+  });
+
+  it('переименование активного цикла сохраняется', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const input = screen.getByRole('textbox', { name: /Название цикла/ });
+    fireEvent.change(input, { target: { value: 'Сушка к Чемпионату' } });
+    fireEvent.click(screen.getByRole('button', { name: /Переименовать/ }));
+    const saved = loadCardioCycles()[0];
+    expect(saved.name).toBe('Сушка к Чемпионату');
+    expect(JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null').name).toBe('Сушка к Чемпионату');
+  });
+
+  it('параметры мастера восстанавливаются из localStorage', () => {
+    localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ goal: 'mass', totalWeeks: 10, daysAvailable: 2, recoveryLow: true, bodyWeight: 90, taperWeeks: 3, peakWeek: false, phaseAuto: false, phaseBase: 2, phaseBuild: 3, phaseMaint: 3 }));
+    const { unmount } = render(<CardioConstructor />);
+    expect(screen.getByRole('button', { name: /Цель: Массонабор/ })).toBeTruthy();
+    unmount();
   });
 });

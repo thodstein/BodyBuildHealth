@@ -12,6 +12,7 @@ import {
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
+  cardioSessionsForDate,
   type CardioCycle, type CardioGoal, type CardioCompetitionRef,
 } from '../../../engines/lms/cardio.engine';
 import {
@@ -49,6 +50,35 @@ const NAV_BTN_PRIMARY: React.CSSProperties = {
   ...NAV_BTN, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.5)', color: '#00e68a',
 };
 
+/** Ключ сохранения параметров мастера (восстановление при перезаходе). */
+const WIZARD_KEY = 'he_cardio_wizard_state';
+
+interface WizardState {
+  goal: CardioGoal;
+  totalWeeks: number;
+  daysAvailable: number;
+  recoveryLow: boolean;
+  bodyWeight: number;
+  taperWeeks: number;
+  peakWeek: boolean;
+  phaseAuto: boolean;
+  phaseBase: number;
+  phaseBuild: number;
+  phaseMaint: number;
+}
+
+function loadWizard(): Partial<WizardState> {
+  try {
+    const v = JSON.parse(localStorage.getItem(WIZARD_KEY) ?? 'null');
+    return v && typeof v === 'object' ? v as Partial<WizardState> : {};
+  } catch { return {}; }
+}
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function downloadIcs(cycle: CardioCycle): void {
   try {
     const blob = new Blob([buildCardioIcs(cycle)], { type: 'text/calendar;charset=utf-8' });
@@ -72,16 +102,22 @@ function printCycle(cycle: CardioCycle): void {
 }
 
 export const CardioConstructor: React.FC = () => {
-  // Шаг 1-2: параметры
+  // Шаг 1-2: параметры (восстанавливаются из последней сессии)
+  const wizard = useMemo(loadWizard, []);
   const [step, setStep] = useState<CardioStep>('params');
-  const [goal, setGoal] = useState<CardioGoal>('cut');
-  const [totalWeeks, setTotalWeeks] = useState(12);
-  const [daysAvailable, setDaysAvailable] = useState(5);
-  const [recoveryLow, setRecoveryLow] = useState(false);
-  const [bodyWeight, setBodyWeight] = useState(80);
-  const [phaseSplit, setPhaseSplit] = useState<PhaseSplitState>({ auto: true, base: 0, build: 0, maintenance: 0 });
-  const [taperWeeks, setTaperWeeks] = useState(2);
-  const [peakWeek, setPeakWeek] = useState(true);
+  const [goal, setGoal] = useState<CardioGoal>(wizard.goal ?? 'cut');
+  const [totalWeeks, setTotalWeeks] = useState(wizard.totalWeeks ?? 12);
+  const [daysAvailable, setDaysAvailable] = useState(wizard.daysAvailable ?? 5);
+  const [recoveryLow, setRecoveryLow] = useState(wizard.recoveryLow ?? false);
+  const [bodyWeight, setBodyWeight] = useState(wizard.bodyWeight ?? 80);
+  const [phaseSplit, setPhaseSplit] = useState<PhaseSplitState>({
+    auto: wizard.phaseAuto ?? true,
+    base: wizard.phaseBase ?? 0,
+    build: wizard.phaseBuild ?? 0,
+    maintenance: wizard.phaseMaint ?? 0,
+  });
+  const [taperWeeks, setTaperWeeks] = useState(wizard.taperWeeks ?? 2);
+  const [peakWeek, setPeakWeek] = useState(wizard.peakWeek ?? true);
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -215,6 +251,29 @@ export const CardioConstructor: React.FC = () => {
     } catch { return null; }
   }, []);
 
+  // Сохранение параметров мастера
+  useEffect(() => {
+    try {
+      const s: WizardState = {
+        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek,
+        phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
+      };
+      localStorage.setItem(WIZARD_KEY, JSON.stringify(s));
+    } catch { /* ignore */ }
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit]);
+
+  const renameCycle = (name: string) => {
+    if (!cycle) return;
+    const next = { ...cycle, name };
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setCycle(next);
+    reload();
+    flashMsg('✏️ Цикл переименован');
+  };
+
+  const todayCardio = useMemo(() => (cycle ? cardioSessionsForDate(cycle, todayIso()) : null), [cycle]);
+
   const stepIdx = STEPS.findIndex(s => s.id === step);
   const goNext = () => {
     if (step === 'preview' && !cycle) { build(); return; }
@@ -227,7 +286,14 @@ export const CardioConstructor: React.FC = () => {
       {/* Шапка мастера */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>❤️ Кардио-конструктор</div>
-        {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {todayCardio && todayCardio.sessions.length > 0 && (
+            <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px' }}>
+              🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин`).join(' · ')}
+            </div>
+          )}
+          {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
+        </div>
       </div>
 
       {/* Степпер */}
@@ -275,7 +341,7 @@ export const CardioConstructor: React.FC = () => {
       )}
       {step === 'preview' && (
         <>
-          <CardioPreviewStep cycle={cycle} onBuild={build} />
+          <CardioPreviewStep cycle={cycle} onBuild={build} onRename={renameCycle} daysAvailable={daysAvailable} />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={NAV_BTN} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>

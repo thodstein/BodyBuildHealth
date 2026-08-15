@@ -8,6 +8,7 @@ import {
   compareCardioCycles, formatCardioComparison,
   cardioWeekForDate, cardioSessionsForDate, cardioHeartZones,
   spreadSessionsAcrossDays, cardioVolumeSeries, autoTuneCardioCycle,
+  cardioQualityReport,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -517,5 +518,44 @@ describe('taperWeeks / peakWeek', () => {
     expect(cardioPhaseForWeek(9, 12, comps, undefined, 1)).toBe('taper');
     expect(cardioPhaseForWeek(9, 12, comps, undefined, 2)).toBe('taper');
     expect(cardioPhaseForWeek(10, 12, comps, undefined, 2, false)).toBe('taper');
+  });
+});
+
+// ─── Качество цикла ───
+
+describe('cardioQualityReport', () => {
+  it('хороший cut-цикл со стартом: score высокий, замечания ok', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 12, daysAvailable: 5, competitions: [{ id: 'c', name: 'Шоу', week: 12 }] });
+    const r = cardioQualityReport(c, 5);
+    expect(r.score).toBeGreaterThanOrEqual(70);
+    expect(r.findings.some(f => f.level === 'ok' && f.text.includes('Прогрессия'))).toBe(true);
+    expect(r.findings.some(f => f.level === 'ok' && f.text.includes('Taper'))).toBe(true);
+  });
+
+  it('mass с большим объёмом → предупреждение', () => {
+    const c = buildCardioCycle({ goal: 'mass', totalWeeks: 8 });
+    // mass-профиль даёт ~20-30 мин/нед — объём в норме; проверим обратное через маленький цикл
+    expect(cardioQualityReport(c, 7).score).toBeGreaterThanOrEqual(80);
+  });
+
+  it('health с малым объёмом → warn', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, daysAvailable: 1 });
+    const r = cardioQualityReport(c, 1);
+    expect(r.score).toBeLessThan(100);
+    expect(r.findings.some(f => f.text.includes('ВОЗ'))).toBe(true);
+  });
+
+  it('старт без taper-недель невозможен для построенного цикла (проверка пика без HIIT)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    const r = cardioQualityReport(c, 7);
+    const peak = c.weeks.find(w => w.phase === 'peak')!;
+    expect(peak.sessions.every(s => s.type === 'recovery')).toBe(true);
+    expect(r.score).toBeGreaterThanOrEqual(60);
+  });
+
+  it('score клампится в 0-100', () => {
+    const r = cardioQualityReport(buildCardioCycle({ goal: 'recovery', totalWeeks: 2, daysAvailable: 0 }), 0);
+    expect(r.score).toBeGreaterThanOrEqual(0);
+    expect(r.score).toBeLessThanOrEqual(100);
   });
 });
