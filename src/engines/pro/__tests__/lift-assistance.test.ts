@@ -42,7 +42,7 @@ describe('analyzePhaseAssistance — оптимальность упражнен
     const analysis = analyzePhaseAssistance('squat', 'bottom');
     expect(analysis.items.length).toBeGreaterThan(0);
     for (const item of analysis.items) {
-      expect(item.protocol).toEqual({ pct: 0.6, reps: 10, sets: 3 });
+      expect(item.protocol).toEqual({ pct: 0.6, reps: 10, sets: 3, rir: 2 });
     }
   });
 
@@ -87,6 +87,6 @@ describe('protocolFromCycle — протокол из раскладки цик�
   });
 
   it('без template — дефолтный протокол', () => {
-    expect(protocolFromCycle(undefined, 'legs')).toEqual({ pct: 0.6, reps: 10, sets: 3 });
+    expect(protocolFromCycle(undefined, 'legs')).toEqual({ pct: 0.6, reps: 10, sets: 3, rir: 2 });
   });
 });

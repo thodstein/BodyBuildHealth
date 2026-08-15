@@ -638,7 +638,7 @@ const ExerciseRow: React.FC<{ item: any; selected: boolean; onToggle: () => void
     <button onClick={onToggle} style={{ minWidth: 24, height: 24, borderRadius: 5, cursor: 'pointer', border: 'none', background: selected ? ACCENT : 'rgba(255,255,255,0.1)', color: selected ? '#000' : DIM, fontWeight: 800, fontSize: 12 }}>{selected ? '✓' : '＋'}</button>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
-        {item.optimal ? '⭐ ' : ''}{item.exercise.name} <span style={{ color: ACCENT, fontWeight: 800 }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}%</span>{' '}
+        {item.optimal ? '⭐ ' : ''}{item.exercise.name} <span style={{ color: ACCENT, fontWeight: 800 }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}% RIR {item.protocol.rir ?? 2}</span>{' '}
         <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, color: tag.color, background: tag.bg, fontWeight: 700 }}>{tag.label}</span>
       </div>
       <div style={{ fontSize: 9, color: DIM, lineHeight: 1.3, marginTop: 1 }}>{item.rationale}</div>

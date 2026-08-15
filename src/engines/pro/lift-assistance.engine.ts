@@ -91,8 +91,8 @@ export interface AssistanceAnalysisItem {
   rationale: string;
   /** Источник упражнения: слабая мышца / слабая точка / мёртвая точка / bar-path. */
   source: 'muscle' | 'weak' | 'sticking' | 'bar';
-  /** Протокол из раскладки цикла (set-блоки аксессуара дня/недели). */
-  protocol: { pct: number; reps: number; sets: number };
+  /** Протокол из раскладки цикла (set-блоки аксессуара дня/недели) + RIR. */
+  protocol: { pct: number; reps: number; sets: number; rir: number };
   /** Паттерн движения упражнения. */
   pattern: string;
 }
@@ -104,7 +104,7 @@ export interface AssistanceAnalysis {
   items: AssistanceAnalysisItem[];
 }
 
-const DEFAULT_PROTOCOL = { pct: 0.6, reps: 10, sets: 3 };
+const DEFAULT_PROTOCOL = { pct: 0.6, reps: 10, sets: 3, rir: 2 };
 
 /** Русское имя движения (для rationale). */
 const LIFT_RU: Record<Lift, string> = {
@@ -228,7 +228,7 @@ function findExerciseInPool(name: string, pool: Exercise[]): Exercise | undefine
  * Протокол из раскладки цикла: берём set-блоки реального аксессуара (load !== 'Тяжелая')
  * из выбранного дня/недели шаблона. Приоритет — аксессуар на целевую группу.
  */
-export function protocolFromCycle(template: SRCycleTemplate | undefined, targetGroup: string): { pct: number; reps: number; sets: number } {
+export function protocolFromCycle(template: SRCycleTemplate | undefined, targetGroup: string): { pct: number; reps: number; sets: number; rir: number } {
   if (!template) return DEFAULT_PROTOCOL;
   const layouts = template.weeks && template.weeks.length > 0 ? template.weeks : [template.week1];
   const accSpecs: SRExerciseSpec[] = layouts.flatMap((days: SRDaySpec[]) => days.flatMap((day: SRDaySpec) =>
@@ -244,7 +244,8 @@ export function protocolFromCycle(template: SRCycleTemplate | undefined, targetG
   const spec = match ?? accSpecs[0];
   const first = spec?.sets?.[0];
   if (!first) return DEFAULT_PROTOCOL;
-  return { pct: first.pct, reps: Math.max(2, first.reps), sets: Math.max(1, first.sets) };
+  // RIR ассистента: из раскладки цикла (RIR-матрицы), иначе аксессуарный дефолт 2.
+  return { pct: first.pct, reps: Math.max(2, first.reps), sets: Math.max(1, first.sets), rir: first.rir ?? 2 };
 }
 
 /**
