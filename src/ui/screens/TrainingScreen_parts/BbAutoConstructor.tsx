@@ -70,7 +70,7 @@ import {
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
-  buildPostShowPlan,
+  buildPostShowPlan, buildContestPrepPrintHtml,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
 } from '../../../engines/bb/bb-contest-prep.engine';
@@ -460,6 +460,21 @@ export const BbAutoConstructor: React.FC = () => {
       setBuiltPlan(updated);
     }
     flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
+  };
+
+  /** 🖨 Печать полной сводки contest prep (фазы/тапер/пик-неделя/шоу-день/post-show). */
+  const handlePrintPrepSummary = () => {
+    if (!prepPlan) return;
+    try {
+      const win = window.open('', '_blank', 'width=900,height=700');
+      if (!win) { flash('Браузер заблокировал окно печати — разрешите всплывающие окна'); return; }
+      win.document.write(buildContestPrepPrintHtml(prepPlan));
+      win.document.close();
+      win.focus();
+      setTimeout(() => { try { win.print(); } catch { /* ignore */ } }, 300);
+    } catch (e) {
+      flash(`Не удалось открыть сводку: ${(e as Error).message}`);
+    }
   };
 
   // ── Test Peak Week: тестовый прогон НЕ меняет основной план ──
@@ -3920,6 +3935,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}>
               <button style={BTN_GHOST} onClick={() => handleExtendPrep(1)}>➕ Неделя подготовки</button>
               <button style={BTN_GHOST} onClick={() => handleExtendPrep(-1)}>➖ Неделя подготовки</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handlePrintPrepSummary}>🖨 Сводка prep (PDF)</button>
               <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => setStep('adjust')}>← К коррекции плана</button>
               {prepApplied && <span style={{ fontSize:10, color:'#4ade80', alignSelf:'center' }}>✓ Применено к плану</span>}
             </div>

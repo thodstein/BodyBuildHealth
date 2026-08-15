@@ -32,6 +32,7 @@ import {
   configFromPlan,
   prepWeightAdvice,
   buildPostShowPlan,
+  buildContestPrepPrintHtml,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -671,5 +672,27 @@ describe('Post-show — контроль восстановления после
     const post = buildPostShowPlan(plan);
     const text = [...post.notes, ...post.training, post.weightCheck].join(' ').toLowerCase();
     expect(text).not.toMatch(/диуретик|0\.5 ?л|0\.25 ?л/);
+  });
+});
+
+describe('Печать сводки contest prep (buildContestPrepPrintHtml)', () => {
+  it('содержит фазы, taper-кривую, пик-неделю, таймлайн, post-show и предупреждения', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ contraindications: ['diabetes'] }), { prepWeeks: 8, taperWeeks: 2 });
+    const html = buildContestPrepPrintHtml(plan);
+    expect(html).toMatch(/<!DOCTYPE html>/);
+    expect(html).toContain('Подготовка');
+    expect(html).toContain('Кривая taper');
+    expect(html).toContain('Пик-неделя');
+    expect(html).toContain('Таймлайн Show Day');
+    expect(html).toContain('Post-show');
+    expect(html).toContain('Требуется профессиональное сопровождение');
+    expect(html).toContain(plan.showDate);
+  });
+
+  it('XSS-безопасен: пользовательские строки экранируются', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ contraindications: ['kidney', '<script>alert(1)</script>'] }), { prepWeeks: 8, taperWeeks: 2 });
+    const html = buildContestPrepPrintHtml(plan);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
   });
 });

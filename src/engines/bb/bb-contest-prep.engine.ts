@@ -2153,3 +2153,70 @@ export function buildPostShowPlan(plan: BBContestPrepPlan, opts?: { referenceCal
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Печать сводки contest prep (HTML, XSS-безопасно)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function escHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** Полная HTML-сводка contest prep для печати (фазы/тапер/пик-неделя/шоу-день/post-show). */
+export function buildContestPrepPrintHtml(plan: BBContestPrepPlan): string {
+  const profile = CATEGORY_PROFILES[plan.category];
+  const post = buildPostShowPlan(plan);
+  const peakWeek = buildPeakWeek(configFromPlan(plan));
+  const timeline = buildShowTimeline(configFromPlan(plan));
+  const rows = (arr: string[]): string => arr.map(n => `<li>${escHtml(n)}</li>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>🏁 Contest Prep — ${escHtml(plan.showDate)}</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:24px;color:#111;font-size:12px;line-height:1.5}
+  h1{font-size:18px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}
+  table{border-collapse:collapse;width:100%;margin:6px 0}
+  th,td{border:1px solid #ccc;padding:4px 8px;text-align:left;font-size:11px}
+  th{background:#f4f4f5}.muted{color:#666;font-size:11px}.warn{color:#b91c1c;font-size:11px}
+  ul{margin:4px 0 8px;padding-left:18px}li{margin:2px 0}
+</style></head><body>
+<h1>🏁 Contest Prep — бодибилдинг</h1>
+<div class="muted">Шоу: ${escHtml(plan.showDate)} · ${escHtml(profile?.label ?? plan.category)} · ${plan.sex === 'female' ? 'жен' : 'муж'} · ${plan.preparation.startingWeightKg} кг · темп ${plan.preparation.targetRatePctPerWeek}%/нед</div>
+<div class="muted">Подготовка ${plan.preparation.weeks} нед (финал ${plan.preparation.finalWeeks}) · taper ${plan.taper.weeks} нед · пик-неделя 7 дн · ${plan.preparation.currentCalories} ккал · ${plan.preparation.stepsPerDay} шагов · кардио ${plan.preparation.cardioMinutesPerWeek} мин/нед</div>
+
+<h2>🗺 Фазы</h2>
+<table><tr><th>Фаза</th><th>Недели</th><th>Даты</th><th>Задача</th></tr>
+${plan.phases.map(p => `<tr><td><b>${escHtml(p.label)}</b></td><td>${p.key === 'show_day' ? 'день шоу' : p.key === 'post_show' ? 'после шоу' : `${p.weekStart}–${p.weekEnd}`}</td><td>${p.dateStart} — ${p.dateEnd}</td><td>${escHtml(p.note)}</td></tr>`).join('')}
+</table>
+
+<h2>📉 Кривая taper (объём ↓, интенсивность сохраняется, RIR 2–4)</h2>
+<table><tr><th>Неделя</th><th>Объём</th><th>Интенсивность (вес)</th><th>RIR</th></tr>
+${plan.taper.volumeProfile.map((v, i) => `<tr><td>${plan.taper.weeks - i}</td><td>${Math.round(v * 100)}%</td><td>${Math.round(plan.taper.intensityProfile[i] * 100)}%</td><td>${plan.taper.rirProfile[i]?.[0]}–${plan.taper.rirProfile[i]?.[1]}</td></tr>`).join('')}
+</table>
+
+<h2>🍚 Пик-неделя (по дням)</h2>
+<table><tr><th>День</th><th>Фаза</th><th>Ккал</th><th>Б/У/Ж</th><th>💧 Вода</th><th>Na мг</th><th>🏋️ Тренировка</th><th>🎭 Позы</th></tr>
+${peakWeek.map(d => `<tr><td>${d.day === 7 ? '🎬 Show' : `Д${d.day}`}</td><td>${escHtml(d.phaseLabel)}</td><td>${d.kcal}</td><td>${d.proteinG}/${d.carbsG}/${d.fatG}</td><td>${d.waterLiters} л</td><td>${d.sodiumMg}</td><td>${escHtml(d.training.type)}</td><td>${d.posingMinutes}'</td></tr>`).join('')}
+</table>
+
+<h2>🎬 Таймлайн Show Day</h2>
+<table><tr><th>Время</th><th>Действие</th><th>Детали</th></tr>
+${timeline.map(t => `<tr><td>${t.time}</td><td><b>${escHtml(t.action)}</b></td><td>${escHtml(t.detail)}</td></tr>`).join('')}
+</table>
+
+<h2>🔄 Post-show (${post.durationDays} дней)</h2>
+<ul>${rows(post.notes)}</ul>
+<div class="muted">🏋️ ${escHtml(post.training.join(' '))}</div>
+<div class="muted">⚖️ ${escHtml(post.weightCheck)}</div>
+
+<h2>⚖️ Адаптация по весу</h2>
+<div class="muted">Анализ средних за 7 дней; целевой темп ${plan.preparation.targetRatePctPerWeek}%/нед. Одна переменная за раз: калории ±150–175 ИЛИ кардио ±20 мин/нед. В taper/пик корректировки запрещены.</div>
+
+${plan.safety.warnings.length > 0 ? `<h2>⚠️ Предупреждения</h2><ul>${rows(plan.safety.warnings)}</ul>` : ''}
+${plan.safety.requiresReview ? `<div class="warn">🩺 Требуется профессиональное сопровождение: ${escHtml(plan.safety.contraindications.join(', '))}. Агрессивные режимы отключены.</div>` : ''}
+<div class="muted" style="margin-top:16px">Расчёт не заменяет работу с врачом и тренером. Диуретики и фармакология не назначаются.</div>
+</body></html>`;
+}
+
