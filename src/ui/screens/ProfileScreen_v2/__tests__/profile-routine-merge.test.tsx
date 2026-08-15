@@ -1,6 +1,6 @@
 /**
- * profile-routine-merge.test.tsx — рутинг v2 (утро/вечер), миграция legacy,
- * мерж записи здоровья при quick-add.
+ * profile-routine-merge.test.tsx — рутинг v2 (утро/вечер, ЧСС в записях АД),
+ * миграция legacy, мерж записи здоровья при quick-add.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -13,29 +13,25 @@ import {
   ROUTINE_KIND_LABELS,
 } from '../diary-modals';
 import { mergeHealthEntry } from '../../../../engines/health-diary.engine';
-import { AddPulseModal } from '../pulse-diary-modal';
 import { ProfileDiariesTab } from '../ProfileDiariesTab';
-import { HR_DIARY_KEY } from '../../../../engines/hr-diary.engine';
 
-describe('Рутинг v2 — шаги', () => {
-  it('утренний: сон → АД → ЧСС → вес → здоровье → конец', () => {
-    expect(ROUTINE_STEPS.morning).toEqual(['sleep', 'bp', 'pulse', 'weight', 'health']);
+describe('Рутинг v2 — шаги (ЧСС ведётся в АД)', () => {
+  it('утренний: сон → АД (с ЧСС) → вес → здоровье → конец', () => {
+    expect(ROUTINE_STEPS.morning).toEqual(['sleep', 'bp', 'weight', 'health']);
     expect(routineNextStep('morning', 'sleep')).toBe('bp');
-    expect(routineNextStep('morning', 'bp')).toBe('pulse');
-    expect(routineNextStep('morning', 'pulse')).toBe('weight');
+    expect(routineNextStep('morning', 'bp')).toBe('weight');
     expect(routineNextStep('morning', 'weight')).toBe('health');
     expect(routineNextStep('morning', 'health')).toBeNull();
   });
 
-  it('вечерний: АД → ЧСС → конец', () => {
-    expect(ROUTINE_STEPS.evening).toEqual(['bp', 'pulse']);
-    expect(routineNextStep('evening', 'bp')).toBe('pulse');
-    expect(routineNextStep('evening', 'pulse')).toBeNull();
+  it('вечерний: АД (с ЧСС) → конец', () => {
+    expect(ROUTINE_STEPS.evening).toEqual(['bp']);
+    expect(routineNextStep('evening', 'bp')).toBeNull();
   });
 
   it('routineStepIndex и лейблы', () => {
-    expect(routineStepIndex('morning', 'pulse')).toBe(2);
-    expect(ROUTINE_STEP_LABELS.pulse).toBe('ЧСС');
+    expect(routineStepIndex('morning', 'bp')).toBe(1);
+    expect(ROUTINE_STEP_LABELS.bp).toBe('Давление и ЧСС');
     expect(ROUTINE_KIND_LABELS.morning).toBe('Утренний лог');
     expect(ROUTINE_KIND_LABELS.evening).toBe('Вечерний лог');
   });
@@ -49,9 +45,9 @@ describe('migrateLegacyRoutine — миграция sessionStorage', () => {
   });
 
   it('v2 JSON восстанавливается; мусор → null', () => {
-    expect(migrateLegacyRoutine(JSON.stringify({ kind: 'evening', step: 'pulse' }))).toEqual({
+    expect(migrateLegacyRoutine(JSON.stringify({ kind: 'evening', step: 'bp' }))).toEqual({
       kind: 'evening',
-      step: 'pulse',
+      step: 'bp',
     });
     expect(migrateLegacyRoutine(JSON.stringify({ kind: 'night', step: 'x' }))).toBeNull();
     expect(migrateLegacyRoutine(null)).toBeNull();
@@ -131,29 +127,7 @@ describe('mergeHealthEntry — мерж quick-add с записью дня', () 
   });
 });
 
-describe('AddPulseModal — базовая функциональность', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
-  });
-
-  it('рендерит форму ЧСС, пресет вечера применяется', () => {
-    render(<AddPulseModal open onClose={() => {}} onSave={() => {}} presetTimeOfDay="evening" />);
-    expect(screen.getByText('Запись ЧСС')).toBeTruthy();
-    expect(screen.getByText('🌆 Вечер (в покое)')).toBeTruthy();
-  });
-
-  it('сохранение передаёт bpm и timeOfDay', () => {
-    let saved: any = null;
-    render(<AddPulseModal open onClose={() => {}} onSave={(e: any) => { saved = e; }} />);
-    const input = screen.getByRole('spinbutton');
-    fireEvent.change(input, { target: { value: '62' } });
-    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
-    expect(saved).toMatchObject({ bpm: 62, timeOfDay: 'morning' });
-  });
-});
-
-describe('ProfileDiariesTab — вечерний рутинг с ЧСС', () => {
+describe('ProfileDiariesTab — рутинг с ЧСС в АД', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -162,22 +136,42 @@ describe('ProfileDiariesTab — вечерний рутинг с ЧСС', () => 
 
   it('кнопки рутинга присутствуют: утренний и вечерний лог', () => {
     render(<ProfileDiariesTab />);
-    expect(screen.getByText(/Утренний лог: сон → АД → ЧСС → вес → здоровье/)).toBeTruthy();
-    expect(screen.getByText(/Вечерний лог: АД → ЧСС/)).toBeTruthy();
+    expect(screen.getByText(/Утренний лог: сон → АД \(с ЧСС\) → вес → здоровье/)).toBeTruthy();
+    expect(screen.getByText(/Вечерний лог: АД \(с ЧСС\)/)).toBeTruthy();
   });
 
-  it('запуск вечернего рутинга → модалка АД, после сохранения → ЧСС', () => {
+  it('вечерний рутинг: АД сохраняется с timeOfDay=evening и ЧСС', () => {
     render(<ProfileDiariesTab />);
-    fireEvent.click(screen.getByText(/Вечерний лог: АД → ЧСС/));
-    // Модалка АД открыта (заголовок «Запись давления»)
+    fireEvent.click(screen.getByText(/Вечерний лог: АД \(с ЧСС\)/));
     expect(screen.getByText('Запись давления')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
-    // Шаг ЧСС: модалка «Запись ЧСС» с пресетом вечера
-    expect(screen.getByText('Запись ЧСС')).toBeTruthy();
+    const bp = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+    expect(bp.length).toBe(1);
+    expect(bp[0].timeOfDay).toBe('evening');
+    expect(Number(bp[0].hr)).toBeGreaterThan(0);
+  });
+
+  it('утренний рутинг: сон → АД (утро) → вес → здоровье', () => {
+    render(<ProfileDiariesTab />);
+    fireEvent.click(screen.getByText(/Утренний лог: сон → АД \(с ЧСС\) → вес → здоровье/));
+    expect(screen.getByText('Запись сна')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
-    // Рутинг завершён: ЧСС сохранён в he_hr_diary
-    const hr = JSON.parse(localStorage.getItem(HR_DIARY_KEY) || '[]');
-    expect(hr.length).toBe(1);
-    expect(hr[0].timeOfDay).toBe('evening');
+    // Шаг АД (утро)
+    expect(screen.getByText('Запись давления')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    // Шаг веса
+    expect(screen.getByText('Вес и замеры тела')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    // Шаг здоровья
+    expect(screen.getByText('Запись здоровья')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /Нейро/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Тревожность/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    const bp = JSON.parse(localStorage.getItem('he_bp_diary') || '[]');
+    expect(bp.length).toBe(1);
+    expect(bp[0].timeOfDay).toBe('morning');
+    expect(Number(bp[0].hr)).toBeGreaterThan(0);
+    // Рутинг завершён — кнопки запуска снова видны
+    expect(screen.getByText(/Утренний лог: сон → АД \(с ЧСС\) → вес → здоровье/)).toBeTruthy();
   });
 });

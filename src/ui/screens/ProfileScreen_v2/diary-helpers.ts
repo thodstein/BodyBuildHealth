@@ -7,7 +7,7 @@ export type DiaryEntryLike = { id?: string; date: string; fields: { label: strin
 
 export type DiaryKey =
   | 'sleep' | 'bp' | 'weight' | 'measurements'
-   | 'injection' | 'health' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato' | 'pulse';
+   | 'injection' | 'health' | 'symptoms' | 'pain' | 'neuro' | 'acne' | 'hemato';
 
 export const PAIN_ZONE_LIST = [
   { id: 'shoulders', label: 'Плечи' }, { id: 'elbows', label: 'Локти' },

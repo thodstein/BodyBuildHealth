@@ -42,11 +42,12 @@ export const nextRoutineStep = (r: 'sleep' | 'bp' | 'weight'): 'sleep' | 'bp' | 
 /* ── Утренний/вечерний рутинг (v2) ── */
 
 export type RoutineKind = 'morning' | 'evening';
-export type RoutineStepId = 'sleep' | 'bp' | 'pulse' | 'weight' | 'health';
+export type RoutineStepId = 'sleep' | 'bp' | 'weight' | 'health';
 
 export const ROUTINE_STEPS: Record<RoutineKind, RoutineStepId[]> = {
-  morning: ['sleep', 'bp', 'pulse', 'weight', 'health'],
-  evening: ['bp', 'pulse'],
+  // ЧСС ведётся В АД (поле «Пульс»): утренний и вечерний АД-шаги включают пульс в покое.
+  morning: ['sleep', 'bp', 'weight', 'health'],
+  evening: ['bp'],
 };
 
 export interface ActiveRoutine {
@@ -67,8 +68,7 @@ export const routineStepIndex = (kind: RoutineKind, step: RoutineStepId): number
 
 export const ROUTINE_STEP_LABELS: Record<RoutineStepId, string> = {
   sleep: 'Сон',
-  bp: 'Давление',
-  pulse: 'ЧСС',
+  bp: 'Давление и ЧСС',
   weight: 'Вес',
   health: 'Здоровье',
 };
@@ -288,7 +288,6 @@ export const DIARY_META: Record<
   weight: { title: 'Вес и замеры', unit: 'кг / см', icon: '⚖️', color: '#22c55e' },
   injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: 'he_injection_diary' },
   health: { title: 'Здоровье', unit: '', icon: '🩺', color: '#ec4899', storageKey: 'he_health_diary' },
-  pulse: { title: 'ЧСС', unit: 'уд/мин', icon: '💓', color: '#f472b6', storageKey: 'he_hr_diary' },
 };
 
 export const painZoneColor = (v: number) => (v <= 2 ? '#22c55e' : v <= 4 ? '#f59e0b' : v <= 7 ? '#f97316' : '#ef4444');
@@ -1135,4 +1134,3 @@ export { AddBPModal, bpCategory } from './bp-diary-modal';
 export { AddBodyMeasurementsModal } from './body-measurements-modal';
 export { AddInjectionModal } from './injection-diary-modal';
 export { AddHealthModal } from './health-diary-modal';
-export { AddPulseModal } from './pulse-diary-modal';

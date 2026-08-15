@@ -20,14 +20,12 @@ import { BPDiary } from './diaries/BPDiary/BPDiary';
 import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
 import { InjectionDiary } from './diaries/InjectionDiary/InjectionDiary';
 import { HealthDiary } from './diaries/HealthDiary/HealthDiary';
-import { PulseDiary } from './diaries/PulseDiary/PulseDiary';
 import {
   AddSleepModal,
   AddBPModal,
   AddBodyMeasurementsModal,
   AddInjectionModal,
   AddHealthModal,
-  AddPulseModal,
   PAIN_ZONES,
   NEURO_SYMPTOMS,
   ACNE_AREAS,
@@ -57,13 +55,6 @@ import {
   generateEntryId,
   type BPEntry as CoreBPEntry,
 } from '../../../core/bp-hr-data';
-import {
-  getHREntries,
-  saveHREntry,
-  findByDateAndTimeOfDay,
-  HR_DIARY_KEY,
-  type HREntry,
-} from '../../../engines/hr-diary.engine';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -662,14 +653,12 @@ export const ProfileDiariesTab: React.FC<{
   const [hematoEntries, setHematoEntries] = useState<HematoEntry[]>([]);
   const [healthEntries, setHealthEntries] = useState<UnifiedHealthEntry[]>([]);
   const [weights, setWeights] = useState<ReturnType<typeof getWeightLog>>([]);
-  const [hrEntries, setHrEntries] = useState<HREntry[]>([]);
 
   const [addSleepOpen, setAddSleepOpen] = useState(false);
   const [addBPOpen, setAddBPOpen] = useState(false);
   const [addInjectionOpen, setAddInjectionOpen] = useState(false);
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
-  const [addPulseOpen, setAddPulseOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [undoQueue, setUndoQueue] = useState<UndoAction[]>([]);
 
@@ -704,7 +693,6 @@ export const ProfileDiariesTab: React.FC<{
   const openRoutineStepModal = (r: ActiveRoutine) => {
     if (r.step === 'sleep') setAddSleepOpen(true);
     else if (r.step === 'bp') setAddBPOpen(true);
-    else if (r.step === 'pulse') setAddPulseOpen(true);
     else if (r.step === 'weight') setAddBodyMeasurementsOpen(true);
     else if (r.step === 'health') setAddHealthOpen(true);
   };
@@ -729,7 +717,6 @@ export const ProfileDiariesTab: React.FC<{
     else if (key === 'bp') setAddBPOpen(true);
     else if (key === 'weight' || key === 'measurements') setAddBodyMeasurementsOpen(true);
     else if (key === 'injection') setAddInjectionOpen(true);
-    else if (key === 'pulse') setAddPulseOpen(true);
     else if (
       key === 'health' ||
       key === 'symptoms' ||
@@ -811,9 +798,6 @@ export const ProfileDiariesTab: React.FC<{
       setWeights(getWeightLog());
     } catch {}
     setHealthEntries(getUnifiedHealthEntries());
-    try {
-      setHrEntries(getHREntries());
-    } catch {}
   };
 
   useEffect(() => {
@@ -830,7 +814,6 @@ export const ProfileDiariesTab: React.FC<{
     if (key === 'bp') return bpEntries;
     if (key === 'weight') return weights;
     if (key === 'injection') return injectionEntries;
-    if (key === 'pulse') return hrEntries;
     if (
       key === 'health' ||
       key === 'symptoms' ||
@@ -868,17 +851,16 @@ export const ProfileDiariesTab: React.FC<{
     if (bpEntries.length) {
       const e = [...bpEntries].sort((a, b) => (b.timestamp ?? new Date(b.date).getTime()) - (a.timestamp ?? new Date(a.date).getTime()))[0];
       if (e.date === today) overview.push({ label: 'АД', value: `${e.systolic}/${e.diastolic}`, color: '#ef4444' });
+      // ЧСС ведётся в записях АД (поле «Пульс»): утро/вечер отдельными замерами.
+      const todayBp = bpEntries.filter((x) => x.date === today);
+      const morningPulse = todayBp.find((x) => x.timeOfDay === 'morning' && (x.hr ?? x.pulse ?? 0) > 0);
+      const eveningPulse = todayBp.find((x) => x.timeOfDay === 'evening' && (x.hr ?? x.pulse ?? 0) > 0);
+      if (morningPulse) overview.push({ label: 'ЧСС утро', value: `${morningPulse.hr ?? morningPulse.pulse} уд/мин`, color: '#f472b6' });
+      if (eveningPulse) overview.push({ label: 'ЧСС вечер', value: `${eveningPulse.hr ?? eveningPulse.pulse} уд/мин`, color: '#f472b6' });
     }
     if (weights.length) {
       const e = weights[weights.length - 1];
       if (e.date === today) overview.push({ label: 'Вес', value: `${e.weight} кг`, color: '#22c55e' });
-    }
-    if (hrEntries.length) {
-      const todayHr = hrEntries.filter((e) => e.date === today);
-      const morningHr = todayHr.find((e) => e.timeOfDay === 'morning');
-      const eveningHr = todayHr.find((e) => e.timeOfDay === 'evening');
-      if (morningHr) overview.push({ label: 'ЧСС утро', value: `${morningHr.bpm} уд/мин`, color: '#f472b6' });
-      if (eveningHr) overview.push({ label: 'ЧСС вечер', value: `${eveningHr.bpm} уд/мин`, color: '#f472b6' });
     }
     if (painEntries.length) {
       const e = painEntries[painEntries.length - 1];
@@ -927,7 +909,6 @@ export const ProfileDiariesTab: React.FC<{
     },
     { key: 'weight', count: weights.length, last: lastDate(weights) },
     { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
-    { key: 'pulse', count: hrEntries.length, last: lastDate(hrEntries) },
     { key: 'health', count: healthEntries.length, last: healthEntries.length ? healthEntries[0].date : '' },
   ];
 
@@ -947,7 +928,6 @@ export const ProfileDiariesTab: React.FC<{
         [ACNE_DIARY_KEY]: acneEntries,
         [HEMATO_DIARY_KEY]: hematoEntries,
         [WEIGHT_LOG_KEY]: weights,
-        [HR_DIARY_KEY]: hrEntries,
       },
     };
     const json = JSON.stringify(payload, null, 2);
@@ -976,13 +956,11 @@ export const ProfileDiariesTab: React.FC<{
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Все дневники</title>
 <style>body{font:12px 'Segoe UI',Arial,sans-serif;padding:20px;color:#111}h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:6px}h2{color:#0f766e;margin-top:18px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #ccc;padding:4px;text-align:left;font-size:11px}th{background:#e6f4f1}.meta{color:#666;font-size:11px}@media print{body{padding:8px}}</style></head><body>
 <h1>📓 Все дневники</h1>
-<p class="meta">Экспорт: ${new Date().toLocaleDateString('ru-RU')} · Записей: ${sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length + hrEntries.length}</p>
+<p class="meta">Экспорт: ${new Date().toLocaleDateString('ru-RU')} · Записей: ${sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length}</p>
 ${table('💤 Сон', ['Дата', 'Часы', 'Качество', 'Пробуждений', 'Легли', 'Подъём', 'Заметки'],
   sortedDesc(sleepEntries).map((e) => [e.date, String(e.hours), String(e.quality), String(e.awakenings), e.bedtime, e.wakeTime, e.notes || '']))}
-${table('❤️ Давление', ['Дата', 'Систола', 'Диастола', 'Пульс', 'Время', 'Лекарство', 'Заметки'],
+${table('❤️ Давление (с ЧСС)', ['Дата', 'Систола', 'Диастола', 'Пульс', 'Время', 'Лекарство', 'Заметки'],
   sortedDesc(bpEntries).map((e) => [e.date, String(e.systolic), String(e.diastolic), String(e.hr ?? e.pulse ?? ''), e.timeOfDay || '', e.medicationTaken ? 'да' : '', e.notes || '']))}
-${table('💓 ЧСС', ['Дата', 'Время', 'ЧСС', 'Заметки'],
-  sortedDesc(hrEntries).map((e) => [e.date, e.timeOfDay === 'morning' ? 'утро' : 'вечер', String(e.bpm), e.notes || '']))}
 ${table('⚖️ Вес', ['Дата', 'Вес', 'Жир %', 'Мышцы', 'Талия', 'Заметки'],
   sortedDesc(weights).map((e) => [e.date, String(e.weight), e.bodyFat !== undefined ? String(e.bodyFat) : '', e.muscleMass !== undefined ? String(e.muscleMass) : '', e.waistCm !== undefined ? String(e.waistCm) : '', e.notes || '']))}
 ${table('💉 Инъекции', ['Дата', 'Препарат', 'Доза', 'Зона', 'Сторона', 'Боль', 'PIP', 'Заметки'],
@@ -1053,10 +1031,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
         if (diaries[WEIGHT_LOG_KEY] && Array.isArray(diaries[WEIGHT_LOG_KEY])) {
           saveWeightLog(diaries[WEIGHT_LOG_KEY]);
           setWeights(diaries[WEIGHT_LOG_KEY]);
-        }
-        if (diaries[HR_DIARY_KEY] && Array.isArray(diaries[HR_DIARY_KEY])) {
-          saveDiary(HR_DIARY_KEY, diaries[HR_DIARY_KEY]);
-          setHrEntries([...diaries[HR_DIARY_KEY]].sort((a, b) => String(b.date).localeCompare(String(a.date))));
         }
         if (data.goals && typeof data.goals === 'object') {
           setGoals({ ...goals, ...data.goals });
@@ -1524,7 +1498,7 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                         transition: 'all 0.2s',
                       }}
                     >
-                      🌅 Утренний лог: сон → АД → ЧСС → вес → здоровье
+                      🌅 Утренний лог: сон → АД (с ЧСС) → вес → здоровье
                     </button>
                     <button
                       type="button"
@@ -1548,7 +1522,7 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                         transition: 'all 0.2s',
                       }}
                     >
-                      🌆 Вечерний лог: АД → ЧСС
+                      🌆 Вечерний лог: АД (с ЧСС)
                     </button>
                   </div>
                 )}
@@ -1824,7 +1798,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                     [HEMATO_DIARY_KEY]: [...hematoEntries] as any[],
                     [HEALTH_DIARY_KEY]: [...healthEntries] as any[],
                     [WEIGHT_LOG_KEY]: [...weights] as any[],
-                    [HR_DIARY_KEY]: [...hrEntries] as any[],
                   };
                   const total = Object.values(snap).reduce((s, a) => s + a.length, 0);
                   [
@@ -1838,7 +1811,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                     HEMATO_DIARY_KEY,
                     HEALTH_DIARY_KEY,
                     WEIGHT_LOG_KEY,
-                    HR_DIARY_KEY,
                   ].forEach((k) => saveDiary(k, []));
                   setSleepEntries([]);
                   setBpEntries([]);
@@ -1850,7 +1822,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                   setHematoEntries([]);
                   setHealthEntries([]);
                   setWeights([]);
-                  setHrEntries([]);
                   pushUndo(`🧹 Очищены все встроенные дневники (${total})`, () => {
                     setSleepEntries(snap[SLEEP_DIARY_KEY] as SleepEntry[]);
                     setBpEntries(snap[BP_DIARY_KEY] as BPEntry[]);
@@ -1862,7 +1833,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                     setHematoEntries(snap[HEMATO_DIARY_KEY] as HematoEntry[]);
                     setHealthEntries(snap[HEALTH_DIARY_KEY] as UnifiedHealthEntry[]);
                     setWeights(snap[WEIGHT_LOG_KEY] as ReturnType<typeof getWeightLog>);
-                    setHrEntries(snap[HR_DIARY_KEY] as HREntry[]);
                     Object.entries(snap).forEach(([k, v]) => saveDiary(k, v as any[]));
                   });
                 }}
@@ -1908,9 +1878,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
           )}
             {activeDiary === 'health' && (
               <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="health" onDataChange={refresh} onNavigate={onNavigate} />
-            )}
-            {activeDiary === 'pulse' && (
-              <PulseDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="pulse" onDataChange={refresh} />
             )}
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
@@ -1985,22 +1952,6 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                 },
               );
               if (routine?.step === 'weight') advanceRoutine();
-            }}
-          />
-          <AddPulseModal
-            open={addPulseOpen}
-            presetTimeOfDay={routine?.step === 'pulse' ? (routine.kind === 'evening' ? 'evening' : 'morning') : undefined}
-            onClose={() => setAddPulseOpen(false)}
-            onSave={(e) => {
-              const prev = getHREntries();
-              const replaced = findByDateAndTimeOfDay(prev, e.date, e.timeOfDay) !== undefined;
-              const updated = saveHREntry(e);
-              setHrEntries(updated);
-              pushUndo(routineUndoLabel(replaced ? 'запись обновлена' : 'запись добавлена'), () => {
-                setHrEntries(prev);
-                saveDiary(HR_DIARY_KEY, prev);
-              });
-              if (routine?.step === 'pulse') advanceRoutine();
             }}
           />
           <AddInjectionModal

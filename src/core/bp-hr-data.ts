@@ -238,3 +238,46 @@ export function getBpRiskLevel(): 'low' | 'medium' | 'high' {
   if (avg.systolic > 130 || avg.diastolic > 80) return 'medium';
   return 'low';
 }
+
+/* ── ЧСС (утро/вечер) — ведётся в записях АД (поле hr) ── */
+
+export interface PulseDaypartStats {
+  morning: { avg: number | null; count: number };
+  evening: { avg: number | null; count: number };
+}
+
+/** Средний пульс в покое по времени суток за период (в окне days дней). */
+export function getPulseDaypartAverages(entries: BPEntry[], days = 7): PulseDaypartStats {
+  const cutoffDate = new Date();
+  cutoffDate.setHours(0, 0, 0, 0);
+  cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
+  const cutoff = localIso(cutoffDate);
+  const inWindow = entries.filter((e) => e.date >= cutoff);
+  const avg = (list: BPEntry[]) => {
+    const vals = list.map((e) => Number(e.hr) || 0).filter((v) => v > 0);
+    if (!vals.length) return null;
+    return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+  };
+  return {
+    morning: { avg: avg(inWindow.filter((e) => e.timeOfDay === 'morning')), count: inWindow.filter((e) => e.timeOfDay === 'morning').length },
+    evening: { avg: avg(inWindow.filter((e) => e.timeOfDay === 'evening')), count: inWindow.filter((e) => e.timeOfDay === 'evening').length },
+  };
+}
+
+/** Тренд утреннего пульса: последние 7 дней vs предыдущие 7 (только утренние замеры). */
+export function getPulseTrend(entries: BPEntry[]): { direction: 'up' | 'down' | 'stable'; delta: number | null } | null {
+  const mornings = entries
+    .filter((e) => e.timeOfDay === 'morning' && (Number(e.hr) || 0) > 0)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (mornings.length < 2) return null;
+  const cutoffDate = new Date();
+  cutoffDate.setHours(0, 0, 0, 0);
+  cutoffDate.setDate(cutoffDate.getDate() - 7);
+  const cutoff = localIso(cutoffDate);
+  const recent = mornings.filter((e) => e.date >= cutoff);
+  const older = mornings.filter((e) => e.date < cutoff).slice(-7);
+  if (!recent.length || !older.length) return null;
+  const avg = (list: BPEntry[]) => list.reduce((s, e) => s + (Number(e.hr) || 0), 0) / list.length;
+  const delta = avg(recent) - avg(older);
+  return { direction: delta > 2 ? 'up' : delta < -2 ? 'down' : 'stable', delta: Math.round(delta * 10) / 10 };
+}

@@ -53,6 +53,8 @@ import {
   validateBpEntry,
   getBpEntries,
   commitBpEntries,
+  getPulseDaypartAverages,
+  getPulseTrend,
   type BPValidationError,
 } from '../../../../../core/bp-hr-data';
 import { BPChart } from './BPChart';
@@ -238,6 +240,13 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const defaultGoals = getDefaultGoals(bpClass);
   const trendSystolic = useMemo(() => calculateTrend(recentRows, 'systolic'), [recentRows]);
   const trendDiastolic = useMemo(() => calculateTrend(recentRows, 'diastolic'), [recentRows]);
+
+  // ЧСС (утро/вечер) — ведётся в записях АД (поле hr)
+  const pulseDayparts = useMemo(() => getPulseDaypartAverages(rows, 7), [rows]);
+  const pulseDayparts30 = useMemo(() => getPulseDaypartAverages(rows, 30), [rows]);
+  const pulseTrend = useMemo(() => getPulseTrend(rows), [rows]);
+  const pulseTone = (v: number | null) =>
+    v === null ? colors.textMuted : v >= 100 ? colors.danger : v < 50 ? colors.warning : v >= 90 ? colors.warning : colors.green;
 
   // Correlations
   const bpCorrelations = useMemo(() => {
@@ -614,6 +623,28 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 {extremes.max ? `${extremes.max.value} (${extremes.max.date})` : '—'}</div>
               <div>Неделя к неделе:{' '}
                 {comparison.delta == null ? '—' : <AnimatedCounter value={Math.abs(comparison.delta)} decimals={1} duration={500} prefix={comparison.delta > 0 ? '+' : '-'} style={{ fontSize: 14, fontWeight: 700 }} />}
+              </div>
+            </section>
+
+            <section style={{ ...goodCard, marginTop: 12 }}>
+              <h3>💓 ЧСС (утро/вечер, поле «Пульс» в записях АД)</h3>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6 }}>
+                <div>Утро (7д): <b style={{ color: pulseTone(pulseDayparts.morning.avg) }}>{pulseDayparts.morning.avg ?? '—'}</b> уд/мин · {pulseDayparts.morning.count} зап.</div>
+                <div>Вечер (7д): <b style={{ color: pulseTone(pulseDayparts.evening.avg) }}>{pulseDayparts.evening.avg ?? '—'}</b> уд/мин · {pulseDayparts.evening.count} зап.</div>
+                <div>Среднее (30д): <b style={{ color: pulseTone(pulseDayparts30.morning.avg) }}>{pulseDayparts30.morning.avg ?? '—'}</b> утро / <b style={{ color: pulseTone(pulseDayparts30.evening.avg) }}>{pulseDayparts30.evening.avg ?? '—'}</b> вечер</div>
+              </div>
+              {pulseTrend && (
+                <div style={{ marginTop: 6, fontSize: 13 }}>
+                  Тренд утреннего ЧСС:{' '}
+                  <b style={{ color: pulseTrend.direction === 'up' ? colors.danger : pulseTrend.direction === 'down' ? colors.green : colors.textMuted }}>
+                    {pulseTrend.direction === 'up' ? '↑ растёт' : pulseTrend.direction === 'down' ? '↓ падает' : '→ стабилен'}
+                  </b>{' '}
+                  <span style={{ color: colors.textMuted }}>(Δ {pulseTrend.delta ?? 0} уд/мин)</span>
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>
+                Норма в покое 60–90 · тахикардия ≥100 · брадикардия &lt;50 (у спортсменов 40–50 может быть нормой).
+                Утренний замер — в покое, до кофеина и тренировки.
               </div>
             </section>
 

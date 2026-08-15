@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   BPEntry,
   BPGoals,
@@ -22,6 +22,8 @@ import {
   getAvgBp,
   getBpEntries,
   commitBpEntries,
+  getPulseDaypartAverages,
+  getPulseTrend,
 } from '../bp-hr-data';
 
 describe('bp-hr-data', () => {
@@ -392,6 +394,62 @@ describe('bp-hr-data', () => {
       // 7-дневное окно = сегодня + 6 предыдущих дней → записи a и b (c за 7 дней до — вне окна)
       expect(avg!.systolic).toBe(Math.round((120 + 130) / 2));
       expect(avg!.diastolic).toBe(Math.round((80 + 85) / 2));
+    });
+  });
+
+  describe('ЧСС (утро/вечер) в записях АД', () => {
+    const localIso = (offsetDays: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - offsetDays);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const mk = (date: string, timeOfDay: string, hr: number): BPEntry => ({
+      id: `x_${date}_${timeOfDay}`, date, systolic: 120, diastolic: 80, hr, timeOfDay,
+    });
+
+    it('getPulseDaypartAverages: средние утро/вечер за 7 дней, пульс 0 игнорируется', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 58),
+        mk(localIso(0), 'evening', 72),
+        mk(localIso(1), 'morning', 62),
+        mk(localIso(1), 'evening', 70),
+        mk(localIso(9), 'morning', 90), // вне 7-дневного окна
+        mk(localIso(0), 'afternoon', 0), // пульс 0 — игнор
+      ];
+      const s = getPulseDaypartAverages(entries, 7);
+      expect(s.morning.count).toBe(2);
+      expect(s.morning.avg).toBe(60);
+      expect(s.evening.count).toBe(2);
+      expect(s.evening.avg).toBe(71);
+    });
+
+    it('getPulseDaypartAverages: нет данных → null', () => {
+      const s = getPulseDaypartAverages([], 7);
+      expect(s.morning.avg).toBeNull();
+      expect(s.evening.avg).toBeNull();
+    });
+
+    it('getPulseTrend: свежие утренние ниже старых → down', () => {
+      const entries = [
+        mk(localIso(10), 'morning', 70),
+        mk(localIso(9), 'morning', 72),
+        mk(localIso(8), 'morning', 71),
+        mk(localIso(2), 'morning', 60),
+        mk(localIso(1), 'morning', 58),
+        mk(localIso(0), 'morning', 62),
+      ];
+      const trend = getPulseTrend(entries);
+      expect(trend).not.toBeNull();
+      expect(trend!.direction).toBe('down');
+      expect(trend!.delta).toBeLessThan(0);
+    });
+
+    it('getPulseTrend: учитывает только утренние замеры, <2 записей → null', () => {
+      expect(getPulseTrend([mk(localIso(0), 'morning', 60)])).toBeNull();
+      expect(getPulseTrend([mk(localIso(0), 'evening', 70), mk(localIso(1), 'evening', 72)])).toBeNull();
     });
   });
 });
