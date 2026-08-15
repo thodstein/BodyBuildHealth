@@ -1804,3 +1804,16 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - Итог: мои файлы tsc 0; полный прогон **5196/5197** (1 чужой WIP-фейл `bb-macrocycle.test.ts` — формат сериализации v7 меняет другой агент, не связан с моей работой; `profile-diaries-e2e` флейк параллельного прогона — изолированно 6/6); `vite build` OK.
 - Чужой незакоммиченный WIP не тронут (lms-cardio/taper/competition, BbAutoConstructor, TrainingScreen, IndividualPlanContext и др.).
 
+---
+
+## Профиль — рабочие максимумы по упражнениям (Aug 16 2026, pushed)
+
+### Что сделано
+- **`src/engines/workmax-exercises.ts`** — категории (группы мышц = ключи BB_WM_KEYS: chest/back/quads/hamstrings/glutes/shoulders/biceps/triceps/calves/abs), в каждой **5-7 конкретных упражнений** (по 62 упражнениям всего) из каталога: `WORKMAX_CATEGORIES`, `exerciseToMuscle(id)` (упражнение → мышца), `exerciseNameOf(id)` (каноническое имя из EXERCISE_CATALOG, fallback на встроенные), `exerciseWorkMaxToMuscle(byExercise, prev)` (вес мышцы = МАКСИМУМ среди её упражнений; незаполненные группы сохраняют prev), `countFilledWorkMaxExercises`, `validateWorkMaxCategories`.
+- **TrainingPMSection (профиль → Тренировки → 2.2 Личные рекорды)**: вместо «рабочий максимум по группе» — раскрывающиеся категории «нажал на группу → выбрал упражнение → ввёл вес»; счётчик N/M в категории, «🗑 Очистить группу» (удаляет упражнения + производный workMax мышцы). Хранение: `training.workMaxByExercise` (новое поле в UnifiedSettings.training), `training.workMax` по мышцам пересчитывается автоматически — **движки (ББ-авто и др.) продолжают работать без правок** (читают `training.workMax` как раньше).
+- Тесты: `workmax-exercises.test.ts` — 10 (категории 5-7/уникальность/имена, exerciseToMuscle, конвертация: максимум/prev/NaN, счётчик); `profile-workmax-exercises.test.tsx` — 4 (рендер категории, ввод веса → workMaxByExercise+workMax.chest, максимум среди упражнений, очистка группы).
+
+### Примечание (важно для будущих раундов)
+- **vitest-рантайм отдаёт `EXERCISE_CATALOG` без 16 упражнений** (hip_thrust, ohp, db_press, ohp_seated, lateral_raise, upright_row, plank, hanging_leg, knee_raise, overhead_squat, bench_bands, leg_press_single, hip_thrust_single, kickback_cable, leg_ext_v2, reverse_curl_cable; 544 из 562). В production-бандле (`vite build`) ВСЕ 562 на месте; в node/esbuild-CLI тоже. Причина не найдена (кэши .vite/.vite-temp очищены, mtime обновлён, дублей/синтаксиса нет). **Решение**: `workmax-exercises` НЕ зависит от каталога (имена встроены, маппинг статичен), `catalogName` — только fallback для отображения имён.
+- Файлы других агентов не тронуты; `exercise-catalog.ts` не изменялся.
+

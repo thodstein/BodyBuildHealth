@@ -507,7 +507,8 @@ export interface UnifiedSettings {
     pmSquat: number;              // 1RM присед
     pmBench: number;              // 1RM жим
     pmDeadlift: number;           // 1RM становая
-    workMax: Record<string, number>;  // рабочие ПМ по группам
+    workMax: Record<string, number>;  // рабочие ПМ по группам (производное из workMaxByExercise)
+    workMaxByExercise?: Record<string, number>;  // рабочие ПМ по конкретным упражнениям (id из EXERCISE_CATALOG)
     equipment: string[];          // доступный инвентарь
     recovery: number;             // 1-10
     motivation: number;           // 1-10
