@@ -12,6 +12,7 @@ import { diaryStyles as style } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { exportMobilityCheckinsCSV, loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
+import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -92,6 +93,23 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               🧘 Скачать чек-ины мобильности CSV
             </button>
           </div>
+          {/* Warmup diary CSV export */}
+          <div style={style.card}>
+            <div style={style.label}>🔥 Разминка CSV</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {loadWarmupLog().length} записей</div>
+            <button onClick={() => {
+              const csv = exportWarmupCheckinsCSV();
+              const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `warmup_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.3)', cursor: 'pointer' }}>
+              🔥 Скачать дневник разминки CSV
+            </button>
+          </div>
           {/* Workout templates from history */}
           {historyWorkouts.length > 0 && (() => {
             const recent = historyWorkouts.slice(-5).reverse();
@@ -159,8 +177,11 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const cutoffStr = cutoff.toISOString().slice(0, 10);
               const mind30 = loadCheckins().filter(c => c.date >= cutoffStr);
               const mob30 = loadMobilityCheckins().filter(c => c.date >= cutoffStr);
+              const warm30 = loadWarmupLog().filter(e => e.date >= cutoffStr);
               const confAvg = mind30.length > 0 ? (mind30.reduce((s, c) => s + c.confidence, 0) / mind30.length).toFixed(1) : null;
               const mobDone30 = mob30.filter(c => c.done).length;
+              const warmDone30 = warm30.filter(e => e.done).length;
+              const warmQ = warmupQualityTrend(30);
               const romAvg = (() => { const scored = mob30.filter(c => c.romScore !== null); return scored.length > 0 ? (scored.reduce((s, c) => s + (c.romScore || 0), 0) / scored.length).toFixed(1) : null; })();
               const rows = month.map(w => `
                 <tr>
@@ -175,11 +196,12 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 .stats{display:flex;gap:24px;font-size:13px;margin:8px 0}</style></head><body>
                 <h1>📊 Тренировочный дневник — 30 дней</h1>
                 <div class="stats"><span>Тренировок: <b>${month.length}</b></span><span>Подходов: <b>${sets}</b></span><span>Тоннаж: <b>${(vol / 1000).toFixed(1)} т</b></span></div>
-                ${mind30.length > 0 || mob30.length > 0 ? `
-                  <h2>🧠 Психология и мобильность</h2>
+                ${mind30.length > 0 || mob30.length > 0 || warm30.length > 0 ? `
+                  <h2>🧠 Психология, мобильность и разминка</h2>
                   <div class="stats">
                     ${mind30.length > 0 ? `<span>Психо-чек-инов: <b>${mind30.length}</b></span><span>Ср. уверенность: <b>${confAvg}/5</b></span>` : ''}
                     ${mob30.length > 0 ? `<span>Мобильность: <b>${mobDone30}/${mob30.length}</b> дней</span><span>Ср. ROM: <b>${romAvg !== null ? romAvg + '/5' : '—'}</b></span>` : ''}
+                    ${warm30.length > 0 ? `<span>Разминка: <b>${warmDone30}/${warm30.length}</b> дней</span><span>Ср. качество: <b>${warmQ.count > 0 ? warmQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
                   </div>` : ''}
                 ${prs.length > 0 ? `<h2>🏆 PR за период</h2><ul>${prs.slice(0, 10).map(p => `<li>${esc(p.ex)} — ${esc(p.w)}</li>`).join('')}</ul>` : ''}
                 <h2>📋 Сессии</h2>

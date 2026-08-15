@@ -8,6 +8,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-l
 import { clearStorageTrimWarning } from '../../../engines/workout-logger.engine';
 import { loadCheckins, protocolAdherence, mindsetTrends } from '../../../engines/mindset-protocol.engine';
 import { loadMobilityCheckins, mobilityAdherence, mobilityTrends } from '../../../engines/mobility-protocol.engine';
+import { loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
 import { Sparkline } from './Sparkline';
 import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
@@ -140,6 +141,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const confAvg = mindWeek.length > 0 ? (mindWeek.reduce((s, c) => s + c.confidence, 0) / mindWeek.length).toFixed(1) : '';
             const mobWeek = loadMobilityCheckins().filter(c => c.date >= weekAgoStr);
             const mobDoneWeek = mobWeek.filter(c => c.done).length;
+            // Разминка за неделю
+            const warmWeek = loadWarmupLog().filter(e => e.date >= weekAgoStr);
+            const warmDoneWeek = warmWeek.filter(e => e.done).length;
             const summary = [
               `📅 Неделя: ${lastWeek[0].date.slice(8, 10)}.${lastWeek[0].date.slice(5, 7)} — ${lastWeek[lastWeek.length - 1].date.slice(8, 10)}.${lastWeek[lastWeek.length - 1].date.slice(5, 7)}`,
               `🏋️ Тренировок: ${lastWeek.length} (${prevWeek.length ? `прошлая: ${prevWeek.length}` : 'прошлая: —'})`,
@@ -147,6 +151,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               best && best.e1rm > 0 ? `🏆 Лучший e1RM: ${best.name} — ${Math.round(best.e1rm)} кг` : '',
               mindWeek.length > 0 ? `🧠 Психо: ${mindWeek.length} чек-ин(а) · уверенность ${confAvg}/5` : '',
               mobWeek.length > 0 ? `🧘 Мобильность: ${mobDoneWeek}/${mobWeek.length} дней выполнено` : '',
+              warmWeek.length > 0 ? `🔥 Разминка: ${warmDoneWeek}/${warmWeek.length} дней` : '',
               lastWeek[0].notes ? `📝 ${lastWeek[0].notes}` : '',
             ].filter(Boolean).join('\n');
             return (
@@ -748,6 +753,40 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{madh.done}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Разминка: сводка (дневник разминки) */}
+          {loadWarmupLog().length > 0 && (() => {
+            const wadh = warmupAdherence(30);
+            const wq = warmupQualityTrend(30);
+            const wlast = loadWarmupLog()[loadWarmupLog().length - 1];
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label}>🔥 Разминка</div>
+                  <span style={{ fontSize: 9, color: 'rgba(249,115,22,0.8)' }}>
+                    последний: {wlast.date.slice(5).replace('-', '.')} · {wlast.done ? `выполнена${wlast.quality !== null ? `, качество ${wlast.quality}/5` : ''}` : 'пропущена'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Записей · 30д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316' }}>{wadh.total}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: wadh.pct >= 80 ? '#22c55e' : wadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{wadh.total > 0 ? `${wadh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Ср. качество</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{wq.count > 0 ? wq.avg.toFixed(1) : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wadh.done}</div>
                   </div>
                 </div>
               </div>

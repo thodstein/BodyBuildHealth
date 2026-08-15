@@ -9,6 +9,7 @@ import { isBodyweightExercise as isBW } from '../../../engines/workout-logger.en
 import { ACCENT } from './diary-tokens';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
+import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
 
 interface Props {
   workout: WorkoutLog;
@@ -178,6 +179,9 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
 
         {/* Чек-ин мобильности (опционально): рутина/сессия + ROM */}
         <MobilityCheckinInline date={log.date} sessionId={workout.id} />
+
+        {/* Чек-ин разминки (опционально): выполнена + качество */}
+        <WarmupCheckinInline date={log.date} sessionId={workout.id} />
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 12 }}>Отмена</button>

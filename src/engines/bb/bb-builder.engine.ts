@@ -26,6 +26,7 @@ import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, compu
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
+import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
@@ -953,31 +954,10 @@ function buildExComment(
 }
 
 /** Разминочная пирамида для compound упражнений.
- *  FIX-B5: проф-тренерская пирамида (bar×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1).
- *  Раньше: 2-4 сета с 30-85%, фиксированные reps 6-8.
- *  Теперь: градуированная пирамида с уменьшением reps по мере роста веса. */
+ *  Канон: warmup-ramp.engine (гриф 20×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1).
+ *  Единый источник — warmupRampFor; здесь только делегирование (совместимость). */
 export function buildWarmup(workWeight: number, isCompound: boolean): { load: number; reps: number }[] {
-  if (!isCompound || workWeight <= 0) return [];
-  // Проф-пирамида: bar (20кг) → 50% → 70% → 80% → (90% только для тяжёлых)
-  const barWeight = 20;
-  const warmups: { load: number; reps: number }[] = [];
-  // Set 1: empty bar × 15 (разминка суставов, кровоток)
-  if (workWeight > barWeight * 2) {
-    warmups.push({ load: barWeight, reps: 15 });
-  }
-  // Set 2: 50% × 10
-  warmups.push({ load: Math.round(workWeight * 0.5), reps: 10 });
-  // Set 3: 70% × 5
-  warmups.push({ load: Math.round(workWeight * 0.7), reps: 5 });
-  // Set 4: 80% × 3 (только если workWeight > 60кг — иначе избыток)
-  if (workWeight > 60) {
-    warmups.push({ load: Math.round(workWeight * 0.8), reps: 3 });
-  }
-  // Set 5: 90% × 1 (только для тяжёлых упражнений > 100кг — powerlifter-style)
-  if (workWeight > 100) {
-    warmups.push({ load: Math.round(workWeight * 0.9), reps: 1 });
-  }
-  return warmups;
+  return warmupRampFor(workWeight, isCompound);
 }
 
 // BUG-B13/B21: STRETCH_DB и addStretching удалены как мёртвый код (вызов закомментирован с Jul 16).

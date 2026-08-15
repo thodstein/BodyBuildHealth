@@ -10,7 +10,7 @@ import {
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
   compareWithPrevious, getCachedProgressForExercise,
 } from '../../../engines/workout-logger.engine';
-import { generateWarmup, type WarmupInput } from '../../../engines/warmup.engine';
+import { generateWarmup, upsertWarmupLog, type WarmupInput } from '../../../engines/warmup.engine';
 import { generateCooldown, type CooldownInput } from '../../../engines/cooldown.engine';
 import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
@@ -384,6 +384,20 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
   const startMain = () => {
      if (!day || !Array.isArray(day.exercises)) return;
+     // Фиксируем факт разминки в дневник (he_warmup_diary, одна запись на дату)
+     try {
+       const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
+       const doneCnt = Object.values(warmupDone).filter(Boolean).length;
+       const pct = total > 0 ? doneCnt / total : 0;
+       upsertWarmupLog({
+         date: new Date().toISOString().slice(0, 10),
+         done: doneCnt > 0,
+         quality: doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
+         totalItems: total,
+         doneItems: doneCnt,
+         skippedReason: doneCnt === 0 ? 'не отметил ни одного пункта' : undefined,
+       });
+     } catch { /* дневник разминки недоступен — не блокируем переход */ }
      let s = startSession(focus || day.label, weekNumber);
      day.exercises.forEach(ex => {
        s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });

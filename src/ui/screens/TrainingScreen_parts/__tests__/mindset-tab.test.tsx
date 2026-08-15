@@ -8,19 +8,21 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
+import { WarmupCheckinInline } from '../../SRCBBScreen_parts/WarmupSessionPanel';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
 import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, loadProtocols, loadActiveProtocol, itemsForDay, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
 import type { DiaryHubCtx } from '../diary-hub-context';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog } from '../../../../core/types';
 import { MobilityTab } from '../MobilityTab';
-import { WorkoutWeekCard } from '../diary-cards';
+import { WorkoutWeekCard, WarmupRampCard } from '../diary-cards';
 import { ZONES } from '../nav';
 import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
 import { SessionPlayer } from '../../SRCBBScreen_parts/SessionPlayer';
 import { TrainingCalendarTab } from '../TrainingCalendarTab';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
 import { saveAssessment } from '../../../../engines/mobility-assessment.engine';
+import { loadWarmupLog, upsertWarmupLog, WARMUP_DIARY_KEY } from '../../../../engines/warmup.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -597,6 +599,66 @@ describe('Бейджи психо/мобильности в карточках �
     const html = renderCard();
     expect(html).not.toContain('🧠 4/5');
     expect(html).not.toContain('🧘 ✓');
+  });
+});
+
+describe('Разминка (чек-ин, бейджи, рампа)', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  it('WarmupCheckinInline: «✓ да» + сохранить → запись в дневнике разминки', () => {
+    render(<WarmupCheckinInline date="2026-08-14" sessionId="w1" />);
+    fireEvent.click(screen.getByText('✓ да'));
+    fireEvent.click(screen.getByLabelText('Сохранить чек-ин разминки'));
+    const log = loadWarmupLog();
+    expect(log.length).toBe(1);
+    expect(log[0].done).toBe(true);
+    expect(log[0].sessionId).toBe('w1');
+    expect(log[0].quality).toBe(3);
+  });
+
+  it('WarmupCheckinInline: «✕ нет» фиксирует причину пропуска', () => {
+    render(<WarmupCheckinInline date="2026-08-14" />);
+    fireEvent.click(screen.getByText('✕ нет'));
+    fireEvent.click(screen.getByLabelText('Сохранить чек-ин разминки'));
+    const log = loadWarmupLog();
+    expect(log[0].done).toBe(false);
+    expect(log[0].skippedReason).toBeTruthy();
+    expect(log[0].quality).toBeNull();
+  });
+
+  it('WarmupCheckinInline: без выбора «—» кнопка сохранения неактивна', () => {
+    render(<WarmupCheckinInline date="2026-08-14" />);
+    expect(screen.getByLabelText('Сохранить чек-ин разминки')).toBeDisabled();
+    expect(loadWarmupLog().length).toBe(0);
+  });
+
+  it('WorkoutWeekCard: выполненная разминка → бейдж 🔥 ✓ с качеством', () => {
+    upsertWarmupLog({ date: today, done: true, quality: 4, sessionId: 'w_badge2' });
+    const workout = {
+      id: 'w_badge2', date: today, exercises: [{ id: 'e1', date: today, exerciseId: 'bench_press', exerciseName: 'Жим', sets: [{ weight: 80, reps: 8 }], totalVolume: 640, estimated1RM: 101 } as any],
+    } as WorkoutLog;
+    const html = renderToStaticMarkup(<WorkoutWeekCard weekLabel="Неделя 1" workouts={[workout]} expanded onToggle={() => {}} />);
+    expect(html).toContain('🔥 ✓ 4/5');
+  });
+
+  it('WorkoutWeekCard: пропущенная разминка → бейдж 🔥 ✕', () => {
+    localStorage.setItem(WARMUP_DIARY_KEY, JSON.stringify([{ id: 'w1', date: today, sessionId: 'w_badge3', done: false, quality: null, skippedReason: 'устал' }]));
+    const workout = {
+      id: 'w_badge3', date: today, exercises: [{ id: 'e1', date: today, exerciseId: 'squat', exerciseName: 'Присед', sets: [{ weight: 100, reps: 5 }], totalVolume: 500, estimated1RM: 115 } as any],
+    } as WorkoutLog;
+    const html = renderToStaticMarkup(<WorkoutWeekCard weekLabel="Неделя 1" workouts={[workout]} expanded onToggle={() => {}} />);
+    expect(html).toContain('🔥 ✕');
+  });
+
+  it('WarmupRampCard рендерит канон для 100 кг (гриф + 50/70/80%)', () => {
+    const html = renderToStaticMarkup(<WarmupRampCard />);
+    expect(html).toContain('Пустой гриф (20 кг)');
+    expect(html).toContain('50%');
+    expect(html).toContain('70%');
+    expect(html).toContain('80%');
+    expect(html).toContain('100кг × работа');
   });
 });
 

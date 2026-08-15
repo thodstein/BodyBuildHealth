@@ -6,6 +6,8 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logger.engine';
 import { loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
+import { loadWarmupLog } from '../../../engines/warmup.engine';
+import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { diaryStyles as style, ACCENT, DIM } from './diary-tokens';
 
@@ -38,6 +40,9 @@ export const WorkoutWeekCard: React.FC<{
   loadCheckins().forEach(c => { if (c.confidence > 0) mindBadge.set(c.sessionId || c.date, c.confidence); });
   const mobBadge = new Set<string>();
   loadMobilityCheckins().forEach(c => { if (c.done) mobBadge.add(c.sessionId || c.date); });
+  // Бейдж разминки (одна запись на дату; ключ — дата или sessionId записи)
+  const warmBadge = new Map<string, { done: boolean; quality: number | null }>();
+  loadWarmupLog().forEach(e => { warmBadge.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
   return (
     <div style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
       <div onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
@@ -65,11 +70,13 @@ export const WorkoutWeekCard: React.FC<{
                 const key = workout.id || workout.date;
                 const m = mindBadge.get(key);
                 const mb = mobBadge.has(key);
-                if (!m && !mb) return null;
+                const wu = warmBadge.get(key);
+                if (!m && !mb && !wu) return null;
                 return (
                   <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
                     {m && <span title={`Психо-чек-ин: уверенность ${m}/5`} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', fontWeight: 700 }}>🧠 {m}/5</span>}
                     {mb && <span title="Мобильность: рутина/сессия выполнена" style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', fontWeight: 700 }}>🧘 ✓</span>}
+                    {wu && <span title={wu.done ? `Разминка выполнена${wu.quality !== null ? `, качество ${wu.quality}/5` : ''}` : 'Разминка пропущена'} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: wu.done ? 'rgba(249,115,22,0.15)' : 'rgba(239,68,68,0.15)', color: wu.done ? '#f97316' : '#ef4444', fontWeight: 700 }}>🔥 {wu.done ? `✓${wu.quality !== null ? ` ${wu.quality}/5` : ''}` : '✕'}</span>}
                   </span>
                 );
               })()}
@@ -380,34 +387,32 @@ export const DiaryEmptyState: React.FC<{
 
 export const WarmupRampCard: React.FC = () => {
   const [wuWeight, setWuWeight] = useState(100);
-  const ramp = wuWeight <= 40
-    ? [{ pct: 0, w: 0, reps: 15, label: 'Разминка' }]
-    : wuWeight <= 80
-      ? [{ pct: 50, w: Math.round(wuWeight * 0.5 / 2.5) * 2.5, reps: 10 }, { pct: 70, w: Math.round(wuWeight * 0.7 / 2.5) * 2.5, reps: 6 }, { pct: 85, w: Math.round(wuWeight * 0.85 / 2.5) * 2.5, reps: 3 }]
-      : wuWeight <= 140
-        ? [{ pct: 40, w: Math.round(wuWeight * 0.4 / 5) * 5, reps: 12 }, { pct: 60, w: Math.round(wuWeight * 0.6 / 5) * 5, reps: 8 }, { pct: 75, w: Math.round(wuWeight * 0.75 / 5) * 5, reps: 5 }, { pct: 85, w: Math.round(wuWeight * 0.85 / 5) * 5, reps: 3 }]
-        : [{ pct: 40, w: Math.round(wuWeight * 0.4 / 5) * 5, reps: 12 }, { pct: 55, w: Math.round(wuWeight * 0.55 / 5) * 5, reps: 8 }, { pct: 70, w: Math.round(wuWeight * 0.7 / 5) * 5, reps: 5 }, { pct: 80, w: Math.round(wuWeight * 0.8 / 5) * 5, reps: 3 }, { pct: 90, w: Math.round(wuWeight * 0.9 / 5) * 5, reps: 1 }];
+  const ramp = activeRampRows(wuWeight);
   return (
     <div style={style.card}>
       <div style={style.label}>🔥 Разминочная рампа</div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Автоподбор разминки по рабочему весу</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Автоподбор разминки по рабочему весу (единый канон: гриф×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1)</div>
       <div style={{ marginBottom: 6 }}>
         <label style={{ fontSize: 9, color: 'var(--text-dim)' }}>Рабочий вес (кг)</label>
         <input type="number" value={wuWeight} onChange={e => setWuWeight(Math.max(0, +e.target.value || 0))} style={{ width: '100%', padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} />
       </div>
-      <div style={{ display: 'grid', gap: 2 }}>
-        {ramp.map((r, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '2px 0' }}>
-            <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.4)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.pct}%</span>
-            <span style={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>{r.w > 0 ? `${r.w}кг` : 'Пустой гриф'}</span>
-            <span style={{ color: 'rgba(255,255,255,0.35)' }}>{r.reps} повт</span>
+      {ramp.length === 0 ? (
+        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Введите рабочий вес — появится разминочная рампа.</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 2 }}>
+          {ramp.map((r, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '2px 0' }}>
+              <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.4)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.bar ? '—' : `${Math.round(r.pct * 100)}%`}</span>
+              <span style={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>{r.bar ? 'Пустой гриф (20 кг)' : `${r.load}кг`}</span>
+              <span style={{ color: 'rgba(255,255,255,0.35)' }}>{r.reps} повт</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '3px 0', fontWeight: 700 }}>
+            <span style={{ minWidth: 30, color: ACCENT }}>100%</span>
+            <span style={{ flex: 1, color: ACCENT }}>{wuWeight}кг × работа</span>
           </div>
-        ))}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '3px 0', fontWeight: 700 }}>
-          <span style={{ minWidth: 30, color: ACCENT }}>100%</span>
-          <span style={{ flex: 1, color: ACCENT }}>{wuWeight}кг × работа</span>
         </div>
-      </div>
+      )}
     </div>
   );
 };

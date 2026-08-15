@@ -556,7 +556,7 @@ export function buildMobilityInsights(protocol: MobilityProtocol | null): string
   const ass = latestAssessment();
   if (ass) {
     const sum = summarizeAssessment(ass);
-    if (sum.scored > 0) {
+    if (sum.counts.scored > 0) {
       const weak = weakestTests(ass);
       if (weak.length > 0) {
         const names = weak.slice(0, 3).map(w => w.test.area.split(' / ')[0]).join(', ');

@@ -22,6 +22,7 @@ import { tempoFor } from './bb-tempo-rest';
 import { PHASE_CONFIGS, type BBPhase } from '../periodization';
 import { PCT_FOR_RIR } from '../rir-table';
 import type { BBTrainingFocus } from './bb-goal-types';
+import { warmupRampFor } from '../warmup-ramp.engine';
 
 export interface LoadingInput {
   muscle: string;
@@ -130,28 +131,9 @@ export function computeLoading(input: LoadingInput): LoadingOutput {
 }
 
 /**
- * Graded warmup pyramid (B5):
- * bar×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1 (for heavy weights)
+ * Graded warmup pyramid — канон warmup-ramp.engine
+ * (bar×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1 for heavy weights).
  */
 function buildGradedWarmup(workWeight: number): { load: number; reps: number }[] {
-  if (workWeight <= 0) return [];
-  const barWeight = 20;
-  const warmups: { load: number; reps: number }[] = [];
-  // Set 1: empty bar × 15
-  if (workWeight > barWeight * 2) {
-    warmups.push({ load: barWeight, reps: 15 });
-  }
-  // Set 2: 50% × 10
-  warmups.push({ load: Math.round(workWeight * 0.5), reps: 10 });
-  // Set 3: 70% × 5
-  warmups.push({ load: Math.round(workWeight * 0.7), reps: 5 });
-  // Set 4: 80% × 3 (only if workWeight > 60кг)
-  if (workWeight > 60) {
-    warmups.push({ load: Math.round(workWeight * 0.8), reps: 3 });
-  }
-  // Set 5: 90% × 1 (only for heavy > 100кг)
-  if (workWeight > 100) {
-    warmups.push({ load: Math.round(workWeight * 0.9), reps: 1 });
-  }
-  return warmups;
+  return warmupRampFor(workWeight, true);
 }
