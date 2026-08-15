@@ -425,12 +425,20 @@ export function getPLWeakGroupExerciseCandidates(template: SRCycleTemplate, grou
     .filter(spec => spec.load === 'Тяжелая' || (spec.coef ?? 0) >= 1)
     .map(sourcePattern))));
 
-  return getExercisesByGroup(group)
+  const base = getExercisesByGroup(group)
     .filter(exercise => allowed.has(catalogPattern(exercise)))
-    .filter(exercise => !cyclePrimaryPatterns.has(catalogPattern(exercise)))
-    .filter(exercise => !exercise.substitutionGroup || !cycleSubstitutionGroups.has(exercise.substitutionGroup))
-    .filter(exercise => isPLWeakGroupTarget(exercise, group))
-    .sort((a, b) => {
+    .filter(exercise => isPLWeakGroupTarget(exercise, group));
+  // Фильтр дублей (primary-паттерны цикла + substitution-группы) — ТОЛЬКО если
+  // после него у паттерна остаются варианты; вырезанные целиком паттерны
+  // возвращаются в конец (лучше предложить ассистентов, чем пустую подгруппу).
+  const filtered = base.filter(exercise =>
+    !cyclePrimaryPatterns.has(catalogPattern(exercise)) &&
+    (!exercise.substitutionGroup || !cycleSubstitutionGroups.has(exercise.substitutionGroup)));
+  const filteredPatterns = new Set(filtered.map(exercise => catalogPattern(exercise)));
+  const fallbackExtra = base.filter(exercise => !filteredPatterns.has(catalogPattern(exercise)));
+  const candidates = [...filtered, ...fallbackExtra];
+
+  return candidates.sort((a, b) => {
       const aName = norm(a.name), bName = norm(b.name);
       const aInCycle = cycleNames.has(aName), bInCycle = cycleNames.has(bName);
       if (aInCycle !== bInCycle) return aInCycle ? -1 : 1;
