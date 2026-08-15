@@ -9,7 +9,7 @@ import {
   buildCardioCycle, cardioCycleSummary, cardioPlanToCycle, buildCardioPlan,
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
-  buildCardioIcs,
+  buildCardioIcs, buildCardioPrintHtml,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
   type CardioCycle, type CardioGoal, type CardioType,
 } from '../../../engines/lms/cardio.engine';
@@ -17,6 +17,9 @@ import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
   SPORT_LABELS, type CardioLinkSport,
 } from '../../../engines/lms/cardio-bridge';
+import { CardioDiaryPanel } from './CardioDiaryPanel';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 
 const BTN: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
@@ -58,6 +61,14 @@ function downloadIcs(cycle: CardioCycle): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function printCycle(cycle: CardioCycle): void {
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(buildCardioPrintHtml(cycle));
+  w.document.close();
+  w.print();
 }
 
 interface CompDraft { name: string; week: string }
@@ -128,6 +139,13 @@ export const CardioConstructor: React.FC = () => {
   };
 
   const unlink = () => { clearCardioLink(); flashMsg('🔓 Кардио отключено от силового плана'); };
+
+  const acwrValue = useMemo(() => {
+    try {
+      const srpe = loadSRPESessions();
+      return srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)).ratio : null;
+    } catch { return null; }
+  }, []);
 
   const summary = useMemo(() => cycle ? cardioCycleSummary(cycle) : null, [cycle]);
   const phaseColors: Record<string, string> = {
@@ -228,6 +246,9 @@ export const CardioConstructor: React.FC = () => {
         </div>
       )}
 
+      {/* Дневник выполнения */}
+      <CardioDiaryPanel cycle={cycle} acwr={acwrValue} recoveryLow={recoveryLow} />
+
       {/* Подключение к силовому плану */}
       <div style={CARD}>
         <div style={LABEL}>🔗 Подключение к силовому плану (ссылка, не копия)</div>
@@ -260,6 +281,7 @@ export const CardioConstructor: React.FC = () => {
             </button>
             <button style={BTN} onClick={() => duplicate(c)} aria-label={`Дублировать ${c.name}`}>⧉</button>
             <button style={BTN} onClick={() => downloadIcs(c)} aria-label={`Экспорт ${c.name}`}>📅 .ics</button>
+            <button style={BTN} onClick={() => printCycle(c)} aria-label={`Печать ${c.name}`}>🖨</button>
             <button style={BTN_DANGER} onClick={() => { removeCardioCycle(c.id); if (cycle?.id === c.id) { setActiveCardioCycle(null); setCycle(null); } reload(); }} aria-label={`Удалить ${c.name}`}>🗑</button>
           </div>
         ))}

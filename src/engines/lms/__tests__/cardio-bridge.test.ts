@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { buildCardioCycle, buildCardioIcs } from '../cardio.engine';
+import { buildCardioCycle, buildCardioIcs, buildCardioPrintHtml } from '../cardio.engine';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
   SPORT_LABELS,
@@ -58,5 +58,22 @@ describe('buildCardioIcs', () => {
     const ics = buildCardioIcs(c, '2026-01-05T00:00:00.000Z');
     expect(ics).toContain('DTSTART:20260105Z');
     expect(ics).toContain('DTSTART:20260112Z');
+  });
+});
+
+describe('buildCardioPrintHtml', () => {
+  it('XSS-safe: пользовательские названия экранируются', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, name: '<script>alert(1)</script>' });
+    const html = buildCardioPrintHtml(c);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>alert');
+  });
+
+  it('содержит фазы, недели и рациональные обоснования', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4 });
+    const html = buildCardioPrintHtml(c);
+    expect(html).toContain('<table>');
+    expect(html).toContain('ZONE2');
+    expect(html).toContain('Цель: сушка');
   });
 });

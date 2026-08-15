@@ -627,3 +627,34 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
 }
+
+// ─── Печатная сводка ───
+
+function escHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** HTML-сводка цикла для печати (XSS-safe экранирование пользовательских названий). */
+export function buildCardioPrintHtml(cycle: CardioCycle): string {
+  const summary = cardioCycleSummary(cycle);
+  const phaseRows = (Object.keys(summary.phaseWeeks) as CardioPhase[])
+    .filter(p => summary.phaseWeeks[p] > 0)
+    .map(p => `<tr><td>${escHtml(CARDIO_PHASE_LABELS[p])}</td><td>${summary.phaseWeeks[p]}</td></tr>`)
+    .join('');
+  const weekRows = cycle.weeks.map(w => {
+    const sessions = w.sessions
+      .map(s => `${s.type.toUpperCase()} ${s.durationMin} мин ×${s.weeklyFrequency}`)
+      .join(' · ');
+    const marks = [w.deload ? 'делод' : null, w.taper ? 'taper' : null].filter(Boolean).join(' + ');
+    return `<tr><td>${w.week}</td><td>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td><td>${escHtml(sessions)}</td><td>${w.totalMinutes}</td><td>${w.totalKcal}</td><td>${escHtml(marks)}</td></tr>`;
+  }).join('');
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${escHtml(cycle.name)}</title>
+<style>body{font-family:system-ui,sans-serif;padding:24px;color:#111}table{border-collapse:collapse;width:100%;margin-top:12px}
+th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px;text-align:left}th{background:#f0f0f0}h2{font-size:18px}</style></head>
+<body><h2>❤️ ${escHtml(cycle.name)}</h2>
+<p>Цель: ${escHtml(CARDIO_GOAL_LABELS[cycle.goal])} · ${cycle.totalWeeks} нед · в среднем ${summary.avgMinutesPerWeek} мин/нед · ${summary.avgKcalPerWeek} ккал/нед</p>
+${cycle.rationale.map(r => `<p style="font-size:12px;color:#555">${escHtml(r)}</p>`).join('')}
+<h3>Фазы</h3><table><tr><th>Фаза</th><th>Недель</th></tr>${phaseRows}</table>
+<h3>Недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Сессии</th><th>Мин</th><th>Ккал</th><th>Метки</th></tr>${weekRows}</table>
+</body></html>`;
+}

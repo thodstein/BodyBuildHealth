@@ -1,0 +1,129 @@
+/**
+ * CardioDiaryPanel.tsx — дневник выполнения кардио: запись сессии,
+ * статистика 7/28 дней, adherence недели активного цикла, рекомендация.
+ */
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
+  cardioLogStats, cardioAdherenceSummary, computeCardioAdvice,
+  type CardioLogEntry,
+} from '../../../engines/lms/cardio-diary.engine';
+import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
+import type { CardioCycle, CardioType } from '../../../engines/lms/cardio.engine';
+
+const BTN: React.CSSProperties = {
+  padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
+  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
+};
+const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'rgba(0,230,138,0.16)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' };
+const CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+  borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
+};
+const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
+const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 };
+const INPUT: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12, minWidth: 60,
+};
+const CHIP: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', fontWeight: 600,
+};
+const CHIP_ACTIVE: React.CSSProperties = { ...CHIP, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.15)', color: '#fff' };
+
+const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
+const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
+const ADVICE_COLOR: Record<string, string> = { reduce: '#f87171', keep: '#22c55e', increase: '#3b82f6' };
+
+function newId(): string {
+  return 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+}
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: number | null; recoveryLow?: boolean }> = ({ cycle, acwr, recoveryLow }) => {
+  const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
+  const [date, setDate] = useState(todayIso());
+  const [type, setType] = useState<CardioType>('zone2');
+  const [minutes, setMinutes] = useState('30');
+  const [rpe, setRpe] = useState('');
+  const [hr, setHr] = useState('');
+  const [flash, setFlash] = useState<string | null>(null);
+
+  const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
+
+  const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
+  const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
+  const advice = useMemo(() => computeCardioAdvice(cycle ?? { totalWeeks: 0, totalKcal: 0, weeks: [], rationale: [], goal: 'health', id: '', name: '', source: 'auto', version: 1, createdAt: '', linkedCompetitionIds: [] } as CardioCycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
+  const adherence = useMemo(() => {
+    if (!cycle) return null;
+    const currentWeek = cycle.weeks.reduce((acc, w) => (w.totalMinutes > 0 ? w.week : acc), 1);
+    return cardioWeekAdherence(cycle, Math.min(currentWeek, cycle.totalWeeks), log);
+  }, [log, cycle]);
+
+  const add = () => {
+    const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
+    const entry: CardioLogEntry = {
+      id: newId(), date, type, durationMin: dur, completed: true,
+      rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
+      avgHr: Number(hr) > 0 ? Number(hr) : undefined,
+    };
+    const next = saveCardioLogEntry(entry);
+    setLog(next);
+    flashMsg('💾 Сессия записана');
+  };
+
+  return (
+    <div style={CARD}>
+      <div style={LABEL}>📓 Дневник выполнения кардио</div>
+      {flash && <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 600 }} role="status">{flash}</div>}
+
+      <div style={ROW}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={INPUT} aria-label="Дата" />
+        {TYPES.map(t => (
+          <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)}>{TYPE_LABEL[t]}</button>
+        ))}
+      </div>
+      <div style={ROW}>
+        <input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Мин" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="Минуты" />
+        <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 80 }} aria-label="RPE" />
+        <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="ЧСС" />
+        <button style={BTN_PRIMARY} onClick={add}>+ Записать</button>
+      </div>
+
+      {adherence && (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+          Неделя {adherence.week}: выполнено {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин ({adherence.pctMinutes}%)
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
+        {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
+        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: ADVICE_COLOR[advice.action] }}>
+        {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
+      </div>
+
+      {log.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {log.slice(0, 6).map(e => (
+            <div key={e.id} style={ROW}>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 84 }}>{e.date}</span>
+              <span style={{ fontSize: 11, minWidth: 60 }}>{TYPE_LABEL[e.type]}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>{e.durationMin} мин</span>
+              {e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
+              {e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
+              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => setLog(removeCardioLogEntry(e.id))} aria-label={`Удалить ${e.date}`}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
