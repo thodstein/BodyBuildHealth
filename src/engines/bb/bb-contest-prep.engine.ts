@@ -973,8 +973,13 @@ export function applyTrainingTaperToBBPlan(
     if (weekAlreadyPrepped(wk) && !force) continue;
 
     // Guard: не резать уже разгруженные недели (anti-двойное снижение, как PL-taper).
-    const isDeload = wk.deload === true || wk.phase === 'deload'
-      || (idx > 0 && weekVolume(wk) < weekVolume(weeks[idx - 1]) * 0.6);
+    // Исключение: недели с меткой taper (без prepProtocol) — это следы АВТО-taper
+    // финализатора (applyTaperToFinalWeeks), а не настоящий deload: наш канонический
+    // taper накладывается ПОВЕРХ существующего (пользователь просил «обновлять план»),
+    // иначе prep-кривая искажается (недели <60% объёма молча пропускались).
+    const autoTaperMarked = wk.taper === true && !wk.prepProtocol && !wk.peakWeek;
+    const isDeload = !autoTaperMarked && (wk.deload === true || wk.phase === 'deload'
+      || (idx > 0 && weekVolume(wk) < weekVolume(weeks[idx - 1]) * 0.6));
     if (isDeload) {
       wk.phase = wk.phase ?? 'deload';
       wk.taper = true;

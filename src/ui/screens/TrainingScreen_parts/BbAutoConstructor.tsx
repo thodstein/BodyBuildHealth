@@ -73,6 +73,7 @@ import {
   buildPostShowPlan, buildContestPrepPrintHtml,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
+  type PrepPhaseKey,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
@@ -2525,17 +2526,17 @@ export const BbAutoConstructor: React.FC = () => {
         <div style={{ marginTop:10 }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>
             Неделя {wk.week} из {W.length} · <span style={{ color:PHASE_COLORS[currentPhase] }}>{PHASE_LABELS[currentPhase]}</span>
-            {(wk as any).contestPhase && (
-              <span style={{
-                marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800,
-                color: PREP_PHASE_COLORS[(wk as any).contestPhase] ?? '#f472b6',
-                background: (PREP_PHASE_COLORS[(wk as any).contestPhase] ?? '#f472b6') + '22',
-                border: `1px solid ${(PREP_PHASE_COLORS[(wk as any).contestPhase] ?? '#f472b6')}55`,
-              }}>
-                {(wk as any).contestPhase === 'preparation' ? '🏁 Подготовка' : (wk as any).contestPhase === 'final_preparation' ? '🏁 Финальная подготовка' : (wk as any).contestPhase === 'taper' ? '📉 Тапер' : '🎭 Пик-неделя'}
-              </span>
-            )}
-            {wk.peakWeek === true && !(wk as any).contestPhase && (
+            {(() => {
+              const cp = (wk as any).contestPhase as PrepPhaseKey | undefined;
+              if (!cp) return null;
+              const c = PREP_PHASE_COLORS[cp] ?? '#f472b6';
+              return (
+                <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800, color: c, background: c + '22', border: `1px solid ${c}55` }}>
+                  {cp === 'preparation' ? '🏁 Подготовка' : cp === 'final_preparation' ? '🏁 Финальная подготовка' : cp === 'taper' ? '📉 Тапер' : '🎭 Пик-неделя'}
+                </span>
+              );
+            })()}
+            {(wk as any).peakWeek === true && !(wk as any).contestPhase && (
               <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.15)', border: '1px solid rgba(236,72,153,0.4)' }}>
                 🎭 Пик-неделя
               </span>
@@ -3824,7 +3825,7 @@ export const BbAutoConstructor: React.FC = () => {
                         {taperWeeksList.map(({ w, wi, totalSets, rirMin, firstEx }) => (
                           <tr key={wi} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
                             <td style={{ padding:'4px 6px', fontWeight:700 }}>{(w as any).week}</td>
-                            <td style={{ padding:'4px 6px', color: PREP_PHASE_COLORS[(w as any).contestPhase] ?? '#f472b6', fontWeight:700 }}>
+                            <td style={{ padding:'4px 6px', color: PREP_PHASE_COLORS[(w as any).contestPhase as PrepPhaseKey] ?? '#f472b6', fontWeight:700 }}>
                               {(w as any).contestPhase === 'peak_week' ? '🎭 Пик-неделя' : 'Тапер'}
                             </td>
                             <td style={{ padding:'4px 6px', textAlign:'right' }}>{totalSets}</td>

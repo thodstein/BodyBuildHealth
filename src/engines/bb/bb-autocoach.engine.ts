@@ -834,6 +834,17 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
 export function applyTaperToFinalWeeks(plan: BBPlan, totalWeeks: number): BBPlan {
   if (!plan || plan.weeks.length < 4) return plan; // taper только для планов ≥4 нед
 
+  // 🏁 Contest prep guard: план уже размечен фазами contest prep (contestPhase /
+  // peakWeek / prepProtocol) — его последние недели уже управляются каноническим
+  // движком (applyTrainingTaperToBBPlan / applyContestPrepToBBPlan: taper-кривая,
+  // RIR 2-4, пик-неделя). Авто-taper финализатора здесь НЕ нужен — повторное
+  // применение даёт двойное снижение объёма поверх prep-кривой (0.5×0.6 и хуже).
+  const isPrepMarked = (w: any): boolean =>
+    w.peakWeek === true
+    || (typeof w.prepProtocol === 'string' && w.prepProtocol.length > 0)
+    || (w.contestPhase === 'taper' || w.contestPhase === 'peak_week');
+  if (plan.weeks.some(isPrepMarked)) return plan;
+
   // Найти последнюю deload-неделю (если есть) — taper применяется к неделям ДО неё.
   // Если deload нет — taper к последним 2-3 неделям.
   const weeks = plan.weeks;

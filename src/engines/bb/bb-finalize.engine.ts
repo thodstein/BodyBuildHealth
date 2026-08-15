@@ -1772,11 +1772,21 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
   }
   syncBBPlanSetShape(next);
+  // 🏁 Contest prep guard: недели, управляемые каноническим prep-движком
+  // (taper/пик-неделя с prepProtocol/contestPhase), НЕ должны получать объём
+  // от финализатора при повторной финализации (revalidate после ручных правок):
+  // иначе leg-target/feeders/back-аллокации «раздувают» taper обратно.
+  const isPrepControlled = (w: any): boolean =>
+    w.contestPhase === 'taper' || w.contestPhase === 'peak_week'
+    || typeof w.prepProtocol === 'string' || w.peakWeek === true;
+  const planHasPrep = next.weeks.some(isPrepControlled);
   // Final hard invariant for adaptive high-volume leg sessions. This is kept
   // after every other pass so fatigue/rotation cannot silently turn a major
   // leg group into one 3-4 set exercise.
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
-    for (const week of next.weeks) for (const session of week.sessions) {
+    for (const week of next.weeks) {
+      if (isPrepControlled(week)) continue; // prep-недели не раздуваем
+      for (const session of week.sessions) {
       if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) continue;
       const target = (options.trainingYears ?? 0) >= 6 ? 12 : 10;
       for (const muscle of ['quads', 'hamstrings', 'glutes']) {
@@ -1808,14 +1818,19 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       }
     }
   }
+  }
   syncBBPlanSetShape(next);
   if (!options.preserveSource && options.phaseSafety) applyAdaptivePhaseSafety(next);
   if (!options.preserveSource && options.reorder !== false) repairAdaptiveSafety(next, options);
-  if (!options.preserveSource && options.ensureMinimumVolume) addAdaptiveMEVFeeders(next, options);
-  if (!options.preserveSource && options.controlledRotation) applyControlledAccessoryRotation(next, options);
+  // 🏁 Prep guard: feeders/ротация добавляют или заменяют упражнения — для taper/пик
+  // недель это нарушает «без новых упражнений и без роста объёма».
+  if (!options.preserveSource && options.ensureMinimumVolume && !planHasPrep) addAdaptiveMEVFeeders(next, options);
+  if (!options.preserveSource && options.controlledRotation && !planHasPrep) applyControlledAccessoryRotation(next, options);
     // Последний back allocation после rotation/fatigue/taper: именно здесь
   // проверяем фактические финальные сеты, а не промежуточный план.
-  for (const week of next.weeks) for (const session of week.sessions) {
+  for (const week of next.weeks) {
+    if (isPrepControlled(week)) continue; // prep-недели: объём и состав фиксированы
+    for (const session of week.sessions) {
     allocateExperiencedBackSession(session, options);
     ensureBackBalance(session, week, options);
     allocateExperiencedArmSession(session, options);
@@ -1828,6 +1843,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     if ((next as any).pattern?.id) {
       ensureWeakPatternCoverage(session, options);
       ensureSmallMuscleQuality(session, week, options);
+    }
     }
   }
 for (const week of next.weeks) {
@@ -2138,6 +2154,7 @@ for (const week of next.weeks) {
   if (!options.preserveSource) {
     const fillSets = (muscle: string) => ['calves', 'abs', 'traps', 'forearms'].includes(muscle) ? 3 : (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 4 : 3);
     for (const week of next.weeks) {
+      if (isPrepControlled(week)) continue; // prep-недели не добираем
       // Natural: малые группы (abs/traps) добираем ТОЛЬКО если их нет во всей
       // неделе — иначе fill дублирует пресс в каждой сессии (> MRV).
       const weekMuscles = new Set(week.sessions.flatMap(s => s.exercises.map((e: any) => e.muscle)));

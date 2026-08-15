@@ -20,6 +20,7 @@ import {
   latestTestPeakWeek,
   resolvePeakStrategy,
   applyContestPrepToBBPlan,
+  applyTrainingTaperToBBPlan,
   extendBBPlanPreparation,
   serializeBBContestPrepPlan,
   deserializeBBContestPrepPlan,
@@ -38,6 +39,8 @@ import {
   type BBPlanWithPrep,
 } from '../bb-contest-prep.engine';
 import type { BBPlan } from '../bb-builder.engine';
+import { applyTaperToFinalWeeks } from '../bb-autocoach.engine';
+import { finalizeBBPlan } from '../bb-finalize.engine';
 
 function addDaysIso(iso: string, days: number): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -370,6 +373,63 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(last.peakWeek).toBe(true);
     const meta = (out as any).contestPrep as { phases?: Array<{ key: string; dateEnd: string }> };
     expect(meta?.phases?.find(p => p.key === 'peak_week')?.dateEnd).toBe(cfg.showDate);
+  });
+
+  it('авто-taper финализатора (taper:true без prepProtocol) не трактуется как deload — наш taper накладывается поверх', () => {
+    // Имитация плана, где applyTaperToFinalWeeks уже порезал последние 2 недели
+    // (объём 0.5/0.75, метка taper:true, БЕЗ deload-флага).
+    const plan = makePlan(8);
+    const weeks = plan.weeks.map((w, i) => {
+      if (i < 6) return w;
+      return {
+        ...w,
+        taper: true,
+        sessions: w.sessions.map(s => ({
+          ...s,
+          exercises: s.exercises.map((e: any) => ({ ...e, sets: Math.max(2, Math.round((e.sets || 10) * (i === 7 ? 0.5 : 0.75))), rir: Math.min(5, (e.rir ?? 2) + (i === 7 ? 2 : 1)) })),
+        })),
+      };
+    });
+    const out = applyTrainingTaperToBBPlan({ ...plan, weeks } as any, baseConfig({ weeksOut: 2 })) as BBPlanWithPrep;
+    // Недели 6,7 (0-index) — в нашем taper-окне, получают prepProtocol (не «Пропущена (разгрузка)»).
+    expect(out.weeks[6].prepProtocol).toBeTruthy();
+    expect(String(out.weeks[6].prepProtocol || '')).not.toMatch(/Пропущена/);
+    expect(out.weeks[7].prepProtocol).toBeTruthy();
+    expect(String(out.weeks[7].prepProtocol || '')).not.toMatch(/Пропущена/);
+  });
+
+  it('applyTaperToFinalWeeks НЕ режет prep-размеченные планы (защита от двойного taper при повторной финализации)', () => {
+    const plan = makePlan(10);
+    const prepped = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 7, taperWeeks: 2 }) as BBPlanWithPrep;
+    const setTotal = (p: any) => p.weeks.reduce((a: number, w: any) => a + w.sessions.reduce((b: number, s: any) => b + s.exercises.reduce((c: number, e: any) => c + (e.sets || 0), 0), 0), 0);
+    const before = setTotal(prepped);
+    const after = applyTaperToFinalWeeks(prepped as any, prepped.weeks.length);
+    expect(setTotal(after)).toBe(before); // объём не изменился
+    // Обычный план (без prep-разметки) по-прежнему taper'ится финализатором.
+    const plain = makePlan(8);
+    const plainAfter = applyTaperToFinalWeeks(plain, 8);
+    expect(setTotal(plainAfter)).toBeLessThan(setTotal(plain));
+  });
+
+  it('finalizeBBPlan (revalidate) НЕ раздувает taper/пик-недели prep-плана (leg/feeders/back-аллокации пропущены)', () => {
+    const plan = makePlan(12) as any;
+    const prepped = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 9, taperWeeks: 2 }) as BBPlanWithPrep;
+    const weekSets = (p: any, idx: number) => p.weeks[idx].sessions.reduce((a: number, s: any) => a + s.exercises.reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    const taperIdx = 9; // первая taper-неделя (0-index)
+    const peakIdx = 11;
+    const taperBefore = weekSets(prepped, taperIdx);
+    const peakBefore = weekSets(prepped, peakIdx);
+    const revalidated = finalizeBBPlan(prepped as any, {
+      level: 'enhanced', trainingYears: 5, reorder: false, phaseSafety: true,
+      methodology: 'compound_first', volumeGoal: 'mav' as any,
+      equipment: [], excludedExercises: [], excludedMuscles: [], avoidAxialLoad: false,
+    });
+    // Объём taper/пик недель не вырос (guard), авто-taper не сработал.
+    expect(weekSets(revalidated, taperIdx)).toBeLessThanOrEqual(taperBefore + 1);
+    expect(weekSets(revalidated, peakIdx)).toBeLessThanOrEqual(peakBefore + 1);
+    // Пик-неделя осталась пик-неделей.
+    expect((revalidated.weeks[peakIdx] as any).peakWeek).toBe(true);
+    expect((revalidated.weeks[peakIdx] as any).contestPhase).toBe('peak_week');
   });
 
   it('extendBBPlanPreparation вставляет недели только в подготовку (тапер не трогается)', () => {
