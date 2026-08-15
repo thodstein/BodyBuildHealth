@@ -309,7 +309,7 @@ function buildWeekSessions(
   const rationale: string[] = [];
   const mult = phase === 'taper' || phase === 'transition' ? profile.taperMult : 1;
   for (const p of pool) {
-    if (p.type === 'hiit' && (recoveryLow || phase === 'taper')) continue;
+    if (p.type === 'hiit' && (recoveryLow || phase === 'taper' || phase === 'transition')) continue;
     const dur = Math.max(10, Math.round(p.dur * mult));
     const freq = Math.max(1, Math.round(p.freq * mult));
     if (freq <= 0) continue;
@@ -709,4 +709,169 @@ export function formatCardioComparison(cmp: CardioCycleComparison): string {
   return cmp.diffs
     .map(d => `${d.label}: ${d.from} → ${d.to} (${signed(d.delta)})`)
     .join(' · ');
+}
+
+// ─── Проф-инструмент: даты, пульс-зоны, авто-подстройка ───
+
+export const DAY_LABELS_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/** Раскладка сессий недели по дням (равномерно от reference-дня; сессии получают dayOfWeek). */
+export function spreadSessionsAcrossDays(week: CardioWeek, referenceIso?: string): CardioSession[] {
+  const ref = referenceIso ? new Date(referenceIso) : new Date();
+  const startDow = (ref.getDay() + 6) % 7; // Пн=0
+  const sessions: CardioSession[] = [];
+  let dayIdx = startDow;
+  for (const s of week.sessions) {
+    const sched: CardioSession = { ...s, dayOfWeek: s.dayOfWeek ?? dayIdx };
+    sessions.push(sched);
+    dayIdx = (dayIdx + 1) % 7;
+  }
+  return sessions;
+}
+
+/** Активная неделя цикла по локальной дате (неделя 1 = reference). */
+export function cardioWeekForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): CardioWeek | null {
+  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const ref = referenceIso ? parseLocal(referenceIso) : new Date();
+  const target = parseLocal(dateIso);
+  if (!Number.isFinite(target.getTime())) return null;
+  const diffDays = Math.round((target.getTime() - ref.getTime()) / 86400000);
+  const week = Math.floor(diffDays / 7) + 1;
+  return cycle.weeks.find(w => w.week === week) ?? null;
+}
+
+/** Сессии на конкретную дату (раскладка по дням недели, без силового контекста). */
+export function cardioSessionsForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): { week: CardioWeek; sessions: CardioSession[] } | null {
+  const week = cardioWeekForDate(cycle, dateIso, referenceIso);
+  if (!week) return null;
+  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const ref = referenceIso ? parseLocal(referenceIso) : new Date();
+  const target = parseLocal(dateIso);
+  const dow = (target.getDay() + 6) % 7;
+  const startDow = (ref.getDay() + 6) % 7;
+  const spread = spreadSessionsAcrossDays(week, referenceIso);
+  const weekdaySessions = spread.filter(s => (s.dayOfWeek ?? startDow) === dow);
+  return { week, sessions: weekdaySessions };
+}
+
+export interface HeartZone {
+  zone: number;
+  label: string;
+  rangeMin: number; // % от ЧСС макс (упрощённо, без резерва)
+  rangeMax: number;
+  bpmMin: number;
+  bpmMax: number;
+  purpose: string;
+}
+
+/** Пульс-зоны (упрощённый метод: % от ЧССмакс), для zone2 — 60-70%. */
+export function cardioHeartZones(age: number, restingHr?: number, maxHr?: number): HeartZone[] {
+  const a = Math.max(12, Math.min(90, age));
+  const hrmax = maxHr && maxHr > 0 ? maxHr : 220 - a;
+  const rest = restingHr && restingHr > 0 ? Math.max(30, Math.min(100, restingHr)) : undefined;
+  const ranges: { zone: number; label: string; min: number; max: number; purpose: string }[] = [
+    { zone: 1, label: 'Z1 Recovery', min: 50, max: 60, purpose: 'Восстановление, разминка' },
+    { zone: 2, label: 'Z2 Zone 2', min: 60, max: 70, purpose: 'Аэробная база, липолиз' },
+    { zone: 3, label: 'Z3 Tempo/MISS', min: 70, max: 80, purpose: 'Мисс, аэробная выносливость' },
+    { zone: 4, label: 'Z4 Threshold', min: 80, max: 90, purpose: 'Порог, интервалы' },
+    { zone: 5, label: 'Z5 VO2max', min: 90, max: 100, purpose: 'Максимальный стимул (короткие интервалы)' },
+  ];
+  const karvonen = (pct: number) => rest != null ? Math.round(rest + (hrmax - rest) * pct / 100) : Math.round(hrmax * pct / 100);
+  return ranges.map(r => ({
+    zone: r.zone,
+    label: r.label,
+    rangeMin: r.min,
+    rangeMax: r.max,
+    bpmMin: karvonen(r.min),
+    bpmMax: karvonen(r.max),
+    purpose: r.purpose,
+  }));
+}
+
+/** Серии объёма по неделям для графика (мин/ккал/фаза). */
+export function cardioVolumeSeries(cycle: CardioCycle): { week: number; minutes: number; kcal: number; phase: CardioPhase; taper: boolean }[] {
+  return cycle.weeks.map(w => ({ week: w.week, minutes: w.totalMinutes, kcal: w.totalKcal, phase: w.phase, taper: w.taper || w.deload }));
+}
+
+export interface CardioTuneChange {
+  week: number;
+  label: string;
+  from: string;
+  to: string;
+}
+
+export interface CardioTuneResult {
+  cycle: CardioCycle;
+  changes: CardioTuneChange[];
+  advice: CardioAdviceLike;
+}
+
+export interface CardioAdviceLike {
+  action: 'reduce' | 'keep' | 'increase';
+  reason: string;
+}
+
+/**
+ * Авто-подстройка цикла по дневнику: «одна переменная за раз».
+ * - adherence сессий <60% → частоту zone2/recovery −1;
+ * - средний RPE ≥8 → минуты −10% (интенсивность не трогаем);
+ * - adherence >110% и RPE <6 → минуты +10% (для cut/recomp);
+ * - ACWR ≥1.5 → HIIT убрать; ACWR 1.3-1.5 → минуты −15%;
+ * - делод/taper/peak недели не трогаются.
+ * Возвращает копию цикла + список изменений (для подтверждения пользователем).
+ */
+export function autoTuneCardioCycle(
+  cycle: CardioCycle,
+  log: { date: string; durationMin: number; rpe?: number; completed: boolean }[],
+  opts: { acwr?: number | null; referenceIso?: string } = {},
+): CardioTuneResult {
+  const ref = opts.referenceIso ? new Date(opts.referenceIso) : new Date();
+  const changes: CardioTuneChange[] = [];
+  const weeks = cycle.weeks.map(w => {
+    if (w.deload || w.taper || w.phase === 'peak' || w.phase === 'transition') return w;
+    const start = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (w.week - 1) * 7);
+    const startIso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const endIso = startIso + '+7';
+    const done = log.filter(e => e.completed && e.date >= startIso && e.date < endIso);
+    const plannedSessions = w.sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    const pct = plannedSessions > 0 ? done.length / plannedSessions : 0;
+    const avgRpe = done.filter(e => typeof e.rpe === 'number').reduce((s, e) => s + (e.rpe ?? 0), 0) / Math.max(1, done.filter(e => typeof e.rpe === 'number').length);
+    let sessions = w.sessions;
+    const cw = (label: string, from: string, to: string) => changes.push({ week: w.week, label, from, to });
+    if (opts.acwr != null && opts.acwr >= 1.5 && sessions.some(s => s.type === 'hiit')) {
+      sessions = sessions.filter(s => s.type !== 'hiit');
+      cw('ACWR опасный → HIIT убран', `HIIT ×${w.sessions.filter(s => s.type === 'hiit').reduce((s, x) => s + x.weeklyFrequency, 0)}`, '0');
+    } else if (opts.acwr != null && opts.acwr >= 1.3) {
+      const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      sessions = sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.85)) }));
+      const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      cw('ACWR осторожный → минуты −15%', `${before} мин`, `${after} мин`);
+    } else if (done.length > 0 && avgRpe >= 8) {
+      const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      sessions = sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 0.9)) }));
+      const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      cw(`RPE ${avgRpe.toFixed(1)} → минуты −10%`, `${before} мин`, `${after} мин`);
+    } else if (pct > 0 && pct < 0.6) {
+      const z2 = sessions.find(s => s.type === 'zone2' || s.type === 'recovery');
+      if (z2 && z2.weeklyFrequency > 1) {
+        const before = `${z2.type.toUpperCase()} ×${z2.weeklyFrequency}`;
+        sessions = sessions.map(s => (s.type === z2.type ? { ...s, weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) } : s));
+        const after = `${z2.type.toUpperCase()} ×${sessions.find(s => s.type === z2.type)!.weeklyFrequency}`;
+        cw(`Выполнено ${Math.round(pct * 100)}% → частота −1`, before, after);
+      }
+    } else if (pct >= 1.1 && avgRpe > 0 && avgRpe < 6 && (cycle.goal === 'cut' || cycle.goal === 'recomp')) {
+      const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      sessions = sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 1.1)) }));
+      const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+      cw('Выполнено >110%, RPE низкий → минуты +10%', `${before} мин`, `${after} мин`);
+    }
+    return rebuildWeek(w, sessions, []);
+  });
+  const totalBefore = cycle.weeks.reduce((s, w) => s + w.totalMinutes, 0);
+  const totalAfter = weeks.reduce((s, w) => s + w.totalMinutes, 0);
+  const cycle2: CardioCycle = { ...cycle, weeks, source: cycle.source };
+  const advice: CardioAdviceLike = changes.length > 0
+    ? { action: totalAfter < totalBefore ? 'reduce' : totalAfter > totalBefore ? 'increase' : 'keep', reason: `Авто-подстройка: ${changes.length} изменений (недель: ${[...new Set(changes.map(c => c.week))].join(', ')}).` }
+    : { action: 'keep', reason: 'Данные дневника соответствуют плану — изменений нет.' };
+  return { cycle: cycle2, changes, advice };
 }

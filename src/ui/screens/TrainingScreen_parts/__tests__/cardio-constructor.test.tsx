@@ -51,6 +51,14 @@ describe('CardioConstructor — CSR', () => {
     expect(saved).toHaveLength(1);
   });
 
+  it('после сборки доступны проф-инструменты: авто-режим, график, редактор недели', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
+    expect(screen.getByRole('button', { name: /Подстроить сейчас/ })).toBeTruthy();
+    expect(screen.getByText(/Объём по неделям/)).toBeTruthy();
+    expect(screen.getByText(/Ручная настройка недели/)).toBeTruthy();
+  });
+
   it('подключение к ПЛ-авто фиксируется в cardio-bridge', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));

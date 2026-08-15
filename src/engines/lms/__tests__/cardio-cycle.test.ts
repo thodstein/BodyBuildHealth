@@ -6,6 +6,8 @@ import {
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
   compareCardioCycles, formatCardioComparison,
+  cardioWeekForDate, cardioSessionsForDate, cardioHeartZones,
+  spreadSessionsAcrossDays, cardioVolumeSeries, autoTuneCardioCycle,
   type CardioCycle,
 } from '../cardio.engine';
 
@@ -296,5 +298,114 @@ describe('compareCardioCycles', () => {
     expect(cmp.diffs.some(d => d.field === 'weeks')).toBe(true);
     const phaseDiff = cmp.diffs.find(d => d.field.startsWith('phase_'));
     expect(phaseDiff?.to).toContain(' нед');
+  });
+});
+
+// ─── Проф-инструмент: даты/раскладка/пульс-зоны/авто-подстройка ───
+
+describe('даты и раскладка', () => {
+  it('cardioWeekForDate: неделя 1 = reference, +7 дней = неделя 2', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    expect(cardioWeekForDate(c, '2026-01-05', '2026-01-05')?.week).toBe(1);
+    expect(cardioWeekForDate(c, '2026-01-12', '2026-01-05')?.week).toBe(2);
+    expect(cardioWeekForDate(c, '2026-02-02', '2026-01-05')).toBeNull();
+  });
+
+  it('spreadSessionsAcrossDays: сессии получают последовательные дни недели', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 2 });
+    const spread = spreadSessionsAcrossDays(c.weeks[0], '2026-01-05');
+    expect(spread.length).toBeGreaterThan(0);
+    expect(spread[0].dayOfWeek).toBe(0);
+  });
+
+  it('cardioSessionsForDate: на дату попадают только сессии соответствующего дня', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4 });
+    const day1 = cardioSessionsForDate(c, '2026-01-05', '2026-01-05');
+    expect(day1?.week.week).toBe(1);
+  });
+});
+
+describe('cardioHeartZones', () => {
+  it('zone2 = 60-70% ЧССмакс (220-возраст)', () => {
+    const zones = cardioHeartZones(40);
+    expect(zones[1].zone).toBe(2);
+    expect(zones[1].bpmMin).toBe(Math.round(180 * 0.6));
+    expect(zones[1].bpmMax).toBe(Math.round(180 * 0.7));
+    expect(zones).toHaveLength(5);
+  });
+
+  it('Karvonen с restingHr: зоны шире', () => {
+    const z = cardioHeartZones(40, 60);
+    expect(z[1].bpmMin).toBe(Math.round(60 + 120 * 0.6));
+  });
+
+  it('возраст клампится 12-90', () => {
+    expect(cardioHeartZones(5)[1].bpmMax).toBeLessThanOrEqual(Math.round(208 * 0.7));
+    expect(cardioHeartZones(95)[1].bpmMin).toBeGreaterThan(0);
+  });
+});
+
+describe('cardioVolumeSeries', () => {
+  it('возвращает недельные серии мин/ккал', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 3 });
+    const s = cardioVolumeSeries(c);
+    expect(s).toHaveLength(3);
+    expect(s[0].minutes).toBeGreaterThan(0);
+    expect(s.some(x => x.taper)).toBe(false);
+  });
+});
+
+describe('autoTuneCardioCycle', () => {
+  const REF = '2026-01-05';
+
+  it('ACWR опасный → HIIT убран на рабочих неделях', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const r = autoTuneCardioCycle(c, [], { acwr: 1.6, referenceIso: REF });
+    expect(r.changes.length).toBeGreaterThan(0);
+    const tunedWeeks = r.cycle.weeks.filter(w => !w.deload && !w.taper);
+    for (const w of tunedWeeks) expect(w.sessions.some(s => s.type === 'hiit')).toBe(false);
+  });
+
+  it('выполнено <60% сессий → частота zone2 −1', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    const log = [{ date: '2026-01-05', durationMin: 30, completed: true }];
+    const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
+    const freqAfter = r.cycle.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    expect(freqAfter).toBeLessThan(planned);
+  });
+
+  it('RPE ≥8 → минуты −10%', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const before = c.weeks[0].totalMinutes;
+    const log = [{ date: '2026-01-05', durationMin: 45, rpe: 9, completed: true }, { date: '2026-01-06', durationMin: 45, rpe: 8, completed: true }];
+    const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
+    expect(r.cycle.weeks[0].totalMinutes).toBeLessThan(before);
+  });
+
+  it('соответствие плану → изменений нет', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    const log = Array.from({ length: planned }, (_, i) => ({ date: `2026-01-${5 + i}`, durationMin: 30, rpe: 5, completed: true }));
+    const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
+    expect(r.changes).toEqual([]);
+    expect(r.advice.action).toBe('keep');
+  });
+
+  it('делод/taper/peak недели не трогаются', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const w4 = c.weeks[3];
+    expect(w4.deload).toBe(true);
+    const before = JSON.stringify(w4);
+    autoTuneCardioCycle(c, [], { acwr: 1.7, referenceIso: REF });
+    const after = JSON.stringify(c.weeks[3]);
+    expect(after).toBe(before);
+  });
+
+  it('исходный цикл не мутируется', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const before = JSON.stringify(c);
+    autoTuneCardioCycle(c, [], { acwr: 1.7, referenceIso: REF });
+    expect(JSON.stringify(c)).toBe(before);
   });
 });

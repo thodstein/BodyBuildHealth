@@ -22,6 +22,9 @@ import {
   attachCardioToMacro, detachCardioFromMacro,
 } from '../../../engines/lms/macrocycle.engine';
 import { CardioDiaryPanel } from './CardioDiaryPanel';
+import { CardioAutoTunePanel } from './CardioAutoTunePanel';
+import { CardioWeekEditor } from './CardioWeekEditor';
+import { CardioVolumeChart } from './CardioVolumeChart';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 
@@ -300,6 +303,13 @@ export const CardioConstructor: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Проф-инструменты: авто-режим, пульс-зоны, «Сегодня» */}
+      {cycle && <CardioAutoTunePanel cycle={cycle} acwr={acwrValue} onChanged={() => { setCycle(loadActiveCardioCycle()); reload(); }} />}
+      {/* График объёма */}
+      {cycle && <CardioVolumeChart cycle={cycle} />}
+      {/* Ручная настройка недели */}
+      {cycle && <CardioWeekEditor cycle={cycle} onChanged={() => { setCycle(loadActiveCardioCycle()); reload(); }} />}
 
       {/* Привязка к годовому плану */}
       <div style={CARD}>
