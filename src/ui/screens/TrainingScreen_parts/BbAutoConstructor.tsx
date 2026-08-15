@@ -70,6 +70,7 @@ import {
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
+  buildPostShowPlan,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
 } from '../../../engines/bb/bb-contest-prep.engine';
@@ -3623,10 +3624,31 @@ export const BbAutoConstructor: React.FC = () => {
               {prepPlan.preparation.weeks} нед подготовки (финал {prepPlan.preparation.finalWeeks}) · taper {prepPlan.taper.weeks} нед · пик-неделя 7 дн · темп {prepPlan.preparation.targetRatePctPerWeek}%/нед · {prepPlan.preparation.currentCalories} ккал · {prepPlan.preparation.stepsPerDay} шагов
             </div>
             {phaseNow && (
-              <div style={{ fontSize:11, fontWeight:700, color:PREP_PHASE_COLORS[phaseNow.key], marginBottom:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:PREP_PHASE_COLORS[phaseNow.key], marginBottom:4 }}>
                 📍 Сейчас: {PREP_PHASE_LABELS[phaseNow.key]} ({phaseNow.dateStart} — {phaseNow.dateEnd})
               </div>
             )}
+            {(() => {
+              const totalWeeks = prepPlan.phases.reduce((m, p) => Math.max(m, p.weekEnd), 0);
+              const passedWeeks = Math.max(0, Math.min(totalWeeks, (() => {
+                const now = isoToday();
+                const p = prepPhaseForDate(prepPlan, now);
+                if (!p) return now > prepPlan.showDate ? totalWeeks : 0;
+                return p.weekStart;
+              })()));
+              const pct = totalWeeks > 0 ? Math.round((passedWeeks / totalWeeks) * 100) : 0;
+              return (
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>
+                    <span>Прогресс подготовки</span>
+                    <span>неделя {passedWeeks} из {totalWeeks} ({pct}%)</span>
+                  </div>
+                  <div style={{ height:5, borderRadius:3, background:'rgba(255,255,255,0.08)', overflow:'hidden' }}>
+                    <div style={{ width:`${pct}%`, height:'100%', borderRadius:3, background:'linear-gradient(90deg,#3b82f6,#ec4899)' }} />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Фазы календарём */}
             <div style={{ overflowX:'auto', marginBottom:10 }}>
@@ -3874,6 +3896,24 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* 🔄 Post-show: восстановление после шоу */}
+            <div style={{ marginTop:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🔄 Post-show (восстановление после шоу)</div>
+              {(() => {
+                const post = buildPostShowPlan(prepPlan);
+                return (
+                  <div style={{ background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)', borderRadius:8, padding:10, fontSize:10 }}>
+                    <div style={{ color:'rgba(255,255,255,0.75)', marginBottom:4 }}>
+                      <b>{post.kcal} ккал</b> (поддержание) · Б {post.proteinG} г · 💧 {post.waterLiters} л стабильно · {post.durationDays} дней
+                    </div>
+                    {post.notes.map((n, i) => <div key={`n${i}`} style={{ color:'rgba(255,255,255,0.55)', marginTop:2 }}>• {n}</div>)}
+                    <div style={{ marginTop:4, fontSize:9, color:'rgba(255,255,255,0.45)' }}>🏋️ {post.training.join(' ')}</div>
+                    <div style={{ marginTop:4, color:'rgba(96,165,250,0.75)' }}>⚖️ {post.weightCheck}</div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}>

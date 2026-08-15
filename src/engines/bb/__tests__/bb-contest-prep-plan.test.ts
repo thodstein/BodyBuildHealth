@@ -31,6 +31,7 @@ import {
   buildShowTimeline,
   configFromPlan,
   prepWeightAdvice,
+  buildPostShowPlan,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -643,5 +644,32 @@ describe('Этап 3.2-3.3 — ступенчатая адаптация под�
     const advice = prepWeightAdvice(log, plan, { referenceDate: ref });
     expect(advice.status).not.toBe('no_data');
     expect(advice.measurements).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('Post-show — контроль восстановления после шоу', () => {
+  it('строит поддерживающий план: калории выше дефицита, белок ~2 г/кг, стабильные вода/натрий', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    const post = buildPostShowPlan(plan);
+    expect(post.durationDays).toBe(7);
+    expect(post.kcal).toBeGreaterThan(plan.preparation.currentCalories);
+    expect(post.proteinG).toBeGreaterThanOrEqual(Math.round(80 * 2.0) - 1);
+    expect(post.waterLiters).toBeGreaterThanOrEqual(2.5);
+    expect(post.notes.some(n => n.includes('стабильны'))).toBe(true);
+    expect(post.training.some(t => t.includes('full-body'))).toBe(true);
+    expect(post.weightCheck).toMatch(/\+1–2 кг/);
+  });
+
+  it('учитывает referenceCalories для поддержания', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const post = buildPostShowPlan(plan, { referenceCalories: 3000 });
+    expect(post.kcal).toBe(3300);
+  });
+
+  it('не содержит агрессивных манипуляций (вода/натрий не режутся)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const post = buildPostShowPlan(plan);
+    const text = [...post.notes, ...post.training, post.weightCheck].join(' ').toLowerCase();
+    expect(text).not.toMatch(/диуретик|0\.5 ?л|0\.25 ?л/);
   });
 });

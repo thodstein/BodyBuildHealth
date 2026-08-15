@@ -424,7 +424,7 @@ export const TaperPlannerTab: React.FC = () => {
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
                 🔗 Применить BB шоу-пик к планировщику (карб-загрузка, водная манипуляция, памп).
               </div>
-              <button onClick={() => applyToPlanner({ kind: 'peak', label: 'BB шоу-пик: карб-загрузка + water cut', data: { volumeMult: 0.4, rirTarget: 0 } })} style={{ width: '100%', ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>
+              <button onClick={() => applyToPlanner({ kind: 'peak', label: 'BB шоу-пик: карб-загрузка, вода и натрий стабильны, RIR 2-4', data: { volumeMult: 0.6, rirTarget: 2 } })} style={{ width: '100%', ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>
                 🛠 Применить шоу-пик к планировщику
               </button>
             </div>
