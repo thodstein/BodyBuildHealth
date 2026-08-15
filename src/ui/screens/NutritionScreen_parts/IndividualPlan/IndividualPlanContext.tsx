@@ -737,14 +737,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return Array.isArray(v) ? v.filter(x => typeof x === 'string') : ['chicken_breast','rice_white','broccoli','egg_whole','avocado'];
     } catch { return ['chicken_breast','rice_white','broccoli','egg_whole','avocado']; }
   });
+  useEffect(() => { try { updateSection('nutrition', { preferredFoods }); } catch {} }, [preferredFoods]);
   const [quickAddMealIdx, setQuickAddMealIdx] = useState<number | null>(null);
   const [quickAddSearch, setQuickAddSearch] = useState('');
+  const cleanPlannerNotes = (v: unknown): string | null => {
+    if (typeof v !== 'string') return null;
+    const t = v.trim();
+    if (!t) return null;
+    if (/^[\s/\\|_\-=~*#·•]+$/.test(t)) return null;
+    return t;
+  };
   const [customNotes, setCustomNotes] = useState(() => {
-    try { const v = (s as any)?.nutrition?.dietNotes; if (typeof v === 'string') return v; } catch {}
-    try { return localStorage.getItem('he_nutrition_notes') || ''; } catch { return ''; }
+    try { const v = cleanPlannerNotes((s as any)?.nutrition?.dietNotes); if (v !== null) return v; } catch {}
+    try { return cleanPlannerNotes(localStorage.getItem('he_nutrition_notes')) || ''; } catch { return ''; }
   });
-  // FIX save-buttons: заметки читались, но не сохранялись — терялись при перезагрузке
-  useEffect(() => { try { safeWriteJSON('he_nutrition_notes', customNotes); } catch {} }, [customNotes]);
+  // FIX save-buttons: заметки читались, но не сохранялись — терялись при перезагрузке.
+  // Двустороннее зеркало: правка пишется и в профиль, иначе старый dietNotes («///////») возвращался после перезагрузки.
+  useEffect(() => { try { safeWriteJSON('he_nutrition_notes', customNotes); updateSection('nutrition', { dietNotes: customNotes }); } catch {} }, [customNotes]);
   // D-28: meal-bound preferred foods (e.g. rice_cream → breakfast only)
   const [preferredByMeal, setPreferredByMeal] = useState<Record<string, string[]>>(() => {
     try { const v = (s as any)?.nutrition?.preferredByMeal; if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch {}
@@ -840,6 +849,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
     } catch { return []; }
   });
+  useEffect(() => { try { updateSection('nutrition', { excludedFoods }); } catch {} }, [excludedFoods]);
   // P1-fix: dietPrefs из Profile (UnifiedSettings.nutrition.tasteProfile) + legacy
   // dietPrefs — это список типов (vegetarian, vegan, pescatarian и т.д.) из UI.
   // В UnifiedSettings он хранится в nutrition.tasteProfile как массив (через миграцию diet_preferences).
@@ -853,6 +863,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
     } catch { return []; }
   });
+  useEffect(() => { try { updateSection('nutrition', { tasteProfile: dietPrefs }); } catch {} }, [dietPrefs]);
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
   const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
   // Bug-1 fix: planTargets must mirror effective* so the full nutrition report
