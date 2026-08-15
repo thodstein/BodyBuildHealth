@@ -53,13 +53,15 @@ describe('PeakWeekTab smoke', () => {
   it('смена пола переключает список категорий (bikini для женщин)', () => {
     render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
     clickTab('Тапер ББ');
-    const selects = document.querySelectorAll('select');
-    const sexSelect = Array.from(selects).find(s => Array.from(s.options).some(o => o.value === 'male' && o.textContent === 'Мужской'));
-    expect(sexSelect).toBeTruthy();
-    fireEvent.change(sexSelect!, { target: { value: 'female' } });
-    const catSelect = Array.from(document.querySelectorAll('select')).find(s => Array.from(s.options).some(o => o.value === 'bikini'));
-    expect(catSelect).toBeTruthy();
-    fireEvent.change(catSelect!, { target: { value: 'bikini' } });
-    expect((catSelect as HTMLSelectElement).value).toBe('bikini');
+    // Открыть попап «Пол»
+    const sexBtn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Пол'));
+    expect(sexBtn).toBeTruthy();
+    fireEvent.click(sexBtn!);
+    fireEvent.click(screen.getByText('Женский'));
+    // Попап «Категория» теперь содержит Bikini
+    const catBtn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Категория'));
+    expect(catBtn).toBeTruthy();
+    fireEvent.click(catBtn!);
+    expect(screen.getAllByText('Bikini').length).toBeGreaterThan(0);
   });
 });

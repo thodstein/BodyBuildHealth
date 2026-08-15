@@ -7,6 +7,9 @@
  *
  * «🏁 Применить тапер-план ББ» — сохраняет конфиг в профиль (goals.bbPeakConfig)
  * и перегенерирует план питания с оверлеем по реальной дате шоу.
+ *
+ * Все выборы — через PopupSelect/PopupNumber/PopupBool (нативные <select> с
+ * appearance:none не открываются в Telegram WebView).
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -14,13 +17,13 @@ import {
   CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
   type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
 } from '../../../../engines/bb/bb-contest-prep.engine';
-import { GlassCard, inputStyle, selectStyle } from './ui';
+import { GlassCard } from './ui';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
+import { PopupNumber, PopupSelect, PopupBool } from '../../../components/PopupXxx';
 
 const ACCENT = '#f59e0b';
 const DIM = 'rgba(255,255,255,0.55)';
-const LBL: React.CSSProperties = { fontSize: 10, color: DIM, marginBottom: 2 };
 const BTN_PRIMARY: React.CSSProperties = {
   flex: 1, padding: 12, borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 12, minHeight: 48,
   background: 'linear-gradient(135deg,#fbbf24,#d97706)', color: '#000',
@@ -39,17 +42,6 @@ const CARD_TITLE: React.CSSProperties = { fontSize: 12, fontWeight: 800, color: 
 
 const MALE_CATS: BBContestCategory[] = ['mens_physique', 'classic_physique', 'mens_bb', 'bb_212'];
 const FEMALE_CATS: BBContestCategory[] = ['bikini', 'figure', 'wellness', 'womens_physique', 'womens_bb'];
-
-const STRATEGY_LABELS: Record<string, string> = {
-  front: 'Front-load (3 дня, раньше)',
-  moderate: 'Классика 3/3 (рекомендуется)',
-  back: 'Back-load (2 дня, поздно)',
-  classic: 'Classic: load + cut (опытные)',
-  minimal: 'Minimal: без манипуляций (безопасно)',
-  constant: 'Constant: натрий не трогаем (современно)',
-  cut_2d: 'Cut за 2 дня',
-  cut_3d: 'Cut за 3 дня (классика)',
-};
 
 const WATER_HINTS: Record<string, string> = {
   classic: 'Load 6–10 л → ступенчатый cut → глотки. Только опытные, здоровые почки.',
@@ -81,6 +73,57 @@ const chip: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999,
   fontSize: 9, fontWeight: 700,
 };
+
+/** Тумблер-чип (современная замена checkbox). */
+const ToggleChip: React.FC<{ label: string; icon?: string; value: boolean; onChange: (v: boolean) => void; danger?: boolean }> = ({ label, icon, value, onChange, danger }) => {
+  const color = danger ? '#f87171' : '#f59e0b';
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 12, cursor: 'pointer',
+        minHeight: 44, fontSize: 10, fontWeight: value ? 800 : 600,
+        background: value ? (danger ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.08))' : 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.08))') : 'rgba(255,255,255,0.04)',
+        border: value ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.1)',
+        color: value ? color : 'rgba(255,255,255,0.75)',
+        boxShadow: value ? `0 2px 12px ${color}22` : 'none',
+        transition: 'all 0.18s ease',
+      }}
+    >
+      <span style={{
+        width: 16, height: 16, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 9, background: value ? color : 'rgba(255,255,255,0.08)', color: value ? '#000' : 'transparent',
+        transition: 'all 0.18s ease',
+      }}>
+        {value ? '✓' : ''}
+      </span>
+      {icon && <span>{icon}</span>}
+      {label}
+    </button>
+  );
+};
+
+/** Дата-карточка: нативный date-picker в современной обёртке. */
+const DateCard: React.FC<{ label: string; value: string; onChange: (v: string) => void }> = ({ label, value, onChange }) => (
+  <div style={{
+    width: '100%', minHeight: 58, borderRadius: 12, padding: '8px 12px', boxSizing: 'border-box',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+    border: '1px solid rgba(255,255,255,0.09)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
+    boxShadow: '0 1px 8px rgba(0,0,0,0.22)', position: 'relative',
+  }}>
+    <span style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</span>
+    <input
+      type="date"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{
+        width: '100%', border: 'none', background: 'transparent', color: '#fbbf24', fontSize: 12.5,
+        fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: 0,
+      }}
+    />
+  </div>
+);
 
 export const PeakWeekTab: React.FC = () => {
   const ctx = usePlanCtx();
@@ -227,126 +270,101 @@ export const PeakWeekTab: React.FC = () => {
       </div>
 
       <GlassCard title="Атлет и тайминг" icon="👤" color={ACCENT}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          <div>
-            <div style={LBL}>Пол</div>
-            <select value={draft.sex} style={selectStyle} onChange={e => patch({ sex: e.target.value as any, category: (e.target.value === 'female' ? 'bikini' : 'mens_physique') })}>
-              <option value="male">Мужской</option>
-              <option value="female">Женский</option>
-            </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <PopupSelect
+            label="Пол"
+            value={draft.sex}
+            options={[{ id: 'male', label: 'Мужской' }, { id: 'female', label: 'Женский' }]}
+            onChange={v => patch({ sex: v as any, category: (v === 'female' ? 'bikini' : 'mens_physique') })}
+          />
+          <PopupSelect
+            label="Категория"
+            value={draft.category}
+            options={catsFor.map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))}
+            onChange={v => patch({ category: v as BBContestCategory })}
+          />
+          <PopupNumber label="Вес тела" value={draft.weightKg} min={40} max={200} suffix="кг" onChange={v => patch({ weightKg: v })} />
+          <PopupNumber label="% жира сейчас" value={draft.bodyFatPct ?? 0} min={0} max={60} step={0.5} suffix="%" onChange={v => patch({ bodyFatPct: v > 0 ? v : undefined })} />
+          <DateCard label="Дата шоу" value={draft.showDate} onChange={v => patch({ showDate: v })} />
+          <PopupSelect
+            label="Уровень"
+            value={draft.experienceLevel}
+            options={[{ id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' }, { id: 'advanced', label: 'Продвинутый' }]}
+            onChange={v => patch({ experienceLevel: v as any })}
+          />
+          <PopupNumber label="Пройдено пиков" value={draft.prepCount} min={0} max={50} onChange={v => patch({ prepCount: Math.round(v) })} />
+          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+            <ToggleChip label="На курсе" icon="💉" value={draft.enhanced} onChange={v => patch({ enhanced: v })} />
           </div>
-          <div>
-            <div style={LBL}>Категория</div>
-            <select value={draft.category} style={selectStyle} onChange={e => patch({ category: e.target.value as BBContestCategory })}>
-              {catsFor.map(c => <option key={c} value={c}>{CONTEST_CATEGORY_LABELS[c]}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={LBL}>Вес тела (кг)</div>
-            <input type="number" min={40} max={200} value={draft.weightKg} style={inputStyle} onChange={e => patch({ weightKg: Number(e.target.value) || 80 })} />
-          </div>
-          <div>
-            <div style={LBL}>% жира сейчас</div>
-            <input type="number" min={3} max={60} step={0.5} value={draft.bodyFatPct ?? ''} placeholder={`${bodyFatPct || '—'}`} style={inputStyle} onChange={e => patch({ bodyFatPct: e.target.value === '' ? undefined : Number(e.target.value) })} />
-          </div>
-          <div>
-            <div style={LBL}>📅 Дата шоу</div>
-            <input type="date" value={draft.showDate} style={inputStyle} onChange={e => patch({ showDate: e.target.value })} />
-          </div>
-          <div>
-            <div style={LBL}>Уровень</div>
-            <select value={draft.experienceLevel} style={selectStyle} onChange={e => patch({ experienceLevel: e.target.value as any })}>
-              <option value="beginner">Новичок</option>
-              <option value="intermediate">Средний</option>
-              <option value="advanced">Продвинутый</option>
-            </select>
-          </div>
-          <div>
-            <div style={LBL}>Пройденных пиков</div>
-            <input type="number" min={0} max={50} value={draft.prepCount} style={inputStyle} onChange={e => patch({ prepCount: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <label style={{ fontSize: 10, color: DIM, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="checkbox" checked={draft.enhanced} onChange={e => patch({ enhanced: e.target.checked })} />
-              💉 На курсе
-            </label>
-          </div>
+        </div>
+        <div style={{ fontSize: 9, color: DIM, marginTop: 8 }}>
+          {bodyFatPct > 0 ? `Профиль: ${sex === 'female' ? 'женщина' : 'мужчина'} · ${weight} кг · ${bodyFatPct}% жира.` : 'Совет: укажите % жира — точнее оценка готовности к пику.'}
         </div>
       </GlassCard>
 
       <GlassCard title="Стратегии протокола" icon="🎯" color="#ec4899">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
-          <div>
-            <div style={LBL}>Тренировочный протокол (Библиотека методик)</div>
-            <select value={draft.trainingProtocol} style={selectStyle} onChange={e => patch({ trainingProtocol: e.target.value as any })}>
-              <option value="bb">Бодибилдинг (4 нед: наполнение → прорисовка → шоу)</option>
-              <option value="classic">Классический WF (перегрузка → суперкомпенсация)</option>
-              <option value="pl">Пауэрлифтинг (3 нед, интенсивность к 100%)</option>
-            </select>
-          </div>
-          <div>
-            <div style={LBL}>Недель тапера (накладывается на последние недели плана)</div>
-            <select value={String(draft.weeksOut)} style={selectStyle} onChange={e => patch({ weeksOut: Number(e.target.value) })}>
-              {[1, 2, 3, 4].map(n => <option key={n} value={n}>{n} недел{n === 1 ? 'я' : n < 4 ? 'и' : 'и'}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={LBL}>🍚 Карб-загрузка</div>
-            <select value={draft.carbLoadStrategy} style={selectStyle} onChange={e => patch({ carbLoadStrategy: e.target.value as any })}>
-              <option value="moderate">{STRATEGY_LABELS.moderate}</option>
-              <option value="front">{STRATEGY_LABELS.front}</option>
-              <option value="back">{STRATEGY_LABELS.back}</option>
-            </select>
-          </div>
-          <div>
-            <div style={LBL}>💧 Вода</div>
-            <select value={draft.waterStrategy} style={selectStyle} onChange={e => patch({ waterStrategy: e.target.value as any })}>
-              <option value="minimal">{STRATEGY_LABELS.minimal}</option>
-              <option value="moderate">Moderate: мягкий cut</option>
-              <option value="classic">{STRATEGY_LABELS.classic}</option>
-            </select>
-            <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>{WATER_HINTS[draft.waterStrategy]}</div>
-          </div>
-          <div>
-            <div style={LBL}>🧂 Натрий</div>
-            <select value={draft.sodiumStrategy} style={selectStyle} onChange={e => patch({ sodiumStrategy: e.target.value as any })}>
-              <option value="constant">{STRATEGY_LABELS.constant}</option>
-              <option value="cut_2d">{STRATEGY_LABELS.cut_2d}</option>
-              <option value="cut_3d">{STRATEGY_LABELS.cut_3d}</option>
-            </select>
-          </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <label style={{ fontSize: 10, color: DIM, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="checkbox" checked={!!draft.preferLowFiberCarbs} onChange={e => patch({ preferLowFiberCarbs: e.target.checked })} />
-              Низковолокнистые карбс (рис/хлебцы)
-            </label>
-            <label style={{ fontSize: 10, color: DIM, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="checkbox" checked={draft.creatineStrategy === 'stop'} onChange={e => patch({ creatineStrategy: e.target.checked ? 'stop' : 'continue' })} />
-              Прекратить креатин
-            </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+          <PopupSelect
+            label="Тренировочный протокол (Библиотека методик)"
+            value={draft.trainingProtocol}
+            options={[
+              { id: 'bb', label: 'Бодибилдинг · 4 нед', desc: 'Наполнение → прорисовка → шоу. Классика соревновательного ББ.' },
+              { id: 'classic', label: 'Классический WF · 4 нед', desc: 'Перегрузка → суперкомпенсация. Подход Issurin.' },
+              { id: 'pl', label: 'Пауэрлифтинг · 3 нед', desc: 'Интенсивность к 100%, синглы перед стартом.' },
+            ]}
+            onChange={v => patch({ trainingProtocol: v as any })}
+          />
+          <PopupSelect
+            label="Недель тапера"
+            value={String(draft.weeksOut)}
+            options={[1, 2, 3, 4].map(n => ({ id: String(n), label: `${n} недел${n === 1 ? 'я' : n < 4 ? 'и' : 'и'}`, desc: 'Столько последних недель плана покрывает тапер.' }))}
+            onChange={v => patch({ weeksOut: Number(v) })}
+          />
+          <PopupSelect
+            label="Карб-загрузка"
+            value={draft.carbLoadStrategy}
+            options={[
+              { id: 'moderate', label: 'Классика 3/3', desc: '3 дня деплеции → 3 дня загрузки. Рекомендуется.' },
+              { id: 'front', label: 'Front-load', desc: 'Загрузка раньше (3 дня), день перед шоу — пик.' },
+              { id: 'back', label: 'Back-load', desc: 'Поздняя загрузка 2 дня — для тех, кого «заливает».' },
+            ]}
+            onChange={v => patch({ carbLoadStrategy: v as any })}
+          />
+          <PopupSelect
+            label="Вода"
+            value={draft.waterStrategy}
+            options={[
+              { id: 'minimal', label: 'Minimal', desc: WATER_HINTS.minimal },
+              { id: 'moderate', label: 'Moderate', desc: WATER_HINTS.moderate },
+              { id: 'classic', label: 'Classic (load+cut)', desc: WATER_HINTS.classic },
+            ]}
+            onChange={v => patch({ waterStrategy: v as any })}
+          />
+          <PopupSelect
+            label="Натрий"
+            value={draft.sodiumStrategy}
+            options={[
+              { id: 'constant', label: 'Constant', desc: 'Не трогаем — современный подход, не ломает fill.' },
+              { id: 'cut_2d', label: 'Cut за 2 дня', desc: 'Ступенчатое снижение к шоу.' },
+              { id: 'cut_3d', label: 'Cut за 3 дня', desc: 'Классика: снижаем с D-3.' },
+            ]}
+            onChange={v => patch({ sodiumStrategy: v as any })}
+          />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <ToggleChip label="Низковолокнистые карбс" icon="🍚" value={!!draft.preferLowFiberCarbs} onChange={v => patch({ preferLowFiberCarbs: v })} />
+            <ToggleChip label="Прекратить креатин" icon="💊" value={draft.creatineStrategy === 'stop'} onChange={v => patch({ creatineStrategy: v ? 'stop' : 'continue' })} />
           </div>
         </div>
       </GlassCard>
 
       <GlassCard title="Безопасность" icon="🛡" color="#60a5fa">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          {['kidney', 'heart', 'hypertension'].map(id => (
-            <label key={id} style={{ fontSize: 10, color: DIM, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input
-                type="checkbox"
-                checked={(draft.contraindications || []).includes(id)}
-                onChange={e => patch({
-                  contraindications: e.target.checked
-                    ? [...(draft.contraindications || []), id]
-                    : (draft.contraindications || []).filter(c => c !== id),
-                })}
-              />
-              {id === 'kidney' ? 'Почки' : id === 'heart' ? 'Сердце' : 'Гипертония'}
-            </label>
-          ))}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <ToggleChip danger label="Почки" icon="🫘" value={(draft.contraindications || []).includes('kidney')} onChange={v => patch({ contraindications: v ? [...(draft.contraindications || []), 'kidney'] : (draft.contraindications || []).filter(c => c !== 'kidney') })} />
+          <ToggleChip danger label="Сердце" icon="❤️" value={(draft.contraindications || []).includes('heart')} onChange={v => patch({ contraindications: v ? [...(draft.contraindications || []), 'heart'] : (draft.contraindications || []).filter(c => c !== 'heart') })} />
+          <ToggleChip danger label="Гипертония" icon="🩸" value={(draft.contraindications || []).includes('hypertension')} onChange={v => patch({ contraindications: v ? [...(draft.contraindications || []), 'hypertension'] : (draft.contraindications || []).filter(c => c !== 'hypertension') })} />
         </div>
         {validation.warnings.length > 0 && (
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
             {validation.warnings.map((w, i) => (
               <div key={i} style={{ fontSize: 9, color: '#fbbf24', lineHeight: 1.4, padding: '5px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>{w}</div>
             ))}

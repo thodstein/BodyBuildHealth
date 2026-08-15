@@ -58,21 +58,24 @@ const IndividualPlanInner: React.FC = () => {
     <>
       {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); try { localStorage.setItem('he_disclaimer_dismissed', 'true'); } catch {} }} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
-        <div style={{ display:'flex', gap:3, padding:'4px 0', overflowX:'auto', scrollbarWidth:'none' }}>
-          {TAB_META.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)} style={{
-              flexShrink:0, padding:'6px 12px', borderRadius:16, cursor:'pointer',
-              fontSize:10, fontWeight: tab === t.key ? 800 : 500,
-              border: tab === t.key ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-              background: tab === t.key ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-              color: tab === t.key ? '#000' : 'rgba(255,255,255,0.6)',
-              boxShadow: tab === t.key ? '0 2px 12px rgba(0,230,138,0.3)' : 'none',
-              transform: tab === t.key ? 'scale(1.05)' : 'scale(1)',
-              transition:'all 0.15s ease',
-            }}>
-              {t.icon} {t.label}
-            </button>
-          ))}
+        <div style={{ display:'flex', gap:6, padding:'6px 2px', overflowX:'auto', scrollbarWidth:'none' }}>
+          {TAB_META.map(t => {
+            const active = tab === t.key;
+            return (
+              <button key={t.key} onClick={() => setTab(t.key)} style={{
+                flexShrink:0, padding:'8px 13px', borderRadius:999, cursor:'pointer', minHeight: 36,
+                fontSize:10.5, fontWeight: active ? 800 : 500,
+                border: active ? '1px solid transparent' : '1px solid rgba(255,255,255,0.08)',
+                background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+                color: active ? '#000' : 'rgba(255,255,255,0.65)',
+                boxShadow: active ? '0 4px 16px rgba(0,230,138,0.35)' : '0 1px 6px rgba(0,0,0,0.25)',
+                transform: active ? 'scale(1.04)' : 'scale(1)',
+                transition:'all 0.18s ease',
+              }}>
+                <span style={{ marginRight: 3 }}>{t.icon}</span>{t.label}
+              </button>
+            );
+          })}
         </div>
         {tab === 'settings' && <IndividualPlanSettings />}
         {tab === 'plan' && <IndividualPlanResults />}
