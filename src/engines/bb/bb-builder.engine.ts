@@ -3137,9 +3137,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears });
   const validationWarnings = validation.issues
     .filter(issue => issue.level === 'warning')
-    // Ложный deficit на этой стадии: weeklyVolume пересчитывается в finalize
-    // после allocation/taper. Финальная валидация даёт корректные значения.
-    .filter(issue => issue.code !== 'target_volume_deficit')
+    // Ложные warning на этой стадии: weeklyVolume пересчитывается в finalize
+    // после allocation/taper, а кап-аджуст (cap-adjust) режет effective по
+    // факту. Финальная валидация даёт корректные значения.
+    .filter(issue => issue.code !== 'target_volume_deficit' && issue.code !== 'effective_mrv_overflow')
     .slice(0, 20)
     .map(issue => `⚠ Валидация: ${issue.message}`);
   if (validationWarnings.length > 0) {

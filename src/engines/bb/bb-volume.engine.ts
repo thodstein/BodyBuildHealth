@@ -136,7 +136,9 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
   const isIsolation = type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|crunch|скручив/i.test(name);
   if (isIsolation) return [];
 
-  if (hasAny(name, /жим|bench|press|dip|отжим.*брус/i)) {
+  // Жимы рук/груди (НЕ «жим ногами» — это квадрицепс-движение и даёт
+  // indirect на glutes/hamstrings, а не на triceps/shoulders!).
+  if (hasAny(name, /жим|bench|press|dip|отжим.*брус/i) && !/ног|leg.?press|жим.*ног/i.test(name)) {
     return [
       // 0.45: трицепс получает ~45% косвенной работы от жимов (EMG-оценки);
       // 0.5 завышал effective — fullbody-сплиты 5x/нед уходили в MRV-overflow.

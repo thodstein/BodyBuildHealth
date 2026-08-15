@@ -2309,7 +2309,10 @@ for (const week of next.weeks) {
               // Удаляем только изоляции (дубли паттернов: сгибания сидя +
               // сгибания в тренажёре и т.п.); compound-движения не трогаем.
               if (!isIsolationName(e.name || '')) continue;
-              if (weekCount <= 1) break;
+              // Минимум 1 изоляция на неделю — НО если косвенный объём уже
+              // покрывает почти весь кап (indirect >= 0.9×cap), последнюю
+              // изоляцию можно убрать (direct 0 — стимул даёт indirect).
+              if (weekCount <= 1 && indirectTotal < cap * 0.9) break;
               need -= e.sets || 0;
               weekCount -= 1;
               s2.exercises = s2.exercises.filter((x: any) => x !== e);

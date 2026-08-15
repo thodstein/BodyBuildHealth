@@ -35,12 +35,12 @@ export interface BBPlanValidationOptions {
   trainingYears?: number;
 }
 
-/** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18. */
+/** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18 (3+ лет)
+ *  и 40/14 (1-2 года) — синхронизировано с maxEx/maxWorkingSets builder. */
 export function sessionLimitsFor(options: BBPlanValidationOptions): { maxExercises: number; maxWorkingSets: number } {
-  const enhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
-  return enhanced
-    ? { maxExercises: 18, maxWorkingSets: 60 }
-    : { maxExercises: 10, maxWorkingSets: 24 };
+  if (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) return { maxExercises: 18, maxWorkingSets: 60 };
+  if (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1) return { maxExercises: 14, maxWorkingSets: 40 };
+  return { maxExercises: 10, maxWorkingSets: 24 };
 }
 
 /** Синхронизирует агрегированное число sets с фактическими рабочими сетами. */
