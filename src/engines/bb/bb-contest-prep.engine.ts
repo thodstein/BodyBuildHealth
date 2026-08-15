@@ -1103,11 +1103,15 @@ export interface ContestPrepApplyOpts {
 }
 
 /**
- * Единое применение contest prep к BB-плану:
- * 1) тренировочный тапер (applyTrainingTaperToBBPlan) на последние taperWeeks + пик-неделя;
- * 2) разметка недель фазами (wk.contestPhase: preparation/final_preparation/taper/peak_week);
- * 3) метаданные phases (BBContestPrepPlan.phases) для календаря.
- * НЕ мутирует входной план. Идемпотентен per-week.
+ * Единое применение contest prep к BB-плану — СТРОИТ тренировочный цикл:
+ * 1) если план короче prepWeeks + taperWeeks + пик — ДОСТРАИВАЕТ недостающие
+ *    недели подготовки в начало плана (пик привязан к концу/дате шоу);
+ * 2) taper (applyTrainingTaperToBBPlan) на последние taperWeeks + пик-неделя;
+ * 3) финальная подготовка (последние 2 нед подготовки): объём ×0.9, RIR 2–3,
+ *    интенсивность сохраняется, спец-мышца щадится, deload не трогается;
+ * 4) разметка недель фазами (wk.contestPhase: preparation/final_preparation/taper/peak_week);
+ * 5) метаданные phases (BBContestPrepPlan.phases) для календаря.
+ * НЕ мутирует входной план. Идемпотентен per-week и по длине.
  */
 export function applyContestPrepToBBPlan(
   plan: BBPlan,
@@ -1122,7 +1126,16 @@ export function applyContestPrepToBBPlan(
   const taperWeeks = Math.min(4, Math.max(1, Math.round(opts.taperWeeks ?? cfg.weeksOut)));
   const prepWeeks = Math.max(1, Math.round(opts.prepWeeks ?? 12));
 
-  const tapered = applyTrainingTaperToBBPlan(plan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber }) as BBPlanWithPrep;
+  // 1) Достройка тренировочного цикла до полной длины фаз.
+  const needed = prepWeeks + taperWeeks + 1;
+  let basePlan: BBPlanWithPrep = plan as BBPlanWithPrep;
+  const addedWeeks = Math.max(0, needed - basePlan.weeks.length);
+  if (addedWeeks > 0) {
+    basePlan = prependPreparationWeeks(basePlan, addedWeeks);
+  }
+
+  // 2) Taper + пик-неделя на последние taperWeeks+1 недель.
+  const tapered = applyTrainingTaperToBBPlan(basePlan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber }) as BBPlanWithPrep;
   const weeks = tapered.weeks as any[];
   const total = weeks.length;
   const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);
@@ -1145,13 +1158,41 @@ export function applyContestPrepToBBPlan(
     weeks[i] = { ...weeks[i], contestPhase: byIdx.get(i) ?? 'preparation' };
   }
 
+  // 3) Финальная подготовка: объём ×0.9, RIR 2–3, интенсивность сохраняется,
+  //    спец-мышца щадится (×1.25 к множителю, ≤1.0), deload не трогаем.
+  const FINAL_PREP_VOLUME = 0.9;
+  for (let i = finalStart0; i <= prepEnd0; i++) {
+    const wk = weeks[i];
+    if (!wk) continue;
+    if (wk.deload === true || wk.phase === 'deload') continue; // anti-двойной deload
+    for (const s of wk.sessions) {
+      s.exercises = s.exercises.map((e: any) => {
+        const isSpec = muscleMatchesSpecialization(e.muscle, cfg.specialization);
+        const mult = Math.max(0.4, isSpec ? Math.min(1, FINAL_PREP_VOLUME * 1.25) : FINAL_PREP_VOLUME);
+        const newSets = Math.max(2, Math.round((e.sets || 0) * mult));
+        const rir = clamp((Number(e.rir) || 2) + 1, 2, 4);
+        const source = e.workSets || [];
+        const workSets = source.slice(0, newSets).map((ws: any) => ({ ...ws, rir }));
+        return { ...e, sets: newSets, rir, workSets, comment: `${e.comment || ''} 📉 Финальная подготовка: объём ×${Math.round(mult * 100)}%, RIR 2–3, вес сохраняется.${isSpec ? ' ⭐ Спец: щадится.' : ''}` };
+      });
+    }
+    wk.phase = wk.phase || 'accumulation';
+    wk.prepProtocol = 'Финальная подготовка: объём ×0.9, RIR 2–3';
+  }
+
   // Метаданные фаз для календаря (BBContestPrepPlan.phases), сжатые до недель плана.
   const usedPrep = Math.max(1, prepEnd0 + 1); // фактическое число недель подготовки в плане
   const phases = computePrepPhaseRanges(usedPrep, taperWeeks, cfg.showDate, true);
 
   const warnings: string[] = [];
-  if (total < prepWeeks + taperWeeks + 1) {
-    warnings.push(`⚠ План (${total} нед) короче подготовки ${prepWeeks}+${taperWeeks}+пик: подготовка усечена до ${usedPrep} нед. Увеличьте длительность плана для полной подготовки.`);
+  const notes: string[] = [];
+  if (addedWeeks > 0) {
+    notes.push(`📈 Тренировочный цикл расширен с ${basePlan.weeks.length - addedWeeks} до ${total} нед: подготовка ${usedPrep} нед → taper ${taperWeeks} нед → пик-неделя.`);
+  } else if (total > needed) {
+    notes.push(`📈 План длиннее минимума подготовки (${total} нед): первые ${total - needed} нед — подготовка, дальше по фазам.`);
+  }
+  if (usedPrep < prepWeeks) {
+    warnings.push(`⚠ План (${total} нед) короче полной подготовки ${prepWeeks}+${taperWeeks}+пик: подготовка усечена до ${usedPrep} нед. Увеличьте длительность плана для полной подготовки.`);
   }
 
   const result = {
@@ -1159,7 +1200,8 @@ export function applyContestPrepToBBPlan(
     weeks,
     rationale: [
       ...(tapered.rationale || []),
-      `🗓 Contest prep: подготовка ${usedPrep} нед → taper ${taperWeeks} нед → пик-неделя (шоу ${cfg.showDate}). Без новых упражнений, без отказа, RIR 2–4.`,
+      `🗓 Contest prep: подготовка ${usedPrep} нед (объём 100%) → финальная ×0.9/RIR 2–3 → taper ${taperWeeks} нед (объём 85%→60%, интенсивность сохраняется, RIR 2–4) → пик-неделя (шоу ${cfg.showDate}).`,
+      ...notes,
     ],
   } as BBPlanWithPrep;
   (result as any).contestPrep = {
@@ -1169,6 +1211,33 @@ export function applyContestPrepToBBPlan(
     showDate: cfg.showDate,
   };
   return result as BBPlanWithPrep;
+}
+
+/** Достроить план В НАЧАЛО недостающими неделями подготовки (клон недели 1). */
+function prependPreparationWeeks(plan: BBPlanWithPrep, addWeeks: number): BBPlanWithPrep {
+  const add = Math.max(1, Math.round(addWeeks));
+  const weeks = plan.weeks as any[];
+  const template = weeks[0];
+  if (!template || add <= 0) return plan;
+  const clone = (w: any) => ({
+    ...w,
+    week: w.week,
+    deload: false,
+    phase: 'accumulation',
+    taper: false,
+    peakWeek: false,
+    prepProtocol: undefined,
+    contestPhase: 'preparation' as BBWeekPrepPhase,
+    sessions: w.sessions.map((s: any) => ({
+      ...s,
+      exercises: s.exercises.map((e: any) => ({ ...e, workSets: (e.workSets || []).map((ws: any) => ({ ...ws })) })),
+    })),
+  });
+  const inserted: any[] = [];
+  for (let k = 0; k < add; k++) inserted.push(clone(template));
+  const newWeeks = [...inserted, ...weeks];
+  newWeeks.forEach((w, i) => { w.week = i + 1; });
+  return { ...plan, weeks: newWeeks } as BBPlanWithPrep;
 }
 
 /**

@@ -283,11 +283,77 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(twice.weeks[11].peakWeek).toBe(true);
   });
 
-  it('план короче подготовки → warning и усечение подготовки', () => {
+  it('план короче подготовки → достраивается до полной длины (усечения нет)', () => {
     const plan = makePlan(6);
     const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 12, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(out.weeks.length).toBe(15); // 12 + 2 + 1
     const warnings = (out as any).contestPrep?.warnings ?? [];
-    expect(warnings.some(w => w.includes('усечена'))).toBe(true);
+    expect(warnings.some(w => w.includes('усечена'))).toBe(false);
+  });
+
+  it('СТРОИТ тренировочный цикл: короткий план достраивается до prepWeeks+taper+пик', () => {
+    const plan = makePlan(6);
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 8, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(out.weeks.length).toBe(11); // 8 prep + 2 taper + 1 пик
+    // Фазы по неделям от начала: 6 подготовки → 2 финальной → 2 taper → пик.
+    expect(out.weeks[0].contestPhase).toBe('preparation');
+    expect(out.weeks[5].contestPhase).toBe('preparation');
+    expect(out.weeks[6].contestPhase).toBe('final_preparation');
+    expect(out.weeks[7].contestPhase).toBe('final_preparation');
+    expect(out.weeks[8].contestPhase).toBe('taper');
+    expect(out.weeks[9].contestPhase).toBe('taper');
+    expect(out.weeks[10].contestPhase).toBe('peak_week');
+    expect(out.weeks[10].peakWeek).toBe(true);
+    // Недели перенумерованы.
+    expect(out.weeks[out.weeks.length - 1].week).toBe(11);
+    // В rationale отражена достройка.
+    expect((out.rationale || []).join(' ')).toMatch(/расширен/);
+  });
+
+  it('финальная подготовка: объём ×0.9, RIR ≥ 2, интенсивность сохраняется', () => {
+    const plan = makePlan(6);
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 8, taperWeeks: 2 }) as BBPlanWithPrep;
+    const finalWk = out.weeks[7]; // 1-index 8 — последняя неделя финальной подготовки
+    const baseWk = plan.weeks[0];
+    for (let s = 0; s < finalWk.sessions.length; s++) {
+      for (let e = 0; e < finalWk.sessions[s].exercises.length; e++) {
+        const ex = finalWk.sessions[s].exercises[e];
+        const orig = baseWk.sessions[s].exercises[e];
+        expect(ex.sets).toBeLessThanOrEqual(Math.round(orig.sets * 0.9) + 1); // ×0.9 (округление)
+        expect(ex.sets).toBeGreaterThanOrEqual(2);
+        expect(ex.rir).toBeGreaterThanOrEqual(2);
+        expect(ex.workSets[0].weight).toBe(orig.workSets[0].weight); // вес сохраняется
+      }
+    }
+  });
+
+  it('подготовка: объём не изменён (100%)', () => {
+    const plan = makePlan(6);
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 8, taperWeeks: 2 }) as BBPlanWithPrep;
+    const prepWk = out.weeks[0];
+    const baseWk = plan.weeks[0];
+    expect(prepWk.sessions[0].exercises[0].sets).toBe(baseWk.sessions[0].exercises[0].sets);
+    expect(prepWk.sessions[0].exercises[0].rir).toBe(baseWk.sessions[0].exercises[0].rir);
+  });
+
+  it('повторное применение не расширяет план (идемпотентность длины)', () => {
+    const plan = makePlan(6);
+    const once = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 8, taperWeeks: 2 }) as BBPlanWithPrep;
+    const twice = applyContestPrepToBBPlan(once, baseConfig(), { prepWeeks: 8, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(twice.weeks.length).toBe(once.weeks.length);
+    expect(twice.weeks[twice.weeks.length - 1].peakWeek).toBe(true);
+  });
+
+  it('пик-неделя остаётся привязанной к концу плана после достройки', () => {
+    const plan = makePlan(4);
+    const cfg = baseConfig();
+    const out = applyContestPrepToBBPlan(plan, cfg, { prepWeeks: 6, taperWeeks: 3 }) as BBPlanWithPrep;
+    expect(out.weeks.length).toBe(10); // 6 + 3 + 1
+    const last = out.weeks[9];
+    expect(last.contestPhase).toBe('peak_week');
+    expect(last.peakWeek).toBe(true);
+    const meta = (out as any).contestPrep as { phases?: Array<{ key: string; dateEnd: string }> };
+    expect(meta?.phases?.find(p => p.key === 'peak_week')?.dateEnd).toBe(cfg.showDate);
   });
 
   it('extendBBPlanPreparation вставляет недели только в подготовку (тапер не трогается)', () => {
@@ -307,9 +373,9 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
   it('extendBBPlanPreparation работает на плане короче подготовки (минимум: taper+пик)', () => {
     const plan = makePlan(3);
     const prepped = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 5, taperWeeks: 2 }) as BBPlanWithPrep;
-    expect(prepped.weeks.length).toBe(3);
+    expect(prepped.weeks.length).toBe(8); // 5 + 2 + 1 — достроен автоматически
     const extended = extendBBPlanPreparation(prepped, 3) as BBPlanWithPrep;
-    expect(extended.weeks.length).toBe(6);
+    expect(extended.weeks.length).toBe(11);
     expect(extended.weeks[extended.weeks.length - 1].contestPhase).toBe('peak_week');
     for (let i = 1; i <= extended.weeks.length; i++) {
       expect(extended.weeks[i - 1].week).toBe(i);
@@ -319,10 +385,11 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
   it('applyContestPrepToBBPlan на минимальном плане (taper+пик) не падает', () => {
     const plan = makePlan(3);
     const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 1, taperWeeks: 2 }) as BBPlanWithPrep;
-    expect(out.weeks.length).toBe(3);
-    expect(out.weeks[2].contestPhase).toBe('peak_week');
-    expect(out.weeks[0].contestPhase).toBe('taper');
+    expect(out.weeks.length).toBe(4); // 1 prep + 2 taper + 1 пик
+    expect(out.weeks[3].contestPhase).toBe('peak_week');
     expect(out.weeks[1].contestPhase).toBe('taper');
+    expect(out.weeks[2].contestPhase).toBe('taper');
+    expect(out.weeks[0].contestPhase).toBe('final_preparation');
   });
 });
 
