@@ -658,3 +658,55 @@ ${cycle.rationale.map(r => `<p style="font-size:12px;color:#555">${escHtml(r)}</
 <h3>Недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Сессии</th><th>Мин</th><th>Ккал</th><th>Метки</th></tr>${weekRows}</table>
 </body></html>`;
 }
+
+// ─── Сравнение сценариев ───
+
+export interface CardioCycleDiff {
+  field: string;
+  label: string;
+  from: string;
+  to: string;
+  delta: number;
+}
+
+export interface CardioCycleComparison {
+  a: { id: string; name: string };
+  b: { id: string; name: string };
+  diffs: CardioCycleDiff[];
+}
+
+function signed(n: number): string {
+  return n > 0 ? `+${n}` : String(n);
+}
+
+/** Сравнение двух кардио-сценариев: недели, минуты, ккал, HIIT-недели, фазы. */
+export function compareCardioCycles(a: CardioCycle, b: CardioCycle): CardioCycleComparison {
+  const sa = cardioCycleSummary(a);
+  const sb = cardioCycleSummary(b);
+  const diffs: CardioCycleDiff[] = [];
+  const add = (field: string, label: string, from: number, to: number, unit = '') => {
+    if (from === to) return;
+    diffs.push({ field, label, from: `${from}${unit}`, to: `${to}${unit}`, delta: to - from });
+  };
+  add('weeks', 'Недель', a.totalWeeks, b.totalWeeks);
+  add('minutes', 'Мин/нед', sa.avgMinutesPerWeek, sb.avgMinutesPerWeek);
+  add('kcal', 'Ккал/нед', sa.avgKcalPerWeek, sb.avgKcalPerWeek);
+  add('hiit', 'HIIT-недель', sa.hiitWeeks, sb.hiitWeeks);
+  const phases = Object.keys(CARDIO_PHASE_LABELS) as CardioPhase[];
+  for (const p of phases) {
+    add('phase_' + p, `Фаза «${CARDIO_PHASE_LABELS[p]}»`, sa.phaseWeeks[p] ?? 0, sb.phaseWeeks[p] ?? 0, ' нед');
+  }
+  return {
+    a: { id: a.id, name: a.name },
+    b: { id: b.id, name: b.name },
+    diffs,
+  };
+}
+
+/** Человекочитаемая строка сравнения (для UI/toast). */
+export function formatCardioComparison(cmp: CardioCycleComparison): string {
+  if (cmp.diffs.length === 0) return 'Сценарии идентичны по нагрузке.';
+  return cmp.diffs
+    .map(d => `${d.label}: ${d.from} → ${d.to} (${signed(d.delta)})`)
+    .join(' · ');
+}

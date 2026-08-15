@@ -8,16 +8,19 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioConstructor } from '../CardioConstructor';
 import { getCardioLink, clearCardioLink } from '../../../../engines/lms/cardio-bridge';
+import { buildBbMacrocycle, serializeBbMacro, deserializeBbMacro } from '../../../../engines/lms/macrocycle.engine';
 
 const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
 const LINK_KEY = 'he_cardio_link';
+const BB_MACRO_KEY = 'he_bb_macro';
 
 beforeEach(() => {
   try {
     localStorage.removeItem(CYCLES_KEY);
     localStorage.removeItem(ACTIVE_KEY);
     localStorage.removeItem(LINK_KEY);
+    localStorage.removeItem(BB_MACRO_KEY);
     clearCardioLink();
   } catch { /* ignore */ }
 });
@@ -64,5 +67,26 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByText(/мигрирован/)).toBeTruthy();
     const saved = JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null');
     expect(saved?.totalWeeks).toBe(1);
+  });
+
+  it('привязка к годовому плану ББ сохраняет cardioCycleId в макроцикл', () => {
+    const macro = buildBbMacrocycle({ level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy' });
+    localStorage.setItem(BB_MACRO_KEY, serializeBbMacro(macro));
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Привязать к плану ББ/ }));
+    expect(screen.getByText(/Привязано к годовому плану ББ/)).toBeTruthy();
+    const restored = deserializeBbMacro(localStorage.getItem(BB_MACRO_KEY) ?? '');
+    expect(restored?.cardioCycleId).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Отвязать/ }));
+    expect(deserializeBbMacro(localStorage.getItem(BB_MACRO_KEY) ?? '')?.cardioCycleId).toBeUndefined();
+  });
+
+  it('«⇄» сравнивает активный цикл с циклом из библиотеки', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Из недельного плана/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сравнить Кардио сушка 12 нед/ }));
+    expect(screen.getByText(/→/)).toBeTruthy();
   });
 });

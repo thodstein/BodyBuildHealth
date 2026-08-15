@@ -5,6 +5,7 @@ import {
   adaptCardioToStrength, applyPLCardioTaper, applyBBCardioTaper, applyCardioTaperBySport,
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
+  compareCardioCycles, formatCardioComparison,
   type CardioCycle,
 } from '../cardio.engine';
 
@@ -264,5 +265,36 @@ describe('applyCardioTaperBySport', () => {
     expect(bb.weeks[5].phase).toBe('peak');
     expect(pl.rationale.some(r => r.includes('PL taper'))).toBe(true);
     expect(bb.rationale.some(r => r.includes('BB taper'))).toBe(true);
+  });
+});
+
+// ─── Сравнение сценариев ───
+
+describe('compareCardioCycles', () => {
+  it('массонабор vs сушка: дифф по минутам, ккал и HIIT', () => {
+    const mass = buildCardioCycle({ goal: 'mass', totalWeeks: 8 });
+    const cut = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const cmp = compareCardioCycles(mass, cut);
+    expect(cmp.diffs.some(d => d.field === 'minutes')).toBe(true);
+    expect(cmp.diffs.some(d => d.field === 'hiit')).toBe(true);
+    expect(cmp.diffs.some(d => d.field === 'weeks')).toBe(false);
+    expect(formatCardioComparison(cmp)).toContain('→');
+  });
+
+  it('одинаковые сценарии → «идентичны»', () => {
+    const a = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    const b = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    const cmp = compareCardioCycles(a, b);
+    expect(cmp.diffs).toEqual([]);
+    expect(formatCardioComparison(cmp)).toContain('идентичны');
+  });
+
+  it('разные недели фаз показываются с единицей «нед»', () => {
+    const a = buildCardioCycle({ goal: 'health', totalWeeks: 12 });
+    const b = buildCardioCycle({ goal: 'health', totalWeeks: 24 });
+    const cmp = compareCardioCycles(a, b);
+    expect(cmp.diffs.some(d => d.field === 'weeks')).toBe(true);
+    const phaseDiff = cmp.diffs.find(d => d.field.startsWith('phase_'));
+    expect(phaseDiff?.to).toContain(' нед');
   });
 });

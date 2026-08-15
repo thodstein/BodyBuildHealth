@@ -9,7 +9,7 @@ import {
   buildCardioCycle, cardioCycleSummary, cardioPlanToCycle, buildCardioPlan,
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
-  buildCardioIcs, buildCardioPrintHtml,
+  buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
   type CardioCycle, type CardioGoal, type CardioType,
 } from '../../../engines/lms/cardio.engine';
@@ -17,6 +17,10 @@ import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
   SPORT_LABELS, type CardioLinkSport,
 } from '../../../engines/lms/cardio-bridge';
+import {
+  deserializeMacro, serializeMacro, deserializeBbMacro, serializeBbMacro,
+  attachCardioToMacro, detachCardioFromMacro,
+} from '../../../engines/lms/macrocycle.engine';
 import { CardioDiaryPanel } from './CardioDiaryPanel';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -83,8 +87,26 @@ export const CardioConstructor: React.FC = () => {
   const [cycle, setCycle] = useState<CardioCycle | null>(null);
   const [library, setLibrary] = useState<CardioCycle[]>([]);
   const [link, setLink] = useState(getCardioLink());
+  const [macroLink, setMacroLink] = useState<{ kind: 'pl' | 'bb'; cycleId?: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [showWeeks, setShowWeeks] = useState(false);
+
+  const readMacroLink = useCallback(() => {
+    try {
+      const rawPL = localStorage.getItem('he_pl_macro');
+      if (rawPL) {
+        const m = deserializeMacro(rawPL);
+        if (m) { setMacroLink({ kind: 'pl', cycleId: m.cardioCycleId }); return; }
+      }
+      const rawBB = localStorage.getItem('he_bb_macro');
+      if (rawBB) {
+        const m = deserializeBbMacro(rawBB);
+        if (m) { setMacroLink({ kind: 'bb', cycleId: m.cardioCycleId }); return; }
+      }
+      setMacroLink(null);
+    } catch { setMacroLink(null); }
+  }, []);
+  useEffect(() => { readMacroLink(); }, [readMacroLink]);
 
   const reload = useCallback(() => { setLibrary(loadCardioCycles()); }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -132,6 +154,13 @@ export const CardioConstructor: React.FC = () => {
 
   const activate = (c: CardioCycle) => { setActiveCardioCycle(c); setCycle(c); flashMsg('⭐ Активный цикл: ' + c.name); };
 
+  const [comparison, setComparison] = useState<string | null>(null);
+  const compareWith = (c: CardioCycle) => {
+    if (!cycle) { flashMsg('⚠ Сначала соберите или выберите активный цикл'); return; }
+    const cmp = compareCardioCycles(cycle, c);
+    setComparison(`${cycle.name} ⇄ ${c.name}: ${formatCardioComparison(cmp)}`);
+  };
+
   const linkTo = (sport: CardioLinkSport) => {
     if (!cycle) { flashMsg('⚠ Сначала соберите или выберите кардио-цикл'); return; }
     setCardioLink({ cycleId: cycle.id, sport, linkedAt: new Date().toISOString() });
@@ -139,6 +168,32 @@ export const CardioConstructor: React.FC = () => {
   };
 
   const unlink = () => { clearCardioLink(); flashMsg('🔓 Кардио отключено от силового плана'); };
+
+  const attachMacro = (kind: 'pl' | 'bb') => {
+    if (!cycle) { flashMsg('⚠ Сначала соберите или выберите кардио-цикл'); return; }
+    const key = kind === 'pl' ? 'he_pl_macro' : 'he_bb_macro';
+    try {
+      const raw = localStorage.getItem(key);
+      const m = kind === 'pl' ? (raw ? deserializeMacro(raw) : null) : (raw ? deserializeBbMacro(raw) : null);
+      if (!m) { flashMsg(kind === 'pl' ? '⚠ Годовой план ПЛ не найден — постройте в ПЛ-авто' : '⚠ Годовой план ББ не найден — постройте в ББ-авто'); return; }
+      const linked = attachCardioToMacro(m, cycle.id);
+      localStorage.setItem(key, kind === 'pl' ? serializeMacro(linked as any) : serializeBbMacro(linked as any));
+      setMacroLink({ kind, cycleId: cycle.id });
+      flashMsg(`🗓 Кардио привязано к годовому плану (${kind === 'pl' ? 'ПЛ' : 'ББ'})`);
+    } catch { flashMsg('⚠ Не удалось привязать кардио к годовому плану'); }
+  };
+
+  const detachMacro = () => {
+    if (!macroLink) return;
+    const key = macroLink.kind === 'pl' ? 'he_pl_macro' : 'he_bb_macro';
+    try {
+      const raw = localStorage.getItem(key);
+      const m = macroLink.kind === 'pl' ? (raw ? deserializeMacro(raw) : null) : (raw ? deserializeBbMacro(raw) : null);
+      if (m) localStorage.setItem(key, macroLink.kind === 'pl' ? serializeMacro(detachCardioFromMacro(m) as any) : serializeBbMacro(detachCardioFromMacro(m) as any));
+      setMacroLink(null);
+      flashMsg('🔓 Кардио отвязано от годового плана');
+    } catch { flashMsg('⚠ Не удалось отвязать кардио'); }
+  };
 
   const acwrValue = useMemo(() => {
     try {
@@ -246,6 +301,22 @@ export const CardioConstructor: React.FC = () => {
         </div>
       )}
 
+      {/* Привязка к годовому плану */}
+      <div style={CARD}>
+        <div style={LABEL}>🗓 Годовой план (macrocycle.cardioCycleId)</div>
+        {macroLink?.cycleId ? (
+          <div style={ROW}>
+            <span style={{ fontSize: 12, color: '#4ade80' }}>Привязано к годовому плану {macroLink.kind === 'pl' ? 'ПЛ' : 'ББ'}{macroLink.cycleId ? ` (${macroLink.cycleId})` : ''}</span>
+            <button style={BTN_DANGER} onClick={detachMacro}>Отвязать</button>
+          </div>
+        ) : (
+          <div style={ROW}>
+            <button style={BTN} onClick={() => attachMacro('pl')}>🏆 Привязать к плану ПЛ</button>
+            <button style={BTN} onClick={() => attachMacro('bb')}>💪 Привязать к плану ББ</button>
+          </div>
+        )}
+      </div>
+
       {/* Дневник выполнения */}
       <CardioDiaryPanel cycle={cycle} acwr={acwrValue} recoveryLow={recoveryLow} />
 
@@ -280,11 +351,17 @@ export const CardioConstructor: React.FC = () => {
               {cycle?.id === c.id ? '⭐ ' : ''}{c.name}
             </button>
             <button style={BTN} onClick={() => duplicate(c)} aria-label={`Дублировать ${c.name}`}>⧉</button>
+            <button style={BTN} onClick={() => compareWith(c)} aria-label={`Сравнить ${c.name}`}>⇄</button>
             <button style={BTN} onClick={() => downloadIcs(c)} aria-label={`Экспорт ${c.name}`}>📅 .ics</button>
             <button style={BTN} onClick={() => printCycle(c)} aria-label={`Печать ${c.name}`}>🖨</button>
             <button style={BTN_DANGER} onClick={() => { removeCardioCycle(c.id); if (cycle?.id === c.id) { setActiveCardioCycle(null); setCycle(null); } reload(); }} aria-label={`Удалить ${c.name}`}>🗑</button>
           </div>
         ))}
+        {comparison && (
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: 8 }} role="status">
+            {comparison}
+          </div>
+        )}
       </div>
     </div>
   );

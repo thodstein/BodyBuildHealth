@@ -39,6 +39,8 @@ export interface Macrocycle {
   /** Несколько соревнований (новое поле). competitionWeek - алиас для events[0].week. */
   competitions?: CompetitionEvent[];
   rationale: string[];
+  /** ID подключённого кардио-цикла (CardioCycle из cardio.engine; ссылка, не копия). */
+  cardioCycleId?: string;
 }
 
 // ─── BB-макроцикл (4 фазы: hypertrophy → strength → contest_prep → transition) ───
@@ -65,6 +67,8 @@ export interface BBMacrocycle {
   competitions?: CompetitionEvent[];
   trainingFocus: BBTrainingFocus;  // общий focus на цикл
   rationale: string[];
+  /** ID подключённого кардио-цикла (CardioCycle из cardio.engine; ссылка, не копия). */
+  cardioCycleId?: string;
 }
 
 /** Соревнование в макроцикле (общий для PL/BB). */
@@ -602,7 +606,7 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
 /** Сериализация для localStorage (компактная, без лишних полей). */
 export function serializeMacro(macro: Macrocycle): string {
   return JSON.stringify({
-    v: 6,
+    v: 7,
     b: macro.blocks.map(b => [b.phase, b.weeks, b.weekOffset, b.kind, b.cycleId ?? null, b.description, b.competitionId ?? null]),
     t: macro.totalWeeks,
     c: macro.competitionWeek ?? null,
@@ -612,6 +616,7 @@ export function serializeMacro(macro: Macrocycle): string {
       co.cycleId ?? null, co.cycleIds ?? null,
     ]) : null,
     r: macro.rationale,
+    k: macro.cardioCycleId ?? null,
   });
 }
 
@@ -619,7 +624,7 @@ export function deserializeMacro(s: string): Macrocycle | null {
   try {
     const o = JSON.parse(s);
     if (!o || !Array.isArray(o.b)) return null;
-    if (o.v != null && o.v !== 6 && o.v !== 5 && o.v !== 4 && o.v !== 3 && o.v !== 2 && o.v !== 1) return null;
+    if (o.v != null && o.v !== 7 && o.v !== 6 && o.v !== 5 && o.v !== 4 && o.v !== 3 && o.v !== 2 && o.v !== 1) return null;
     const validPhases: MacroPhase[] = ['endurance', 'strength', 'peak', 'competition', 'transition'];
     const blocks: MacroBlock[] = o.b.map((b: unknown) => {
       if (!Array.isArray(b) || !validPhases.includes(b[0]) || !Number.isInteger(b[1]) || b[1] <= 0 || !Number.isInteger(b[2]) || b[2] < 1) {
@@ -719,6 +724,7 @@ export function deserializeMacro(s: string): Macrocycle | null {
       competitionDate: o.d ?? undefined,
       competitions,
       rationale: o.r || [],
+      cardioCycleId: typeof o.k === 'string' ? o.k : undefined,
     };
   } catch { return null; }
 }
@@ -1054,7 +1060,7 @@ export function rebalanceBbMacrocycle(
  */
 export function serializeBbMacro(macro: BBMacrocycle): string {
   return JSON.stringify({
-    v: 7,
+    v: 8,
     t: macro.totalWeeks,
     b: macro.blocks.map(b => [b.phase, b.weeks, b.weekOffset, b.description, b.competitionId ?? null, b.trainingFocus ?? null]),
     e: macro.competitions ? macro.competitions.map(c => [
@@ -1063,6 +1069,7 @@ export function serializeBbMacro(macro: BBMacrocycle): string {
     ]) : null,
     f: macro.trainingFocus,
     r: macro.rationale,
+    k: macro.cardioCycleId ?? null,
   });
 }
 
@@ -1072,7 +1079,7 @@ export function serializeBbMacro(macro: BBMacrocycle): string {
 export function deserializeBbMacro(s: string): BBMacrocycle | null {
   try {
     const o = JSON.parse(s);
-    if (!o || !Array.isArray(o.b) || o.v !== 7) return null;
+    if (!o || !Array.isArray(o.b) || (o.v !== 8 && o.v !== 7)) return null;
     const validPhases: BBMacroPhase[] = ['hypertrophy', 'strength', 'contest_prep', 'transition'];
     const blocks: BBMacroBlock[] = o.b.map((b: unknown) => {
       if (!Array.isArray(b) || !validPhases.includes(b[0]) || !Number.isInteger(b[1]) || b[1] <= 0 || !Number.isInteger(b[2]) || b[2] < 1) {
@@ -1150,8 +1157,20 @@ export function deserializeBbMacro(s: string): BBMacrocycle | null {
       competitions,
       trainingFocus: (tFocus as BBTrainingFocus) ?? 'hypertrophy',
       rationale: Array.isArray(o.r) ? o.r : [],
+      cardioCycleId: typeof o.k === 'string' ? o.k : undefined,
     };
   } catch { return null; }
+}
+
+/** Привязать кардио-цикл к макроциклу (PL или BB) — ссылка, не копия. */
+export function attachCardioToMacro(macro: Macrocycle | BBMacrocycle, cardioCycleId: string): Macrocycle | BBMacrocycle {
+  return { ...macro, cardioCycleId };
+}
+
+/** Отвязать кардио-цикл от макроцикла. */
+export function detachCardioFromMacro(macro: Macrocycle | BBMacrocycle): Macrocycle | BBMacrocycle {
+  const { cardioCycleId: _ignored, ...rest } = macro;
+  return rest as Macrocycle | BBMacrocycle;
 }
 
 export { PHASE_COLOR, PHASE_LABEL_RU, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, BB_PHASE_ICON };
