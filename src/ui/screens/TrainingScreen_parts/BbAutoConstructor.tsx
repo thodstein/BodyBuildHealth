@@ -84,6 +84,7 @@ import { getBBSuggestions } from './bb-compat';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
+import { CardioLinkCard } from './CardioLinkCard';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -4049,10 +4050,11 @@ export const BbAutoConstructor: React.FC = () => {
             setBbWeeks(source.totalWeeks);
             setBbTrainingFocus(source.trainingFocus);
             setStep('params');
-           }} onApplyCycle={() => {
+            }} onApplyCycle={() => {
              // BB macro blocks have no LMS cycleId. Keep the annual macrocycle
              // intact instead of switching to an unrelated BB cycle path.
            }} />
+          <div style={{ marginTop: 8 }}><CardioLinkCard /></div>
         </div>
       )}
       {/* Глобальное уведомление (flash) — видно на ВСЕХ шагах, не только в параметрах */}

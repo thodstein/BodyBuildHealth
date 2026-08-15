@@ -29,6 +29,12 @@ import { getProfile } from '../../../core/profile-manager';
 import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines/pro/training-load.engine';
+import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardio.engine';
+
+/** Кардио-фазы (кардио-слой в «Итог года»). */
+const CARDIO_PHASE_LABEL_RU: Record<string, string> = {
+  base: 'База', build: 'Наращивание', maintenance: 'Поддержание', contest_prep: 'Prep', taper: 'Taper', peak: 'Пик', transition: 'Переход',
+};
 
 /** Маппинг названий категорий профиля → id категорий движка пик-недели. */
 const PEAK_CATEGORY_MAP: Record<string, string> = {
@@ -1695,6 +1701,41 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     );
                   })}
                 </div>
+                {/* ❤️ Кардио-слой: привязанный CardioCycle (ссылка в macrocycle.cardioCycleId) */}
+                {(() => {
+                  const cardioId = (src as { cardioCycleId?: string }).cardioCycleId;
+                  if (!cardioId) return null;
+                  const cardio = loadCardioCycles().find(c => c.id === cardioId);
+                  if (!cardio) {
+                    return <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>❤️ Кардио привязано ({cardioId}), но цикл не найден в библиотеке.</div>;
+                  }
+                  const cs = cardioCycleSummary(cardio);
+                  const cardioPhaseColor: Record<string, string> = {
+                    base: '#22c55e', build: '#3b82f6', maintenance: '#8b5cf6', contest_prep: '#f59e0b', taper: '#eab308', peak: '#ef4444', transition: '#71717a',
+                  };
+                  const cw = cardio.weeks.find(x => x.week === Math.min(cardio.totalWeeks, Math.max(1, currentWeekIdx)));
+                  return (
+                    <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.55)' }} className="macro-cardio-layer">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700 }}>❤️ Кардио: {cardio.name}</span>
+                        <span>{cardio.totalWeeks} нед · {cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал/нед · {cs.hiitWeeks} HIIT-нед</span>
+                        {cw && <span style={{ color: 'rgba(255,255,255,0.4)' }}>📍 сейчас: {CARDIO_PHASE_LABEL_RU[cw.phase]}{cw.deload ? ' · делод' : ''}{cw.taper ? ' · taper' : ''}</span>}
+                      </div>
+                      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        {Array.from({ length: total }, (_, i) => {
+                          const w = i + 1;
+                          const c = cardio.weeks.find(x => x.week === w);
+                          const active = w === currentWeekIdx;
+                          return (
+                            <div key={w} title={c ? `Нед ${w}: ${CARDIO_PHASE_LABEL_RU[c.phase]} · ${c.totalMinutes} мин` : `Нед ${w}: вне кардио-цикла`}
+                              aria-label={`Нед ${w}: ${c ? CARDIO_PHASE_LABEL_RU[c.phase] : '—'}`}
+                              style={{ width: 8, height: 8, borderRadius: 2, background: c ? (cardioPhaseColor[c.phase] ?? '#888') : 'rgba(255,255,255,0.04)', outline: active ? '1.5px solid #fff' : 'none' }} />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* ⚡ ACWR из дневника (sRPE) + сессии */}
                 {(() => {
                   const d = diaryMacroStats();

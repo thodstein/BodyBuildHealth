@@ -16,7 +16,6 @@ import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromPr
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
-import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import { DayCard, type PlanDayView, type PlanExerciseView, type PhaseKey } from './TrainingScreen_parts/PlanOutput';
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
@@ -48,6 +47,7 @@ import { MesocycleProgressionCard, SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL
 import { parseProgressionRationale, progressionTiles, splitDescriptionPoints } from './TrainingScreen_parts/plan-card-helpers';
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
+import { CardioLinkCard } from './TrainingScreen_parts/CardioLinkCard';
 import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
@@ -105,7 +105,7 @@ function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanM
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['plates', '🧮 Калькулятор блинов'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пик/Соревнования'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['autoreg', '🧠 Авторегуляция'], ['peak', '🏁 Пик/Соревнования'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -972,11 +972,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   }, [builtBb, bbWeekSel, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
-  const workingWeight = useMemo(() => {
-    if (mainTab === 'pl' && builtSrc) return builtSrc.weeks[0]?.days[0]?.exercises[0]?.workSets[0]?.weight || 100;
-    if (mainTab === 'bb' && builtBb) return builtBb.weeks[0]?.sessions[0]?.exercises[0]?.workSets[0]?.weight || 100;
-    return 100;
-  }, [mainTab, builtSrc, builtBb]);
   const runFocus = mainTab === 'pl' ? (getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл') : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
     if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
@@ -3069,7 +3064,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           setSubView('plan');
         }
       }} />}
-      {subView === 'plates' && <PlateCalcTab initialWeight={workingWeight} onApply={() => {}} />}
+      {subView === 'macro' && <div style={{ marginTop: 8 }}><CardioLinkCard /></div>}
       {subView === 'autoreg' && <AutoregPanel />}
       {subView === 'peak' && <PeakingPanel />}
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
