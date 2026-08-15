@@ -1119,6 +1119,11 @@ export const BbAutoConstructor: React.FC = () => {
       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
     } catch {}
 
+    // План перестроен — применённый ранее contest prep больше не актуален
+    // (новый план не содержит taper/пик-неделю). Сброс метки применения.
+    setPrepApplied(false);
+    setShowPeakWeek(false);
+
     } catch (e: any) {
       console.error('[BB-auto] Ошибка генерации плана:', e);
       flash('Ошибка при генерации плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');

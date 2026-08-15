@@ -1812,6 +1812,24 @@ export function nutritionTargetsForPrepDate(
       phase: null, phaseLabel: '', note: '',
     };
   }
+  if (phase.key === 'post_show') {
+    // После шоу — восстановление на поддерживающем уровне (не дефицит подготовки).
+    const w = plan.preparation.startingWeightKg;
+    const post = buildPostShowPlan(plan);
+    return {
+      kcal: post.kcal,
+      proteinG: post.proteinG,
+      fatG: Math.max(30, Math.round(w * prepFatFloorGPerKg(plan.sex))),
+      carbsG: Math.max(50, Math.round((post.kcal - post.proteinG * 4 - Math.max(30, Math.round(w * prepFatFloorGPerKg(plan.sex))) * 9) / 4)),
+      fiberMaxG: 40,
+      waterMl: Math.round(post.waterLiters * 1000),
+      sodiumMg: base.sodiumMg,
+      potassiumMg: 3500,
+      phase: null,
+      phaseLabel: PREP_PHASE_LABELS.post_show,
+      note: `🔄 Post-show: питание на поддерживающем уровне (${post.kcal} ккал), белок ${post.proteinG} г, вода/натрий стабильны. ${post.weightCheck}`,
+    };
+  }
   const profile = CATEGORY_PROFILES[plan.category];
   const w = plan.preparation.startingWeightKg;
   const proteinG = Math.round(w * clamp(profile?.proteinGPerKg ?? 2.2, 1.8, 2.8));

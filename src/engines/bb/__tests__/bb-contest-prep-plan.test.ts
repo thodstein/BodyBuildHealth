@@ -357,6 +357,15 @@ describe('Этап 5 — питание по дням (план vs факт)', (
     expect(t.note).toBe('');
   });
 
+  it('после шоу (post_show): поддержание, не дефицит подготовки', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const postDay = addDaysIso(plan.showDate, 3);
+    const t = nutritionTargetsForPrepDate(postDay, plan, base);
+    expect(t.phaseLabel).toBe('Post-show');
+    expect(t.kcal).toBeGreaterThan(plan.preparation.currentCalories);
+    expect(t.note).toMatch(/Post-show|поддерживающем/i);
+  });
+
   it('prepToMealPlanInput → целевые макросы генератора меню', () => {
     const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
     const t = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, base);
