@@ -21,7 +21,10 @@ import {
   loadCheckins, upsertCheckin, latestCheckin,
   mindsetTrends, protocolAdherence,
   sessionsBestE1RM, correlateConfidenceWithPerformance, buildMindsetInsights,
+  MOOD_TAGS, MOOD_LABELS, loadMoods, upsertMood, latestMood, moodTrends,
+  detectMotivationPhase, psychProfileInsights,
   type MindsetProtocol, type ProtocolItem, type ProtocolItemKind, type MindsetDayType, type MindsetDirection,
+  type MoodTag,
 } from '../../../engines/mindset-protocol.engine';
 
 const CARD = diaryCard;
@@ -90,6 +93,13 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
+
+  // ── Настроение (mood-лог) ──
+  const [mood, setMood] = useState(() => {
+    const last = latestMood();
+    return { value: last?.mood || 3, tags: (last?.tags || []) as MoodTag[], note: '' };
+  });
+  const [moodSaved, setMoodSaved] = useState(false);
 
   const active = useMemo(() => protocols.find(p => p.id === activeId) || null, [protocols, activeId]);
 
@@ -231,12 +241,26 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     setTick(t => t + 1);
   }, [checkin]);
 
+  // ── Настроение ──
+  const saveMood = useCallback(() => {
+    upsertMood({ date: new Date().toISOString().slice(0, 10), mood: mood.value, tags: mood.tags, note: mood.note.trim() || undefined });
+    setMoodSaved(true);
+    setTick(t => t + 1);
+  }, [mood]);
+
+  const toggleMoodTag = useCallback((t: MoodTag) => {
+    setMood(p => ({ ...p, tags: p.tags.includes(t) ? p.tags.filter(x => x !== t) : [...p.tags, t] }));
+    setMoodSaved(false);
+  }, []);
+
   // ── Аналитика ──
   const trends = useMemo(() => mindsetTrends(14), [tick]);
   const adherence = useMemo(() => protocolAdherence(30), [tick]);
   const perfs = useMemo(() => sessionsBestE1RM(hub.historyWorkouts as any[]), [hub.historyWorkouts]);
   const link = useMemo(() => correlateConfidenceWithPerformance(loadCheckins(), perfs), [tick, perfs]);
   const insights = useMemo(() => buildMindsetInsights(active, hub.historyWorkouts as any[]), [active, tick, hub.historyWorkouts]);
+  const moodTrend = useMemo(() => moodTrends(14), [tick]);
+  const motivation = useMemo(() => detectMotivationPhase(hub.historyWorkouts as any[]), [hub.historyWorkouts, tick]);
 
   const dayItems = useMemo(() => itemsForDay(active, previewDay), [active, previewDay]);
   const filteredLibrary = useMemo(() => {
@@ -255,12 +279,20 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     const adh = protocolAdherence(30);
     const tr = mindsetTrends(14);
     const link2 = correlateConfidenceWithPerformance(checks, perfs);
+    const mtr = moodTrends(14);
+    const mph = detectMotivationPhase(perfs as any[]);
     const rows = [...checks].reverse().slice(0, 60).map(c => `
       <tr>
         <td>${esc(c.date)}</td><td>${esc(c.sessionId || '—')}</td>
         <td>${c.confidence}</td><td>${c.arousal}</td><td>${c.focus}</td>
         <td>${c.protocolFollowed === null ? '—' : c.protocolFollowed ? 'да' : 'нет'}</td>
         <td>${esc(c.note || '')}</td>
+      </tr>`).join('');
+    const moodRows = [...loadMoods()].reverse().slice(0, 30).map(m => `
+      <tr>
+        <td>${esc(m.date)}</td><td>${m.mood}</td>
+        <td>${Array.isArray(m.tags) ? esc(m.tags.join(', ')) : '—'}</td>
+        <td>${esc(m.note || '')}</td>
       </tr>`).join('');
     const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Психология тренировок — отчёт</title>
       <style>body{font-family:system-ui;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:11px}
@@ -275,12 +307,16 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         <span>Ср. уверенность: <b>${tr.averages.confidence > 0 ? tr.averages.confidence.toFixed(1) : '—'}</b></span>
         <span>Ср. активация: <b>${tr.averages.arousal > 0 ? tr.averages.arousal.toFixed(1) : '—'}</b></span>
         <span>Ср. фокус: <b>${tr.averages.focus > 0 ? tr.averages.focus.toFixed(1) : '—'}</b></span>
+        <span>Настроение (14д): <b>${mtr.count > 0 ? mtr.avg.toFixed(1) + '/5' : '—'}</b></span>
       </div>
       ${link2.pearson !== null ? `<div class="stats"><span>Связь уверенности ↔ e1RM: <b>r = ${link2.pearson}</b> (${link2.n} пар)</span></div>` : ''}
+      ${mph.inputs.weeksInProgram > 0 ? `<div class="stats"><span>Фаза мотивации: <b>${esc(mph.icon + ' ' + mph.label)}</b> (${mph.inputs.weeksInProgram} нед в программе)</span></div>` : ''}
       <h2>Инсайты</h2>
       <ul>${insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
       <h2>Чек-ины (последние 60)</h2>
       <table><thead><tr><th>Дата</th><th>Сессия</th><th>Уверенность</th><th>Активация</th><th>Фокус</th><th>Протокол</th><th>Заметка</th></tr></thead><tbody>${rows}</tbody></table>
+      <h2>Настроение (последние 30)</h2>
+      <table><thead><tr><th>Дата</th><th>Настроение</th><th>Теги</th><th>Заметка</th></tr></thead><tbody>${moodRows}</tbody></table>
       <script>window.print();</script></body></html>`;
     try {
       const win = window.open('', '_blank', 'width=900,height=700');
@@ -549,6 +585,69 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             <button type="button" style={{ ...btn, width: '100%', marginTop: 10 }} onClick={saveCheckin}>💾 Сохранить чек-ин</button>
           </div>
 
+          {/* ── Настроение дня ── */}
+          <div style={CARD}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>🌤 Настроение дня</div>
+              {moodSaved && <span style={{ fontSize: 9, color: ACCENT }}>✓ сохранено · сегодня</span>}
+            </div>
+            <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>Дневник настроения: одна оценка в день + теги. Копится в тренд и влияет на фазу мотивации.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginTop: 10 }} role="radiogroup" aria-label="Настроение">
+              {[1, 2, 3, 4, 5].map(v => (
+                <button key={v} type="button" role="radio" aria-checked={mood.value === v} aria-label={`Настроение ${v}: ${MOOD_LABELS[v].label}`}
+                  onClick={() => { setMood(p => ({ ...p, value: v })); setMoodSaved(false); }}
+                  style={{
+                    padding: '8px 4px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
+                    border: mood.value === v ? `1px solid ${MOOD_LABELS[v].color}` : '1px solid var(--border)',
+                    background: mood.value === v ? `${MOOD_LABELS[v].color}22` : 'var(--bg-secondary)',
+                  }}>
+                  <div style={{ fontSize: 18 }}>{MOOD_LABELS[v].emoji}</div>
+                  <div style={{ fontSize: 8, color: mood.value === v ? MOOD_LABELS[v].color : 'var(--text-dim)', marginTop: 2 }}>{MOOD_LABELS[v].label}</div>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+              {MOOD_TAGS.map(t => (
+                <button key={t} type="button" style={chip(mood.tags.includes(t), '#a78bfa')} onClick={() => toggleMoodTag(t)} aria-pressed={mood.tags.includes(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            <input aria-label="Заметка настроения" style={{ ...IN, marginTop: 8 }} placeholder="заметка: почему такое состояние…" value={mood.note}
+              onChange={e => setMood(p => ({ ...p, note: e.target.value }))} />
+            <button type="button" style={{ ...btn, width: '100%', marginTop: 10 }} onClick={saveMood}>💾 Сохранить настроение</button>
+            {moodTrend.count >= 2 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Тренд настроения · 14 дней</div>
+                <MiniLineChart
+                  data={moodTrend.series.map(s => s.mood)}
+                  labels={moodTrend.series.map(s => s.date.slice(5))}
+                  color="#a78bfa"
+                  height={50}
+                  ySuffix="/5"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
+                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 8, color: DIM }}>Среднее</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>{moodTrend.avg.toFixed(1)}/5</div>
+                  </div>
+                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 8, color: DIM }}>Дельта 14д</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: moodTrend.delta > 0.05 ? '#22c55e' : moodTrend.delta < -0.05 ? '#ef4444' : 'var(--text-dim)' }}>
+                      {moodTrend.delta > 0.05 ? '▲' : moodTrend.delta < -0.05 ? '▼' : '•'} {Math.abs(moodTrend.delta) > 0.05 ? Math.abs(moodTrend.delta).toFixed(1) : ''}
+                    </div>
+                  </div>
+                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 8, color: DIM }}>Низкие (≤2)</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: (moodTrend.distribution[1] || 0) + (moodTrend.distribution[2] || 0) > 0 ? '#f59e0b' : 'var(--text-dim)' }}>
+                      {(moodTrend.distribution[1] || 0) + (moodTrend.distribution[2] || 0)} из {moodTrend.count}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* ── Тренды ── */}
           <div style={CARD}>
             <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 8 }}>
@@ -627,6 +726,48 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 {s}
               </div>
             ))}
+          </div>
+
+          {/* ── Фаза мотивации ── */}
+          <div style={CARD}>
+            <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 8 }}>
+              📈 Фаза мотивации
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 26 }}>{motivation.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{motivation.label}</div>
+                <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>
+                  {motivation.duration} · {motivation.inputs.weeksInProgram} нед в программе
+                  {motivation.inputs.lastPRDaysAgo < 999 ? ` · PR ${motivation.inputs.lastPRDaysAgo} дн. назад` : ''}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginTop: 8 }}>{motivation.description}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Признаки</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {motivation.signs.map((s, i) => (
+                    <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>• {s}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Что делать</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {motivation.interventions.map((s, i) => (
+                    <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>• {s}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: '#a78bfa', lineHeight: 1.5, marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(167,139,250,0.07)', borderLeft: '2px solid rgba(167,139,250,0.4)' }}>
+              🏋️ Тренировка: {motivation.trainingAdjustment}
+            </div>
+            <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 6 }}>
+              По данным дневника: {motivation.inputs.motivationScore.toFixed(1)}/5 мотивация · усталость {Math.round(motivation.inputs.fatigueScore * 100)}% · PR {motivation.inputs.lastPRDaysAgo < 999 ? `${motivation.inputs.lastPRDaysAgo} дн. назад` : 'нет данных'}
+            </div>
           </div>
         </>
       )}

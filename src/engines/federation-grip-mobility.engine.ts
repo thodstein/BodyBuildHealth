@@ -37,6 +37,8 @@ export interface GripProtocol {
 }
 
 export interface MobilityFlow {
+  /** Стабильный id (используется в пресетах протокола мобильности). */
+  id: string;
   name: string;
   durationMin: number;
   targetAreas: string[];
@@ -206,38 +208,38 @@ export function getGripProtocols(): GripProtocol[] { return GRIP_PROTOCOLS; }
 
 const MOBILITY_FLOWS: MobilityFlow[] = [
   {
-    name: 'Full Body Morning Flow', durationMin: 15, targetAreas: ['Весь позвоночник', 'Бёдра', 'Плечи', 'Грудной'],
+    id: 'flow_full_body_morning', name: 'Полный утренний поток', durationMin: 15, targetAreas: ['Весь позвоночник', 'Бёдра', 'Плечи', 'Грудной'],
     exercises: [
-      { name: 'Cat-Cow (10 reps)', reps: '10', breathing: 'Вдох — прогиб, выдох — округление', notes: 'Медленно. Каждый позвонок.' },
-      { name: 'Thread the Needle', reps: '5/сторону', breathing: 'Выдох на скручивание', notes: 'T-spine rotation.' },
-      { name: 'World\'s Greatest Stretch', reps: '5/сторону', breathing: 'Выдох на опускание локтя', notes: 'Hip flexor + T-spine + hamstring.' },
-      { name: 'Downward Dog → Upward Dog', reps: '8 циклов', breathing: 'Вдох upward, выдох downward', notes: 'Плавный переход.' },
-      { name: '90/90 Hip Switch', reps: '10/сторону', breathing: 'Выдох на переход', notes: 'Колени 90°, переход через сед.' },
-      { name: 'Deep Squat Hold', reps: '60 сек', breathing: 'Диафрагмальное', notes: 'Локти раздвигают колени. Пятки на полу.' },
-      { name: 'Shoulder CARs', reps: '5/руку', breathing: 'Медленный выдох', notes: 'Controlled Articular Rotations. Максимальный круг.' },
-      { name: 'Neck CARs', reps: '5/сторону', breathing: 'Ровное', notes: 'Медленно. Полный круг головой.' },
+      { name: 'Кошка-корова (10 повторов)', reps: '10', breathing: 'Вдох — прогиб, выдох — округление', notes: 'Медленно. Каждый позвонок.' },
+      { name: 'Скручивание «нить в иголку»', reps: '5/сторону', breathing: 'Выдох на скручивание', notes: 'Ротация грудного отдела.' },
+      { name: 'Растяжка «Величайшая в мире»', reps: '5/сторону', breathing: 'Выдох на опускание локтя', notes: 'Сгибатели бедра + грудной + бицепс бедра.' },
+      { name: 'Собака мордой вниз → вверх', reps: '8 циклов', breathing: 'Вдох на подъём, выдох на опускание', notes: 'Плавный переход.' },
+      { name: '90/90 переход бёдер', reps: '10/сторону', breathing: 'Выдох на переход', notes: 'Колени 90°, переход через сед.' },
+      { name: 'Глубокий присед с удержанием', reps: '60 сек', breathing: 'Диафрагмальное', notes: 'Локти раздвигают колени. Пятки на полу.' },
+      { name: 'CARs плеч', reps: '5/руку', breathing: 'Медленный выдох', notes: 'Контролируемые вращения. Максимальный круг.' },
+      { name: 'CARs шеи', reps: '5/сторону', breathing: 'Ровное', notes: 'Медленно. Полный круг головой.' },
     ],
   },
   {
-    name: 'Hip Opener Flow', durationMin: 10, targetAreas: ['Тазобедренные', 'Пах', 'Ягодицы', 'Поясница'],
+    id: 'flow_hip_opener', name: 'Поток раскрытия бёдер', durationMin: 10, targetAreas: ['Тазобедренные', 'Пах', 'Ягодицы', 'Поясница'],
     exercises: [
-      { name: 'Happy Baby Pose', reps: '60 сек', breathing: 'Диафрагмальное', notes: 'Колени к подмышкам. Поясница на полу.' },
-      { name: 'Frog Stretch', reps: '60 сек', breathing: 'Медленный выдох', notes: 'Широко колени, стопы вместе. Опускать таз.' },
-      { name: 'Pigeon Pose', reps: '60 сек/ногу', breathing: 'Выдох на наклон', notes: 'Передняя нога 90°. Задняя прямая.' },
-      { name: 'Couch Stretch', reps: '60 сек/ногу', breathing: 'Ровное', notes: 'Заднее колено у стены. Таз вперёд.' },
-      { name: 'Butterfly', reps: '60 сек', breathing: 'Выдох на наклон', notes: 'Стопы вместе. Локти на бёдра.' },
-      { name: 'Pancake Stretch', reps: '60 сек', breathing: 'Выдох на наклон', notes: 'Ноги широко. Наклон вперёд с прямой спиной.' },
+      { name: 'Поза счастливого ребёнка', reps: '60 сек', breathing: 'Диафрагмальное', notes: 'Колени к подмышкам. Поясница на полу.' },
+      { name: 'Растяжка «лягушка»', reps: '60 сек', breathing: 'Медленный выдох', notes: 'Широко колени, стопы вместе. Опускать таз.' },
+      { name: 'Поза голубя', reps: '60 сек/ногу', breathing: 'Выдох на наклон', notes: 'Передняя нога 90°. Задняя прямая.' },
+      { name: 'Растяжка сгибателей бедра у стены', reps: '60 сек/ногу', breathing: 'Ровное', notes: 'Заднее колено у стены. Таз вперёд.' },
+      { name: 'Бабочка', reps: '60 сек', breathing: 'Выдох на наклон', notes: 'Стопы вместе. Локти на бёдра.' },
+      { name: 'Растяжка «блинчик»', reps: '60 сек', breathing: 'Выдох на наклон', notes: 'Ноги широко. Наклон вперёд с прямой спиной.' },
     ],
   },
   {
-    name: 'Spine & Shoulder Flow', durationMin: 12, targetAreas: ['Позвоночник', 'Плечи', 'Шея', 'Грудной отдел'],
+    id: 'flow_spine_shoulder', name: 'Поток позвоночник и плечи', durationMin: 12, targetAreas: ['Позвоночник', 'Плечи', 'Шея', 'Грудной отдел'],
     exercises: [
-      { name: 'Foam Roll Thoracic', reps: '60 сек', breathing: 'Выдох на разгибание', notes: 'Ролл под лопатками. Руки за голову.' },
-      { name: 'Open Book Stretch', reps: '8/сторону', breathing: 'Выдох на поворот', notes: 'Колени вместе. Верхняя рука раскрывается.' },
-      { name: 'Child Pose with Lat Stretch', reps: '60 сек', breathing: 'Диафрагмальное', notes: 'Руки вперёд, таз на пятки. Сместить руки вправо/влево.' },
-      { name: 'Wall Shoulder Dislocates', reps: '10', breathing: 'Свободное', notes: 'ПВХ-труба. Максимально узкий хват.' },
-      { name: 'Doorway Pec Stretch', reps: '60 сек/сторону', breathing: 'Выдох на углубление', notes: 'Рука на косяке. Корпус вперёд.' },
-      { name: 'Brettzel Stretch', reps: '45 сек/сторону', breathing: 'Выдох на скручивание', notes: 'Одна нога согнута поверх другой. Противоположная рука тянется.' },
+      { name: 'Фоам-роллинг грудного отдела', reps: '60 сек', breathing: 'Выдох на разгибание', notes: 'Ролл под лопатками. Руки за голову.' },
+      { name: 'Растяжка «открытая книга»', reps: '8/сторону', breathing: 'Выдох на поворот', notes: 'Колени вместе. Верхняя рука раскрывается.' },
+      { name: 'Поза ребёнка с растяжкой широчайших', reps: '60 сек', breathing: 'Диафрагмальное', notes: 'Руки вперёд, таз на пятки. Сместить руки вправо/влево.' },
+      { name: 'Выкруты у стены (с палкой)', reps: '10', breathing: 'Свободное', notes: 'ПВХ-труба. Максимально узкий хват.' },
+      { name: 'Растяжка груди в дверном проёме', reps: '60 сек/сторону', breathing: 'Выдох на углубление', notes: 'Рука на косяке. Корпус вперёд.' },
+      { name: 'Растяжка «крендель»', reps: '45 сек/сторону', breathing: 'Выдох на скручивание', notes: 'Одна нога согнута поверх другой. Противоположная рука тянется.' },
     ],
   },
 ];

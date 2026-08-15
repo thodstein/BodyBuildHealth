@@ -69,8 +69,8 @@ describe('Пресеты', () => {
     expect(titles).toContain('Мобильность позвоночника (5-10 мин)');
     expect(titles).toContain('CARs бёдер перед приседом (2 мин)');
     expect(titles).toContain('PNF после тренировки (с партнёром)');
-    expect(titles).toContain('Hip Opener Flow');
-    expect(titles).toContain('Spine & Shoulder Flow');
+    expect(titles).toContain('Поток раскрытия бёдер');
+    expect(titles).toContain('Поток позвоночник и плечи');
     expect(p.items.every(i => i.id.startsWith('item_'))).toBe(true);
   });
   it('ББ-пресет: нагруженная растяжка в post и rest', () => {

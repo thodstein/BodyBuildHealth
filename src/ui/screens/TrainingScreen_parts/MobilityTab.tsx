@@ -22,6 +22,12 @@ import {
   mobilityAdherence, mobilityTrends, exportMobilityCheckinsCSV, buildMobilityInsights,
   type MobilityProtocol, type MobilityItem, type MobilitySlot, type MobilityDirection,
 } from '../../../engines/mobility-protocol.engine';
+import {
+  MOBILITY_TESTS, type AssessmentScore,
+  loadAssessmentLog, saveAssessment, latestAssessment, assessmentTrend,
+  summarizeAssessment, weakestTests, correctivesForEntry, correctiveItemsForProtocol,
+  assessmentCSV, getMobilityTestById,
+} from '../../../engines/mobility-assessment.engine';
 
 const CARD = diaryCard;
 const IN = diaryInput;
@@ -51,7 +57,21 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
 
+  // ── Оценка мобильности (тесты) ──
+  const [assessOpen, setAssessOpen] = useState(false);
+  const [assessScores, setAssessScores] = useState<Record<string, AssessmentScore>>(() => {
+    const last = latestAssessment();
+    return last ? { ...last.scores } : {};
+  });
+  const [assessNote, setAssessNote] = useState('');
+  const [assessSaved, setAssessSaved] = useState(false);
+  const [assessAdded, setAssessAdded] = useState(false);
+
   const active = useMemo(() => protocols.find(p => p.id === activeId) || null, [protocols, activeId]);
+
+  const assessment = useMemo(() => assessmentTrend(), [tick, assessSaved, assessAdded]);
+  const assessSummary = useMemo(() => summarizeAssessment(assessment.current), [assessment.current]);
+  const assessWeak = useMemo(() => weakestTests(assessment.current), [assessment.current]);
 
   const refresh = useCallback(() => {
     setProtocols(loadMobilityProtocols());
@@ -173,6 +193,46 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
     setCheckinSaved(true);
     setTick(t => t + 1);
   }, [checkin]);
+
+  // ── Оценка мобильности ──
+  const saveAssessmentEntry = useCallback(() => {
+    const date = new Date().toISOString().slice(0, 10);
+    const scored = Object.keys(assessScores).length > 0;
+    saveAssessment({ date, scores: assessScores, note: assessNote.trim() || undefined });
+    setAssessSaved(true);
+    setAssessAdded(false);
+    setTick(t => t + 1);
+    return scored;
+  }, [assessScores, assessNote]);
+
+  const setTestScore = useCallback((testId: string, v: AssessmentScore) => {
+    setAssessScores(prev => {
+      const next = { ...prev };
+      if (v === 0 && prev[testId] === 0) delete next[testId];
+      else if (prev[testId] === v) delete next[testId];
+      else next[testId] = v;
+      return next;
+    });
+    setAssessSaved(false);
+  }, []);
+
+  const addCorrectives = useCallback(() => {
+    if (!active) return;
+    const entry = latestAssessment();
+    const items = correctiveItemsForProtocol(entry, active.items);
+    if (items.length === 0) return;
+    const newItems: MobilityItem[] = items.map(it => ({
+      id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      slot: it.slot,
+      title: it.title,
+      script: it.script,
+      durationMin: it.durationMin,
+      targetAreas: it.targetAreas,
+      sourceMethod: 'Оценка мобильности',
+    }));
+    persist({ ...active, items: [...active.items, ...newItems] });
+    setAssessAdded(true);
+  }, [active, persist]);
 
   // ── Аналитика ──
   const adherence = useMemo(() => mobilityAdherence(30), [tick]);
@@ -510,6 +570,118 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
             <input aria-label="Заметка чек-ина" style={{ ...IN, marginTop: 8 }} placeholder="заметка: что жёстко, что стало лучше…" value={checkin.note}
               onChange={e => setCheckin(p => ({ ...p, note: e.target.value }))} />
             <button type="button" style={{ ...btn, width: '100%', marginTop: 10 }} onClick={saveCheckin}>💾 Сохранить чек-ин</button>
+          </div>
+
+          {/* ── Оценка мобильности (объективные тесты) ── */}
+          <div style={CARD}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>🎯 Оценка мобильности (тесты)</div>
+              {assessment.current && (
+                <span style={{ fontSize: 9, color: '#60a5fa' }}>последняя: {assessment.current.date}</span>
+              )}
+            </div>
+            <div style={{ fontSize: 9, color: DIM, marginTop: 2, lineHeight: 1.5 }}>
+              6 FMS-подобных тестов: голеностоп/бёдра, сгибатели бедра, плечи, бицепс бедра, кор, грудной отдел.
+              Оцените 0-2 (не проходит / частично / проходит) — слабые зоны превратятся в корректирующие блоки.
+            </div>
+            {assessment.current && assessSummary.counts.scored > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
+                <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM }}>Балл</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa' }}>{assessSummary.total}/{assessSummary.max}</div>
+                  <div style={{ fontSize: 9, color: DIM }}>{assessSummary.pct}%</div>
+                </div>
+                <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM }}>Динамика</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: assessment.deltaTotal === null ? 'var(--text-dim)' : assessment.deltaTotal > 0 ? '#22c55e' : assessment.deltaTotal < 0 ? '#ef4444' : DIM }}>
+                    {assessment.deltaTotal === null ? '—' : `${assessment.deltaTotal > 0 ? '+' : ''}${assessment.deltaTotal}`}
+                  </div>
+                  <div style={{ fontSize: 9, color: DIM }}>vs предыдущая</div>
+                </div>
+                <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, color: DIM }}>Слабые зоны</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: assessWeak.length > 0 ? '#f59e0b' : '#22c55e', lineHeight: 1.3 }}>
+                    {assessWeak.length > 0 ? `${assessWeak.length}` : 'нет'}
+                  </div>
+                  <div style={{ fontSize: 9, color: DIM }}>{assessWeak.length > 0 ? 'тестов < 2/2' : 'все в норме'}</div>
+                </div>
+              </div>
+            )}
+            {assessment.history.length >= 2 && (
+              <div style={{ marginTop: 8 }}>
+                <MiniLineChart
+                  data={assessment.history.map(h => h.total)}
+                  labels={assessment.history.map(h => h.date.slice(5))}
+                  color="#60a5fa"
+                  height={50}
+                  ySuffix="/12"
+                />
+              </div>
+            )}
+            <button type="button" style={{ ...ghost, width: '100%', marginTop: 8 }} onClick={() => setAssessOpen(v => !v)} aria-expanded={assessOpen}>
+              {assessOpen ? '▲ Свернуть тесты' : `▼ Пройти тесты (${Object.keys(assessScores).length}/6 оценено)`}
+            </button>
+            {assessOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                {MOBILITY_TESTS.map(t => {
+                  const s = assessScores[t.id];
+                  const cur = assessment.current?.scores[t.id];
+                  const prev = assessment.previous?.scores[t.id];
+                  const delta = cur !== undefined && prev !== undefined ? cur - prev : null;
+                  return (
+                    <div key={t.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--bg-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 14 }}>{t.areaIcon}</span>
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{t.title}</div>
+                          <div style={{ fontSize: 9, color: DIM, marginTop: 2 }}>{t.area}</div>
+                        </div>
+                        {delta !== null && (
+                          <span style={{ fontSize: 9, color: delta > 0 ? '#22c55e' : delta < 0 ? '#ef4444' : DIM }}>
+                            {delta > 0 ? '▲' : delta < 0 ? '▼' : '•'} {delta > 0 ? '+' : ''}{delta}
+                          </span>
+                        )}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button type="button" aria-label={`${t.title}: не проходит`} style={chip(s === 0, '#ef4444')} onClick={() => setTestScore(t.id, 0)}>✕</button>
+                          <button type="button" aria-label={`${t.title}: частично`} style={chip(s === 1, '#f59e0b')} onClick={() => setTestScore(t.id, 1)}>~</button>
+                          <button type="button" aria-label={`${t.title}: проходит`} style={chip(s === 2, '#22c55e')} onClick={() => setTestScore(t.id, 2)}>✓</button>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 6 }}>
+                        <b style={{ color: 'rgba(255,255,255,0.8)' }}>Как делать:</b> {t.instructions}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 4 }}>
+                        <b style={{ color: '#22c55e' }}>✓ Норма:</b> {t.passCriteria}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 4 }}>
+                        <b style={{ color: '#ef4444' }}>✕ Проблема:</b> {t.failHint}
+                      </div>
+                      {(s === 0 || s === 1) && (
+                        <div style={{ marginTop: 6 }}>
+                          <div style={{ fontSize: 9, color: '#f59e0b', marginBottom: 3 }}>Корректирующие упражнения:</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {t.corrective.map((c, i) => (
+                              <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>• {c.name} — {c.detail}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <input aria-label="Заметка оценки мобильности" style={IN} placeholder="заметка: где жёсткость, что болит…" value={assessNote}
+                  onChange={e => setAssessNote(e.target.value)} />
+                <button type="button" style={btn} onClick={saveAssessmentEntry}>💾 Сохранить оценку ({Object.keys(assessScores).length}/6)</button>
+                {assessSaved && <span style={{ fontSize: 9, color: ACCENT }}>✓ оценка сохранена · сегодня</span>}
+                {assessWeak.length > 0 && (
+                  <button type="button" style={{ ...ghost, border: '1px solid rgba(245,158,11,0.35)', color: '#f59e0b' }}
+                    onClick={addCorrectives} aria-label="Добавить коррективы в протокол">
+                    ＋ Добавить корректирующие блоки в протокол ({assessWeak.length})
+                  </button>
+                )}
+                {assessAdded && <span style={{ fontSize: 9, color: ACCENT }}>✓ коррективы добавлены в активный протокол (слот «Ежедневная рутина»)</span>}
+              </div>
+            )}
           </div>
 
           {/* ── Тренды ── */}

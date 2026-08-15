@@ -20,6 +20,7 @@
  */
 
 import { getMobilityFlows } from './federation-grip-mobility.engine';
+import { latestAssessment, summarizeAssessment, weakestTests } from './mobility-assessment.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -109,7 +110,7 @@ export const DIRECTION_LABELS: Record<MobilityDirection, string> = {
 
 function flowToBlock(flow: ReturnType<typeof getMobilityFlows>[number], slot: MobilitySlot, direction: MobilityDirection, description: string): MobilityBlock {
   return {
-    id: `flow_${flow.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+    id: flow.id || `flow_${flow.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
     slot,
     title: flow.name,
     script: `Готовый поток (${flow.durationMin} мин) для зон: ${flow.targetAreas.join(', ')}. Выполняйте упражнения последовательно, дыхание — по подсказкам каждого.`,
@@ -220,11 +221,11 @@ export function mobilityBlockToItem(block: MobilityBlock): MobilityItem {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const PRESET_RECIPES: Record<Exclude<MobilityDirection, 'both'>, string[]> = {
-  pl: ['cars_morning', 'spine_daily', 'hip_cars_pre', 'tspine_pre', 'static_post', 'pnf_post', 'flow_hip_opener_flow', 'flow_spine_shoulder_flow'],
-  bb: ['cars_morning', 'spine_daily', 'loaded_bb', 'static_post', 'loaded_rest', 'flow_full_body_morning_flow'],
+  pl: ['cars_morning', 'spine_daily', 'hip_cars_pre', 'tspine_pre', 'static_post', 'pnf_post', 'flow_hip_opener', 'flow_spine_shoulder'],
+  bb: ['cars_morning', 'spine_daily', 'loaded_bb', 'static_post', 'loaded_rest', 'flow_full_body_morning'],
 };
 
-const UNIVERSAL_RECIPE: string[] = ['cars_morning', 'spine_daily', 'static_post', 'flow_hip_opener_flow', 'flow_spine_shoulder_flow'];
+const UNIVERSAL_RECIPE: string[] = ['cars_morning', 'spine_daily', 'static_post', 'flow_hip_opener', 'flow_spine_shoulder'];
 
 export const PRESET_LABELS: Record<MobilityDirection, string> = {
   pl: 'ПЛ: спина/бёдра под присед-тягу, статика+PNF после, потоки в отдых',
@@ -552,6 +553,19 @@ export function buildMobilityInsights(protocol: MobilityProtocol | null): string
   if (!hasDaily) out.push('В протоколе нет ежедневной рутины (слот «Ежедневная рутина») — добавьте CARs или мобильность позвоночника: эффект накопительный, без ежедневности он теряется.');
   if (!hasRest) out.push('Нет сессий в дни отдыха — добавьте поток (бёдра/позвоночник) в слот «День отдыха»: дни без тренировки — лучшее время для глубокой мобильности.');
   if (!hasPost) out.push('Нет растяжки после тренировки — статика/PNF после сессии дают ROM без потери силы и снижают DOMS.');
+  const ass = latestAssessment();
+  if (ass) {
+    const sum = summarizeAssessment(ass);
+    if (sum.scored > 0) {
+      const weak = weakestTests(ass);
+      if (weak.length > 0) {
+        const names = weak.slice(0, 3).map(w => w.test.area.split(' / ')[0]).join(', ');
+        out.push(`Оценка мобильности от ${ass.date}: ${sum.total}/${sum.max} (${sum.pct}%). Слабые зоны: ${names}${weak.length > 3 ? ' и др.' : ''}. Добавьте корректирующие блоки (кнопка «＋ Коррективы» в карточке оценки).`);
+      } else {
+        out.push(`Оценка мобильности от ${ass.date}: ${sum.total}/${sum.max} (${sum.pct}%) — все зоны в норме. Поддерживайте рутиной и пере-оценивайте раз в 2-4 недели.`);
+      }
+    }
+  }
   if (out.length === 0) out.push('Протокол сбалансирован. Отмечайте выполнение и ROM — появятся персональные рекомендации.');
   return out;
 }

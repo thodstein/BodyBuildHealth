@@ -16,6 +16,8 @@
  */
 
 import { epley1RM } from './e1rm';
+import { identifyPhase } from './coaching-psychology.engine';
+import { getProfile } from '../core/profile-manager';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -700,6 +702,17 @@ export function buildMindsetInsights(
       out.push(`Связь уверенности с e1RM сессии: r = ${link.pearson} (n=${link.n}). ${link.pearson > 0 ? 'Психика заметно влияет на рабочие веса — протокол перед тяжёлыми днями окупается.' : 'Парадоксальная обратная связь — посмотрите на сон/стресс в эти дни.'}`);
     }
   }
+  const moods = moodTrends(14);
+  if (moods.count >= 3) {
+    if (moods.avg <= 2.5) out.push(`Среднее настроение ${moods.avg.toFixed(1)}/5 за 14 дней — низкое. Проверьте сон и восстановление; при апатии замените тяжёлую сессию на лёгкую или день отдыха.`);
+    else if (moods.delta <= -0.5) out.push(`Настроение снижается (${moods.delta.toFixed(1)} за 14 дней) — добавьте день отдыха или снизьте объём на неделю.`);
+  }
+  const psych = psychProfileInsights();
+  out.push(...psych);
+  const phase = detectMotivationPhase(workouts);
+  if (phase.phase !== 'grind' && phase.inputs.weeksInProgram > 0) {
+    out.push(`Фаза мотивации: «${phase.label}» (${phase.inputs.weeksInProgram} нед в программе). ${phase.trainingAdjustment}`);
+  }
   if (out.length === 0) {
     out.push('Пока мало данных: выполните протокол и заполните чек-ин в нескольких сессиях — появятся персональные инсайты.');
   }
@@ -753,4 +766,195 @@ export function exportMindsetCheckinsCSV(): string {
     ].join(','));
   }
   return rows.join('\n');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mood log (настроение дня)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const MINDSET_MOOD_KEY = 'he_mindset_mood';
+
+export const MOOD_TAGS = ['энергия', 'спокойствие', 'мотивация', 'тревога', 'раздражение', 'апатия', 'сонливость', 'эйфория'] as const;
+export type MoodTag = typeof MOOD_TAGS[number];
+
+export interface MoodEntry {
+  id: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** Настроение 1-5. */
+  mood: number;
+  tags?: MoodTag[];
+  note?: string;
+}
+
+export const MOOD_LABELS: Record<number, { emoji: string; label: string; color: string }> = {
+  1: { emoji: '😖', label: 'Отвратно', color: '#ef4444' },
+  2: { emoji: '😕', label: 'Плохо', color: '#f97316' },
+  3: { emoji: '😐', label: 'Нормально', color: '#facc15' },
+  4: { emoji: '🙂', label: 'Хорошо', color: '#22c55e' },
+  5: { emoji: '😄', label: 'Отлично', color: '#00e68a' },
+};
+
+export interface MoodTrends {
+  series: { date: string; mood: number }[];
+  avg: number;
+  /** Дельта средних текущего окна vs предыдущего окна той же длины. */
+  delta: number;
+  count: number;
+  /** Распределение оценок 1-5 (сколько раз). */
+  distribution: Record<number, number>;
+}
+
+export function sanitizeMood(raw: any): MoodEntry | null {
+  if (!raw || typeof raw !== 'object') return null;
+  if (typeof raw.date !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(raw.date)) return null;
+  const mood = typeof raw.mood === 'number' && Number.isFinite(raw.mood) ? Math.round(raw.mood) : 0;
+  if (mood < 1 || mood > 5) return null;
+  return {
+    id: typeof raw.id === 'string' && raw.id ? raw.id : `mood_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    date: raw.date.slice(0, 10),
+    mood,
+    tags: Array.isArray(raw.tags) ? raw.tags.filter((t: unknown): t is MoodTag => MOOD_TAGS.includes(t as MoodTag)) : undefined,
+    note: typeof raw.note === 'string' ? raw.note : undefined,
+  };
+}
+
+export function loadMoods(): MoodEntry[] {
+  const list = readJSON(MINDSET_MOOD_KEY)
+    .map(sanitizeMood)
+    .filter((m): m is MoodEntry => !!m)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return list.slice(-730);
+}
+
+/** Upsert настроения по дате (одна запись на день). Возвращает полный список. */
+export function upsertMood(input: { date: string; mood: number; tags?: MoodTag[]; note?: string }): MoodEntry[] {
+  const list = loadMoods();
+  const idx = list.findIndex(m => m.date === input.date.slice(0, 10));
+  const entry: MoodEntry = {
+    id: idx >= 0 ? list[idx].id : `mood_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    date: input.date.slice(0, 10),
+    mood: Math.min(5, Math.max(1, Math.round(input.mood) || 3)),
+    tags: Array.isArray(input.tags) ? input.tags.filter(t => MOOD_TAGS.includes(t)) : undefined,
+    note: typeof input.note === 'string' && input.note.trim() ? input.note.trim() : undefined,
+  };
+  if (idx >= 0) list[idx] = entry; else list.push(entry);
+  writeJSON(MINDSET_MOOD_KEY, list);
+  return loadMoods();
+}
+
+export function latestMood(): MoodEntry | null {
+  const list = loadMoods();
+  return list.length > 0 ? list[list.length - 1] : null;
+}
+
+export function moodTrends(days = 14): MoodTrends {
+  const list = loadMoods().slice(-days * 2);
+  const current = list.slice(-days);
+  const previous = list.slice(0, Math.max(0, list.length - days)).slice(-days);
+  const avgOf = (arr: MoodEntry[]) => arr.length > 0 ? Math.round(arr.reduce((s, m) => s + m.mood, 0) / arr.length * 10) / 10 : 0;
+  const aC = avgOf(current);
+  const dist: Record<number, number> = {};
+  for (const m of current) dist[m.mood] = (dist[m.mood] || 0) + 1;
+  return {
+    series: current.map(m => ({ date: m.date, mood: m.mood })),
+    avg: aC,
+    delta: Math.round((aC - avgOf(previous)) * 10) / 10,
+    count: current.length,
+    distribution: dist,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Motivation phase (фаза мотивации)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface MotivationPhaseResult {
+  /** Ключ фазы: honeymoon | grind | plateau | breakthrough | burnout. */
+  phase: string;
+  label: string;
+  icon: string;
+  description: string;
+  duration: string;
+  signs: string[];
+  interventions: string[];
+  trainingAdjustment: string;
+  inputs: { weeksInProgram: number; lastPRDaysAgo: number; motivationScore: number; fatigueScore: number };
+}
+
+const PHASE_META: Record<string, { label: string; icon: string }> = {
+  honeymoon: { label: 'Медовый месяц', icon: '🌱' },
+  grind: { label: 'Рабочая рутина', icon: '⚙️' },
+  plateau: { label: 'Плато', icon: '🧱' },
+  breakthrough: { label: 'Прорыв', icon: '🚀' },
+  burnout: { label: 'Выгорание', icon: '🔥' },
+};
+
+/**
+ * Фаза мотивации по данным дневника: недели в программе (из истории),
+ * дней с последнего максимума e1RM, средняя уверенность/настроение (мотивация),
+ * доля «вялых» чек-инов и низкого настроения (усталость).
+ * Метод — coaching-psychology.engine.identifyPhase.
+ */
+export function detectMotivationPhase(workouts: { date: string }[]): MotivationPhaseResult {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const dates = (Array.isArray(workouts) ? workouts : [])
+    .map(w => w && typeof (w as any).date === 'string' ? (w as any).date.slice(0, 10) : '')
+    .filter(Boolean)
+    .sort();
+  let weeksInProgram = 0;
+  if (dates.length > 0) {
+    const first = new Date(dates[0] + 'T00:00:00');
+    weeksInProgram = Math.max(0, Math.floor((today.getTime() - first.getTime()) / (7 * 86400000)));
+  }
+  const perfs = sessionsBestE1RM(workouts as any[]);
+  let lastPRDaysAgo = 999;
+  if (perfs.length > 0) {
+    const best = perfs.reduce((a, b) => (a.e1rm >= b.e1rm ? a : b));
+    lastPRDaysAgo = Math.max(0, Math.round((today.getTime() - new Date(best.date + 'T00:00:00').getTime()) / 86400000));
+  }
+  const checks = loadCheckins().slice(-14);
+  const moods = loadMoods().slice(-14);
+  const confAvg = checks.length > 0 ? checks.reduce((s, c) => s + c.confidence, 0) / checks.length : 0;
+  const moodAvg = moods.length > 0 ? moods.reduce((s, m) => s + m.mood, 0) / moods.length : 0;
+  const motivationScore = confAvg > 0 ? Math.round(confAvg * 10) / 10 : (moodAvg > 0 ? Math.round(moodAvg * 10) / 10 : 3);
+  const lowArousal = checks.filter(c => c.arousal <= 2).length;
+  const lowMood = moods.filter(m => m.mood <= 2).length;
+  const total = checks.length + moods.length;
+  const fatigueScore = total > 0 ? Math.min(1, (lowArousal + lowMood) / total) : 0;
+  const ph = identifyPhase(weeksInProgram, lastPRDaysAgo, motivationScore, fatigueScore);
+  const meta = PHASE_META[ph.phase] || PHASE_META.grind;
+  return {
+    phase: ph.phase,
+    label: meta.label,
+    icon: meta.icon,
+    description: ph.description,
+    duration: ph.duration,
+    signs: ph.signs,
+    interventions: ph.interventions,
+    trainingAdjustment: ph.trainingAdjustment,
+    inputs: { weeksInProgram, lastPRDaysAgo, motivationScore, fatigueScore },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Psych profile insights (поля психологии профиля v2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Инсайты из профиля v2 (health.fearOfLoss / mirrorObsession / apathyOffCycle,
+ * 1-5): при значениях 4-5 выдаёт конкретные психологические рекомендации.
+ */
+export function psychProfileInsights(): string[] {
+  const out: string[] = [];
+  try {
+    const p = getProfile();
+    const h = (p.settings as any)?.health || {};
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    if (num(h.fearOfLoss) >= 4) out.push('В профиле отмечен страх потери формы (4-5/5). Сместите фокус на процессуальные цели: «выполнить план» вместо «не потерять». Визуализация + self-talk перед подходами помогут.');
+    if (num(h.mirrorObsession) >= 4) out.push('Высокая фиксация на зеркале (4-5/5): сверяйте прогресс по дневнику (веса, объёмы) и фото раз в 2-4 недели, а не ежедневно.');
+    if (num(h.apathyOffCycle) >= 4) out.push('Отмечена апатия вне курса (4-5/5): снизьте планку на неделю (делод/лёгкий объём) и добавьте шаг «Фиксация победы» — он восстанавливает мотивацию.');
+  } catch { /* профиль недоступен — без инсайтов */ }
+  return out;
 }

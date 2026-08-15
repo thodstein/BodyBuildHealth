@@ -20,6 +20,7 @@ import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '
 import { SessionPlayer } from '../../SRCBBScreen_parts/SessionPlayer';
 import { TrainingCalendarTab } from '../TrainingCalendarTab';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
+import { saveAssessment } from '../../../../engines/mobility-assessment.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -71,6 +72,36 @@ describe('MindsetTab (SSR-смок)', () => {
 
   it('tabToHubMode маппит вкладку mindset', () => {
     expect(tabToHubMode('mindset')).toBe('mindset');
+  });
+
+  it('рендерит карточки «Настроение дня» и «Фаза мотивации»', () => {
+    const p = buildPresetProtocol('pl');
+    upsertProtocol(p);
+    setActiveProtocol(p.id);
+    const html = renderToStaticMarkup(<MindsetTab hub={mkHub()} />);
+    expect(html).toContain('Настроение дня');
+    expect(html).toContain('Фаза мотивации');
+    expect(html).toContain('Рабочая рутина');
+  });
+
+  it('MobilityTab рендерит карточку «Оценка мобильности» с баллами и слабыми зонами', () => {
+    const p = buildPresetMobility('pl');
+    upsertMobilityProtocol(p);
+    setActiveMobility(p.id);
+    saveAssessment({ date: new Date().toISOString().slice(0, 10), scores: { deep_squat: 0, shoulder_flexion: 2 } });
+    const html = renderToStaticMarkup(<MobilityTab hub={mkHub()} />);
+    expect(html).toContain('Оценка мобильности (тесты)');
+    expect(html).toContain('Слабые зоны');
+    expect(html).toContain('2/12');
+  });
+
+  it('потоки мобильности в пресетах — русские названия', () => {
+    const p = buildPresetMobility('pl');
+    const titles = p.items.map(i => i.title);
+    expect(titles).toContain('Поток раскрытия бёдер');
+    expect(titles).toContain('Поток позвоночник и плечи');
+    const flows = p.items.filter(i => i.sourceMethod === 'flow');
+    expect(flows.length).toBe(2);
   });
 });
 
