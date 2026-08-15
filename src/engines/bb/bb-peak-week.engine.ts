@@ -179,20 +179,15 @@ export function buildPeakWeekProtocol(
 }
 
 /**
- * Применить peak week к BB-плану: заменить выбранную неделю на peak week protocol
- * (по умолчанию — последнюю). Тренировки в peak week = только лёгкий памп.
- * @param weekNumber — 1-индекс недели для применения (по умолчанию последняя).
+ * Применить peak week к BB-плану: заменить последнюю неделю на peak week protocol.
+ * Тренировки в peak week = только лёгкий памп (из кода bb-autocoach.applyTaperToFinalWeeks).
  */
 export function applyPeakWeekToPlan(
   plan: any,
   protocol: PeakWeekProtocol,
-  weekNumber?: number,
 ): any {
   if (!plan || !plan.weeks || plan.weeks.length < 1) return plan;
-  const idx = weekNumber == null
-    ? plan.weeks.length - 1
-    : Math.max(0, Math.min(plan.weeks.length - 1, weekNumber - 1));
-  const lastWeekIdx = idx;
+  const lastWeekIdx = plan.weeks.length - 1;
   const lastWeek = plan.weeks[lastWeekIdx];
   // Заменяем фазу последней недели на 'peaking'
   const newWeek = {

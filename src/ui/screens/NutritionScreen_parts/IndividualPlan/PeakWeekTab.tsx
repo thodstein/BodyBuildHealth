@@ -22,7 +22,6 @@ import {
 import { GlassCard } from './ui';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
-import { PopupNumber, PopupSelect, PopupBool } from '../../../components/PopupXxx';
 
 const ACCENT = '#f59e0b';
 const DIM = 'rgba(255,255,255,0.55)';
@@ -126,6 +125,107 @@ const DateCard: React.FC<{ label: string; value: string; onChange: (v: string) =
     />
   </div>
 );
+
+/** Сегментированные чипы — надёжная замена попап-выбора (нативные кнопки). */
+const SegGroup: React.FC<{
+  label: string;
+  icon?: string;
+  value: string;
+  options: { id: string; label: string; desc?: string }[];
+  onChange: (v: string) => void;
+  accent?: string;
+}> = ({ label, icon, value, options, onChange, accent = '#00e68a' }) => {
+  const sel = options.find(o => o.id === value);
+  return (
+    <div>
+      <div style={{ fontSize: 8.5, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5 }}>
+        {icon && <span style={{ marginRight: 4 }}>{icon}</span>}{label}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+        {options.map(o => {
+          const active = o.id === value;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onChange(o.id)}
+              style={{
+                padding: '7px 11px', borderRadius: 999, cursor: 'pointer', minHeight: 36, fontSize: 10,
+                fontWeight: active ? 800 : 600, border: active ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
+                background: active
+                  ? `linear-gradient(135deg, ${accent}, ${accent}cc)`
+                  : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+                color: active ? '#000' : 'rgba(255,255,255,0.7)',
+                boxShadow: active ? `0 3px 12px ${accent}44` : '0 1px 6px rgba(0,0,0,0.22)',
+                transition: 'all 0.16s ease',
+              }}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {sel?.desc && <div style={{ fontSize: 9, color: DIM, marginTop: 4, lineHeight: 1.4 }}>{sel.desc}</div>}
+    </div>
+  );
+};
+
+/** Степпер (−/+) — надёжная замена числового попапа. */
+const Stepper: React.FC<{
+  label: string;
+  icon?: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  onChange: (v: number) => void;
+  accent?: string;
+}> = ({ label, icon, value, min, max, step = 1, suffix = '', onChange, accent = '#00e68a' }) => {
+  const set = (v: number) => onChange(Math.max(min, Math.min(max, Math.round(v * 100) / 100)));
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 12,
+      background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+      border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 1px 8px rgba(0,0,0,0.22)',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 8.5, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 }}>
+          {icon && <span style={{ marginRight: 4 }}>{icon}</span>}{label}
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: accent }}>{value}{suffix ? ` ${suffix}` : ''}</div>
+      </div>
+      <button
+        type="button"
+        onClick={() => set(value - step)}
+        disabled={value <= min}
+        aria-label={`${label} минус`}
+        style={{
+          width: 38, height: 38, borderRadius: 10, cursor: value <= min ? 'default' : 'pointer',
+          fontSize: 16, fontWeight: 800, border: '1px solid rgba(255,255,255,0.12)',
+          background: 'rgba(255,255,255,0.04)', color: value <= min ? 'rgba(255,255,255,0.25)' : '#fff',
+          opacity: value <= min ? 0.5 : 1,
+        }}
+      >
+        −
+      </button>
+      <button
+        type="button"
+        onClick={() => set(value + step)}
+        disabled={value >= max}
+        aria-label={`${label} плюс`}
+        style={{
+          width: 38, height: 38, borderRadius: 10, cursor: value >= max ? 'default' : 'pointer',
+          fontSize: 16, fontWeight: 800, border: '1px solid transparent',
+          background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#000',
+          opacity: value >= max ? 0.5 : 1,
+        }}
+      >
+        +
+      </button>
+    </div>
+  );
+};
 
 export const PeakWeekTab: React.FC = () => {
   const ctx = usePlanCtx();
@@ -285,59 +385,73 @@ export const PeakWeekTab: React.FC = () => {
       </div>
 
       <GlassCard title="Атлет и тайминг" icon="👤" color={ACCENT}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <PopupSelect
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <SegGroup
             label="Пол"
+            icon="👤"
             value={draft.sex}
+            accent="#00e68a"
             options={[{ id: 'male', label: 'Мужской' }, { id: 'female', label: 'Женский' }]}
             onChange={v => patch({ sex: v as any, category: (v === 'female' ? 'bikini' : 'mens_physique') })}
           />
-          <PopupSelect
+          <SegGroup
             label="Категория"
+            icon="🏅"
             value={draft.category}
+            accent="#f59e0b"
             options={catsFor.map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))}
             onChange={v => patch({ category: v as BBContestCategory })}
           />
-          <PopupNumber label="Вес тела" value={draft.weightKg} min={40} max={200} suffix="кг" onChange={v => patch({ weightKg: v })} />
-          <PopupNumber label="% жира сейчас" value={draft.bodyFatPct ?? 0} min={0} max={60} step={0.5} suffix="%" onChange={v => patch({ bodyFatPct: v > 0 ? v : undefined })} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Stepper label="Вес тела" icon="⚖️" value={draft.weightKg} min={40} max={200} suffix="кг" accent="#f59e0b" onChange={v => patch({ weightKg: v })} />
+            <Stepper label="% жира сейчас" icon="📏" value={draft.bodyFatPct ?? 0} min={0} max={60} step={0.5} suffix="%" accent="#60a5fa" onChange={v => patch({ bodyFatPct: v > 0 ? v : undefined })} />
+          </div>
           <DateCard label="Дата шоу" value={draft.showDate} onChange={v => patch({ showDate: v })} />
-          <PopupSelect
+          <SegGroup
             label="Уровень"
+            icon="📶"
             value={draft.experienceLevel}
+            accent="#a855f7"
             options={[{ id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' }, { id: 'advanced', label: 'Продвинутый' }]}
             onChange={v => patch({ experienceLevel: v as any })}
           />
-          <PopupNumber label="Пройдено пиков" value={draft.prepCount} min={0} max={50} onChange={v => patch({ prepCount: Math.round(v) })} />
-          <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Stepper label="Пройдено пиков" icon="🏆" value={draft.prepCount} min={0} max={50} accent="#22c55e" onChange={v => patch({ prepCount: Math.round(v) })} />
             <ToggleChip label="На курсе" icon="💉" value={draft.enhanced} onChange={v => patch({ enhanced: v })} />
           </div>
         </div>
-        <div style={{ fontSize: 9, color: DIM, marginTop: 8 }}>
+        <div style={{ fontSize: 9, color: DIM, marginTop: 10 }}>
           {bodyFatPct > 0 ? `Профиль: ${sex === 'female' ? 'женщина' : 'мужчина'} · ${weight} кг · ${bodyFatPct}% жира.` : 'Совет: укажите % жира — точнее оценка готовности к пику.'}
         </div>
       </GlassCard>
 
       <GlassCard title="Стратегии протокола" icon="🎯" color="#ec4899">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-          <PopupSelect
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <SegGroup
             label="Тренировочный протокол (Библиотека методик)"
+            icon="🏋️"
             value={draft.trainingProtocol}
+            accent="#ec4899"
             options={[
               { id: 'bb', label: 'Бодибилдинг · 4 нед', desc: 'Наполнение → прорисовка → шоу. Классика соревновательного ББ.' },
-              { id: 'classic', label: 'Классический WF · 4 нед', desc: 'Перегрузка → суперкомпенсация. Подход Issurin.' },
-              { id: 'pl', label: 'Пауэрлифтинг · 3 нед', desc: 'Интенсивность к 100%, синглы перед стартом.' },
+              { id: 'classic', label: 'Classic WF · 4 нед', desc: 'Перегрузка → суперкомпенсация. Подход Issurin.' },
+              { id: 'pl', label: 'ПЛ · 3 нед', desc: 'Интенсивность к 100%, синглы перед стартом.' },
             ]}
             onChange={v => patch({ trainingProtocol: v as any })}
           />
-          <PopupSelect
-            label="Недель тапера"
+          <SegGroup
+            label="Недель тапера (покрывают последние недели плана)"
+            icon="📉"
             value={String(draft.weeksOut)}
-            options={[1, 2, 3, 4].map(n => ({ id: String(n), label: `${n} недел${n === 1 ? 'я' : n < 4 ? 'и' : 'и'}`, desc: 'Столько последних недель плана покрывает тапер.' }))}
+            accent="#a855f7"
+            options={[1, 2, 3, 4].map(n => ({ id: String(n), label: `${n}`, desc: `${n} недел${n === 1 ? 'я' : 'и'} тапера перед шоу.` }))}
             onChange={v => patch({ weeksOut: Number(v) })}
           />
-          <PopupSelect
+          <SegGroup
             label="Карб-загрузка"
+            icon="🍚"
             value={draft.carbLoadStrategy}
+            accent="#22c55e"
             options={[
               { id: 'moderate', label: 'Классика 3/3', desc: '3 дня деплеции → 3 дня загрузки. Рекомендуется.' },
               { id: 'front', label: 'Front-load', desc: 'Загрузка раньше (3 дня), день перед шоу — пик.' },
@@ -345,9 +459,11 @@ export const PeakWeekTab: React.FC = () => {
             ]}
             onChange={v => patch({ carbLoadStrategy: v as any })}
           />
-          <PopupSelect
+          <SegGroup
             label="Вода"
+            icon="💧"
             value={draft.waterStrategy}
+            accent="#38bdf8"
             options={[
               { id: 'minimal', label: 'Minimal', desc: WATER_HINTS.minimal },
               { id: 'moderate', label: 'Moderate', desc: WATER_HINTS.moderate },
@@ -355,9 +471,11 @@ export const PeakWeekTab: React.FC = () => {
             ]}
             onChange={v => patch({ waterStrategy: v as any })}
           />
-          <PopupSelect
+          <SegGroup
             label="Натрий"
+            icon="🧂"
             value={draft.sodiumStrategy}
+            accent="#f59e0b"
             options={[
               { id: 'constant', label: 'Constant', desc: 'Не трогаем — современный подход, не ломает fill.' },
               { id: 'cut_2d', label: 'Cut за 2 дня', desc: 'Ступенчатое снижение к шоу.' },
@@ -455,7 +573,7 @@ export const PeakWeekTab: React.FC = () => {
                       ✕
                     </button>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
                     <div style={{
                       borderRadius: 8, padding: '6px 9px', background: 'rgba(255,255,255,0.04)',
                       border: '1px solid rgba(255,255,255,0.09)', display: 'flex', flexDirection: 'column', gap: 1,
@@ -468,16 +586,33 @@ export const PeakWeekTab: React.FC = () => {
                         style={{ border: 'none', background: 'transparent', color: '#fbbf24', fontSize: 11, fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: 0 }}
                       />
                     </div>
-                    <PopupSelect
-                      label="Приоритет"
-                      value={c.priority ?? 'B'}
-                      options={[
-                        { id: 'A', label: 'A · главный', desc: 'Пик формы к этому старту.' },
-                        { id: 'B', label: 'B · контрольный', desc: 'Промежуточная проверка формы.' },
-                        { id: 'C', label: 'C · тренировочный', desc: 'Без отдельной пик-недели.' },
-                      ]}
-                      onChange={v => patchCompetition(c.id, { priority: v as any })}
-                    />
+                    <div>
+                      <span style={{ fontSize: 8, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', marginBottom: 4 }}>Приоритет</span>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        {(['A', 'B', 'C'] as const).map(p => {
+                          const active = (c.priority ?? 'B') === p;
+                          const color = p === 'A' ? '#fbbf24' : p === 'B' ? '#f59e0b' : '#a78bfa';
+                          const labels: Record<string, string> = { A: 'A · главный', B: 'B · контроль', C: 'C · тренир.' };
+                          return (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => patchCompetition(c.id, { priority: p })}
+                              style={{
+                                flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', minHeight: 32, fontSize: 9.5,
+                                fontWeight: active ? 800 : 600,
+                                background: active ? `${color}22` : 'rgba(255,255,255,0.04)',
+                                border: active ? `1px solid ${color}66` : '1px solid rgba(255,255,255,0.09)',
+                                color: active ? color : 'rgba(255,255,255,0.65)',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              {labels[p]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

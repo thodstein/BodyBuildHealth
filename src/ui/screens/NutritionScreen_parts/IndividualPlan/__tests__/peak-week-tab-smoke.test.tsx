@@ -53,15 +53,18 @@ describe('PeakWeekTab smoke', () => {
   it('смена пола переключает список категорий (bikini для женщин)', () => {
     render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
     clickTab('Тапер ББ');
-    // Открыть попап «Пол»
-    const sexBtn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Пол'));
-    expect(sexBtn).toBeTruthy();
-    fireEvent.click(sexBtn!);
+    // Сегментированные чипы: клик «Женский» сразу меняет пол и категорию.
     fireEvent.click(screen.getByText('Женский'));
-    // Попап «Категория» теперь содержит Bikini
-    const catBtn = Array.from(document.querySelectorAll('button')).find(b => (b.textContent || '').includes('Категория'));
-    expect(catBtn).toBeTruthy();
-    fireEvent.click(catBtn!);
     expect(screen.getAllByText('Bikini').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Wellness').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Bodybuilding (открытая)')).toBeNull();
+  });
+
+  it('степперы меняют вес и перестраивают протокол', () => {
+    const { container } = render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickTab('Тапер ББ');
+    const plusBtn = screen.getByLabelText('Вес тела плюс');
+    fireEvent.click(plusBtn);
+    expect(container.textContent).toContain('81');
   });
 });
