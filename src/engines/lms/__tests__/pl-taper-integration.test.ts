@@ -129,4 +129,24 @@ describe('appendPLTaperWeeks: все схемы — прикиды на фина
       expect(final.taperWeek, `mode=${mode}`).toBe(true);
     }
   });
+
+  it('pl с taperWeeks=4 — кламп: 4 недели без краша (регрессия legacy-повтора)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 4, { peakMode: 'pl' });
+    expect(next.weeks).toHaveLength(plan.weeks.length + 4);
+    const finals = next.weeks.slice(-4);
+    expect(finals.every(w => w.taperWeek)).toBe(true);
+    expect(next.weeks[next.weeks.length - 1].meetAttempts).toBeTruthy();
+  });
+
+  it('taperWeeks=1 для всех схем — одна соревновательная неделя с прикидами', () => {
+    const plan = buildBase(6);
+    for (const mode of ['classic', 'pl', 'pro', 'wf'] as const) {
+      const next = appendPLTaperWeeks(plan, 1, { peakMode: mode });
+      expect(next.weeks).toHaveLength(plan.weeks.length + 1, `mode=${mode}`);
+      const final = next.weeks[next.weeks.length - 1];
+      expect(final.meetAttempts, `mode=${mode}`).toBeTruthy();
+      expect(weekVolume(final)).toBeLessThan(weekVolume(plan.weeks[plan.weeks.length - 1]), `mode=${mode}`);
+    }
+  });
 });

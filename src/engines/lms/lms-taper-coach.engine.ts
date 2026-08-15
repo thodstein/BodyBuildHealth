@@ -57,7 +57,9 @@ export interface PmFeasibility {
 
 /** Достижимость плана ПМ к старту: forecast × (1+k)^weeks vs план федерации. */
 export function pmFeasibility(ctx: TaperCoachCtx): PmFeasibility {
-  const k = Number.isFinite(ctx.weeklyK) ? (ctx.weeklyK ?? 0.01) : 0.01;
+  // Кламп темпа: 0/NaN/отрицательные → минимальный прогресс (guard от Infinity/NaN).
+  const rawK = Number.isFinite(ctx.weeklyK) ? (ctx.weeklyK ?? 0.01) : 0.01;
+  const k = Math.max(0.001, Math.min(0.1, rawK));
   const weeks = Math.max(1, ctx.weeksToMeet ?? 1);
   const planned = ctx.plannedPm ?? {};
   const forecastBase = ctx.forecastPm ?? {};
@@ -187,7 +189,7 @@ export interface TaperCoachVerdict {
 
 const weekVolume = (w: LMSPlanWeek): number => {
   let v = 0;
-  for (const d of w.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
+  for (const d of w.days ?? []) for (const e of d.exercises ?? []) for (const ws of e.workSets ?? []) v += ws.sets ?? 0;
   return v;
 };
 
@@ -204,6 +206,12 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
   const taperWeeksList = weeks.filter(w => w.taperWeek);
   const peakVol = Math.max(1, ...weeks.map(weekVolume));
 
+  // ── Тапер не применён вовсе ──
+  if (taperWeeksList.length === 0 && meetWeeks.length === 0) {
+    score -= 30;
+    notes.push({ severity: 'danger', icon: '⛔', text: 'Тапер не применён к плану — добавьте тапер-недели («📉 Добавить тапер к плану») и неделю соревнований, иначе к старту придёте с полным объёмом и накопленной усталостью.' });
+  }
+
   // ── Финальная тапер-неделя: объём и RIR ──
   const finalTaper = taperWeeksList[taperWeeksList.length - 1]
     ?? (meetWeeks[0] ? weeks[weeks.indexOf(meetWeeks[0]) - 1] : undefined);
@@ -216,7 +224,7 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
     // Тяжёлые рабочие сеты (≥85%, ≥2 сетов) в финале — только для разгрузочных режимов;
     // соревновательная неделя ПЛ-протокола (разминка 50/70/90) — норма.
     const heavySets = finalTaper.days.flatMap(d => d.exercises.filter(e => isMain(e)).flatMap(e => e.workSets))
-      .filter(ws => ws.pct >= 0.85 && ws.sets >= 2);
+      .filter(ws => (ws.pct ?? 0) >= 0.85 && (ws.sets ?? 0) >= 2);
     if (heavySets.length > 0) {
       score -= 25;
       notes.push({ severity: 'danger', icon: '🚨', text: `В финальную тапер-неделю ${finalTaper.week} остались тяжёлые рабочие сеты (${heavySets.length} шт ≥85%) — перегруз ЦНС перед стартом. Последние тяжёлые: присед за ${LAST_HEAVY_DAYS.squat} дн, жим за ${LAST_HEAVY_DAYS.bench} дн, тяга за ${LAST_HEAVY_DAYS.deadlift} дн до старта.` });

@@ -62,6 +62,17 @@ describe('pmFeasibility', () => {
     expect(f.lifts.every(l => l.feasible)).toBe(true);
   });
 
+  it('weeklyK=0/NaN/отрицательный — не даёт Infinity/NaN (guard)', () => {
+    for (const k of [0, NaN, -0.01, undefined]) {
+      const f = pmFeasibility({ ...baseCtx(), weeklyK: k, plannedPm: { 'Присед': 230 } });
+      for (const l of f.lifts) {
+        expect(Number.isFinite(l.weeksNeeded), `k=${k}`).toBe(true);
+        expect(Number.isFinite(l.forecast), `k=${k}`).toBe(true);
+      }
+      expect(f.status).toBeTruthy();
+    }
+  });
+
   it('план чуть выше прогноза — на грани (tight)', () => {
     // База приседа — фактический ПМ 198; прогноз к старту ≈ 198×1.01^4 ≈ 206.
     // План 210 требует ещё ~2 нед прогрессии — впритык к 4 неделям → tight.
@@ -171,6 +182,28 @@ describe('coachPLPeakPlan', () => {
     expect(v.actions).toBeTruthy();
     expect(v.actions!.mode).toBeTruthy();
     expect(v.actions!.taperWeeks).toBeGreaterThan(0);
+  });
+
+  it('план БЕЗ тапера → danger «тапер не применён»', () => {
+    const plain = { ...balancedPlan(), weeks: [mkWeek(1), mkWeek(2), mkWeek(3), mkWeek(4)] };
+    const v = coachPLPeakPlan(plain, baseCtx());
+    expect(v.notes.some(n => n.severity === 'danger' && n.text.includes('Тапер не применён'))).toBe(true);
+    expect(v.score).toBeLessThan(80);
+  });
+
+  it('старый план без workSets у упражнений — вердикт не падает', () => {
+    const stale: LMSBuildOutput = {
+      template: {} as any,
+      progressionRationale: '',
+      cycleMetrics: {} as any,
+      weeks: [
+        { week: 1, pmRow: { 'Присед': 200 }, days: [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, pm: 200, rir: 2 } as any], metrics: {} as any }] },
+        { week: 2, pmRow: { 'Присед': 200 }, taperWeek: true, days: [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, pm: 200, rir: 2 } as any], metrics: {} as any }] },
+      ],
+    };
+    const v = coachPLPeakPlan(stale, baseCtx());
+    expect(Number.isFinite(v.score)).toBe(true);
+    expect(v.notes.length).toBeGreaterThan(0);
   });
 
   it('при наличии meet-недели — рекомендация по последним тяжёлым и праймингу', () => {
