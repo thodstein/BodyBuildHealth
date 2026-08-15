@@ -233,6 +233,7 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
   if (meetWeeks.length > 0) {
     if (!weeks.some(w => w.mockMeet)) { score -= 5; notes.push({ severity: 'info', icon: '🎯', text: 'Mock meet отсутствует — имитация прикидок за 10-14 дней до старта проверяет стратегию на практике.' }); }
     if (!weeks.some(w => w.postMeet)) { score -= 5; notes.push({ severity: 'info', icon: '🔄', text: 'Пост-соревновательная неделя отсутствует — восстановление после прикидок (×0.5, RIR +3) снижает риск перетренированности.' }); }
+    notes.push({ severity: 'info', icon: '⏱', text: `Последние тяжёлые перед стартом: присед за ${LAST_HEAVY_DAYS.squat} дн, жим за ${LAST_HEAVY_DAYS.bench} дн, тяга за ${LAST_HEAVY_DAYS.deadlift} дн до старта; за 1-2 дня — только лёгкий прайминг 60-75% (синглы), ЦНС должна прийти свежей.` });
   } else if (taperWeeksList.length > 0) {
     notes.push({ severity: 'info', icon: '🏁', text: 'Тапер применён, но недели соревнований нет — добавьте «🏁 Неделю соревнований в конце», чтобы получить прикиды дня старта.' });
   }

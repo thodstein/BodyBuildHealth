@@ -172,6 +172,12 @@ describe('coachPLPeakPlan', () => {
     expect(v.actions!.mode).toBeTruthy();
     expect(v.actions!.taperWeeks).toBeGreaterThan(0);
   });
+
+  it('при наличии meet-недели — рекомендация по последним тяжёлым и праймингу', () => {
+    const v = coachPLPeakPlan(balancedPlan(), baseCtx());
+    expect(v.notes.some(n => n.text.includes('Последние тяжёлые'))).toBe(true);
+    expect(v.notes.some(n => n.text.includes('прайминг'))).toBe(true);
+  });
 });
 
 describe('вспомогательные', () => {
