@@ -68,7 +68,8 @@ import {
   isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, CONTEST_SPECIALIZATION_LABELS,
   buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
-  prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,
+  prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS, buildShowTimeline, configFromPlan,
+  saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
 } from '../../../engines/bb/bb-contest-prep.engine';
@@ -395,6 +396,11 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepApplied(true);
       }
       savePrepToProfile(plan, cfg);
+      try {
+        window.dispatchEvent(new CustomEvent('he-bb-contest-prep-updated', {
+          detail: { prepPlanId: plan.id, trainingPlanId: undefined, nutritionPlanId: undefined, showDate: cfg.showDate },
+        }));
+      } catch { /* ignore */ }
       flash('🏁 Contest prep собран' + (applyToPlan ? ' и применён к плану' : ''));
     } catch (e) {
       flash(`Не удалось собрать contest prep: ${(e as Error).message}`);
@@ -452,6 +458,46 @@ export const BbAutoConstructor: React.FC = () => {
     }
     flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
   };
+
+  // ── Test Peak Week: тестовый прогон НЕ меняет основной план ──
+  const [testRatings, setTestRatings] = useState<Record<string, number>>({});
+  const [testWeightDelta, setTestWeightDelta] = useState<number>(0);
+  const [lastTest, setLastTest] = useState<ReturnType<typeof latestTestPeakWeek>>(null);
+  const handleRunTestPeakWeek = () => {
+    if (!prepPlan) return;
+    const ratings = {
+      carbTolerance: testRatings.carbTolerance ?? 3,
+      digestion: testRatings.digestion ?? 3,
+      fullness: testRatings.fullness ?? 3,
+      waterRetention: testRatings.waterRetention ?? 3,
+      pump: testRatings.pump ?? 3,
+      sleep: testRatings.sleep ?? 3,
+    };
+    const t = saveTestPeakWeekResult(prepPlan.id, prepPlan.showDate, ratings, testWeightDelta);
+    setLastTest(t);
+    setPrepPlan(p => p ? { ...p, testPeakWeekId: t.id, updatedAt: new Date().toISOString() } : p);
+    savePrepToProfile({ ...prepPlan, testPeakWeekId: t.id }, buildContestPrepConfig());
+    flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать' : t.verdict === 'adjust' ? 'нужна коррекция' : 'консервативный режим'}`);
+  };
+
+  // 🏁 Авто-восстановление сохранённого prep-плана после перезагрузки.
+  useEffect(() => {
+    try {
+      const prof = (linked.profile?.settings ?? {}) as any;
+      const stored = planFromStored(prof?.goals?.bbContestPrepPlan, prof?.goals?.bbPeakConfig, prof?.goals, prof?.personal);
+      if (!stored) return;
+      setPrepPlan(stored);
+      setPrepShowDate(stored.showDate);
+      setPrepWeeks(stored.preparation.weeks);
+      setPrepTaperWeeks(stored.taper.weeks);
+      setPeakWeekCategory(stored.category);
+      setPrepWaterMode(stored.peakWeek.waterMode);
+      setPrepSodiumMode(stored.peakWeek.sodiumMode);
+      setPrepCarbMode(stored.peakWeek.carbMode);
+      setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
   const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
   // ⭐ Специализация (упор мышцы к старту) — из профильного конфига, с override в UI.
@@ -3581,6 +3627,42 @@ export const BbAutoConstructor: React.FC = () => {
               </table>
             </div>
 
+            {/* 🗺 Гент-диаграмма фаз по неделям */}
+            {(() => {
+              const maxWeek = prepPlan.phases.reduce((m, p) => Math.max(m, p.weekEnd), 0);
+              const cells: { color: string; label: string; week: number }[] = [];
+              for (let wk = 1; wk <= maxWeek; wk++) {
+                const p = prepPlan.phases.find(q => q.key !== 'show_day' && wk >= q.weekStart && wk <= q.weekEnd);
+                cells.push({ color: p?.color ?? 'rgba(255,255,255,0.06)', label: p?.label ?? '', week: wk });
+              }
+              const todayWeek = (() => {
+                const now = isoToday();
+                const p = prepPhaseForDate(prepPlan, now);
+                return p && p.weekStart >= 1 && p.weekStart <= maxWeek ? p.weekStart : null;
+              })();
+              return (
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.7)', marginBottom:4 }}>🗺 Фазы по неделям {todayWeek ? `· 📍 сейчас: неделя ${todayWeek}` : ''}</div>
+                  <div style={{ display:'flex', gap:2, overflowX:'auto', paddingBottom:4 }}>
+                    {cells.map((c, i) => (
+                      <div key={i} style={{ flex:'0 0 auto', width:22, textAlign:'center' }} title={`Нед ${c.week}: ${c.label}`}>
+                        <div style={{ height:34, borderRadius:4, background:c.color, border: c.week === todayWeek ? '2px solid #fff' : '1px solid rgba(255,255,255,0.08)' }} />
+                        <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:2 }}>{c.week}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:4 }}>
+                    {prepPlan.phases.filter(p => p.key !== 'show_day').map(p => (
+                      <span key={p.key} style={{ fontSize:9, color:'rgba(255,255,255,0.5)', display:'flex', alignItems:'center', gap:4 }}>
+                        <span style={{ width:8, height:8, borderRadius:2, background:PREP_PHASE_COLORS[p.key], display:'inline-block' }} />
+                        {PREP_PHASE_LABELS[p.key]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Taper-кривая */}
             <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>📉 Кривая taper (объём ↓, интенсивность сохраняется, RIR 2–4)</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
@@ -3592,6 +3674,61 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ color:'#4ade80' }}>RIR {prepPlan.taper.rirProfile[i]?.[0]}–{prepPlan.taper.rirProfile[i]?.[1]}</div>
                 </div>
               ))}
+            </div>
+
+            {/* 🧪 Test Peak Week */}
+            <div style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Week (не меняет основной план)</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>
+                Прогоните протокол за 3–4 недели до шоу и зафиксируйте реакцию — результат сохраняется ({'testPeakWeekId'}) и влияет на стратегию основной пик-недели.
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                {([
+                  ['carbTolerance', 'Переносимость углеводов'],
+                  ['digestion', 'Пищеварение'],
+                  ['fullness', 'Наполненность'],
+                  ['waterRetention', 'Вода ушла (5 = ушла)'],
+                  ['pump', 'Пампинг'],
+                  ['sleep', 'Сон'],
+                ] as const).map(([key, label]) => (
+                  <div key={key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, fontSize:10 }}>
+                    <span style={{ color:'rgba(255,255,255,0.7)' }}>{label}</span>
+                    <div style={{ display:'flex', gap:3 }}>
+                      {[1, 2, 3, 4, 5].map(v => (
+                        <button
+                          key={v}
+                          onClick={() => setTestRatings(r => ({ ...r, [key]: v }))}
+                          style={{
+                            width: 22, height: 22, borderRadius: 6, fontSize: 9, cursor: 'pointer', color: '#fff',
+                            border: '1px solid rgba(168,85,247,0.3)',
+                            background: (testRatings[key] ?? 3) === v ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.03)',
+                          }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8, flexWrap:'wrap' }}>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}>Δ веса за неделю, кг:</span>
+                <input type="number" step={0.1} value={testWeightDelta} onChange={e => setTestWeightDelta(parseFloat(e.target.value) || 0)} style={{ width:70, ...IN }} />
+                <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleRunTestPeakWeek}>💾 Сохранить тест</button>
+              </div>
+              {lastTest && (
+                <div style={{ marginTop:8, fontSize:10, color:'rgba(255,255,255,0.8)' }}>
+                  <div style={{ fontWeight:700, color: lastTest.verdict === 'tested_ok' ? '#4ade80' : lastTest.verdict === 'adjust' ? '#ef4444' : '#fbbf24' }}>
+                    {lastTest.verdict === 'tested_ok' ? '✅ Протокол подходит (strategy: tested)' : lastTest.verdict === 'adjust' ? '⚠ Нужна коррекция' : '🔶 Консервативный режим'}
+                  </div>
+                  <div style={{ color:'rgba(255,255,255,0.55)', marginTop:2 }}>{lastTest.recommendation}</div>
+                  {prepPlan.testPeakWeekId && (
+                    <div style={{ color:'rgba(255,255,255,0.4)', marginTop:4 }}>
+                      Стратегия основной пик-недели: <b>{resolvePeakStrategy(prepPlan)}</b>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Безопасность */}
@@ -3631,6 +3768,19 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               );
             })()}
+
+            {/* 🎬 Таймлайн Show Day */}
+            <div style={{ marginTop:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fbbf24', marginBottom:4 }}>🎬 Таймлайн Show Day</div>
+              <div style={{ background:'rgba(251,191,36,0.04)', border:'1px solid rgba(251,191,36,0.12)', borderRadius:8, padding:8 }}>
+                {buildShowTimeline(configFromPlan(prepPlan)).map((t, i) => (
+                  <div key={i} style={{ display:'grid', gridTemplateColumns:'80px 1fr', gap:8, padding:'4px 0', borderBottom: i < buildShowTimeline(configFromPlan(prepPlan)).length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', fontSize:10 }}>
+                    <span style={{ color:'#fbbf24', fontWeight:700 }}>{t.time}</span>
+                    <span style={{ color:'rgba(255,255,255,0.7)' }}><b>{t.action}</b> — {t.detail}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}>
               <button style={BTN_GHOST} onClick={() => handleExtendPrep(1)}>➕ Неделя подготовки</button>

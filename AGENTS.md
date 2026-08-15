@@ -31,13 +31,22 @@
 - «🏁 Собрать contest prep и применить» → `buildBBContestPrepPlan` + `applyContestPrepToBBPlan` + сохранение в профиль (goals.bbContestPrepPlan + bbPeakConfig + peakShowDay); «Пропустить» — план остаётся обычным.
 - Просмотр: текущая фаза «📍 Сейчас», календарь фаз с датами, кривая taper (объём/вес/RIR), предупреждения safety, «🍽 Питание на сегодня» через `nutritionTargetsForPrepDate`, «➕/➖ Неделя подготовки» через `extendBBPlanPreparation`, перенос даты через `shiftBBContestPrepShowDate`. Кнопка «🏁 Contest prep» также в шаге «Коррекция».
 
+### Этап 8.1 — визуал + синхронизация (Aug 16, итерация 2)
+- **🗺 Гент-диаграмма фаз по неделям** в шаге contest (ячейки по цветам фаз, маркер «📍 сейчас: неделя N» с белой обводкой, легенда).
+- **🎬 Таймлайн Show Day** через `buildShowTimeline(configFromPlan(prepPlan))` (подъём → грим → backstage → памп → выход).
+- **🧪 Test Peak Week UI**: степперы 1-5 (carbTolerance/digestion/fullness/waterRetention/pump/sleep) + Δ веса → `saveTestPeakWeekResult` → вердикт и `resolvePeakStrategy`.
+- **Авто-восстановление**: при монтировании BbAutoConstructor читает `planFromStored(goals.bbContestPrepPlan, bbPeakConfig, goals, personal)` и восстанавливает шаг contest (дата/недели/моды/категория/тест).
+- **Событие `he-bb-contest-prep-updated`** (detail: prepPlanId/trainingPlanId/nutritionPlanId/showDate) при сборке; `IndividualPlanContext` слушает его и живьём перечитывает план (NutritionScreen ↔ TrainingScreen).
+- **NutritionScreen**: `IndividualPlanContext` гидрация через `planFromStored` (приоритет новому плану), цели дня через `nutritionTargetsForPrepDate` для подготовки/тапера/пик-недели (`_applyPrepTargets`), legacy `computePeakWeekNutritionTargets` остаётся fallback.
+
 ### Этап 9 — тесты
-- NEW `bb-contest-prep-plan.test.ts` — **32 теста**: модель/версии (5), фазы 8/12/16/20 нед (2), сериализация (2), динамические недели и перенос даты (6), taper-кривая и разметка (4), питание (4), безопасность (4), test peak week (3), обратная совместимость (3).
-- MOD `bb-contest-prep.test.ts` — 3 теста переведены на каноническую кривую (объём [0.85,0.7,0.6], интенсивность 0.95, RIR≥2). Итого **126/126** по обоим файлам; смежные BB (пик-неделя/audit/taper) **169/169**; tsc 0; taper-planner-tab 6/6.
+- NEW `bb-contest-prep-plan.test.ts` — **39 тестов**: модель/версии (5), фазы 8/12/16/20 нед (2), сериализация (2), динамические недели и перенос даты (7), taper-кривая и разметка (6), питание (5), безопасность (4), test peak week (4), обратная совместимость (4), show-day таймлайн из плана (1).
+- MOD `bb-contest-prep.test.ts` — 3 теста переведены на каноническую кривую (объём [0.85,0.7,0.6], интенсивность 0.95, RIR≥2). Итого **133/133** по обоим файлам; IndividualPlan 193/193; taper-planner-tab 6/6.
 
 ### Проверено
-- Полный `tsc --noEmit` — 0 ошибок; BB-тесты contest-prep 126/126 + смежные 169/169; `taper-planner-tab.test.tsx` 6/6.
-- Файлы других агентов не тронуты (health-diary/дневники — чужой WIP; MACROCYCLE-ROADMAP.md — чужой кардио-план).
+- `tsc --noEmit` — 0 ошибок (кроме чужого незакоммиченного `lms-taper.engine.ts` с битым импортом `./peaking-protocols.engine` — 21 тест-Suite падает в прогоне из-за него, не связано с моей работой; файл другого агента не трогается).
+- `vite build` OK; contest-prep 133/133; IndividualPlan 193/193; taper-planner 6/6; bb-auto-smoke недоступен до фикса чужого импорта.
+- Файлы других агентов не тронуты (health-diary/дневники, lms-taper, MACROCYCLE-ROADMAP.md — чужой WIP).
 
 ---
 

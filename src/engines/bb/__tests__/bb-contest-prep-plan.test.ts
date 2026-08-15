@@ -28,6 +28,8 @@ import {
   professionalReviewConditions,
   PREP_PHASE_LABELS,
   TEST_PEAK_WEEK_STORAGE_KEY,
+  buildShowTimeline,
+  configFromPlan,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -298,6 +300,27 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     // Недели перенумерованы
     expect(extended.weeks[extended.weeks.length - 1].week).toBe(12);
   });
+
+  it('extendBBPlanPreparation работает на плане короче подготовки (минимум: taper+пик)', () => {
+    const plan = makePlan(3);
+    const prepped = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 5, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(prepped.weeks.length).toBe(3);
+    const extended = extendBBPlanPreparation(prepped, 3) as BBPlanWithPrep;
+    expect(extended.weeks.length).toBe(6);
+    expect(extended.weeks[extended.weeks.length - 1].contestPhase).toBe('peak_week');
+    for (let i = 1; i <= extended.weeks.length; i++) {
+      expect(extended.weeks[i - 1].week).toBe(i);
+    }
+  });
+
+  it('applyContestPrepToBBPlan на минимальном плане (taper+пик) не падает', () => {
+    const plan = makePlan(3);
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 1, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(out.weeks.length).toBe(3);
+    expect(out.weeks[2].contestPhase).toBe('peak_week');
+    expect(out.weeks[0].contestPhase).toBe('taper');
+    expect(out.weeks[1].contestPhase).toBe('taper');
+  });
 });
 
 describe('Этап 5 — питание по дням (план vs факт)', () => {
@@ -341,6 +364,16 @@ describe('Этап 5 — питание по дням (план vs факт)', (
     expect(input.targetCarbs).toBe(t.carbsG);
     expect(input.days).toBe(3);
     expect(input.preferences.excludePork).toBe(true);
+  });
+
+  it('в taper-фазе калории стабильны (не меньше подготовки), вода/натрий не трогаются', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const prepDay = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, base);
+    const taperDay = nutritionTargetsForPrepDate(plan.phases.find(p => p.key === 'taper')!.dateStart, plan, base);
+    expect(taperDay.kcal).toBeGreaterThanOrEqual(prepDay.kcal);
+    expect(taperDay.waterMl).toBe(base.waterMl);
+    expect(taperDay.sodiumMg).toBe(base.sodiumMg);
+    expect(taperDay.proteinG).toBeGreaterThanOrEqual(prepDay.proteinG * 0.95);
   });
 });
 
@@ -421,6 +454,21 @@ describe('Этап 7 — Test Peak Week', () => {
     expect(resolvePeakStrategy({ ...plan, testPeakWeekId: 'x' })).toBe('conservative');
     expect(resolvePeakStrategy(plan)).toBe(plan.peakWeek.strategy);
   });
+
+  it('resolvePeakStrategy: testPeakWeekId задан, но тест не найден → консервативный дефолт', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const withId = { ...plan, testPeakWeekId: 'missing-test' };
+    expect(resolvePeakStrategy(withId)).toBe('conservative');
+  });
+
+  it('addPrepWeeks сохраняет статус/тест/frozenWeeks и пересчитывает updatedAt', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const grown = addPrepWeeks({ ...plan, status: 'draft' as const, testPeakWeekId: 't1', frozenWeeks: 4 }, 2);
+    expect(grown.status).toBe('draft');
+    expect(grown.testPeakWeekId).toBe('t1');
+    expect(grown.frozenWeeks).toBe(4);
+    expect(grown.updatedAt >= plan.updatedAt).toBe(true);
+  });
 });
 
 describe('Обратная совместимость и вспомогательные функции', () => {
@@ -441,6 +489,20 @@ describe('Обратная совместимость и вспомогател�
     expect(fromLegacy!.peakWeek.sodiumMode).toBe('stable');
   });
 
+  it('planFromStored: новый план имеет приоритет над legacy конфигом', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ showDate: addDaysIso(todayIso(), 60) }), { prepWeeks: 12, taperWeeks: 3 });
+    const oldCfg = baseConfig({ showDate: addDaysIso(todayIso(), 45), weeksOut: 2 });
+    const result = planFromStored(
+      serializeBBContestPrepPlan(plan),
+      JSON.stringify(oldCfg),
+      { peakWeek: true, peakShowDay: addDaysIso(todayIso(), 30) },
+      { weight: 80, sex: 'male' },
+    );
+    expect(result?.id).toBe(plan.id);
+    expect(result?.showDate).toBe(plan.showDate);
+    expect(result!.taper.weeks).toBe(3);
+  });
+
   it('estimatePrepCalories учитывает темп снижения', () => {
     const slow = estimatePrepCalories(80, 0.25);
     const fast = estimatePrepCalories(80, 0.75);
@@ -459,5 +521,15 @@ describe('Обратная совместимость и вспомогател�
     expect(ranges.some(p => p.key === 'peak_week')).toBe(false);
     expect(ranges.some(p => p.key === 'show_day')).toBe(false);
     expect(ranges.some(p => p.key === 'taper')).toBe(true);
+  });
+
+  it('buildShowTimeline(configFromPlan) — таймлайн дня шоу из единого плана', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const timeline = buildShowTimeline(configFromPlan(plan));
+    expect(timeline.length).toBeGreaterThanOrEqual(6);
+    expect(timeline[0].action).toMatch(/Подъём|завтрак|подъё/i);
+    expect(timeline[timeline.length - 1].action).toMatch(/Выход/);
+    // Времена убывают к выходу на сцену (12:00 по умолчанию) — последний шаг раньше старта.
+    expect(timeline[timeline.length - 1].time <= '12:00').toBe(true);
   });
 });

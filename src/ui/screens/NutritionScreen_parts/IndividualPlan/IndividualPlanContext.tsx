@@ -30,7 +30,7 @@ import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput } fr
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
 import { getBBCategory, type BBCategory, getPeakWeekDay, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
-import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, type BBContestPrepConfig } from "../../../../engines/bb/bb-contest-prep.engine";
+import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -389,8 +389,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return legacyConfigFromProfile((s as any)?.goals, (s as any)?.personal);
     } catch { return null; }
   });
+  // 🏁 Единый версионированный план contest prep (goals.bbContestPrepPlan) — приоритет над конфигом:
+  // покрывает подготовку/тапер/пик-неделю дневными целями (nutritionTargetsForPrepDate).
+  const [bbPrepPlan, setBBPrepPlan] = useState<BBContestPrepPlan | null>(() => {
+    try {
+      return planFromStored(
+        (s as any)?.goals?.bbContestPrepPlan,
+        (s as any)?.goals?.bbPeakConfig,
+        (s as any)?.goals,
+        (s as any)?.personal,
+      );
+    } catch { return null; }
+  });
   const setBBPrepConfig = (cfg: BBContestPrepConfig | null) => {
     setBBPrepConfigState(cfg);
+    setBBPrepPlan(null);
     try {
       if (cfg) {
         updateSection('goals', { bbPeakConfig: serializeBBPrepConfig(cfg), peakWeek: true, peakShowDay: cfg.showDate });
@@ -399,6 +412,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }
     } catch {}
   };
+  // 🏁 Живая синхронизация: событие he-bb-contest-prep-updated из BB Auto
+  // (собран/изменён prep-план) → перечитать единый план из профиля.
+  useEffect(() => {
+    const onPrepUpdated = () => {
+      try {
+        const s2 = getProfile().settings as any;
+        const p = planFromStored(s2?.goals?.bbContestPrepPlan, s2?.goals?.bbPeakConfig, s2?.goals, s2?.personal);
+        if (p) { setBBPrepPlan(p); setBBPrepConfigState(configFromPlan(p)); }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('he-bb-contest-prep-updated', onPrepUpdated);
+    return () => window.removeEventListener('he-bb-contest-prep-updated', onPrepUpdated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const applyBBPeakToPlan = (cfg: BBContestPrepConfig | null) => {
     setBBPrepConfig(cfg);
     try {
@@ -1635,28 +1662,43 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _cycDir = dayKcalMod - 1; // >0 = up-day, <0 = down-day
         const _dampK = (_diaryActive && Math.sign(_cycDir) === Math.sign(diaryComp.delta.kcal)) ? (1 - Math.abs(_cycDir)) : 1;
         const _dampC = (_diaryActive && Math.sign(dayCarbMod - 1) === Math.sign(diaryComp.delta.c)) ? (1 - Math.abs(dayCarbMod - 1)) : 1;
-        // #4b Пик-неделя ББ (новый движок): абсолютные цели по РЕАЛЬНОЙ дате дня
+        // #4b Пик-неделя ББ / 🏁 Contest prep: абсолютные цели по РЕАЛЬНОЙ дате дня
         // (today + offset) — приоритет над cycling/компенсацией.
-        const _peakTargets = bbPrepConfig
-          ? computePeakWeekNutritionTargets(isoAddDays(isoToday(), offset), {
+        // Приоритет источников: единый план (goals.bbContestPrepPlan, покрывает и подготовку)
+        // → legacy конфиг (goals.bbPeakConfig, только пик-неделя).
+        const _prepDate = isoAddDays(isoToday(), offset);
+        const _inPrepWindow = bbPrepPlan ? prepPhaseForDate(bbPrepPlan, _prepDate) !== null : false;
+        const _peakTargets = bbPrepPlan && _inPrepWindow
+          ? nutritionTargetsForPrepDate(_prepDate, bbPrepPlan, {
               kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
               proteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
               fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
               carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
               waterMl: 3000,
               sodiumMg: 3500,
-            }, bbPrepConfig)
-          : null;
+            })
+          : bbPrepConfig
+            ? computePeakWeekNutritionTargets(_prepDate, {
+                kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
+                proteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
+                fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
+                carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
+                waterMl: 3000,
+                sodiumMg: 3500,
+              }, bbPrepConfig)
+            : null;
         if (_peakTargets?.phase) _peakNote = _peakTargets.note;
+        else if (bbPrepPlan && _peakTargets?.note) _peakNote = _peakTargets.note;
+        const _applyPrepTargets = !!(_peakTargets && (_peakTargets.phase || _inPrepWindow));
         const input: MealPlanInput = {
           weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,
           // D-22: nutrMult already folded into effective* above — do NOT multiply again.
           // D-22: nutrMult folded into effective* above. Адаптация по дневнику: компенсация
           // вчерашнего отклонения применяется только к «сегодня» (offset === dayIdx).
-          goalKcal: _peakTargets?.phase ? _peakTargets.kcal : Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-          goalProteinG: _peakTargets?.phase ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
-          goalFatG: _peakTargets?.phase ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
-          goalCarbsG: _peakTargets?.phase ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
+          goalKcal: _applyPrepTargets ? _peakTargets.kcal : Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
+          goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
+          goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
+          goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
           mealsCount, isTrainingDay: isTrainDay(offset),
           trainStartMin: linkToTraining && isTrainDay(offset) ? toMin(trainStart) : undefined,
           allowIntraWorkout: trainIntensity === 'high',
