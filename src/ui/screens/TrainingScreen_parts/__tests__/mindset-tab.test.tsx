@@ -272,6 +272,54 @@ describe('Напоминание о психо-чек-ине в блоке «С�
   });
 });
 
+describe('Разминка в блоке «Сегодня»', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+  const mkWorkoutToday = (): WorkoutLog => ({
+    id: 'w_today2', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody',
+    exercises: [{ id: `${today}_squat`, date: today, exerciseId: 'squat', exerciseName: 'Присед', isCompound: true, weekNumber: 1, sets: [{ weight: 100, reps: 5, rir: 2, rpe: 7 }], totalVolume: 500, estimated1RM: 115 } as any],
+  });
+
+  const baseProps = {
+    diary: {} as any,
+    diaryStats: [],
+    diaryProgress: [],
+    historyWorkouts: [mkWorkoutToday()],
+    macrocycle: null,
+    selectedWeek: 1,
+    level: 'intermediate',
+    onRefresh: () => {},
+    trainingOutput: null,
+    goal: 'bulk',
+    daysPerWeek: 4,
+    splitType: 'auto',
+    periodizationType: 'auto',
+    mesoLength: 12,
+    tprofile: { weakPoints: [], bodyWeight: 80, onCourse: false, courseIntensity: 1, goal: 'bulk', level: 'intermediate' },
+    linked: { profile: { settings: { personal: { height: 175 } } } },
+  };
+
+  it('тренировка сегодня без разминки → напоминание + кнопки', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).toContain('Разминка сегодня не отмечена');
+    expect(html).toContain('✓ Разминка выполнена');
+    expect(html).toContain('К разминке');
+  });
+
+  it('разминка отмечена → напоминания нет, кольцо 100%', () => {
+    upsertWarmupLog({ date: today, done: true, quality: 4 });
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).not.toContain('Разминка сегодня не отмечена');
+    expect(html).toContain('Разминка');
+  });
+
+  it('без тренировки сегодня → напоминания о разминке нет', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" historyWorkouts={[] as any} />);
+    expect(html).not.toContain('Разминка сегодня не отмечена');
+  });
+});
+
 describe('MobilityTab (SSR-смок)', () => {
   beforeEach(() => localStorage.clear());
 

@@ -26,6 +26,7 @@ import { loadTrainingProfile } from './training-profile';
 import { addWeakToWeekLogic, calcW as calcWLogic, firstFreeTrainingDay, resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex } from './program-editor-logic';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { findSubstitutions } from '../../../engines/exercise-substitution.engine';
+import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
@@ -664,27 +665,23 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
            >{expandedBlock === bi ? '▲ Детали' : '▼ Детали'}</button>
           </div>
           
-          {/* Авто-разминка для compound с заданным весом */}
+          {/* Авто-разминка для compound с заданным весом — единый канон warmup-ramp.engine */}
           {b.type === 'compound' && b.sets[0]?.weight && b.sets[0].weight > 0 && (() => {
             const w = b.sets[0].weight;
-            const warmup = [
-              { pct: 0.5, reps: 8, label: 'разминка' },
-              { pct: 0.7, reps: 5, label: 'подход' },
-              { pct: 0.85, reps: 3, label: 'подход' },
-            ];
+            const warmup = activeRampRows(w);
             return (
               <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '4px 0', borderTop: '1px dashed rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>🔥 Разминка:</span>
                 {warmup.map((wu, i) => (
                   <span key={i} style={{ fontSize: 10, color: DIM }}>
-                    {Math.round(w * wu.pct / 2.5) * 2.5}кг×{wu.reps}
+                    {wu.bar ? `гриф ${wu.load}кг×${wu.reps}` : `${wu.load}кг×${wu.reps}`}
                     {i < warmup.length - 1 ? ' → ' : ''}
                   </span>
                 ))}
                 <button
                   style={{ marginLeft: 4, fontSize: 11, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                   onClick={() => {
-                    const warmupSets = warmup.map(wu => ({ load: Math.round(w * wu.pct / 2.5) * 2.5, reps: wu.reps }));
+                    const warmupSets = warmup.map(wu => ({ load: wu.load, reps: wu.reps }));
                     updateBlock(bi, { warmupSets });
                   }}
                 >сохранить</button>

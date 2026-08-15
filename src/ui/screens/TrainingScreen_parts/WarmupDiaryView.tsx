@@ -8,7 +8,7 @@
  *
  * Отображение-онли: вкладка НЕ влияет на планирование/авторегуляцию.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ACCENT, DIM, diaryCard } from './diary-tokens';
 import { MiniLineChart } from './DiaryChart';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
@@ -34,6 +34,41 @@ export const WarmupDiaryView: React.FC = () => {
     log.slice(-30).forEach(e => { if (e.skippedReason) counts[e.skippedReason] = (counts[e.skippedReason] || 0) + 1; });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [log]);
+
+  // ── Печатный отчёт ──
+  const printReport = useCallback(() => {
+    const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const rows = [...log].reverse().slice(0, 60).map(e => `
+      <tr>
+        <td>${esc(e.date)}</td><td>${e.done ? 'да' : 'нет'}</td>
+        <td>${e.quality === null ? '—' : e.quality}</td>
+        <td>${e.doneItems === undefined || e.totalItems === undefined ? '—' : `${e.doneItems}/${e.totalItems}`}</td>
+        <td>${esc(e.skippedReason || '')}</td>
+        <td>${esc(e.note || '')}</td>
+      </tr>`).join('');
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Разминка — отчёт</title>
+      <style>body{font-family:system-ui;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:11px}
+      th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}th{background:#f5f5f5}h1{font-size:18px}h2{font-size:14px;margin-top:20px}
+      .stats{display:flex;gap:20px;font-size:13px;margin:8px 0;flex-wrap:wrap}</style></head><body>
+      <h1>🔥 Разминка — отчёт</h1>
+      <div style="color:#555;font-size:12px">Сформировано: ${new Date().toLocaleString('ru-RU')}</div>
+      <div class="stats">
+        <span>Записей (30д): <b>${adherence.total}</b></span>
+        <span>Приверженность: <b>${adherence.total > 0 ? adherence.pct + '%' : '—'}</b></span>
+        <span>Выполнено дней: <b>${adherence.done}</b></span>
+        <span>Ср. качество: <b>${quality.count > 0 ? quality.avg.toFixed(1) + '/5' : '—'}</b></span>
+      </div>
+      ${skipCounts.length > 0 ? `<h2>Причины пропуска</h2><ul>${skipCounts.map(([r, n]) => `<li>${esc(r)} — ${n}×</li>`).join('')}</ul>` : ''}
+      <h2>Инсайты</h2>
+      <ul>${insights.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+      <h2>Записи (последние 60)</h2>
+      <table><thead><tr><th>Дата</th><th>Выполнено</th><th>Качество</th><th>Пункты</th><th>Причина</th><th>Заметка</th></tr></thead><tbody>${rows}</tbody></table>
+      <script>window.print();</script></body></html>`;
+    try {
+      const win = window.open('', '_blank', 'width=900,height=700');
+      if (win) { win.document.write(html); win.document.close(); }
+    } catch { /* SSR/блокировка — игнор */ }
+  }, [log, adherence, quality, insights, skipCounts]);
 
   const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
 
@@ -154,6 +189,7 @@ export const WarmupDiaryView: React.FC = () => {
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
+        <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={printReport} aria-label="Печать отчёта разминки">🖨 Отчёт</button>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2, border: '1px solid rgba(249,115,22,0.3)', color: WARMUP_COLOR }} aria-label="Скачать CSV дневника разминки"
           onClick={() => {
             try {

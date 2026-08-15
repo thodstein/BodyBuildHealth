@@ -61,6 +61,7 @@ import { MobilityTab } from './MobilityTab';
 import { WarmupDiaryView } from './WarmupDiaryView';
 import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins, detectDayType } from '../../../engines/mindset-protocol.engine';
 import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
+import { loadWarmupLog, upsertWarmupLog, warmupLogForDate } from '../../../engines/warmup.engine';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -494,7 +495,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     </div>
                   </div>
                   {(() => {
-                    // Прогресс-кольца: тренировка (есть план), психо-протокол, рутина мобильности
+                    // Прогресс-кольца: тренировка (есть план), психо-протокол, рутина мобильности, разминка
                     const today = new Date().toISOString().slice(0, 10);
                     const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
                     const mindProto = loadActiveProtocol();
@@ -505,10 +506,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
                     const mindPct = mindItems.length > 0 ? Math.round(mindItems.filter(i => mindDone.includes(i.id)).length / mindItems.length * 100) : null;
                     const mobPct = mobDaily.length > 0 ? Math.round(mobDaily.filter(i => mobDone.includes(i.id)).length / mobDaily.length * 100) : null;
+                    const warmToday = warmupLogForDate(today);
+                    const warmPct = warmToday ? (warmToday.done ? 100 : 0) : (trainedToday ? 0 : null);
                     const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
                       { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: () => {} },
                       { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => setMode('mindset') },
                       { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => setMode('mobility') },
+                      { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => setMode('warmup') },
                     ];
                     const hasAny = rings.some(r => r.pct !== null);
                     if (!hasAny) return null;
@@ -615,6 +619,30 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         </button>
                         <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           К рутине →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  // Разминка: сегодня была тренировка, но разминка не отмечена
+                  const today = new Date().toISOString().slice(0, 10);
+                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
+                  if (!trainedToday) return null;
+                  if (warmupLogForDate(today)) return null;
+                  const markWarmupDone = () => {
+                    upsertWarmupLog({ date: today, done: true, quality: 4 });
+                    forceHub(h => h + 1);
+                  };
+                  return (
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span>🔥 Разминка сегодня не отмечена</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={markWarmupDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          ✓ Разминка выполнена
+                        </button>
+                        <button onClick={() => setMode('warmup')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          К разминке →
                         </button>
                       </div>
                     </div>

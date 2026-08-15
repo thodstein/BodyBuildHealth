@@ -852,7 +852,12 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
               const done = Object.values(warmupDone).filter(Boolean).length;
               const pct = total > 0 ? Math.round(done / total * 100) : 0;
-              return <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>{done}/{total} · {pct}%</span>;
+              const totalSec = warmupBlocks.reduce((s, b) => s + (b.durationSec || 0), 0);
+              return (
+                <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>
+                  {done}/{total} · {pct}%{totalSec > 0 ? ` · ~${Math.round(totalSec / 60 * 10) / 10} мин` : ''}
+                </span>
+              );
             })()}
           </div>
           {(() => {
