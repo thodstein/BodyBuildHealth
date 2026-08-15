@@ -7,7 +7,6 @@ import { selectProgressionRule } from '../../../engines/progression.engine';
 import { RIR_MATRIX, generateWeeklyPlan } from '../../../engines/rir-matrix.engine';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress, type ProgressionAlert } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../../core/types';
-import { generateWarmup } from '../../../engines/warmup.engine';
 import { generateCooldown } from '../../../engines/cooldown.engine';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
@@ -23,7 +22,7 @@ import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { getStrengthLevel, getNextLevelTarget } from '../../../engines/performance-analytics.engine';
 import { computeStructuredAnalytics } from '../../../engines/structured-analytics.engine';
 import {
-  WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
+  GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
   type TrainingTab, type TrainingPage,
 } from './shared';

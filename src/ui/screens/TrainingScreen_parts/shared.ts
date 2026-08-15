@@ -1,13 +1,7 @@
 /** shared.ts — общие константы/типы TrainingScreen (вынесено из монолита).
  * Чистая версия: только то, что реально используется. 5-зонная навигация — в nav.ts. */
-export const WARMUP_LABELS: Record<string, string> = {
-  jumping_jack: 'Прыжки Jumping Jack', arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
-  hip_circle: 'Круги тазом', ankle_mobility: 'Мобилизация голеностопа', shoulder_circle: 'Круги плечами',
-  thoracic_rotation: 'Ротация грудного отдела', cat_camel: 'Кошка-корова', worlds_greatest: 'Глубокий выпад с ротацией',
-  banded_clam: 'Ракушка с резинкой', external_rotation: 'Внешняя ротация плеча', bird_dog: 'Bird-dog',
-  dead_bug: 'Dead bug', light_cardio: 'Лёгкое кардио', squat: 'Присед',
-  deep_breathing: 'Глубокое дыхание', box_breathing: 'Квадратное дыхание',
-};
+/** Единый словарь разминки — канон warmup.engine (был расходящийся дубль). */
+export { WARMUP_LABELS } from '../../../engines/warmup.engine';
 
 export const GOALS = [
   { value: 'bulk', label: 'Масса', icon: '💪' },
@@ -51,7 +45,7 @@ export type TrainingTab =
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
-  | 'training_mix_hub' | 'mix_presets';
+  | 'training_mix_hub' | 'mix_presets' | 'warmup';
 export type TrainingPage = 'hero' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
@@ -88,6 +82,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   mmc_tracking: '🔄 MMC/Пампинг/Суставы',
   mindset: '🧠 Психология',
   mobility: '🧘 Мобильность',
+  warmup: '🔥 Разминка',
   checkin: '📋 Чек-ин метрик',
   strength: '💪 Аналитика силы',
   bb_tools: '💪 ББ-инструменты',

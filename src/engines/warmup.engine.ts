@@ -22,17 +22,26 @@ export const WARMUP_LABELS: Record<string, string> = {
   thoracic_rotation: 'Ротация грудного отдела',
   cat_camel: 'Кошка-корова',
   worlds_greatest: 'Растяжка «Величайшая в мире»',
-  banded_clam: 'Боковой подъём колена с лентой',
+  banded_clam: 'Ракушка с резинкой',
   external_rotation: 'Наружная ротация плеч (лента)',
   bird_dog: 'Птица-собака (Bird dog)',
   dead_bug: 'Мёртвый жук (Dead bug)',
   side_lying_abduction: 'Отведение ноги лёжа на боку',
   wall_slide: 'Скольжение по стене (Wall slide)',
+  squat: 'Разминочные подходы — присед',
+  bench: 'Разминочные подходы — жим',
+  bench_press: 'Разминочные подходы — жим',
+  deadlift: 'Разминочные подходы — тяга',
 };
 
 /** Русское название упражнения с fallback на id. */
 export function warmupLabel(exerciseId: string): string {
   return WARMUP_LABELS[exerciseId] || exerciseId;
+}
+
+/** Подпись разминочного подхода конкретного упражнения (специальная часть). */
+export function warmupSpecificLabel(exerciseId: string): string {
+  return WARMUP_LABELS[exerciseId] || `Разминочные подходы — ${exerciseId}`;
 }
 
 export function generateWarmup(input: WarmupInput): WarmupBlock[] {

@@ -10,7 +10,7 @@ import {
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
   compareWithPrevious, getCachedProgressForExercise,
 } from '../../../engines/workout-logger.engine';
-import { generateWarmup, upsertWarmupLog, type WarmupInput } from '../../../engines/warmup.engine';
+import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, type WarmupInput } from '../../../engines/warmup.engine';
 import { generateCooldown, type CooldownInput } from '../../../engines/cooldown.engine';
 import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
@@ -41,17 +41,6 @@ import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
     }
   `;
 
-const WARMUP_LABELS: Record<string, string> = {
-  light_cardio: 'Лёгкое кардио (ходьба/вело)', jumping_jack: 'Прыжки ноги вместе-врозь',
-  arm_circles: 'Круги руками', leg_swings: 'Махи ногами',
-  hip_circle: 'Круги тазом', ankle_mobility: 'Мобильность голеностопа',
-  shoulder_circle: 'Круги плечами', thoracic_rotation: 'Грудная ротация',
-  cat_camel: 'Кошка-верблюд', worlds_greatest: 'Растяжка мирового уровня',
-  banded_clam: 'Ракушка с резиной', external_rotation: 'Наружная ротация плеча',
-  bird_dog: 'Птица-собака', dead_bug: 'Мёртвый жук',
-  squat: 'Разминочные подходы — присед', bench: 'Разминочные подходы — жим',
-  deadlift: 'Разминочные подходы — тяга',
-};
 const COOLDOWN_LABELS: Record<string, string> = {
   deep_breathing: 'Глубокое дыхание (диафрагмальное)', box_breathing: 'Квадратное дыхание (4-4-4-4)',
   chest_stretch: 'Растяжка груди', shoulder_stretch: 'Растяжка плеч',
@@ -60,7 +49,6 @@ const COOLDOWN_LABELS: Record<string, string> = {
   child_pose: 'Поза ребёнка', cat_camel: 'Кошка-верблюд',
   nerve_flossing: 'Нейро-мобилизация',
 };
-function wLabel(exId: string) { return WARMUP_LABELS[exId] || exId; }
 function cLabel(exId: string) { return COOLDOWN_LABELS[exId] || exId; }
 
 function formatPlates(targetW: number): string {
@@ -890,7 +878,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   return (
                     <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)} />
-                      {wLabel(ex.exerciseId)}
+                      {'intensityPct' in ex && ex.intensityPct ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}
                       {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
                     </li>
                   );

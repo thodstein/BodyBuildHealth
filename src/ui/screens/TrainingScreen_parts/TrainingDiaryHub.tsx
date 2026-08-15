@@ -58,6 +58,7 @@ import { BBRecommendationsTab } from './BBRecommendationsTab';
 import { MyTrainingTab } from './MyTrainingTab';
 import { MindsetTab } from './MindsetTab';
 import { MobilityTab } from './MobilityTab';
+import { WarmupDiaryView } from './WarmupDiaryView';
 import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins, detectDayType } from '../../../engines/mindset-protocol.engine';
 import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
@@ -102,7 +103,7 @@ const RecordModeSelector: React.FC<{
 const style = diaryStyles;
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'mytraining';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -122,7 +123,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'competition' | 'recommendations' | 'mytraining';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'competition' | 'recommendations' | 'mytraining';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
@@ -720,6 +721,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'mmc' && <MMCTrackingCard />}
       {mode === 'mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
       {mode === 'mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
+      {mode === 'warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView /></InfoErrorBoundary>}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
       {mode === 'tools' && <DiaryToolsView hub={hub} />}

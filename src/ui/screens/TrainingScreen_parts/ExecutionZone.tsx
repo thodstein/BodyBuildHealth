@@ -12,6 +12,7 @@ import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
 import { getCachedProgressForExercise } from '../../../engines/workout-logger.engine';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
+import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import type { TrainingTab } from './shared';
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
@@ -429,21 +430,25 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       </div>
                     )}
 
-                    {/* Warmup ramp-up (first set only) */}
-                    {log.sets.length === 0 && ex.weight && (
-                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 10 }}>
-                        <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, color: 'var(--text-dim)' }}>
-                          {[{ pct: 20, reps: 10 }, { pct: 40, reps: 5 }, { pct: 60, reps: 3 }, { pct: 75, reps: 1 }].map(wu => (
-                            <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
-                              <div style={{ color: '#ff9100', fontWeight: 600 }}>~{Math.round((ex.weight || 80) * wu.pct / 100)}кг</div>
-                              <div style={{ fontSize: 10 }}>{wu.reps} повт</div>
-                              <div style={{ fontSize: 10 }}>{wu.pct}%</div>
-                            </div>
-                          ))}
+                    {/* Warmup ramp-up (first set only) — единый канон warmup-ramp.engine */}
+                    {log.sets.length === 0 && ex.weight && (() => {
+                      const rows = activeRampRows(Number(ex.weight));
+                      if (rows.length === 0) return null;
+                      return (
+                        <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 10 }}>
+                          <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 5)}, 1fr)`, gap: 2, color: 'var(--text-dim)' }}>
+                            {rows.map(wu => (
+                              <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
+                                <div style={{ color: '#ff9100', fontWeight: 600 }}>{wu.bar ? 'гриф' : `~${wu.load}кг`}</div>
+                                <div style={{ fontSize: 10 }}>{wu.reps} повт</div>
+                                <div style={{ fontSize: 10 }}>{wu.bar ? '—' : `${Math.round(wu.pct * 100)}%`}</div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Progress bar */}
                     <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 4, height: 6, marginBottom: 8, overflow: 'hidden' }}>

@@ -23,6 +23,7 @@ import { TrainingCalendarTab } from '../TrainingCalendarTab';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
 import { saveAssessment } from '../../../../engines/mobility-assessment.engine';
 import { loadWarmupLog, upsertWarmupLog, WARMUP_DIARY_KEY } from '../../../../engines/warmup.engine';
+import { WarmupDiaryView } from '../WarmupDiaryView';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -764,6 +765,28 @@ describe('Визуальные улучшения (степпер, кольца,
     const all = cats!.flatMap(c => c.tabs);
     expect(all).toContain('mindset');
     expect(all).toContain('mobility');
+    expect(all).toContain('warmup');
+  });
+
+  it('tabToHubMode маппит вкладку warmup', () => {
+    expect(tabToHubMode('warmup')).toBe('warmup');
+  });
+
+  it('WarmupDiaryView (SSR): рендерит сводку, инсайты и пустое состояние', () => {
+    const html = renderToStaticMarkup(<WarmupDiaryView />);
+    expect(html).toContain('🔥 Разминка');
+    expect(html).toContain('Сводка · 30 дней');
+    expect(html).toContain('Пока нет записей');
+    expect(html).toContain('Персональные инсайты');
+  });
+
+  it('WarmupDiaryView (SSR): с записями показывает приверженность и причины', () => {
+    upsertWarmupLog({ date: new Date().toISOString().slice(0, 10), done: true, quality: 4 });
+    upsertWarmupLog({ date: new Date().toISOString().slice(0, 10), done: false, quality: null, skippedReason: 'устал' });
+    const html = renderToStaticMarkup(<WarmupDiaryView />);
+    expect(html).toContain('Приверженность');
+    expect(html).toContain('устал · 1×');
+    expect(html).toContain('CSV');
   });
 
   it('TrainingCalendarTab (CSR) показывает бейджи чек-инов на ячейках', async () => {

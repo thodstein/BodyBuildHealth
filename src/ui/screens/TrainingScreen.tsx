@@ -47,7 +47,7 @@ import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
 
 import {
-  WARMUP_LABELS, GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
+  GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
   type TrainingTab, type TrainingPage,
   type PlanningTrack, getPlanningTrack, setPlanningTrack,
@@ -216,8 +216,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       setZone('diary'); setPage('tabs'); setTab(initialSubTab as TrainingTab);
     }
   }, [initialSubTab]);
-  const [showWarmup, setShowWarmup] = useState(false);
-  const [showCooldown, setShowCooldown] = useState(false);
   const [runtimeSetW, setRuntimeSetW] = useState(80);
   const [runtimeSetR, setRuntimeSetR] = useState(8);
   const [runtimeSetRP, setRuntimeSetRP] = useState(7);

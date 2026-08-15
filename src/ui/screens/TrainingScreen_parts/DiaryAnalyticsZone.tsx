@@ -13,7 +13,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'mytraining';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -34,7 +34,7 @@ interface Props {
 }
 
 /** Map old external tabs and legacy mode names to hub modes */
-export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'mytraining' {
+export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'mytraining' {
   // Legacy initialDiaryMode values
   if (initialDiaryMode === 'reports') return 'tools';
   if (initialDiaryMode === 'diary') return 'record';
@@ -47,6 +47,7 @@ export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'reco
     case 'mmc_tracking': return 'mmc';
     case 'mindset': return 'mindset';
     case 'mobility': return 'mobility';
+    case 'warmup': return 'warmup';
     case 'mytraining': return 'mytraining';
     case 'reports':
     case 'import_data': return 'tools';
