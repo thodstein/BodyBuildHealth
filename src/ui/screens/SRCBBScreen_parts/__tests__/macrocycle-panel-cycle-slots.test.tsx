@@ -13,7 +13,7 @@
 import React from 'react';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MacrocyclePanel, buildMacroSummary, buildMacroPrintHtml, buildMacroIcs, profilePeakDefaults, diaryMacroStats, macroWeekForDate, ACWR_ZONE_LABEL, saveMacroScenario, loadMacroScenarios, removeMacroScenario, compareMacroScenarios, scenarioSummary } from '../MacrocyclePanel';
+import { MacrocyclePanel, buildMacroSummary, buildMacroPrintHtml, buildMacroIcs, profilePeakDefaults, diaryMacroStats, macroWeekForDate, ACWR_ZONE_LABEL, saveMacroScenario, loadMacroScenarios, removeMacroScenario, compareMacroScenarios, scenarioSummary, prepCheckInStats } from '../MacrocyclePanel';
 import { deserializeMacro, buildBbMacrocycle, serializeBbMacro, buildMacrocycle } from '../../../../engines/lms/macrocycle.engine';
 
 vi.mock('../../../../core/profile-manager', () => ({
@@ -549,5 +549,54 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     expect(phaseOf(newBlocks[1])).toBe(firstPhase);
     // Недели пересчитаны: первый блок начинается с недели 1
     expect((newBlocks[0] as HTMLElement).getAttribute('aria-label')).toContain('недели 1-');
+  });
+
+  it('D15: prepCheckInStats — динамика веса, изменения за 7/14 дней, прогресс к цели', () => {
+    const day = 86400000;
+    const now = new Date().toISOString();
+    const iso = (offsetDays: number) => new Date(Date.now() - offsetDays * day).toISOString().slice(0, 10);
+    const log = [
+      { date: iso(21), weight: 80 },
+      { date: iso(13), weight: 79.2 },
+      { date: iso(10), weight: 78.6 },
+      { date: iso(3), weight: 78.0 },
+      { date: iso(0), weight: 77.5 },
+    ];
+    const stats = prepCheckInStats(log, iso(21), 75);
+    expect(stats.last).toEqual({ date: iso(0), weight: 77.5 });
+    expect(stats.change7).toBe(-0.5);   // 78.0 → 77.5
+    expect(stats.change14).toBe(-1.7);  // 79.2 → 77.5
+    expect(stats.inPrepCount).toBe(5);
+    expect(stats.target).toBe(75);
+    expect(stats.progressPct).toBe(50); // (80-77.5)/(80-75) = 50%
+  });
+
+  it('D15: prepCheckInStats — пустой дневник/без цели', () => {
+    expect(prepCheckInStats([], undefined, null)).toMatchObject({ last: null, change7: null, target: null });
+    const stats = prepCheckInStats([{ date: '2026-08-01', weight: 80 }], undefined, undefined);
+    expect(stats.last?.weight).toBe(80);
+    expect(stats.target).toBeNull();
+    expect(stats.progressPct).toBeNull();
+  });
+
+  it('D15: чек-ин prep отображается в prep-блоке с данными дневника', () => {
+    localStorage.setItem('he_weight_log', JSON.stringify([
+      { date: '2026-08-01', weight: 80 },
+      { date: '2026-08-05', weight: 79 },
+      { date: '2026-08-08', weight: 78 },
+    ]));
+    const macro = buildBbMacrocycle({
+      level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy',
+      competitions: [{ id: 'c1', name: 'Шоу', week: 10, priority: 'A' }],
+    });
+    localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
+    render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
+
+    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const prepBlock = Array.from(timeline!.querySelectorAll('[role="button"]'))
+      .find(b => (b.getAttribute('aria-label') || '').startsWith('Подготовка'));
+    fireEvent.click(prepBlock!);
+    expect(screen.getByText(/⚖️ Чек-ин prep/)).toBeTruthy();
+    expect(screen.getByText(/78 кг/)).toBeTruthy();
   });
 });

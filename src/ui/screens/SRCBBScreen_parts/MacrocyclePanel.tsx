@@ -26,6 +26,7 @@ import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draf
 import { createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
+import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines/pro/training-load.engine';
 
@@ -63,8 +64,7 @@ export function profilePeakDefaults(): { weight: number; category: string; sex: 
   } catch { return { weight: 80, category: 'mens_physique', sex: 'male' }; }
 }
 
-export interface MacroScenario {
-  id: string;
+export interface MacroScenario {  id: string;
   label: string;
   ts: number;
   data: Macrocycle | BBMacrocycle;
@@ -149,6 +149,53 @@ export function macroWeekForDate(isoDate: string, reference?: Date | string): nu
     ? Math.floor(diffDays / 7) + 1
     : 1 + Math.floor(-diffDays / 7);
   return Math.max(1, week);
+}
+
+export interface PrepCheckInStats {
+  last: { date: string; weight: number } | null;
+  change7: number | null;    // кг: последний вес минус самый ранний за последние 7 дней
+  change14: number | null;   // кг: за 14 дней
+  inPrepCount: number;       // записей с начала prep (prepStartIso)
+  inPrepStart: { date: string; weight: number } | null;
+  target: number | null;
+  progressPct: number | null; // (start − last) / (start − target) × 100
+}
+
+/** Чек-ин prep (D15): динамика веса из дневника к целевому весу. Чистая функция. */
+export function prepCheckInStats(
+  log: WeightEntry[],
+  prepStartIso?: string,
+  target?: number | null,
+  reference?: Date | string,
+): PrepCheckInStats {
+  const entries = log
+    .filter(e => Number.isFinite(e.weight))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (entries.length === 0) return { last: null, change7: null, change14: null, inPrepCount: 0, inPrepStart: null, target: target ?? null, progressPct: null };
+  const last = entries[entries.length - 1];
+  const now = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
+  const dayMs = 86400000;
+  const earliestIn = (windowDays: number): { date: string; weight: number } | null => {
+    const inWindow = entries.filter(e => now - new Date(e.date).getTime() <= windowDays * dayMs);
+    return inWindow.length > 0 ? inWindow[0] : null;
+  };
+  const e7 = earliestIn(7);
+  const e14 = earliestIn(14);
+  const prepEntries = prepStartIso ? entries.filter(e => e.date >= prepStartIso) : [];
+  const inPrepStart = prepEntries.length > 0 ? prepEntries[0] : null;
+  let progressPct: number | null = null;
+  if (inPrepStart && target != null && target > 0 && inPrepStart.weight !== target) {
+    progressPct = Math.max(0, Math.min(100, Math.round(((inPrepStart.weight - last.weight) / (inPrepStart.weight - target)) * 100)));
+  }
+  return {
+    last: { date: last.date, weight: last.weight },
+    change7: e7 ? Math.round((last.weight - e7.weight) * 10) / 10 : null,
+    change14: e14 ? Math.round((last.weight - e14.weight) * 10) / 10 : null,
+    inPrepCount: prepEntries.length,
+    inPrepStart,
+    target: target ?? null,
+    progressPct,
+  };
 }
 
 /** Статистика дневника (sRPE) для макроцикла: сессии, ACWR, последняя неделя. */
@@ -1464,6 +1511,43 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                             {res && res.warnings.length > 0 && <div style={{ marginTop: 4, color: '#f59e0b' }}>⚠ {res.warnings[0]}</div>}
                             <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.4)' }}>Протокол на {pk.weight} кг · {pk.category} — при сборке цикла применяется автоматически (галочка в попапе).</div>
                           </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {/* ⚖️ Чек-ин prep (D15): динамика веса из дневника к целевому */}
+                  {activeBlock.phase === 'contest_prep' && (() => {
+                    const prepStartIso = formatMacroDate(macroWeekStartDate(activeBlock.weekOffset)).split('.').reverse().join('-');
+                    const targetW = (() => {
+                      try { const s = getProfile()?.settings as any; const w = Number(s?.goals?.targetWeight); return Number.isFinite(w) && w > 30 ? w : null; } catch { return null; }
+                    })();
+                    const ci = prepCheckInStats(getWeightLog(), prepStartIso, targetW);
+                    if (!ci.last) {
+                      return (
+                        <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(34,197,94,0.04)', border: '1px dashed rgba(34,197,94,0.25)', fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                          ⚖️ <b style={{ color: '#22c55e' }}>Чек-ин prep</b>: записывайте вес в «📓 Дневники → Вес» — динамика и прогресс к цели появятся здесь.
+                        </div>
+                      );
+                    }
+                    const delta7 = ci.change7 != null ? `${ci.change7 > 0 ? '+' : ''}${ci.change7} кг/7д` : null;
+                    const delta14 = ci.change14 != null ? `${ci.change14 > 0 ? '+' : ''}${ci.change14} кг/14д` : null;
+                    return (
+                      <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.2)', fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }} className="macrocycle-prep-checkin">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                          <span><b style={{ color: '#22c55e' }}>⚖️ Чек-ин prep:</b> {ci.last.weight} кг ({ci.last.date})</span>
+                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>{ci.inPrepCount > 0 ? `замеров в prep: ${ci.inPrepCount}` : ''}</span>
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.55)' }}>
+                          {[delta7, delta14].filter(Boolean).join(' · ') || 'нет замеров за 14 дней'}
+                          {ci.target != null && ` · цель ${ci.target} кг`}
+                        </div>
+                        {ci.target != null && ci.progressPct != null && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                              <div style={{ width: `${ci.progressPct}%`, height: '100%', background: 'linear-gradient(90deg,#22c55e,#00e68a)', borderRadius: 3 }} />
+                            </div>
+                            <span style={{ fontSize: 9, color: '#22c55e', fontWeight: 700 }}>{ci.progressPct}%</span>
+                          </div>
                         )}
                       </div>
                     );

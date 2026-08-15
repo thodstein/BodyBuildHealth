@@ -144,6 +144,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
   // Библиотека внутри редактора
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | 'macro' | null>(null);
+  // ⭐ Избранные программы (he_program_fav)
+  const [progFavs, setProgFavs] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_program_fav') || '[]'); } catch { return []; }
+  });
+  const [progFavOnly, setProgFavOnly] = useState(false);
+  useEffect(() => {
+    try { localStorage.setItem('he_program_fav', JSON.stringify(progFavs)); } catch { /* ignore */ }
+  }, [progFavs]);
+  const toggleProgFav = (id: string) => setProgFavs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   // State для MacrocyclePanel (редактируемые level/goal макроцикла)
   const [macroLevel, setMacroLevel] = useState<string>(program.meta.level);
   const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
@@ -1040,15 +1049,31 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         <TrainingModal title={`📚 ${editorLibOpen === 'bb' ? 'Библиотека программ' : 'Проф. ПЛ-циклы'}`} onClose={() => setEditorLibOpen(null)}>
             {editorLibOpen === 'bb' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>
-                {libraryPrograms.map(pr => (
-                  <button key={pr.id ?? pr.name} onClick={() => {
-                    loadIntoEditor(cloneFromLibrary(pr));
-                  }}
-                    style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', color: DIM_STRONG, cursor: 'pointer', fontSize: 11 }}>
-                    <div style={{ fontWeight: 700 }}>{pr.name}</div>
-                    <div style={{ fontSize: 11, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д/нед · {pr.durationWeeks}нед</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button type="button" onClick={() => setProgFavOnly(v => !v)} style={{
+                    padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                    background: progFavOnly ? 'var(--accent)' : 'var(--bg-secondary)', color: progFavOnly ? '#000' : 'var(--text-dim)', border: 'none',
+                  }}>
+                    ⭐ Избранное ({progFavs.length})
                   </button>
-                ))}
+                  <span style={{ fontSize: 10, color: DIM }}>{progFavOnly ? 'Показаны избранные программы' : `${libraryPrograms.length} программ`}</span>
+                </div>
+                {libraryPrograms.filter(pr => !progFavOnly || progFavs.includes(String(pr.id ?? pr.name))).map(pr => {
+                  const favId = String(pr.id ?? pr.name);
+                  const isFav = progFavs.includes(favId);
+                  return (
+                    <div key={favId} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <button onClick={() => { loadIntoEditor(cloneFromLibrary(pr)); }}
+                        style={{ flex: 1, textAlign: 'left', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', color: DIM_STRONG, cursor: 'pointer', fontSize: 11 }}>
+                        <div style={{ fontWeight: 700 }}>{pr.name}</div>
+                        <div style={{ fontSize: 11, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д/нед · {pr.durationWeeks}нед</div>
+                      </button>
+                      <button aria-label={isFav ? `Убрать из избранного ${pr.name}` : `В избранное ${pr.name}`} onClick={() => toggleProgFav(favId)}
+                        style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, filter: isFav ? 'none' : 'grayscale(1)', opacity: isFav ? 1 : 0.4 }}
+                        title={isFav ? 'Убрать из избранного' : 'В избранное'}>⭐</button>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {editorLibOpen === 'pl' && (
