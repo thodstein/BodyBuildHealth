@@ -88,6 +88,10 @@ export interface CardioCycleInput {
    *  используются эти доли вместо авто-процентов. taper/peak/contest_prep
    *  по-прежнему определяются соревнованиями. */
   phaseSplit?: { base?: number; build?: number; maintenance?: number };
+  /** Длина taper-окна перед стартом (1-4, по умолчанию 2). */
+  taperWeeks?: number;
+  /** Строить пик-неделю старта (по умолчанию true; false → неделя старта лёгкая taper). */
+  peakWeek?: boolean;
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
@@ -108,9 +112,9 @@ export interface CardioPreset {
 }
 
 export const CARDIO_PRESETS: CardioPreset[] = [
-  { id: 'health-8', name: 'Здоровье · 8 нед', desc: 'Аэробная база для ССС, 3 дня', icon: '💚', goal: 'health', totalWeeks: 8, daysAvailable: 3, recoveryLow: false },
+  { id: 'health-8', name: 'Здоровье · 8 нед', desc: 'Zone 2 3-4 дня, аэробная база', icon: '💚', goal: 'health', totalWeeks: 8, daysAvailable: 4, recoveryLow: false },
   { id: 'cut-16', name: 'Сушка · 16 нед', desc: 'Прогрессия Zone 2 + HIIT, делоды', icon: '🔥', goal: 'cut', totalWeeks: 16, daysAvailable: 5, recoveryLow: false },
-  { id: 'base-12', name: 'База · 12 нед', desc: 'Zone 2 3×, наращивание объёма', icon: '🌱', goal: 'health', totalWeeks: 12, daysAvailable: 3, recoveryLow: false },
+  { id: 'base-12', name: 'База · 12 нед', desc: 'Zone 2 3-4×, наращивание объёма', icon: '🌱', goal: 'health', totalWeeks: 12, daysAvailable: 4, recoveryLow: false },
   { id: 'mass-12', name: 'Масса · 12 нед', desc: 'Только восстановление 1-2×', icon: '🏗', goal: 'mass', totalWeeks: 12, daysAvailable: 2, recoveryLow: false },
   { id: 'recovery-4', name: 'Восстановление · 4 нед', desc: 'Лёгкий кровоток после тяжёлого блока', icon: '💤', goal: 'recovery', totalWeeks: 4, daysAvailable: 3, recoveryLow: true },
 ];
@@ -239,15 +243,23 @@ export function buildCardioPlan(input: CardioInput): CardioPlan {
 /**
  * Определить фазу недели: ramp base → build → maintenance,
  * taper/peak у соревнования, transition на последней неделе (без соревнований).
- * При заданном phaseSplit используется ручное распределение недель.
+ * При заданном phaseSplit используется ручное распределение недель;
+ * taperWeeks задаёт длину taper-окна (1-4), peakWeek — строить ли пик-неделю старта.
  */
-export function cardioPhaseForWeek(week: number, totalWeeks: number, competitions?: CardioCompetitionRef[], phaseSplit?: { base?: number; build?: number; maintenance?: number }): CardioPhase {
+export function cardioPhaseForWeek(
+  week: number,
+  totalWeeks: number,
+  competitions?: CardioCompetitionRef[],
+  phaseSplit?: { base?: number; build?: number; maintenance?: number },
+  taperWeeks = 2,
+  peakWeek = true,
+): CardioPhase {
   const comp = competitions?.find(c => c.week === week);
-  if (comp) return 'peak';
-  const beforeComp = competitions?.find(c => c.week === week + 1 || c.week === week + 2);
+  if (comp) return peakWeek ? 'peak' : 'taper';
+  const beforeComp = competitions?.find(c => c.week > week && c.week - week <= taperWeeks);
   if (beforeComp && week <= beforeComp.week) return 'taper';
   const upcoming = competitions?.find(c => c.week > week);
-  if (upcoming) return week >= upcoming.week - 2 ? 'taper' : 'contest_prep';
+  if (upcoming) return week >= upcoming.week - taperWeeks ? 'taper' : 'contest_prep';
   if (week === totalWeeks) return 'transition';
   if (phaseSplit && (phaseSplit.base || phaseSplit.build || phaseSplit.maintenance)) {
     const baseEnd = Math.max(0, Math.round(phaseSplit.base ?? 0));
@@ -314,9 +326,9 @@ function profileForGoal(goal: CardioGoal): RampProfile {
     case 'health':
     default:
       return {
-        base: [{ type: 'zone2', dur: 25, freq: 3, purpose: 'База для здоровья ССС' }],
-        build: [{ type: 'zone2', dur: 35, freq: 3, purpose: 'Наращивание аэробной выносливости' }],
-        maintenance: [{ type: 'zone2', dur: 40, freq: 3, purpose: 'Поддержание кардиореспираторного здоровья' }],
+        base: [{ type: 'zone2', dur: 25, freq: 3, purpose: 'База для здоровья ССС (3×)' }],
+        build: [{ type: 'zone2', dur: 30, freq: 4, purpose: 'Наращивание аэробной выносливости (4×)' }],
+        maintenance: [{ type: 'zone2', dur: 40, freq: 4, purpose: 'Поддержание кардиореспираторного здоровья (4×)' }],
         deloadMult: 0.6,
         taperMult: 0.6,
       };
@@ -362,6 +374,8 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const daysAvailable = clamp(Math.round(input.daysAvailable ?? 7), 0, 7);
   const recoveryLow = !!input.recoveryLow;
   const competitions = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= totalWeeks);
+  const taperWeeks = clamp(Math.round(input.taperWeeks ?? 2), 1, 4);
+  const peakWeek = input.peakWeek !== false;
   const phaseSplit = input.phaseSplit
     ? {
         base: input.phaseSplit.base != null ? clamp(Math.round(input.phaseSplit.base), 0, Math.max(0, totalWeeks - 2)) : 0,
@@ -375,7 +389,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   let totalMinutes = 0;
 
   for (let w = 1; w <= totalWeeks; w++) {
-    const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit);
+    const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit, taperWeeks, peakWeek);
     const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition';
     let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow);
     if (deload) {
@@ -408,7 +422,9 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   };
   cycle.rationale.push(`Цель: ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()}, ${totalWeeks} нед, ${daysAvailable} дн/нед.`);
   if (recoveryLow) cycle.rationale.push('Низкое восстановление: HIIT исключён.');
-  if (competitions.length > 0) cycle.rationale.push(`Соревнования: ${competitions.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper и пик-неделя построены.`);
+  if (competitions.length > 0) {
+    cycle.rationale.push(`Соревнования: ${competitions.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}.`);
+  }
   return cycle;
 }
 

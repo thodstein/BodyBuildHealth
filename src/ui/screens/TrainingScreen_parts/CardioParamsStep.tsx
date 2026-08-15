@@ -33,7 +33,7 @@ const GOAL_CARD_ACTIVE: React.CSSProperties = {
 };
 
 const GOAL_DESC: Record<CardioGoal, string> = {
-  health: '2-3× Zone 2, аэробная база для здоровья ССС',
+  health: '3-4× Zone 2, аэробная база для здоровья ССС',
   mass: 'Минимум кардио — только восстановление, не мешает росту',
   cut: 'Прогрессия Zone 2 2×30 → 3×45 + HIIT, делоды каждые 4 нед',
   recomp: 'Умеренное Zone 2 2×25-30, здоровье без вреда для набора',
@@ -55,12 +55,16 @@ export const CardioParamsStep: React.FC<{
   phaseSplit: PhaseSplitState;
   setPhaseSplit: (s: PhaseSplitState) => void;
   comps: CardioCompetitionRef[];
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps }) => {
+  bodyWeight: number;
+  setBodyWeight: (n: number) => void;
+  taperWeeks: number;
+  peakWeek: boolean;
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
     for (const c of comps) {
-      if (c.week < 3) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper не влезает (нужно ≥3).`);
+      if (c.week < taperWeeks + 1) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper (${taperWeeks} нед) не влезает.`);
     }
     try {
       const cycle = buildCardioCycle({
@@ -68,13 +72,16 @@ export const CardioParamsStep: React.FC<{
         totalWeeks,
         daysAvailable,
         recoveryLow,
+        bodyWeight,
         competitions: comps,
+        taperWeeks,
+        peakWeek,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         source: 'auto',
       });
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -124,6 +131,11 @@ export const CardioParamsStep: React.FC<{
           <button style={BTN} onClick={() => setDaysAvailable(Math.max(0, daysAvailable - 1))} aria-label="Меньше дней">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{daysAvailable}</span>
           <button style={BTN} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>
+          <span style={{ ...LABEL, marginLeft: 12 }}>Вес (кг)</span>
+          <input type="number" value={bodyWeight} onChange={e => setBodyWeight(Math.max(30, Math.min(300, Number(e.target.value) || 80)))} inputMode="numeric" style={{ width: 70, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Вес" />
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Вес влияет на оценку расхода калорий кардио-сессий.
         </div>
       </div>
 

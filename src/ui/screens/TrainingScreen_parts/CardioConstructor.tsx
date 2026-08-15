@@ -78,7 +78,10 @@ export const CardioConstructor: React.FC = () => {
   const [totalWeeks, setTotalWeeks] = useState(12);
   const [daysAvailable, setDaysAvailable] = useState(5);
   const [recoveryLow, setRecoveryLow] = useState(false);
+  const [bodyWeight, setBodyWeight] = useState(80);
   const [phaseSplit, setPhaseSplit] = useState<PhaseSplitState>({ auto: true, base: 0, build: 0, maintenance: 0 });
+  const [taperWeeks, setTaperWeeks] = useState(2);
+  const [peakWeek, setPeakWeek] = useState(true);
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -125,7 +128,10 @@ export const CardioConstructor: React.FC = () => {
       totalWeeks,
       daysAvailable,
       recoveryLow,
+      bodyWeight,
       competitions: comps,
+      taperWeeks,
+      peakWeek,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     });
     saveCardioCycle(c);
@@ -259,10 +265,13 @@ export const CardioConstructor: React.FC = () => {
           recoveryLow={recoveryLow} setRecoveryLow={setRecoveryLow}
           phaseSplit={phaseSplit} setPhaseSplit={setPhaseSplit}
           comps={comps}
+          bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
+          taperWeeks={taperWeeks} peakWeek={peakWeek}
         />
       )}
       {step === 'comps' && (
-        <CardioCompsStep comps={comps} setComps={setComps} draft={compDraft} setDraft={setCompDraft} totalWeeks={totalWeeks} />
+        <CardioCompsStep comps={comps} setComps={setComps} draft={compDraft} setDraft={setCompDraft} totalWeeks={totalWeeks}
+          taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} peakWeek={peakWeek} setPeakWeek={setPeakWeek} />
       )}
       {step === 'preview' && (
         <>

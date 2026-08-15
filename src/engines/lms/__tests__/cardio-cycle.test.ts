@@ -464,3 +464,58 @@ describe('CARDIO_PRESETS — быстрые старты', () => {
     expect(c.weeks.some(w => w.deload)).toBe(true);
   });
 });
+
+// ─── Здоровье: 3-4 кардио-сессии в неделю ───
+
+describe('health — 3-4 кардио-сессии в неделю', () => {
+  it('база: 3 сессии, наращивание/поддержание: 4 сессии zone2', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 12, daysAvailable: 7 });
+    const freq = (w: number) => c.weeks[w - 1].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    expect(freq(1)).toBeGreaterThanOrEqual(3);
+    expect(freq(6)).toBeGreaterThanOrEqual(3);
+    expect(freq(6)).toBeLessThanOrEqual(4);
+    expect(freq(10)).toBe(4);
+  });
+
+  it('при daysAvailable=3 частота обрезается до 3 (не больше лимита)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 12, daysAvailable: 3 });
+    for (const w of c.weeks) {
+      const freq = w.sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+      expect(freq).toBeLessThanOrEqual(3);
+    }
+  });
+});
+
+// ─── Taper-окно и пик-неделя ───
+
+describe('taperWeeks / peakWeek', () => {
+  it('taperWeeks=1: только 1 неделя taper перед стартом', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, competitions: [{ id: 'c', name: 'Шоу', week: 6 }], taperWeeks: 1 });
+    expect(c.weeks[5].phase).toBe('peak');
+    expect(c.weeks[4].phase).toBe('taper');
+    expect(c.weeks[3].phase).toBe('contest_prep');
+  });
+
+  it('taperWeeks=3: 3 недели taper', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, competitions: [{ id: 'c', name: 'Шоу', week: 8 }], taperWeeks: 3 });
+    expect(c.weeks[7].phase).toBe('peak');
+    expect(c.weeks[6].phase).toBe('taper');
+    expect(c.weeks[5].phase).toBe('taper');
+    expect(c.weeks[4].phase).toBe('taper');
+  });
+
+  it('peakWeek=false: неделя старта — лёгкая taper, без пика', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, competitions: [{ id: 'c', name: 'Шоу', week: 6 }], peakWeek: false });
+    expect(c.weeks[5].phase).toBe('taper');
+    expect(c.weeks.some(w => w.phase === 'peak')).toBe(false);
+    expect(c.weeks[5].sessions.every(s => s.type !== 'hiit')).toBe(true);
+  });
+
+  it('кардиоPhaseForWeek: taperWeeks/peakWeek параметры', () => {
+    const comps = [{ id: 'c', name: 'x', week: 10 }];
+    expect(cardioPhaseForWeek(8, 12, comps, undefined, 1)).toBe('contest_prep');
+    expect(cardioPhaseForWeek(9, 12, comps, undefined, 1)).toBe('taper');
+    expect(cardioPhaseForWeek(9, 12, comps, undefined, 2)).toBe('taper');
+    expect(cardioPhaseForWeek(10, 12, comps, undefined, 2, false)).toBe('taper');
+  });
+});

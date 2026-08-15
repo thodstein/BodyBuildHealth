@@ -59,6 +59,18 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByRole('button', { name: /Собрать и сохранить цикл/ })).toBeTruthy();
   });
 
+  it('шаг «Старты»: конструирование taper (недель + пик-неделя) влияет на сборку', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Недель taper/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Больше taper/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Пик-неделя: вкл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const saved = loadCardioCycles()[0];
+    expect(saved.weeks.some(w => w.phase === 'peak')).toBe(false);
+  });
+
   it('сборка на предпросмотре сохраняет цикл в библиотеку и показывает метрики', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
