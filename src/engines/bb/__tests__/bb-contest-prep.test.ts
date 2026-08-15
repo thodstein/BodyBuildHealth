@@ -200,19 +200,24 @@ describe('validateBBContestPrepConfig', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('buildTrainingTaper', () => {
-  it('берёт кривую BB-протокола Библиотеки, усечённую до weeksOut', () => {
+  it('каноническая BB-кривая (Этап 4): объём ↓, интенсивность сохраняется, RIR 2-4', () => {
     const t = buildTrainingTaper(baseConfig({ weeksOut: 3, trainingProtocol: 'bb' }));
     expect(t).toHaveLength(3);
     expect(t.map(x => x.weekOffset)).toEqual([-3, -2, -1]);
-    // BB-протокол: 0.90 → 0.85 → 0.80 → 0.70; weeksOut 3 → последние 3: 0.85, 0.80, 0.70
-    expect(t.map(x => x.volumePct)).toEqual([0.85, 0.8, 0.7]);
-    expect(t[2].label).toBe('Шоу');
+    // Каноническая BB-кривая: 0.90 → 0.85 → 0.70 → 0.60; weeksOut 3 → последние 3: 0.85, 0.70, 0.60
+    expect(t.map(x => x.volumePct)).toEqual([0.85, 0.7, 0.6]);
+    // Интенсивность сохраняется (не падает до 50-70%), RIR 2-4 (никакого авто-RIR 0)
+    expect(t[0].intensityPct).toBe(0.95);
+    expect(t[2].rirMin).toBeGreaterThanOrEqual(2);
+    expect(t[2].label).toBe('Финал');
   });
 
-  it('weeksOut 4 — полная кривая BB (4 недели)', () => {
+  it('weeksOut 4 — полная каноническая BB-кривая (4 недели)', () => {
     const t = buildTrainingTaper(baseConfig({ weeksOut: 4, trainingProtocol: 'bb' }));
     expect(t).toHaveLength(4);
-    expect(t.map(x => x.volumePct)).toEqual([0.9, 0.85, 0.8, 0.7]);
+    expect(t.map(x => x.volumePct)).toEqual([0.9, 0.85, 0.7, 0.6]);
+    expect(t.map(x => x.intensityPct)).toEqual([0.95, 0.95, 0.9, 0.85]);
+    expect(t.every(x => x.rirMin >= 2)).toBe(true);
   });
 
   it('classic-протокол — суперкомпенсация (перегрузка → реализация)', () => {
@@ -501,15 +506,17 @@ describe('applyTrainingTaperToBBPlan', () => {
     expect(setsOf(w7)).toBeLessThan(setsOf(w6));
   });
 
-  it('интенсивность (вес) масштабируется по intensityPct протокола', () => {
+  it('интенсивность (вес) масштабируется по intensityPct канонической кривой', () => {
     const plan = makePlan(8);
     const cfg = baseConfig({ weeksOut: 3, trainingProtocol: 'bb' });
     const out = applyTrainingTaperToBBPlan(plan, cfg) as BBPlanWithPrep;
     const w6 = out.weeks[5];
     const ex = w6.sessions[0].exercises[0];
     const origWeight = plan.weeks[5].sessions[0].exercises[0].workSets[0].weight;
-    // BB week2 (первая из усечённых 3): intensityPct 0.85
-    expect(ex.workSets[0].weight).toBe(Math.round(origWeight * 0.85 * 10) / 10);
+    // Каноническая BB-кривая: первая из усечённых 3 (Taper-2) — intensityPct 0.95 (интенсивность сохраняется)
+    expect(ex.workSets[0].weight).toBe(Math.round(origWeight * 0.95 * 10) / 10);
+    // RIR в тапере ≥ 2 (никакого автоматического RIR 0)
+    expect(ex.rir).toBeGreaterThanOrEqual(2);
   });
 
   it('финальная неделя — пик-неделя (памп, метка peakWeek)', () => {

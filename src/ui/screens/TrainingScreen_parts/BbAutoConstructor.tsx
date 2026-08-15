@@ -66,7 +66,11 @@ import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBP
 import {
   buildBBContestPrep, applyPeakWeekOverlayToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile,
   isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, CONTEST_SPECIALIZATION_LABELS,
+  buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
+  shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
+  prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
+  type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
@@ -80,7 +84,9 @@ import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
-type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'annual';
+import { getProfile, updateProfile } from '../../../core/profile-manager';
+
+type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 type PlanMode = 'generic_split' | 'bb_cycle';
 
@@ -309,6 +315,143 @@ export const BbAutoConstructor: React.FC = () => {
   // PRO: peak week — единая система тапера ББ (bb-contest-prep.engine)
   const [showPeakWeek, setShowPeakWeek] = useState(false);
   const [peakPrep, setPeakPrep] = useState<BBContestPrepResult | null>(null);
+  // 🏁 Contest Prep (Этап 8): опциональный полный цикл подготовки
+  const [prepPlan, setPrepPlan] = useState<BBContestPrepPlan | null>(null);
+  const [prepApplied, setPrepApplied] = useState(false);
+  const [prepShowDate, setPrepShowDate] = useState<string>(() => {
+    try {
+      const prof = (linked.profile?.settings ?? {}) as any;
+      const stored = prof?.goals?.bbPeakConfig ? deserializeBBPrepConfig(prof.goals.bbPeakConfig) : null;
+      if (stored?.showDate) return stored.showDate;
+      if (prof?.goals?.peakShowDay) return String(prof.goals.peakShowDay);
+    } catch { /* ignore */ }
+    return isoAddDays(isoToday(), 8 * 7);
+  });
+  const [prepWeeks, setPrepWeeks] = useState<number>(12);
+  const [prepTaperWeeks, setPrepTaperWeeks] = useState<number>(2);
+  const [prepWaterMode, setPrepWaterMode] = useState<PrepWaterMode>('stable');
+  const [prepSodiumMode, setPrepSodiumMode] = useState<PrepSodiumMode>('stable');
+  const [prepCarbMode, setPrepCarbMode] = useState<PrepCarbMode>('moderate');
+  const [prepConfirmedManip, setPrepConfirmedManip] = useState(false);
+  const [prepBusy, setPrepBusy] = useState(false);
+  const prepContra = useMemo(() => {
+    try {
+      const health = (linked.profile?.settings as any)?.health as { chronicConditions?: string[]; contraindications?: Record<string, boolean> } | undefined;
+      const out: string[] = [...(health?.chronicConditions ?? [])];
+      const ci = health?.contraindications ?? {};
+      if (ci.diabetes) out.push('diabetes');
+      if (ci.kidneyDisease) out.push('kidney');
+      if (ci.cvd) out.push('heart');
+      return out;
+    } catch { return []; }
+  }, [linked.profile?.settings]);
+  const [prepContraExtra, setPrepContraExtra] = useState<string[]>([]);
+  const allPrepContra = useMemo(() => Array.from(new Set([...prepContra, ...prepContraExtra])), [prepContra, prepContraExtra]);
+
+  const buildContestPrepConfig = (): BBContestPrepConfig => {
+    const prof = (linked.profile?.settings ?? {}) as any;
+    const catProfile = CATEGORY_PROFILES[peakWeekCategory] ?? CATEGORY_PROFILES.mens_physique;
+    const sex: 'male' | 'female' = catProfile.sex;
+    const base: BBContestPrepConfig = {
+      sex,
+      category: peakWeekCategory,
+      weightKg: Math.max(40, Math.min(200, Number(prof?.personal?.weight) || 80)),
+      bodyFatPct: Number(prof?.personal?.bodyFat) > 0 ? Number(prof?.personal?.bodyFat) : undefined,
+      experienceLevel: 'intermediate',
+      enhanced: peds.length > 0,
+      prepCount: 0,
+      showDate: prepShowDate,
+      weeksOut: Math.min(4, Math.max(1, prepTaperWeeks)),
+      trainingProtocol: 'bb',
+      carbLoadStrategy: prepCarbMode === 'high' ? 'front' : prepCarbMode === 'conservative' ? 'back' : 'moderate',
+      waterStrategy: prepWaterMode === 'moderate' ? 'moderate' : 'minimal',
+      sodiumStrategy: prepSodiumMode === 'moderate' ? 'cut_2d' : 'constant',
+      confirmedManipulation: prepConfirmedManip || undefined,
+      contraindications: allPrepContra.length > 0 ? allPrepContra : undefined,
+      specialization: peakSpec === 'none' ? undefined : peakSpec,
+      schedule: { wake: '07:00', stage: '12:00' },
+    };
+    return base;
+  };
+
+  /** Собрать единый prep-план, применить к текущему плану и сохранить в профиль. */
+  const assembleContestPrep = (applyToPlan: boolean) => {
+    if (!builtPlan) { flash('Сначала соберите план тренировок'); return; }
+    setPrepBusy(true);
+    try {
+      const cfg = buildContestPrepConfig();
+      const plan = buildBBContestPrepPlan(cfg, {
+        prepWeeks: Math.min(52, Math.max(1, prepWeeks)),
+        taperWeeks: Math.min(4, Math.max(1, prepTaperWeeks)),
+        source: 'bb_auto',
+      });
+      setPrepPlan(plan);
+      if (applyToPlan) {
+        const updated = applyContestPrepToBBPlan(builtPlan, cfg, {
+          prepWeeks: plan.preparation.weeks,
+          taperWeeks: plan.taper.weeks,
+        });
+        setBuiltPlan(updated);
+        setPrepApplied(true);
+      }
+      savePrepToProfile(plan, cfg);
+      flash('🏁 Contest prep собран' + (applyToPlan ? ' и применён к плану' : ''));
+    } catch (e) {
+      flash(`Не удалось собрать contest prep: ${(e as Error).message}`);
+    } finally {
+      setPrepBusy(false);
+    }
+  };
+
+  const savePrepToProfile = (plan: BBContestPrepPlan, cfg: BBContestPrepConfig) => {
+    try {
+      const cur = getProfile();
+      const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
+      if (!next.goals) next.goals = {};
+      next.goals.bbContestPrepPlan = JSON.stringify(plan);
+      next.goals.bbPeakConfig = JSON.stringify(cfg);
+      next.goals.peakWeek = true;
+      next.goals.peakShowDay = cfg.showDate;
+      updateProfile({ settings: next });
+    } catch { /* silent */ }
+  };
+
+  /** Перенос даты шоу с пересчётом фаз (завершённые недели — с предупреждением). */
+  const handleShiftPrepShowDate = (d: string) => {
+    if (!prepPlan) { setPrepShowDate(d); return; }
+    const { plan, changedFrozen, warnings } = shiftBBContestPrepShowDate(prepPlan, d);
+    setPrepPlan(plan);
+    setPrepShowDate(d);
+    if (changedFrozen) flash(warnings[0] ?? 'Завершённые недели требуют подтверждения');
+    else if (warnings.length) flash(warnings[0]);
+    if (builtPlan && prepApplied) {
+      const updated = applyContestPrepToBBPlan(builtPlan, buildContestPrepConfig(), {
+        prepWeeks: plan.preparation.weeks,
+        taperWeeks: plan.taper.weeks,
+      });
+      setBuiltPlan(updated);
+    }
+  };
+
+  /** Расширить только подготовительный блок (+/- недели). */
+  const handleExtendPrep = (delta: number) => {
+    if (!prepPlan) return;
+    const newWeeks = Math.min(52, Math.max(1, prepPlan.preparation.weeks + delta));
+    if (newWeeks === prepPlan.preparation.weeks) return;
+    setPrepWeeks(newWeeks);
+    const replanned = replanBBContestPrep(prepPlan, prepPlan.showDate, newWeeks);
+    setPrepPlan(replanned);
+    if (builtPlan && prepApplied) {
+      let base: BBPlanWithPrep = builtPlan as BBPlanWithPrep;
+      if (delta > 0) base = extendBBPlanPreparation(base, delta);
+      const updated = applyContestPrepToBBPlan(base, buildContestPrepConfig(), {
+        prepWeeks: newWeeks,
+        taperWeeks: replanned.taper.weeks,
+      });
+      setBuiltPlan(updated);
+    }
+    flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
+  };
   // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
   const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
   // ⭐ Специализация (упор мышцы к старту) — из профильного конфига, с override в UI.
@@ -1219,12 +1362,12 @@ export const BbAutoConstructor: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','annual'] : ['params','ped','split','plan','quality','adjust','annual'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', annual:'🗓 Годовой план' };
+  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual'] : ['params','ped','split','plan','quality','adjust','contest','annual'];
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план' };
   const renderStepNav = () => (
     <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
       {stepList.map(s => {
-        return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust') && !builtPlan) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
+        return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
       })}
     </div>
   );
@@ -3095,6 +3238,7 @@ export const BbAutoConstructor: React.FC = () => {
              <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
               <button disabled={!!builtPlan.validation && !builtPlan.validation.valid} style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
               <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#f472b6', color:'#f472b6' }} onClick={() => setStep('contest')}>🏁 Contest prep</button>
              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
              <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
            </div>
@@ -3283,6 +3427,223 @@ export const BbAutoConstructor: React.FC = () => {
     );
   };
 
+  // ── 🏁 Contest prep (опциональный шаг 7) ──
+  const renderContestPrep = () => {
+    const today = isoToday();
+    const phaseNow = prepPlan ? prepPhaseForDate(prepPlan, today) : null;
+    const strategySafe = !prepWaterMode || !prepSodiumMode; // всегда true — для читаемости
+    void strategySafe;
+    return (
+      <div>
+        <div style={H}>🏁 Contest Prep — подготовка к соревнованию</div>
+        <div style={SMALL}>
+          Опциональный цикл: <b>подготовка → taper → peak week → show day</b>. План тренировок строится как
+          обычный; этот шаг накладывает фазы поверх него (копию) и генерирует дневные цели питания.
+          Можно пропустить — план останется обычным.
+        </div>
+
+        {/* Параметры */}
+        <div style={{ ...CARD, marginTop:10 }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#ec4899', marginBottom:8 }}>📅 Параметры подготовки</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>📆 Дата шоу</div>
+              <input type="date" value={prepShowDate} onChange={e => handleShiftPrepShowDate(e.target.value)} style={{ ...IN, width:'100%' }} />
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>🎭 Категория</div>
+              <select value={peakWeekCategory} onChange={e => setPeakWeekCategory(e.target.value as BBContestCategory)} style={{ ...IN, width:'100%' }}>
+                {(Object.keys(CATEGORY_PROFILES) as BBContestCategory[]).map(c => (
+                  <option key={c} value={c}>{CONTEST_CATEGORY_LABELS[c]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>⭐ Специализация</div>
+              <select value={peakSpec} onChange={e => setPeakSpec(e.target.value as ContestSpecialization)} style={{ ...IN, width:'100%' }}>
+                {(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => (
+                  <option key={s} value={s}>{CONTEST_SPECIALIZATION_LABELS[s]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>Противопоказания (из профиля + ручные)</div>
+              <input
+                value={prepContraExtra.join(', ')}
+                onChange={e => setPrepContraExtra(e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder={prepContra.length ? prepContra.join(', ') : 'kidney, heart, hypertension, diabetes…'}
+                style={{ ...IN, width:'100%' }}
+              />
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
+            <span style={{ ...SMALL }}>Недели подготовки:</span>
+            <button style={BTN_GHOST} onClick={() => handleExtendPrep(-1)}>−</button>
+            <b style={{ fontSize:15, color:'#fff', minWidth:28, textAlign:'center' }}>{prepPlan ? prepPlan.preparation.weeks : prepWeeks}</b>
+            <button style={BTN_GHOST} onClick={() => handleExtendPrep(1)}>+</button>
+            <span style={{ ...SMALL, marginLeft:10 }}>Недели taper (1-4):</span>
+            <button style={BTN_GHOST} onClick={() => setPrepTaperWeeks(w => Math.max(1, w - 1))}>−</button>
+            <b style={{ fontSize:15, color:'#fff', minWidth:24, textAlign:'center' }}>{prepTaperWeeks}</b>
+            <button style={BTN_GHOST} onClick={() => setPrepTaperWeeks(w => Math.min(4, w + 1))}>+</button>
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>💧 Вода (по умолчанию стабильна)</div>
+              <div style={{ display:'flex', gap:6 }}>
+                {(['stable', 'moderate'] as PrepWaterMode[]).map(m => (
+                  <button key={m} onClick={() => setPrepWaterMode(m)} style={{ ...BTN_GHOST, background: prepWaterMode === m ? 'rgba(59,130,246,0.2)' : 'transparent', borderColor: prepWaterMode === m ? '#3b82f6' : undefined, color: prepWaterMode === m ? '#60a5fa' : undefined }}>
+                    {m === 'stable' ? 'Стабильная' : 'Умеренная'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>🧂 Натрий (по умолчанию стабилен)</div>
+              <div style={{ display:'flex', gap:6 }}>
+                {(['stable', 'moderate'] as PrepSodiumMode[]).map(m => (
+                  <button key={m} onClick={() => setPrepSodiumMode(m)} style={{ ...BTN_GHOST, background: prepSodiumMode === m ? 'rgba(245,158,11,0.2)' : 'transparent', borderColor: prepSodiumMode === m ? '#f59e0b' : undefined, color: prepSodiumMode === m ? '#fbbf24' : undefined }}>
+                    {m === 'stable' ? 'Стабильный' : 'Умеренный'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>🍚 Карб-загрузка</div>
+              <div style={{ display:'flex', gap:6 }}>
+                {(['conservative', 'moderate', 'high'] as PrepCarbMode[]).map(m => (
+                  <button key={m} onClick={() => setPrepCarbMode(m)} style={{ ...BTN_GHOST, background: prepCarbMode === m ? 'rgba(34,197,94,0.2)' : 'transparent', borderColor: prepCarbMode === m ? '#22c55e' : undefined, color: prepCarbMode === m ? '#4ade80' : undefined }}>
+                    {m === 'conservative' ? 'Консервативная' : m === 'moderate' ? 'Умеренная' : 'Высокая'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {(prepWaterMode === 'moderate' || prepSodiumMode === 'moderate') && (
+            <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:8, fontSize:11, color:'#fbbf24', background:'rgba(245,158,11,0.08)', padding:10, borderRadius:8 }}>
+              <input type="checkbox" checked={prepConfirmedManip} onChange={e => setPrepConfirmedManip(e.target.checked)} />
+              <span>⚠ Я понимаю: умеренная модуляция воды/натрия допустима только при стабильном здоровье, без противопоказаний; диуретики не назначаются; при симптомах нарушения электролитов — план остановить. Подтверждаю выбор.</span>
+            </label>
+          )}
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            <button
+              style={{ ...BTN, flex:1, background: 'linear-gradient(135deg,#ec4899,#db2777)', color:'#fff' }}
+              disabled={prepBusy || !builtPlan}
+              onClick={() => assembleContestPrep(true)}
+            >
+              {prepBusy ? 'Собираю…' : prepApplied ? '🔄 Пересобрать и применить' : '🏁 Собрать contest prep и применить'}
+            </button>
+            <button style={BTN_GHOST} onClick={() => assembleContestPrep(false)} disabled={prepBusy || !builtPlan}>💾 Только сохранить настройки</button>
+            <button style={BTN_GHOST} onClick={() => setStep('adjust')}>Пропустить →</button>
+          </div>
+          {!builtPlan && <div style={{ fontSize:11, color:'#ef4444', marginTop:6 }}>Сначала соберите план тренировок (шаги 1-4).</div>}
+        </div>
+
+        {/* Результат */}
+        {prepPlan && (
+          <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.2)' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:4 }}>
+              🏁 Contest prep · шоу {prepPlan.showDate} · {CONTEST_CATEGORY_LABELS[prepPlan.category]}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>
+              {prepPlan.preparation.weeks} нед подготовки (финал {prepPlan.preparation.finalWeeks}) · taper {prepPlan.taper.weeks} нед · пик-неделя 7 дн · темп {prepPlan.preparation.targetRatePctPerWeek}%/нед · {prepPlan.preparation.currentCalories} ккал · {prepPlan.preparation.stepsPerDay} шагов
+            </div>
+            {phaseNow && (
+              <div style={{ fontSize:11, fontWeight:700, color:PREP_PHASE_COLORS[phaseNow.key], marginBottom:8 }}>
+                📍 Сейчас: {PREP_PHASE_LABELS[phaseNow.key]} ({phaseNow.dateStart} — {phaseNow.dateEnd})
+              </div>
+            )}
+
+            {/* Фазы календарём */}
+            <div style={{ overflowX:'auto', marginBottom:10 }}>
+              <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse', minWidth:520 }}>
+                <thead>
+                  <tr style={{ color:'rgba(255,255,255,0.5)', textAlign:'left' }}>
+                    <th style={{ padding:'4px 6px' }}>Фаза</th>
+                    <th style={{ padding:'4px 6px' }}>Недели</th>
+                    <th style={{ padding:'4px 6px' }}>Даты</th>
+                    <th style={{ padding:'4px 6px' }}>Задача</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prepPlan.phases.map(p => (
+                    <tr key={p.key} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding:'4px 6px', fontWeight:700, color:PREP_PHASE_COLORS[p.key] }}>
+                        {p.weekStart === p.weekEnd && p.key === 'show_day' ? '🎬' : ''} {p.label}
+                      </td>
+                      <td style={{ padding:'4px 6px' }}>
+                        {p.key === 'show_day' ? 'день шоу' : p.key === 'post_show' ? 'после шоу' : `${p.weekStart}–${p.weekEnd}`}
+                      </td>
+                      <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.6)' }}>{p.dateStart} — {p.dateEnd}</td>
+                      <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.6)' }}>{p.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Taper-кривая */}
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>📉 Кривая taper (объём ↓, интенсивность сохраняется, RIR 2–4)</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
+              {prepPlan.taper.volumeProfile.map((v, i) => (
+                <div key={i} style={{ padding:'6px 10px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', fontSize:10 }}>
+                  <div style={{ color:'rgba(255,255,255,0.5)' }}>Нед {prepPlan.taper.weeks - i}</div>
+                  <div style={{ color:'#fbbf24', fontWeight:700 }}>объём {Math.round(v * 100)}%</div>
+                  <div style={{ color:'#60a5fa' }}>вес {Math.round(prepPlan.taper.intensityProfile[i] * 100)}%</div>
+                  <div style={{ color:'#4ade80' }}>RIR {prepPlan.taper.rirProfile[i]?.[0]}–{prepPlan.taper.rirProfile[i]?.[1]}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Безопасность */}
+            {prepPlan.safety.warnings.length > 0 && (
+              <div style={{ marginBottom:10 }}>
+                {prepPlan.safety.warnings.map((w, i) => (
+                  <div key={i} style={{ fontSize:10, color: w.startsWith('⛔') ? '#ef4444' : '#f87171', marginTop:2 }}>{w}</div>
+                ))}
+              </div>
+            )}
+            {prepPlan.safety.requiresReview && (
+              <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>
+                🩺 Требуется профессиональное сопровождение (противопоказания: {prepPlan.safety.contraindications.join(', ')}). Агрессивные режимы отключены.
+              </div>
+            )}
+
+            {/* Дневные цели питания на сегодня */}
+            <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>🍽 Питание на сегодня</div>
+            {(() => {
+              const w = prepPlan.preparation.startingWeightKg;
+              const base = {
+                kcal: prepPlan.preparation.currentCalories,
+                proteinG: Math.round(w * 2.2),
+                fatG: Math.max(30, Math.round(w * (prepPlan.sex === 'female' ? 0.8 : 0.6))),
+                carbsG: 0,
+                waterMl: 3000,
+                sodiumMg: 2800,
+              };
+              const t = nutritionTargetsForPrepDate(today, prepPlan, base);
+              return (
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.8)', background:'rgba(34,197,94,0.06)', padding:10, borderRadius:8, border:'1px solid rgba(34,197,94,0.15)' }}>
+                  <div><b>{t.kcal} ккал</b> · Б {t.proteinG} г · У {t.carbsG} г · Ж {t.fatG} г · 💧 {(t.waterMl / 1000).toFixed(1)} л · Na {t.sodiumMg} мг {t.phaseLabel ? `· ${t.phaseLabel}` : ''}</div>
+                  {t.note && <div style={{ color:'rgba(255,255,255,0.55)', marginTop:4 }}>{t.note}</div>}
+                  <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.45)' }}>
+                    План отделён от факта: цели переносятся в «Планировщик питания» → дневник сохраняет только фактическое питание.
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}>
+              <button style={BTN_GHOST} onClick={() => handleExtendPrep(1)}>➕ Неделя подготовки</button>
+              <button style={BTN_GHOST} onClick={() => handleExtendPrep(-1)}>➖ Неделя подготовки</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => setStep('adjust')}>← К коррекции плана</button>
+              {prepApplied && <span style={{ fontSize:10, color:'#4ade80', alignSelf:'center' }}>✓ Применено к плану</span>}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ── Exercise swap modal ──
   const renderExSwapModal = () => {
     if (!exSwapModal || !builtPlan) return null;
@@ -3422,6 +3783,7 @@ export const BbAutoConstructor: React.FC = () => {
       {step === 'plan' && renderPlanWithComments()}
       {step === 'quality' && renderQuality()}
       {step === 'adjust' && renderAdjust()}
+      {step === 'contest' && renderContestPrep()}
       {renderExSwapModal()}
       {subTarget && (() => {
         const wk = builtPlan?.weeks[bbWeekSel - 1];

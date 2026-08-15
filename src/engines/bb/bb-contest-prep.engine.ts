@@ -98,6 +98,8 @@ export interface BBContestPrepConfig {
   preferLowFiberCarbs?: boolean;    // рисовые хлебцы/белый рис вместо овсянки/бобовых
   creatineStrategy?: 'continue' | 'stop';
   schedule?: { wake: string; stage: string };  // для таймлайна шоу-дня (HH:mm)
+  /** Явное подтверждение агрессивных модов (classic water / cut_* натрия). Без него — стабильные. */
+  confirmedManipulation?: boolean;
 }
 
 /** Неделя тренировочного тапера (из Библиотеки методик, усечённая до weeksOut). */
@@ -497,15 +499,30 @@ export function applyForcedModes(cfg: BBContestPrepConfig): BBContestPrepConfig 
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Тренировочный тапер (из Библиотеки методик)
+// Тренировочный тапер (canonical BB-кривая; PL/classic — из Библиотеки методик)
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Каноническая BB-кривая тапера (современный подход, Bosquet 2005 + Helms 2022):
+ * объём снижается (90% → 60%), ИНТЕНСИВНОСТЬ сохраняется (95% → 85%),
+ * RIR 2–4 (никакого автоматического RIR 0 и отказных серий),
+ * без новых упражнений и тяжёлых эксцентрических нагрузок.
+ */
+const BB_TAPER_CURVE: Array<Pick<TrainingTaperWeek, 'label' | 'volumePct' | 'intensityPct' | 'rirMin' | 'rirMax' | 'focus' | 'deloadBefore'>> = [
+  { label: 'Подводящая', volumePct: 0.90, intensityPct: 0.95, rirMin: 2, rirMax: 3, focus: 'Объём слегка снижен, рабочие веса сохраняются, без отказа', deloadBefore: true },
+  { label: 'Taper-2', volumePct: 0.85, intensityPct: 0.95, rirMin: 2, rirMax: 3, focus: 'Снижение объёма (80–90%), интенсивность сохраняется, RIR 2–3', deloadBefore: false },
+  { label: 'Taper-1', volumePct: 0.70, intensityPct: 0.90, rirMin: 2, rirMax: 4, focus: 'Объём 60–75%, вес в разумных пределах, RIR 2–4', deloadBefore: false },
+  { label: 'Финал', volumePct: 0.60, intensityPct: 0.85, rirMin: 2, rirMax: 4, focus: 'Минимум объёма, памп-акцент, без отказа', deloadBefore: false },
+];
 
 export function buildTrainingTaper(cfg: BBContestPrepConfig): TrainingTaperWeek[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
   const eff = applyForcedModes(cfg);
-  const protocol = getPeakingProtocol(eff.trainingProtocol);
-  const selected = protocol.weeks.slice(-eff.weeksOut);
+  const source = eff.trainingProtocol === 'bb'
+    ? BB_TAPER_CURVE
+    : getPeakingProtocol(eff.trainingProtocol).weeks;
+  const selected = source.slice(-eff.weeksOut);
   const n = selected.length;
   return selected.map((w, i) => ({
     weekOffset: -(n - i),
@@ -924,6 +941,10 @@ export function applyTrainingTaperToBBPlan(
   const weekAlreadyPrepped = (wk: any): boolean =>
     wk.peakWeek === true || (typeof wk.prepProtocol === 'string' && wk.prepProtocol.length > 0 && !wk.prepProtocol.startsWith('Пропущена'));
 
+  // 🦵 Ноги (и крупные мышцы с длительной крепатурой) разгружаются РАНЬШЕ:
+  // в первую неделю тапера их объём режется дополнительно.
+  const LEG_MUSCLES = ['quads', 'hamstrings', 'glutes', 'calves'];
+
   for (let i = 0; i < windowLen; i++) {
     const idx = startIdx + i;
     const wk = weeks[idx];
@@ -942,12 +963,19 @@ export function applyTrainingTaperToBBPlan(
     }
 
     const rirClamp = (r: number): number => clamp(r, t.rirMin, t.rirMax);
+    const firstTaperWeek = i === 0;
 
     for (const s of wk.sessions) {
       s.exercises = s.exercises.map((e: any) => {
         const isSpec = muscleMatchesSpecialization(e.muscle, cfg.specialization);
+        const muscleKey = String(e.muscle || '').toLowerCase();
+        const isLeg = LEG_MUSCLES.some(m => muscleKey.includes(m) || m.includes(muscleKey));
         // ⭐ Специализация: целевая мышца щадится — объём режется мягче (×1.25 к множителю).
-        const effMult = isSpec ? Math.min(1, t.volumePct * 1.25) : t.volumePct;
+        // 🦵 Ноги: в первую неделю тапера — дополнительно ×0.9 (последняя тяжёлая ног уже позади).
+        const effMult = Math.max(
+          0.4,
+          (isSpec ? Math.min(1, t.volumePct * 1.25) : t.volumePct) * (firstTaperWeek && isLeg ? 0.9 : 1),
+        );
         const newSets = Math.max(2, Math.round((e.sets || 0) * effMult));
         const source = e.workSets || [];
         const template = source[source.length - 1] || { reps: (e.repsRange?.[0] ?? 10), rir: e.rir, weight: 0 };
@@ -961,7 +989,7 @@ export function applyTrainingTaperToBBPlan(
           sets: newSets,
           rir: rirClamp(e.rir),
           workSets,
-          comment: `${e.comment || ''} 📉 Тапер: ${t.label} (объём ${Math.round(effMult * 100)}%, вес ${Math.round(t.intensityPct * 100)}%).${isSpec ? ' ⭐ Спец: объём щадится.' : ''}`,
+          comment: `${e.comment || ''} 📉 Тапер: ${t.label} (объём ${Math.round(effMult * 100)}%, вес ${Math.round(t.intensityPct * 100)}%).${isSpec ? ' ⭐ Спец: объём щадится.' : ''}${firstTaperWeek && isLeg ? ' 🦵 Ноги: разгружаются раньше.' : ''}`,
         };
       });
     }
@@ -1062,6 +1090,133 @@ export function applyPeakWeekOverlayToBBPlan(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Применение фаз contest prep к BB-плану (Этап 3: разметка недель, привязка к дате)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Фаза недели в контексте contest prep (пишется в wk.contestPhase). */
+export type BBWeekPrepPhase = 'preparation' | 'final_preparation' | 'taper' | 'peak_week';
+
+export interface ContestPrepApplyOpts {
+  prepWeeks?: number;      // недели подготовки (включая финальную), дефолт 12
+  taperWeeks?: number;     // недели тапера (1-4), дефолт cfg.weeksOut
+  weekNumber?: number;     // неделя шоу (1-index), дефолт последняя
+}
+
+/**
+ * Единое применение contest prep к BB-плану:
+ * 1) тренировочный тапер (applyTrainingTaperToBBPlan) на последние taperWeeks + пик-неделя;
+ * 2) разметка недель фазами (wk.contestPhase: preparation/final_preparation/taper/peak_week);
+ * 3) метаданные phases (BBContestPrepPlan.phases) для календаря.
+ * НЕ мутирует входной план. Идемпотентен per-week.
+ */
+export function applyContestPrepToBBPlan(
+  plan: BBPlan,
+  rawCfg: BBContestPrepConfig,
+  opts: ContestPrepApplyOpts = {},
+): BBPlanWithPrep {
+  if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
+  const v = validateBBContestPrepConfig(rawCfg);
+  if (!v.ok) return plan as BBPlanWithPrep;
+  const base = applyForcedModes(rawCfg);
+  const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
+  const taperWeeks = Math.min(4, Math.max(1, Math.round(opts.taperWeeks ?? cfg.weeksOut)));
+  const prepWeeks = Math.max(1, Math.round(opts.prepWeeks ?? 12));
+
+  const tapered = applyTrainingTaperToBBPlan(plan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber }) as BBPlanWithPrep;
+  const weeks = tapered.weeks as any[];
+  const total = weeks.length;
+  const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);
+  // 0-index: taper занимает недели [endIdx - taperWeeks, endIdx - 1], пик = endIdx.
+  const taperStart0 = Math.max(0, endIdx - taperWeeks);
+  const prepEnd0 = taperStart0 - 1;
+  const finalStart0 = Math.max(0, prepEnd0 - 1);
+
+  const byIdx = new Map<number, BBWeekPrepPhase>();
+  for (let i = 0; i < total; i++) {
+    let phase: BBWeekPrepPhase;
+    if (i === endIdx) phase = 'peak_week';
+    else if (i >= taperStart0) phase = 'taper';
+    else if (prepEnd0 >= 0 && i >= finalStart0) phase = 'final_preparation';
+    else phase = 'preparation';
+    byIdx.set(i, phase);
+  }
+
+  for (let i = 0; i < total; i++) {
+    weeks[i] = { ...weeks[i], contestPhase: byIdx.get(i) ?? 'preparation' };
+  }
+
+  // Метаданные фаз для календаря (BBContestPrepPlan.phases), сжатые до недель плана.
+  const usedPrep = Math.max(1, prepEnd0 + 1); // фактическое число недель подготовки в плане
+  const phases = computePrepPhaseRanges(usedPrep, taperWeeks, cfg.showDate, true);
+
+  const warnings: string[] = [];
+  if (total < prepWeeks + taperWeeks + 1) {
+    warnings.push(`⚠ План (${total} нед) короче подготовки ${prepWeeks}+${taperWeeks}+пик: подготовка усечена до ${usedPrep} нед. Увеличьте длительность плана для полной подготовки.`);
+  }
+
+  const result = {
+    ...tapered,
+    weeks,
+    rationale: [
+      ...(tapered.rationale || []),
+      `🗓 Contest prep: подготовка ${usedPrep} нед → taper ${taperWeeks} нед → пик-неделя (шоу ${cfg.showDate}). Без новых упражнений, без отказа, RIR 2–4.`,
+    ],
+  } as BBPlanWithPrep;
+  (result as any).contestPrep = {
+    ...(result.contestPrep ?? {}),
+    phases,
+    warnings,
+    showDate: cfg.showDate,
+  };
+  return result as BBPlanWithPrep;
+}
+
+/**
+ * Расширить ТОЛЬКО подготовительный блок плана (пик и тапер не трогаются):
+ * дублирует последнюю неделю подготовки перед началом тапера.
+ * Завершённые недели (contestPhase недели с прошлой датой) не копируются.
+ */
+export function extendBBPlanPreparation(plan: BBPlanWithPrep, addWeeks: number): BBPlanWithPrep {
+  if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
+  const add = Math.max(1, Math.round(addWeeks));
+  const weeks = plan.weeks as any[];
+  const total = weeks.length;
+  const endIdx = total - 1;
+  const meta = (plan as any).contestPrep as { phases?: PrepPhaseRange[] } | undefined;
+  const taperPhases = (meta?.phases ?? []).filter(p => p.key === 'taper' || p.key === 'peak_week');
+  const taperWeeks = taperPhases.length > 0
+    ? Math.max(1, taperPhases.filter(p => p.key === 'taper').reduce((s, p) => s + (p.weekEnd - p.weekStart + 1), 0) || 1)
+    : Math.max(1, Math.min(4, (plan as any).contestPrep?.weeksOut ?? 3));
+  const taperStart = Math.max(1, endIdx - taperWeeks);
+  const prepIdx = taperStart - 1;
+  const template = weeks[prepIdx] ?? weeks[Math.max(0, taperStart - 2)] ?? weeks[0];
+  if (!template) return plan;
+  const clone = (w: any) => ({
+    ...w,
+    week: w.week,
+    sessions: w.sessions.map((s: any) => ({
+      ...s,
+      exercises: s.exercises.map((e: any) => ({ ...e, workSets: (e.workSets || []).map((ws: any) => ({ ...ws })) })),
+    })),
+  });
+  const inserted: any[] = [];
+  for (let k = 0; k < add; k++) {
+    const c = clone(template);
+    c.contestPhase = 'preparation';
+    c.taper = false;
+    c.peakWeek = false;
+    c.prepProtocol = undefined;
+    inserted.push(c);
+  }
+  const newWeeks = [...weeks.slice(0, prepIdx), ...inserted, ...weeks.slice(prepIdx)];
+  // Перенумеровать week 1-index.
+  newWeeks.forEach((w, i) => { w.week = i + 1; });
+  const result = { ...plan, weeks: newWeeks } as BBPlanWithPrep;
+  (result as any).contestPrep = meta ?? (plan as any).contestPrep;
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Сериализация и legacy
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1094,6 +1249,7 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
     allergens: Array.isArray(c.allergens) ? c.allergens.filter((x): x is string => typeof x === 'string') : undefined,
     preferLowFiberCarbs: !!c.preferLowFiberCarbs,
     creatineStrategy: c.creatineStrategy === 'stop' ? 'stop' : c.creatineStrategy === 'continue' ? 'continue' : undefined,
+    confirmedManipulation: c.confirmedManipulation === true ? true : undefined,
     competitions: Array.isArray(c.competitions)
       ? c.competitions
           .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
@@ -1180,3 +1336,621 @@ export function legacyConfigFromProfile(
 
 // ── Ключ хранения в профиле ──
 export const BB_PREP_CONFIG_KEY = 'bbPeakConfig';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BBContestPrepPlan — единая версионированная модель contest prep
+// (Этап 2: preparation / taper / peakWeek / showDay разделены, safety, версии)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PrepPhaseKey =
+  | 'preparation' | 'final_preparation' | 'taper' | 'peak_week' | 'show_day' | 'post_show';
+
+export type PrepPlanStatus = 'draft' | 'active' | 'completed' | 'cancelled';
+
+/** Вода: стабильная (безопасно, по умолчанию) / умеренная модуляция. classic запрещён по умолчанию. */
+export type PrepWaterMode = 'stable' | 'moderate';
+/** Натрий: стабильный (по умолчанию) / умеренная модуляция. cut_* запрещён по умолчанию. */
+export type PrepSodiumMode = 'stable' | 'moderate';
+/** Карб-загрузка: консервативная / умеренная / высокая. */
+export type PrepCarbMode = 'conservative' | 'moderate' | 'high';
+/** Стратегия пик-недели: только тестированная / консервативная / умеренная / высокая. */
+export type PrepPeakStrategy = 'tested' | 'conservative' | 'moderate' | 'high';
+
+/** Диапазон недель фазы (1-index, включительно) с датами. */
+export interface PrepPhaseRange {
+  key: PrepPhaseKey;
+  label: string;
+  weekStart: number;
+  weekEnd: number;
+  dateStart: string;   // ISO yyyy-mm-dd
+  dateEnd: string;     // ISO (последний день фазы)
+  note: string;
+  color: string;
+}
+
+export interface BBContestPrepPlan {
+  id: string;
+  version: number;            // версия СХЕМЫ (миграции)
+  algorithmVersion: number;   // версия алгоритма (пересчёт результатов)
+  status: PrepPlanStatus;
+  createdAt: string;          // ISO datetime
+  updatedAt: string;          // ISO datetime
+  source: 'bb_auto' | 'planner' | 'macrocycle' | 'legacy';
+
+  showDate: string;
+  category: BBContestCategory;
+  sex: 'male' | 'female';
+
+  preparation: {
+    startDate: string;
+    weeks: number;                    // включая «финальную подготовку»
+    finalWeeks: number;               // последние N недель подготовки = финальная (обычно 2)
+    targetRatePctPerWeek: number;     // 0.25..0.75 % массы тела в неделю
+    startingWeightKg: number;
+    currentCalories: number;
+    stepsPerDay: number;
+    cardioMinutesPerWeek: number;
+  };
+
+  taper: {
+    enabled: boolean;
+    weeks: number;                    // 1..4
+    volumeProfile: number[];          // множители объёма (от ранней недели к поздней)
+    intensityProfile: number[];       // множители веса (интенсивность сохраняется)
+    rirProfile: Array<[number, number]>;
+  };
+
+  peakWeek: {
+    enabled: boolean;
+    strategy: PrepPeakStrategy;
+    waterMode: PrepWaterMode;
+    sodiumMode: PrepSodiumMode;
+    carbMode: PrepCarbMode;
+  };
+
+  phases: PrepPhaseRange[];
+
+  trainingPlanId?: string;
+  nutritionPlanId?: string;
+  testPeakWeekId?: string;
+
+  safety: {
+    contraindications: string[];
+    warnings: string[];
+    requiresReview: boolean;   // requiresProfessionalReview
+    blockedProtocol: boolean;  // автоматический peak-протокол ограничен/отключён
+  };
+
+  /** Число завершённых недель от старта — не пересчитываются без подтверждения. */
+  frozenWeeks?: number;
+}
+
+export const PREP_PLAN_VERSION = 1;
+export const PREP_ALGORITHM_VERSION = 1;
+/** Ключ хранения единого плана в профиле (goals.bbContestPrepPlan). */
+export const BB_PREP_PLAN_KEY = 'bbContestPrepPlan';
+
+export const PREP_PHASE_LABELS: Record<PrepPhaseKey, string> = {
+  preparation: 'Подготовка',
+  final_preparation: 'Финальная подготовка',
+  taper: 'Taper',
+  peak_week: 'Peak week',
+  show_day: 'Show day',
+  post_show: 'Post-show',
+};
+
+export const PREP_PHASE_COLORS: Record<PrepPhaseKey, string> = {
+  preparation: '#3b82f6',
+  final_preparation: '#8b5cf6',
+  taper: '#f59e0b',
+  peak_week: '#ec4899',
+  show_day: '#fbbf24',
+  post_show: '#22c55e',
+};
+
+/** Расширенный список противопоказаний, при которых нужен requiresReview. */
+const PROFESSIONAL_REVIEW_CONDITIONS: Array<{ id: string; label: string; re: RegExp }> = [
+  { id: 'kidney', label: 'заболевания почек', re: /kidney|kidneys|почк/ },
+  { id: 'heart', label: 'сердечно-сосудистые заболевания', re: /heart|серд/ },
+  { id: 'hypertension', label: 'гипертония', re: /hypertension|гипертон|давлен|blood.?pressure/ },
+  { id: 'diabetes', label: 'диабет', re: /diabet|диабет/ },
+  { id: 'pregnancy', label: 'беременность', re: /pregnan|беремен/ },
+  { id: 'eating_disorder', label: 'расстройство пищевого поведения', re: /eating.?disorder|пищев(?:ого|ое).?(?:расстройств|поведен)|анорекс|булим|ортодекс/ },
+  { id: 'seizures', label: 'обмороки или судороги', re: /seizure|обморок|судорог|syncope|epileps|эпилепс/ },
+  { id: 'electrolyte', label: 'нарушения электролитов', re: /electrolyte|электролит|гипонатрием|hyp[o]?natr/ },
+];
+
+/** Какие условия требуют профессионального сопровождения (requiresReview). */
+export function professionalReviewConditions(contraindications: string[] | undefined): string[] {
+  const list = (contraindications || []).map(c => String(c).trim().toLowerCase()).filter(Boolean);
+  if (list.length === 0) return [];
+  return PROFESSIONAL_REVIEW_CONDITIONS
+    .filter(c => list.some(s => c.re.test(s)))
+    .map(c => c.label);
+}
+
+/** Диапазоны недель всех фаз prep-плана. totalWeeks = prepWeeks + taperWeeks + peak(1). */
+export function computePrepPhaseRanges(
+  prepWeeks: number,
+  taperWeeks: number,
+  showDate: string,
+  peakEnabled: boolean,
+): PrepPhaseRange[] {
+  const pw = Math.max(1, Math.min(52, Math.round(prepWeeks)));
+  const tw = Math.min(4, Math.max(1, Math.round(taperWeeks)));
+  const total = pw + tw + (peakEnabled ? 1 : 0);
+  const finalW = pw >= 4 ? 2 : 0;
+  const phases: PrepPhaseRange[] = [];
+
+  const push = (key: PrepPhaseKey, wStart: number, wEnd: number, note: string) => {
+    if (wEnd < wStart || wStart < 1) return;
+    const weeksFromEnd = total - wEnd;
+    const dateEnd = isoAddDays(showDate, -7 * weeksFromEnd);
+    const len = wEnd - wStart + 1;
+    const dateStart = isoAddDays(dateEnd, -(7 * len - 1));
+    phases.push({ key, label: PREP_PHASE_LABELS[key], weekStart: wStart, weekEnd: wEnd, dateStart, dateEnd, note, color: PREP_PHASE_COLORS[key] });
+  };
+
+  if (finalW > 0) {
+    push('preparation', 1, pw - finalW,
+      'Сушка и сохранение массы: дефицит 0.25–0.75%/нед, объём стабилен, кардио/шаги по плану.');
+    push('final_preparation', pw - finalW + 1, pw,
+      'Финал подготовки: дефицит смягчается, объём снижается умеренно, позирование 20–30 мин/день.');
+  } else {
+    push('preparation', 1, pw, 'Подготовка: дефицит 0.25–0.75%/нед, объём стабилен.');
+  }
+  push('taper', pw + 1, pw + tw,
+    'Taper: объём снижается (объём 80–90% → 60–75%), интенсивность сохраняется, RIR 2–4, без отказа, без новых упражнений.');
+  if (peakEnabled) {
+    push('peak_week', total, total,
+      'Peak week: 7 дней к сцене — деплеция/загрузка по протоколу, лёгкий памп, вода и натрий стабильны (если не подтверждена модуляция).');
+    // Show day — сам день шоу (одна дата, внутри недели пика).
+    const showRange: PrepPhaseRange = {
+      key: 'show_day',
+      label: PREP_PHASE_LABELS.show_day,
+      weekStart: total,
+      weekEnd: total,
+      dateStart: showDate,
+      dateEnd: showDate,
+      note: 'Show day: выход на сцену, памп-рутина backstage, карбс малыми порциями.',
+      color: PREP_PHASE_COLORS.show_day,
+    };
+    phases.push(showRange);
+  }
+  push('post_show', total + 1, total + 1,
+    'Post-show: восстановление — питание на поддерживающем уровне, лёгкие тренировки, контроль веса.');
+
+  return phases;
+}
+
+/** Оценка текущих калорий подготовки: поддерживающие − дефицит на цель. */
+export function estimatePrepCalories(weightKg: number, targetRatePctPerWeek: number, referenceKcal?: number): number {
+  const maintenance = referenceKcal && referenceKcal > 1200 ? referenceKcal : Math.round(weightKg * 31);
+  const rate = clamp(Number(targetRatePctPerWeek) || 0.5, 0.1, 1.5);
+  const deficit = Math.round((rate / 100) * weightKg * 7700 / 7);
+  return Math.max(1200, maintenance - deficit);
+}
+
+/** Минимально безопасные жиры (г/кг): 0.6–0.8 — жиры не обнуляются в последние дни. */
+export function prepFatFloorGPerKg(sex: 'male' | 'female'): number {
+  return sex === 'female' ? 0.8 : 0.6;
+}
+
+/** Собрать единый версионированный план contest prep из конфига. */
+export interface BuildPrepPlanOpts {
+  id?: string;
+  source?: BBContestPrepPlan['source'];
+  status?: BBContestPrepPlan['status'];
+  prepWeeks?: number;
+  taperWeeks?: number;
+  currentCalories?: number;
+  stepsPerDay?: number;
+  cardioMinutesPerWeek?: number;
+  targetRatePctPerWeek?: number;
+  trainingPlanId?: string;
+  nutritionPlanId?: string;
+  testPeakWeekId?: string;
+}
+
+export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildPrepPlanOpts = {}): BBContestPrepPlan {
+  const v = validateBBContestPrepConfig(rawCfg);
+  if (!v.ok) throw new Error(`Некорректный конфиг contest prep: ${v.errors.join(' ')}`);
+  const base = applyForcedModes(rawCfg);
+  const showDate = resolveShowDate(base);
+  const cfg: BBContestPrepConfig = { ...base, showDate };
+
+  const prepWeeks = clamp(Number(opts.prepWeeks) || 12, 1, 52);
+  const taperWeeks = clamp(Number(opts.taperWeeks) || cfg.weeksOut, 1, 4);
+  const taperCurve = buildTrainingTaper({ ...cfg, weeksOut: taperWeeks });
+  const phases = computePrepPhaseRanges(prepWeeks, taperWeeks, showDate, true);
+
+  const conditionLabels = professionalReviewConditions(cfg.contraindications);
+  const requiresReview = conditionLabels.length > 0;
+  const confirmed = cfg.confirmedManipulation === true;
+  // Агрессивные моды (не stable-вода/натрий) при противопоказаниях → протокол блокируется;
+  // без явного подтверждения (confirmedManipulation) классика/срезание недоступны — стабильные.
+  const manipulationRequested = cfg.waterStrategy !== 'minimal' || cfg.sodiumStrategy !== 'constant';
+  const blockedProtocol = requiresReview && manipulationRequested;
+  const allowedManipulation = confirmed && !blockedProtocol;
+
+  const warnings = [...v.warnings];
+  if (blockedProtocol) {
+    warnings.push('⛔ Автоматический пик-протокол ограничен: при противопоказаниях требуются стабильные вода и натрий и сопровождение врача/тренера.');
+  }
+  if (manipulationRequested && !confirmed) {
+    warnings.push('⚠ Агрессивные режимы (water load/cut, срезание натрия) требуют явного подтверждения: используются стабильные вода и натрий.');
+  }
+  if (cfg.waterStrategy === 'classic' && confirmed) {
+    warnings.push('⚠ Классический water load/cut подтверждён: контроль электролитов обязателен, диуретики — только по назначению врача.');
+  }
+
+  const now = new Date().toISOString();
+  const startDate = phases[0]?.dateStart ?? isoAddDays(showDate, -(7 * (prepWeeks + taperWeeks)));
+  const targetRate = clamp(Number(opts.targetRatePctPerWeek) || 0.5, 0.25, 0.75);
+
+  const plan: BBContestPrepPlan = {
+    id: opts.id ?? `bbprep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    version: PREP_PLAN_VERSION,
+    algorithmVersion: PREP_ALGORITHM_VERSION,
+    status: opts.status ?? 'active',
+    createdAt: now,
+    updatedAt: now,
+    source: opts.source ?? 'bb_auto',
+    showDate,
+    category: cfg.category,
+    sex: cfg.sex,
+    preparation: {
+      startDate,
+      weeks: prepWeeks,
+      finalWeeks: prepWeeks >= 4 ? 2 : 0,
+      targetRatePctPerWeek: targetRate,
+      startingWeightKg: cfg.weightKg,
+      currentCalories: opts.currentCalories ?? estimatePrepCalories(cfg.weightKg, targetRate),
+      stepsPerDay: opts.stepsPerDay ?? 8000,
+      cardioMinutesPerWeek: opts.cardioMinutesPerWeek ?? 0,
+    },
+    taper: {
+      enabled: taperWeeks > 0,
+      weeks: taperWeeks,
+      volumeProfile: taperCurve.map(t => t.volumePct),
+      intensityProfile: taperCurve.map(t => t.intensityPct),
+      rirProfile: taperCurve.map(t => [t.rirMin, t.rirMax]),
+    },
+    peakWeek: {
+      enabled: true,
+      strategy: cfg.experienceLevel === 'beginner' || cfg.prepCount === 0
+        ? 'conservative'
+        : cfg.carbLoadStrategy === 'front' ? 'moderate' : 'conservative',
+      waterMode: allowedManipulation && (cfg.waterStrategy === 'classic' || cfg.waterStrategy === 'moderate') ? 'moderate' : 'stable',
+      sodiumMode: allowedManipulation && cfg.sodiumStrategy !== 'constant' ? 'moderate' : 'stable',
+      carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate',
+    },
+    phases,
+    trainingPlanId: opts.trainingPlanId,
+    nutritionPlanId: opts.nutritionPlanId,
+    testPeakWeekId: opts.testPeakWeekId,
+    safety: {
+      contraindications: [...(cfg.contraindications || [])],
+      warnings,
+      requiresReview,
+      blockedProtocol,
+    },
+  };
+  return plan;
+}
+
+/** Пересчитать фазы плана (после изменения даты/длительности). */
+export function replanBBContestPrep(plan: BBContestPrepPlan, showDate: string, prepWeeks?: number, taperWeeks?: number): BBContestPrepPlan {
+  const pw = prepWeeks ?? plan.preparation.weeks;
+  const tw = taperWeeks ?? plan.taper.weeks;
+  const phases = computePrepPhaseRanges(pw, tw, showDate, plan.peakWeek.enabled);
+  const startDate = phases[0]?.dateStart ?? plan.preparation.startDate;
+  return {
+    ...plan,
+    showDate,
+    phases,
+    updatedAt: new Date().toISOString(),
+    preparation: { ...plan.preparation, weeks: pw, finalWeeks: pw >= 4 ? 2 : 0, startDate },
+    taper: { ...plan.taper, weeks: tw },
+  };
+}
+
+/**
+ * Перенос даты шоу. Завершённые недели (frozenWeeks от старта) не пересчитываются
+ * без подтверждения: если новый календарь меняет фазы внутри замороженной зоны,
+ * возвращается warning + frozenOverridden=true (пересчёт всё же происходит,
+ * UI обязан спросить подтверждение).
+ */
+export function shiftBBContestPrepShowDate(plan: BBContestPrepPlan, newShowDate: string): { plan: BBContestPrepPlan; changedFrozen: boolean; warnings: string[] } {
+  if (!isValidIsoDate(newShowDate)) return { plan, changedFrozen: false, warnings: ['Некорректная дата шоу.'] };
+  if (daysBetween(isoToday(), newShowDate) < 0) return { plan, changedFrozen: false, warnings: ['Дата шоу в прошлом — план не изменён.'] };
+  const prev = plan;
+  const next = replanBBContestPrep(plan, newShowDate);
+  let changedFrozen = false;
+  const frozen = prev.frozenWeeks ?? 0;
+  if (frozen > 0) {
+    // Завершённые недели (weekStart ≤ frozen) не должны менять СВОИ даты при пересчёте.
+    for (const p of next.phases) {
+      if (p.weekStart > frozen) break;
+      const prevPhase = prev.phases.find(q => q.key === p.key);
+      if (prevPhase && prevPhase.dateStart !== p.dateStart) { changedFrozen = true; break; }
+    }
+  }
+  const warnings: string[] = [];
+  if (changedFrozen) warnings.push(`⚠ Перенос шоу меняет фазы внутри первых ${frozen} завершённых недель — пересчёт требует подтверждения.`);
+  return { plan: next, changedFrozen, warnings };
+}
+
+/** Добавить/убрать недели ТОЛЬКО в подготовительный блок (пик и тапер не трогаются). */
+export function addPrepWeeks(plan: BBContestPrepPlan, delta: number): BBContestPrepPlan {
+  const pw = Math.max(1, Math.min(52, plan.preparation.weeks + Math.round(delta)));
+  return replanBBContestPrep(plan, plan.showDate, pw, plan.taper.weeks);
+}
+
+/** Фаза конкретной недели плана (1-index) или null. */
+export function prepPhaseForWeek(plan: BBContestPrepPlan, week1: number): PrepPhaseRange | null {
+  return plan.phases.find(p => week1 >= p.weekStart && week1 <= p.weekEnd) ?? null;
+}
+
+/** Прошли ли все фазы (шоу позади). */
+export function prepPlanCompleted(plan: BBContestPrepPlan): boolean {
+  return daysBetween(isoToday(), plan.showDate) > 7;
+}
+
+export function serializeBBContestPrepPlan(plan: BBContestPrepPlan): string {
+  return JSON.stringify(plan);
+}
+
+/** Безопасное чтение: валидация формы + отсев мусора. */
+export function deserializeBBContestPrepPlan(str: string | null | undefined): BBContestPrepPlan | null {
+  if (!str) return null;
+  let raw: unknown;
+  try { raw = JSON.parse(str); } catch { return null; }
+  if (!raw || typeof raw !== 'object') return null;
+  const p = raw as Record<string, unknown>;
+  if (typeof p.id !== 'string' || !Array.isArray(p.phases) || !p.preparation || typeof p.preparation !== 'object') return null;
+  if (p.version == null || !Number.isFinite(Number(p.version))) return null;
+  const prep = p.preparation as Record<string, unknown>;
+  const tp = p.taper as Record<string, unknown> | undefined;
+  const pk = p.peakWeek as Record<string, unknown> | undefined;
+  const sf = p.safety as Record<string, unknown> | undefined;
+  const cfg: BBContestPrepConfig = {
+    sex: p.sex === 'female' ? 'female' : 'male',
+    category: (p.category as BBContestCategory) in CATEGORY_PROFILES ? (p.category as BBContestCategory) : 'mens_physique',
+    weightKg: Number(prep.startingWeightKg) || 80,
+    experienceLevel: 'intermediate',
+    enhanced: false,
+    prepCount: 0,
+    showDate: String(p.showDate || ''),
+    weeksOut: Number.isInteger(Number(tp?.weeks)) ? clamp(Number(tp?.weeks), 1, 4) : 3,
+    trainingProtocol: 'bb',
+    carbLoadStrategy: 'moderate',
+    waterStrategy: pk?.waterMode === 'moderate' ? 'moderate' : 'minimal',
+    sodiumStrategy: pk?.sodiumMode === 'moderate' ? 'cut_2d' : 'constant',
+    contraindications: Array.isArray(sf?.contraindications) ? sf.contraindications.filter((x): x is string => typeof x === 'string') : undefined,
+  };
+  const v = validateBBContestPrepConfig(cfg);
+  if (!v.ok) return null;
+  return p as unknown as BBContestPrepPlan;
+}
+
+/**
+ * Единая точка чтения сохранённого prep-состояния из профиля:
+ * новый план (goals.bbContestPrepPlan) → legacy конфиг (goals.bbPeakConfig) →
+ * legacy поля (goals.peakWeek + peakShowDay). Возвращает план или null.
+ */
+export function planFromStored(
+  storedPlan: string | null | undefined,
+  storedConfig: string | null | undefined,
+  goals?: { peakWeek?: boolean; peakShowDay?: string; bbCategory?: string } | null,
+  personal?: { weight?: number; sex?: string } | null,
+  opts?: BuildPrepPlanOpts,
+): BBContestPrepPlan | null {
+  const fromPlan = deserializeBBContestPrepPlan(storedPlan);
+  if (fromPlan) return fromPlan;
+  const cfg = storedConfig ? deserializeBBPrepConfig(storedConfig) : null;
+  if (cfg) return buildBBContestPrepPlan(cfg, opts);
+  const legacy = legacyConfigFromProfile(goals, personal);
+  if (legacy) return buildBBContestPrepPlan(legacy, opts);
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Питание: дневные цели для ЛЮБОЙ даты подготовки + адаптер в MealPlanInput
+// (Этап 5: пик-неделя — абсолютные цели; подготовка — дефицит по targetRate,
+//  белок 2.2-2.5 г/кг, жиры ≥ floor, вода/натрий стабильны)
+// ═══════════════════════════════════════════════════════════════════════════
+
+import type { MealPlanInput } from '../meal-plan-generator.engine';
+
+/** Обратная проекция плана в конфиг (для переиспользования функций пик-недели). */
+export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {
+  return {
+    sex: plan.sex,
+    category: plan.category,
+    weightKg: plan.preparation.startingWeightKg,
+    experienceLevel: 'intermediate',
+    enhanced: false,
+    prepCount: 0,
+    showDate: plan.showDate,
+    weeksOut: plan.taper.weeks,
+    trainingProtocol: 'bb',
+    carbLoadStrategy: plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate',
+    waterStrategy: plan.peakWeek.waterMode === 'moderate' ? 'moderate' : 'minimal',
+    sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'cut_2d' : 'constant',
+    contraindications: plan.safety.contraindications,
+  };
+}
+
+/** Фаза плана по дате (из plan.phases). */
+export function prepPhaseForDate(plan: BBContestPrepPlan, dateIso: string): PrepPhaseRange | null {
+  if (!isValidIsoDate(dateIso)) return null;
+  return plan.phases.find(p => dateIso >= p.dateStart && dateIso <= p.dateEnd) ?? null;
+}
+
+/**
+ * Единая точка расчёта дневных целей питания на ЛЮБУЮ дату contest prep.
+ * - пик-неделя (≤ 7 дней до шоу): абсолютные цели buildPeakWeek;
+ * - подготовка/тапер: дефицит по plan.preparation (калории ступенчатые,
+ *   белок из профиля категории, жиры ≥ безопасный минимум, вода/натрий стабильны);
+ * - вне окна: база без изменений.
+ */
+export function nutritionTargetsForPrepDate(
+  dateIso: string,
+  plan: BBContestPrepPlan,
+  base: PeakNutritionBase,
+): PeakNutritionTargets {
+  const day = peakWeekDayForDate(dateIso, configFromPlan(plan));
+  if (day) {
+    return computePeakWeekNutritionTargets(dateIso, base, configFromPlan(plan));
+  }
+  const phase = prepPhaseForDate(plan, dateIso);
+  if (!phase) {
+    return {
+      kcal: base.kcal, proteinG: base.proteinG, fatG: base.fatG, carbsG: base.carbsG,
+      fiberMaxG: 60, waterMl: base.waterMl, sodiumMg: base.sodiumMg, potassiumMg: 3500,
+      phase: null, phaseLabel: '', note: '',
+    };
+  }
+  const profile = CATEGORY_PROFILES[plan.category];
+  const w = plan.preparation.startingWeightKg;
+  const proteinG = Math.round(w * clamp(profile?.proteinGPerKg ?? 2.2, 1.8, 2.8));
+  const fatFloor = prepFatFloorGPerKg(plan.sex);
+  const fatG = Math.max(30, Math.round(w * fatFloor));
+  // Ступенчатая коррекция калорий по фазе: финальная подготовка −2-3%, тапер — поддержание.
+  const phaseMult = phase.key === 'final_preparation' ? 0.97 : phase.key === 'taper' ? 1.0 : 1.0;
+  const kcal = Math.max(1400, Math.round(plan.preparation.currentCalories * phaseMult));
+  const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+  const phaseNote = phase.key === 'taper'
+    ? 'Объём снижается, калории стабильны — усталость падает, катаболизм не нужен.'
+    : phase.key === 'final_preparation'
+      ? 'Финал подготовки: лёгкий дефицит сохраняется, белок и жиры не режутся.'
+      : 'Подготовка: дефицит 0.25–0.75%/нед по среднему весу за 7 дней, вода и натрий стабильны.';
+  return {
+    kcal,
+    proteinG,
+    fatG,
+    carbsG,
+    fiberMaxG: 40,
+    waterMl: base.waterMl,
+    sodiumMg: base.sodiumMg,
+    potassiumMg: 3500,
+    phase: null,
+    phaseLabel: phase.label,
+    note: `🗓 ${phase.label}: ${kcal} ккал · Б/У/Ж ${proteinG}/${carbsG}/${fatG} г · 💧 ${(base.waterMl / 1000).toFixed(1)} л · Na ${base.sodiumMg} мг (стабильно). ${phaseNote}`,
+  };
+}
+
+/** Адаптер целей дня → MealPlanInput генератора меню (цепочка: план → меню). */
+export function prepToMealPlanInput(
+  t: PeakNutritionTargets,
+  opts?: { days?: number; excludePork?: boolean; excludeFish?: boolean; excludeDairy?: boolean; highCarb?: boolean },
+): MealPlanInput {
+  return {
+    targetKcal: Math.max(800, t.kcal),
+    targetProtein: Math.max(40, t.proteinG),
+    targetFat: Math.max(20, t.fatG),
+    targetCarbs: Math.max(20, t.carbsG),
+    days: opts?.days ?? 1,
+    preferences: {
+      excludePork: opts?.excludePork,
+      excludeFish: opts?.excludeFish,
+      excludeDairy: opts?.excludeDairy,
+      highCarb: opts?.highCarb,
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Test Peak Week (Этап 7): проверка реакции без изменения основного плана
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface TestPeakWeekResult {
+  id: string;
+  planId: string;
+  createdAt: string;
+  showDate: string;
+  /** Оценки 1-5 (плохо → отлично). */
+  responses: {
+    carbTolerance: number;    // переносимость углеводов
+    digestion: number;        // пищеварение
+    fullness: number;         // наполненность
+    waterRetention: number;   // задержка воды (5 = вода ушла, 1 = сильно заливает)
+    pump: number;             // пампинг
+    sleep: number;            // сон
+  };
+  weightDeltaKg: number;      // изменение веса за тестовую неделю
+  notes?: string;
+  /** Итоговый вердикт для основной пик-недели. */
+  verdict: 'tested_ok' | 'conservative' | 'adjust';
+  recommendation: string;
+}
+
+export const TEST_PEAK_WEEK_STORAGE_KEY = 'he_bb_test_peak_weeks';
+
+/** Прогноз результата тестовой пик-недели по ответам (детерминированный расчёт). */
+export function scoreTestPeakWeek(
+  responses: TestPeakWeekResult['responses'],
+  weightDeltaKg: number,
+): { verdict: TestPeakWeekResult['verdict']; recommendation: string } {
+  const avg = (responses.carbTolerance + responses.digestion + responses.fullness + responses.pump) / 4;
+  if (responses.waterRetention >= 4 && avg >= 3.5 && Math.abs(weightDeltaKg) <= 1.5) {
+    return { verdict: 'tested_ok', recommendation: 'Протокол отработал стабильно: карб-загрузка и модуляция подходят. Используйте ту же схему на основной пик-неделе (strategy: tested).' };
+  }
+  if (responses.waterRetention <= 2 || avg <= 2 || weightDeltaKg > 2) {
+    return { verdict: 'adjust', recommendation: 'Схема не подошла: залив или плохая переносимость. На основной пик-неделе — консервативный режим: стабильные вода/натрий, умеренные карбс, без агрессивных манипуляций.' };
+  }
+  return { verdict: 'conservative', recommendation: 'Результат смешанный: на основной пик-неделе выбирайте умеренные настройки и тестируйте ещё раз за 3-4 недели до шоу.' };
+}
+
+/** Сохранить результат тестовой пик-недели (не меняет основной план). */
+export function saveTestPeakWeekResult(
+  planId: string,
+  showDate: string,
+  responses: TestPeakWeekResult['responses'],
+  weightDeltaKg: number,
+  notes?: string,
+): TestPeakWeekResult {
+  const scored = scoreTestPeakWeek(responses, weightDeltaKg);
+  const result: TestPeakWeekResult = {
+    id: `testpw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    planId,
+    createdAt: new Date().toISOString(),
+    showDate,
+    responses,
+    weightDeltaKg,
+    notes,
+    verdict: scored.verdict,
+    recommendation: scored.recommendation,
+  };
+  try {
+    const raw = localStorage.getItem(TEST_PEAK_WEEK_STORAGE_KEY);
+    const list: TestPeakWeekResult[] = raw ? (JSON.parse(raw) as TestPeakWeekResult[]) : [];
+    list.unshift(result);
+    localStorage.setItem(TEST_PEAK_WEEK_STORAGE_KEY, JSON.stringify(list.slice(0, 10)));
+  } catch { /* storage недоступен */ }
+  return result;
+}
+
+/** Последний тест для плана (для strategy: 'tested'). */
+export function latestTestPeakWeek(planId: string): TestPeakWeekResult | null {
+  try {
+    const raw = localStorage.getItem(TEST_PEAK_WEEK_STORAGE_KEY);
+    if (!raw) return null;
+    const list = JSON.parse(raw) as TestPeakWeekResult[];
+    return list.find(t => t.planId === planId) ?? null; // первый в списке = самый свежий
+  } catch { return null; }
+}
+
+/** Стратегия пик-недели с учётом тестового прогона. */
+export function resolvePeakStrategy(plan: BBContestPrepPlan): PrepPeakStrategy {
+  if (plan.testPeakWeekId) {
+    const t = latestTestPeakWeek(plan.id);
+    if (t) {
+      if (t.verdict === 'tested_ok') return 'tested';
+      if (t.verdict === 'adjust') return 'conservative';
+    }
+  }
+  return plan.peakWeek.strategy === 'tested' ? 'conservative' : plan.peakWeek.strategy;
+}
+

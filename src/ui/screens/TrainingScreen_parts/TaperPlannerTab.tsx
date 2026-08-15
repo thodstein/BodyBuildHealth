@@ -10,6 +10,7 @@ import {
   type AttemptStrategy, type Lift, type TaperPlan,
 } from '../../../engines/pro/taper.engine';
 import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
+import { buildBBContestPrep, isoToday, isoAddDays, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
 import {
   selectWeightClass, generateCompetitionTimeline,
   getRecoveryProtocols, getMentalRoutines, recommendWeightCut,
@@ -90,12 +91,43 @@ export const TaperPlannerTab: React.FC = () => {
   const mental = useMemo(() => getMentalRoutines(), []);
   const warmup = plan ? warmupSequence(plan.attempts.squat.opener) : [];
 
-  // ── Расчёты BB ──
+  // ── Расчёты BB (canonical engine: bb-contest-prep.engine.ts) ──
   const bb: BBPeakingOutput | null = useMemo(() => {
     if (kind !== 'bb') return null;
-    try { return generateBBPeaking({ showDate, conditioning, fullness, dryness, carbTolerance: carbTol }); }
-    catch { return null; }
-  }, [kind, showDate, conditioning, fullness, dryness, carbTol]);
+    try {
+      const cfg: BBContestPrepConfig = {
+        sex: 'male',
+        category: 'mens_physique',
+        weightKg: 80,
+        experienceLevel: 'intermediate',
+        enhanced: false,
+        prepCount: 0,
+        showDate,
+        weeksOut: 1,
+        trainingProtocol: 'bb',
+        carbLoadStrategy: 'moderate',
+        waterStrategy: 'minimal',
+        sodiumStrategy: 'constant',
+      };
+      const res = buildBBContestPrep(cfg);
+      return {
+        weekPlan: res.peakWeek.map(d => ({
+          day: d.day,
+          training: d.training.type,
+          carbs: `${d.carbsG} г`,
+          water: `${d.waterLiters} л`,
+          sodium: `${d.sodiumMg} мг`,
+          posing: `${d.posingMinutes} мин`,
+        })),
+        recommendations: [
+          ...res.warnings,
+          'Вода и натрий стабильны по умолчанию; резкие манипуляции недоступны без подтверждения.',
+          'Объём тапера снижается, интенсивность сохраняется, RIR 2–4 — без отказных серий.',
+        ],
+      };
+    } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, showDate]);
 
   const handleSave = () => {
     if (kind === 'pl' && plan) {

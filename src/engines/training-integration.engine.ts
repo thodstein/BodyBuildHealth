@@ -101,6 +101,12 @@ export function autoregPlan(r: ReadinessInput): AutoregOutput {
 export function peakForPLMeet(input: PLPeakingInput) {
   return generatePLPeaking(input);
 }
+/**
+ * @deprecated — BB-шоу-пик переведён на canonical engine
+ * (bb-contest-prep.engine.ts: buildBBContestPrep / applyTrainingTaperToBBPlan /
+ * applyPeakWeekOverlayToBBPlan / computePeakWeekNutritionTargets).
+ * Функция нигде не вызывается и сохранена только для совместимости сигнатуры.
+ */
 export function peakForBBShow(input: BBPeakingInput) {
   return generateBBPeaking(input);
 }

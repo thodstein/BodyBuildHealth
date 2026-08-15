@@ -1,0 +1,463 @@
+/**
+ * bb-contest-prep-plan.test.ts — тесты единой версионированной модели contest prep
+ * (Этапы 2-7): BBContestPrepPlan, фазы, перенос даты, расширение подготовки,
+ * taper по новой философии (объём ↓ / интенсивность ↑ / RIR 2-4), безопасность,
+ * питание по дням, test peak week, обратная совместимость.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  buildBBContestPrepPlan,
+  computePrepPhaseRanges,
+  shiftBBContestPrepShowDate,
+  addPrepWeeks,
+  replanBBContestPrep,
+  prepPhaseForWeek,
+  prepPhaseForDate,
+  nutritionTargetsForPrepDate,
+  prepToMealPlanInput,
+  scoreTestPeakWeek,
+  saveTestPeakWeekResult,
+  latestTestPeakWeek,
+  resolvePeakStrategy,
+  applyContestPrepToBBPlan,
+  extendBBPlanPreparation,
+  serializeBBContestPrepPlan,
+  deserializeBBContestPrepPlan,
+  planFromStored,
+  estimatePrepCalories,
+  professionalReviewConditions,
+  PREP_PHASE_LABELS,
+  TEST_PEAK_WEEK_STORAGE_KEY,
+  type BBContestPrepConfig,
+  type BBContestPrepPlan,
+  type BBPlanWithPrep,
+} from '../bb-contest-prep.engine';
+import type { BBPlan } from '../bb-builder.engine';
+
+function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function baseConfig(over: Partial<BBContestPrepConfig> = {}): BBContestPrepConfig {
+  return {
+    sex: 'male',
+    category: 'mens_physique',
+    weightKg: 80,
+    bodyFatPct: 7,
+    experienceLevel: 'intermediate',
+    enhanced: false,
+    prepCount: 2,
+    showDate: addDaysIso(todayIso(), 90),
+    weeksOut: 2,
+    trainingProtocol: 'bb',
+    carbLoadStrategy: 'moderate',
+    waterStrategy: 'minimal',
+    sodiumStrategy: 'constant',
+    ...over,
+  };
+}
+
+function makeExercise(sets = 4, weight = 60, rir = 2, muscle = 'chest'): any {
+  return {
+    muscle,
+    name: muscle === 'chest' ? 'Жим лёжа' : muscle === 'back' ? 'Тяга в наклоне' : 'Жим стоя',
+    role: 'primary',
+    character: 'тяж',
+    sets,
+    repsRange: [8, 12] as [number, number],
+    rir,
+    workSets: Array.from({ length: sets }, () => ({ reps: 10, rir, weight })),
+    comment: '',
+  };
+}
+
+function makeWeek(week: number, sessionsCount = 4, sets = 4): any {
+  return {
+    week,
+    phase: 'accumulation',
+    deload: false,
+    sessions: Array.from({ length: sessionsCount }, (_, i) => ({
+      day: i + 1,
+      weekOffset: week * 7 + i,
+      character: 'тяж',
+      exercises: [
+        makeExercise(sets),
+        makeExercise(sets, 40, 2, 'back'),
+        makeExercise(sets, 20, 3, 'shoulders'),
+      ],
+    })),
+  };
+}
+
+function makePlan(weeksCount = 12): BBPlan {
+  return {
+    pattern: {} as any,
+    weeks: Array.from({ length: weeksCount }, (_, i) => makeWeek(i + 1, 4, 10)),
+    rotationMuscleVolume: {},
+    rationale: ['Тестовый план'],
+  };
+}
+
+beforeEach(() => {
+  try { localStorage.removeItem(TEST_PEAK_WEEK_STORAGE_KEY); } catch { /* ignore */ }
+});
+
+describe('BBContestPrepPlan — единая модель (Этап 2)', () => {
+  it('строит план с версиями, статусом и разделением подготовка/тапер/пик/шоу', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 12, taperWeeks: 2 });
+    expect(plan.id).toBeTruthy();
+    expect(plan.version).toBeGreaterThanOrEqual(1);
+    expect(plan.algorithmVersion).toBeGreaterThanOrEqual(1);
+    expect(plan.status).toBe('active');
+    expect(plan.createdAt).toBeTruthy();
+    expect(plan.updatedAt).toBeTruthy();
+    expect(plan.source).toBe('bb_auto');
+    expect(plan.preparation.weeks).toBe(12);
+    expect(plan.preparation.finalWeeks).toBe(2);
+    expect(plan.taper.weeks).toBe(2);
+    expect(plan.taper.enabled).toBe(true);
+    expect(plan.peakWeek.enabled).toBe(true);
+    expect(plan.phases.length).toBeGreaterThan(0);
+  });
+
+  it('фазы: подготовка → финальная → taper → peak week → show day → post-show', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 12, taperWeeks: 2 });
+    const keys = plan.phases.map(p => p.key);
+    expect(keys).toEqual(['preparation', 'final_preparation', 'taper', 'peak_week', 'show_day', 'post_show']);
+    const prep = plan.phases[0];
+    expect(prep.weekStart).toBe(1);
+    expect(prep.weekEnd).toBe(10);
+    const taper = plan.phases[2];
+    expect(taper.weekStart).toBe(13);
+    expect(taper.weekEnd).toBe(14);
+    const peak = plan.phases[3];
+    expect(peak.weekStart).toBe(15);
+    expect(peak.weekEnd).toBe(15);
+    // Пик-неделя привязана к дате шоу: последний день peak = showDate.
+    expect(peak.dateEnd).toBe(plan.showDate);
+  });
+
+  it('генерация на 8/12/16/20 недель подготовки — целостные диапазоны', () => {
+    for (const pw of [8, 12, 16, 20]) {
+      const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: pw, taperWeeks: 2 });
+      const prep = plan.phases.find(p => p.key === 'preparation')!;
+      expect(prep.weekStart).toBe(1);
+      const final = plan.phases.find(p => p.key === 'final_preparation')!;
+      expect(final.weekEnd).toBe(pw);
+      expect(prep.weekEnd).toBe(pw - 2);
+      const taper = plan.phases.find(p => p.key === 'taper')!;
+      expect(taper.weekStart).toBe(pw + 1);
+      expect(taper.weekEnd).toBe(pw + 2);
+      const peak = plan.phases.find(p => p.key === 'peak_week')!;
+      expect(peak.weekStart).toBe(pw + 3);
+      // Даты непрерывны: каждая следующая фаза начинается на следующий день после конца предыдущей.
+      // (show_day — сам день шоу, лежит ВНУТРИ пик-недели: dateStart = dateEnd = peak.dateEnd.)
+      let prevEnd = '';
+      for (const p of plan.phases) {
+        if (p.key === 'show_day') continue;
+        if (prevEnd) expect(p.dateStart).toBe(addDaysIso(prevEnd, 1));
+        prevEnd = p.dateEnd;
+      }
+    }
+  });
+
+  it('невалидный конфиг → throw с понятным сообщением', () => {
+    expect(() => buildBBContestPrepPlan(baseConfig({ showDate: 'bad-date' }))).toThrow(/showDate|дата шоу/i);
+  });
+
+  it('сериализация round-trip сохраняет модель', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 12, taperWeeks: 3 });
+    const back = deserializeBBContestPrepPlan(serializeBBContestPrepPlan(plan));
+    expect(back).not.toBeNull();
+    expect(back!.id).toBe(plan.id);
+    expect(back!.preparation.weeks).toBe(12);
+    expect(back!.taper.weeks).toBe(3);
+    expect(back!.phases).toHaveLength(plan.phases.length);
+  });
+
+  it('deserialize отсеивает мусор', () => {
+    expect(deserializeBBContestPrepPlan(null)).toBeNull();
+    expect(deserializeBBContestPrepPlan('{')).toBeNull();
+    expect(deserializeBBContestPrepPlan(JSON.stringify({ id: 'x' }))).toBeNull();
+    expect(deserializeBBContestPrepPlan('"string"')).toBeNull();
+  });
+});
+
+describe('Этап 3 — динамические недели и перенос даты', () => {
+  it('addPrepWeeks меняет только подготовительный блок (пик привязан к шоу)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 10, taperWeeks: 2 });
+    const grown = addPrepWeeks(plan, 3);
+    expect(grown.preparation.weeks).toBe(13);
+    expect(grown.taper.weeks).toBe(2);
+    const peak = grown.phases.find(p => p.key === 'peak_week')!;
+    expect(peak.dateEnd).toBe(plan.showDate); // пик не сдвинулся
+    expect(grown.preparation.startDate).toBe(addDaysIso(plan.preparation.startDate, -21));
+  });
+
+  it('addPrepWeeks не уходит ниже 1 недели', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 2, taperWeeks: 1 });
+    const shrunk = addPrepWeeks(plan, -10);
+    expect(shrunk.preparation.weeks).toBe(1);
+  });
+
+  it('перенос даты шоу пересчитывает фазы без дублирования taper', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ showDate: addDaysIso(todayIso(), 90) }), { prepWeeks: 10, taperWeeks: 2 });
+    const newDate = addDaysIso(plan.showDate, 14);
+    const { plan: moved, changedFrozen, warnings } = shiftBBContestPrepShowDate(plan, newDate);
+    expect(moved.showDate).toBe(newDate);
+    expect(changedFrozen).toBe(false);
+    expect(warnings).toEqual([]);
+    expect(moved.phases.filter(p => p.key === 'taper').length).toBe(1); // без дублей
+    const peak = moved.phases.find(p => p.key === 'peak_week')!;
+    expect(peak.dateEnd).toBe(newDate);
+  });
+
+  it('дата в прошлом → план не изменяется', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const past = addDaysIso(todayIso(), -30);
+    const { plan: moved, warnings } = shiftBBContestPrepShowDate(plan, past);
+    expect(moved.showDate).toBe(plan.showDate);
+    expect(warnings.length).toBeGreaterThan(0);
+  });
+
+  it('завершённые недели (frozenWeeks) помечаются при переносе, меняющем фазы', () => {
+    const plan: BBContestPrepPlan = {
+      ...buildBBContestPrepPlan(baseConfig(), { prepWeeks: 10, taperWeeks: 2 }),
+      frozenWeeks: 6,
+    };
+    const { changedFrozen } = shiftBBContestPrepShowDate(plan, addDaysIso(plan.showDate, 28));
+    expect(changedFrozen).toBe(true);
+  });
+
+  it('prepPhaseForWeek / prepPhaseForDate отвечают корректно', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 6, taperWeeks: 2 });
+    expect(prepPhaseForWeek(plan, 1)?.key).toBe('preparation');
+    expect(prepPhaseForWeek(plan, 6)?.key).toBe('final_preparation');
+    expect(prepPhaseForWeek(plan, 7)?.key).toBe('taper');
+    expect(prepPhaseForWeek(plan, 9)?.key).toBe('peak_week');
+    expect(prepPhaseForWeek(plan, 99)).toBeNull();
+    const peak = plan.phases.find(p => p.key === 'peak_week')!;
+    expect(prepPhaseForDate(plan, peak.dateStart)?.key).toBe('peak_week');
+  });
+});
+
+describe('Этап 4 — taper: объём ↓, интенсивность сохраняется, RIR 2-4', () => {
+  it('применение к плану размечает фазы недель и режет объём без обнуления интенсивности', () => {
+    const plan = makePlan(12);
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 9, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(out.weeks[11].contestPhase).toBe('peak_week');
+    expect(out.weeks[10].contestPhase).toBe('taper');
+    expect(out.weeks[9].contestPhase).toBe('taper');
+    expect(out.weeks[8].contestPhase).toBe('final_preparation');
+    expect(out.weeks[0].contestPhase).toBe('preparation');
+    const taperWk = out.weeks[9];
+    const baseWk = plan.weeks[9];
+    for (let s = 0; s < taperWk.sessions.length; s++) {
+      for (let e = 0; e < taperWk.sessions[s].exercises.length; e++) {
+        const ex = taperWk.sessions[s].exercises[e];
+        const orig = baseWk.sessions[s].exercises[e];
+        expect(ex.sets).toBeLessThan(orig.sets);          // объём ↓
+        expect(ex.workSets[0].weight).toBeGreaterThan(orig.workSets[0].weight * 0.8); // интенсивность сохраняется
+        expect(ex.rir).toBeGreaterThanOrEqual(2);          // RIR 2-4, никакого авто-RIR 0
+      }
+    }
+  });
+
+  it('идентичен при повторном применении (идемпотентность)', () => {
+    const plan = makePlan(12);
+    const once = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 9, taperWeeks: 2 }) as BBPlanWithPrep;
+    const twice = applyContestPrepToBBPlan(once, baseConfig(), { prepWeeks: 9, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect((twice.contestPrep?.appliedWeeks ?? []).length).toBe((once.contestPrep?.appliedWeeks ?? []).length);
+    expect(twice.weeks[11].peakWeek).toBe(true);
+  });
+
+  it('план короче подготовки → warning и усечение подготовки', () => {
+    const plan = makePlan(6);
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 12, taperWeeks: 2 }) as BBPlanWithPrep;
+    const warnings = (out as any).contestPrep?.warnings ?? [];
+    expect(warnings.some(w => w.includes('усечена'))).toBe(true);
+  });
+
+  it('extendBBPlanPreparation вставляет недели только в подготовку (тапер не трогается)', () => {
+    const plan = makePlan(10);
+    const prepped = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 7, taperWeeks: 2 }) as BBPlanWithPrep;
+    const extended = extendBBPlanPreparation(prepped, 2) as BBPlanWithPrep;
+    expect(extended.weeks.length).toBe(12);
+    const prepCount = extended.weeks.filter((w: any) => w.contestPhase === 'preparation').length;
+    expect(prepCount).toBeGreaterThanOrEqual(7);
+    const taperIdx = extended.weeks.length - 3; // taper начинается за 2 недели до конца
+    expect(extended.weeks[taperIdx].contestPhase).toBe('taper');
+    expect(extended.weeks[extended.weeks.length - 1].contestPhase).toBe('peak_week');
+    // Недели перенумерованы
+    expect(extended.weeks[extended.weeks.length - 1].week).toBe(12);
+  });
+});
+
+describe('Этап 5 — питание по дням (план vs факт)', () => {
+  const base = { kcal: 2400, proteinG: 160, fatG: 60, carbsG: 260, waterMl: 3000, sodiumMg: 2800 };
+
+  it('в подготовке: дефицит-калории, стабильные вода/натрий, белок ≥ 2 г/кг', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    const t = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, base);
+    expect(t.phase).toBeNull();
+    expect(t.waterMl).toBe(3000);
+    expect(t.sodiumMg).toBe(2800);
+    expect(t.proteinG).toBeGreaterThanOrEqual(160);
+    expect(t.kcal).toBeLessThan(plan.preparation.currentCalories + 1);
+    expect(t.carbsG).toBeGreaterThan(0);
+  });
+
+  it('в пик-неделе: абсолютные цели дня (фаза, карб-загрузка)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const peakStart = plan.phases.find(p => p.key === 'peak_week')!.dateStart;
+    const t = nutritionTargetsForPrepDate(peakStart, plan, base);
+    expect(t.phase).toBe('deplete_1');
+    expect(t.kcal).toBeGreaterThan(0);
+  });
+
+  it('вне окна подготовки: база без изменений', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const far = addDaysIso(plan.showDate, 60);
+    const t = nutritionTargetsForPrepDate(far, plan, base);
+    expect(t.kcal).toBe(base.kcal);
+    expect(t.carbsG).toBe(base.carbsG);
+    expect(t.note).toBe('');
+  });
+
+  it('prepToMealPlanInput → целевые макросы генератора меню', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const t = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, base);
+    const input = prepToMealPlanInput(t, { days: 3, excludePork: true });
+    expect(input.targetKcal).toBe(t.kcal);
+    expect(input.targetProtein).toBe(t.proteinG);
+    expect(input.targetFat).toBe(t.fatG);
+    expect(input.targetCarbs).toBe(t.carbsG);
+    expect(input.days).toBe(3);
+    expect(input.preferences.excludePork).toBe(true);
+  });
+});
+
+describe('Этап 6 — безопасность', () => {
+  it('стабильные вода/натрий по умолчанию', () => {
+    const plan = buildBBContestPrepPlan(baseConfig());
+    expect(plan.peakWeek.waterMode).toBe('stable');
+    expect(plan.peakWeek.sodiumMode).toBe('stable');
+  });
+
+  it('умеренная модуляция без подтверждения → стабильная (warning)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ waterStrategy: 'moderate', sodiumStrategy: 'cut_2d' }));
+    expect(plan.peakWeek.waterMode).toBe('stable');
+    expect(plan.peakWeek.sodiumMode).toBe('stable');
+    expect(plan.safety.warnings.some(w => w.includes('подтверждения'))).toBe(true);
+  });
+
+  it('подтверждение разрешает умеренную модуляцию', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ waterStrategy: 'moderate', sodiumStrategy: 'cut_2d', confirmedManipulation: true }));
+    expect(plan.peakWeek.waterMode).toBe('moderate');
+    expect(plan.peakWeek.sodiumMode).toBe('moderate');
+  });
+
+  it('противопоказания → requiresReview; +агрессивные моды → blockedProtocol', () => {
+    const review = buildBBContestPrepPlan(baseConfig({ contraindications: ['kidney', 'hypertension'] }));
+    expect(review.safety.requiresReview).toBe(true);
+    expect(review.safety.blockedProtocol).toBe(false);
+    expect(professionalReviewConditions(['kidney'])).toEqual(['заболевания почек']);
+
+    // diabetes НЕ входит в KNOWN_CONTRAINDICATIONS validate (не форсится), но требует review —
+    // при запрошенной модуляции воды протокол блокируется.
+    const blocked = buildBBContestPrepPlan(baseConfig({ contraindications: ['diabetes'], waterStrategy: 'moderate' }));
+    expect(blocked.safety.requiresReview).toBe(true);
+    expect(blocked.safety.blockedProtocol).toBe(true);
+    expect(blocked.peakWeek.waterMode).toBe('stable');
+    expect(blocked.safety.warnings.some(w => w.includes('ограничен'))).toBe(true);
+
+    // kidney форсится самим validate (minimal/constant) — протокол и так безопасен.
+    const forcedSafe = buildBBContestPrepPlan(baseConfig({ contraindications: ['kidney'], waterStrategy: 'moderate', sodiumStrategy: 'cut_3d' }));
+    expect(forcedSafe.safety.blockedProtocol).toBe(false);
+    expect(forcedSafe.peakWeek.waterMode).toBe('stable');
+    expect(forcedSafe.peakWeek.sodiumMode).toBe('stable');
+  });
+
+  it('жиры не обнуляются: безопасный минимум по полу', () => {
+    const male = buildBBContestPrepPlan(baseConfig());
+    const female = buildBBContestPrepPlan(baseConfig({ sex: 'female', category: 'bikini' }));
+    const baseFor = (p: BBContestPrepPlan) => ({ kcal: 0, proteinG: 0, fatG: 0, carbsG: 0, waterMl: 3000, sodiumMg: 2800 });
+    const tMale = nutritionTargetsForPrepDate(male.phases[0].dateStart, male, baseFor(male));
+    const tFemale = nutritionTargetsForPrepDate(female.phases[0].dateStart, female, baseFor(female));
+    expect(tMale.fatG).toBeGreaterThanOrEqual(Math.round(80 * 0.6));
+    expect(tFemale.fatG).toBeGreaterThanOrEqual(Math.round(80 * 0.8));
+  });
+});
+
+describe('Этап 7 — Test Peak Week', () => {
+  it('scoreTestPeakWeek: стабильный прогон → tested_ok, залив → adjust', () => {
+    const ok = scoreTestPeakWeek({ carbTolerance: 4, digestion: 4, fullness: 4, waterRetention: 4, pump: 4, sleep: 4 }, 0.5);
+    expect(ok.verdict).toBe('tested_ok');
+    const bad = scoreTestPeakWeek({ carbTolerance: 2, digestion: 2, fullness: 2, waterRetention: 1, pump: 2, sleep: 2 }, 3);
+    expect(bad.verdict).toBe('adjust');
+  });
+
+  it('saveTestPeakWeekResult сохраняет и отдаёт последний тест', () => {
+    const planId = 'bbprep_test1';
+    saveTestPeakWeekResult(planId, todayIso(), { carbTolerance: 4, digestion: 4, fullness: 4, waterRetention: 4, pump: 4, sleep: 4 }, 0.5);
+    const latest = latestTestPeakWeek(planId);
+    expect(latest).not.toBeNull();
+    expect(latest!.verdict).toBe('tested_ok');
+    expect(latest!.id).toBeTruthy();
+  });
+
+  it('resolvePeakStrategy: tested_ok → tested, adjust → conservative', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    saveTestPeakWeekResult(plan.id, plan.showDate, { carbTolerance: 4, digestion: 4, fullness: 4, waterRetention: 4, pump: 4, sleep: 4 }, 0.5);
+    expect(resolvePeakStrategy({ ...plan, testPeakWeekId: 'x' })).toBe('tested');
+    saveTestPeakWeekResult(plan.id, plan.showDate, { carbTolerance: 1, digestion: 1, fullness: 1, waterRetention: 1, pump: 1, sleep: 1 }, 4);
+    expect(resolvePeakStrategy({ ...plan, testPeakWeekId: 'x' })).toBe('conservative');
+    expect(resolvePeakStrategy(plan)).toBe(plan.peakWeek.strategy);
+  });
+});
+
+describe('Обратная совместимость и вспомогательные функции', () => {
+  it('planFromStored: новый план → legacy конфиг → legacy поля профиля', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 10, taperWeeks: 2 });
+    const fromPlan = planFromStored(serializeBBContestPrepPlan(plan), null);
+    expect(fromPlan?.id).toBe(plan.id);
+
+    const cfg = baseConfig({ showDate: addDaysIso(todayIso(), 45), weeksOut: 3 });
+    const fromCfg = planFromStored(null, JSON.stringify(cfg), null, { weight: 80, sex: 'male' });
+    expect(fromCfg?.showDate).toBe(cfg.showDate);
+    expect(fromCfg!.taper.weeks).toBe(3);
+
+    const fromLegacy = planFromStored(null, null, { peakWeek: true, peakShowDay: addDaysIso(todayIso(), 30), bbCategory: 'bikini' }, { weight: 55, sex: 'female' });
+    expect(fromLegacy).not.toBeNull();
+    expect(fromLegacy!.category).toBe('bikini');
+    expect(fromLegacy!.peakWeek.waterMode).toBe('stable');
+    expect(fromLegacy!.peakWeek.sodiumMode).toBe('stable');
+  });
+
+  it('estimatePrepCalories учитывает темп снижения', () => {
+    const slow = estimatePrepCalories(80, 0.25);
+    const fast = estimatePrepCalories(80, 0.75);
+    expect(slow).toBeGreaterThan(fast);
+    expect(slow).toBeGreaterThan(1200);
+  });
+
+  it('PREP_PHASE_LABELS покрывает все фазы', () => {
+    for (const key of ['preparation', 'final_preparation', 'taper', 'peak_week', 'show_day', 'post_show']) {
+      expect(PREP_PHASE_LABELS[key as keyof typeof PREP_PHASE_LABELS]).toBeTruthy();
+    }
+  });
+
+  it('computePrepPhaseRanges: без пика — нет peak/show фаз', () => {
+    const ranges = computePrepPhaseRanges(8, 2, addDaysIso(todayIso(), 60), false);
+    expect(ranges.some(p => p.key === 'peak_week')).toBe(false);
+    expect(ranges.some(p => p.key === 'show_day')).toBe(false);
+    expect(ranges.some(p => p.key === 'taper')).toBe(true);
+  });
+});

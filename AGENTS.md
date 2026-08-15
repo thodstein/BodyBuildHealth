@@ -1,5 +1,46 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Contest Prep — полноценный адаптивный цикл (Aug 16 2026, uncommitted)
+
+Терминология разделена: **подготовка** (недели/месяцы дефицита) → **taper** (1-4 нед: объём ↓, интенсивность сохраняется) → **peak week** (7 дней, привязана к дате шоу) → **show day** → **post-show**. Canonical engine — `bb-contest-prep.engine.ts` (расширен, все новые функции экспортированы).
+
+### Этапы 1-2 — аудит + единая модель `BBContestPrepPlan`
+- **Legacy**: `bb-peak-week.engine.ts` помечен `@deprecated` (экстремальные протоколы вода 0.25л/натрий 0.5г запрещены для новых UI-точек); `peaking-engine.generateBBPeaking` и `training-integration.peakForBBShow` — `@deprecated` (TaperPlannerTab BB-ветка переведена на canonical `buildBBContestPrep`).
+- **Модель**: `BBContestPrepPlan` (версионированная: `version`/`algorithmVersion`/`status`/`createdAt`/`updatedAt`/`source`) с раздельными блоками `preparation` (weeks/finalWeeks/targetRatePctPerWeek 0.25-0.75/currentCalories/steps/cardio), `taper` (volumeProfile/intensityProfile/rirProfile), `peakWeek` (strategy/waterMode/sodiumMode/carbMode), `phases` (6 фаз с неделями и датами), `safety` (contraindications/warnings/requiresReview/blockedProtocol), `frozenWeeks` (завершённые недели не пересчитываются без подтверждения).
+- `buildBBContestPrepPlan(cfg, opts)` / `computePrepPhaseRanges` / `replanBBContestPrep` / `shiftBBContestPrepShowDate` (возвращает `{plan, changedFrozen, warnings}`) / `addPrepWeeks` (только подготовка) / `prepPhaseForWeek` / `prepPhaseForDate` / `serialize/deserializeBBContestPrepPlan` / `planFromStored` (новый план → legacy bbPeakConfig → legacy поля профиля) / `configFromPlan`.
+- Хранение: `goals.bbContestPrepPlan` (новый ключ в `UnifiedSettings.goals`), `bbPeakConfig` остаётся для совместимости.
+
+### Этап 4 — taper по современной модели (Bosquet 2005 + Helms 2022)
+- **Каноническая BB-кривая** (вместо Библиотеки с RIR 0→0 и интенсивностью 0.80-0.85): объём 0.90 → 0.85 → 0.70 → 0.60, интенсивность 0.95 → 0.85 (сохраняется), **RIR 2-4** (никакого авто-RIR 0/отказа), без новых упражнений, без тяжёлых эксцентриков.
+- **Per-muscle**: 🦵 ноги (quads/hams/glutes/calves) разгружаются раньше (×0.9 в первую taper-неделю), ⭐ специализация щадится (×1.25 к множителю, ≤1.0); anti-двойной deload сохранён.
+- `applyContestPrepToBBPlan(plan, cfg, opts)` — единое применение: тапер (+пик в окне `weeksOut=taper+1`) + разметка `wk.contestPhase` (preparation/final_preparation/taper/peak_week) + метаданные фаз + warning при коротком плане; идемпотентен. `extendBBPlanPreparation(plan, addWeeks)` — вставка недель ТОЛЬКО в подготовку (пик/тапер не тронуты), перенумерация week.
+
+### Этап 5 — питание по дням (план vs факт)
+- `nutritionTargetsForPrepDate(dateIso, plan, base)` — цели на ЛЮБУЮ дату: пик-неделя — абсолютные (buildPeakWeek); подготовка — дефицит по `currentCalories` (финальная ×0.97), белок 2.2-2.5 г/кг (профиль категории), **жиры ≥ 0.6/0.8 г/кг (мин 30 г — не обнуляются)**, вода/натрий стабильны.
+- `prepToMealPlanInput(targets, opts)` — адаптер в `MealPlanInput` → `generateMealPlan` (meal-plan-generator.engine). План отделён от факта: сгенерированное меню не пишется в дневник.
+
+### Этап 6 — безопасность
+- По умолчанию **stable** вода и натрий; `confirmedManipulation: true` — единственный путь к умеренной модуляции; `classic` water/cut_* недоступны без подтверждения.
+- `professionalReviewConditions()` — расширенный список (почки/сердце/гипертония/диабет/беременность/РПП/судороги/электролиты) → `requiresReview`; при противопоказаниях + запрошенной модуляции → `blockedProtocol` (стабильные моды + warning). Диуретики и фарма не назначаются.
+
+### Этап 7 — Test Peak Week
+- `saveTestPeakWeekResult` / `scoreTestPeakWeek` (carbTolerance/digestion/fullness/waterRetention/pump/sleep + weightDelta → tested_ok/conservative/adjust) / `latestTestPeakWeek` / `resolvePeakStrategy` — тестовый прогон НЕ меняет основной план, результат (`testPeakWeekId`) влияет на стратегию пик-недели. Storage `he_bb_test_peak_weeks` (кап 10).
+
+### Этап 8 — UI: опциональный шаг «🏁 Contest Prep» в BB Auto
+- Новый шаг `contest` (после «Коррекция», перед «Годовой план») в `BbAutoConstructor.tsx`: дата шоу (input date), категория/специализация, недели подготовки и taper (степперы), моды вода/натрий/карбс (чипы, stable по умолчанию), чекбокс подтверждения модуляции, противопоказания из профиля (chronicConditions + ручные).
+- «🏁 Собрать contest prep и применить» → `buildBBContestPrepPlan` + `applyContestPrepToBBPlan` + сохранение в профиль (goals.bbContestPrepPlan + bbPeakConfig + peakShowDay); «Пропустить» — план остаётся обычным.
+- Просмотр: текущая фаза «📍 Сейчас», календарь фаз с датами, кривая taper (объём/вес/RIR), предупреждения safety, «🍽 Питание на сегодня» через `nutritionTargetsForPrepDate`, «➕/➖ Неделя подготовки» через `extendBBPlanPreparation`, перенос даты через `shiftBBContestPrepShowDate`. Кнопка «🏁 Contest prep» также в шаге «Коррекция».
+
+### Этап 9 — тесты
+- NEW `bb-contest-prep-plan.test.ts` — **32 теста**: модель/версии (5), фазы 8/12/16/20 нед (2), сериализация (2), динамические недели и перенос даты (6), taper-кривая и разметка (4), питание (4), безопасность (4), test peak week (3), обратная совместимость (3).
+- MOD `bb-contest-prep.test.ts` — 3 теста переведены на каноническую кривую (объём [0.85,0.7,0.6], интенсивность 0.95, RIR≥2). Итого **126/126** по обоим файлам; смежные BB (пик-неделя/audit/taper) **169/169**; tsc 0; taper-planner-tab 6/6.
+
+### Проверено
+- Полный `tsc --noEmit` — 0 ошибок; BB-тесты contest-prep 126/126 + смежные 169/169; `taper-planner-tab.test.tsx` 6/6.
+- Файлы других агентов не тронуты (health-diary/дневники — чужой WIP; MACROCYCLE-ROADMAP.md — чужой кардио-план).
+
+---
+
 ## Годовой планировщик — финальные раунды (Aug 14-15 2026, pushed cf2f12523; следующий раунд uncommitted)
 
 ### Раунд A — «цикл не выбирается»: карточки+попапы (Aug 14, pushed cf2f12523)

@@ -1,15 +1,20 @@
 /**
- * bb-peak-week.engine.ts — peak week протокол для BB-соревнований.
+ * @deprecated — legacy engine. Содержит экстремальные протоколы
+ * (вода → 0.25 л/день, натрий → 0.5 г/день), которые противоречат современной
+ * практике (Helms 2022): резкие водные/натриевые манипуляции опасны и не являются
+ * обязательным признаком профессионального подхода.
  *
- * Профессиональный инструмент: 7-дневный протокол подготовки к сцене.
+ * CANONICAL ENGINE: bb-contest-prep.engine.ts
+ *   - buildBBContestPrep / buildTrainingTaper / buildPeakWeek / buildShowTimeline
+ *   - applyTrainingTaperToBBPlan / applyPeakWeekOverlayToBBPlan
+ *   - computePeakWeekNutritionTargets
+ * Новые UI-точки входа через этот файл ЗАПРЕЩЕНЫ. Файл сохранён только для
+ * обратной совместимости существующих тестов (bb-peak-week.test.ts).
+ *
+ * Оригинальная документация (историческая):
  * - Вода: load (8-10л) → cut (0.5л за 2 дня до сцены)
  * - Натрий: load (5-7г/день) → cut (0.5г/день за 1-2 дня)
  * - Углеводы: depletion (3 дня, <50г/день) → reload (2 дня, 300-500г/день)
- * - Позирование: расписание (утро/вечер, 15-30 мин)
- * - Тренировка: только лёгкая памп (без compounds), последний день — отдых
- *
- * Источники: Helms MAAS (peak week protocols), Alberts Nippardt (carb cycling),
- * competitive BB coaching practice 2020-2024.
  */
 
 export type PeakDayPhase = 'load' | 'depletion' | 'reload' | 'peak' | 'show';

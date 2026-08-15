@@ -218,6 +218,14 @@ export function generatePLPeaking(input: PLPeakingInput): PLPeakingOutput {
 // BB Peaking Engine
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * @deprecated — BB-часть peaking-engine переведена на canonical engine
+ * `bb-contest-prep.engine.ts` (buildBBContestPrep / buildPeakWeek /
+ * computePeakWeekNutritionTargets). generateBBPeaking оставлен только для
+ * обратной совместимости (TaperPlannerTab переведён на canonical через
+ * `bbPeakingCompatFromContestPrep` в bb-contest-prep.engine.ts).
+ * Новые UI-точки входа ЗАПРЕЩЕНЫ.
+ */
 export function generateBBPeaking(input: BBPeakingInput): BBPeakingOutput {
   const week: BBPeakingOutput['weekPlan'] = [];
 

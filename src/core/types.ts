@@ -704,6 +704,8 @@ export interface UnifiedSettings {
     peakShowDay?: string;
     /** JSON-конфиг тапера ББ (bb-contest-prep.engine) — единая система пикинга. */
     bbPeakConfig?: string;
+    /** JSON единого версионированного плана contest prep (BBContestPrepPlan). */
+    bbContestPrepPlan?: string;
     /** Этап жизни (детокс/набор/поддержание/сушка) */
     lifeStage?: string;
   };
