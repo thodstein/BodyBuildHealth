@@ -75,6 +75,15 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   };
   // Переход в зону «Планировщик» → режим «Ручной сбор» (внешние ссылки setTab('constructor'))
   const goPlannerManual = useCallback(() => { setZone('planner'); switchPlanningTrack('manual'); }, []);
+  // Внешнее переключение режима планировщика (напр., из CardioLinkCard «Открыть кардио-конструктор»)
+  useEffect(() => {
+    const h = (e: Event) => {
+      const track = (e as CustomEvent).detail as PlanningTrack | undefined;
+      if (track === 'pl' || track === 'bb' || track === 'manual' || track === 'cardio') switchPlanningTrack(track);
+    };
+    window.addEventListener('planning-track-open', h);
+    return () => window.removeEventListener('planning-track-open', h);
+  }, []);
   // Универсальный переход на вкладку с автоматическим выбором её зоны
   const goTab = useCallback((t: TrainingTab) => { setZone(zoneForTab(t)); setTab(t); }, []);
 

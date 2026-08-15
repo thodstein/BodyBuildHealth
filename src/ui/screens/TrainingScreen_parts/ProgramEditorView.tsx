@@ -21,6 +21,7 @@ import { MesoHeatmap } from './MesoHeatmap';
 import { ProgramNotes, ProgramMetricsCSV, RecoveryBadge, ProgramStrengthScore } from './ProgramExtras';
 import { ProgramRevisionsDiff } from './ProgramRevisions';
 import { StrengthDiaryPanel } from './StrengthDiaryPanel';
+import { CardioLinkCard } from './CardioLinkCard';
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
@@ -615,6 +616,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 title="Справочник тренировочных методик"
               >📚 Методики</button>
             )}
+            <CardioLinkCard />
           </div>
         )}
       </div>
