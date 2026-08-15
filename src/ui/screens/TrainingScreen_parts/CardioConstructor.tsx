@@ -24,7 +24,7 @@ import {
 } from '../../../engines/lms/macrocycle.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
-import { CardioParamsStep } from './CardioParamsStep';
+import { CardioParamsStep, type PhaseSplitState } from './CardioParamsStep';
 import { CardioCompsStep, type CompDraft } from './CardioCompsStep';
 import { CardioPreviewStep } from './CardioPreviewStep';
 import { CardioManageStep } from './CardioManageStep';
@@ -78,6 +78,7 @@ export const CardioConstructor: React.FC = () => {
   const [totalWeeks, setTotalWeeks] = useState(12);
   const [daysAvailable, setDaysAvailable] = useState(5);
   const [recoveryLow, setRecoveryLow] = useState(false);
+  const [phaseSplit, setPhaseSplit] = useState<PhaseSplitState>({ auto: true, base: 0, build: 0, maintenance: 0 });
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -125,6 +126,7 @@ export const CardioConstructor: React.FC = () => {
       daysAvailable,
       recoveryLow,
       competitions: comps,
+      phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     });
     saveCardioCycle(c);
     setActiveCardioCycle(c);
@@ -255,6 +257,8 @@ export const CardioConstructor: React.FC = () => {
           totalWeeks={totalWeeks} setTotalWeeks={setTotalWeeks}
           daysAvailable={daysAvailable} setDaysAvailable={setDaysAvailable}
           recoveryLow={recoveryLow} setRecoveryLow={setRecoveryLow}
+          phaseSplit={phaseSplit} setPhaseSplit={setPhaseSplit}
+          comps={comps}
         />
       )}
       {step === 'comps' && (

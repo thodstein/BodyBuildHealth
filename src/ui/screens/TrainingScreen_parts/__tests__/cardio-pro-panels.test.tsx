@@ -84,12 +84,38 @@ describe('CardioWeekEditor', () => {
     expect(saved!.weeks[0].totalMinutes).toBeGreaterThan(c.weeks[0].totalMinutes);
   });
 
-  it('CSR: toggle HIIT убирает/добавляет HIIT на неделе', () => {
-    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'we-2' });
+  it('редактор сессий: добавление HIIT-сессии через селектор типа', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'we-2' });
     render(<CardioWeekEditor cycle={c} />);
-    fireEvent.click(screen.getByRole('button', { name: /Добавить HIIT/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    const select = screen.getByRole('combobox', { name: /Тип новой сессии/ });
+    fireEvent.change(select, { target: { value: 'hiit' } });
+    fireEvent.click(screen.getByRole('button', { name: /Добавить сессию/ }));
     const saved = loadCardioCycles().find(x => x.id === 'we-2');
     expect(saved!.weeks[0].sessions.some(s => s.type === 'hiit')).toBe(true);
+  });
+
+  it('редактор сессий: добавление сессии увеличивает число сессий недели', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'we-3' });
+    const before = c.weeks[0].sessions.length;
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Добавить сессию/ }));
+    const saved = loadCardioCycles().find(x => x.id === 'we-3');
+    expect(saved!.weeks[0].sessions.length).toBe(before + 1);
+  });
+
+  it('редактор сессий: изменение минут пересчитывает итог недели', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'we-4' });
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    const input = screen.getAllByRole('spinbutton')[0];
+    fireEvent.change(input, { target: { value: '50' } });
+    const saved = loadCardioCycles().find(x => x.id === 'we-4');
+    const week = saved!.weeks[0];
+    const expected = week.sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+    expect(week.totalMinutes).toBe(expected);
+    expect(week.sessions[0].durationMin).toBe(50);
   });
 });
 

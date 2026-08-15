@@ -38,11 +38,14 @@ describe('CardioConstructor — SSR', () => {
     expect(html).toContain('Назад');
   });
 
-  it('шаг 1 показывает цель и горизонт', () => {
+  it('шаг 1 показывает цель, горизонт, быстрые старты и живой предпросмотр', () => {
     const html = renderToStaticMarkup(<CardioConstructor />);
     expect(html).toContain('Цель цикла');
     expect(html).toContain('Сушка');
     expect(html).toContain('Горизонт');
+    expect(html).toContain('Быстрые старты');
+    expect(html).toContain('Структура фаз');
+    expect(html).toContain('Предпросмотр цикла');
   });
 });
 
@@ -65,6 +68,17 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByText(/Ккал\/нед/)).toBeTruthy();
     expect(loadCardioCycles().length).toBe(1);
     expect(JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null')).toBeTruthy();
+  });
+
+  it('пресет «Сушка · 16 нед» применяет параметры и виден в предпросмотре', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Пресет: Сушка · 16 нед/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const saved = loadCardioCycles()[0];
+    expect(saved.totalWeeks).toBe(16);
+    expect(saved.goal).toBe('cut');
   });
 
   it('шаг 4: подключение к ПЛ-авто фиксируется в cardio-bridge', () => {

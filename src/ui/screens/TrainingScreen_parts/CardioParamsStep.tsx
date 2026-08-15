@@ -1,9 +1,13 @@
 /**
- * CardioParamsStep.tsx — шаг 1 мастера кардио: цель, горизонт, доступные дни,
- * уровень восстановления. Карточки целей с описаниями вместо голых чипов.
+ * CardioParamsStep.tsx — шаг 1 мастера кардио: цель, горизонт, восстановление,
+ * быстрые старты (пресеты), ручная структура фаз и живой предпросмотр.
  */
-import React from 'react';
-import { CARDIO_GOAL_LABELS, type CardioGoal } from '../../../engines/lms/cardio.engine';
+import React, { useMemo } from 'react';
+import {
+  buildCardioCycle, cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PRESETS,
+  type CardioCycle, type CardioGoal,
+} from '../../../engines/lms/cardio.engine';
+import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
 
 const CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
@@ -14,7 +18,11 @@ const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fon
 const BTN: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
   border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-  color: '#fff', minHeight: 40,
+  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
+};
+const PRESET: React.CSSProperties = {
+  flex: '1 1 130px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
 };
 const GOAL_CARD: React.CSSProperties = {
   flex: '1 1 140px', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
@@ -33,6 +41,8 @@ const GOAL_DESC: Record<CardioGoal, string> = {
   recovery: 'Лёгкое кардио 2-3× для кровотока и мобильности',
 };
 
+export interface PhaseSplitState { auto: boolean; base: number; build: number; maintenance: number }
+
 export const CardioParamsStep: React.FC<{
   goal: CardioGoal;
   setGoal: (g: CardioGoal) => void;
@@ -42,9 +52,55 @@ export const CardioParamsStep: React.FC<{
   setDaysAvailable: (n: number) => void;
   recoveryLow: boolean;
   setRecoveryLow: (v: boolean) => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow }) => {
+  phaseSplit: PhaseSplitState;
+  setPhaseSplit: (s: PhaseSplitState) => void;
+  comps: CardioCompetitionRef[];
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps }) => {
+  const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
+    const warnings: string[] = [];
+    if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
+    for (const c of comps) {
+      if (c.week < 3) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper не влезает (нужно ≥3).`);
+    }
+    try {
+      const cycle = buildCardioCycle({
+        goal,
+        totalWeeks,
+        daysAvailable,
+        recoveryLow,
+        competitions: comps,
+        phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+        source: 'auto',
+      });
+      return { cycle, warnings };
+    } catch { return { cycle: null, warnings }; }
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit]);
+
+  const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
+  const applyPreset = (id: string) => {
+    const p = CARDIO_PRESETS.find(x => x.id === id);
+    if (!p) return;
+    setGoal(p.goal);
+    setTotalWeeks(p.totalWeeks);
+    setDaysAvailable(p.daysAvailable);
+    setRecoveryLow(p.recoveryLow);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Быстрые старты */}
+      <div style={CARD}>
+        <div style={LABEL}>⚡ Быстрые старты</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {CARDIO_PRESETS.map(p => (
+            <div key={p.id} style={PRESET} onClick={() => applyPreset(p.id)} role="button" aria-label={`Пресет: ${p.name}`}>
+              <div style={{ fontSize: 11, fontWeight: 800 }}>{p.icon} {p.name}</div>
+              <div style={{ fontSize: 10, marginTop: 2, opacity: 0.7 }}>{p.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div style={CARD}>
         <div style={LABEL}>🎯 Цель цикла</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -69,24 +125,79 @@ export const CardioParamsStep: React.FC<{
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{daysAvailable}</span>
           <button style={BTN} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
-          Горизонт цикла и сколько дней можно выделить под кардио поверх силовых тренировок.
+      </div>
+
+      {/* Структура фаз */}
+      <div style={CARD}>
+        <div style={LABEL}>🧩 Структура фаз</div>
+        <div style={ROW}>
+          <button
+            style={phaseSplit.auto ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+            onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}
+          >Авто (по долям)</button>
+          <button
+            style={!phaseSplit.auto ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+            onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}
+          >Вручную</button>
         </div>
+        {!phaseSplit.auto && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(['base', 'build', 'maintenance'] as const).map(k => (
+              <div key={k} style={ROW}>
+                <span style={{ ...LABEL, minWidth: 120 }}>{k === 'base' ? '🌱 База' : k === 'build' ? '📈 Наращивание' : '🧘 Поддержание'}</span>
+                <button style={BTN} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.max(0, phaseSplit[k] - 1) })} aria-label={`Меньше ${k}`}>−</button>
+                <span style={{ fontSize: 14, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{phaseSplit[k]}</span>
+                <button style={BTN} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.min(Math.max(1, totalWeeks - 2), phaseSplit[k] + 1) })} aria-label={`Больше ${k}`}>+</button>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нед</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+              Итого распределено: {phaseSplit.base + phaseSplit.build + phaseSplit.maintenance} нед (сверх — поддерживающие; taper/пик задаются стартами).
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={CARD}>
         <div style={LABEL}>🧘 Восстановление</div>
-        <div style={ROW}>
-          <button
-            style={recoveryLow ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-            onClick={() => setRecoveryLow(!recoveryLow)}
-          >
-            {recoveryLow ? '🧘 Низкое восстановление (HIIT убран)' : '🟢 Восстановление в норме'}
-          </button>
-        </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          При низком восстановлении (сон/HRV/ACWR) интенсивные сессии исключаются из цикла.
-        </div>
+        <button
+          style={recoveryLow ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+          onClick={() => setRecoveryLow(!recoveryLow)}
+        >
+          {recoveryLow ? '🧘 Низкое восстановление (HIIT убран)' : '🟢 Восстановление в норме'}
+        </button>
+      </div>
+
+      {/* Живой предпросмотр */}
+      <div style={{ ...CARD, borderColor: 'rgba(0,230,138,0.25)' }}>
+        <div style={LABEL}>👁 Предпросмотр цикла</div>
+        {s && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>НЕДЕЛЬ</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>{totalWeeks}</div>
+            </div>
+            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>МИН/НЕД</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#3b82f6' }}>{s.avgMinutesPerWeek}</div>
+            </div>
+            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>ККАЛ/НЕД</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b' }}>{s.avgKcalPerWeek}</div>
+            </div>
+            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>HIIT-НЕД</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#a78bfa' }}>{s.hiitWeeks}</div>
+            </div>
+            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>ЦЕЛЬ</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#94a3b8' }}>{CARDIO_GOAL_LABELS[goal]}</div>
+            </div>
+          </div>
+        )}
+        {preview.warnings.map((w, i) => (
+          <div key={i} style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '5px 8px' }} role="alert">⚠ {w}</div>
+        ))}
       </div>
     </div>
   );

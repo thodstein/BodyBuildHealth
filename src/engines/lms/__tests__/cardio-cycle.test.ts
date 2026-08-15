@@ -8,6 +8,7 @@ import {
   compareCardioCycles, formatCardioComparison,
   cardioWeekForDate, cardioSessionsForDate, cardioHeartZones,
   spreadSessionsAcrossDays, cardioVolumeSeries, autoTuneCardioCycle,
+  CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
 
@@ -407,5 +408,59 @@ describe('autoTuneCardioCycle', () => {
     const before = JSON.stringify(c);
     autoTuneCardioCycle(c, [], { acwr: 1.7, referenceIso: REF });
     expect(JSON.stringify(c)).toBe(before);
+  });
+});
+
+// ─── Ручная структура фаз (phaseSplit) и пресеты ───
+
+describe('phaseSplit — ручная структура фаз', () => {
+  it('распределение недель по фазам вместо процентов', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 10, phaseSplit: { base: 2, build: 4, maintenance: 3 } });
+    const phases = c.weeks.map(w => w.phase);
+    expect(phases[0]).toBe('base');
+    expect(phases[1]).toBe('base');
+    expect(phases[2]).toBe('build');
+    expect(phases[5]).toBe('build');
+    expect(phases[6]).toBe('maintenance');
+    expect(phases[9]).toBe('transition');
+  });
+
+  it('кардиоPhaseForWeek с phaseSplit: пограничные недели', () => {
+    expect(cardioPhaseForWeek(2, 10, undefined, { base: 2, build: 4, maintenance: 3 })).toBe('base');
+    expect(cardioPhaseForWeek(3, 10, undefined, { base: 2, build: 4, maintenance: 3 })).toBe('build');
+    expect(cardioPhaseForWeek(6, 10, undefined, { base: 2, build: 4, maintenance: 3 })).toBe('build');
+    expect(cardioPhaseForWeek(7, 10, undefined, { base: 2, build: 4, maintenance: 3 })).toBe('maintenance');
+  });
+
+  it('соревнования приоритетнее phaseSplit (taper/peak)', () => {
+    const comps = [{ id: 'c', name: 'x', week: 10 }];
+    expect(cardioPhaseForWeek(9, 10, comps, { base: 4, build: 4, maintenance: 1 })).toBe('taper');
+    expect(cardioPhaseForWeek(10, 10, comps, { base: 4, build: 4, maintenance: 1 })).toBe('peak');
+  });
+
+  it('без phaseSplit поведение не меняется', () => {
+    const a = buildCardioCycle({ goal: 'health', totalWeeks: 12 });
+    const b = buildCardioCycle({ goal: 'health', totalWeeks: 12, phaseSplit: {} });
+    expect(JSON.stringify(a.weeks.map(w => w.phase))).toBe(JSON.stringify(b.weeks.map(w => w.phase)));
+  });
+});
+
+describe('CARDIO_PRESETS — быстрые старты', () => {
+  it('5 пресетов с валидными параметрами', () => {
+    expect(CARDIO_PRESETS).toHaveLength(5);
+    for (const p of CARDIO_PRESETS) {
+      expect(p.totalWeeks).toBeGreaterThan(0);
+      expect(p.daysAvailable).toBeGreaterThanOrEqual(0);
+      expect(['health', 'mass', 'cut', 'recomp', 'maintenance', 'recovery']).toContain(p.goal);
+      const c = buildCardioCycle({ goal: p.goal, totalWeeks: p.totalWeeks, daysAvailable: p.daysAvailable, recoveryLow: p.recoveryLow });
+      expect(c.weeks).toHaveLength(p.totalWeeks);
+    }
+  });
+
+  it('пресет «Сушка 16 нед» содержит HIIT и делоды', () => {
+    const p = CARDIO_PRESETS.find(x => x.id === 'cut-16')!;
+    const c = buildCardioCycle({ goal: p.goal, totalWeeks: p.totalWeeks, daysAvailable: p.daysAvailable });
+    expect(c.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(true);
+    expect(c.weeks.some(w => w.deload)).toBe(true);
   });
 });

@@ -84,11 +84,36 @@ export interface CardioCycleInput {
   daysAvailable?: number;          // 0-7 доступных дней (по умолчанию 7)
   recoveryLow?: boolean;           // низкое восстановление → HIIT убран
   competitions?: CardioCompetitionRef[];
+  /** Ручная структура фаз (недели base/build/maintenance). Если задано —
+   *  используются эти доли вместо авто-процентов. taper/peak/contest_prep
+   *  по-прежнему определяются соревнованиями. */
+  phaseSplit?: { base?: number; build?: number; maintenance?: number };
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
   createdAt?: string;
 }
+
+// ─── Пресеты-шаблоны (быстрые старты) ───
+
+export interface CardioPreset {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  goal: CardioGoal;
+  totalWeeks: number;
+  daysAvailable: number;
+  recoveryLow: boolean;
+}
+
+export const CARDIO_PRESETS: CardioPreset[] = [
+  { id: 'health-8', name: 'Здоровье · 8 нед', desc: 'Аэробная база для ССС, 3 дня', icon: '💚', goal: 'health', totalWeeks: 8, daysAvailable: 3, recoveryLow: false },
+  { id: 'cut-16', name: 'Сушка · 16 нед', desc: 'Прогрессия Zone 2 + HIIT, делоды', icon: '🔥', goal: 'cut', totalWeeks: 16, daysAvailable: 5, recoveryLow: false },
+  { id: 'base-12', name: 'База · 12 нед', desc: 'Zone 2 3×, наращивание объёма', icon: '🌱', goal: 'health', totalWeeks: 12, daysAvailable: 3, recoveryLow: false },
+  { id: 'mass-12', name: 'Масса · 12 нед', desc: 'Только восстановление 1-2×', icon: '🏗', goal: 'mass', totalWeeks: 12, daysAvailable: 2, recoveryLow: false },
+  { id: 'recovery-4', name: 'Восстановление · 4 нед', desc: 'Лёгкий кровоток после тяжёлого блока', icon: '💤', goal: 'recovery', totalWeeks: 4, daysAvailable: 3, recoveryLow: true },
+];
 
 // ─── Константы ───
 
@@ -214,8 +239,9 @@ export function buildCardioPlan(input: CardioInput): CardioPlan {
 /**
  * Определить фазу недели: ramp base → build → maintenance,
  * taper/peak у соревнования, transition на последней неделе (без соревнований).
+ * При заданном phaseSplit используется ручное распределение недель.
  */
-export function cardioPhaseForWeek(week: number, totalWeeks: number, competitions?: CardioCompetitionRef[]): CardioPhase {
+export function cardioPhaseForWeek(week: number, totalWeeks: number, competitions?: CardioCompetitionRef[], phaseSplit?: { base?: number; build?: number; maintenance?: number }): CardioPhase {
   const comp = competitions?.find(c => c.week === week);
   if (comp) return 'peak';
   const beforeComp = competitions?.find(c => c.week === week + 1 || c.week === week + 2);
@@ -223,6 +249,13 @@ export function cardioPhaseForWeek(week: number, totalWeeks: number, competition
   const upcoming = competitions?.find(c => c.week > week);
   if (upcoming) return week >= upcoming.week - 2 ? 'taper' : 'contest_prep';
   if (week === totalWeeks) return 'transition';
+  if (phaseSplit && (phaseSplit.base || phaseSplit.build || phaseSplit.maintenance)) {
+    const baseEnd = Math.max(0, Math.round(phaseSplit.base ?? 0));
+    const buildEnd = baseEnd + Math.max(0, Math.round(phaseSplit.build ?? 0));
+    if (baseEnd > 0 && week <= baseEnd) return 'base';
+    if (buildEnd > baseEnd && week <= buildEnd) return 'build';
+    return 'maintenance';
+  }
   const t = totalWeeks;
   if (week <= Math.ceil(t * 0.33)) return 'base';
   if (week <= Math.ceil(t * 0.66)) return 'build';
@@ -329,13 +362,20 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const daysAvailable = clamp(Math.round(input.daysAvailable ?? 7), 0, 7);
   const recoveryLow = !!input.recoveryLow;
   const competitions = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= totalWeeks);
+  const phaseSplit = input.phaseSplit
+    ? {
+        base: input.phaseSplit.base != null ? clamp(Math.round(input.phaseSplit.base), 0, Math.max(0, totalWeeks - 2)) : 0,
+        build: input.phaseSplit.build != null ? clamp(Math.round(input.phaseSplit.build), 0, Math.max(0, totalWeeks - 2)) : 0,
+        maintenance: input.phaseSplit.maintenance != null ? clamp(Math.round(input.phaseSplit.maintenance), 0, Math.max(0, totalWeeks - 2)) : 0,
+      }
+    : undefined;
   const profile = profileForGoal(input.goal);
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
   let totalMinutes = 0;
 
   for (let w = 1; w <= totalWeeks; w++) {
-    const phase = cardioPhaseForWeek(w, totalWeeks, competitions);
+    const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit);
     const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition';
     let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow);
     if (deload) {
