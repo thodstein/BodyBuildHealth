@@ -78,7 +78,11 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
   const dirArrow: Record<string, string> = { up: '↑', down: '↓', normalize: '↕' };
 
   return (
-    <div className="card" style={{ fontSize: 12, lineHeight: 1.6 }}>
+    <div className="card" style={{
+      fontSize: 12, lineHeight: 1.6,
+      background: 'transparent', border: 'none', padding: 0, margin: 0,
+      boxShadow: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', transition: 'none',
+    }}>
       <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{sub.name}</h3>
       <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', marginBottom: 8 }}>
         <span>Класс:</span><span style={{ fontWeight: 600 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
@@ -602,7 +606,7 @@ export const CatalogTab: React.FC = () => {
       {/* Popup detail modal — same style as supplements catalog */}
       {selected && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 300,
+          position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 300,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(0,0,0,0.85)',
         }} onClick={() => setSelectedId(null)}>
@@ -614,7 +618,7 @@ export const CatalogTab: React.FC = () => {
             overflow: 'hidden', display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ height: 3, background: 'linear-gradient(90deg, var(--accent), #00c853)' }} />
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{selected.name}</span>
                 <button onClick={() => setSelectedId(null)} style={{
