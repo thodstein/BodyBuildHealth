@@ -18,19 +18,20 @@ import { SYNERGY_PAIRS } from '../../../engines/support.engine';
 import { decodeGarbled } from '../../../utils/text-sanitizer';
 import { useDataLink } from '../../../core/data-link';
 
+const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
+const PHARMA_INTERACT_FILTER_SYNERGY = PHARMA_INTERACT_FILTER;
+
 export const InteractionCheckerTab: React.FC = () => {
   const linked = useDataLink();
   const [interactSub, setInteractSub] = useState<'interactions' | 'synergies' | 'unified'>('interactions');
   const [unifiedOnlyCritical, setUnifiedOnlyCritical] = useState(false);
   const [unifiedSeverity, setUnifiedSeverity] = useState<'CRITICAL'|'HIGH'|'ALL'>('HIGH'); // по умолчанию только крит+высокие
   const [interactDetail, setInteractDetail] = useState<'conflicts' | 'instructions'>('conflicts');
-  const PHARMA_INTERACT_FILTER = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
   const allSubstances = useMemo(() => {
     return Object.values(PHARMA_DB).filter(s => 
       !!s?.name && PHARMA_INTERACT_FILTER.has(s.class)
     );
   }, []);
-  const PHARMA_INTERACT_FILTER_SYNERGY = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','sarm','drostanolone','dht_derivative','igf1','mgf','insulin','peptide_ghrh','peptide_ghrp','peptide_gnrh','peptide_fat_loss','peptide_other']);
   const synergyToPharmaId = (id: string): string => {
     const map: Record<string, string> = {
       testosterone_enanthate: 'test_enan', testosterone_cypionate: 'test_cyp', testosterone_propionate: 'test_prop',
@@ -83,7 +84,7 @@ export const InteractionCheckerTab: React.FC = () => {
     setSelectedIds(updated);
   };
 
-  const validIds = selectedIds.filter(Boolean);
+  const validIds = useMemo(() => selectedIds.filter(Boolean), [selectedIds]);
 
   // Только выбранные пользователем препараты (не все подряд)
   const selectedPharma = useMemo(() => {
@@ -189,7 +190,7 @@ export const InteractionCheckerTab: React.FC = () => {
     { id: 'unified', label: '🔬 Unified' },
   ];
 
-  const renderUnified = (): React.ReactElement => {
+  const unifiedView = useMemo((): React.ReactElement => {
     const validIdsForUnified = validIds.length > 0 ? validIds : [''];
     const courseForUnified: CourseEntry[] = validIdsForUnified.filter(Boolean).map((id, i) => ({
       id: `${id}-${i}`,
@@ -263,7 +264,7 @@ export const InteractionCheckerTab: React.FC = () => {
         </div>
       );
     }
-  };
+  }, [validIds, doseMgWk, unifiedOnlyCritical, unifiedSeverity]);
 
   return (
     <div>
@@ -328,7 +329,7 @@ export const InteractionCheckerTab: React.FC = () => {
             )}
           </div>
         </div>
-      ) : interactSub === 'unified' ? renderUnified() : (<>
+      ) : interactSub === 'unified' ? unifiedView : (<>
         {/* ── AUTO DETECTED ALERTS ── */}
         {hasAlerts && (
           <div style={{

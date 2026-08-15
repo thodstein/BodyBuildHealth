@@ -417,7 +417,7 @@ const CatalogRow = React.memo<{
   s: PharmaSubstance;
   selected: boolean;
   flat?: boolean;
-  onSelect: () => void;
+  onSelect: (id: string) => void;
   onAddCourse: (s: PharmaSubstance) => void;
   onAddCart: (s: PharmaSubstance) => void;
 }>(({ s, selected, flat, onSelect, onAddCourse, onAddCart }) => {
@@ -436,7 +436,7 @@ const CatalogRow = React.memo<{
         marginBottom: 1,
       };
   return (
-    <div style={rowStyle} onClick={onSelect}>
+    <div style={rowStyle} onClick={() => onSelect(s.id)}>
       <div>
         <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
         {flat && <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>}
@@ -519,6 +519,8 @@ export const CatalogTab: React.FC = () => {
     } catch {}
   }, []);
 
+  const handleSelect = useCallback((id: string) => setSelectedId(id), []);
+
   return (
     <div>
       <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -568,7 +570,7 @@ export const CatalogTab: React.FC = () => {
                     key={s.id}
                     s={s}
                     selected={selectedId === s.id}
-                    onSelect={() => setSelectedId(s.id)}
+                    onSelect={handleSelect}
                     onAddCourse={addToCourse}
                     onAddCart={addToCart}
                   />
@@ -585,7 +587,7 @@ export const CatalogTab: React.FC = () => {
             s={s}
             flat
             selected={selectedId === s.id}
-            onSelect={() => setSelectedId(s.id)}
+            onSelect={handleSelect}
             onAddCourse={addToCourse}
             onAddCart={addToCart}
           />

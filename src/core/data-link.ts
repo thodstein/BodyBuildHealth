@@ -168,7 +168,7 @@ export function useDataLink(): LinkedData {
   }, [profile.id, tick]);
 
   const s = profile.settings;
-  const activeDrugs = computeActiveDrugs(course);
+  const activeDrugs = useMemo(() => computeActiveDrugs(course), [course]);
   const _t = s.training ?? {};
   const _l = s.lifestyle ?? {};
   const _n = s.nutrition ?? {};
@@ -179,10 +179,20 @@ export function useDataLink(): LinkedData {
   const trainingLoad = deriveTrainingLoad(_t.daysPerWeek ?? 3, _t.minutesPerSession ?? 60);
 
   // sRPE-оверлей: реальная тренировочная нагрузка из дневника sRPE → корректирует readiness
-  const _srpe = loadSRPESessions();
-  const _acwr = _srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(_srpe)) : null;
-  const sRpeFatigueAdj = _acwr ? Math.max(0, (_acwr.ratio - 1.3) * 4) : 0;  // доп. пункты усталости при ACWR>1.3
-  const sRpeLoadAdj = _acwr ? (_acwr.ratio < 0.8 ? -0.15 : _acwr.ratio > 1.5 ? 0.2 : 0) : 0; // коррекция trainingLoad
+  const srpeAdj = useMemo(() => {
+    try {
+      const _srpe = loadSRPESessions();
+      const _acwr = _srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(_srpe)) : null;
+      return {
+        sRpeFatigueAdj: _acwr ? Math.max(0, (_acwr.ratio - 1.3) * 4) : 0,
+        sRpeLoadAdj: _acwr ? (_acwr.ratio < 0.8 ? -0.15 : _acwr.ratio > 1.5 ? 0.2 : 0) : 0,
+      };
+    } catch {
+      return { sRpeFatigueAdj: 0, sRpeLoadAdj: 0 };
+    }
+  }, [tick]);
+  const sRpeFatigueAdj = srpeAdj.sRpeFatigueAdj;
+  const sRpeLoadAdj = srpeAdj.sRpeLoadAdj;
 
   const readiness = useMemo(() => {
     const altVal = getLatestLabValue(labs, 'ALT');

@@ -22,15 +22,18 @@ const AndrogenicIndexCalculator: React.FC = () => {
 
   const aiFiltered = allAiDrugs.map(d => PHARMA_DB[d]).filter((s): s is NonNullable<typeof s> => !!s);
   const aiKeepClasses = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','dht_derivative','pct_gonadotropin','insulin','igf1','mgf']);
-  const aiKeep = aiFiltered.filter(s => aiKeepClasses.has(s.class));
-  const aiGrouped: { cls: string; label: string }[] = [];
-  const aiSingles = new Set<string>();
-  const seenCls = new Set<string>();
-  for (const s of aiKeep) {
-    if (INJECTABLE_WITH_ESTERS.has(s.class)) {
-      if (!seenCls.has(s.class)) { seenCls.add(s.class); aiGrouped.push({ cls: s.class, label: CLASS_LABELS[s.class] || s.class }); }
-    } else { aiSingles.add(s.id); }
-  }
+  const { aiKeep, aiGrouped, aiSingles } = useMemo(() => {
+    const keep = aiFiltered.filter(s => aiKeepClasses.has(s.class));
+    const grouped: { cls: string; label: string }[] = [];
+    const singles = new Set<string>();
+    const seenCls = new Set<string>();
+    for (const s of keep) {
+      if (INJECTABLE_WITH_ESTERS.has(s.class)) {
+        if (!seenCls.has(s.class)) { seenCls.add(s.class); grouped.push({ cls: s.class, label: CLASS_LABELS[s.class] || s.class }); }
+      } else { singles.add(s.id); }
+    }
+    return { aiKeep: keep, aiGrouped: grouped, aiSingles: singles };
+  }, [aiFiltered]);
 
   const addEntry = () => setEntries([...entries, { drug: 'testosterone_enanthate', doseMgWeek: 300 }]);
   const removeEntry = (i: number) => setEntries(entries.filter((_, idx) => idx !== i));
@@ -171,7 +174,10 @@ const AndrogenicIndexCalculator: React.FC = () => {
 
 export const DosageCalculatorTab: React.FC = () => {
   const [dosageSub, setDosageSub] = useState<'dosage' | 'androgen'>('dosage');
-  const allPharma = Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass));
+  const allPharma = useMemo(
+    () => Object.values(PHARMA_DB).filter((s) => PHARMA_CLASSES.includes(s.class as PharmaClass)),
+    []
+  );
   const [drug, setDrug] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [dosageClass, setDosageClass] = useState('');
@@ -216,15 +222,18 @@ export const DosageCalculatorTab: React.FC = () => {
   const wastePerVial = vialMl && doseResult ? Math.max(0, vialMl - (doseResult?.dosesPerVial || 0) * doseResult.volumeMl) : 0;
 
   const KEEP_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','drostanolone','pct_gonadotropin']);
-  const pharmaFiltered = allPharma.filter(p => KEEP_CLASSES.has(p.class));
-  const grouped: { type: 'class'; cls: string; label: string }[] = [];
-  const singles: typeof pharmaFiltered = [];
-  const seenClasses = new Set<string>();
-  for (const p of pharmaFiltered) {
-    if (INJECTABLE_WITH_ESTERS.has(p.class)) {
-      if (!seenClasses.has(p.class)) { seenClasses.add(p.class); grouped.push({ type:'class', cls: p.class, label: CLASS_LABELS[p.class] || p.class }); }
-    } else { singles.push(p); }
-  }
+  const { pharmaFiltered, grouped, singles } = useMemo(() => {
+    const filtered = allPharma.filter(p => KEEP_CLASSES.has(p.class));
+    const grouped: { type: 'class'; cls: string; label: string }[] = [];
+    const singles: typeof filtered = [];
+    const seenClasses = new Set<string>();
+    for (const p of filtered) {
+      if (INJECTABLE_WITH_ESTERS.has(p.class)) {
+        if (!seenClasses.has(p.class)) { seenClasses.add(p.class); grouped.push({ type:'class', cls: p.class, label: CLASS_LABELS[p.class] || p.class }); }
+      } else { singles.push(p); }
+    }
+    return { pharmaFiltered: filtered, grouped, singles };
+  }, [allPharma]);
 
   return (
     <div>

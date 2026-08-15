@@ -46,6 +46,9 @@ const FREQ_SHORT: Record<string, string> = {
 
 const UNIT_OPTIONS = ['mg/wk', 'mg', 'mcg', 'IU', 'ml'];
 
+const subClassOf = (id: string) => PHARMA_DB[id]?.class ?? '';
+const classColorOf = (cls: string) => CLASS_COLORS[cls] || 'var(--accent)';
+
 const pillStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '2px 8px', borderRadius: 10, fontSize: 10,
@@ -152,7 +155,7 @@ export const PharmaCourseScreen: React.FC = () => {
   };
 
   const subName = (id: string) => PHARMA_DB[id]?.name ?? id;
-  const subClass = (id: string) => PHARMA_DB[id]?.class ?? '';
+  const subClass = subClassOf;
 
   const startEdit = (e: CourseEntry) => {
     setEditId(e.id);
@@ -179,7 +182,7 @@ export const PharmaCourseScreen: React.FC = () => {
     return FREQ_SHORT[entry.frequency] || entry.frequency;
   };
 
-  const classColor = (cls: string) => CLASS_COLORS[cls] || 'var(--accent)';
+  const classColor = classColorOf;
 
   const totalWeeks = course.reduce((max, e) => Math.max(max, e.endWeek || 0), 0);
 
