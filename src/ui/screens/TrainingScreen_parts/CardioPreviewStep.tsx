@@ -4,7 +4,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  cardioCycleSummary, cardioQualityReport, CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
+  cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel, CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
   type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
@@ -123,7 +123,7 @@ export const CardioPreviewStep: React.FC<{
                   {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
                 </span>
                 <span style={{ flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {w.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}×${s.weeklyFrequency}`).join(' · ')}
+                  {w.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}×${s.weeklyFrequency}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join('  |  ')}
                 </span>
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', minWidth: 74, textAlign: 'right' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
               </div>

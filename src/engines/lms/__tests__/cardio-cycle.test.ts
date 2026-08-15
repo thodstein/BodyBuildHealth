@@ -559,3 +559,46 @@ describe('cardioQualityReport', () => {
     expect(r.score).toBeLessThanOrEqual(100);
   });
 });
+
+// ─── Персонализация: уровень, оборудование, суставы, возраст ───
+
+describe('персонализация подбора', () => {
+  it('level: новичок ×0.8, продвинутый ×1.15 (минуты сессий)', () => {
+    const base = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    const nov = buildCardioCycle({ goal: 'health', totalWeeks: 6, level: 'beginner' });
+    const adv = buildCardioCycle({ goal: 'health', totalWeeks: 6, level: 'advanced' });
+    expect(nov.weeks[0].totalMinutes).toBeLessThan(base.weeks[0].totalMinutes);
+    expect(adv.weeks[0].totalMinutes).toBeGreaterThan(base.weeks[0].totalMinutes);
+  });
+
+  it('equipment: сессии получают выбранное оборудование', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, equipment: ['cycling', 'rowing'] });
+    for (const w of c.weeks) {
+      for (const s of w.sessions) {
+        expect(['cycling', 'rowing']).toContain(s.equipment);
+      }
+    }
+    expect(c.rationale.some(r => r.includes('Оборудование'))).toBe(true);
+  });
+
+  it('lowImpact: бег исключается, даже если выбран', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, equipment: ['running'], lowImpact: true });
+    for (const w of c.weeks) {
+      for (const s of w.sessions) expect(s.equipment).not.toBe('running');
+    }
+    expect(c.rationale.some(r => r.includes('низкоударное'))).toBe(true);
+  });
+
+  it('age: zone2-сессии получают целевой пульс (60-70% ЧССмакс)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, age: 40 });
+    const z2 = c.weeks[0].sessions.find(s => s.type === 'zone2')!;
+    expect(z2.targetHr?.min).toBe(Math.round(180 * 0.6));
+    expect(z2.targetHr?.max).toBe(Math.round(180 * 0.7));
+  });
+
+  it('без level/equipment/age поведение не меняется (обратная совместимость)', () => {
+    const a = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    expect(a.weeks[0].sessions[0].equipment).toBe('running');
+    expect(a.weeks[0].sessions[0].targetHr).toBeUndefined();
+  });
+});

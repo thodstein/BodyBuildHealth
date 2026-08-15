@@ -12,6 +12,27 @@
 
 export type CardioType = 'zone2' | 'hiit' | 'miss' | 'recovery';
 
+/** Оборудование/форма кардио (влияет на подбор при ограничениях суставов). */
+export type CardioEquipment = 'running' | 'cycling' | 'rowing' | 'elliptical' | 'walking' | 'swimming';
+
+export const CARDIO_EQUIPMENT_OPTIONS: { id: CardioEquipment; label: string; icon: string; impact: 'high' | 'low' }[] = [
+  { id: 'running', label: 'Бег', icon: '🏃', impact: 'high' },
+  { id: 'cycling', label: 'Вело', icon: '🚴', impact: 'low' },
+  { id: 'rowing', label: 'Гребля', icon: '🚣', impact: 'low' },
+  { id: 'elliptical', label: 'Эллипс', icon: '🧘', impact: 'low' },
+  { id: 'walking', label: 'Ходьба', icon: '🚶', impact: 'low' },
+  { id: 'swimming', label: 'Плавание', icon: '🏊', impact: 'low' },
+];
+
+export function cardioEquipmentLabel(id: CardioEquipment): string {
+  return CARDIO_EQUIPMENT_OPTIONS.find(e => e.id === id)?.label ?? id;
+}
+
+/** Уровень подготовки: корректирует стартовый объём. */
+export type CardioLevel = 'beginner' | 'intermediate' | 'advanced';
+export const CARDIO_LEVEL_MULT: Record<CardioLevel, number> = { beginner: 0.8, intermediate: 1, advanced: 1.15 };
+export const CARDIO_LEVEL_LABELS: Record<CardioLevel, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый' };
+
 export interface CardioSession {
   id?: string;
   type: CardioType;
@@ -23,6 +44,8 @@ export interface CardioSession {
   targetHr?: { min?: number; max?: number };
   dayOfWeek?: number;
   restrictions?: string[];
+  /** Предпочтительное оборудование для сессии (персонализация подбора). */
+  equipment?: CardioEquipment;
 }
 
 export interface CardioPlan {
@@ -92,6 +115,14 @@ export interface CardioCycleInput {
   taperWeeks?: number;
   /** Строить пик-неделю старта (по умолчанию true; false → неделя старта лёгкая taper). */
   peakWeek?: boolean;
+  /** Уровень подготовки (корректирует стартовый объём: 0.8/1/1.15). */
+  level?: CardioLevel;
+  /** Предпочтительное оборудование (до 3). */
+  equipment?: CardioEquipment[];
+  /** Щадить суставы: исключает ударные виды (бег). */
+  lowImpact?: boolean;
+  /** Возраст — для целевых пульс-зон сессий (Karvonen/ЧССмакс). */
+  age?: number;
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
@@ -383,6 +414,11 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
         maintenance: input.phaseSplit.maintenance != null ? clamp(Math.round(input.phaseSplit.maintenance), 0, Math.max(0, totalWeeks - 2)) : 0,
       }
     : undefined;
+  const levelMult = CARDIO_LEVEL_MULT[input.level ?? 'intermediate'];
+  const lowImpact = !!input.lowImpact;
+  const equipmentPool = (input.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
+  const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
+  const zones = input.age != null ? cardioHeartZones(input.age) : undefined;
   const profile = profileForGoal(input.goal);
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
@@ -398,6 +434,19 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
         .map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * profile.deloadMult)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * profile.deloadMult)) }));
       rationale.push('Делод: объём кардио снижен, HIIT убран.');
     }
+    // Персонализация: уровень (объём), оборудование, целевые пульс-зоны
+    sessions = sessions.map(s => {
+      const dur = Math.max(10, Math.round(s.durationMin * levelMult));
+      const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
+      const zone = s.type === 'hiit' ? zones?.[3] : s.type === 'miss' ? zones?.[2] : zones?.[1];
+      return {
+        ...s,
+        durationMin: dur,
+        kcalPerSession: kcalForCardio(s.type, dur, bw),
+        equipment: equip,
+        targetHr: zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr,
+      };
+    });
     if (daysAvailable < 7) sessions = capSessionsToDays(sessions, daysAvailable);
     const weekMinutes = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
     const weekKcal = sessions.reduce((s, x) => s + x.kcalPerSession * x.weeklyFrequency, 0);
@@ -421,6 +470,10 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     rationale: [],
   };
   cycle.rationale.push(`Цель: ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()}, ${totalWeeks} нед, ${daysAvailable} дн/нед.`);
+  if (input.level && input.level !== 'intermediate') cycle.rationale.push(`Уровень: ${CARDIO_LEVEL_LABELS[input.level].toLowerCase()} (объём ×${levelMult}).`);
+  if (equipmentPool.length > 0) cycle.rationale.push(`Оборудование: ${equipmentPool.map(e => cardioEquipmentLabel(e)).join(', ')}${lowImpact ? ' (низкоударное)' : ''}.`);
+  else if (lowImpact) cycle.rationale.push('Оборудование: низкоударное (ходьба/вело/эллипс по умолчанию).');
+  if (input.age != null) cycle.rationale.push(`Возраст ${input.age} — целевые пульс-зоны сессий заданы.`);
   if (recoveryLow) cycle.rationale.push('Низкое восстановление: HIIT исключён.');
   if (competitions.length > 0) {
     cycle.rationale.push(`Соревнования: ${competitions.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}.`);

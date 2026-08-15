@@ -164,4 +164,15 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByRole('button', { name: /Цель: Массонабор/ })).toBeTruthy();
     unmount();
   });
+
+  it('персонализация: уровень и оборудование влияют на собранный цикл', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Продвинутый/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Оборудование: Вело/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const saved = loadCardioCycles()[0];
+    expect(saved.weeks[0].sessions[0].equipment).toBe('cycling');
+  });
 });

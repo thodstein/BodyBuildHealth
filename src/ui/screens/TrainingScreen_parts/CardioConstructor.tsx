@@ -12,8 +12,8 @@ import {
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
-  cardioSessionsForDate,
-  type CardioCycle, type CardioGoal, type CardioCompetitionRef,
+  cardioSessionsForDate, cardioEquipmentLabel,
+  type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
@@ -66,6 +66,10 @@ interface WizardState {
   phaseBase: number;
   phaseBuild: number;
   phaseMaint: number;
+  level: CardioLevel;
+  equipment: CardioEquipment[];
+  lowImpact: boolean;
+  age: number;
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -128,6 +132,10 @@ export const CardioConstructor: React.FC = () => {
   });
   const [taperWeeks, setTaperWeeks] = useState(wizard.taperWeeks ?? 2);
   const [peakWeek, setPeakWeek] = useState(wizard.peakWeek ?? true);
+  const [level, setLevel] = useState<CardioLevel>(wizard.level ?? 'intermediate');
+  const [equipment, setEquipment] = useState<CardioEquipment[]>(wizard.equipment ?? []);
+  const [lowImpact, setLowImpact] = useState(wizard.lowImpact ?? false);
+  const [age, setAge] = useState(String(wizard.age ?? 30));
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -178,6 +186,10 @@ export const CardioConstructor: React.FC = () => {
       competitions: comps,
       taperWeeks,
       peakWeek,
+      level,
+      equipment,
+      lowImpact,
+      age: Math.max(12, Math.min(90, Number(age) || 30)),
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     });
     saveCardioCycle(c);
@@ -267,10 +279,11 @@ export const CardioConstructor: React.FC = () => {
       const s: WizardState = {
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
+        level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)),
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify(s));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -299,7 +312,7 @@ export const CardioConstructor: React.FC = () => {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {todayCardio && todayCardio.sessions.length > 0 && (
             <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px' }}>
-              🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин`).join(' · ')}
+              🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')}
             </div>
           )}
           {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
@@ -343,6 +356,10 @@ export const CardioConstructor: React.FC = () => {
           comps={comps}
           bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
           taperWeeks={taperWeeks} peakWeek={peakWeek}
+          level={level} setLevel={setLevel}
+          equipment={equipment} setEquipment={setEquipment}
+          lowImpact={lowImpact} setLowImpact={setLowImpact}
+          age={age} setAge={setAge}
         />
       )}
       {step === 'comps' && (

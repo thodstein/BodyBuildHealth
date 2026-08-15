@@ -5,7 +5,8 @@
 import React, { useMemo } from 'react';
 import {
   buildCardioCycle, cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PRESETS,
-  type CardioCycle, type CardioGoal,
+  CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS,
+  type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
 
@@ -59,13 +60,25 @@ export const CardioParamsStep: React.FC<{
   setBodyWeight: (n: number) => void;
   taperWeeks: number;
   peakWeek: boolean;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek }) => {
+  level: CardioLevel;
+  setLevel: (l: CardioLevel) => void;
+  equipment: CardioEquipment[];
+  setEquipment: (e: CardioEquipment[]) => void;
+  lowImpact: boolean;
+  setLowImpact: (v: boolean) => void;
+  age: string;
+  setAge: (v: string) => void;
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
     for (const c of comps) {
       if (c.week < taperWeeks + 1) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper (${taperWeeks} нед) не влезает.`);
     }
+    if (lowImpact && equipment.includes('running')) {
+      warnings.push('«Щадить суставы» включено, но выбран бег — бег заменяется низкоударным видом.');
+    }
+    const ageNum = Math.max(12, Math.min(90, Number(age) || 30));
     try {
       const cycle = buildCardioCycle({
         goal,
@@ -76,12 +89,16 @@ export const CardioParamsStep: React.FC<{
         competitions: comps,
         taperWeeks,
         peakWeek,
+        level,
+        equipment,
+        lowImpact,
+        age: ageNum,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         source: 'auto',
       });
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek, level, equipment, lowImpact, age]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -91,6 +108,11 @@ export const CardioParamsStep: React.FC<{
     setTotalWeeks(p.totalWeeks);
     setDaysAvailable(p.daysAvailable);
     setRecoveryLow(p.recoveryLow);
+  };
+
+  const toggleEquipment = (e: CardioEquipment) => {
+    if (equipment.includes(e)) setEquipment(equipment.filter(x => x !== e));
+    else if (equipment.length < 3) setEquipment([...equipment, e]);
   };
 
   return (
@@ -178,6 +200,52 @@ export const CardioParamsStep: React.FC<{
         >
           {recoveryLow ? '🧘 Низкое восстановление (HIIT убран)' : '🟢 Восстановление в норме'}
         </button>
+      </div>
+
+      {/* Персонализация: уровень, оборудование, суставы, возраст */}
+      <div style={CARD}>
+        <div style={LABEL}>🎚 Уровень подготовки</div>
+        <div style={ROW}>
+          {(Object.keys(CARDIO_LEVEL_LABELS) as CardioLevel[]).map(l => (
+            <button
+              key={l}
+              style={level === l ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+              onClick={() => setLevel(l)}
+            >
+              {CARDIO_LEVEL_LABELS[l]}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Новичок — объём ×0.8, продвинутый — ×1.15.
+        </div>
+      </div>
+
+      <div style={CARD}>
+        <div style={LABEL}>🏃 Оборудование (до 3)</div>
+        <div style={ROW}>
+          {CARDIO_EQUIPMENT_OPTIONS.map(e => (
+            <button
+              key={e.id}
+              style={equipment.includes(e.id) ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : { ...BTN, opacity: lowImpact && e.impact === 'high' ? 0.4 : 1 }}
+              onClick={() => toggleEquipment(e.id)}
+              disabled={lowImpact && e.impact === 'high'}
+              aria-label={`Оборудование: ${e.label}`}
+            >
+              {e.icon} {e.label}
+            </button>
+          ))}
+        </div>
+        <button
+          style={lowImpact ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+          onClick={() => setLowImpact(!lowImpact)}
+        >
+          {lowImpact ? '🦴 Щадить суставы: вкл' : 'Щадить суставы: выкл'}
+        </button>
+        <div style={ROW}>
+          <span style={LABEL}>Возраст (пульс-зоны)</span>
+          <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={{ width: 70, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Возраст" />
+        </div>
       </div>
 
       {/* Живой предпросмотр */}
