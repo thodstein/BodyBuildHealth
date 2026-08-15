@@ -1,6 +1,6 @@
 /**
- * cardio-constructor.test.tsx — SSR/CSR smoke отдельного кардио-конструктора:
- * сборка цикла, библиотека, подключение к силовому плану (cardio-bridge).
+ * cardio-constructor.test.tsx — SSR/CSR smoke пошагового мастера кардио:
+ * степпер, сборка, интеграции, библиотека, дневник.
  */
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
@@ -9,6 +9,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioConstructor } from '../CardioConstructor';
 import { getCardioLink, clearCardioLink } from '../../../../engines/lms/cardio-bridge';
 import { buildBbMacrocycle, serializeBbMacro, deserializeBbMacro } from '../../../../engines/lms/macrocycle.engine';
+import { loadCardioCycles } from '../../../../engines/lms/cardio.engine';
 
 const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
@@ -26,63 +27,68 @@ beforeEach(() => {
 });
 
 describe('CardioConstructor — SSR', () => {
-  it('рендерит заголовок, кнопки и селектор цели', () => {
+  it('рендерит степпер из 5 шагов и навигацию', () => {
     const html = renderToStaticMarkup(<CardioConstructor />);
     expect(html).toContain('Кардио-конструктор');
-    expect(html).toContain('Собрать цикл');
-    expect(html).toContain('Сушка');
-    expect(html).toContain('Подключить к ПЛ-авто');
+    expect(html).toContain('1 Параметры');
+    expect(html).toContain('2 Старты');
+    expect(html).toContain('3 Предпросмотр');
+    expect(html).toContain('4 Управление');
+    expect(html).toContain('5 Дневник');
+    expect(html).toContain('Назад');
   });
 
-  it('пустая библиотека показывает подсказку', () => {
+  it('шаг 1 показывает цель и горизонт', () => {
     const html = renderToStaticMarkup(<CardioConstructor />);
-    expect(html).toContain('Пока пусто');
+    expect(html).toContain('Цель цикла');
+    expect(html).toContain('Сушка');
+    expect(html).toContain('Горизонт');
   });
 });
 
 describe('CardioConstructor — CSR', () => {
-  it('«Собрать цикл» создаёт цикл, сохраняет в библиотеку и показывает недели', () => {
+  it('навигация: Далее → Далее → предпросмотр с CTA сборки', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
-    expect(screen.getByText(/✅ Кардио-цикл собран/)).toBeTruthy();
-    expect(screen.getByText(/нед с HIIT/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Недели/ })).toBeTruthy();
-    const saved = JSON.parse(localStorage.getItem(CYCLES_KEY) ?? '[]');
-    expect(saved).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Соревнования и старты/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Соберите кардио-цикл/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Собрать и сохранить цикл/ })).toBeTruthy();
   });
 
-  it('после сборки доступны проф-инструменты: авто-режим, график, редактор недели', () => {
+  it('сборка на предпросмотре сохраняет цикл в библиотеку и показывает метрики', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
-    expect(screen.getByRole('button', { name: /Подстроить сейчас/ })).toBeTruthy();
-    expect(screen.getByText(/Объём по неделям/)).toBeTruthy();
-    expect(screen.getByText(/Ручная настройка недели/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    expect(screen.getByText(/Мин\/нед/)).toBeTruthy();
+    expect(screen.getByText(/Ккал\/нед/)).toBeTruthy();
+    expect(loadCardioCycles().length).toBe(1);
+    expect(JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null')).toBeTruthy();
   });
 
-  it('подключение к ПЛ-авто фиксируется в cardio-bridge', () => {
+  it('шаг 4: подключение к ПЛ-авто фиксируется в cardio-bridge', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Подключить к ПЛ-авто/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /К ПЛ-авто/ }));
     expect(getCardioLink()?.sport).toBe('pl');
     expect(screen.getByText(/Подключено к ПЛ-авто/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Отключить/ }));
     expect(getCardioLink()).toBeNull();
   });
 
-  it('«Из недельного плана» мигрирует план в CardioCycle', () => {
-    render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Из недельного плана/ }));
-    expect(screen.getByText(/мигрирован/)).toBeTruthy();
-    const saved = JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null');
-    expect(saved?.totalWeeks).toBe(1);
-  });
-
-  it('привязка к годовому плану ББ сохраняет cardioCycleId в макроцикл', () => {
+  it('шаг 4: привязка к годовому плану ББ сохраняет cardioCycleId в макроцикл', () => {
     const macro = buildBbMacrocycle({ level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy' });
     localStorage.setItem(BB_MACRO_KEY, serializeBbMacro(macro));
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Привязать к плану ББ/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /К плану ББ/ }));
     expect(screen.getByText(/Привязано к годовому плану ББ/)).toBeTruthy();
     const restored = deserializeBbMacro(localStorage.getItem(BB_MACRO_KEY) ?? '');
     expect(restored?.cardioCycleId).toBeTruthy();
@@ -90,11 +96,24 @@ describe('CardioConstructor — CSR', () => {
     expect(deserializeBbMacro(localStorage.getItem(BB_MACRO_KEY) ?? '')?.cardioCycleId).toBeUndefined();
   });
 
-  it('«⇄» сравнивает активный цикл с циклом из библиотеки', () => {
+  it('шаг 4: сравнение сценариев показывает дифф', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Собрать цикл/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Из недельного плана/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Сравнить Кардио сушка 12 нед/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /⇄ Сравнить/ }));
     expect(screen.getByText(/→/)).toBeTruthy();
+  });
+
+  it('шаг 5: доступны авто-режим и дневник', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByRole('button', { name: /Подстроить сейчас/ })).toBeTruthy();
+    expect(screen.getByText(/Дневник выполнения кардио/)).toBeTruthy();
   });
 });
