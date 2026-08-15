@@ -64,13 +64,16 @@
 - [x] **E3. PL и BB cardio taper adapters** — `applyPLCardioTaper`/`applyBBCardioTaper` (идемпотентны,
       делод-недели не режутся повторно) + `adaptCardioToStrength` (ACWR caution/dangerous, частые ноги,
       recoveryLow). Кардио-сессии НЕ добавляются в силовые планы — только в CardioCycle.
-- [~] **E4. Интеграционные блоки** — ✅ ручной конструктор: `CardioLinkCard` в ProgramEditorView
-      (статус связи, открыть конструктор через событие `planning-track-open`, пересчёт под ACWR,
-      отключение). ⏳ ПЛ-авто и ББ-авто: карточка готова, вставка отложена до фикса чужих WIP
-      (`SRCBBScreen.tsx`/`BbAutoConstructor.tsx` заняты другим агентом).
+- [~] **E4. Интеграционные блоки** — ✅ ручной конструктор (`CardioLinkCard` в ProgramEditorView),
+      ✅ ПЛ-авто (`SRCBBScreen`, вкладка «🗓 Годовой план»), ✅ ББ-авто (`BbAutoConstructor`, шаг
+      «🗓 Годовой план»): статус связи, открыть конструктор через событие `planning-track-open`,
+      пересчёт под ACWR, отключение. Осталось по желанию: подтверждение diff перед пересчётом.
 - [x] **E5. Дневник кардио и feedback** — `he_cardio_sessions` (`cardio-diary.engine.ts`):
       CRUD (cap 500), статы 7/28 дн (минуты/RPE/ЧСС/ккал), adherence недели и сводка,
       `computeCardioAdvice` (ACWR/RPE/план → снизить/сохранить/увеличить); UI `CardioDiaryPanel`.
+- [x] **E6. Привязка к годовому плану и кардио-слой** — `macrocycle.cardioCycleId` (PL v7/BB v8,
+      обратная совместимость), helpers attach/detach; «❤️ Кардио» в «Итог года» (мини-heatmap фаз,
+      минуты/ккал, «📍 сейчас»); сравнение сценариев (`compareCardioCycles`, кнопка «⇄»).
 - [x] Полная спецификация: `docs/CARDIO-CYCLE-INTEGRATION-PLAN.md`.
 
 ## Порядок реализации
@@ -85,5 +88,6 @@
 8. C10 (перемещение блоков) — реализован в Раунде K. **Роадмап A-D закрыт.**
 9. Дальше: D15 чек-ин prep (вес/фото), B7 переходные делоды в ПЛ-пути, A5 readiness→объём.
 10. Кардио: E1 доменная модель → E2 отдельный конструктор → E3 taper → E4 интеграции → E5 дневник —
-    реализованы (43f7c610…e779012a). Осталось: вставка CardioLinkCard в ПЛ-авто/ББ-авто после фикса
-    чужих WIP, кардио-слой на heatmap года (MacrocyclePanel — чужой WIP).
+    реализованы (43f7c610…5b82b9f0). E4: карточки в ручном/ПЛ-авто/ББ-авто, E6: привязка к макро
+    и кардио-слой «Итог года». Осталось по желанию: подтверждение diff при пересчёте, сравнение
+    сценариев в MacrocyclePanel (сейчас в CardioConstructor).
