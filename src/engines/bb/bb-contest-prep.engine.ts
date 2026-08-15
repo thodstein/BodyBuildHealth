@@ -35,6 +35,38 @@ export type WaterStrategy = 'classic' | 'moderate' | 'minimal';
 export type SodiumStrategy = 'constant' | 'cut_2d' | 'cut_3d';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
+/** Специализация к соревнованиям — упор на мышцу/группу, которую подтягиваем к пику. */
+export type ContestSpecialization =
+  | 'none'
+  | 'chest' | 'back' | 'shoulders' | 'arms'
+  | 'biceps' | 'triceps'
+  | 'quads' | 'hamstrings' | 'glutes' | 'calves'
+  | 'abs' | 'traps';
+
+export const CONTEST_SPECIALIZATION_LABELS: Record<ContestSpecialization, string> = {
+  none: 'Без специализации',
+  chest: 'Грудь',
+  back: 'Спина',
+  shoulders: 'Плечи',
+  arms: 'Руки (бицепс+трицепс)',
+  biceps: 'Бицепс',
+  triceps: 'Трицепс',
+  quads: 'Квадрицепс',
+  hamstrings: 'Бицепс бедра',
+  glutes: 'Ягодицы',
+  calves: 'Икры',
+  abs: 'Пресс',
+  traps: 'Трапеции',
+};
+
+/** Соревнование в календаре подготовки (поддержка нескольких стартов). */
+export interface ContestEventEntry {
+  id: string;
+  name: string;
+  date?: string;              // ISO yyyy-mm-dd (если нет — используется showDate/неделя макроцикла)
+  priority?: 'A' | 'B' | 'C'; // A — главный старт, B — контрольный, C — тренировочный
+}
+
 export interface BBContestPrepConfig {
   // ── Атлет ──
   sex: 'male' | 'female';
@@ -46,8 +78,13 @@ export interface BBContestPrepConfig {
   prepCount: number;                // сколько пиков уже пройдено (0 → консервативно)
 
   // ── Тайминг ──
-  showDate: string;                 // ISO yyyy-mm-dd (день 7 пик-недели)
+  showDate: string;                 // ISO yyyy-mm-dd (день 7 пик-недели; при соревнованиях — fallback)
   weeksOut: number;                 // 1..4 — сколько последних недель плана покрывает тапер
+
+  // ── Соревнования и специализация ──
+  competitions?: ContestEventEntry[];  // несколько стартов (пик-неделя строится под ГЛАВНЫЙ)
+  mainCompetitionId?: string;          // id главного соревнования (иначе авто: A > B > первое)
+  specialization?: ContestSpecialization; // упор на мышцу к соревнованиям (объём щадится в тапере, добивка в пик-неделе)
 
   // ── Стратегии ──
   trainingProtocol: PeakingProtocol;   // кривая тапера из Библиотеки (bb/classic/pl)
@@ -108,6 +145,9 @@ export interface BBContestPrepResult {
   taper: TrainingTaperWeek[];
   peakWeek: PeakWeekDayPlan[];
   showTimeline: ShowTimelineItem[];
+  /** Соревнования (сортированы по дате/приоритету) и главное из них. */
+  competitions: ContestEventEntry[];
+  mainCompetition: ContestEventEntry | null;
   readiness: {
     targetBf: number | null;
     gap: number | null;
@@ -126,13 +166,15 @@ export interface ConfigValidationResult {
   forced: Partial<BBContestPrepConfig>;
 }
 
-/** BB-план с маркером наложенного тапера (идемпотентность). */
+/** BB-план с маркером наложенного тапера (идемпотентность, мульти-соревнования). */
 export interface BBPlanWithPrep extends BBPlan {
   contestPrep?: {
     showDate: string;
     protocol: PeakingProtocol;
     weeksOut: number;
     appliedAt: string;
+    /** 1-индекс недель плана, к которым уже применён тапер/пик-неделя. */
+    appliedWeeks?: number[];
   };
 }
 
@@ -195,6 +237,51 @@ export const CATEGORY_PROFILES: Record<BBContestCategory, CategoryProfile> = {
 export const CONTEST_CATEGORY_LABELS: Record<BBContestCategory, string> = Object.fromEntries(
   (Object.keys(CATEGORY_PROFILES) as BBContestCategory[]).map(k => [k, CATEGORY_PROFILES[k].label]),
 ) as Record<BBContestCategory, string>;
+
+/** Канонические мышцы BB-планов, на которые влияет специализация. */
+const SPEC_TO_MUSCLES: Record<Exclude<ContestSpecialization, 'none'>, string[]> = {
+  chest: ['chest'],
+  back: ['back'],
+  shoulders: ['shoulders', 'delt_front', 'delt_mid', 'delt_rear'],
+  arms: ['biceps', 'triceps', 'forearms'],
+  biceps: ['biceps'],
+  triceps: ['triceps'],
+  quads: ['quads'],
+  hamstrings: ['hamstrings'],
+  glutes: ['glutes'],
+  calves: ['calves'],
+  abs: ['abs'],
+  traps: ['traps'],
+};
+
+/** Совпадает ли мышца упражнения со специализацией. */
+export function muscleMatchesSpecialization(muscle: string | null | undefined, spec: ContestSpecialization | undefined): boolean {
+  if (!spec || spec === 'none') return false;
+  const targets = SPEC_TO_MUSCLES[spec] ?? [];
+  const m = String(muscle || '').toLowerCase();
+  return targets.some(t => m === t || m.includes(t) || t.includes(m));
+}
+
+/** Главное соревнование: явный id → авто (A > B > первое) → null. */
+export function resolveMainCompetition(cfg: BBContestPrepConfig): ContestEventEntry | null {
+  const comps = Array.isArray(cfg.competitions) ? cfg.competitions : [];
+  if (comps.length === 0) return null;
+  if (cfg.mainCompetitionId) {
+    const found = comps.find(c => c.id === cfg.mainCompetitionId);
+    if (found) return found;
+  }
+  return comps.find(c => c.priority === 'A')
+    ?? comps.find(c => c.priority === 'B')
+    ?? comps[0]
+    ?? null;
+}
+
+/** Дата главного шоу: дата главного соревнования или showDate. */
+export function resolveShowDate(cfg: BBContestPrepConfig): string {
+  const main = resolveMainCompetition(cfg);
+  if (main?.date && isValidIsoDate(main.date)) return main.date;
+  return cfg.showDate;
+}
 
 /** Фазы по дням (день 1 = D-6, день 7 = шоу). */
 const PHASES_BY_STRATEGY: Record<CarbLoadStrategy, PeakDayPhase[]> = {
@@ -334,6 +421,31 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   if (cfg.schedule && (cfg.schedule.wake != null || cfg.schedule.stage != null)) {
     const okTime = (t?: string) => t == null || /^\d{2}:\d{2}$/.test(t);
     if (!okTime(cfg.schedule.wake) || !okTime(cfg.schedule.stage)) errors.push('schedule.wake/stage должны быть в формате HH:mm.');
+  }
+  // ── Соревнования и специализация ──
+  const comps = Array.isArray(cfg.competitions) ? cfg.competitions : [];
+  const compIds = new Set<string>();
+  for (const c of comps) {
+    if (!c || typeof c.id !== 'string' || !c.id.trim() || typeof c.name !== 'string' || !c.name.trim()) {
+      errors.push('Каждое соревнование должно иметь id и название.');
+      continue;
+    }
+    if (compIds.has(c.id)) errors.push(`Дублирующийся id соревнования: ${c.id}`);
+    compIds.add(c.id);
+    if (c.date != null && !isValidIsoDate(c.date)) errors.push(`Дата соревнования «${c.name}» некорректна (нужно ISO yyyy-mm-dd).`);
+    if (c.priority != null && !['A', 'B', 'C'].includes(c.priority)) errors.push(`Приоритет соревнования «${c.name}» должен быть A/B/C.`);
+  }
+  if (cfg.mainCompetitionId && !compIds.has(cfg.mainCompetitionId)) {
+    errors.push(`Главное соревнование ${cfg.mainCompetitionId} не найдено в списке.`);
+  }
+  if (comps.length > 0 && !cfg.mainCompetitionId && !comps.some(c => c.priority === 'A')) {
+    warnings.push('💡 Укажите главное соревнование (или приоритет A) — пик-неделя строится под главный старт.');
+  }
+  if (comps.filter(c => c.priority === 'A').length > 1) {
+    warnings.push('⚠ Несколько соревнований с приоритетом A — выберите одно главное (mainCompetitionId).');
+  }
+  if (cfg.specialization != null && !(cfg.specialization in CONTEST_SPECIALIZATION_LABELS)) {
+    errors.push(`Неизвестная специализация: ${cfg.specialization}`);
   }
 
   // ── Принудительные безопасные моды по противопоказаниям ──
@@ -633,12 +745,22 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepRe
   if (!v.ok) {
     throw new Error(`Некорректный конфиг тапера ББ: ${v.errors.join(' ')}`);
   }
-  const cfg = applyForcedModes(rawCfg);
+  const base = applyForcedModes(rawCfg);
+  const showDate = resolveShowDate(base);
+  const cfg: BBContestPrepConfig = { ...base, showDate };
   const profile = CATEGORY_PROFILES[cfg.category];
   const taper = buildTrainingTaper(cfg);
   const peakWeek = buildPeakWeek(cfg);
   const showTimeline = buildShowTimeline(cfg);
   const readiness = computeReadiness(cfg);
+
+  const competitions = [...(Array.isArray(cfg.competitions) ? cfg.competitions : [])].sort((a, b) => {
+    if (a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1;
+    const pr = { A: 0, B: 1, C: 2 };
+    return (pr[a.priority ?? 'C'] ?? 2) - (pr[b.priority ?? 'C'] ?? 2);
+  });
+  const mainCompetition = resolveMainCompetition(cfg);
+  const spec = cfg.specialization;
 
   const warnings = [...v.warnings];
   const rationale = [
@@ -648,9 +770,16 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepRe
     `💧 Вода: ${cfg.waterStrategy}; 🧂 натрий: ${cfg.sodiumStrategy}; калий ${peakWeek[0]?.potassiumMg ?? 3500} мг — не снижается.`,
     `🎭 Позирование ${POSING_BY_DAY[1]}–${POSING_BY_DAY[7]} мин/день; день шоу — памп-рутина backstage.`,
   ];
+  if (competitions.length > 0) {
+    rationale.push(`🏁 Соревнования (${competitions.length}): ${competitions.map(c => `${c.name}${c.priority ? ` [${c.priority}]` : ''}`).join(', ')}.`);
+    if (mainCompetition) rationale.push(`⭐ Главный старт: «${mainCompetition.name}»${mainCompetition.date ? ` (${mainCompetition.date})` : ''} — пик-неделя и тапер строятся под него.`);
+  }
+  if (spec && spec !== 'none') {
+    rationale.push(`⭐ Специализация: ${CONTEST_SPECIALIZATION_LABELS[spec]} — объём целевой мышцы щадится в тапере и добивается в памп-сессиях пик-недели.`);
+  }
   if (cfg.enhanced) rationale.push('💉 На курсе: карбс-толерантность выше; диуретики — только врач.');
 
-  return { config: cfg, taper, peakWeek, showTimeline, readiness, warnings, rationale };
+  return { config: cfg, taper, peakWeek, showTimeline, competitions, mainCompetition, readiness, warnings, rationale };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -662,12 +791,13 @@ export function buildBBContestPrep(rawCfg: BBContestPrepConfig): BBContestPrepRe
  * День 1 = D-6, день 7 = шоу.
  */
 export function peakWeekDayForDate(dateIso: string, cfg: BBContestPrepConfig): PeakWeekDayPlan | null {
-  if (!isValidIsoDate(dateIso) || !isValidIsoDate(cfg.showDate)) return null;
-  const diff = daysBetween(dateIso, cfg.showDate); // дней от date до шоу
-  if (diff < 0 || diff > 6) return null;
+  if (!isValidIsoDate(dateIso)) return null;
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return null;
-  const peakWeek = buildPeakWeek(cfg);
+  const showDate = resolveShowDate(cfg);
+  const diff = daysBetween(dateIso, showDate); // дней от date до шоу
+  if (diff < 0 || diff > 6) return null;
+  const peakWeek = buildPeakWeek({ ...cfg, showDate });
   // diff = дней от date до шоу: 0 → шоу (день 7), 6 → день 1 (D-6).
   return peakWeek[6 - diff] ?? null;
 }
@@ -735,26 +865,28 @@ function toPeakWeekSession(
     };
   }
   const exercises = session.exercises.map(e => {
-    const baseSets = Math.max(2, Math.round((e.sets || 3) * 0.8));
+    const isSpec = muscleMatchesSpecialization((e as any).muscle, cfg.specialization);
+    const baseSets = Math.max(2, Math.round((e.sets || 3) * 0.8)) + (isSpec ? 2 : 0); // ⭐ спец-добивка в пик-неделе
+    const finalSets = Math.min(5, baseSets);
     const template: any = (e.workSets || [])[0] || { reps: 15, rir: 2, weight: 0 };
     return {
       ...e,
-      sets: baseSets,
+      sets: finalSets,
       repsRange: [15, 20] as [number, number],
       rir: 2,
       tempoSpec: '2-1-1-0',
       restSeconds: 60,
       warmupSets: [],
-      workSets: Array.from({ length: baseSets }, (_, i) => ({
-        ...(e.workSets?.[i] ?? template),
+      workSets: Array.from({ length: finalSets }, (_, i) => ({
+        ...(e.workSets?.[i % Math.max(1, (e.workSets || []).length)] ?? template),
         reps: 15,
         rir: 2,
-        weight: Math.round((e.workSets?.[i]?.weight ?? template.weight ?? 0) * 0.6 * 10) / 10,
+        weight: Math.round((e.workSets?.[i % Math.max(1, (e.workSets || []).length)]?.weight ?? template.weight ?? 0) * 0.6 * 10) / 10,
         tempo: '2-1-1-0',
         restSeconds: 60,
       })),
-      comment: `🎭 Пик-неделя (${training.type.toLowerCase()}): памп 15–20 повт, без отказа, ~60% веса. [Peak week: ${training.type}]`,
-      rationale: `Пик-неделя: деплеция гликогена, памп-режим. ${training.details[0] ?? ''}`,
+      comment: `🎭 Пик-неделя (${training.type.toLowerCase()}): памп 15–20 повт, без отказа, ~60% веса.${isSpec ? ' ⭐ Спец-добивка (целевая мышца).' : ''} [Peak week: ${training.type}]`,
+      rationale: `Пик-неделя: деплеция гликогена, памп-режим.${isSpec ? ' Специализация: приоритет целевой мышцы.' : ''} ${training.details[0] ?? ''}`,
     };
   });
   return { ...session, exercises, peakWeekTraining: true };
@@ -763,7 +895,8 @@ function toPeakWeekSession(
 /**
  * Наложить тренировочный тапер (кривая Библиотеки) на недели плана, предшествующие
  * неделе шоу, и превратить неделю шоу в пик-неделю. НЕ мутирует исходный план.
- * Идемпотентен: повторный вызов на уже обработанном плане возвращает его как есть.
+ * Идемпотентен per-week: недели, уже обработанные тапером/пик-неделей, пропускаются,
+ * поэтому можно накладывать тапер на НЕСКОЛЬКО недель шоу (несколько соревнований).
  * `opts.weekNumber` — 1-индекс недели шоу (по умолчанию последняя; клампится к краям).
  */
 export function applyTrainingTaperToBBPlan(
@@ -774,9 +907,9 @@ export function applyTrainingTaperToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const cfg = applyForcedModes(rawCfg);
+  const base = applyForcedModes(rawCfg);
+  const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
-  if (existing) return plan as BBPlanWithPrep;
 
   const taper = buildTrainingTaper(cfg);
   const n = taper.length;
@@ -786,12 +919,17 @@ export function applyTrainingTaperToBBPlan(
   const startIdx = Math.max(0, endIdx - n + 1);
   const windowLen = endIdx - startIdx + 1;
   const usedTaper = taper.slice(n - windowLen);
+  const appliedWeeks: number[] = [];
+
+  const weekAlreadyPrepped = (wk: any): boolean =>
+    wk.peakWeek === true || (typeof wk.prepProtocol === 'string' && wk.prepProtocol.length > 0 && !wk.prepProtocol.startsWith('Пропущена'));
 
   for (let i = 0; i < windowLen; i++) {
     const idx = startIdx + i;
     const wk = weeks[idx];
     const t = usedTaper[i];
     if (!t) break;
+    if (weekAlreadyPrepped(wk)) continue; // idempotent per-week (другое соревнование)
 
     // Guard: не резать уже разгруженные недели (anti-двойное снижение, как PL-taper).
     const isDeload = wk.deload === true || wk.phase === 'deload'
@@ -807,7 +945,10 @@ export function applyTrainingTaperToBBPlan(
 
     for (const s of wk.sessions) {
       s.exercises = s.exercises.map((e: any) => {
-        const newSets = Math.max(2, Math.round((e.sets || 0) * t.volumePct));
+        const isSpec = muscleMatchesSpecialization(e.muscle, cfg.specialization);
+        // ⭐ Специализация: целевая мышца щадится — объём режется мягче (×1.25 к множителю).
+        const effMult = isSpec ? Math.min(1, t.volumePct * 1.25) : t.volumePct;
+        const newSets = Math.max(2, Math.round((e.sets || 0) * effMult));
         const source = e.workSets || [];
         const template = source[source.length - 1] || { reps: (e.repsRange?.[0] ?? 10), rir: e.rir, weight: 0 };
         const workSets = Array.from({ length: newSets }, (_, si) => ({
@@ -820,40 +961,50 @@ export function applyTrainingTaperToBBPlan(
           sets: newSets,
           rir: rirClamp(e.rir),
           workSets,
-          comment: `${e.comment || ''} 📉 Тапер: ${t.label} (объём ${Math.round(t.volumePct * 100)}%, вес ${Math.round(t.intensityPct * 100)}%).`,
+          comment: `${e.comment || ''} 📉 Тапер: ${t.label} (объём ${Math.round(effMult * 100)}%, вес ${Math.round(t.intensityPct * 100)}%).${isSpec ? ' ⭐ Спец: объём щадится.' : ''}`,
         };
       });
     }
     wk.phase = 'peaking';
     wk.taper = true;
     wk.prepProtocol = `${getPeakingProtocol(cfg.trainingProtocol).name} — ${t.label}`;
+    appliedWeeks.push(idx + 1);
   }
 
   // Неделя шоу → пик-неделя (памп/деплеция, отдых).
   if (windowLen > 0) {
     const wk = weeks[endIdx];
-    const peakWeek = buildPeakWeek(cfg);
-    wk.phase = 'peaking';
-    wk.taper = true;
-    wk.peakWeek = true;
-    wk.sessions = wk.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
-    wk.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
+    // Guard только против ПРОШЛЫХ применений (peakWeek), а не против собственного
+    // тапер-прохода этой недели — тапер и пик-трансформация в одном вызове совместимы.
+    if (wk.peakWeek !== true) {
+      const peakWeek = buildPeakWeek(cfg);
+      wk.phase = 'peaking';
+      wk.taper = true;
+      wk.peakWeek = true;
+      wk.sessions = wk.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
+      wk.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
+      appliedWeeks.push(endIdx + 1);
+    }
   }
 
+  const applied = appliedWeeks.length > 0;
   const result = {
     ...plan,
     weeks,
-    rationale: [
-      ...(plan.rationale || []),
-      `🏁 Тапер ББ наложен: «${getPeakingProtocol(cfg.trainingProtocol).name}» (${cfg.weeksOut} нед) + пик-неделя (шоу ${cfg.showDate}).`,
-      `🍚 Питание пик-недели: ${cfg.carbLoadStrategy} загрузка, вода ${cfg.waterStrategy}, натрий ${cfg.sodiumStrategy} — см. блок «Питание → Тапер ББ».`,
-    ],
+    rationale: applied
+      ? [
+          ...(plan.rationale || []),
+          `🏁 Тапер ББ наложен (нед ${appliedWeeks.join(', ')}): «${getPeakingProtocol(cfg.trainingProtocol).name}» (${cfg.weeksOut} нед) + пик-неделя (шоу ${cfg.showDate}).`,
+          `🍚 Питание пик-недели: ${cfg.carbLoadStrategy} загрузка, вода ${cfg.waterStrategy}, натрий ${cfg.sodiumStrategy} — см. блок «Питание → Тапер ББ».`,
+        ]
+      : plan.rationale,
   };
   (result as BBPlanWithPrep).contestPrep = {
-    showDate: cfg.showDate,
+    showDate: existing?.showDate ?? cfg.showDate,
     protocol: cfg.trainingProtocol,
     weeksOut: cfg.weeksOut,
     appliedAt: new Date().toISOString(),
+    appliedWeeks: [...(existing?.appliedWeeks ?? []), ...appliedWeeks],
   };
   return result as BBPlanWithPrep;
 }
@@ -861,6 +1012,7 @@ export function applyTrainingTaperToBBPlan(
 /**
  * Оверлей только пик-недели (без недельного тапера) — на конкретную неделю плана
  * (по умолчанию финальная; `opts.weekNumber` — 1-индекс, клампится к краям).
+ * Идемпотентен per-week — можно накладывать на несколько недель шоу.
  */
 export function applyPeakWeekOverlayToBBPlan(
   plan: BBPlan,
@@ -870,34 +1022,41 @@ export function applyPeakWeekOverlayToBBPlan(
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
   if (!v.ok) return plan as BBPlanWithPrep;
-  const cfg = applyForcedModes(rawCfg);
+  const base = applyForcedModes(rawCfg);
+  const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
-  if (existing) return plan as BBPlanWithPrep;
 
   const weeks = plan.weeks.map(w => ({ ...w, sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: (e.workSets || []).map(ws => ({ ...ws })) })) })) })) as any[];
   const targetIdx = clamp((opts?.weekNumber ?? weeks.length) - 1, 0, weeks.length - 1);
   const target = weeks[targetIdx];
-  const peakWeek = buildPeakWeek(cfg);
-  target.phase = 'peaking';
-  target.deload = false;
-  target.taper = true;
-  target.peakWeek = true;
-  target.sessions = target.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
-  target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
+  let applied = false;
+  if (target.peakWeek !== true) {
+    const peakWeek = buildPeakWeek(cfg);
+    target.phase = 'peaking';
+    target.deload = false;
+    target.taper = true;
+    target.peakWeek = true;
+    target.sessions = target.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
+    target.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
+    applied = true;
+  }
 
   const result = {
     ...plan,
     weeks,
-    rationale: [
-      ...(plan.rationale || []),
-      `🎭 Пик-неделя наложена на неделю ${targetIdx + 1} (шоу ${cfg.showDate}): деплеция → загрузка → отдых → памп.`,
-    ],
+    rationale: applied
+      ? [
+          ...(plan.rationale || []),
+          `🎭 Пик-неделя наложена на неделю ${targetIdx + 1} (шоу ${cfg.showDate}): деплеция → загрузка → отдых → памп.`,
+        ]
+      : plan.rationale,
   };
   (result as BBPlanWithPrep).contestPrep = {
-    showDate: cfg.showDate,
+    showDate: existing?.showDate ?? cfg.showDate,
     protocol: cfg.trainingProtocol,
     weeksOut: cfg.weeksOut,
     appliedAt: new Date().toISOString(),
+    appliedWeeks: [...(existing?.appliedWeeks ?? []), ...(applied ? [targetIdx + 1] : [])],
   };
   return result as BBPlanWithPrep;
 }
@@ -935,6 +1094,20 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
     allergens: Array.isArray(c.allergens) ? c.allergens.filter((x): x is string => typeof x === 'string') : undefined,
     preferLowFiberCarbs: !!c.preferLowFiberCarbs,
     creatineStrategy: c.creatineStrategy === 'stop' ? 'stop' : c.creatineStrategy === 'continue' ? 'continue' : undefined,
+    competitions: Array.isArray(c.competitions)
+      ? c.competitions
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
+          .map(x => ({
+            id: String(x.id ?? ''),
+            name: String(x.name ?? ''),
+            date: x.date != null ? String(x.date) : undefined,
+            priority: x.priority === 'A' || x.priority === 'B' || x.priority === 'C' ? x.priority : undefined,
+          }))
+      : undefined,
+    mainCompetitionId: c.mainCompetitionId != null ? String(c.mainCompetitionId) : undefined,
+    specialization: (c.specialization != null && (c.specialization as string) in CONTEST_SPECIALIZATION_LABELS)
+      ? (c.specialization as ContestSpecialization)
+      : undefined,
     schedule: (c.schedule && typeof c.schedule === 'object' && (c.schedule as any).stage)
       ? { wake: String((c.schedule as any).wake || '07:00'), stage: String((c.schedule as any).stage || '12:00') }
       : undefined,

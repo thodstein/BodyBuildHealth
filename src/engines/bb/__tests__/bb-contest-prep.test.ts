@@ -24,6 +24,9 @@ import {
   deserializeBBPrepConfig,
   legacyConfigFromProfile,
   normalizeContestCategory,
+  resolveMainCompetition,
+  resolveShowDate,
+  muscleMatchesSpecialization,
   CATEGORY_PROFILES,
   type BBContestPrepConfig,
   type BBPlanWithPrep,
@@ -64,10 +67,10 @@ function baseConfig(over: Partial<BBContestPrepConfig> = {}): BBContestPrepConfi
   };
 }
 
-function makeExercise(sets = 4, weight = 60, rir = 2): any {
+function makeExercise(sets = 4, weight = 60, rir = 2, muscle = 'chest'): any {
   return {
-    muscle: 'chest',
-    name: 'Жим лёжа',
+    muscle,
+    name: muscle === 'chest' ? 'Жим лёжа' : muscle === 'back' ? 'Тяга в наклоне' : 'Жим стоя',
     role: 'primary',
     character: 'тяж',
     sets,
@@ -87,7 +90,11 @@ function makeWeek(week: number, sessionsCount = 4, sets = 4, deload = false): an
       day: i + 1,
       weekOffset: week * 7 + i,
       character: 'тяж',
-      exercises: [makeExercise(sets), makeExercise(sets, 40, 2), makeExercise(sets, 20, 3)],
+      exercises: [
+        makeExercise(sets),
+        makeExercise(sets, 40, 2, 'back'),
+        makeExercise(sets, 20, 3, 'shoulders'),
+      ],
     })),
   };
 }
@@ -529,12 +536,16 @@ describe('applyTrainingTaperToBBPlan', () => {
     expect(setsOf(w7)).toBe(setsOf(plan.weeks[6]));
   });
 
-  it('идемпотентен: повторный вызов возвращает план как есть', () => {
+  it('идемпотентен per-week: повторный вызов не режет дважды и не дублирует недели', () => {
     const plan = makePlan(8);
     const cfg = baseConfig();
     const once = applyTrainingTaperToBBPlan(plan, cfg) as BBPlanWithPrep;
     const twice = applyTrainingTaperToBBPlan(once, cfg) as BBPlanWithPrep;
-    expect(twice).toBe(once);
+    const setsOf = (w: any) => w.sessions.reduce((s: number, ss: any) => s + ss.exercises.reduce((x: number, e: any) => x + e.sets, 0), 0);
+    for (let i = 0; i < 8; i++) {
+      expect(setsOf(twice.weeks[i])).toBe(setsOf(once.weeks[i]));
+    }
+    expect((twice.contestPrep?.appliedWeeks ?? []).length).toBe((once.contestPrep?.appliedWeeks ?? []).length);
   });
 
   it('невалидный конфиг → план без изменений', () => {
@@ -591,10 +602,14 @@ describe('applyPeakWeekOverlayToBBPlan', () => {
     expect(out.weeks[6].sessions[0].exercises[0].sets).toBe(plan.weeks[6].sessions[0].exercises[0].sets);
   });
 
-  it('идемпотентен', () => {
+  it('идемпотентен per-week', () => {
     const plan = makePlan(8);
-    const once = applyPeakWeekOverlayToBBPlan(plan, baseConfig());
-    expect(applyPeakWeekOverlayToBBPlan(once, baseConfig())).toBe(once);
+    const once = applyPeakWeekOverlayToBBPlan(plan, baseConfig()) as BBPlanWithPrep;
+    const twice = applyPeakWeekOverlayToBBPlan(once, baseConfig()) as BBPlanWithPrep;
+    const setsOf = (w: any) => w.sessions.reduce((s: number, ss: any) => s + ss.exercises.reduce((x: number, e: any) => x + e.sets, 0), 0);
+    expect(setsOf(twice.weeks[7])).toBe(setsOf(once.weeks[7]));
+    expect(twice.weeks[7].peakWeek).toBe(true);
+    expect((twice.contestPrep?.appliedWeeks ?? []).length).toBe((once.contestPrep?.appliedWeeks ?? []).length);
   });
 
   it('weekNumber: применяет пик-неделю к указанной неделе (1-индекс)', () => {
@@ -673,6 +688,36 @@ describe('сериализация', () => {
     expect(cfg?.sodiumStrategy).toBe('constant');
     expect(cfg?.weeksOut).toBe(4);
   });
+
+  it('round-trip с соревнованиями и специализацией', () => {
+    const cfg = baseConfig({
+      competitions: [
+        { id: 'c1', name: 'Главное шоу', date: '2026-12-12', priority: 'A' },
+        { id: 'c2', name: 'Контрольный старт', date: '2026-11-01', priority: 'B' },
+      ],
+      mainCompetitionId: 'c1',
+      specialization: 'chest',
+    });
+    const back = deserializeBBPrepConfig(serializeBBPrepConfig(cfg));
+    expect(back?.competitions).toEqual(cfg.competitions);
+    expect(back?.mainCompetitionId).toBe('c1');
+    expect(back?.specialization).toBe('chest');
+  });
+
+  it('мусорные соревнования отфильтровываются, невалидный приоритет отбрасывается', () => {
+    const raw = {
+      ...baseConfig(),
+      competitions: [
+        'garbage',
+        { id: 'c1', name: 'Шоу', priority: 'X' },
+        { id: 'c2', name: 'ОК', priority: 'A', date: '2026-12-12' },
+      ],
+      specialization: 'nope',
+    };
+    const back = deserializeBBPrepConfig(JSON.stringify(raw));
+    expect(back?.competitions).toEqual([{ id: 'c1', name: 'Шоу', priority: undefined, date: undefined }, { id: 'c2', name: 'ОК', priority: 'A', date: '2026-12-12' }]);
+    expect(back?.specialization).toBeUndefined();
+  });
 });
 
 describe('normalizeContestCategory', () => {
@@ -726,5 +771,136 @@ describe('legacyConfigFromProfile', () => {  it('включённый стары
     const showDate = addDaysIso(todayIso(), 30);
     expect(legacyConfigFromProfile({ peakWeek: true, peakShowDay: showDate }, { sex: 'female' })?.category).toBe('bikini');
     expect(legacyConfigFromProfile({ peakWeek: true, peakShowDay: showDate }, { sex: 'male' })?.category).toBe('mens_physique');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Мульти-соревнования и специализация
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('мульти-соревнования', () => {
+  it('валидация: дубли id, битые даты и приоритеты — ошибки', () => {
+    const v = validateBBContestPrepConfig(baseConfig({
+      competitions: [
+        { id: 'c1', name: 'Шоу', date: 'не дата', priority: 'D' as any },
+        { id: 'c1', name: 'Дубль' },
+      ],
+    }));
+    expect(v.ok).toBe(false);
+    expect(v.errors.join(' ')).toMatch(/Дублирующийся/);
+    expect(v.errors.join(' ')).toMatch(/некорректна/);
+    expect(v.errors.join(' ')).toMatch(/A\/B\/C/);
+  });
+
+  it('mainCompetitionId не из списка — ошибка', () => {
+    const v = validateBBContestPrepConfig(baseConfig({
+      competitions: [{ id: 'c1', name: 'Шоу' }],
+      mainCompetitionId: 'ghost',
+    }));
+    expect(v.ok).toBe(false);
+  });
+
+  it('без явного главного и без A — warning; с A — авто-выбор', () => {
+    const cfgNoA = baseConfig({ competitions: [{ id: 'c1', name: 'X', priority: 'B' }, { id: 'c2', name: 'Y', priority: 'C' }] });
+    const v = validateBBContestPrepConfig(cfgNoA);
+    expect(v.warnings.join(' ')).toMatch(/главное/);
+    expect(resolveMainCompetition(cfgNoA)?.id).toBe('c1');
+
+    const cfgA = baseConfig({ competitions: [{ id: 'c1', name: 'X', priority: 'B' }, { id: 'c2', name: 'Y', priority: 'A', date: addDaysIso(todayIso(), 30) }] });
+    expect(resolveMainCompetition(cfgA)?.id).toBe('c2');
+    expect(resolveShowDate(cfgA)).toBe(cfgA.competitions![1].date);
+  });
+
+  it('несколько A без явного главного — warning', () => {
+    const v = validateBBContestPrepConfig(baseConfig({
+      competitions: [{ id: 'c1', name: 'X', priority: 'A' }, { id: 'c2', name: 'Y', priority: 'A' }],
+    }));
+    expect(v.warnings.join(' ')).toMatch(/Несколько соревнований с приоритетом A/);
+  });
+
+  it('пик-неделя строится под дату ГЛАВНОГО соревнования', () => {
+    const showDate = addDaysIso(todayIso(), 40);
+    const cfg = baseConfig({
+      competitions: [
+        { id: 'c1', name: 'Главное', date: showDate, priority: 'A' },
+        { id: 'c2', name: 'Контрольное', date: addDaysIso(todayIso(), 12), priority: 'B' },
+      ],
+    });
+    const res = buildBBContestPrep(cfg);
+    expect(res.config.showDate).toBe(showDate);
+    expect(res.peakWeek[6].date).toBe(showDate);
+    expect(res.mainCompetition?.id).toBe('c1');
+    expect(res.competitions).toHaveLength(2);
+    expect(res.rationale.join(' ')).toMatch(/Главный старт: «Главное»/);
+  });
+
+  it('без соревнований — поведение одиночного шоу (mainCompetition null)', () => {
+    const res = buildBBContestPrep(baseConfig());
+    expect(res.competitions).toEqual([]);
+    expect(res.mainCompetition).toBeNull();
+  });
+
+  it('печатная сводка: multiple применения тапера к РАЗНЫМ неделям — обе применяются', () => {
+    const plan = makePlan(10);
+    const cfg = baseConfig({ weeksOut: 3 });
+    const first = applyTrainingTaperToBBPlan(plan, cfg, { weekNumber: 4 }) as BBPlanWithPrep;
+    const second = applyTrainingTaperToBBPlan(first, cfg, { weekNumber: 9 }) as BBPlanWithPrep;
+    expect(second.weeks[3].peakWeek).toBe(true);
+    expect(second.weeks[8].peakWeek).toBe(true);
+    expect(second.contestPrep?.appliedWeeks).toContain(4);
+    expect(second.contestPrep?.appliedWeeks).toContain(9);
+    // Недели 5-8 (между) — тапер второй недели задел 7-8; неделя 6 не должна быть затронута дважды.
+    const setsOf = (w: any) => w.sessions.reduce((s: number, ss: any) => s + ss.exercises.reduce((x: number, e: any) => x + e.sets, 0), 0);
+    expect(setsOf(second.weeks[5])).toBe(setsOf(plan.weeks[5]));
+  });
+
+  it('повторное применение к ТОЙ ЖЕ неделе — не режет дважды (per-week идемпотентность)', () => {
+    const plan = makePlan(10);
+    const cfg = baseConfig({ weeksOut: 3 });
+    const once = applyTrainingTaperToBBPlan(plan, cfg, { weekNumber: 5 }) as BBPlanWithPrep;
+    const twice = applyTrainingTaperToBBPlan(once, cfg, { weekNumber: 5 }) as BBPlanWithPrep;
+    const setsOf = (w: any) => w.sessions.reduce((s: number, ss: any) => s + ss.exercises.reduce((x: number, e: any) => x + e.sets, 0), 0);
+    expect(setsOf(twice.weeks[3])).toBe(setsOf(once.weeks[3]));
+    expect(setsOf(twice.weeks[4])).toBe(setsOf(once.weeks[4]));
+  });
+});
+
+describe('специализация', () => {
+  it('специализация: целевая мышца щадится в тапере (объём выше, чем у остальных)', () => {
+    const plan = makePlan(10);
+    const cfg = baseConfig({ weeksOut: 3, specialization: 'chest' });
+    const out = applyTrainingTaperToBBPlan(plan, cfg, { weekNumber: 9 }) as BBPlanWithPrep;
+    // Неделя 7 (тапер 0.80): грудь — ×(0.8*1.25=1.0), остальные ×0.8
+    const wk = out.weeks[6];
+    const chestEx = wk.sessions[0].exercises.find((e: any) => e.muscle === 'chest');
+    const otherEx = wk.sessions[0].exercises.find((e: any) => e.muscle !== 'chest');
+    expect(chestEx.sets).toBeGreaterThan(otherEx.sets);
+    expect(String(chestEx.comment)).toMatch(/Спец/);
+  });
+
+  it('специализация: в пик-неделе целевая мышца получает добивку (+2 сета, cap 5)', () => {
+    const lightPlan: BBPlan = { ...makePlan(10), weeks: Array.from({ length: 10 }, (_, i) => makeWeek(i + 1, 4, 4)) };
+    const cfg2 = baseConfig({ weeksOut: 3, specialization: 'chest' });
+    const out2 = applyPeakWeekOverlayToBBPlan(lightPlan, cfg2, { weekNumber: 9 }) as BBPlanWithPrep;
+    const chestEx2 = out2.weeks[8].sessions[0].exercises.find((e: any) => e.muscle === 'chest');
+    const otherEx2 = out2.weeks[8].sessions[0].exercises.find((e: any) => e.muscle !== 'chest');
+    expect(chestEx2.sets).toBeGreaterThan(otherEx2.sets);
+    expect(chestEx2.sets).toBeLessThanOrEqual(5);
+    expect(String(chestEx2.comment)).toMatch(/Спец-добивка/);
+  });
+
+  it('muscleMatchesSpecialization: гранулярные дельты и руки', () => {
+    expect(muscleMatchesSpecialization('chest', 'chest')).toBe(true);
+    expect(muscleMatchesSpecialization('back', 'chest')).toBe(false);
+    expect(muscleMatchesSpecialization('delt_mid', 'shoulders')).toBe(true);
+    expect(muscleMatchesSpecialization('biceps', 'arms')).toBe(true);
+    expect(muscleMatchesSpecialization('triceps', 'arms')).toBe(true);
+    expect(muscleMatchesSpecialization('glutes', 'none')).toBe(false);
+    expect(muscleMatchesSpecialization('glutes', undefined)).toBe(false);
+  });
+
+  it('рационале содержит специализацию', () => {
+    const res = buildBBContestPrep(baseConfig({ specialization: 'back' }));
+    expect(res.rationale.join(' ')).toMatch(/Специализация: Спина/);
   });
 });

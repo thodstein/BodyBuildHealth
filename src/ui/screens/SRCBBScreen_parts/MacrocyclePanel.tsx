@@ -21,7 +21,7 @@ import { PopupNumber, PopupSelect } from './TrainingPopups';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
-import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, PEAK_PHASE_COLORS, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
+import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS, deserializeBBPrepConfig, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
 import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draft.engine';
 import { createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
@@ -664,19 +664,24 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           const category = normalizeContestCategory(builderCategory || pk.category, pk.sex);
           const comp = (bbMacro?.competitions ?? []).find(c => c.id === block.competitionId);
           const showDate = comp?.date ?? isoAddDays(isoToday(), Math.max(0, lastPrepWeek - 1) * 7);
+          // База — конфиг из профиля (goals.bbPeakConfig): стратегии, специализация,
+          // соревнования и главный старт переиспользуются единой системой.
+          const goals = (getProfile()?.settings as any)?.goals;
+          const storedCfg = goals?.bbPeakConfig ? deserializeBBPrepConfig(goals.bbPeakConfig) : null;
           const prepCfg: BBContestPrepConfig = {
+            ...(storedCfg ?? {}),
             sex: pk.sex,
             category,
             weightKg: Math.max(40, Math.min(200, pk.weight)),
-            experienceLevel: 'intermediate',
-            enhanced: false,
-            prepCount: 0,
+            experienceLevel: storedCfg?.experienceLevel ?? 'intermediate',
+            enhanced: storedCfg?.enhanced ?? false,
+            prepCount: storedCfg?.prepCount ?? 0,
             showDate,
-            weeksOut: 3,
-            trainingProtocol: 'bb',
-            carbLoadStrategy: 'moderate',
-            waterStrategy: 'minimal',
-            sodiumStrategy: 'constant',
+            weeksOut: Math.min(storedCfg?.weeksOut ?? 3, prepBlock?.weeks ?? 3),
+            trainingProtocol: storedCfg?.trainingProtocol ?? 'bb',
+            carbLoadStrategy: storedCfg?.carbLoadStrategy ?? 'moderate',
+            waterStrategy: storedCfg?.waterStrategy ?? 'minimal',
+            sodiumStrategy: storedCfg?.sodiumStrategy ?? 'constant',
           };
           plan = applyPeakWeekOverlayToBBPlan(plan, prepCfg, { weekNumber: lastPrepWeek });
         }
@@ -1391,19 +1396,23 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     const showDate = comp?.date ?? isoAddDays(isoToday(), Math.max(0, activeBlock.weekOffset + activeBlock.weeks - 2) * 7);
                     let res: BBContestPrepResult | null = null;
                     try {
+                      // База — конфиг из профиля (специализация/соревнования/стратегии).
+                      const goals = (getProfile()?.settings as any)?.goals;
+                      const storedCfg = goals?.bbPeakConfig ? deserializeBBPrepConfig(goals.bbPeakConfig) : null;
                       const prepCfg: BBContestPrepConfig = {
+                        ...(storedCfg ?? {}),
                         sex: pk.sex,
                         category,
                         weightKg: Math.max(40, Math.min(200, pk.weight)),
-                        experienceLevel: 'intermediate',
-                        enhanced: false,
-                        prepCount: 0,
+                        experienceLevel: storedCfg?.experienceLevel ?? 'intermediate',
+                        enhanced: storedCfg?.enhanced ?? false,
+                        prepCount: storedCfg?.prepCount ?? 0,
                         showDate,
-                        weeksOut: 3,
-                        trainingProtocol: 'bb',
-                        carbLoadStrategy: 'moderate',
-                        waterStrategy: 'minimal',
-                        sodiumStrategy: 'constant',
+                        weeksOut: Math.min(storedCfg?.weeksOut ?? 3, activeBlock.weeks ?? 3),
+                        trainingProtocol: storedCfg?.trainingProtocol ?? 'bb',
+                        carbLoadStrategy: storedCfg?.carbLoadStrategy ?? 'moderate',
+                        waterStrategy: storedCfg?.waterStrategy ?? 'minimal',
+                        sodiumStrategy: storedCfg?.sodiumStrategy ?? 'constant',
                       };
                       res = buildBBContestPrep(prepCfg);
                     } catch { res = null; }
@@ -1426,6 +1435,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                             </div>
                           )}
                         </div>
+                        {res?.config?.specialization && res.config.specialization !== 'none' && (
+                          <div style={{ marginTop: 4, fontSize: 9, color: '#c084fc' }}>
+                            ⭐ Специализация: {CONTEST_SPECIALIZATION_LABELS[res.config.specialization]} — упор в тапере и пик-неделе.
+                          </div>
+                        )}
                         {peakWeekOpen && (
                           <>
                             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>

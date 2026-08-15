@@ -14,8 +14,10 @@
 import React, { useMemo, useState } from 'react';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, isoToday, isoAddDays, isoDiffDays,
-  CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
+  CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS,
+  resolveMainCompetition,
   type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
+  type ContestSpecialization, type ContestEventEntry,
 } from '../../../../engines/bb/bb-contest-prep.engine';
 import { GlassCard } from './ui';
 import { usePlanCtx } from './IndividualPlanContext';
@@ -213,6 +215,19 @@ export const PeakWeekTab: React.FC = () => {
 
   const catsFor = draft.sex === 'female' ? FEMALE_CATS : MALE_CATS;
 
+  const SPECIALIZATIONS: ContestSpecialization[] = ['none', 'chest', 'back', 'shoulders', 'arms', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs', 'traps'];
+  const competitions = draft.competitions ?? [];
+  const patchCompetition = (id: string, p: Partial<ContestEventEntry>) =>
+    patch({ competitions: (draft.competitions || []).map(c => (c.id === id ? { ...c, ...p } : c)) });
+  const addCompetition = () =>
+    patch({ competitions: [...(draft.competitions || []), { id: `comp_${Date.now().toString(36)}`, name: `Старт ${(draft.competitions?.length ?? 0) + 1}`, priority: 'B' }] });
+  const removeCompetition = (id: string) =>
+    patch({
+      competitions: (draft.competitions || []).filter(c => c.id !== id),
+      mainCompetitionId: draft.mainCompetitionId === id ? undefined : draft.mainCompetitionId,
+    });
+  const resolveMainId = (c: BBContestPrepConfig): string | undefined => resolveMainCompetition(c)?.id;
+
   const readinessColor = !result ? '#60a5fa' : result.readiness.verdict === 'behind' ? '#f87171' : result.readiness.verdict === 'ahead' ? '#4ade80' : '#60a5fa';
   const countdownChip = daysToShow == null ? null : daysToShow < 0
     ? { text: `🎬 Шоу прошло (${-daysToShow} дн назад)`, color: '#94a3b8' }
@@ -355,6 +370,131 @@ export const PeakWeekTab: React.FC = () => {
             <ToggleChip label="Прекратить креатин" icon="💊" value={draft.creatineStrategy === 'stop'} onChange={v => patch({ creatineStrategy: v ? 'stop' : 'continue' })} />
           </div>
         </div>
+      </GlassCard>
+
+      <GlassCard title="Специализация к соревнованиям" icon="⭐" color="#a855f7">
+        <div style={{ fontSize: 9, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
+          Какую мышцу подтягиваем к старту: её объём щадится в тапере (режется мягче), а в памп-сессиях пик-недели она получает добивку.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
+          {SPECIALIZATIONS.map(s => {
+            const active = (draft.specialization ?? 'none') === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => patch({ specialization: s })}
+                style={{
+                  padding: '7px 8px', borderRadius: 10, cursor: 'pointer', minHeight: 40, fontSize: 9.5,
+                  fontWeight: active ? 800 : 600,
+                  background: active ? 'linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.08))' : 'rgba(255,255,255,0.04)',
+                  border: active ? '1px solid rgba(168,85,247,0.55)' : '1px solid rgba(255,255,255,0.09)',
+                  color: active ? '#c084fc' : 'rgba(255,255,255,0.7)',
+                  boxShadow: active ? '0 2px 12px rgba(168,85,247,0.25)' : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {active ? '★ ' : ''}{CONTEST_SPECIALIZATION_LABELS[s]}
+              </button>
+            );
+          })}
+        </div>
+      </GlassCard>
+
+      <GlassCard title={`Соревнования (${competitions.length || 1})`} icon="🏁" color="#ef4444">
+        <div style={{ fontSize: 9, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
+          Несколько стартов: тапер и пик-неделя строятся под <b style={{ color: '#fbbf24' }}>главное</b> (приоритет A или явный выбор).
+          В годовом планировщике тапер накладывается на каждый блок подготовки.
+        </div>
+        {competitions.length === 0 ? (
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', padding: '6px 0' }}>
+            Одно шоу — дата задана выше ({draft.showDate}).
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {competitions.map(c => {
+              const isMain = resolveMainId(draft) === c.id;
+              return (
+                <div key={c.id} style={{
+                  padding: 8, borderRadius: 10, border: isMain ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  background: isMain ? 'linear-gradient(135deg, rgba(251,191,36,0.1), rgba(24,24,27,0.4))' : 'rgba(255,255,255,0.02)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => patch({ mainCompetitionId: isMain ? undefined : c.id })}
+                      title={isMain ? 'Главное соревнование' : 'Сделать главным'}
+                      style={{
+                        flexShrink: 0, width: 34, height: 34, borderRadius: 10, cursor: 'pointer',
+                        fontSize: 14, border: isMain ? '1px solid rgba(251,191,36,0.6)' : '1px solid rgba(255,255,255,0.12)',
+                        background: isMain ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.03)',
+                        color: isMain ? '#fbbf24' : 'rgba(255,255,255,0.35)',
+                      }}
+                    >
+                      ★
+                    </button>
+                    <input
+                      type="text"
+                      value={c.name}
+                      placeholder="Название"
+                      onChange={e => patchCompetition(c.id, { name: e.target.value })}
+                      style={{
+                        flex: 1, minWidth: 0, padding: '7px 9px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.25)', color: '#fff', outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeCompetition(c.id)}
+                      aria-label="Удалить соревнование"
+                      style={{
+                        flexShrink: 0, width: 34, height: 34, borderRadius: 10, cursor: 'pointer', fontSize: 13,
+                        border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                    <div style={{
+                      borderRadius: 8, padding: '6px 9px', background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.09)', display: 'flex', flexDirection: 'column', gap: 1,
+                    }}>
+                      <span style={{ fontSize: 8, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4 }}>Дата (необязательно)</span>
+                      <input
+                        type="date"
+                        value={c.date ?? ''}
+                        onChange={e => patchCompetition(c.id, { date: e.target.value || undefined })}
+                        style={{ border: 'none', background: 'transparent', color: '#fbbf24', fontSize: 11, fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: 0 }}
+                      />
+                    </div>
+                    <PopupSelect
+                      label="Приоритет"
+                      value={c.priority ?? 'B'}
+                      options={[
+                        { id: 'A', label: 'A · главный', desc: 'Пик формы к этому старту.' },
+                        { id: 'B', label: 'B · контрольный', desc: 'Промежуточная проверка формы.' },
+                        { id: 'C', label: 'C · тренировочный', desc: 'Без отдельной пик-недели.' },
+                      ]}
+                      onChange={v => patchCompetition(c.id, { priority: v as any })}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={addCompetition}
+          style={{
+            width: '100%', marginTop: 8, padding: '9px', borderRadius: 10, cursor: 'pointer', minHeight: 44,
+            fontSize: 10, fontWeight: 800, border: '1px dashed rgba(239,68,68,0.4)',
+            background: 'rgba(239,68,68,0.06)', color: '#f87171',
+          }}
+        >
+          ＋ Добавить соревнование
+        </button>
       </GlassCard>
 
       <GlassCard title="Безопасность" icon="🛡" color="#60a5fa">

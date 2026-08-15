@@ -7,8 +7,8 @@ import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, deserializeBBPrepConfig, serializeBBPrepConfig,
-  isoAddDays, isoToday, isoDiffDays, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
-  type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
+  isoAddDays, isoToday, isoDiffDays, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS,
+  type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase, type ContestSpecialization,
 } from '../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#00e68a';
@@ -297,6 +297,21 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             <PopupSelect label="Категория" value={bbCfg.category} options={bbCats.map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))} onChange={v => bbPatch({ category: v as BBContestCategory })} />
             <PopupNumber label="Вес тела" value={bbCfg.weightKg} min={40} max={200} suffix="кг" onChange={v => bbPatch({ weightKg: v })} />
             <PopupNumber label="% жира сейчас" value={bbCfg.bodyFatPct ?? 0} min={0} max={60} step={0.5} suffix="%" hint="0 = не указан" onChange={v => bbPatch({ bodyFatPct: v > 0 ? v : undefined })} />
+            <PopupSelect
+              label="⭐ Специализация (упор)"
+              value={bbCfg.specialization ?? 'none'}
+              options={(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => ({ id: s, label: CONTEST_SPECIALIZATION_LABELS[s] }))}
+              onChange={v => bbPatch({ specialization: v as ContestSpecialization })}
+            />
+            <PopupSelect
+              label="Главное соревнование"
+              value={bbCfg.mainCompetitionId ?? ''}
+              options={[
+                { id: '', label: 'Одиночное шоу', desc: `Дата шоу: ${bbCfg.showDate}` },
+                ...(bbCfg.competitions ?? []).map(c => ({ id: c.id, label: c.name, desc: `${c.date ?? 'без даты'}${c.priority ? ` · ${c.priority}` : ''}` })),
+              ]}
+              onChange={v => bbPatch({ mainCompetitionId: v || undefined })}
+            />
             <PopupSelect label="Тренировочный протокол" value={bbCfg.trainingProtocol} options={[{ id: 'bb', label: 'ББ (4 нед)' }, { id: 'classic', label: 'Classic WF (4 нед)' }, { id: 'pl', label: 'ПЛ (3 нед)' }]} onChange={v => bbPatch({ trainingProtocol: v as any })} />
             <PopupSelect label="Недель тапера" value={String(bbCfg.weeksOut)} options={[1, 2, 3, 4].map(n => ({ id: String(n), label: `${n} нед` }))} onChange={v => bbPatch({ weeksOut: Number(v) })} />
             <PopupSelect label="🍚 Карб-загрузка" value={bbCfg.carbLoadStrategy} options={[{ id: 'moderate', label: 'Классика 3/3' }, { id: 'front', label: 'Front-load (раньше)' }, { id: 'back', label: 'Back-load (поздно)' }]} onChange={v => bbPatch({ carbLoadStrategy: v as any })} />

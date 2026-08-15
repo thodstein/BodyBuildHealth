@@ -10,7 +10,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
-import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, buildBBContestPrep, PEAK_PHASE_COLORS, PHASE_LABELS_RU } from '../../engines/bb/bb-contest-prep.engine';
+import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, buildBBContestPrep, isoAddDays, isoToday, PEAK_PHASE_COLORS, PHASE_LABELS_RU, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
@@ -779,7 +779,9 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     }, pedAdapt);
     const phased = applyMacrocycleToBBPlan(plan, macro);
     // 🏁 Тапер ББ: оверлей на макроцикл-план из профиля (goals.bbPeakConfig).
-    // Таргет — последняя неделя блока contest_prep (не обязательно конец плана).
+    // Мульти-соревнования: тапер + пик-неделя накладываются на КАЖДЫЙ блок
+    // contest_prep (неделя шоу = последняя неделя блока), недель тапера —
+    // не больше длины блока (не залезаем в соседнюю фазу).
     let finalPlan: BBPlan = phased;
     try {
       const goals = (linked.profile?.settings as any)?.goals;
@@ -787,12 +789,23 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, profData);
       if (prepCfg) {
         const blocks = Array.isArray((macro as any)?.blocks) ? (macro as any).blocks : [];
-        const lastPrepWeek = blocks
-          .filter((b: any) => b.phase === 'contest_prep')
-          .reduce((max: number, b: any) => Math.max(max, (b.weekOffset ?? 0) + (b.weeks ?? 0) - 1), 0);
-        finalPlan = lastPrepWeek > 0
-          ? applyTrainingTaperToBBPlan(phased, prepCfg, { weekNumber: lastPrepWeek })
-          : applyTrainingTaperToBBPlan(phased, prepCfg);
+        const prepBlocks = blocks.filter((b: any) => b.phase === 'contest_prep');
+        const macroEvents = Array.isArray((macro as any)?.competitions) ? (macro as any).competitions : [];
+        if (prepBlocks.length > 0) {
+          for (const b of prepBlocks) {
+            const lastWeek = (b.weekOffset ?? 0) + (b.weeks ?? 0) - 1;
+            if (lastWeek < 1) continue;
+            const event = b.competitionId ? macroEvents.find((c: any) => c.id === b.competitionId) : undefined;
+            const eventCfg: BBContestPrepConfig = {
+              ...prepCfg,
+              showDate: event?.date ?? isoAddDays(isoToday(), Math.max(0, lastWeek - 1) * 7),
+              weeksOut: Math.min(prepCfg.weeksOut, b.weeks ?? prepCfg.weeksOut),
+            };
+            finalPlan = applyTrainingTaperToBBPlan(finalPlan, eventCfg, { weekNumber: lastWeek });
+          }
+        } else {
+          finalPlan = applyTrainingTaperToBBPlan(phased, prepCfg);
+        }
       }
     } catch { /* оверлей не блокирует сборку */ }
     setBbWeeks(macro.totalWeeks);
