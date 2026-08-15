@@ -142,14 +142,15 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (p.goal) next.training.primaryGoal = p.goal as any;
     if (p.trainingFocus) next.training.trainingFocus = p.trainingFocus;
     if (p.level) next.training.level = p.level as any;
+    if (p.trainingYears !== undefined) next.training.experience = p.trainingYears;
     if (p.daysPerWeek) next.training.daysPerWeek = p.daysPerWeek;
     if (p.recovery) next.training.recovery = p.recovery;
     if (p.fatigue !== undefined) next.lifestyle.fatigueLevel = p.fatigue;
     if (p.sleepHours) next.lifestyle.sleepHours = p.sleepHours;
     if (p.stressLevel) next.lifestyle.stressLevel = p.stressLevel;
     if (p.weakPoints?.length) next.training.weakPoints = p.weakPoints;
-    if (p.favoriteExercises?.length) (next.training as any).favoriteExercises = p.favoriteExercises;
-    if (p.excludedExercises?.length) (next.training as any).excludedExercises = p.excludedExercises;
+    (next.training as any).favoriteExercises = p.favoriteExercises ?? [];
+    (next.training as any).excludedExercises = p.excludedExercises ?? [];
     if (p.avoidAxialLoad !== undefined) (next.training as any).avoidAxialLoad = p.avoidAxialLoad;
     if (p.equipment?.length) next.training.equipment = p.equipment;
     if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;

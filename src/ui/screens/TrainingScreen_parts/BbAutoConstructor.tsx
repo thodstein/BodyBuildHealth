@@ -34,11 +34,11 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
-import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
+import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply } from './planner-bridge';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
-import { PopupNumber, PopupSelect, PopupSelectSmart, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
@@ -221,6 +221,14 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbGoal, setBbGoal] = useState<string>(prof.goal === 'bulk' ? 'mass' : prof.goal || 'mass');
   const [bbDays, setBbDays] = useState<number>(prof.daysPerWeek || 4);
   const [bbWeeks, setBbWeeks] = useState<number>(8);
+  // Стаж + любимые/нелюбимые упражнения (синхронизируются с профилем тренированности).
+  const [bbTrainingYears, setBbTrainingYears] = useState<number>(prof.trainingYears || 3);
+  const [bbFavEx, setBbFavEx] = useState<string[]>(prof.favoriteExercises || []);
+  const [bbExclEx, setBbExclEx] = useState<string[]>(prof.excludedExercises || []);
+  // Синхронизация параметров шага 1 в профиль тренированности (legacy + UnifiedSettings).
+  const syncProf = useCallback((patch: Partial<TrainingProfile>) => {
+    try { saveTrainingProfile({ ...loadTrainingProfile(), ...patch }); } catch { /* silent */ }
+  }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
   const [bbFocus, setBbFocus] = useState<string>('');
@@ -525,7 +533,7 @@ export const BbAutoConstructor: React.FC = () => {
       weakPoints,
       hasDeload: autoDeload,
       onCourse: peds.length > 0,
-      trainingYears: prof.trainingYears,
+      trainingYears: bbTrainingYears,
       pedMultiplier: pedAdapt.combinedMrvMultiplier,
     });
     const result = validatePlanQuality(input);
@@ -539,7 +547,7 @@ export const BbAutoConstructor: React.FC = () => {
       })),
       recommendations: result.recommendations,
     };
-  }, [builtPlan, bbLevel, weakPoints, autoDeload, peds, prof.trainingYears, pedAdapt.combinedMrvMultiplier]);
+  }, [builtPlan, bbLevel, weakPoints, autoDeload, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier]);
 
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
@@ -695,15 +703,15 @@ export const BbAutoConstructor: React.FC = () => {
           deloadType,
           loadStrategy,
           autoRegResult: autoRegPayload,
-          favoriteExercises: prof.favoriteExercises || [],
-          excludedExercises: prof.excludedExercises || [],
+          favoriteExercises: bbFavEx,
+          excludedExercises: bbExclEx,
           avoidAxialLoad: prof.avoidAxialLoad || false,
           equipment: bbEquipment,
           peds,
            pedDoses,
            courseIntensity,
             level: bbLevel,
-            trainingYears: prof.trainingYears,
+            trainingYears: bbTrainingYears,
             bodyweightCapability: prof.bodyweightCapability,
            volumeGoal: bbVolGoal as any,
           specialization: specializationMode,
@@ -742,14 +750,14 @@ export const BbAutoConstructor: React.FC = () => {
           autoDeload,
           deloadType,
           autoRegResult: autoRegPayload,
-          favoriteExercises: prof.favoriteExercises || [],
-          excludedExercises: prof.excludedExercises || [],
+          favoriteExercises: bbFavEx,
+          excludedExercises: bbExclEx,
           avoidAxialLoad: prof.avoidAxialLoad || false,
           volumeGoal: bbVolGoal as any,
            specialization: specializationMode,
            focusGroup: bbFocus,
             level: bbLevel,
-            trainingYears: prof.trainingYears,
+            trainingYears: bbTrainingYears,
             bodyweightCapability: prof.bodyweightCapability,
             equipment: bbEquipment,
            mode: bbAdaptMode,
@@ -779,14 +787,14 @@ export const BbAutoConstructor: React.FC = () => {
       const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
       if (!pattern) return;
        plan = buildBBPlan({
-         patternId: selectedSplitId, level: bbLevel, trainingYears: prof.trainingYears, goal: bbGoal as any, weeks: bbWeeks,
+         patternId: selectedSplitId, level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, weeks: bbWeeks,
          bodyweightCapability: prof.bodyweightCapability,
         workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
         specialization: specializationMode,
         injuries,
         planStartWeek: new Date().toISOString().slice(0, 10),
-        favoriteExercises: prof.favoriteExercises || [],
-        excludedExercises: prof.excludedExercises || [],
+        favoriteExercises: bbFavEx,
+        excludedExercises: bbExclEx,
         avoidAxialLoad: prof.avoidAxialLoad || false,
         intensityTechnique: intensityTech,
         autoDeload,
@@ -1526,6 +1534,7 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
         <PopupSelect label="Уровень" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (PED)']].map(([id,label]) => ({ id, label }))} />
+        <PopupNumber label="Стаж" value={bbTrainingYears} min={0} max={50} step={0.5} suffix=" лет" onChange={v => { setBbTrainingYears(v); syncProf({ trainingYears: v }); }} />
         <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
         <PopupNumber label="Дней/нед" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
         <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
@@ -1596,6 +1605,23 @@ export const BbAutoConstructor: React.FC = () => {
            { id:'1.2', label:'1.2 — Выраженный eccentric overload (+20%)' },
          ]} />
          <PopupNumber label="🍽️ Профицит калорий (ккал/день)" value={calorieSurplus} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10% MRV. Дефицит <-200 → -20% MRV. 0 = нейтрально (Helms 2022)." />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+          <PopupExerciseList
+            label="⭐ Любимые упражнения"
+            ids={bbFavEx}
+            onChange={ids => { setBbFavEx(ids); syncProf({ favoriteExercises: ids }); }}
+            accent="#00e68a"
+          />
+          <PopupExerciseList
+            label="✕ Не любимые"
+            ids={bbExclEx}
+            onChange={ids => { setBbExclEx(ids); syncProf({ excludedExercises: ids }); }}
+            accent="#ef4444"
+          />
+        </div>
+        <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Любимые получают приоритет при отборе упражнений. Не любимые полностью исключаются из генерации плана. Синхронизируется с профилем (🧬 Профиль тренированности).
         </div>
       </div>
       )}
@@ -2612,7 +2638,7 @@ export const BbAutoConstructor: React.FC = () => {
           const b = validatePlan({
             weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints,
             readiness: ((prof.recovery ?? 7) * 10),
-            trainingYears: prof.trainingYears,
+            trainingYears: bbTrainingYears,
             mrvMultiplier: pedAdapt.combinedMrvMultiplier,
             mrvByMuscle: builtPlan.mrvByMuscle,
           });
@@ -2883,7 +2909,7 @@ export const BbAutoConstructor: React.FC = () => {
           const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints);
           if (garbage.length === 0) return null;
           const ctxParts: string[] = [`уровень ${bbLevel}`];
-          if (prof.trainingYears !== undefined) ctxParts.push(`стаж ${prof.trainingYears} лет`);
+          if (bbTrainingYears !== undefined) ctxParts.push(`стаж ${bbTrainingYears} лет`);
           if (weakPoints.length > 0) ctxParts.push(`слабые: ${weakPoints.join(', ')}`);
           return (
             <div style={{ ...CARD, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>

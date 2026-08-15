@@ -5,6 +5,7 @@
 import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, SliderInput, colors } from '../ui';
+import { PopupExerciseList } from '../../SRCBBScreen_parts/TrainingPopups';
 
 const SPORT_TYPES = [
   { id: 'bodybuilding', label: 'Бодибилдинг' },
@@ -125,6 +126,26 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
           />
         </div>
       </FieldRow>
+
+      <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <PopupExerciseList
+          label="⭐ Любимые упражнения"
+          ids={training.favoriteExercises || []}
+          onChange={ids => updateTraining({ favoriteExercises: ids })}
+          accent="#00e68a"
+        />
+        <PopupExerciseList
+          label="✕ Не любимые упражнения"
+          ids={training.excludedExercises || []}
+          onChange={ids => updateTraining({ excludedExercises: ids })}
+          accent="#ef4444"
+        />
+      </div>
+      <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>
+        Любимые получают приоритет при отборе упражнений в ББ-авто. Не любимые полностью исключаются из генерации плана.
+      </div>
     </AccordionSection>
   );
 });

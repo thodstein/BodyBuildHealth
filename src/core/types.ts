@@ -512,6 +512,18 @@ export interface UnifiedSettings {
     recovery: number;             // 1-10
     motivation: number;           // 1-10
     doms: number;                 // 1-10
+    favoriteExercises?: string[]; // любимые упражнения (id из EXERCISE_CATALOG)
+    excludedExercises?: string[]; // исключённые упражнения (id из EXERCISE_CATALOG)
+    avoidAxialLoad?: boolean;     // избегать осевой нагрузки на позвоночник
+    loadStrategy?: string;        // стратегия прогрессии весов
+    bodyweightCapability?: {      // способность к bodyweight-упражнениям
+      pullUpsStrict?: number;
+      chinUpsStrict?: number;
+      dipsStrict?: number;
+      pushUpsStrict?: number;
+      weightedPullUpLoad?: number;
+      assistedPullUpLoad?: number;
+    };
     // График тренировок для привязки рациона к тренировке (планировщик питания).
     // 'weekly' — фиксированные дни недели; 'eod' — через день; 'pattern' — цикл work/off.
     schedule?: {
@@ -770,6 +782,8 @@ export function getDefaultSettings(): UnifiedSettings {
       workMax: { chest: 100, back: 110, legs: 140, shoulders: 60, arms: 50, core: 60 },
       equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
       recovery: 7, motivation: 7, doms: 3,
+      favoriteExercises: [], excludedExercises: [], avoidAxialLoad: false,
+      loadStrategy: 'double_progression',
     },
     pharma: {
       phase: 'baseline', courseStartDate: new Date().toISOString().slice(0, 10),
