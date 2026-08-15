@@ -140,4 +140,24 @@ describe('applyPeakWeekToPlan', () => {
     expect(result.rationale.some(r => r.includes('Peak week'))).toBe(true);
     expect(result.rationale.some(r => r.includes('⚠'))).toBe(true);
   });
+
+  it('weekNumber: применяется к указанной неделе, а не последней (для prep-блока)', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 8 }));
+    const proto = buildPeakWeekProtocol(80, 'mens_physique', 'male');
+    const result = applyPeakWeekToPlan(plan, proto, 5);
+    expect(result.weeks[4].phase).toBe('peaking');
+    expect(result.weeks[4].deload).toBe(true);
+    // Последняя неделя НЕ тронута
+    expect(result.weeks[7].phase).not.toBe('peaking');
+    // Комментарий Peak week в целевом упражнении
+    const targetEx = result.weeks[4].sessions[0].exercises[0];
+    expect(String(targetEx.comment || '')).toContain('[Peak week:');
+  });
+
+  it('weekNumber за пределами диапазона → клампится к краям', () => {
+    const plan = buildBBPlan(makeInput({ weeks: 4 }));
+    const proto = buildPeakWeekProtocol(80, 'mens_physique', 'male');
+    expect(applyPeakWeekToPlan(plan, proto, 99).weeks[3].phase).toBe('peaking');
+    expect(applyPeakWeekToPlan(plan, proto, 0).weeks[0].phase).toBe('peaking');
+  });
 });

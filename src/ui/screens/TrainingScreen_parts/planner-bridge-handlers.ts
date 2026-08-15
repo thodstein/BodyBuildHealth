@@ -245,6 +245,13 @@ const methodologyHandler: Handler = (payload, { program: p, update, showToast })
 
 const programHandler: Handler = (payload, { onChange, showToast }) => {
   try {
+    // Готовая UserProgram из «Сборки цикла» Годового планировщика.
+    const direct = payload.data.program as UserProgram | undefined;
+    if (direct && direct.meta && (direct.bb || direct.pl)) {
+      onChange(direct);
+      showToast('🔗 Собранный цикл загружен: ' + payload.label);
+      return;
+    }
     const cycleId = payload.data.id ?? payload.data.meta?.id;
     let cloned: UserProgram | null = null;
     if (cycleId && typeof cycleId === 'string') {

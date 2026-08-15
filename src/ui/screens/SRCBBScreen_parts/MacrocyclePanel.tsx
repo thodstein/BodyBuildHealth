@@ -9,7 +9,7 @@ import {
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
   buildBbMacrocycle, rebalanceBbMacrocycle, serializeBbMacro, deserializeBbMacro,
   macroWeekStartDate, macroWeekEndDate, weeksUntilWeek, formatMacroDate,
-  projectPmGrowthMultiplier, taperWeeksForBlock,
+  projectPmGrowthMultiplier, taperWeeksForBlock, moveMacroBlock,
   PHASE_COLOR, PHASE_LABEL_RU, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, BB_PHASE_ICON,
   type Macrocycle, type MacroBlock, type MacroPhase, type MacroInput, type BBMacrocycle, type BBMacroBlock, type BBMacroPhase, type CompetitionEvent,
 } from '../../../engines/lms/macrocycle.engine';
@@ -596,6 +596,19 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const block = macro.blocks[idx];
     if (!block || !block.cycleId) return;
     onApplyCycle(block.cycleId, block.weeks);
+  };
+
+  // ⇄ Перемещение блока по таймлайну (C10): сдвиг + пересчёт недель.
+  const moveBlock = (dir: -1 | 1) => {
+    const src = isBB ? bbMacro : macro;
+    if (!src || selectedBlockIdx < 0) return;
+    const to = selectedBlockIdx + dir;
+    if (to < 0 || to >= src.blocks.length) return;
+    const moved = moveMacroBlock(src, selectedBlockIdx, to);
+    if (!moved) return;
+    if (isBB && bbMacro) setBbMacro(moved as BBMacrocycle);
+    else if (macro) setMacro(moved as Macrocycle);
+    setSelectedBlockIdx(to);
   };
 
   // ── ⚙️ Сборка цикла ББ: сплит + фазы ББ-макроцикла → BBPlan → ручной режим / ББ-авто ──
@@ -1307,7 +1320,19 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
              <div className="macrocycle-active-block" style={{ padding: 10, borderRadius: 8, background: abColor + '15', border: `1px solid ${abColor}40`, marginBottom: 8 }}>
                 <div className="macrocycle-active-block__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-light, #fff)', borderLeft: `3px solid ${abColor}`, paddingLeft: 6 }}>{abIcon} {abLabel}</span>
-                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Нед {activeBlock.weekOffset}–{activeBlock.weekOffset + activeBlock.weeks - 1} ({activeBlock.weeks} нед · {Math.round((activeBlock.weeks / Math.max(1, (isBB ? bbMacro!.totalWeeks : macro!.totalWeeks))) * 100)}% года)</span>
+                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                   <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>Нед {activeBlock.weekOffset}–{activeBlock.weekOffset + activeBlock.weeks - 1} ({activeBlock.weeks} нед · {Math.round((activeBlock.weeks / Math.max(1, (isBB ? bbMacro!.totalWeeks : macro!.totalWeeks))) * 100)}% года)</span>
+                   {(isBB ? bbMacro!.blocks.length : macro!.blocks.length) > 1 && (
+                     <span style={{ display: 'flex', gap: 2 }}>
+                       <button type="button" aria-label="Переместить блок влево" title="Переместить блок раньше"
+                         onClick={() => moveBlock(-1)}
+                         style={{ minHeight: 44, minWidth: 40, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 12 }}>◀</button>
+                       <button type="button" aria-label="Переместить блок вправо" title="Переместить блок позже"
+                         onClick={() => moveBlock(1)}
+                         style={{ minHeight: 44, minWidth: 40, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 12 }}>▶</button>
+                     </span>
+                   )}
+                 </span>
               </div>
               <div className="macrocycle-active-block__description" style={{ ...SMALL, marginBottom: 6 }}>{activeBlock.description}</div>
               <div style={{ ...SMALL, marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
