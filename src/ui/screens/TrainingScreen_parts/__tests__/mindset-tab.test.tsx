@@ -5,7 +5,7 @@
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
@@ -18,6 +18,7 @@ import { WorkoutWeekCard } from '../diary-cards';
 import { ZONES } from '../nav';
 import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
 import { SessionPlayer } from '../../SRCBBScreen_parts/SessionPlayer';
+import { TrainingCalendarTab } from '../TrainingCalendarTab';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
@@ -670,5 +671,18 @@ describe('Визуальные улучшения (степпер, кольца,
     const all = cats!.flatMap(c => c.tabs);
     expect(all).toContain('mindset');
     expect(all).toContain('mobility');
+  });
+
+  it('TrainingCalendarTab (CSR) показывает бейджи чек-инов на ячейках', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(MINDSET_CHECKS_KEY, JSON.stringify([{ id: 'c1', date: today, confidence: 4, arousal: 3, focus: 5, protocolFollowed: true }]));
+    localStorage.setItem('he_mobility_checks', JSON.stringify([{ id: 'm1', date: today, done: true, romScore: 4 }]));
+    render(<TrainingCalendarTab />);
+    // Дождаться отрисовки календаря (загрузка журнала)
+    await waitFor(() => {
+      expect(screen.queryByText(/Загрузка/)).toBeNull();
+    });
+    expect(screen.queryAllByText('🧠').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('🧘').length).toBeGreaterThan(0);
   });
 });

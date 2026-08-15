@@ -177,6 +177,20 @@ export const TrainingCalendarTab: React.FC = () => {
     return generateTrainingCalendar(year, month, plannedMap, actualMap);
   }, [monthKey, plannedData, syntheticPlan, actualMap]);
 
+  // Даты с психо-чек-инами и мобильностью (бейджи на ячейках календаря)
+  const mindDates = useMemo(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('he_mindset_checks') || '[]');
+      return new Set((Array.isArray(list) ? list : []).filter((c: any) => typeof c?.date === 'string').map((c: any) => c.date.slice(0, 10)));
+    } catch { return new Set<string>(); }
+  }, [monthKey]);
+  const mobDates = useMemo(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('he_mobility_checks') || '[]');
+      return new Set((Array.isArray(list) ? list : []).filter((c: any) => typeof c?.date === 'string' && c.done).map((c: any) => c.date.slice(0, 10)));
+    } catch { return new Set<string>(); }
+  }, [monthKey]);
+
   const weekSummaries = cal.weekSummaries || [];
 
   const navigateMonth = (delta: number) => {
@@ -319,7 +333,7 @@ export const TrainingCalendarTab: React.FC = () => {
             <div key={wi} style={{ display: 'grid', gridTemplateColumns: '32px repeat(7, 1fr)', gap: 2, marginBottom: 2 }}>
               <div style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>Н{wi + 1}</div>
               {week.map((day, di) => (
-                <CalendarCell key={di} day={day} today={today} onClick={() => { setView('week'); setSelectedWeek(wi + 1); }} />
+                <CalendarCell key={di} day={day} today={today} mindDates={mindDates} mobDates={mobDates} onClick={() => { setView('week'); setSelectedWeek(wi + 1); }} />
               ))}
             </div>
           ))}
@@ -560,7 +574,7 @@ export const TrainingCalendarTab: React.FC = () => {
 };
 
 /** Calendar cell for month grid */
-const CalendarCell: React.FC<{ day: CalendarDay; today: string; onClick: () => void }> = ({ day, today, onClick }) => {
+const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<string>; mobDates?: Set<string>; onClick: () => void }> = ({ day, today, mindDates, mobDates, onClick }) => {
   if (!day.date) {
     return <div style={{ aspectRatio: '1', borderRadius: 8 }} />;
   }
@@ -570,9 +584,15 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; onClick: () => v
   const border = isToday
     ? '1px solid ' + ACCENT
     : `1px solid ${STATUS_COLORS[day.status]}33`;
+  const hasMind = !!mindDates && mindDates.has(day.date);
+  const hasMob = !!mobDates && mobDates.has(day.date);
 
   return (
-    <div onClick={onClick} title={STATUS_LABELS[day.status] || ''} style={{
+    <div onClick={onClick} title={[
+      STATUS_LABELS[day.status] || '',
+      hasMind ? '🧠 психо-чек-ин' : '',
+      hasMob ? '🧘 мобильность выполнена' : '',
+    ].filter(Boolean).join(' · ') || ''} style={{
       aspectRatio: '1',
       borderRadius: 8,
       background: bg,
@@ -586,9 +606,15 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; onClick: () => v
       transition: 'all 0.15s',
       position: 'relative',
     }}>
-      <div style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? ACCENT : '#fff' }}>
+      <div style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? ACCENT : 'var(--text)' }}>
         {day.date.slice(8)}
       </div>
+      {(hasMind || hasMob) && (
+        <div style={{ position: 'absolute', top: 1, right: 2, display: 'flex', gap: 1, fontSize: 7 }}>
+          {hasMind && <span title="Психо-чек-ин">🧠</span>}
+          {hasMob && <span title="Мобильность">🧘</span>}
+        </div>
+      )}
       {day.isTrainingDay && (
         <div style={{ fontSize: 10, color: DIM, marginTop: 1 }}>
           {day.plannedExercises}упр
@@ -620,8 +646,8 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; onClick: () => v
 const MiniStat: React.FC<{ label: string; value: string | number; color: string }> = ({ label, value, color }) => (
   <div style={{
     padding: '6px 10px', borderRadius: 8, fontSize: 10,
-    background: 'rgba(24,24,27,0.6)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border)',
     textAlign: 'center', minWidth: 60,
   }}>
     <div style={{ fontSize: 16, fontWeight: 800, color }}>{value}</div>

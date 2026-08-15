@@ -10,7 +10,7 @@ import {
 
 const CARD: React.CSSProperties = {
   padding: 10, borderRadius: 12,
-  background: 'rgba(24,24,27,0.35)', border: '1px solid rgba(139,92,246,0.2)',
+  background: 'var(--bg-secondary)', border: '1px solid rgba(139,92,246,0.2)',
   marginBottom: 8,
 };
 
