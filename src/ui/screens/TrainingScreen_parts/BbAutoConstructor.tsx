@@ -65,8 +65,8 @@ import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import {
   buildBBContestPrep, applyPeakWeekOverlayToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile,
-  isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU,
-  type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory,
+  isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, CONTEST_SPECIALIZATION_LABELS,
+  type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
@@ -303,9 +303,17 @@ export const BbAutoConstructor: React.FC = () => {
   const [peakPrep, setPeakPrep] = useState<BBContestPrepResult | null>(null);
   // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
   const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
+  // ⭐ Специализация (упор мышцы к старту) — из профильного конфига, с override в UI.
+  const [peakSpec, setPeakSpec] = useState<ContestSpecialization>(() => {
+    try {
+      const raw = (linked.profile?.settings as any)?.goals?.bbPeakConfig;
+      const cfg = raw ? deserializeBBPrepConfig(raw) : null;
+      return cfg?.specialization ?? 'none';
+    } catch { return 'none'; }
+  });
 
   /** Конфиг тапера для кнопки «🎭 Peak week»: профиль (goals.bbPeakConfig/legacy)
-   *  с переопределением категории выбранной в UI; пол следует категории. */
+   *  с переопределением категории и специализации выбранными в UI. */
   const buildPeakConfig = (): BBContestPrepConfig => {
     const prof = (linked.profile?.settings ?? {}) as any;
     const catProfile = CATEGORY_PROFILES[peakWeekCategory] ?? CATEGORY_PROFILES.mens_physique;
@@ -313,7 +321,7 @@ export const BbAutoConstructor: React.FC = () => {
     const stored = prof?.goals?.bbPeakConfig ? deserializeBBPrepConfig(prof.goals.bbPeakConfig) : null;
     const legacy = stored ? null : legacyConfigFromProfile(prof?.goals, prof?.personal);
     const base = stored ?? legacy;
-    if (base) return { ...base, category: peakWeekCategory, sex };
+    if (base) return { ...base, category: peakWeekCategory, sex, specialization: peakSpec };
     return {
       sex,
       category: peakWeekCategory,
@@ -328,15 +336,17 @@ export const BbAutoConstructor: React.FC = () => {
       carbLoadStrategy: 'moderate',
       waterStrategy: 'minimal',
       sodiumStrategy: 'constant',
+      specialization: peakSpec,
     };
   };
 
-  const applyPeakWeekToCurrentPlan = (category: BBContestCategory) => {
+  const applyPeakWeekToCurrentPlan = (category: BBContestCategory, spec: ContestSpecialization = peakSpec) => {
     setPeakWeekCategory(category);
+    setPeakSpec(spec);
     if (!builtPlan) return;
     try {
       const cfg = buildPeakConfig();
-      const res = buildBBContestPrep({ ...cfg, category, sex: (CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.mens_physique).sex });
+      const res = buildBBContestPrep({ ...cfg, category, sex: (CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.mens_physique).sex, specialization: spec });
       setPeakPrep(res);
       setBuiltPlan(applyPeakWeekOverlayToBBPlan(builtPlan, res.config));
       setShowPeakWeek(true);
@@ -3068,21 +3078,46 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)' }}>
               <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Пик-неделя (тапер ББ) · шоу {peakPrep.config.showDate}</div>
               <div style={{ marginBottom:10, fontSize:11 }}>
-                <span style={{ color:'rgba(255,255,255,0.6)', marginRight:6 }}>Категория:</span>
-                <select value={peakWeekCategory} onChange={e => applyPeakWeekToCurrentPlan(e.target.value as BBContestCategory)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
-                  <option value="mens_physique">{CONTEST_CATEGORY_LABELS.mens_physique}</option>
-                  <option value="classic_physique">{CONTEST_CATEGORY_LABELS.classic_physique}</option>
-                  <option value="bb_212">{CONTEST_CATEGORY_LABELS.bb_212}</option>
-                  <option value="mens_bb">{CONTEST_CATEGORY_LABELS.mens_bb}</option>
-                  <option value="bikini">{CONTEST_CATEGORY_LABELS.bikini}</option>
-                  <option value="figure">{CONTEST_CATEGORY_LABELS.figure}</option>
-                  <option value="wellness">{CONTEST_CATEGORY_LABELS.wellness}</option>
-                  <option value="womens_physique">{CONTEST_CATEGORY_LABELS.womens_physique}</option>
-                  <option value="womens_bb">{CONTEST_CATEGORY_LABELS.womens_bb}</option>
-                </select>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ color:'rgba(255,255,255,0.6)' }}>Категория:</span>
+                  <select value={peakWeekCategory} onChange={e => applyPeakWeekToCurrentPlan(e.target.value as BBContestCategory)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
+                    <option value="mens_physique">{CONTEST_CATEGORY_LABELS.mens_physique}</option>
+                    <option value="classic_physique">{CONTEST_CATEGORY_LABELS.classic_physique}</option>
+                    <option value="bb_212">{CONTEST_CATEGORY_LABELS.bb_212}</option>
+                    <option value="mens_bb">{CONTEST_CATEGORY_LABELS.mens_bb}</option>
+                    <option value="bikini">{CONTEST_CATEGORY_LABELS.bikini}</option>
+                    <option value="figure">{CONTEST_CATEGORY_LABELS.figure}</option>
+                    <option value="wellness">{CONTEST_CATEGORY_LABELS.wellness}</option>
+                    <option value="womens_physique">{CONTEST_CATEGORY_LABELS.womens_physique}</option>
+                    <option value="womens_bb">{CONTEST_CATEGORY_LABELS.womens_bb}</option>
+                  </select>
+                  <span style={{ color:'rgba(255,255,255,0.6)' }}>⭐ Специализация:</span>
+                  <select value={peakSpec} onChange={e => applyPeakWeekToCurrentPlan(peakWeekCategory, e.target.value as ContestSpecialization)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.3)', fontSize:11 }}>
+                    {(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => (
+                      <option key={s} value={s}>{CONTEST_SPECIALIZATION_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
                 <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.5)' }}>
                   {peakPrep.config.carbLoadStrategy} загрузка · вода {peakPrep.config.waterStrategy} · Na {peakPrep.config.sodiumStrategy} · {peakPrep.config.weightKg} кг
                 </div>
+                {peakPrep.competitions.length > 0 && (
+                  <div style={{ marginTop: 6, display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    {peakPrep.competitions.map(c => {
+                      const isMain = peakPrep.mainCompetition?.id === c.id;
+                      return (
+                        <span key={c.id} style={{
+                          padding: '2px 8px', borderRadius: 999, fontSize: 9, fontWeight: isMain ? 800 : 600,
+                          background: isMain ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.05)',
+                          border: isMain ? '1px solid rgba(251,191,36,0.5)' : '1px solid rgba(255,255,255,0.12)',
+                          color: isMain ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+                        }}>
+                          {isMain ? '★ ' : ''}{c.name}{c.priority ? ` [${c.priority}]` : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse' }}>
