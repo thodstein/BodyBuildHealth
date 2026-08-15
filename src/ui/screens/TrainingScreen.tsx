@@ -26,6 +26,7 @@ import { getStrengthLevel, getNextLevelTarget } from '../../engines/performance-
 import { computeStructuredAnalytics } from '../../engines/structured-analytics.engine';
 import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
 import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
+import { CardioConstructor } from './TrainingScreen_parts/CardioConstructor';
 import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
@@ -601,6 +602,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {planningTrack === 'pl' && <PlannerPlAuto />}
             {planningTrack === 'bb' && <PlannerBbAuto />}
             {planningTrack === 'manual' && <ProgramManagerPanel />}
+            {planningTrack === 'cardio' && <CardioConstructor />}
           </div>
         </InfoErrorBoundary>
       )}

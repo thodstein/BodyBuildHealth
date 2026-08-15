@@ -17,11 +17,12 @@
  *  - program   : { cycleId }                                       — программа/цикл целиком (заменяет)
  *  - design    : { design: MacrocycleDesign, fillExercises?, daysPerWeek?, level?, goal? } — применить дизайн периодизации к новой/текущей программе
  *  - macrocycle: { macro: Macrocycle, level?, goal?, daysPerWeek? } — применить макроцикл ПЛ-авто как ББ-программу
+ *  - cardio    : { cycleId?, cycle? } — подключить CardioCycle к силовому плану (ссылка, не копия)
  */
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -37,8 +38,9 @@ export interface MethodologyPayload { methodName: string; category?: string }
 export interface ProgramPayload { cycleId?: string; [key: string]: unknown }
 export interface DesignPayload { design: unknown; fillExercises?: boolean; daysPerWeek?: number; level?: string; goal?: string }
 export interface MacrocyclePayload { macro: unknown; level?: string; goal?: string; daysPerWeek?: number }
+export interface CardioPayload { cycleId?: string; cycle?: unknown }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -57,6 +59,7 @@ export interface PlannerApplyDataByKind {
   program: unknown;
   design: DesignPayload;
   macrocycle: MacrocyclePayload;
+  cardio: CardioPayload;
 }
 
 export interface PlannerApply {

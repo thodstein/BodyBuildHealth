@@ -82,12 +82,15 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
  *  PL-авто и BB-авто — авто-планировщики.
  *  Manual ("Ручной конструктор") — пустая UserProgram, которую пользователь сам
  *  редактирует (program-store.ts). Не дублирует BB-auto — пустой blackboard,
- *  который программируется пользователем по факту. */
-export type PlannerMode = 'pl' | 'bb' | 'manual';
+ *  который программируется пользователем по факту.
+ *  Cardio ("Кардио-конструктор") — отдельный CardioCycle (cardio.engine),
+ *  подключается к PL/BB ссылкой (cardio-bridge). */
+export type PlannerMode = 'pl' | 'bb' | 'manual' | 'cardio';
 export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
   { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: LMS-циклы, ПМ-прогрессия, пик-протоколы' },
   { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
   { id: 'manual', label: 'Ручной конструктор', icon: '✋', hint: 'Своя программа: создать с нуля, загрузить для правки, авто-черновик для ручной правки' },
+  { id: 'cardio', label: 'Кардио-конструктор', icon: '❤️', hint: 'Отдельный кардио-цикл: Zone 2/HIIT, фазы, taper к стартам, подключение к ПЛ/ББ' },
 ];
 
 /** Порядок вывода зон на hero-экране. */

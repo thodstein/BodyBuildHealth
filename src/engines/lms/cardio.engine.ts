@@ -583,3 +583,47 @@ export function applyCardioTaperBySport(cycle: CardioCycle, sport: 'pl' | 'bb', 
   if (sport === 'pl') return applyPLCardioTaper(cycle, { competitionWeek: opts.competitionWeek });
   return applyBBCardioTaper(cycle, { showWeek: opts.competitionWeek, peakWeek: opts.peakWeek });
 }
+
+// ─── Экспорт .ics ───
+
+function escIcs(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function toIcsDate(isoDate: string): string {
+  return isoDate.replace(/[-:]/g, '').slice(0, 15) + 'Z';
+}
+
+function dayStartIso(week: number, referenceIso?: string): string {
+  const ref = referenceIso ? new Date(referenceIso) : new Date();
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (week - 1) * 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Календарь .ics: кардио-события по неделям (тип, минуты, фаза). */
+export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): string {
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BodyBuildHealth//CardioCycle//RU',
+    'CALSCALE:GREGORIAN',
+  ];
+  for (const w of cycle.weeks) {
+    const day = dayStartIso(w.week, referenceIso);
+    const start = toIcsDate(day);
+    for (const s of w.sessions) {
+      if (s.weeklyFrequency <= 0) continue;
+      const summary = `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин · нед ${w.week}`;
+      const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`;
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:${cycle.id}-w${w.week}-${s.type}@bbh`);
+      lines.push(`DTSTART:${start}`);
+      lines.push(`DTEND:${toIcsDate(day)}`);
+      lines.push(`SUMMARY:${escIcs(summary)}`);
+      lines.push(`DESCRIPTION:${escIcs(desc)}`);
+      lines.push('END:VEVENT');
+    }
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
