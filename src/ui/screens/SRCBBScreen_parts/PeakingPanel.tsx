@@ -10,6 +10,8 @@ import {
   isoAddDays, isoToday, isoDiffDays, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS,
   type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase, type ContestSpecialization,
 } from '../../../engines/bb/bb-contest-prep.engine';
+import { buildPLTaperCurve, taperWeeksByFatigue, TAPER_MODE_LABELS, type TaperMode } from '../../../engines/lms/lms-taper.engine';
+import { meetAttemptsFor, MEET_STRATEGY_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 10px' };
@@ -25,31 +27,11 @@ const FED_OPTS = [
 const MALE_BB_CATS: BBContestCategory[] = ['mens_physique', 'classic_physique', 'mens_bb', 'bb_212'];
 const FEMALE_BB_CATS: BBContestCategory[] = ['bikini', 'figure', 'wellness', 'womens_physique', 'womens_bb'];
 
-function genTaperCurve(weeks: number, fatigue: number): { week: number; volumePct: number; intensityPct: number; rirTarget: number }[] {
-  const taper: { week: number; volumePct: number; intensityPct: number; rirTarget: number }[] = [];
-  for (let w = 1; w <= weeks; w++) {
-    const progress = w / weeks;
-    const volBase = Math.max(0.3, 1 - progress * 0.55);
-    const intBase = Math.min(1, 0.65 + progress * 0.3);
-    const fatigueAdjust = Math.min(0.2, fatigue / 500);
-    taper.push({
-      week: w,
-      volumePct: Math.round((volBase - fatigueAdjust) * 100) / 100,
-      intensityPct: Math.round((intBase + fatigueAdjust * 0.5) * 100) / 100,
-      rirTarget: Math.max(0, Math.round(4 - progress * 3)),
-    });
-  }
-  return taper;
-}
-
-function genAttemptStrategy(squat: number, bench: number, deadlift: number):
-  { lift: string; opener: number; second: number; third: number }[] {
-  return [
-    { lift: 'Присед', opener: Math.round(squat * 0.92), second: Math.round(squat * 0.96), third: Math.round(squat * 1.0) },
-    { lift: 'Жим', opener: Math.round(bench * 0.93), second: Math.round(bench * 0.97), third: Math.round(bench * 1.0) },
-    { lift: 'Тяга', opener: Math.round(deadlift * 0.91), second: Math.round(deadlift * 0.95), third: Math.round(deadlift * 1.0) },
-  ];
-}
+const STRATEGY_OPTS: { id: MeetStrategy; label: string }[] = [
+  { id: 'conservative', label: 'Консервативная (90/95.5/100%)' },
+  { id: 'balanced', label: 'Сбалансированная (92/96/102%)' },
+  { id: 'aggressive', label: 'Агрессивная (93/97/105%)' },
+];
 
 function genTimeline(weighIn: string, startTime: string): string[] {
   const [sh, sm] = startTime.split(':').map(Number);
@@ -107,6 +89,8 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   const [fed, setFed] = useState('ipf');
   const [weeks, setWeeks] = useState(3);
   const [fatigue, setFatigue] = useState(300);
+  const [taperMode, setTaperMode] = useState<TaperMode>('classic');
+  const [strategy, setStrategy] = useState<MeetStrategy>('balanced');
   const [weighIn, setWeighIn] = useState('09:00');
   const [startTime, setStartTime] = useState('10:00');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
@@ -158,16 +142,23 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   };
 
   const cls = useMemo(() => weightClass(bw, fed), [bw, fed]);
-  const taper = useMemo(() => genTaperCurve(weeks, fatigue), [weeks, fatigue]);
-  const attempts = useMemo(() => genAttemptStrategy(squat, bench, deadlift), [squat, bench, deadlift]);
+  // Канон (lms-taper.engine): единая кривая тапера — режим × длительность.
+  const taper = useMemo(() => buildPLTaperCurve({ taperWeeks: weeks, mode: taperMode, fatigue: Math.max(0, Math.min(100, Math.round(fatigue / 5))) }), [weeks, taperMode, fatigue]);
+  // Прикиды — канон (competition-attempts.meetAttemptsFor), стратегия на выбор.
+  const attempts = useMemo(() => ([
+    { lift: 'Присед', ...meetAttemptsFor(squat, strategy) },
+    { lift: 'Жим', ...meetAttemptsFor(bench, strategy) },
+    { lift: 'Тяга', ...meetAttemptsFor(deadlift, strategy) },
+  ] as { lift: string; opener: number; second: number; third: number; target: number }[]), [squat, bench, deadlift, strategy]);
   const timeline = useMemo(() => genTimeline(weighIn, startTime), [weighIn, startTime]);
+  const suggestedWeeks = useMemo(() => taperWeeksByFatigue(Math.max(0, Math.min(100, Math.round(fatigue / 5)))), [fatigue]);
 
   const applyTaper = () => {
     const lastWeek = taper[taper.length - 1];
     applyToPlanner({
       kind: 'peak',
-      label: `Taper ${weeks} нед: объём ×${lastWeek.volumePct}, RIR → ${lastWeek.rirTarget}`,
-      data: { volumeMult: lastWeek.volumePct, rirTarget: lastWeek.rirTarget, weeks: taper.map(t => t.week) },
+      label: `Taper ${weeks} нед (${TAPER_MODE_LABELS[taperMode]}): объём ×${lastWeek.volumePct}, RIR → ${lastWeek.rirTarget ?? '+' + lastWeek.rirShift}`,
+      data: { volumeMult: lastWeek.volumePct, rirTarget: lastWeek.rirTarget, weeks: taper.map(t => t.week), protocol: { mode: taperMode, curve: taper } },
     });
   };
 
@@ -466,8 +457,10 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         <PopupNumber label="Становая (1ПМ)" value={deadlift} min={20} max={500} suffix=" кг" onChange={setDeadlift} />
         <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={setBw} />
         <PopupSelect label="Федерация" value={fed} options={FED_OPTS} onChange={setFed} />
-        <PopupSelect label="Длительность taper" value={String(weeks)} options={WEEK_OPTS} hint="Недель пиковой фазы перед соревнованием" onChange={v => setWeeks(Number(v))} />
-        <PopupNumber label="Усталость (у.е.)" value={fatigue} min={100} max={500} step={50} hint="Субъективная накопленная усталость" onChange={setFatigue} />
+        <PopupSelect label="Длительность taper" value={String(weeks)} options={WEEK_OPTS} hint={`Недель пиковой фазы перед соревнованием${suggestedWeeks ? ` · по усталости рекомендуется ${suggestedWeeks} нед` : ''}`} onChange={v => setWeeks(Number(v))} />
+        <PopupNumber label="Усталость (у.е.)" value={fatigue} min={100} max={500} step={50} hint="Субъективная накопленная усталость (рекомендация длительности тапера)" onChange={setFatigue} />
+        <PopupSelect label="Раскладка тапера" value={taperMode} options={(['classic', 'pl', 'pro'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m] }))} hint="Канон lms-taper.engine: классика — разгрузка Bosquet; ПЛ-пик-протокол — интенсификация 90/95/100%; про — усталость-зависимая кривая с праймингом" onChange={v => setTaperMode(v as TaperMode)} />
+        <PopupSelect label="Стратегия прикидов" value={strategy} options={STRATEGY_OPTS} hint="Прикиды дня соревнований (округление к 2.5 кг)" onChange={v => setStrategy(v as MeetStrategy)} />
       </CalcSection>
 
       <CalcSection icon="⚖️" title="Весовая категория" accent="#60a5fa" grid2>
@@ -475,7 +468,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         <CalcResult label="Нужно сбросить" value={bw > cls.max ? `${(bw - cls.max + 0.5).toFixed(1)} кг` : '0 кг'} accent="#f59e0b" hint={bw > cls.max ? 'Рекомендуется сушка' : 'Вес в норме'} />
       </CalcSection>
 
-      <CalcSection icon="📉" title="Taper-кривая" accent="#a855f7" desc={`${weeks}-недельная пиковая фаза от текущей усталости (${fatigue} у.е.)`}>
+      <CalcSection icon="📉" title="Taper-кривая" accent="#a855f7" desc={`${weeks}-недельная пиковая фаза · ${TAPER_MODE_LABELS[taperMode]}${suggestedWeeks && suggestedWeeks !== weeks ? ` (по усталости рекомендуется ${suggestedWeeks} нед)` : ''}`}>
         {taper.map(t => (
           <div key={t.week} style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10,
@@ -484,6 +477,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
           }}>
             <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', minWidth: 28 }}>Н{t.week}</span>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {t.label && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{t.label}{t.focus ? `: ${t.focus}` : ''}</span>}
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <span style={{ width: 48, fontSize: 9, color: 'var(--text-dim)' }}>Объём</span>
                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
@@ -496,15 +490,15 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                   <div style={{ width: `${t.intensityPct * 100}%`, height: '100%', borderRadius: 2, background: '#ef4444' }} />
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#f87171', minWidth: 32, textAlign: 'right' }}>{Math.round(t.intensityPct * 100)}%</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#f87171', minWidth: 32, textAlign: 'right' }}>{t.intensityMode === 'preserve' ? 'сохр.' : `${Math.round(t.intensityPct * 100)}%`}</span>
               </div>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', minWidth: 20 }}>RIR {t.rirTarget}</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#a855f7', minWidth: 20 }}>RIR {t.rirTarget ?? `+${t.rirShift}`}</span>
           </div>
         ))}
       </CalcSection>
 
-      <CalcSection icon="📋" title="Стратегия подходов" accent="#f59e0b">
+      <CalcSection icon="📋" title={`Стратегия подходов — ${MEET_STRATEGY_LABEL[strategy]}`} accent="#f59e0b">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, fontWeight: 700, fontSize: 9, color: 'var(--text-dim)', padding: '4px 8px' }}>
           <span>Движение</span><span style={{textAlign:'center'}}>1-й</span><span style={{textAlign:'center'}}>2-й</span><span style={{textAlign:'center'}}>3-й</span>
         </div>

@@ -79,6 +79,11 @@ export interface BBPeakingOutput {
 // PL Peaking Engine
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * @deprecated НЕ подключён ни к одному UI. Жёсткий 4-нед шаблон без учёта реальных 1RM.
+ * Канон тапера/пика ПЛ: lms-taper.engine (buildPLTaperCurve) + lms-builder.engine
+ * (appendPLTaperWeeks) + lms-macro-taper.engine (макроцикл) + pro/taper.engine (калькулятор).
+ */
 export function generatePLPeaking(input: PLPeakingInput): PLPeakingOutput {
   const plan: PLPeakWeek[] = [];
 

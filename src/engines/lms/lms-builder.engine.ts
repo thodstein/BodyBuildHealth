@@ -1415,6 +1415,16 @@ export function appendPLTaperWeeks(
   const last = plan.weeks[plan.weeks.length - 1];
   const nextWeekNum = last.week + 1;
   const lastPhase = mesocyclePhaseForWeek(last.week, plan.weeks.length);
+  // База тапер-недель: последняя НЕ-deload неделя (иначе делод станет основой
+  // тапера — разгрузка поверх разгрузки, объём некуда снижать).
+  const baseWeek = (() => {
+    if (lastPhase !== 'deload') return last;
+    for (let i = plan.weeks.length - 2; i >= 0; i--) {
+      const wk = plan.weeks[i];
+      if (mesocyclePhaseForWeek(wk.week, plan.weeks.length) !== 'deload') return wk;
+    }
+    return last;
+  })();
   // Канон: единая кривая тапера (lms-taper.engine) — режим × весовая цель.
   const taperCurvePoints = buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal });
 
@@ -1514,7 +1524,7 @@ export function appendPLTaperWeeks(
     // от него (разница ПМ: факт вместо прогноза), прогрессия в тапере = 0.
     const pmGrowth = opts?.meetData?.actualPm ? 1 : Math.pow(1 + k, idx + 1);
     const pmRow: Record<string, number> = {};
-    for (const [name, pm] of Object.entries(last.pmRow)) {
+    for (const [name, pm] of Object.entries(baseWeek.pmRow)) {
       const actual = opts?.meetData?.actualPm?.[name];
       pmRow[name] = actual != null && actual > 0
         ? Math.round(actual * 10) / 10
@@ -1524,7 +1534,7 @@ export function appendPLTaperWeeks(
     // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
     // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
     const protocolFinal = isFinal && pt.intensityMode === 'set_pct' && pt.intensityPct >= 1.0;
-    const days = last.days.map(d => {
+    const days = baseWeek.days.map(d => {
       const exercises = d.exercises.map(e => {
         // Подготовительные прикиды на тапер-неделях (кроме финальной):
         // пробный сингл ~80% от ПМ недели для основных движений — «прощупать»
@@ -1605,7 +1615,7 @@ export function appendPLTaperWeeks(
     // Если задан ФАКТИЧЕСКИЙ ПМ после цикла — используем его (разница ПМ).
     const pmGrowth = opts?.meetData?.actualPm ? 1 : Math.pow(1 + k, idx + 1);
     const pmRow: Record<string, number> = {};
-    for (const [name, pm] of Object.entries(last.pmRow)) {
+    for (const [name, pm] of Object.entries(baseWeek.pmRow)) {
       const actual = opts?.meetData?.actualPm?.[name];
       pmRow[name] = actual != null && actual > 0
         ? Math.round(actual * 10) / 10
@@ -1630,7 +1640,7 @@ export function appendPLTaperWeeks(
       if (/станов/.test(n)) return attempts.lifts.find(l => /станов/.test(norm(l.name)));
       return undefined;
     };
-    const days = last.days.map(d => {
+    const days = baseWeek.days.map(d => {
       const exercises = d.exercises.map(e => {
         const lift = matchLift(e.name);
         if (lift) {
@@ -1696,7 +1706,7 @@ export function appendPLTaperWeeks(
   // Пост-соревновательная неделя (post-meet): лёгкий объём, высокий RIR —
   // возврат к тренировкам после прикидок без перегруза.
   if (opts?.postMeet) {
-    const baseWk = extra[extra.length - 1] ?? last;
+    const baseWk = extra[extra.length - 1] ?? baseWeek;
     const pmRow: Record<string, number> = { ...baseWk.pmRow };
     const volMult = Math.max(0.3, Math.min(1, opts.postMeet.volumeMult ?? 0.5));
     const days = baseWk.days.map(d => {
@@ -1818,7 +1828,7 @@ export function appendPLTaperWeeks(
       pedNote +
       nutritionTaperNote +
       autoRegNote +
-      (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер добавлен от её объёма.' : ''),
+      (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер построен от последней НЕ-deload недели (разгрузка поверх разгрузки не нужна).' : ''),
   };
 }
 

@@ -98,6 +98,11 @@ export function autoregPlan(r: ReadinessInput): AutoregOutput {
 }
 
 // ── INT3: выход на пик / соревновательная подготовка ──
+/**
+ * @deprecated НЕ подключён ни к одному UI. Канон тапера/пика ПЛ:
+ * lms-taper.engine (buildPLTaperCurve) + lms-builder.engine (appendPLTaperWeeks)
+ * + lms-macro-taper.engine (макроцикл) + pro/taper.engine (калькулятор TaperPlannerTab).
+ */
 export function peakForPLMeet(input: PLPeakingInput) {
   return generatePLPeaking(input);
 }
