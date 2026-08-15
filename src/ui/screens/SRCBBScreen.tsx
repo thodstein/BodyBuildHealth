@@ -10,7 +10,7 @@ import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { SPLIT_PATTERNS } from '../../engines/bb/bb-split-patterns';
 import { rankBBSplits, selectBestBBSplit, explainBBSelection, type BBSelectorInput } from '../../engines/bb/bb-selector.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
-import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile } from '../../engines/bb/bb-contest-prep.engine';
+import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, buildBBContestPrep, PEAK_PHASE_COLORS, PHASE_LABELS_RU } from '../../engines/bb/bb-contest-prep.engine';
 import { calcBBPlanMetrics, explainBBMetrics } from '../../engines/bb/bb-metrics.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
@@ -2565,7 +2565,30 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                 <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}{(wk as any).peakWeek ? ' · 🎭 пик-неделя' : ''}</div>
                 {(wk as any).peakWeek && (
                   <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.3)', fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-                    🎭 <b style={{ color: '#ec4899' }}>Пик-неделя (тапер ББ)</b>{(builtBb as any)?.contestPrep?.showDate ? ` · шоу ${(builtBb as any).contestPrep.showDate}` : ''}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                      <span>🎭 <b style={{ color: '#ec4899' }}>Пик-неделя (тапер ББ)</b>{(builtBb as any)?.contestPrep?.showDate ? ` · шоу ${(builtBb as any).contestPrep.showDate}` : ''}</span>
+                      {(() => {
+                        try {
+                          const goals = (linked.profile?.settings as any)?.goals;
+                          const rawCfg = goals?.bbPeakConfig;
+                          const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, linked.profile?.settings?.personal);
+                          if (!prepCfg) return null;
+                          const days = buildBBContestPrep(prepCfg).peakWeek;
+                          return (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} title="Фазы пик-недели: деплеция → загрузка → пик → шоу">
+                              {days.map(d => (
+                                <span key={d.day} title={`D-${7 - d.day}: ${PHASE_LABELS_RU[d.phase]}`} style={{
+                                  width: 12, height: 12, borderRadius: 4,
+                                  background: PEAK_PHASE_COLORS[d.phase],
+                                  boxShadow: d.day === 7 ? `0 0 8px ${PEAK_PHASE_COLORS[d.phase]}` : 'none',
+                                  opacity: 0.9,
+                                }} />
+                              ))}
+                            </div>
+                          );
+                        } catch { return null; }
+                      })()}
+                    </div>
                     {(wk as any).prepProtocol ? <div style={{ color: 'rgba(255,255,255,0.55)' }}>{(wk as any).prepProtocol}</div> : null}
                     <div style={{ color: 'rgba(255,255,255,0.55)' }}>День 1–2: памп-деплеция (верх/низ) · день 3: лёгкий full-body · далее отдых и позы. Питание по дням (карбс/вода/натрий) — блок «Питание → 🏁 Тапер ББ».</div>
                   </div>

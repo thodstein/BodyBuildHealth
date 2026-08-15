@@ -7,7 +7,7 @@ import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, deserializeBBPrepConfig, serializeBBPrepConfig,
-  isoAddDays, isoToday, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
+  isoAddDays, isoToday, isoDiffDays, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
   type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
 } from '../../../engines/bb/bb-contest-prep.engine';
 
@@ -231,6 +231,12 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       try { bbResult = buildBBContestPrep({ ...bbCfg, ...bbValidation.forced }); } catch { bbResult = null; }
     }
     const bbCats = bbCfg.sex === 'female' ? FEMALE_BB_CATS : MALE_BB_CATS;
+    const bbDaysLeft = isoDiffDays(isoToday(), bbCfg.showDate);
+    const bbCountdownText = bbDaysLeft < 0
+      ? `🎬 шоу прошло (${-bbDaysLeft} дн назад)`
+      : bbDaysLeft === 0
+        ? '🎬 сегодня шоу!'
+        : `⏳ до шоу: ${bbDaysLeft} дн`;
     const saveBbConfig = () => {
       if (!bbValidation.ok) return;
       try {
@@ -279,7 +285,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     };
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-        <CalcSection icon="🏆" title="Шоу-пик (ББ) — единая система тапера" accent="#ec4899" desc="Тренировочный тапер (Библиотека методик) + пик-неделя 7 дней: карбс, вода, натрий, позы">
+        <CalcSection icon="🏆" title="Шоу-пик (ББ) — единая система тапера" accent="#ec4899" desc={`${bbCountdownText} · Тренировочный тапер (Библиотека методик) + пик-неделя 7 дней: карбс, вода, натрий, позы`}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             <div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>📅 Дата шоу</div>
