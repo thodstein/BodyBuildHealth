@@ -217,6 +217,18 @@ export const PHASE_LABELS_RU: Record<PeakDayPhase, string> = {
   show: 'Шоу',
 };
 
+/** Визуальные цвета фаз пик-недели (единые для всех UI-поверхностей). */
+export const PEAK_PHASE_COLORS: Record<PeakDayPhase, string> = {
+  deplete_1: '#f59e0b',
+  deplete_2: '#f59e0b',
+  deplete_3: '#f59e0b',
+  load_1: '#22c55e',
+  load_2: '#22c55e',
+  load_3: '#22c55e',
+  peak: '#a855f7',
+  show: '#fbbf24',
+};
+
 /** Вода по дням (л) — множители от пика нагрузки. */
 const WATER_DAY_MULT: Record<WaterStrategy, number[]> = {
   classic: [1, 1, 1, 1, 0.6, 0.35, 0.03],  // load → ступенчатый cut → глотки
@@ -260,10 +272,15 @@ export function isoAddDays(iso: string, days: number): string {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
-function daysBetween(aIso: string, bIso: string): number {
+/** Разница в календарных днях: bIso − aIso (положительно, если b позже). */
+export function isoDiffDays(aIso: string, bIso: string): number {
   const a = new Date(`${aIso}T00:00:00`);
   const b = new Date(`${bIso}T00:00:00`);
   return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+function daysBetween(aIso: string, bIso: string): number {
+  return isoDiffDays(aIso, bIso);
 }
 
 function timeMinus(timeStr: string, minutes: number): string {

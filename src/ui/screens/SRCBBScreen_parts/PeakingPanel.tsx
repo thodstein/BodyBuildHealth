@@ -7,8 +7,8 @@ import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, deserializeBBPrepConfig, serializeBBPrepConfig,
-  isoAddDays, isoToday, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU,
-  type BBContestPrepConfig, type BBContestCategory,
+  isoAddDays, isoToday, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
+  type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
 } from '../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#00e68a';
@@ -328,31 +328,47 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             </CalcSection>
 
             <CalcSection icon="🍚" title="Пик-неделя (7 дней)" accent="#ec4899" desc={`Шоу ${bbCfg.showDate} · карбс ${bbCfg.carbLoadStrategy} · вода ${bbCfg.waterStrategy} · Na ${bbCfg.sodiumStrategy}`}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, minWidth: 440 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                {([['deplete_1', 'Деплеция'], ['load_1', 'Загрузка'], ['peak', 'Пик'], ['show', 'Шоу']] as [PeakDayPhase, string][]).map(([ph, label]) => (
+                  <span key={ph} style={{ padding: '2px 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: PEAK_PHASE_COLORS[ph] + '18', color: PEAK_PHASE_COLORS[ph], border: `1px solid ${PEAK_PHASE_COLORS[ph]}40` }}>
+                    ● {label}
+                  </span>
+                ))}
+              </div>
+              <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, minWidth: 460 }}>
                   <thead>
-                    <tr style={{ color: 'var(--text-dim)', textAlign: 'left' }}>
-                      <th style={{ padding: '3px 4px' }}>День</th>
-                      <th style={{ padding: '3px 4px' }}>Фаза</th>
-                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>Ккал</th>
-                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>Б/У/Ж</th>
-                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>💧л</th>
-                      <th style={{ padding: '3px 4px', textAlign: 'right' }}>Na</th>
-                      <th style={{ padding: '3px 4px' }}>Тренировка</th>
+                    <tr style={{ color: 'var(--text-dim)', textAlign: 'left', background: 'rgba(255,255,255,0.03)' }}>
+                      <th style={{ padding: '5px 6px' }}>День</th>
+                      <th style={{ padding: '5px 6px' }}>Фаза</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right' }}>Ккал</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right' }}>Б/У/Ж</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right' }}>💧л</th>
+                      <th style={{ padding: '5px 6px', textAlign: 'right' }}>Na</th>
+                      <th style={{ padding: '5px 6px' }}>Тренировка</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {bbResult.peakWeek.map(d => (
-                      <tr key={d.day} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: d.day === 7 ? 'rgba(236,72,153,0.08)' : undefined }}>
-                        <td style={{ padding: '3px 4px', fontWeight: 700, color: d.day === 7 ? '#ec4899' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}<div style={{ fontSize: 8, color: 'var(--text-dim)', fontWeight: 400 }}>{d.date.slice(5).replace('-', '.')}</div></td>
-                        <td style={{ padding: '3px 4px', color: '#ec4899' }}>{PHASE_LABELS_RU[d.phase]}</td>
-                        <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.kcal}</td>
-                        <td style={{ padding: '3px 4px', textAlign: 'right', color: 'var(--text-dim)' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
-                        <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.waterLiters}</td>
-                        <td style={{ padding: '3px 4px', textAlign: 'right' }}>{d.sodiumMg}</td>
-                        <td style={{ padding: '3px 4px', color: 'var(--text-dim)' }}>{d.training.type === 'Отдых' ? '—' : d.training.type.split(' ')[0]}</td>
-                      </tr>
-                    ))}
+                    {bbResult.peakWeek.map(d => {
+                      const phColor = PEAK_PHASE_COLORS[d.phase];
+                      return (
+                        <tr key={d.day} style={{
+                          borderTop: '1px solid rgba(255,255,255,0.05)',
+                          borderLeft: `3px solid ${phColor}`,
+                          background: d.day === 7 ? 'linear-gradient(90deg, rgba(251,191,36,0.12), rgba(251,191,36,0.03))' : undefined,
+                        }}>
+                          <td style={{ padding: '5px 6px', fontWeight: 700, color: d.day === 7 ? '#fbbf24' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}<div style={{ fontSize: 8, color: 'var(--text-dim)', fontWeight: 400 }}>{d.date.slice(5).replace('-', '.')}</div></td>
+                          <td style={{ padding: '5px 6px' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 8, fontWeight: 700, background: phColor + '18', color: phColor, border: `1px solid ${phColor}40` }}>{PHASE_LABELS_RU[d.phase]}</span>
+                          </td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 700 }}>{d.kcal}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right', color: 'var(--text-dim)' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.waterLiters}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.sodiumMg}</td>
+                          <td style={{ padding: '5px 6px', color: 'var(--text-dim)' }}>{d.training.type === 'Отдых' ? '—' : d.training.type.split(' ')[0]}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
