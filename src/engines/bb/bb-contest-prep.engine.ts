@@ -1954,3 +1954,154 @@ export function resolvePeakStrategy(plan: BBContestPrepPlan): PrepPeakStrategy {
   return plan.peakWeek.strategy === 'tested' ? 'conservative' : plan.peakWeek.strategy;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Адаптация подготовки по весу (Этап 3.2-3.3): ступенчатые корректировки,
+// ОДНА переменная за раз, анализ среднего веса за 7+ дней (не 2-3 дня),
+// taper/пик — без агрессивных изменений.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PrepWeightStatus =
+  | 'no_data'       // недостаточно замеров для анализа
+  | 'on_track'      // темп в целевом диапазоне
+  | 'too_fast'      // теряет быстрее цели (или недобор/болезнь)
+  | 'too_slow'      // плато/медленнее цели
+  | 'taper';        // taper/пик — корректировки не агрессивны
+
+export interface PrepWeightAdvice {
+  lastWeight: number | null;
+  lastDate: string | null;
+  measurements: number;              // замеров за последние 14 дней
+  avg7d: number | null;              // средний вес за последние 7 дней
+  avgPrev7d: number | null;          // средний вес за 7 дней до этого
+  delta7d: number | null;            // кг (avg7 − avgPrev)
+  delta14d: number | null;           // кг (avg7 − avg за [today-20..today-14])
+  weeklyRatePct: number | null;      // фактическая скорость %/нед
+  targetRatePctPerWeek: number;
+  currentCalories: number;
+  phase: PrepPhaseKey | null;        // фаза на referenceDate
+  status: PrepWeightStatus;
+  /** Прогресс к целевому весу (0-100+; null без цели/старта). */
+  progressToTargetPct: number | null;
+  recommendation: string;
+  /** Ступень коррекции калорий (0 если не рекомендовано). */
+  adjustCalories: number;
+  /** Ступень коррекции кардио, мин/нед (0 если не рекомендовано). ВЗАИМНО ИСКЛЮЧАЕТ калории. */
+  adjustCardioMin: number;
+}
+
+const PREP_WEIGHT_MIN_MEASUREMENTS = 2; // минимум замеров в окне для среднего
+
+function meanWeights(entries: Array<{ date: string; weight: number }>, fromIso: string, toIso: string): number | null {
+  const vals = entries
+    .filter(e => e && e.date >= fromIso && e.date <= toIso && Number.isFinite(e.weight) && e.weight > 30)
+    .map(e => e.weight);
+  if (vals.length < PREP_WEIGHT_MIN_MEASUREMENTS) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+/**
+ * Ступенчатая адаптация подготовки по фактической динамике веса.
+ * Вход: лог веса (любой порядок — сортируется внутри), единый prep-план.
+ * Анализ только СРЕДНИХ за 7-дневные окна (не реагирует на 2-3-дневные
+ * колебания воды/натрия/стресса). Рекомендует менять ОДНУ переменную за раз.
+ */
+export function prepWeightAdvice(
+  log: Array<{ date: string; weight: number }>,
+  plan: BBContestPrepPlan,
+  opts?: { referenceDate?: string; targetWeightKg?: number },
+): PrepWeightAdvice {
+  const ref = opts?.referenceDate && isValidIsoDate(opts.referenceDate) ? opts.referenceDate : isoToday();
+  const sorted = [...(Array.isArray(log) ? log : [])]
+    .filter(e => e && isValidIsoDate(e.date) && Number.isFinite(e.weight) && e.weight > 30)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const targetRate = clamp(plan.preparation.targetRatePctPerWeek, 0.25, 0.75);
+  const last = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+
+  const avg7d = meanWeights(sorted, isoAddDays(ref, -6), ref);
+  const avgPrev7d = meanWeights(sorted, isoAddDays(ref, -13), isoAddDays(ref, -7));
+  const avgPrev14d = meanWeights(sorted, isoAddDays(ref, -20), isoAddDays(ref, -14));
+  const delta7d = avg7d != null && avgPrev7d != null ? Math.round((avg7d - avgPrev7d) * 100) / 100 : null;
+  const delta14d = avg7d != null && avgPrev14d != null ? Math.round((avg7d - avgPrev14d) * 100) / 100 : null;
+  const weightRef = avg7d ?? last?.weight ?? plan.preparation.startingWeightKg;
+  // weeklyRatePct — в ПРОЦЕНТАХ массы тела в неделю (например −0.5 = −0.5%/нед).
+  const weeklyRatePct = delta7d != null && weightRef > 0
+    ? Math.round((delta7d / weightRef) * 100 * 100) / 100
+    : null;
+
+  const measurements = sorted.filter(e => e.date >= isoAddDays(ref, -13)).length;
+  const phase = prepPhaseForDate(plan, ref);
+
+  const base: PrepWeightAdvice = {
+    lastWeight: last?.weight ?? null,
+    lastDate: last?.date ?? null,
+    measurements,
+    avg7d, avgPrev7d, delta7d, delta14d,
+    weeklyRatePct,
+    targetRatePctPerWeek: targetRate,
+    currentCalories: plan.preparation.currentCalories,
+    phase: phase?.key ?? null,
+    status: 'no_data' as PrepWeightStatus,
+    progressToTargetPct: null,
+    recommendation: '',
+    adjustCalories: 0,
+    adjustCardioMin: 0,
+  };
+
+  // Прогресс к целевому весу.
+  const targetW = opts?.targetWeightKg != null && opts.targetWeightKg > 30 ? opts.targetWeightKg : null;
+  if (targetW != null && avg7d != null) {
+    const start = plan.preparation.startingWeightKg;
+    if (Math.abs(start - targetW) > 0.5) {
+      base.progressToTargetPct = Math.round((Math.min(start, targetW) - Math.min(avg7d, targetW)) / Math.abs(start - targetW) * 100);
+    }
+  }
+
+  // ── Taper / пик: не корректируем агрессивно.
+  if (phase?.key === 'taper' || phase?.key === 'peak_week' || phase?.key === 'show_day') {
+    base.status = 'taper';
+    base.recommendation = 'Taper/пик-неделя: калории и кардио НЕ меняем — усталость снижается, темп уже не критичен. При полном застое допустима только мягкая ступень (−100 ккал) при полном соблюдении плана и шагов.';
+    base.adjustCalories = 0;
+    base.adjustCardioMin = 0;
+    return base;
+  }
+
+  // ── Недостаточно данных.
+  if (delta7d == null || measurements < 2 || avg7d == null) {
+    base.status = 'no_data';
+    base.recommendation = `Записывайте вес 3-4 раза в неделю (утро, натощак). Анализ — по среднему за 7 дней: сейчас замеров за 14 дней: ${measurements}.`;
+    return base;
+  }
+
+  // Целевые границы: 0.25–0.75 %/нед (по умолчанию) — допускаем ±30%.
+  const slowBound = -(targetRate * 0.55);
+  const fastBound = -(targetRate * 1.3);
+  const lossPerWeek = weeklyRatePct ?? 0; // отрицательно = потеря
+
+  const steps = [
+    '1) Проверьте соблюдение плана (калории, шаги, кардио).',
+    '2) Проверьте средние шаги и пищеварение (натрий/запоры/соль).',
+    '3) Меняйте ОДНУ переменную за раз и оценивайте эффект минимум 5-7 дней.',
+  ].join(' ');
+
+  if (lossPerWeek < fastBound) {
+    // Слишком быстро (или наоборот — набор на сушке).
+    base.status = 'too_fast';
+    base.recommendation = `Темп ${(Math.abs(lossPerWeek)).toFixed(2)}%/нед — быстрее цели (${targetRate}%/нед). Задержка воды, стресс, сон? ${steps} Шаг: +150 ккал ИЛИ −20 мин кардио/нед (одна переменная).`;
+    base.adjustCalories = 150;
+    base.adjustCardioMin = -20;
+    return base;
+  }
+  if (lossPerWeek > slowBound) {
+    // Слишком медленно / плато.
+    base.status = 'too_slow';
+    base.recommendation = `Темп ${(Math.abs(lossPerWeek)).toFixed(2)}%/нед — медленнее цели (${targetRate}%/нед)${delta14d != null && Math.abs(delta14d) < 0.3 ? ', плато 2+ недели' : ''}. ${steps} Шаг: калории −150…−200 ИЛИ кардио +15…20 мин/нед (одна переменная).`;
+    base.adjustCalories = -175;
+    base.adjustCardioMin = 20;
+    return base;
+  }
+  base.status = 'on_track';
+  base.recommendation = `Темп ${(Math.abs(lossPerWeek)).toFixed(2)}%/нед — в целевом диапазоне (0.25–0.75%/нед). Коррекции не нужны: продолжайте по плану.`;
+  return base;
+}
+

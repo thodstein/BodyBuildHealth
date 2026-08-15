@@ -39,14 +39,18 @@
 - **Событие `he-bb-contest-prep-updated`** (detail: prepPlanId/trainingPlanId/nutritionPlanId/showDate) при сборке; `IndividualPlanContext` слушает его и живьём перечитывает план (NutritionScreen ↔ TrainingScreen).
 - **NutritionScreen**: `IndividualPlanContext` гидрация через `planFromStored` (приоритет новому плану), цели дня через `nutritionTargetsForPrepDate` для подготовки/тапера/пик-недели (`_applyPrepTargets`), legacy `computePeakWeekNutritionTargets` остаётся fallback.
 
+### Этап 3.2-3.3 — ступенчатая адаптация по весу (Aug 16, итерация 3)
+- **`prepWeightAdvice(log, plan, opts?)`** (экспортирован, чистый): анализ СРЕДНИХ за 7-дневные окна (avg7d vs avgPrev7d, delta14d), фактический темп %/нед vs цель 0.25-0.75% (границы 0.55×/1.3×), статус `no_data/on_track/too_fast/too_slow/taper`, прогресс к `goals.targetWeight`, рекомендация «ОДНА переменная за раз» + ступени `adjustCalories` (±150-175) / `adjustCardioMin` (±20, взаимно исключающие). В taper/пик коррекции запрещены.
+- **UI**: карточка «⚖️ Адаптация по весу» в шаге contest — последний вес/Δ7/Δ14/темп/бейдж статуса/прогресс-бар к цели/рекомендация + кнопки «Применить калории ±» / «Кардио ±» → обновляют `prepPlan.preparation.currentCalories/cardioMinutesPerWeek` + сохранение в профиль.
+
 ### Этап 9 — тесты
-- NEW `bb-contest-prep-plan.test.ts` — **39 тестов**: модель/версии (5), фазы 8/12/16/20 нед (2), сериализация (2), динамические недели и перенос даты (7), taper-кривая и разметка (6), питание (5), безопасность (4), test peak week (4), обратная совместимость (4), show-day таймлайн из плана (1).
-- MOD `bb-contest-prep.test.ts` — 3 теста переведены на каноническую кривую (объём [0.85,0.7,0.6], интенсивность 0.95, RIR≥2). Итого **133/133** по обоим файлам; IndividualPlan 193/193; taper-planner-tab 6/6.
+- NEW `bb-contest-prep-plan.test.ts` — **47 тестов**: модель/версии (5), фазы 8/12/16/20 нед (2), сериализация (2), динамические недели и перенос даты (7), taper-кривая и разметка (6), питание (5), безопасность (4), test peak week (4), обратная совместимость (4), show-day таймлайн (1), **адаптация по весу (7)**: no_data/мало замеров/on_track/плато/too_fast/taper-блокировка/прогресс-бар/устойчивость к мусору.
+- MOD `bb-contest-prep.test.ts` — 3 теста переведены на каноническую кривую (объём [0.85,0.7,0.6], интенсивность 0.95, RIR≥2). Итого **141/141** по обоим файлам; IndividualPlan 193/193; taper-planner-tab 6/6; смежные peak-week/audit 253/253.
 
 ### Проверено
-- `tsc --noEmit` — 0 ошибок (кроме чужого незакоммиченного `lms-taper.engine.ts` с битым импортом `./peaking-protocols.engine` — 21 тест-Suite падает в прогоне из-за него, не связано с моей работой; файл другого агента не трогается).
-- `vite build` OK; contest-prep 133/133; IndividualPlan 193/193; taper-planner 6/6; bb-auto-smoke недоступен до фикса чужого импорта.
-- Файлы других агентов не тронуты (health-diary/дневники, lms-taper, MACROCYCLE-ROADMAP.md — чужой WIP).
+- `tsc --noEmit` — 0 ошибок (по моим файлам); полный прогон **5158/5162** — падают только 4 теста в чужих WIP (pl-taper-append ×2, profile-routine-merge ×2, не связаны с моей работой).
+- `vite build` OK; contest-prep 141/141; IndividualPlan 193/193; taper-planner 6/6.
+- Файлы других агентов не тронуты (health-diary/дневники/HR, lms-taper/competition-attempts, MACROCYCLE-ROADMAP.md — чужой WIP).
 
 ---
 

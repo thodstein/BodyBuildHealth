@@ -68,8 +68,8 @@ import {
   isoAddDays, isoToday, CATEGORY_PROFILES, CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, CONTEST_SPECIALIZATION_LABELS,
   buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
-  prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS, buildShowTimeline, configFromPlan,
-  saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored,
+  prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
+  saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
 } from '../../../engines/bb/bb-contest-prep.engine';
@@ -86,6 +86,7 @@ import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
+import { getWeightLog } from '../../../engines/profile-store';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -478,6 +479,34 @@ export const BbAutoConstructor: React.FC = () => {
     setPrepPlan(p => p ? { ...p, testPeakWeekId: t.id, updatedAt: new Date().toISOString() } : p);
     savePrepToProfile({ ...prepPlan, testPeakWeekId: t.id }, buildContestPrepConfig());
     flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать' : t.verdict === 'adjust' ? 'нужна коррекция' : 'консервативный режим'}`);
+  };
+
+  // ⚖️ Ступенчатая адаптация подготовки по весу (одна переменная за раз).
+  const weightAdvice = useMemo(() => {
+    if (!prepPlan) return null;
+    try {
+      const goals = (linked.profile?.settings as any)?.goals;
+      const targetW = Number(goals?.targetWeight) > 30 ? Number(goals.targetWeight) : undefined;
+      return prepWeightAdvice(getWeightLog().map(e => ({ date: e.date, weight: e.weight })), prepPlan, { targetWeightKg: targetW });
+    } catch { return null; }
+  }, [prepPlan, linked.profile?.settings]);
+  const handleApplyWeightAdjustment = (caloriesDelta: number, cardioDelta: number) => {
+    if (!prepPlan || weightAdvice?.status === 'no_data') return;
+    const next: BBContestPrepPlan = {
+      ...prepPlan,
+      updatedAt: new Date().toISOString(),
+      preparation: {
+        ...prepPlan.preparation,
+        currentCalories: Math.max(1200, prepPlan.preparation.currentCalories + caloriesDelta),
+        cardioMinutesPerWeek: Math.max(0, prepPlan.preparation.cardioMinutesPerWeek + cardioDelta),
+      },
+    };
+    setPrepPlan(next);
+    savePrepToProfile(next, buildContestPrepConfig());
+    const parts: string[] = [];
+    if (caloriesDelta !== 0) parts.push(`${caloriesDelta > 0 ? '+' : ''}${caloriesDelta} ккал`);
+    if (cardioDelta !== 0) parts.push(`${cardioDelta > 0 ? '+' : ''}${cardioDelta} мин кардио/нед`);
+    flash(`⚖️ Применено (одна переменная): ${parts.join(' · ')}. Эффект оценивайте через 5-7 дней по среднему весу.`);
   };
 
   // 🏁 Авто-восстановление сохранённого prep-плана после перезагрузки.
@@ -3768,6 +3797,71 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               );
             })()}
+
+            {/* ⚖️ Адаптация подготовки по весу */}
+            <div style={{ marginTop:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>⚖️ Адаптация по весу (среднее за 7 дней)</div>
+              {weightAdvice && (
+                <div style={{ background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.15)', borderRadius:8, padding:10, fontSize:10 }}>
+                  <div style={{ display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ color:'rgba(255,255,255,0.7)' }}>
+                      Последний вес: <b style={{ color:'#fff' }}>{weightAdvice.lastWeight ?? '—'} кг</b>
+                      {weightAdvice.lastDate ? ` (${weightAdvice.lastDate})` : ''}
+                    </span>
+                    {weightAdvice.delta7d != null && (
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>
+                        Δ7д: <b style={{ color: weightAdvice.delta7d < 0 ? '#4ade80' : '#fbbf24' }}>{weightAdvice.delta7d > 0 ? '+' : ''}{weightAdvice.delta7d.toFixed(2)} кг</b>
+                      </span>
+                    )}
+                    {weightAdvice.delta14d != null && (
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>
+                        Δ14д: <b style={{ color: weightAdvice.delta14d < 0 ? '#4ade80' : '#fbbf24' }}>{weightAdvice.delta14d > 0 ? '+' : ''}{weightAdvice.delta14d.toFixed(2)} кг</b>
+                      </span>
+                    )}
+                    {weightAdvice.weeklyRatePct != null && (
+                      <span style={{ color:'rgba(255,255,255,0.7)' }}>
+                        Темп: <b style={{ color:'#fff' }}>{weightAdvice.weeklyRatePct.toFixed(2)}%/нед</b> (цель {weightAdvice.targetRatePctPerWeek}%/нед)
+                      </span>
+                    )}
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 999, fontWeight: 700,
+                      background: weightAdvice.status === 'on_track' ? 'rgba(34,197,94,0.15)' : weightAdvice.status === 'no_data' ? 'rgba(255,255,255,0.08)' : weightAdvice.status === 'too_fast' ? 'rgba(239,68,68,0.15)' : weightAdvice.status === 'taper' ? 'rgba(168,85,247,0.15)' : 'rgba(245,158,11,0.15)',
+                      color: weightAdvice.status === 'on_track' ? '#4ade80' : weightAdvice.status === 'no_data' ? 'rgba(255,255,255,0.5)' : weightAdvice.status === 'too_fast' ? '#ef4444' : weightAdvice.status === 'taper' ? '#a855f7' : '#fbbf24',
+                    }}>
+                      {weightAdvice.status === 'on_track' ? '✓ По графику' : weightAdvice.status === 'no_data' ? 'Мало данных' : weightAdvice.status === 'too_fast' ? '⚠ Быстрее цели' : weightAdvice.status === 'taper' ? '🛑 Taper' : '🔶 Плато/медленно'}
+                    </span>
+                    {weightAdvice.measurements > 0 && <span style={{ color:'rgba(255,255,255,0.4)' }}>замеров 14д: {weightAdvice.measurements}</span>}
+                  </div>
+                  {weightAdvice.progressToTargetPct != null && (
+                    <div style={{ marginTop:6 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'rgba(255,255,255,0.5)', marginBottom:2 }}>
+                        <span>Прогресс к целевому весу</span>
+                        <span>{Math.min(100, Math.max(0, weightAdvice.progressToTargetPct))}%</span>
+                      </div>
+                      <div style={{ height:5, borderRadius:3, background:'rgba(255,255,255,0.08)', overflow:'hidden' }}>
+                        <div style={{ width:`${Math.min(100, Math.max(0, weightAdvice.progressToTargetPct))}%`, height:'100%', borderRadius:3, background:'linear-gradient(90deg,#60a5fa,#00e68a)' }} />
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ color:'rgba(255,255,255,0.6)', marginTop:6, lineHeight:1.45 }}>{weightAdvice.recommendation}</div>
+                  {(weightAdvice.adjustCalories !== 0 || weightAdvice.adjustCardioMin !== 0) && (
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+                      {weightAdvice.adjustCalories !== 0 && (
+                        <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={() => handleApplyWeightAdjustment(weightAdvice.adjustCalories, 0)}>
+                          {weightAdvice.adjustCalories > 0 ? '➕' : '➖'} Применить калории {weightAdvice.adjustCalories > 0 ? '+' : ''}{weightAdvice.adjustCalories} ккал
+                        </button>
+                      )}
+                      {weightAdvice.adjustCardioMin !== 0 && (
+                        <button style={{ ...BTN_GHOST, borderColor:'#34d399', color:'#34d399' }} onClick={() => handleApplyWeightAdjustment(0, weightAdvice.adjustCardioMin)}>
+                          {weightAdvice.adjustCardioMin > 0 ? '➕' : '➖'} Кардио {weightAdvice.adjustCardioMin > 0 ? '+' : ''}{weightAdvice.adjustCardioMin} мин/нед
+                        </button>
+                      )}
+                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)', alignSelf:'center' }}>Одна переменная за раз · эффект оценивать через 5–7 дней</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* 🎬 Таймлайн Show Day */}
             <div style={{ marginTop:10 }}>

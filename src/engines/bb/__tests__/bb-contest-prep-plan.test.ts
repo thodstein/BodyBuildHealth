@@ -30,6 +30,7 @@ import {
   TEST_PEAK_WEEK_STORAGE_KEY,
   buildShowTimeline,
   configFromPlan,
+  prepWeightAdvice,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -531,5 +532,116 @@ describe('Обратная совместимость и вспомогател�
     expect(timeline[timeline.length - 1].action).toMatch(/Выход/);
     // Времена убывают к выходу на сцену (12:00 по умолчанию) — последний шаг раньше старта.
     expect(timeline[timeline.length - 1].time <= '12:00').toBe(true);
+  });
+});
+
+describe('Этап 3.2-3.3 — ступенчатая адаптация подготовки по весу', () => {
+  const w = (startIso: string, weights: number[]): Array<{ date: string; weight: number }> =>
+    weights.map((weight, i) => ({ date: addDaysIso(startIso, i * 1), weight }));
+
+  function makePlanNear(refIso: string): BBContestPrepPlan {
+    const showDate = addDaysIso(refIso, 60);
+    return buildBBContestPrepPlan(baseConfig({ showDate, weightKg: 80 }), { prepWeeks: 6, taperWeeks: 2 });
+  }
+
+  it('нет данных → no_data с подсказкой записывать вес', () => {
+    const plan = makePlanNear(todayIso());
+    const advice = prepWeightAdvice([], plan);
+    expect(advice.status).toBe('no_data');
+    expect(advice.lastWeight).toBeNull();
+    expect(advice.recommendation).toMatch(/записывайте вес/i);
+    expect(advice.adjustCalories).toBe(0);
+  });
+
+  it('недостаточно замеров (1 запись) → no_data', () => {
+    const plan = makePlanNear(todayIso());
+    const advice = prepWeightAdvice(w(todayIso(), [80]), plan);
+    expect(advice.status).toBe('no_data');
+    expect(advice.measurements).toBe(1);
+  });
+
+  it('темп в цели (0.5%/нед) → on_track, коррекции нет', () => {
+    const plan = makePlanNear(todayIso());
+    const ref = todayIso();
+    // 0.5 кг/нед при 80 кг = 0.625%/нед — в диапазоне.
+    const log = [
+      ...w(addDaysIso(ref, -13), [80.5, 80.4, 80.3]),
+      ...w(addDaysIso(ref, -6), [80.0, 80.1, 79.9, 80.0]),
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: ref });
+    expect(advice.status).toBe('on_track');
+    expect(advice.delta7d).toBeLessThan(0);
+    expect(advice.adjustCalories).toBe(0);
+    expect(advice.adjustCardioMin).toBe(0);
+  });
+
+  it('плато 2+ недели → too_slow, калории −175 ИЛИ кардио +20 (не вместе)', () => {
+    const plan = makePlanNear(todayIso());
+    const ref = todayIso();
+    const log = [
+      ...w(addDaysIso(ref, -13), [80, 80.1, 80]),
+      ...w(addDaysIso(ref, -6), [80, 79.9, 80, 80.1]),
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: ref });
+    expect(advice.status).toBe('too_slow');
+    expect(advice.adjustCalories).toBe(-175);
+    expect(advice.adjustCardioMin).toBe(20);
+    expect(advice.recommendation).toMatch(/одну переменную|ОДНУ переменную/i);
+  });
+
+  it('слишком быстрый темп (>1.3× цели) → too_fast, +150 ккал ИЛИ −20 мин кардио', () => {
+    const plan = makePlanNear(todayIso());
+    const ref = todayIso();
+    // 1.5 кг/нед при 80 кг ≈ 1.9%/нед — много быстрее 0.5%.
+    const log = [
+      ...w(addDaysIso(ref, -13), [83, 83, 82.9]),
+      ...w(addDaysIso(ref, -6), [81.5, 81.4, 81.3, 81.4]),
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: ref });
+    expect(advice.status).toBe('too_fast');
+    expect(advice.adjustCalories).toBe(150);
+    expect(advice.adjustCardioMin).toBe(-20);
+  });
+
+  it('в taper-фазе — статус taper, коррекции нулевые', () => {
+    const plan = makePlanNear(todayIso());
+    const taperStart = plan.phases.find(p => p.key === 'taper')!.dateStart;
+    const log = [
+      ...w(addDaysIso(taperStart, -13), [80, 80, 80]),
+      ...w(addDaysIso(taperStart, -6), [80, 80, 80]),
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: taperStart });
+    expect(advice.status).toBe('taper');
+    expect(advice.adjustCalories).toBe(0);
+    expect(advice.adjustCardioMin).toBe(0);
+    expect(advice.phase).toBe('taper');
+  });
+
+  it('прогресс к целевому весу считается от старта подготовки', () => {
+    const plan = makePlanNear(todayIso());
+    const ref = todayIso();
+    const log = [
+      ...w(addDaysIso(ref, -13), [82, 81.9, 82]),
+      ...w(addDaysIso(ref, -6), [80.5, 80.6, 80.4]),
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: ref, targetWeightKg: 76 });
+    // старт 80 → цель 76 (4 кг); сейчас ~80.5 → прогресс ≈ 0%
+    expect(advice.progressToTargetPct).not.toBeNull();
+    expect(advice.progressToTargetPct!).toBeGreaterThanOrEqual(0);
+  });
+
+  it('устойчив к любому порядку лога и мусору', () => {
+    const plan = makePlanNear(todayIso());
+    const ref = todayIso();
+    const log = [
+      { date: addDaysIso(ref, -3), weight: 80 },
+      { date: 'bad-date', weight: 70 },
+      { date: addDaysIso(ref, -8), weight: 80.5 },
+      { date: addDaysIso(ref, -13), weight: 80.6 },
+      { date: addDaysIso(ref, -2), weight: 80.1 },
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: ref });
+    expect(advice.status).not.toBe('no_data');
+    expect(advice.measurements).toBeGreaterThanOrEqual(3);
   });
 });
