@@ -1537,7 +1537,7 @@ export function appendPLTaperWeeks(
     const isFinal = idx === taperWeeks - 1;
     // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
     // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
-    const protocolFinal = isFinal && pt.intensityMode === 'set_pct' && pt.intensityPct >= 1.0;
+    const protocolFinal = isFinal && pt.warmupOnly === true;
     const days = baseWeek.days.map(d => {
       const exercises = d.exercises.map(e => {
         // Подготовительные прикиды на тапер-неделях (кроме финальной):

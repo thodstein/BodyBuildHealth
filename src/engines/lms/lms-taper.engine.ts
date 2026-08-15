@@ -59,6 +59,11 @@ export interface TaperCurvePoint {
   focus?: string;
   /** Основные движения — синглы (интенсивная неделя ПЛ-протокола). */
   singles?: boolean;
+  /** Соревновательная неделя ПЛ-протокола: основные движения — ТОЛЬКО разминка
+   *  50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно («разминка → открытие →
+   *  2-3 прохода»), НЕ рабочие сеты на 100% (иначе перегрузка + дубль прикидов).
+   *  Для остальных схем (classic/pro/wf) — false: финал остаётся рабочим. */
+  warmupOnly?: boolean;
 }
 
 export interface TaperCurveOptions {
@@ -121,9 +126,9 @@ export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
   if (mode === 'pl') {
     const proto = getPeakingProtocol('pl');
     const offset = Math.max(0, proto.weeks.length - n);
-    const sel = proto.weeks.slice(offset, offset + n);
-    // Протокол ровно 3 недели: последние N недель — подводящая/интенсивная/соревновательная
-    // (финал всегда в списке). При n > 3 — крайние недели повторяются (кламп).
+    // Последние N недель протокола (финал всегда в списке). При n > 3 —
+    // крайняя (соревновательная) неделя повторяется (кламп, как в legacy).
+    const sel = Array.from({ length: n }, (_, i) => proto.weeks[Math.min(offset + i, proto.weeks.length - 1)]);
     return sel.map((pw, i) => ({
       week: i + 1,
       volumePct: r2(pw.volumePct * wGoalMult),
@@ -134,6 +139,7 @@ export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
       label: pw.label,
       focus: pw.focus,
       singles: n === 3 && i === 1,
+      warmupOnly: i === n - 1,
     }));
   }
 
@@ -157,7 +163,7 @@ export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
     // N недель протокола (финал — суперкомпенсация). n <= 2 — только реализация.
     const proto = getPeakingProtocol('classic');
     const offset = Math.max(0, proto.weeks.length - n);
-    const sel = proto.weeks.slice(offset, offset + n);
+    const sel = Array.from({ length: n }, (_, i) => proto.weeks[Math.min(offset + i, proto.weeks.length - 1)]);
     return sel.map((pw, i) => ({
       week: i + 1,
       volumePct: r2(pw.volumePct * wGoalMult),

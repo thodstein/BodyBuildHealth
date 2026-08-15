@@ -55,7 +55,7 @@ function remeasure(day: LMSPlanWeek['days'][number]): LMSPlanWeek['days'][number
 function applyCurvePoint(wk: LMSPlanWeek, pt: TaperCurvePoint, strategy: MeetStrategy, isLast: boolean): LMSPlanWeek {
   // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
   // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
-  const protocolFinal = isLast && pt.intensityMode === 'set_pct' && pt.intensityPct >= 1.0;
+  const protocolFinal = isLast && pt.warmupOnly === true;
   const days = wk.days.map(d => {
     const exercises = d.exercises.map(e => {
       if (isMain(e)) {
