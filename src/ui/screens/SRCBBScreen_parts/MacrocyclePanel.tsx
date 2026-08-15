@@ -21,7 +21,7 @@ import { PopupNumber, PopupSelect } from './TrainingPopups';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
-import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
+import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, PEAK_PHASE_COLORS, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
 import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draft.engine';
 import { createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
@@ -1409,22 +1409,38 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     } catch { res = null; }
                     const proto = res?.peakWeek ?? [];
                     return (
-                      <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-                        <button type="button" onClick={() => setPeakWeekOpen(v => !v)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: '#f59e0b' }}>
-                          {peakWeekOpen ? '▼' : '▶'} 🎭 Пик-неделя (тапер ББ) — 7 дней к сцене
-                        </button>
+                      <div style={{ marginTop: 6, padding: 10, borderRadius: 10, background: 'linear-gradient(135deg, rgba(245,158,11,0.07), rgba(24,24,27,0.4))', border: '1px solid rgba(245,158,11,0.25)', fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                          <button type="button" onClick={() => setPeakWeekOpen(v => !v)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: 11, fontWeight: 800, color: '#f59e0b' }}>
+                            {peakWeekOpen ? '▼' : '▶'} 🎭 Пик-неделя (тапер ББ) — 7 дней к сцене
+                          </button>
+                          {proto.length > 0 && (
+                            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }} title="Фазы пик-недели: деплеция → загрузка → пик → шоу">
+                              {proto.map(d => (
+                                <span key={d.day} title={`День ${d.day}: ${PHASE_LABELS_RU[d.phase]}`} style={{
+                                  width: 10, height: 10, borderRadius: 3,
+                                  background: PEAK_PHASE_COLORS[d.phase],
+                                  boxShadow: d.day === 7 ? `0 0 6px ${PEAK_PHASE_COLORS[d.phase]}` : 'none',
+                                }} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         {peakWeekOpen && (
                           <>
                             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              {proto.map(d => (
-                                <div key={d.day} style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-                                  <span style={{ fontWeight: 700, minWidth: 34 }}>День {d.day}</span>
-                                  <span style={{ minWidth: 62, color: d.day === 7 ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>{PHASE_LABELS_RU[d.phase]}</span>
-                                  <span style={{ color: 'rgba(255,255,255,0.55)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    💧{d.waterLiters}л · 🧂{d.sodiumMg}мг · 🍚{d.carbsG}г · {d.training.minutes ? `🏋️${d.training.minutes}м` : 'отдых'} · 🎭{d.posingMinutes}м
-                                  </span>
-                                </div>
-                              ))}
+                              {proto.map(d => {
+                                const phColor = PEAK_PHASE_COLORS[d.phase];
+                                return (
+                                  <div key={d.day} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 6px', borderRadius: 6, borderLeft: `3px solid ${phColor}`, background: d.day === 7 ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.02)' }}>
+                                    <span style={{ fontWeight: 700, minWidth: 34, color: d.day === 7 ? '#fbbf24' : '#fff' }}>День {d.day}</span>
+                                    <span style={{ minWidth: 74, padding: '1px 6px', borderRadius: 999, fontSize: 8, fontWeight: 700, textAlign: 'center', background: phColor + '18', color: phColor, border: `1px solid ${phColor}40` }}>{PHASE_LABELS_RU[d.phase]}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.55)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      💧{d.waterLiters}л · 🧂{d.sodiumMg}мг · 🍚{d.carbsG}г · {d.training.minutes ? `🏋️${d.training.minutes}м` : 'отдых'} · 🎭{d.posingMinutes}м
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                             {res && res.rationale.length > 0 && (
                               <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.45)' }}>
