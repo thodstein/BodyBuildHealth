@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { colors } from '../../ui';
 import type { WeightEntry } from '../../../../../engines/profile-store';
-import { detectAnomalies } from '../../diary-helpers';
+import { detectAnomalies, toLocalIso } from '../../diary-helpers';
 
 interface WeeklyHistogramImprovedProps {
   rows: WeightEntry[];
@@ -29,7 +29,7 @@ const WeeklyHistogramImproved: React.FC<WeeklyHistogramImprovedProps> = ({ rows 
       start.setHours(0, 0, 0, 0);
       const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
       start.setDate(d.getDate() - dow);
-      const key = start.toISOString().slice(0, 10);
+      const key = toLocalIso(start);
       if (!groups[key]) groups[key] = { dates: [], values: [] };
       groups[key].dates.push(r.date);
       groups[key].values.push(r.weight);

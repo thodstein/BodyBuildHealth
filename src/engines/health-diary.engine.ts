@@ -273,10 +273,10 @@ function mergeSymptomDiary(entries: UnifiedHealthEntry[]): UnifiedHealthEntry[] 
 
 export function getUnifiedHealthEntries(): UnifiedHealthEntry[] {
   if (!hasMigrated()) {
-    const existing = safeParse(UNIFIED_KEY, []);
+    const existing = safeParse<UnifiedHealthEntry[]>(UNIFIED_KEY, []);
     if (existing.length > 0) {
       markMigrated();
-      return existing;
+      return [...existing].sort((a, b) => b.date.localeCompare(a.date));
     }
     const migrated = migrateLegacyEntries();
     saveUnifiedHealthEntries(migrated);
@@ -293,12 +293,17 @@ export function getUnifiedHealthEntries(): UnifiedHealthEntry[] {
     try { localStorage.setItem(SYMPTOMS_MERGED_FLAG, '1'); } catch {}
     entries = merged;
   }
-  return entries;
+  // Единый порядок: DESC (новейшая первая). Защита от ASC-записей из quick-add путей.
+  return [...entries].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export function saveUnifiedHealthEntries(entries: UnifiedHealthEntry[]): void {
   try {
-    localStorage.setItem(UNIFIED_KEY, JSON.stringify(entries.slice(-365)));
+    // Единый порядок DESC; кап 365 — оставляем САМЫЕ НОВЫЕ (не хвост массива).
+    const ordered = [...entries]
+      .filter(e => e && typeof e.date === 'string')
+      .sort((a, b) => b.date.localeCompare(a.date));
+    localStorage.setItem(UNIFIED_KEY, JSON.stringify(ordered.slice(0, 365)));
   } catch {}
 }
 

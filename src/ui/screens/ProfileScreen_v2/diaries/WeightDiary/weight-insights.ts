@@ -113,8 +113,10 @@ export function preferMorning<T extends { timeOfDay?: 'morning' | 'evening' }>(r
   return morning.length >= 3 && morning.length >= rows.length * 0.6 ? morning : rows;
 }
 
-/** RFC 4180 escape для CSV: поле с разделителем/кавычками/переносами оборачивается в кавычки. */
+/** RFC 4180 escape для CSV: поле с разделителем/кавычками/переносами оборачивается в кавычки.
+ *  Защита от формульной инъекции (Excel): префикс «'» для полей, начинающихся с = + - @. */
 export function csvEscape(value: unknown): string {
   const s = value === undefined || value === null ? '' : String(value);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
 }

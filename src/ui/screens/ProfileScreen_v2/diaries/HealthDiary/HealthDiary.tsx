@@ -116,7 +116,7 @@ function entryFields(entry: UnifiedHealthEntry): DiaryEntryLike {
     { label: 'Нейро', value: String(neuro), unit: '/10' },
     { label: 'Акне', value: String(acne), unit: '/12' },
     { label: 'Гемат', value: String(hemato), unit: '/8' },
-    { label: 'Симптомы', value: String(entry.symptoms.length), unit: 'шт.' },
+    { label: 'Симптомы', value: String(Array.isArray(entry.symptoms) ? entry.symptoms.length : 0), unit: 'шт.' },
   ];
   if (entry.pain?.timeOfDay) fields.push({ label: 'Время', value: entry.pain.timeOfDay, unit: '' });
   if (entry.pain?.painType) fields.push({ label: 'Тип', value: entry.pain.painType, unit: '' });
@@ -659,14 +659,33 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     (window as any).showToast?.('✅ Запись здоровья добавлена');
   };
   const saveEdit = (draft: EntryDraft) => {
-    const result = updateUnifiedHealthEntry(edit!.date, (current) =>
-      Object.assign(current, clone(draft), {
-        id: current.id,
-        createdAt: current.createdAt,
-        updatedAt: new Date().toISOString(),
-      }),
-    );
-    commit(result);
+    const current = edit ? rows.find((r) => r.date === edit.date) : undefined;
+    const merged: UnifiedHealthEntry = current
+      ? {
+          ...clone(current),
+          ...clone(draft),
+          id: current.id,
+          createdAt: current.createdAt,
+          updatedAt: new Date().toISOString(),
+        }
+      : {
+          ...clone(draft),
+          id: '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as UnifiedHealthEntry;
+    // Пустая дата недопустима: движок (sanitize) подставил бы «сегодня» молча — делаем явно.
+    if (!merged.date) merged.date = todayIso();
+    if (current && merged.date === current.date) {
+      // Дата не менялась — обычное обновление.
+      const result = updateUnifiedHealthEntry(current.date, (entry) => Object.assign(entry, merged));
+      commit(result);
+    } else {
+      // Дата изменилась: удаляем запись со старой даты (и любую на новой),
+      // вставляем перенесённую — инвариант «одна запись на дату» сохраняется.
+      const rest = rows.filter((r) => r.date !== edit!.date && r.date !== merged.date);
+      commit([...rest, merged]);
+    }
     setEdit(null);
     (window as any).showToast?.('✅ Запись здоровья обновлена');
   };
@@ -740,19 +759,19 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     hemato: getUnifiedHematoStats(rangeRows),
   };
   const status = getUnifiedTodayStatus(rows);
-  const planCtx = useMemo(buildPlanCtx, []);
+  // planCtx пересчитывается при изменении записей — план строится на свежих
+  // соседних дневниках (сон/АД/вес), а не на данных момента монтирования.
+  const planCtx = useMemo(buildPlanCtx, [rows]);
   const [plan, setPlan] = useState<HealthPlanType>(() => loadHealthPlan() ?? generateHealthPlan(analyzeHealthProfile(rows, planCtx)));
   useEffect(() => {
     if (rows.length === 0) return;
     const fresh = generateHealthPlan(analyzeHealthProfile(rows, planCtx));
-    setPlan((prev) => {
-      const prevKey = prev.recommendations.map((r) => r.id).join('|');
-      const nextKey = fresh.recommendations.map((r) => r.id).join('|');
-      if (prevKey === nextKey) return prev;
-      saveHealthPlan(fresh);
-      return fresh;
-    });
-  }, [rows, planCtx]);
+    const prevKey = plan.recommendations.map((r) => r.id).join('|');
+    const nextKey = fresh.recommendations.map((r) => r.id).join('|');
+    if (prevKey === nextKey) return;
+    setPlan(fresh);
+    saveHealthPlan(fresh);
+  }, [rows, planCtx, plan]);
   const [planDone, setPlanDone] = useState<string[]>(() => {
     try { return loadPlanDone(); } catch { return []; }
   });

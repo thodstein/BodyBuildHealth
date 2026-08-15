@@ -85,6 +85,9 @@ const localDateKey = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
+/** Локальный ISO-ключ даты (YYYY-MM-DD). Экспортирован для компонентов, группирующих по неделям. */
+export const toLocalIso = (d: Date): string => localDateKey(d);
+
 export const computeStreak = (
   entries: { date: string }[]
 ): { current: number; best: number; totalDays: number } => {
@@ -236,7 +239,7 @@ export const groupEntriesByPeriod = (
     startOfWeek.setHours(0, 0, 0, 0);
     const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
     startOfWeek.setDate(d.getDate() - dow);
-    const key = startOfWeek.toISOString().slice(0, 10);
+    const key = localDateKey(startOfWeek);
     if (!groups[key]) { groups[key] = []; order.push(key); }
     groups[key].push(e);
   }
@@ -814,7 +817,7 @@ export const buildWeeklyHistogram = (
     start.setHours(0, 0, 0, 0);
     const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
     start.setDate(d.getDate() - dow);
-    const key = start.toISOString().slice(0, 10);
+    const key = localDateKey(start);
     if (!groups[key]) groups[key] = [];
     if (Number.isFinite(v.value)) groups[key].push(v.value);
   }

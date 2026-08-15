@@ -117,7 +117,9 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const [validationErrors, setValidationErrors] = useState<BPValidationError[]>([]);
   const svg = useRef<SVGSVGElement>(null);
 
-  useEffect(() => { if (open) setRows(getBpEntries()); }, [open]);
+  useEffect(() => {
+    if (open) setRows(sortEntriesByTimestamp(getBpEntries()));
+  }, [open]);
 
   const [alerts, dismissAlert] = useBPAlerts({
     entries: rows,
@@ -189,17 +191,21 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   }, [entries, range, query, sort]);
 
   const pageData = paginate(visible, page, 8);
-  const points = visible.map(e => ({ date: e.date, value: Number(e.fields[0].value) })).filter(x => Number.isFinite(x.value));
+  // Статистика, графики и аномалии зависят ТОЛЬКО от диапазона (не от поиска).
+  const rangeEntries = useMemo(() => filterByRange(entries, range), [entries, range]);
+  const points = rangeEntries.map(e => ({ date: e.date, value: Number(e.fields[0].value) })).filter(x => Number.isFinite(x.value));
   const dist = computeDistribution(points.map(x => x.value));
-  const extremes = computeExtremes('bp', visible);
-  const streak = computeStreak(visible);
-  const anomalies = detectAnomalies('bp', visible);
+  const extremes = computeExtremes('bp', rangeEntries);
+  const streak = computeStreak(rangeEntries);
+  const anomalies = detectAnomalies('bp', rangeEntries);
   const comparison = compareWithLastWeek(points);
   const weekly = buildWeeklyHistogram(points);
   const normal = getNormalRange('bp');
 
   const latest = rows.length > 0 ? sortEntriesByTimestamp(rows)[0] : undefined;
-  const recentRows = rows.filter(x => visible.some(v => v.date === x.date));
+  // Статистика зависит ТОЛЬКО от диапазона (7/30/90); поиск влияет лишь на таблицу.
+  const rangeDateSet = useMemo(() => new Set(rangeEntries.map((e) => e.date)), [rangeEntries]);
+  const recentRows = rows.filter((x) => rangeDateSet.has(x.date));
   const bpGoal = goals?.systolicTarget > 0 ? goals.systolicTarget : 120;
   const bpClass = latest ? classifyBP(latest.systolic, latest.diastolic) : 'normal';
   const bpColor = getBpClassificationColor(bpClass);

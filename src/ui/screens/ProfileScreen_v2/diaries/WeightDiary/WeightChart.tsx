@@ -142,7 +142,13 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
   const touchStartX = useRef<number>(0);
   const [swipeIndex, setSwipeIndex] = useState(0);
 
-  const activeSeries = useMemo(() => series.filter(s => s.points.length > 0), [series]);
+  const activeSeries = useMemo(
+    () =>
+      series
+        .filter(s => s.points.length > 0)
+        .map(s => ({ ...s, points: [...s.points].sort((a, b) => a.date.localeCompare(b.date)) })),
+    [series],
+  );
   const leftSeries = useMemo(() => activeSeries.filter(s => !s.useRightAxis), [activeSeries]);
   const rightSeries = useMemo(() => activeSeries.filter(s => s.useRightAxis), [activeSeries]);
 

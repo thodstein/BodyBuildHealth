@@ -821,7 +821,7 @@ export const ProfileDiariesTab: React.FC<{
     const today = todayIso();
     const overview: { label: string; value: string; color: string }[] = [];
     if (sleepEntries.length) {
-      const e = sleepEntries[sleepEntries.length - 1];
+      const e = [...sleepEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
       if (e.date === today) overview.push({ label: 'Сон', value: `${e.hours} ч`, color: '#a78bfa' });
     }
     if (bpEntries.length) {
@@ -933,7 +933,9 @@ export const ProfileDiariesTab: React.FC<{
         }
         if (diaries[HEALTH_DIARY_KEY] && Array.isArray(diaries[HEALTH_DIARY_KEY])) {
           saveUnifiedHealthEntries(diaries[HEALTH_DIARY_KEY]);
-          setHealthEntries(diaries[HEALTH_DIARY_KEY]);
+          setHealthEntries(
+            [...diaries[HEALTH_DIARY_KEY]].sort((a, b) => String(b.date).localeCompare(String(a.date))),
+          );
         }
         if (diaries[SYMPTOMS_DIARY_KEY] && Array.isArray(diaries[SYMPTOMS_DIARY_KEY])) {
           saveDiary(SYMPTOMS_DIARY_KEY, diaries[SYMPTOMS_DIARY_KEY]);
@@ -1624,6 +1626,8 @@ export const ProfileDiariesTab: React.FC<{
                     [NEURO_DIARY_KEY]: [...neuroEntries] as any[],
                     [ACNE_DIARY_KEY]: [...acneEntries] as any[],
                     [HEMATO_DIARY_KEY]: [...hematoEntries] as any[],
+                    [HEALTH_DIARY_KEY]: [...healthEntries] as any[],
+                    [WEIGHT_LOG_KEY]: [...weights] as any[],
                   };
                   const total = Object.values(snap).reduce((s, a) => s + a.length, 0);
                   [
@@ -1635,6 +1639,8 @@ export const ProfileDiariesTab: React.FC<{
                     NEURO_DIARY_KEY,
                     ACNE_DIARY_KEY,
                     HEMATO_DIARY_KEY,
+                    HEALTH_DIARY_KEY,
+                    WEIGHT_LOG_KEY,
                   ].forEach((k) => saveDiary(k, []));
                   setSleepEntries([]);
                   setBpEntries([]);
@@ -1644,6 +1650,8 @@ export const ProfileDiariesTab: React.FC<{
                   setNeuroEntries([]);
                   setAcneEntries([]);
                   setHematoEntries([]);
+                  setHealthEntries([]);
+                  setWeights([]);
                   pushUndo(`🧹 Очищены все встроенные дневники (${total})`, () => {
                     setSleepEntries(snap[SLEEP_DIARY_KEY] as SleepEntry[]);
                     setBpEntries(snap[BP_DIARY_KEY] as BPEntry[]);
@@ -1653,6 +1661,8 @@ export const ProfileDiariesTab: React.FC<{
                     setNeuroEntries(snap[NEURO_DIARY_KEY] as NeuroEntry[]);
                     setAcneEntries(snap[ACNE_DIARY_KEY] as AcneEntry[]);
                     setHematoEntries(snap[HEMATO_DIARY_KEY] as HematoEntry[]);
+                    setHealthEntries(snap[HEALTH_DIARY_KEY] as UnifiedHealthEntry[]);
+                    setWeights(snap[WEIGHT_LOG_KEY] as ReturnType<typeof getWeightLog>);
                     Object.entries(snap).forEach(([k, v]) => saveDiary(k, v as any[]));
                   });
                 }}
@@ -1803,7 +1813,7 @@ export const ProfileDiariesTab: React.FC<{
               const prevSymptoms = symptomEntries;
               const replacedHealth = prevUnified.some((x) => x.date === e.date);
               const updated = [...healthEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
-                a.date.localeCompare(b.date),
+                b.date.localeCompare(a.date),
               );
               saveUnifiedHealthEntries(updated);
               setHealthEntries(updated);

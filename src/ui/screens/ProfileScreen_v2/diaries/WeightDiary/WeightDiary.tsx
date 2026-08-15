@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import { DiaryHeader } from '../DiaryHeader';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
-import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, type WeightEntry } from '../../../../../engines/profile-store';
+import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, normalizeWeightEntry, type WeightEntry } from '../../../../../engines/profile-store';
 import { updateSection } from '../../../../../core/profile-manager';
 import { strengthDiary } from '../../../../../engines/strength-diary.engine';
 import { generateInsights, type DiarySession, type DiarySet } from '../../../../../engines/diary-insights.engine';
@@ -347,7 +347,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     );
   useEffect(() => {
     if (!open) return;
-    setRows(getWeightLog());
+    // Единый порядок: DESC (новейшая первая) — совпадает с commit() и
+    // ожиданиями всего UI (rows[0] = последняя запись).
+    migrateWeightLogLegacy();
+    setRows([...getWeightLog()].sort((a, b) => b.date.localeCompare(a.date)));
     setArchiveRows(getWeightLogArchived());
     try {
       const stored = Number(JSON.parse(localStorage.getItem('he_diary_goals') || '{}').weightKg);
@@ -378,7 +381,6 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     } catch {
       /* ignore */
     }
-    migrateWeightLogLegacy();
   }, [open, goals?.weightKg]);
   useEffect(() => {
     if (goal > 0) {
@@ -401,9 +403,13 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     };
   }, [open]);
   const commit = (next: WeightEntry[], remember = true) => {
-    // Дедупликация по дате: последняя запись на дату выигрывает
+    // Дедупликация по дате: последняя запись на дату выигрывает.
+    // Нормализация до state — чтобы NaN/невалидные не попадали в таблицу.
     const byDate = new Map<string, WeightEntry>();
-    for (const e of next) if (e && e.date) byDate.set(e.date, e);
+    for (const e of next) {
+      const n = normalizeWeightEntry(e);
+      if (n) byDate.set(n.date, n);
+    }
     const ordered = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
     if (remember) setUndo(rows);
     saveWeightLog(ordered);
