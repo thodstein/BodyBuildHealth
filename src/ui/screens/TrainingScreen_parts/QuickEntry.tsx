@@ -14,7 +14,7 @@ import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
 import { DiarySetRow } from './DiarySetRow';
-import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
+import { getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { useIsMobile } from './useIsMobile';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
@@ -46,53 +46,10 @@ interface ExerciseRecord {
 }
 
 /**
- * Получить рекомендацию веса/повторов из предыдущих сессий
+ * Общие хелперы (прошлые данные/PR) вынесены в diary-shared.ts —
+ * единый источник для QuickEntry и DiaryRecordingForm.
  */
-function getPreviousWorkoutData(
-  historyWorkouts: WorkoutLog[],
-  exerciseName: string,
-): { weight: number; reps: number; rir: number; date: string } | null {
-  let best: { weight: number; reps: number; rir: number; date: string; e1rm: number } | null = null;
-  for (const wl of historyWorkouts) {
-    for (const ex of wl.exercises) {
-      const score = exerciseMatchScore(ex.exerciseName, exerciseName);
-      if (score >= 0.5) {
-        const sets = ex.sets || [];
-        for (const set of sets) {
-          const e1rm = epley1RM(set.weight, set.reps);
-          if (!best || e1rm > best.e1rm) {
-            best = { weight: set.weight, reps: set.reps, rir: set.rir || 2, date: wl.date, e1rm };
-          }
-        }
-      }
-    }
-  }
-  return best ? { weight: best.weight, reps: best.reps, rir: best.rir, date: best.date } : null;
-}
-
-/**
- * Получить PR по упражнению
- */
-function getPersonalRecord(
-  historyWorkouts: WorkoutLog[],
-  exerciseName: string,
-): { weight: number; reps: number; e1rm: number } | null {
-  let best: { weight: number; reps: number; e1rm: number } | null = null;
-  for (const wl of historyWorkouts) {
-    for (const ex of wl.exercises) {
-      const score = exerciseMatchScore(ex.exerciseName, exerciseName);
-      if (score >= 0.5) {
-        for (const set of ex.sets || []) {
-          const e1rm = epley1RM(set.weight, set.reps);
-          if (!best || e1rm > best.e1rm) {
-            best = { weight: set.weight, reps: set.reps, e1rm };
-          }
-        }
-      }
-    }
-  }
-  return best;
-}
+import { getPreviousWorkoutData, getPersonalRecord } from './diary-shared';
 
 export const QuickEntry: React.FC<QuickEntryProps> = ({
   diary, historyWorkouts, selectedWeek, onSave,

@@ -2,11 +2,12 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { epley1RM } from '../../../engines/e1rm';
-import { exerciseMatchScore, getAliasesForExercise } from '../../../engines/exercise-aliases';
+import { getAliasesForExercise } from '../../../engines/exercise-aliases';
 import { loadReadinessHistory } from './readiness-history';
 import { MMCSetPanel } from './MMCSetPanel';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
+import { getPreviousWorkoutData } from './diary-shared';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
@@ -47,26 +48,6 @@ interface DiaryRecordingFormProps {
   pendingTemplate?: { exercises: Array<{ name?: string; sets?: number; reps?: string | number; rir?: number }> } | null;
   templateKey?: number;
   onTemplateApplied?: () => void;
-}
-
-function getPreviousWorkoutData(historyWorkouts: WorkoutLog[], exerciseName: string): { weight: number; reps: number; rir: number } | null {
-  let best: { weight: number; reps: number; rir: number; e1rm: number } | null = null;
-  for (const wl of historyWorkouts) {
-    // legacy-записи могут не иметь exercises или иметь не-массив (например, {}) — не роняем форму
-    const wlExercises = Array.isArray(wl.exercises) ? wl.exercises : [];
-    for (const ex of wlExercises) {
-      const score = exerciseMatchScore(ex.exerciseName, exerciseName);
-      if (score >= 0.5) {
-        for (const set of ex.sets || []) {
-          const e1rm = epley1RM(set.weight, set.reps);
-          if (!best || e1rm > best.e1rm) {
-            best = { weight: set.weight, reps: set.reps, rir: set.rir || 2, e1rm };
-          }
-        }
-      }
-    }
-  }
-  return best ? { weight: best.weight, reps: best.reps, rir: best.rir } : null;
 }
 
 export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, selectedWeek, onSave, historyWorkouts = [], pendingTemplate = null, templateKey = 0, onTemplateApplied }) => {
