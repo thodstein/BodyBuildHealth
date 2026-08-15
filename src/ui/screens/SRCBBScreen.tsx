@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
+import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -225,6 +225,45 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [taperFed, setTaperFed] = useState<string>(_plSaved?.plTaperFed ?? 'fpr');
   // Ручная корректировка прикидов: { имя лифта: [опенер, вторая, третья] } (если задано — перекрывает расчёт)
   const [taperAttemptOverride, setTaperAttemptOverride] = useState<Record<string, number[]>>({});
+  // 🏁 Несколько соревнований сезона с выбором ГЛАВНОГО (по главному строится тапер-план).
+  interface MeetListItem { id: string; name: string; weeksToStart: number; fed: string; plannedPm: Record<string, number>; strategy: MeetStrategy }
+  const [meetList, setMeetList] = useState<MeetListItem[]>(() => {
+    const saved = _plSaved?.plMeetList as MeetListItem[] | undefined;
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+    return [{ id: 'm1', name: 'Соревнование 1', weeksToStart: weeksToMeet, fed: taperFed, plannedPm: { ...taperPlannedPm }, strategy: attemptStrategy }];
+  });
+  const [mainMeetId, setMainMeetId] = useState<string>((_plSaved?.plMainMeetId as string) ?? 'm1');
+  const mainMeet = meetList.find(m => m.id === mainMeetId) ?? meetList[0];
+  // Синхронизация: локальные поля = главное соревнование.
+  const applyMainMeet = (m: MeetListItem) => {
+    setWeeksToMeet(m.weeksToStart);
+    setTaperFed(m.fed);
+    setTaperPlannedPm({ ...m.plannedPm });
+    setAttemptStrategy(m.strategy);
+  };
+  const updateMainMeet = (patch: Partial<MeetListItem>) => {
+    setMeetList(cur => cur.map(m => m.id === mainMeetId ? { ...m, ...patch } : m));
+  };
+  const addMeet = () => {
+    const last = meetList[meetList.length - 1];
+    const id = 'm' + Date.now();
+    const item: MeetListItem = {
+      id,
+      name: `Соревнование ${meetList.length + 1}`,
+      weeksToStart: (last?.weeksToStart ?? 8) + 6,
+      fed: last?.fed ?? 'fpr',
+      plannedPm: { ...(last?.plannedPm ?? {}) },
+      strategy: last?.strategy ?? 'balanced',
+    };
+    setMeetList(cur => [...cur, item]);
+  };
+  const removeMeet = (id: string) => {
+    setMeetList(cur => cur.length <= 1 ? cur : cur.filter(m => m.id !== id));
+    if (id === mainMeetId) {
+      const next = meetList.find(m => m.id !== id);
+      if (next) { setMainMeetId(next.id); applyMainMeet(next); }
+    }
+  };
   // Режим пика: classic — разгрузка Bosquet; pl — 3-нед ПЛ-пик-протокол Библиотеки.
   const [peakMode, setPeakMode] = useState<'classic' | 'pl'>(_plSaved?.plPeakMode ?? 'pl');
   // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
@@ -1201,8 +1240,65 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
             return (
               <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>🏁 Соревнование + тапер</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>🏁 Соревнования сезона + тапер</div>
                   {builtSrc && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
+                </div>
+                {/* 🏁 Несколько соревнований: список + выбор главного */}
+                <div style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>📋 Сезон ({meetList.length}) — тапер-план строится по ⭐ главному</div>
+                    <button onClick={addMeet} style={{ ...BTN_GHOST, minHeight: 30, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.08)', padding: '3px 10px' }}>➕ Добавить соревнование</button>
+                  </div>
+                  {meetList.map(m => {
+                    const isMain = m.id === mainMeetId;
+                    return (
+                      <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: 6, borderRadius: 8, marginTop: 4, background: isMain ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                        <button
+                          onClick={() => { setMainMeetId(m.id); applyMainMeet(m); }}
+                          title={isMain ? 'Главное соревнование — по нему строится тапер-план' : 'Сделать главным'}
+                          style={{ minHeight: 30, padding: '3px 8px', borderRadius: 7, fontSize: 12, cursor: 'pointer', border: isMain ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)', background: isMain ? 'rgba(234,179,8,0.2)' : 'transparent', color: isMain ? '#eab308' : 'rgba(255,255,255,0.4)' }}
+                        >{isMain ? '⭐' : '☆'}</button>
+                        <input
+                          value={m.name}
+                          onChange={e => setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))}
+                          style={{ flex: 1, minWidth: 120, padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, minHeight: 30, boxSizing: 'border-box' }}
+                          placeholder="Название"
+                        />
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+                          через
+                          <input
+                            type="number"
+                            value={m.weeksToStart}
+                            min={1}
+                            max={52}
+                            onChange={e => {
+                              const v = Number(e.target.value);
+                              const weeks = Number.isFinite(v) && v >= 1 ? Math.min(Math.round(v), 52) : m.weeksToStart;
+                              setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, weeksToStart: weeks } : x));
+                              if (isMain) setWeeksToMeet(weeks);
+                            }}
+                            style={{ width: 44, marginLeft: 4, padding: '3px 4px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center', minHeight: 26, boxSizing: 'border-box' }}
+                          /> нед
+                        </span>
+                        <select
+                          value={m.fed}
+                          onChange={e => { setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, fed: e.target.value } : x)); if (isMain) setTaperFed(e.target.value); }}
+                          style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, minHeight: 30, boxSizing: 'border-box' }}
+                        >
+                          <option value="ipf">IPF</option><option value="fpr">FPR</option><option value="wpc">WPC</option><option value="other">Другая</option>
+                        </select>
+                        <button
+                          onClick={() => removeMeet(m.id)}
+                          disabled={meetList.length <= 1}
+                          title="Удалить соревнование"
+                          style={{ minHeight: 30, padding: '3px 8px', borderRadius: 7, fontSize: 11, cursor: meetList.length <= 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171', opacity: meetList.length <= 1 ? 0.4 : 1 }}
+                        >✕</button>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 6, lineHeight: 1.4 }}>
+                    ⭐ Главное — полный тапер/пик-план (ниже). Остальные — контрольные старты: прикиды по их данным показываются в карточке «Тапер-план» → «Сезон». Стратегия, план ПМ и факт ПМ ниже относятся к ГЛАВНОМУ.
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
                   <PopupNumber label="Вес сейчас" value={bw} min={40} max={250} suffix=" кг" onChange={v => setBw(v)} />
@@ -1438,6 +1534,39 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           {peakWk && taperWeeks.includes(peakWk) && null}
                           {meetWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(234,179,8,0.14)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)' }}>🏁 Соревнования — нед {meetWk.week}</span>}
                         </div>
+                        {/* 📋 Сезон: все соревнования — прикиды по их данным (главное ⭐ + контрольные) */}
+                        {meetList.length > 1 && (
+                          <div style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', marginBottom: 6 }}>📋 Сезон соревнований — прикиды по каждому старту</div>
+                            {meetList.map(m => {
+                              const isMain = m.id === mainMeetId;
+                              const row = { ...(taperActualPm || {}), ...(m.plannedPm || {}) };
+                              const hasRow = Object.values(m.plannedPm || {}).some(v => v > 0) || Object.values(taperActualPm || {}).some(v => v > 0);
+                              const attempts = hasRow ? computeMeetAttemptsFromPmRow(row as Record<string, number>, m.strategy) : null;
+                              return (
+                                <div key={m.id} style={{ marginTop: 4, padding: 6, borderRadius: 8, background: isMain ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
+                                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10 }}>
+                                    <b style={{ color: isMain ? '#fbbf24' : '#93c5fd' }}>{isMain ? '⭐' : '·'} {m.name}</b>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>через {m.weeksToStart} нед</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>{fedRu[m.fed] || m.fed}</span>
+                                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>{MEET_STRATEGY_PCT_LABEL[m.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}</span>
+                                  </div>
+                                  {attempts ? (
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                                      {attempts.lifts.map(l => (
+                                        <span key={l.name} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
+                                          <b>{l.name}</b>: {Math.round(l.opener * arMult * 10) / 10} / {Math.round(l.second * arMult * 10) / 10} / {Math.round(l.third * arMult * 10) / 10}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Задайте план ПМ (выше) — прикиды появятся автоматически.</div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                         {/* Данные к соревнованиям */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6, marginBottom: 8 }}>
                           {(['Присед', 'Жим лежа', 'Становая тяга'] as const).map(name => {
