@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BoolChip, SliderInput, colors, glassCard, inputStyle } from '../../ui';
+import { useDiaryDraft } from '../../diary-modals';
 import {
   analyzeAllSleepCorrelations,
   generateCorrelationRecommendations,
@@ -246,13 +247,16 @@ const Stars: React.FC<{ value: number; onChange?: (v: number) => void; size?: nu
 
 /* ── Форма записи ──────────────────────────────────────────────────────── */
 
+const SLEEP_FORM_DRAFT_KEY = 'he_draft_sleep_inline';
+
 const SleepForm: React.FC<{
   value: RichSleepEntry;
   onCancel: () => void;
   onSave: (entry: RichSleepEntry) => void;
   targetHours?: number;
 }> = ({ value, onCancel, onSave, targetHours = 8 }) => {
-  const [draft, setDraft] = useState(value);
+  // Персистентный черновик: введённое переживает закрытие формы и переключение вкладок.
+  const [draft, setDraft, resetDraft] = useDiaryDraft<RichSleepEntry>(SLEEP_FORM_DRAFT_KEY, () => value);
   const [error, setError] = useState<string | null>(null);
   const set = (key: keyof RichSleepEntry, val: string | number | boolean) =>
     setDraft((prev) => ({ ...prev, [key]: val }));
@@ -277,6 +281,7 @@ const SleepForm: React.FC<{
       stressLevel: Math.min(10, Math.max(1, Number(draft.stressLevel) || 5)),
       notes: draft.notes?.trim() || '',
     });
+    resetDraft();
   };
 
   const numField = (label: string, key: keyof RichSleepEntry, extra: Record<string, string> = {}) => (
@@ -492,6 +497,16 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
     ...read(GOALS_KEY, {}),
   }));
   const [form, setForm] = useState<RichSleepEntry | null>(null);
+  /** Открыть форму: при РЕДАКТИРОВАНИИ существующей записи сбрасываем персистентный
+   *  черновик (иначе подхватится ввод прошлого раза); для новой — черновик сохраняется. */
+  const openSleepForm = (source: RichSleepEntry, isEdit: boolean) => {
+    if (isEdit) {
+      try {
+        sessionStorage.removeItem(SLEEP_FORM_DRAFT_KEY);
+      } catch {}
+    }
+    setForm(source);
+  };
   const [undo, setUndo] = useState<RichSleepEntry[] | null>(null);
   const [range, setRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [query, setQuery] = useState('');
@@ -621,6 +636,12 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
       'Дата', 'Часы', 'Качество', 'Пробуждений', 'Легли', 'Подъём', 'Латентность', 'Кофеин',
       'Алкоголь', 'Экран', 'Стресс', 'Тренировка', 'Заметки',
     ];
+    // Защита от формульной инъекции (Excel): префикс «'» для полей, начинающихся с = + - @.
+    const csvCell = (v: unknown) => {
+      const s = String(v ?? '');
+      const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return `"${guarded.replace(/"/g, '""')}"`;
+    };
     const csv = [
       headers,
       ...rows.map((r) => [
@@ -629,7 +650,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         r.exerciseTiming || '', r.notes || '',
       ]),
     ]
-      .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .map((row) => row.map(csvCell).join(','))
       .join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
@@ -757,7 +778,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
           <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{rows.length} записей</span>
         </b>
         <div style={{ flex: 1 }} />
-        <button style={btnPrimary} onClick={() => setForm(blankEntry())}>
+        <button style={btnPrimary} onClick={() => openSleepForm(blankEntry(), false)}>
           + Записать
         </button>
         <button
@@ -765,7 +786,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
           onClick={() => {
             const today = todayIso();
             const existing = rows.find((r) => r.date === today);
-            setForm(existing ? { ...existing } : blankEntry());
+            openSleepForm(existing ? { ...existing } : blankEntry(), !!existing);
           }}
         >
           ⚡ Сегодня
@@ -965,7 +986,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                   </>
                 )}
               </div>
-              <button style={todays ? btnBase : btnPrimary} onClick={() => setForm(todays ? { ...todays } : blankEntry())}>
+              <button style={todays ? btnBase : btnPrimary} onClick={() => openSleepForm(todays ? { ...todays } : blankEntry(), !!todays)}>
                 {todays ? '✏️ Изменить' : '+ Записать сегодня'}
               </button>
             </section>
@@ -1511,7 +1532,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                       {r.notes || '—'}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button style={{ ...btnBase, minHeight: 32, padding: '4px 9px' }} onClick={() => setForm(r)}>
+                      <button style={{ ...btnBase, minHeight: 32, padding: '4px 9px' }} onClick={() => openSleepForm(r, true)}>
                         ✏️
                       </button>{' '}
                       <button
@@ -1571,7 +1592,7 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
               Записывайте часы, качество и факторы сна — приложение покажет тренды, корреляции с тренировками и
               персональные рекомендации.
             </div>
-            <button style={{ ...btnPrimary, marginTop: 14 }} onClick={() => setForm(blankEntry())}>
+            <button style={{ ...btnPrimary, marginTop: 14 }} onClick={() => openSleepForm(blankEntry(), false)}>
               + Добавить первую запись
             </button>
             <div style={{ display: 'grid', gap: 8, maxWidth: 420, margin: '18px auto 0', textAlign: 'left' }}>

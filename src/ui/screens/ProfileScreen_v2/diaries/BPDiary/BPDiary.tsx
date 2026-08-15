@@ -12,6 +12,7 @@ import {
   statCard,
 } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
+import { useDiaryDraft } from '../../diary-modals';
 import {
   buildWeeklyHistogram,
   compareWithLastWeek,
@@ -105,7 +106,8 @@ const defaultDraft = (): BPForm => ({
 
 export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDataChange }) => {
   const [rows, setRows] = useState<BPEntry[]>([]);
-  const [draft, setDraft] = useState<BPForm>(defaultDraft());
+  // Персистентный черновик модалки: ввод не теряется при случайном закрытии/переключении вкладок.
+  const [draft, setDraft, resetDraft] = useDiaryDraft<BPForm>('he_draft_bp_inline', defaultDraft);
   const [editing, setEditing] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
   const [undo, setUndo] = useState<BPEntry[] | null>(null);
@@ -134,7 +136,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
     onDataChange?.();
   };
 
-  const openNew = () => { setEditing(null); setDraft(defaultDraft()); setValidationErrors([]); setModal(true); };
+  const openNew = () => {
+    setEditing(null);
+    resetDraft(defaultDraft());
+    setValidationErrors([]);
+    setModal(true);
+  };
 
   const save = () => {
     const s = Number(draft.systolic), d = Number(draft.diastolic), p = Number(draft.pulse);
@@ -154,11 +161,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
       ? rows.map(x => x.id === editing ? entry : x)
       : sortEntriesByTimestamp([entry, ...rows]));
     setModal(false); setEditing(null);
+    resetDraft(defaultDraft());
   };
 
   const editRow = (x: BPEntry) => {
     setEditing(x.id || '');
-    setDraft({ ...defaultDraft(), ...x, systolic: String(x.systolic), diastolic: String(x.diastolic), pulse: String(x.hr), selectedSymptoms: x.symptoms || [] });
+    resetDraft({ ...defaultDraft(), ...x, systolic: String(x.systolic), diastolic: String(x.diastolic), pulse: String(x.hr), selectedSymptoms: x.symptoms || [] });
     setValidationErrors([]);
     setModal(true);
   };
@@ -536,7 +544,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               </section>
             )}
 
-            {/* Data table */}
+            {/* Data table: «день = серия» — замеры одного дня группируются */}
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
               <thead>
                 <tr>
@@ -544,26 +552,41 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 </tr>
               </thead>
               <tbody>
-                {pageData.pageItems.map(e => {
-                  const x = rows.find(r => r.id === e.id) || rows.find(r => r.date === e.date)!;
-                  if (!x) return null;
-                  const cls = classifyBP(x.systolic, x.diastolic);
-                  const clr = getBpClassificationColor(cls);
-                  return (
-                    <tr key={x.id || x.date}>
-                      <td style={tableTd}>{x.date}</td>
-                      <td style={{ ...tableTd, color: clr, fontWeight: 700 }}>{x.systolic}/{x.diastolic}</td>
-                      <td style={tableTd}>{x.hr}</td>
-                      <td style={tableTd}>{calcMAP(x.systolic, x.diastolic)}</td>
-                      <td style={{ ...tableTd, color: clr }}>{getBpClassificationLabel(cls)}</td>
-                      <td style={tableTd}>{x.position || '—'} · {x.timeOfDay || '—'}{x.medicationTaken ? ' · 💊' : ''}</td>
-                      <td style={tableTd}>
-                        <button style={btn} onClick={() => editRow(x)}>Изменить</button>{' '}
-                        <button style={btn} onClick={() => { if (window.confirm('Удалить запись?')) deleteRow(x.id || x.date); }}>Удалить</button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {(() => {
+                  const dayGroups = new Map<string, BPEntry[]>();
+                  for (const e of pageData.pageItems) {
+                    const x = rows.find(r => r.id === e.id) || rows.find(r => r.date === e.date);
+                    if (!x) continue;
+                    const list = dayGroups.get(x.date) || [];
+                    list.push(x);
+                    dayGroups.set(x.date, list);
+                  }
+                  const groupRow = (entries: BPEntry[]) => {
+                    const cls = classifyBP(entries[0].systolic, entries[0].diastolic);
+                    const clr = getBpClassificationColor(cls);
+                    const multi = entries.length > 1;
+                    return entries.map((x, idx) => (
+                      <tr key={x.id || `${x.date}-${idx}`} style={multi ? { background: idx === 0 ? 'rgba(255,255,255,0.03)' : undefined } : undefined}>
+                        {idx === 0 ? (
+                          <td style={{ ...tableTd, whiteSpace: 'nowrap' }} rowSpan={entries.length}>
+                            <b>{x.date}</b>
+                            {multi && <small style={{ display: 'block', color: colors.textMuted }}>{entries.length} замера</small>}
+                          </td>
+                        ) : null}
+                        <td style={{ ...tableTd, color: clr, fontWeight: 700 }}>{x.systolic}/{x.diastolic}</td>
+                        <td style={tableTd}>{x.hr}</td>
+                        <td style={tableTd}>{calcMAP(x.systolic, x.diastolic)}</td>
+                        <td style={{ ...tableTd, color: clr }}>{getBpClassificationLabel(classifyBP(x.systolic, x.diastolic))}</td>
+                        <td style={tableTd}>{x.position || '—'} · {x.timeOfDay || '—'}{x.medicationTaken ? ' · 💊' : ''}</td>
+                        <td style={tableTd}>
+                          <button style={btn} onClick={() => editRow(x)}>Изменить</button>{' '}
+                          <button style={btn} onClick={() => { if (window.confirm('Удалить запись?')) deleteRow(x.id || x.date); }}>Удалить</button>
+                        </td>
+                      </tr>
+                    ));
+                  };
+                  return [...dayGroups.values()].flatMap(groupRow);
+                })()}
               </tbody>
             </table>
             <div style={{ marginTop: 10 }}>

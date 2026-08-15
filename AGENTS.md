@@ -1765,3 +1765,28 @@ ull → default. Реальные значения лежат в UnifiedSettings
 5. **Здоровье**: quick-add «+ Добавить» должен МЕРЖИТЬСЯ с существующей записью дня (сейчас заменяет — теряются данные с 3D-карты); общая сводка по 5 подразделам в карточке дневника.
 6. **Профиль в целом**: единый `diary-storage.ts` (все ключи/нормализация в одном месте вместо 3 копий loadDiary); утренний рутинг — добавить здоровье; экспорт в PDF по всем дневникам одним файлом; наблюдение за quota (фото) с автоочисткой старых фото.
 
+---
+
+## Дневники профиля — доработки по плану (Aug 16 2026, pushed)
+
+Выполнен план из предыдущего раунда + расширенный рутинг по требованию (ЧСС утром, вечерний АД+ЧСС).
+
+### Новое
+- **💓 Дневник ЧСС** (`he_hr_diary`, `hr-diary.engine.ts`): одна запись на (дата+утро/вечер), CRUD (saveHREntry дедуп по date+timeOfDay, update с переносом без дублей), `getHRAverages` (утро/вечер/среднее за 7д), `detectHRAnomalies` (тахи/бради), `getHRTrend` (свежие 7д vs предыдущие). UI: `AddPulseModal` (DiaryModalShell, пресет утро/вечер из рутинга, stale-чип, баннер замены) + `PulseDiary.tsx` (окно: метрики, тренд, аномалии, таблица, CSV). Карточка «ЧСС» в ProfileDiariesTab + сводка «Сегодня» (ЧСС утро/вечер) + экспорт/импорт/сброс/undo.
+- **🔄 Рутинг v2**: `ROUTINE_STEPS` morning = [сон, АД, ЧСС, вес, здоровье] (5 шагов), evening = [АД, ЧСС] (2 шага); `routineNextStep`/`migrateLegacyRoutine` (legacy sessionStorage 'sleep'|'bp'|'weight' → morning); две кнопки запуска («🌅 Утренний лог: сон → АД → ЧСС → вес → здоровье», «🌆 Вечерний лог: АД → ЧСС»); баннер с прогрессом N/total, «✍ Заполнить», «⏭ Пропустить», ✕; сохранение шага автоматически открывает следующий; undo-лейблы «🌅/🌆 Утренний/Вечерний лог · …»; AddBPModal/AddPulseModal — проп `presetTimeOfDay` (вечерний рутинг пишет АД и ЧСС с timeOfDay=evening). **Фикс двойного advance**: переход шага ТОЛЬКО в onSave (onClose больше не продвигает).
+- **🩺 МЕРЖ quick-add здоровья**: `mergeHealthEntry(existing, incoming)` в health-diary.engine (zones объединяются с пересчётом totalScore, симптомы дедуплицируются по имени, neuro/acne/hemato перезаписываются только если заполнены, notes конкатенация) — боль с 3D-карты больше не затирается добавлением нейро. Сводка по 5 подразделам в карточке «Здоровье» (🦴/🩺/🧠/🔴/🩸).
+- **🗄 Единый слой хранилища** `diary-storage.ts`: `readDiaryEntries`/`saveDiaryEntries` (кап N новейших по дате, устойчив к ASC/DESC входу, quota-fallback 90), `readJSONSafe`, `capEntriesByDate`, `diaryStorageBytes`. Подключён в ProfileDiariesTab и diary-modals (реэкспорт readDiaryEntries — обратная совместимость).
+- **💤 SleepDiary**: персистентный черновик инлайн-формы (`he_draft_sleep_inline` через useDiaryDraft; при редактировании существующей записи черновик сбрасывается); CSV-формул-защита (префикс `'`).
+- **❤️ BPDiary**: черновик инлайн-модалки (`he_draft_bp_inline`); таблица «день = серия» — замеры одного дня группируются (rowSpan + бейдж «N замера»).
+- **⚖️ WeightDiary**: «🖼 Сбросить фото» и «📥 Фото из архива» в меню; архивные записи включены в графики/тренды при «Всё время»; commit обновляет архив; `profile-store.saveWeightLog` — автоочистка фото из старых записей при >4MB (новейшие 30 сохраняют фото).
+- **💉 InjectionDiary**: карта зон подсвечивает зоны с пропущенными по расписанию инъекциями (⏭, dashed-рамка, легенда); InjectionEditor показывает макс. объём/иглу/угол зоны с предупреждением при превышении.
+- **🖨 PDF всех дневников**: кнопка «🖨 Экспорт всех дневников (PDF)» — window.open + таблицы (сон/АД/ЧСС/вес/инъекции/здоровье) → print; HTML-экранирование.
+
+### Тесты
+- NEW `hr-diary.test.ts` — 10 (CRUD/дедуп/порядок/нормализация, средние, аномалии, тренд).
+- NEW `diary-storage.test.ts` — 7 (чтение/fallback, кап новейших ASC/DESC, capEntriesByDate, размер).
+- NEW `profile-routine-merge.test.tsx` — 13 (шаги утро/вечер, миграция legacy, mergeHealthEntry 4 кейса, AddPulseModal, вечерний рутинг e2e через UI: АД → ЧСС → he_hr_diary).
+- MOD `profile-diaries-tab-reset.test.tsx` — +ЧСС в сброс/undo.
+- Итог: мои файлы tsc 0; полный прогон **5196/5197** (1 чужой WIP-фейл `bb-macrocycle.test.ts` — формат сериализации v7 меняет другой агент, не связан с моей работой; `profile-diaries-e2e` флейк параллельного прогона — изолированно 6/6); `vite build` OK.
+- Чужой незакоммиченный WIP не тронут (lms-cardio/taper/competition, BbAutoConstructor, TrainingScreen, IndividualPlanContext и др.).
+

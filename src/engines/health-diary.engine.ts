@@ -399,6 +399,49 @@ export function getTodayUnifiedEntry(): UnifiedHealthEntry | null {
   return getUnifiedEntryByDate(todayIso());
 }
 
+/**
+ * МЕРЖ нового ввода с существующей записью дня (quick-add поверх 3D-карты и т.п.):
+ * заполненные разделы нового ввода перезаписывают, незаполненные — сохраняются.
+ * pain.zones объединяются по ключам, symptoms дедуплицируются по имени.
+ */
+export function mergeHealthEntry(
+  existing: UnifiedHealthEntry | null | undefined,
+  incoming: Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'>,
+): UnifiedHealthEntry {
+  if (!existing) {
+    return { ...incoming, id: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+  const mergedPain = incoming.pain
+    ? (() => {
+        const zones = { ...existing.pain?.zones, ...incoming.pain.zones };
+        return {
+          ...existing.pain,
+          ...incoming.pain,
+          zones,
+          totalScore: Object.values(zones).reduce((s, v) => s + (Number(v) || 0), 0),
+        };
+      })()
+    : existing.pain;
+  const mergedSymptoms = Array.from(
+    new Map(
+      [...(existing.symptoms || []), ...(incoming.symptoms || [])].map((s) => [String(s.name || '').toLowerCase(), s]),
+    ).values(),
+  );
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    createdAt: existing.createdAt,
+    updatedAt: new Date().toISOString(),
+    pain: mergedPain,
+    symptoms: mergedSymptoms,
+    neuro: incoming.neuro !== undefined && incoming.neuro !== null ? incoming.neuro : existing.neuro,
+    acne: incoming.acne !== undefined && incoming.acne !== null ? incoming.acne : existing.acne,
+    hemato: incoming.hemato !== undefined && incoming.hemato !== null ? incoming.hemato : existing.hemato,
+    notes: [existing.notes, incoming.notes].filter(Boolean).join(' · ') || undefined,
+  };
+}
+
 export function resetUnifiedHealthDiary(): void {
   try {
     localStorage.removeItem(UNIFIED_KEY);

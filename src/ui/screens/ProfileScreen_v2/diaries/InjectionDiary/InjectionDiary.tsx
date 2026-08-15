@@ -126,7 +126,8 @@ const ZoneMap: React.FC<{
   entries: InjectionEntry[];
   selectedZone: string;
   onSelectZone: (zoneId: string) => void;
-}> = ({ entries, selectedZone, onSelectZone }) => {
+  missedZones?: Set<string>;
+}> = ({ entries, selectedZone, onSelectZone, missedZones }) => {
   const zoneDays = useMemo(() => {
     const map = new Map<string, number>();
     for (const zone of INJECTION_ZONES) {
@@ -151,6 +152,7 @@ const ZoneMap: React.FC<{
           const days = zoneDays.get(zone.id) ?? 999;
           const c = zoneColor(days);
           const isSelected = selectedZone === zone.id;
+          const missed = missedZones?.has(zone.id);
           return (
             <button
               key={zone.id}
@@ -162,14 +164,21 @@ const ZoneMap: React.FC<{
                 fontSize: 11,
                 fontWeight: 600,
                 background: isSelected ? c.bg.replace('.15', '.25').replace('.12', '.2').replace('.10', '.18').replace('.10', '.18') : c.bg,
-                border: `1px solid ${isSelected ? c.text : c.border}`,
+                border: missed ? `2px dashed ${isSelected ? '#fff' : '#fca5a5'}` : `1px solid ${isSelected ? c.text : c.border}`,
                 color: c.text,
                 transition: 'all 0.15s',
                 minHeight: 32,
               }}
-              title={days >= 999 ? 'Не использовалась' : `Последняя: ${days} дн. назад`}
+              title={
+                missed
+                  ? `⏭ Пропущена по расписанию (${zone.label}) — запланированная инъекция не внесена`
+                  : days >= 999
+                    ? 'Не использовалась'
+                    : `Последняя: ${days} дн. назад`
+              }
             >
               {zone.label}
+              {missed && <span style={{ marginLeft: 5, opacity: 0.9 }}>⏭</span>}
               <span style={{ marginLeft: 5, opacity: 0.7 }}>{days >= 999 ? '—' : `${days}д`}</span>
             </button>
           );
@@ -180,6 +189,7 @@ const ZoneMap: React.FC<{
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(59,130,246,.15)', border: '1px solid rgba(59,130,246,.25)' }} /> 3-7д</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(245,158,11,.15)', border: '1px solid rgba(245,158,11,.3)' }} /> 7-14д</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(239,68,68,.15)', border: '1px solid rgba(239,68,68,.3)' }} /> ≥14д</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: 3, border: '2px dashed #fca5a5' }} /> ⏭ пропущена по расписанию</span>
       </div>
     </div>
   );
@@ -298,6 +308,16 @@ const InjectionEditor: React.FC<{
               ))}
             </select>
             {draft.zone === suggestedZone && <small style={{ color: colors.green }}>✓ рекомендована ротацией</small>}
+            {(() => {
+              const advice = getZoneTechniqueAdvice(draft.zone);
+              if (!advice) return null;
+              const over = draft.volumeMl > advice.maxVolumeMl;
+              return (
+                <small style={{ display: 'block', marginTop: 3, color: over ? '#fca5a5' : colors.textMuted }}>
+                  💡 {over ? '⚠ ' : ''}Макс. объём зоны: {advice.maxVolumeMl} мл · игла {advice.needleGauge} × {advice.needleLength} · {advice.angle}
+                </small>
+              );
+            })()}
           </Field>
           <Field label="Сторона">
             <select
@@ -599,6 +619,10 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const doseSummary = useMemo(() => getDoseSummary(entries, doseRangeDays), [entries, doseRangeDays]);
   const dueToday = useMemo(() => getDueToday(schedule), [schedule]);
   const missed = useMemo(() => getMissedInjections(entries, schedule), [entries, schedule]);
+  const missedZones = useMemo(
+    () => new Set(missed.filter((m) => m.item.zone).map((m) => m.item.zone as string)),
+    [missed],
+  );
   const adherence = useMemo(() => computeScheduleAdherence(entries, schedule), [entries, schedule]);
 
   const localDateDaysAgo = (days: number): string => {
@@ -867,7 +891,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
         <ZoneMap entries={entries} selectedZone={selectedZone} onSelectZone={(zoneId) => {
           setSelectedZone(zoneId);
           setEditor({ open: true });
-        }} />
+        }} missedZones={missedZones} />
         <section style={{ display: 'flex', gap: 9, flexWrap: 'wrap', marginBottom: 12 }}>
           <Metric label="Всего" value={stats.totalInjections} />
           <Metric

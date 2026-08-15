@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { getWeightLog, saveWeightLog, WEIGHT_LOG_KEY } from '../../../engines/profile-store';
+import { readDiaryEntries, saveDiaryEntries } from '../../../engines/diary-storage';
 import { useProfileRefresh } from '../../../core/profile-manager';
 import { AccordionSection, colors } from './ui';
 import {
@@ -19,12 +20,14 @@ import { BPDiary } from './diaries/BPDiary/BPDiary';
 import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
 import { InjectionDiary } from './diaries/InjectionDiary/InjectionDiary';
 import { HealthDiary } from './diaries/HealthDiary/HealthDiary';
+import { PulseDiary } from './diaries/PulseDiary/PulseDiary';
 import {
   AddSleepModal,
   AddBPModal,
   AddBodyMeasurementsModal,
   AddInjectionModal,
   AddHealthModal,
+  AddPulseModal,
   PAIN_ZONES,
   NEURO_SYMPTOMS,
   ACNE_AREAS,
@@ -33,12 +36,19 @@ import {
   pushUndoAction,
   topUndo,
   dismissTopUndo,
-  nextRoutineStep,
+  ROUTINE_STEPS,
+  routineNextStep,
+  routineStepIndex,
+  ROUTINE_STEP_LABELS,
+  ROUTINE_KIND_LABELS,
+  migrateLegacyRoutine,
+  type ActiveRoutine,
   type UndoAction,
 } from './diary-modals';
 import {
   getUnifiedHealthEntries,
   saveUnifiedHealthEntries,
+  mergeHealthEntry,
   type UnifiedHealthEntry,
 } from '../../../engines/health-diary.engine';
 import {
@@ -47,6 +57,13 @@ import {
   generateEntryId,
   type BPEntry as CoreBPEntry,
 } from '../../../core/bp-hr-data';
+import {
+  getHREntries,
+  saveHREntry,
+  findByDateAndTimeOfDay,
+  HR_DIARY_KEY,
+  type HREntry,
+} from '../../../engines/hr-diary.engine';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -128,20 +145,13 @@ interface BuiltInDiaryRow {
   last: string;
 }
 
-/* ── Хелперы localStorage ── */
+/* ── Хелперы localStorage (единый слой — diary-storage.ts) ── */
 
 function loadDiary<T>(key: string): T[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(key) || '[]');
-    return Array.isArray(v) ? v : [];
-  } catch {
-    return [];
-  }
+  return readDiaryEntries<T>(key);
 }
 function saveDiary<T>(key: string, data: T[]): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data.slice(-365)));
-  } catch {}
+  saveDiaryEntries<T>(key, data);
 }
 
 function latestDiaryDate(arr: { date: string; timestamp?: number }[]): string {
@@ -158,7 +168,8 @@ const DiaryCard: React.FC<{
   loggedToday: boolean;
   onAdd: () => void;
   onOpen: () => void;
-}> = ({ diaryKey, count, last, daysSinceLast, loggedToday, onAdd, onOpen }) => {
+  extra?: string;
+}> = ({ diaryKey, count, last, daysSinceLast, loggedToday, onAdd, onOpen, extra }) => {
   const meta = DIARY_META[diaryKey];
   const stale = daysSinceLast !== null && daysSinceLast >= 3 && !loggedToday;
   const staleColor =
@@ -290,6 +301,9 @@ const DiaryCard: React.FC<{
           'Нет записей'
         )}
       </div>
+      {extra && (
+        <div style={{ fontSize: 9.5, color: meta.color, lineHeight: 1.35, marginTop: -4 }}>{extra}</div>
+      )}
       <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }} onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onAdd}
@@ -648,32 +662,54 @@ export const ProfileDiariesTab: React.FC<{
   const [hematoEntries, setHematoEntries] = useState<HematoEntry[]>([]);
   const [healthEntries, setHealthEntries] = useState<UnifiedHealthEntry[]>([]);
   const [weights, setWeights] = useState<ReturnType<typeof getWeightLog>>([]);
+  const [hrEntries, setHrEntries] = useState<HREntry[]>([]);
 
   const [addSleepOpen, setAddSleepOpen] = useState(false);
   const [addBPOpen, setAddBPOpen] = useState(false);
   const [addInjectionOpen, setAddInjectionOpen] = useState(false);
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
+  const [addPulseOpen, setAddPulseOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [undoQueue, setUndoQueue] = useState<UndoAction[]>([]);
 
   const ROUTINE_KEY = 'he_routine_active';
-  const [routine, setRoutine] = useState<'sleep' | 'bp' | 'weight' | null>(() => {
+  const [routine, setRoutine] = useState<ActiveRoutine | null>(() => {
     try {
-      const v = sessionStorage.getItem(ROUTINE_KEY);
-      return v === 'sleep' || v === 'bp' || v === 'weight' ? v : null;
+      return migrateLegacyRoutine(sessionStorage.getItem(ROUTINE_KEY));
     } catch {
       return null;
     }
   });
   /** Рутинг персистентен: переживает переключение вкладок и перезагрузку. */
-  const setRoutinePersist = (r: 'sleep' | 'bp' | 'weight' | null) => {
+  const setRoutinePersist = (r: ActiveRoutine | null) => {
     setRoutine(r);
     try {
-      if (r) sessionStorage.setItem(ROUTINE_KEY, r);
+      if (r) sessionStorage.setItem(ROUTINE_KEY, JSON.stringify(r));
       else sessionStorage.removeItem(ROUTINE_KEY);
     } catch {}
   };
+  const routineTotal = routine ? ROUTINE_STEPS[routine.kind].length : 0;
+  const routineIdx = routine ? Math.max(0, routineStepIndex(routine.kind, routine.step)) : 0;
+
+  /** Завершить текущий шаг рутинга: сохранить, перейти к следующему (открыв его) или закрыть. */
+  const advanceRoutine = () => {
+    if (!routine) return;
+    const next = routineNextStep(routine.kind, routine.step);
+    const r = next ? { kind: routine.kind, step: next } : null;
+    setRoutinePersist(r);
+    if (r) openRoutineStepModal(r);
+  };
+  /** Открыть модалку текущего шага рутинга. */
+  const openRoutineStepModal = (r: ActiveRoutine) => {
+    if (r.step === 'sleep') setAddSleepOpen(true);
+    else if (r.step === 'bp') setAddBPOpen(true);
+    else if (r.step === 'pulse') setAddPulseOpen(true);
+    else if (r.step === 'weight') setAddBodyMeasurementsOpen(true);
+    else if (r.step === 'health') setAddHealthOpen(true);
+  };
+  const routineUndoLabel = (action: string) =>
+    routine ? `${ROUTINE_KIND_LABELS[routine.kind]} · ${ROUTINE_STEP_LABELS[routine.step]}: ${action}` : action;
 
   const pushUndo = (label: string, undo: () => void) => {
     setUndoQueue((q) => pushUndoAction(q, label, undo));
@@ -693,6 +729,7 @@ export const ProfileDiariesTab: React.FC<{
     else if (key === 'bp') setAddBPOpen(true);
     else if (key === 'weight' || key === 'measurements') setAddBodyMeasurementsOpen(true);
     else if (key === 'injection') setAddInjectionOpen(true);
+    else if (key === 'pulse') setAddPulseOpen(true);
     else if (
       key === 'health' ||
       key === 'symptoms' ||
@@ -774,6 +811,9 @@ export const ProfileDiariesTab: React.FC<{
       setWeights(getWeightLog());
     } catch {}
     setHealthEntries(getUnifiedHealthEntries());
+    try {
+      setHrEntries(getHREntries());
+    } catch {}
   };
 
   useEffect(() => {
@@ -790,6 +830,7 @@ export const ProfileDiariesTab: React.FC<{
     if (key === 'bp') return bpEntries;
     if (key === 'weight') return weights;
     if (key === 'injection') return injectionEntries;
+    if (key === 'pulse') return hrEntries;
     if (
       key === 'health' ||
       key === 'symptoms' ||
@@ -831,6 +872,13 @@ export const ProfileDiariesTab: React.FC<{
     if (weights.length) {
       const e = weights[weights.length - 1];
       if (e.date === today) overview.push({ label: 'Вес', value: `${e.weight} кг`, color: '#22c55e' });
+    }
+    if (hrEntries.length) {
+      const todayHr = hrEntries.filter((e) => e.date === today);
+      const morningHr = todayHr.find((e) => e.timeOfDay === 'morning');
+      const eveningHr = todayHr.find((e) => e.timeOfDay === 'evening');
+      if (morningHr) overview.push({ label: 'ЧСС утро', value: `${morningHr.bpm} уд/мин`, color: '#f472b6' });
+      if (eveningHr) overview.push({ label: 'ЧСС вечер', value: `${eveningHr.bpm} уд/мин`, color: '#f472b6' });
     }
     if (painEntries.length) {
       const e = painEntries[painEntries.length - 1];
@@ -879,6 +927,7 @@ export const ProfileDiariesTab: React.FC<{
     },
     { key: 'weight', count: weights.length, last: lastDate(weights) },
     { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
+    { key: 'pulse', count: hrEntries.length, last: lastDate(hrEntries) },
     { key: 'health', count: healthEntries.length, last: healthEntries.length ? healthEntries[0].date : '' },
   ];
 
@@ -898,6 +947,7 @@ export const ProfileDiariesTab: React.FC<{
         [ACNE_DIARY_KEY]: acneEntries,
         [HEMATO_DIARY_KEY]: hematoEntries,
         [WEIGHT_LOG_KEY]: weights,
+        [HR_DIARY_KEY]: hrEntries,
       },
     };
     const json = JSON.stringify(payload, null, 2);
@@ -911,6 +961,49 @@ export const ProfileDiariesTab: React.FC<{
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 500);
     if ((window as any).showToast) (window as any).showToast('📦 Все дневники экспортированы в JSON');
+  };
+
+  const exportAllDiariesPdf = () => {
+    const esc = (v: unknown) =>
+      String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+    const table = (title: string, headers: string[], rowsArr: string[][]) =>
+      rowsArr.length
+        ? `<h2>${esc(title)}</h2><table><tr>${headers.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${rowsArr
+            .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`)
+            .join('')}</table>`
+        : '';
+    const sortedDesc = <T extends { date: string }>(arr: T[]) => [...arr].sort((a, b) => b.date.localeCompare(a.date));
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Все дневники</title>
+<style>body{font:12px 'Segoe UI',Arial,sans-serif;padding:20px;color:#111}h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:6px}h2{color:#0f766e;margin-top:18px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #ccc;padding:4px;text-align:left;font-size:11px}th{background:#e6f4f1}.meta{color:#666;font-size:11px}@media print{body{padding:8px}}</style></head><body>
+<h1>📓 Все дневники</h1>
+<p class="meta">Экспорт: ${new Date().toLocaleDateString('ru-RU')} · Записей: ${sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length + hrEntries.length}</p>
+${table('💤 Сон', ['Дата', 'Часы', 'Качество', 'Пробуждений', 'Легли', 'Подъём', 'Заметки'],
+  sortedDesc(sleepEntries).map((e) => [e.date, String(e.hours), String(e.quality), String(e.awakenings), e.bedtime, e.wakeTime, e.notes || '']))}
+${table('❤️ Давление', ['Дата', 'Систола', 'Диастола', 'Пульс', 'Время', 'Лекарство', 'Заметки'],
+  sortedDesc(bpEntries).map((e) => [e.date, String(e.systolic), String(e.diastolic), String(e.hr ?? e.pulse ?? ''), e.timeOfDay || '', e.medicationTaken ? 'да' : '', e.notes || '']))}
+${table('💓 ЧСС', ['Дата', 'Время', 'ЧСС', 'Заметки'],
+  sortedDesc(hrEntries).map((e) => [e.date, e.timeOfDay === 'morning' ? 'утро' : 'вечер', String(e.bpm), e.notes || '']))}
+${table('⚖️ Вес', ['Дата', 'Вес', 'Жир %', 'Мышцы', 'Талия', 'Заметки'],
+  sortedDesc(weights).map((e) => [e.date, String(e.weight), e.bodyFat !== undefined ? String(e.bodyFat) : '', e.muscleMass !== undefined ? String(e.muscleMass) : '', e.waistCm !== undefined ? String(e.waistCm) : '', e.notes || '']))}
+${table('💉 Инъекции', ['Дата', 'Препарат', 'Доза', 'Зона', 'Сторона', 'Боль', 'PIP', 'Заметки'],
+  sortedDesc(injectionEntries).map((e) => [e.date, e.substance, e.dose, e.site || '', e.notes || '', '', '', e.notes || '']))}
+${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', 'Нейро', 'Акне', 'Гемат', 'Заметки'],
+  sortedDesc(healthEntries).map((e) => [
+    e.date,
+    e.pain && e.pain.totalScore > 0 ? `${e.pain.totalScore}/70` : '',
+    Array.isArray(e.symptoms) ? String(e.symptoms.length) : '0',
+    e.neuro && e.neuro.totalScore > 0 ? `${e.neuro.totalScore}/10` : '',
+    e.acne && e.acne.totalScore > 0 ? `${e.acne.totalScore}/12` : '',
+    e.hemato && e.hemato.totalScore > 0 ? `${e.hemato.totalScore}/8` : '',
+    e.notes || '',
+  ]))}
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 120);
   };
 
   const importAllDiaries = (file: File) => {
@@ -960,6 +1053,10 @@ export const ProfileDiariesTab: React.FC<{
         if (diaries[WEIGHT_LOG_KEY] && Array.isArray(diaries[WEIGHT_LOG_KEY])) {
           saveWeightLog(diaries[WEIGHT_LOG_KEY]);
           setWeights(diaries[WEIGHT_LOG_KEY]);
+        }
+        if (diaries[HR_DIARY_KEY] && Array.isArray(diaries[HR_DIARY_KEY])) {
+          saveDiary(HR_DIARY_KEY, diaries[HR_DIARY_KEY]);
+          setHrEntries([...diaries[HR_DIARY_KEY]].sort((a, b) => String(b.date).localeCompare(String(a.date))));
         }
         if (data.goals && typeof data.goals === 'object') {
           setGoals({ ...goals, ...data.goals });
@@ -1333,12 +1430,12 @@ export const ProfileDiariesTab: React.FC<{
                     }}
                   >
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap' }}>
-                      🌅 Утренний лог · {routine === 'sleep' ? 'Сон' : routine === 'bp' ? 'Давление' : 'Вес'} ({routine === 'sleep' ? 1 : routine === 'bp' ? 2 : 3}/3)
+                      {routine.kind === 'morning' ? '🌅' : '🌆'} {ROUTINE_KIND_LABELS[routine.kind]} · {ROUTINE_STEP_LABELS[routine.step]} ({routineIdx + 1}/{routineTotal})
                     </span>
                     <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                       <div
                         style={{
-                          width: `${(routine === 'sleep' ? 1 : routine === 'bp' ? 2 : 3) * 33}%`,
+                          width: `${((routineIdx + 1) / routineTotal) * 100}%`,
                           height: '100%',
                           background: 'linear-gradient(90deg, #fbbf24, #f59e0b)',
                           borderRadius: 2,
@@ -1348,8 +1445,46 @@ export const ProfileDiariesTab: React.FC<{
                     </div>
                     <button
                       type="button"
+                      onClick={() => openRoutineStepModal(routine)}
+                      aria-label={`Заполнить: ${ROUTINE_STEP_LABELS[routine.step]}`}
+                      style={{
+                        background: 'rgba(245,158,11,0.18)',
+                        border: '1px solid rgba(245,158,11,0.45)',
+                        color: '#fbbf24',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        padding: '6px 12px',
+                        borderRadius: 9,
+                        flexShrink: 0,
+                        minHeight: 32,
+                      }}
+                    >
+                      ✍ Заполнить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={advanceRoutine}
+                      aria-label="Пропустить шаг"
+                      style={{
+                        background: 'rgba(255,255,255,0.07)',
+                        border: '1px solid rgba(255,255,255,0.18)',
+                        color: '#d4d4d8',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        padding: '6px 12px',
+                        borderRadius: 9,
+                        flexShrink: 0,
+                        minHeight: 32,
+                      }}
+                    >
+                      ⏭ Пропустить
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setRoutinePersist(null)}
-                      aria-label="Отменить утренний лог"
+                      aria-label="Отменить лог"
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -1366,27 +1501,56 @@ export const ProfileDiariesTab: React.FC<{
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setRoutinePersist('sleep')}
-                    style={{
-                      width: '100%',
-                      marginTop: 10,
-                      padding: '10px 12px',
-                      borderRadius: 12,
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontWeight: 800,
-                      textAlign: 'center',
-                      background: 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))',
-                      border: '1px solid rgba(245,158,11,0.4)',
-                      color: '#fbbf24',
-                      boxShadow: '0 4px 16px rgba(245,158,11,0.12)',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    🌅 Утренний лог: сон → давление → вес
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoutinePersist({ kind: 'morning', step: 'sleep' });
+                        openRoutineStepModal({ kind: 'morning', step: 'sleep' });
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 180,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        textAlign: 'center',
+                        background: 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.06))',
+                        border: '1px solid rgba(245,158,11,0.4)',
+                        color: '#fbbf24',
+                        boxShadow: '0 4px 16px rgba(245,158,11,0.12)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      🌅 Утренний лог: сон → АД → ЧСС → вес → здоровье
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoutinePersist({ kind: 'evening', step: 'bp' });
+                        openRoutineStepModal({ kind: 'evening', step: 'bp' });
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 150,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        textAlign: 'center',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.06))',
+                        border: '1px solid rgba(99,102,241,0.4)',
+                        color: '#a5b4fc',
+                        boxShadow: '0 4px 16px rgba(99,102,241,0.12)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      🌆 Вечерний лог: АД → ЧСС
+                    </button>
+                  </div>
                 )}
                 {/* Темп-цели и streak-карта */}
                 <div
@@ -1531,6 +1695,20 @@ export const ProfileDiariesTab: React.FC<{
                     last={d.last}
                     daysSinceLast={daysSinceLast(getEntryArray(d.key))}
                     loggedToday={todayEntry(getEntryArray(d.key))}
+                    extra={
+                      d.key === 'health' && healthEntries[0]
+                        ? (() => {
+                            const e = healthEntries[0];
+                            const parts: string[] = [];
+                            if (e.pain && e.pain.totalScore > 0) parts.push(`🦴 ${e.pain.totalScore}/70`);
+                            if (Array.isArray(e.symptoms) && e.symptoms.length) parts.push(`🩺 ${e.symptoms.length}`);
+                            if (e.neuro && e.neuro.totalScore > 0) parts.push(`🧠 ${e.neuro.totalScore}/10`);
+                            if (e.acne && e.acne.totalScore > 0) parts.push(`🔴 ${e.acne.totalScore}/12`);
+                            if (e.hemato && e.hemato.totalScore > 0) parts.push(`🩸 ${e.hemato.totalScore}/8`);
+                            return parts.length ? parts.join(' · ') : undefined;
+                          })()
+                        : undefined
+                    }
                     onAdd={() => {
                       if (d.key === 'sleep') setAddSleepOpen(true);
                       else if (d.key === 'bp') setAddBPOpen(true);
@@ -1584,6 +1762,24 @@ export const ProfileDiariesTab: React.FC<{
               >
                 📤 Экспорт всех дневников (JSON)
               </button>
+              <button
+                onClick={exportAllDiariesPdf}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  background: 'rgba(239,68,68,0.12)',
+                  border: '1px solid rgba(239,68,68,0.4)',
+                  color: '#f87171',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                🖨 Экспорт всех дневников (PDF)
+              </button>
               <input
                 ref={importInputRef}
                 type="file"
@@ -1628,6 +1824,7 @@ export const ProfileDiariesTab: React.FC<{
                     [HEMATO_DIARY_KEY]: [...hematoEntries] as any[],
                     [HEALTH_DIARY_KEY]: [...healthEntries] as any[],
                     [WEIGHT_LOG_KEY]: [...weights] as any[],
+                    [HR_DIARY_KEY]: [...hrEntries] as any[],
                   };
                   const total = Object.values(snap).reduce((s, a) => s + a.length, 0);
                   [
@@ -1641,6 +1838,7 @@ export const ProfileDiariesTab: React.FC<{
                     HEMATO_DIARY_KEY,
                     HEALTH_DIARY_KEY,
                     WEIGHT_LOG_KEY,
+                    HR_DIARY_KEY,
                   ].forEach((k) => saveDiary(k, []));
                   setSleepEntries([]);
                   setBpEntries([]);
@@ -1652,6 +1850,7 @@ export const ProfileDiariesTab: React.FC<{
                   setHematoEntries([]);
                   setHealthEntries([]);
                   setWeights([]);
+                  setHrEntries([]);
                   pushUndo(`🧹 Очищены все встроенные дневники (${total})`, () => {
                     setSleepEntries(snap[SLEEP_DIARY_KEY] as SleepEntry[]);
                     setBpEntries(snap[BP_DIARY_KEY] as BPEntry[]);
@@ -1663,6 +1862,7 @@ export const ProfileDiariesTab: React.FC<{
                     setHematoEntries(snap[HEMATO_DIARY_KEY] as HematoEntry[]);
                     setHealthEntries(snap[HEALTH_DIARY_KEY] as UnifiedHealthEntry[]);
                     setWeights(snap[WEIGHT_LOG_KEY] as ReturnType<typeof getWeightLog>);
+                    setHrEntries(snap[HR_DIARY_KEY] as HREntry[]);
                     Object.entries(snap).forEach(([k, v]) => saveDiary(k, v as any[]));
                   });
                 }}
@@ -1709,11 +1909,14 @@ export const ProfileDiariesTab: React.FC<{
             {activeDiary === 'health' && (
               <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="health" onDataChange={refresh} onNavigate={onNavigate} />
             )}
+            {activeDiary === 'pulse' && (
+              <PulseDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="pulse" onDataChange={refresh} />
+            )}
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
           <AddSleepModal
             open={addSleepOpen}
-            onClose={() => { setAddSleepOpen(false); if (routine === 'sleep') setRoutinePersist(nextRoutineStep('sleep')); }}
+            onClose={() => setAddSleepOpen(false)}
             onSave={(e) => {
               const prev = sleepEntries;
               const replaced = prev.some((x) => x.date === e.date);
@@ -1722,16 +1925,17 @@ export const ProfileDiariesTab: React.FC<{
               );
               saveDiary(SLEEP_DIARY_KEY, updated);
               setSleepEntries(updated);
-              pushUndo(replaced ? 'Запись сна обновлена' : 'Запись сна добавлена', () => {
+              pushUndo(routineUndoLabel(replaced ? 'запись обновлена' : 'запись добавлена'), () => {
                 saveDiary(SLEEP_DIARY_KEY, prev);
                 setSleepEntries(prev);
               });
-              if (routine === 'sleep') setRoutinePersist(nextRoutineStep('sleep'));
+              if (routine?.step === 'sleep') advanceRoutine();
             }}
           />
           <AddBPModal
             open={addBPOpen}
-            onClose={() => { setAddBPOpen(false); if (routine === 'bp') setRoutinePersist(nextRoutineStep('bp')); }}
+            presetTimeOfDay={routine?.step === 'bp' ? (routine.kind === 'evening' ? 'evening' : 'morning') : undefined}
+            onClose={() => setAddBPOpen(false)}
             onSave={(e) => {
               const entry: CoreBPEntry = {
                 id: e.id || generateEntryId(),
@@ -1751,16 +1955,16 @@ export const ProfileDiariesTab: React.FC<{
               const existing = prev.filter((x) => x.id !== entry.id);
               const updated = commitBpEntries([...existing, entry]);
               setBpEntries(updated.map((x) => ({ ...x, pulse: x.hr })));
-              pushUndo('Запись давления добавлена', () => {
+              pushUndo(routineUndoLabel('давление записано'), () => {
                 const restored = commitBpEntries(prev);
                 setBpEntries(restored.map((x) => ({ ...x, pulse: x.hr })));
               });
-              if (routine === 'bp') setRoutinePersist(nextRoutineStep('bp'));
+              if (routine?.step === 'bp') advanceRoutine();
             }}
           />
           <AddBodyMeasurementsModal
             open={addBodyMeasurementsOpen}
-            onClose={() => { setAddBodyMeasurementsOpen(false); if (routine === 'weight') setRoutinePersist(nextRoutineStep('weight')); }}
+            onClose={() => setAddBodyMeasurementsOpen(false)}
             onSave={(e) => {
               const prev = getWeightLog() || [];
               const replaced = prev.some((x) => x.date === e.date);
@@ -1770,8 +1974,8 @@ export const ProfileDiariesTab: React.FC<{
               saveWeightLog(updated);
               setWeights(updated);
               pushUndo(
-                routine === 'weight'
-                  ? '🌅 Утренний лог завершён · вес записан'
+                routine?.step === 'weight'
+                  ? routineUndoLabel('вес записан')
                   : replaced
                     ? 'Запись веса обновлена'
                     : 'Запись веса добавлена',
@@ -1780,7 +1984,23 @@ export const ProfileDiariesTab: React.FC<{
                   setWeights(prev);
                 },
               );
-              if (routine === 'weight') setRoutinePersist(null);
+              if (routine?.step === 'weight') advanceRoutine();
+            }}
+          />
+          <AddPulseModal
+            open={addPulseOpen}
+            presetTimeOfDay={routine?.step === 'pulse' ? (routine.kind === 'evening' ? 'evening' : 'morning') : undefined}
+            onClose={() => setAddPulseOpen(false)}
+            onSave={(e) => {
+              const prev = getHREntries();
+              const replaced = findByDateAndTimeOfDay(prev, e.date, e.timeOfDay) !== undefined;
+              const updated = saveHREntry(e);
+              setHrEntries(updated);
+              pushUndo(routineUndoLabel(replaced ? 'запись обновлена' : 'запись добавлена'), () => {
+                setHrEntries(prev);
+                saveDiary(HR_DIARY_KEY, prev);
+              });
+              if (routine?.step === 'pulse') advanceRoutine();
             }}
           />
           <AddInjectionModal
@@ -1811,8 +2031,12 @@ export const ProfileDiariesTab: React.FC<{
               const prevAcne = acneEntries;
               const prevHemato = hematoEntries;
               const prevSymptoms = symptomEntries;
-              const replacedHealth = prevUnified.some((x) => x.date === e.date);
-              const updated = [...healthEntries.filter((x) => x.date !== e.date), e].sort((a, b) =>
+              const existingForDate = healthEntries.find((x) => x.date === e.date);
+              // МЕРЖ вместо замены: сохраняем разделы, которые не заполнены в новой записи
+              // (например, боль с 3D-карты при добавлении нейро через quick-add).
+              const mergedEntry = mergeHealthEntry(existingForDate, e);
+              const replacedHealth = !!existingForDate;
+              const updated = [...healthEntries.filter((x) => x.date !== e.date), mergedEntry].sort((a, b) =>
                 b.date.localeCompare(a.date),
               );
               saveUnifiedHealthEntries(updated);
@@ -1853,7 +2077,7 @@ export const ProfileDiariesTab: React.FC<{
                 saveDiary(SYMPTOMS_DIARY_KEY, s);
                 setSymptomEntries(s);
               }
-              pushUndo(replacedHealth ? 'Запись здоровья обновлена' : 'Запись здоровья добавлена', () => {
+              pushUndo(routineUndoLabel(replacedHealth ? 'запись обновлена' : 'запись добавлена'), () => {
                 saveUnifiedHealthEntries(prevUnified);
                 setHealthEntries(prevUnified);
                 if (e.pain) { saveDiary(PAIN_DIARY_KEY, prevPain); setPainEntries(prevPain); }
@@ -1862,6 +2086,7 @@ export const ProfileDiariesTab: React.FC<{
                 if (e.hemato) { saveDiary(HEMATO_DIARY_KEY, prevHemato); setHematoEntries(prevHemato); }
                 if (e.symptoms && e.symptoms.length > 0) { saveDiary(SYMPTOMS_DIARY_KEY, prevSymptoms); setSymptomEntries(prevSymptoms); }
               });
+              if (routine?.step === 'health') advanceRoutine();
             }}
           />
         </>

@@ -4,7 +4,7 @@
  * dual-спарклайн (систола/диастола), PP/MAP, симптомы, рука/позиция,
  * валидация кризов, 3/7-дневные средние, тренд.
  */
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import { BP_SYMPTOMS, classifyBP } from '../../../core/bp-hr-data';
@@ -97,11 +97,12 @@ const POSITION_OPTIONS: { id: 'sitting' | 'lying' | 'standing'; label: string }[
   { id: 'standing', label: '🧍 Стоя' },
 ];
 
-export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({
-  open,
-  onClose,
-  onSave,
-}) => {
+export const AddBPModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onSave: (e: any) => void;
+  presetTimeOfDay?: 'morning' | 'afternoon' | 'evening' | 'night';
+}> = ({ open, onClose, onSave, presetTimeOfDay }) => {
   const initial = (): BPDraft => {
     const last = lastEntryOf(readDiaryEntries<BpRec>('he_bp_diary'));
     const lastPulse = last?.pulse ?? last?.hr;
@@ -122,6 +123,10 @@ export const AddBPModal: React.FC<{ open: boolean; onClose: () => void; onSave: 
     };
   };
   const [draft, setDraft, resetDraft] = useDiaryDraft<BPDraft>('he_draft_bp', initial);
+  // Пресет рутинга (утро/вечер) имеет приоритет над сохранённым черновиком.
+  useEffect(() => {
+    if (presetTimeOfDay) setDraft((p) => ({ ...p, timeOfDay: presetTimeOfDay as BPDraft['timeOfDay'] }));
+  }, [presetTimeOfDay, setDraft]);
   const lastRec = useMemo(() => lastEntryOf(readDiaryEntries<BpRec>('he_bp_diary')), [open]);
   const set = (key: keyof BPDraft, val: string | string[] | boolean) => setDraft((p) => ({ ...p, [key]: val }));
 

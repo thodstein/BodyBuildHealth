@@ -15,6 +15,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, useId } from 
 import { colors, BoolChip } from './ui';
 import { todayIso } from './diary-helpers';
 import { getWeightLog } from '../../../engines/profile-store';
+import { readDiaryEntries as readDiaryEntriesFromStorage } from '../../../engines/diary-storage';
 import { INJECTION_ZONES, NEEDLE_GAUGES, TECHNIQUES } from '../../../engines/injection-diary.engine';
 
 export interface UndoAction {
@@ -37,6 +38,64 @@ export const dismissTopUndo = (queue: UndoAction[]): UndoAction[] => queue.slice
 /** Следующий шаг утреннего рутинга: сон → давление → вес → конец. */
 export const nextRoutineStep = (r: 'sleep' | 'bp' | 'weight'): 'sleep' | 'bp' | 'weight' | null =>
   r === 'sleep' ? 'bp' : r === 'bp' ? 'weight' : null;
+
+/* ── Утренний/вечерний рутинг (v2) ── */
+
+export type RoutineKind = 'morning' | 'evening';
+export type RoutineStepId = 'sleep' | 'bp' | 'pulse' | 'weight' | 'health';
+
+export const ROUTINE_STEPS: Record<RoutineKind, RoutineStepId[]> = {
+  morning: ['sleep', 'bp', 'pulse', 'weight', 'health'],
+  evening: ['bp', 'pulse'],
+};
+
+export interface ActiveRoutine {
+  kind: RoutineKind;
+  step: RoutineStepId;
+}
+
+/** Следующий шаг рутинга; null — рутинг завершён. */
+export const routineNextStep = (kind: RoutineKind, step: RoutineStepId): RoutineStepId | null => {
+  const steps = ROUTINE_STEPS[kind];
+  const idx = steps.indexOf(step);
+  if (idx < 0 || idx >= steps.length - 1) return null;
+  return steps[idx + 1];
+};
+
+export const routineStepIndex = (kind: RoutineKind, step: RoutineStepId): number =>
+  ROUTINE_STEPS[kind].indexOf(step);
+
+export const ROUTINE_STEP_LABELS: Record<RoutineStepId, string> = {
+  sleep: 'Сон',
+  bp: 'Давление',
+  pulse: 'ЧСС',
+  weight: 'Вес',
+  health: 'Здоровье',
+};
+
+export const ROUTINE_KIND_LABELS: Record<RoutineKind, string> = {
+  morning: 'Утренний лог',
+  evening: 'Вечерний лог',
+};
+
+/** Миграция legacy-значения рутинга ('sleep'|'bp'|'weight') в v2. */
+export const migrateLegacyRoutine = (raw: string | null): ActiveRoutine | null => {
+  if (!raw) return null;
+  if (raw === 'sleep' || raw === 'bp' || raw === 'weight') return { kind: 'morning', step: raw };
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      (parsed.kind === 'morning' || parsed.kind === 'evening') &&
+      typeof parsed.step === 'string' &&
+      ROUTINE_STEPS[parsed.kind as RoutineKind].includes(parsed.step as RoutineStepId)
+    ) {
+      return { kind: parsed.kind, step: parsed.step };
+    }
+  } catch {}
+  return null;
+};
 
 export const daysAgoLabel = (days: number): string =>
   days <= 0 ? 'сегодня' : days === 1 ? 'вчера' : `${days} дн. назад`;
@@ -109,13 +168,9 @@ export const styles = { fieldLabel, fieldInput, btnGhost, btnPrimary };
 
 /* ── Хелперы дневников ── */
 
+/** Единый слой чтения — diary-storage.ts (реэкспорт для обратной совместимости). */
 export function readDiaryEntries<T>(key: string): T[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(key) || '[]');
-    return Array.isArray(v) ? (v as T[]) : [];
-  } catch {
-    return [];
-  }
+  return readDiaryEntriesFromStorage<T>(key);
 }
 
 export function lastEntryOf<T extends { date?: string; timestamp?: number }>(arr: T[]): T | undefined {
@@ -233,6 +288,7 @@ export const DIARY_META: Record<
   weight: { title: 'Вес и замеры', unit: 'кг / см', icon: '⚖️', color: '#22c55e' },
   injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: 'he_injection_diary' },
   health: { title: 'Здоровье', unit: '', icon: '🩺', color: '#ec4899', storageKey: 'he_health_diary' },
+  pulse: { title: 'ЧСС', unit: 'уд/мин', icon: '💓', color: '#f472b6', storageKey: 'he_hr_diary' },
 };
 
 export const painZoneColor = (v: number) => (v <= 2 ? '#22c55e' : v <= 4 ? '#f59e0b' : v <= 7 ? '#f97316' : '#ef4444');
@@ -1079,3 +1135,4 @@ export { AddBPModal, bpCategory } from './bp-diary-modal';
 export { AddBodyMeasurementsModal } from './body-measurements-modal';
 export { AddInjectionModal } from './injection-diary-modal';
 export { AddHealthModal } from './health-diary-modal';
+export { AddPulseModal } from './pulse-diary-modal';

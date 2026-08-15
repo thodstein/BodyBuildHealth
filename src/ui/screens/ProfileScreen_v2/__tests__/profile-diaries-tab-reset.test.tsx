@@ -26,6 +26,7 @@ describe('ProfileDiariesTab — «Сбросить всё»', () => {
     localStorage.setItem('he_injection_diary', JSON.stringify([{ date: today, substance: 'Тестостерон энантат', dose: '250 мг', zone: 'glute_dorsal' }]));
     localStorage.setItem('he_health_diary', JSON.stringify([{ date: today, pain: { totalScore: 5 }, symptoms: [], neuro: null, acne: null, hemato: null }]));
     localStorage.setItem('he_weight_log', JSON.stringify([{ date: today, weight: 82.5 }]));
+    localStorage.setItem('he_hr_diary', JSON.stringify([{ date: today, timeOfDay: 'morning', bpm: 58 }]));
 
     render(<ProfileDiariesTab />);
 
@@ -38,6 +39,7 @@ describe('ProfileDiariesTab — «Сбросить всё»', () => {
     await waitFor(() => {
       expect(localStorage.getItem('he_health_diary')).toBe('[]');
       expect(localStorage.getItem('he_weight_log')).toBe('[]');
+      expect(localStorage.getItem('he_hr_diary')).toBe('[]');
       expect(localStorage.getItem('he_sleep_diary')).toBe('[]');
       expect(localStorage.getItem('he_bp_diary')).toBe('[]');
       expect(localStorage.getItem('he_injection_diary')).toBe('[]');
@@ -48,6 +50,7 @@ describe('ProfileDiariesTab — «Сбросить всё»', () => {
     const today = todayIso();
     localStorage.setItem('he_health_diary', JSON.stringify([{ date: today, pain: { totalScore: 5 }, symptoms: [], neuro: null, acne: null, hemato: null }]));
     localStorage.setItem('he_weight_log', JSON.stringify([{ date: today, weight: 82.5 }]));
+    localStorage.setItem('he_hr_diary', JSON.stringify([{ date: today, timeOfDay: 'morning', bpm: 58 }]));
 
     render(<ProfileDiariesTab />);
     fireEvent.click(screen.getByText('💾 Данные'));
@@ -59,9 +62,12 @@ describe('ProfileDiariesTab — «Сбросить всё»', () => {
     await waitFor(() => {
       const health = JSON.parse(localStorage.getItem('he_health_diary') || '[]');
       const weights = JSON.parse(localStorage.getItem('he_weight_log') || '[]');
+      const hr = JSON.parse(localStorage.getItem('he_hr_diary') || '[]');
       expect(health.length).toBe(1);
       expect(weights.length).toBe(1);
       expect(weights[0].weight).toBe(82.5);
+      expect(hr.length).toBe(1);
+      expect(hr[0].bpm).toBe(58);
     });
   });
 });

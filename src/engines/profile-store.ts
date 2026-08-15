@@ -115,9 +115,22 @@ export function saveWeightLog(log: WeightEntry[]) {
     } catch { /* quota — silent */ }
   }
   const totalPhotos = trimmed.reduce((sum, e) => sum + (e.photos?.length || 0), 0);
-  const estimatedSize = new Blob([JSON.stringify(trimmed)]).size;
+  let estimatedSize = new Blob([JSON.stringify(trimmed)]).size;
   if (estimatedSize > 4 * 1024 * 1024) {
-    console.warn(`[profile-store] weight log size ${(estimatedSize / 1024 / 1024).toFixed(1)}MB — consider removing old photos`);
+    console.warn(`[profile-store] weight log size ${(estimatedSize / 1024 / 1024).toFixed(1)}MB — removing old photos`);
+    // Автоочистка фото: убираем фото из СТАРЫХ записей (кроме 30 новейших),
+    // пока размер не войдёт в лимит 4MB. Фото освобождают место быстрее всего.
+    const newest30 = new Set(trimmed.slice(0, 30).map((e) => e.date));
+    const stripped = trimmed.map((e) => {
+      if (newest30.has(e.date) || !e.photos || e.photos.length === 0) return e;
+      return { ...e, photos: undefined };
+    });
+    const resized = new Blob([JSON.stringify(stripped)]).size;
+    if (resized < estimatedSize) {
+      trimmed.length = 0;
+      trimmed.push(...stripped);
+      estimatedSize = resized;
+    }
   }
   localStorage.setItem(KEYS.weight, JSON.stringify(trimmed));
 }

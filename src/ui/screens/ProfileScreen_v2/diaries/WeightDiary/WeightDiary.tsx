@@ -414,7 +414,40 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     if (remember) setUndo(rows);
     saveWeightLog(ordered);
     setRows(ordered);
+    setArchiveRows(getWeightLogArchived());
     onDataChange?.();
+  };
+  /** Удалить ВСЕ фото из лога (photos раздувают localStorage). */
+  const clearAllPhotos = () => {
+    if (!rows.some((r) => r.photos && r.photos.length)) {
+      (window as any).showToast?.('📷 Фото в дневнике нет');
+      return;
+    }
+    if (!window.confirm('Удалить ВСЕ фото из всех записей веса? Это освободит место в хранилище.')) return;
+    commit(rows.map((r) => (r.photos && r.photos.length ? { ...r, photos: undefined } : r)));
+    (window as any).showToast?.('🖼 Все фото удалены');
+  };
+  /** Импорт фото из архива в основные записи (по совпадающим датам, если фото нет). */
+  const importArchivePhotos = () => {
+    const withPhotos = archiveRows.filter((a) => a.photos && a.photos.length);
+    if (!withPhotos.length) {
+      (window as any).showToast?.('🗄 В архиве нет записей с фото');
+      return;
+    }
+    let changed = false;
+    const next = rows.map((r) => {
+      if (r.photos && r.photos.length) return r;
+      const arch = archiveRows.find((a) => a.date === r.date && a.photos && a.photos.length);
+      if (!arch) return r;
+      changed = true;
+      return { ...r, photos: arch.photos };
+    });
+    if (!changed) {
+      (window as any).showToast?.('Нет совпадающих дат с фото в архиве');
+      return;
+    }
+    commit(next);
+    (window as any).showToast?.('📥 Фото импортированы из архива');
   };
   const quickAdd = () => {
     const raw = Number(quickW);
@@ -450,7 +483,12 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   }, [entries, range, query, sort]);
   const pageData = paginate(filtered, page, 8);
   /* График и связанные с ним метрики учитывают выбранный диапазон. */
-  const chartRows = useMemo(() => rowsInRange(rows, range), [rows, range]);
+  // График/тренды: архивные записи (старше 365 дней) включаются в «Всё время» —
+  // длинный тренд без разрыва; фото не тащим в расчёты.
+  const chartRows = useMemo(() => {
+    const base = range === 'all' ? [...rows, ...archiveRows.filter((a) => !rows.some((r) => r.date === a.date))] : rows;
+    return rowsInRange(base, range);
+  }, [rows, archiveRows, range]);
   const chartSeries = useMemo<OverlayChartProps['series']>(() => {
     if (activeChartFields.length === 0) return [];
     const series: OverlayChartProps['series'] = activeChartFields.map(f => ({
@@ -845,6 +883,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           { label: '📥 CSV-файл', onClick: doExportCsv },
           { label: '🖨 Печать / PDF', onClick: doPrint },
           { label: '🗄 Архив', onClick: () => setShowArchive((v: boolean) => !v), danger: false },
+          { label: '📥 Фото из архива', onClick: importArchivePhotos },
+          { label: '🖼 Сбросить фото', onClick: clearAllPhotos, danger: true },
           { label: '📋 Из профиля', onClick: syncFromProfile },
           { label: '💾 В профиль', onClick: syncToProfile },
           { label: '🗑 Очистить дневник', onClick: () => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }, danger: true },
