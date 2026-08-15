@@ -749,7 +749,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'mmc' && <MMCTrackingCard />}
       {mode === 'mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
       {mode === 'mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
-      {mode === 'warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView /></InfoErrorBoundary>}
+      {mode === 'warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
       {mode === 'tools' && <DiaryToolsView hub={hub} />}

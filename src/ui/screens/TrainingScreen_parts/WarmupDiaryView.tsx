@@ -14,20 +14,25 @@ import { MiniLineChart } from './DiaryChart';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
 import {
   loadWarmupLog, warmupAdherence, warmupQualityTrend, buildWarmupInsights,
-  exportWarmupCheckinsCSV,
+  exportWarmupCheckinsCSV, warmupStreak, correlateWarmupWithPerformance,
 } from '../../../engines/warmup.engine';
+import { sessionsBestE1RM } from '../../../engines/mindset-protocol.engine';
+import type { WorkoutLog } from '../../../core/types';
 
 const CARD = diaryCard;
 const WARMUP_COLOR = '#f97316';
 
-export const WarmupDiaryView: React.FC = () => {
+export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[] }> = ({ historyWorkouts }) => {
   const [tick, setTick] = useState(0);
   const refresh = () => setTick(t => t + 1);
 
   const log = useMemo(() => loadWarmupLog(), [tick]);
   const adherence = useMemo(() => warmupAdherence(30), [tick]);
   const quality = useMemo(() => warmupQualityTrend(30), [tick]);
-  const insights = useMemo(() => buildWarmupInsights(), [tick]);
+  const streak = useMemo(() => warmupStreak(), [tick]);
+  const perfs = useMemo(() => sessionsBestE1RM((historyWorkouts || []) as any[]), [historyWorkouts]);
+  const insights = useMemo(() => buildWarmupInsights(perfs), [tick, perfs]);
+  const link = useMemo(() => correlateWarmupWithPerformance(perfs), [tick, perfs]);
 
   const skipCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -105,7 +110,7 @@ export const WarmupDiaryView: React.FC = () => {
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
               <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Записей</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: WARMUP_COLOR }}>{adherence.total}</div>
@@ -124,6 +129,10 @@ export const WarmupDiaryView: React.FC = () => {
                 <div style={{ fontSize: 9, color: DIM }}>Выполнено дней</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{adherence.done}</div>
               </div>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: DIM }}>Серия</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : 'var(--text-dim)' }}>{streak > 0 ? `${streak} дн` : '—'}</div>
+              </div>
             </div>
             {quality.count >= 2 && (
               <div style={{ marginTop: 8 }}>
@@ -135,6 +144,23 @@ export const WarmupDiaryView: React.FC = () => {
                   height={50}
                   ySuffix="/5"
                 />
+              </div>
+            )}
+            {link.n >= 3 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Связь качества разминки и e1RM сессии (n={link.n}):</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {link.buckets.map(b => (
+                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 8, color: DIM }}>{b.range}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgE1RM} кг` : '—'}</div>
+                      <div style={{ fontSize: 8, color: DIM }}>{b.n} сессий</div>
+                    </div>
+                  ))}
+                </div>
+                {link.pearson !== null && Math.abs(link.pearson) >= 0.3 && (
+                  <div style={{ fontSize: 9, color: '#a78bfa', marginTop: 4 }}>r = {link.pearson} — {link.pearson > 0 ? 'качество разминки связано с силой дня' : 'обратная связь (сон/стресс?)'}</div>
+                )}
               </div>
             )}
             {skipCounts.length > 0 && (

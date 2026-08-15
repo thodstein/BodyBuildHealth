@@ -7,6 +7,7 @@ import {
   WARMUP_DIARY_KEY, WARMUP_DIARY_CAP, WARMUP_SKIP_REASONS, WARMUP_LABELS, warmupLabel,
   sanitizeWarmupLog, loadWarmupLog, upsertWarmupLog, latestWarmupLog,
   warmupAdherence, warmupQualityTrend, warmupLogForDate, buildWarmupInsights, exportWarmupCheckinsCSV,
+  warmupStreak, correlateWarmupWithPerformance,
 } from '../warmup.engine';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -104,6 +105,73 @@ describe('Аналитика', () => {
     upsertWarmupLog({ date: daysAgo(6), done: false, quality: null, skippedReason: 'не было времени' });
     const skip = buildWarmupInsights();
     expect(skip.some(s => s.includes('не было времени'))).toBe(true);
+  });
+});
+
+describe('Серия и связь с e1RM', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('warmupStreak: пусто → 0', () => {
+    expect(warmupStreak()).toBe(0);
+  });
+
+  it('warmupStreak: 3 дня подряд до сегодня → 3', () => {
+    upsertWarmupLog({ date: daysAgo(0), done: true, quality: 4 });
+    upsertWarmupLog({ date: daysAgo(1), done: true, quality: 4 });
+    upsertWarmupLog({ date: daysAgo(2), done: true, quality: 4 });
+    expect(warmupStreak()).toBe(3);
+  });
+
+  it('warmupStreak: сегодня не отмечено → серия со вчера', () => {
+    upsertWarmupLog({ date: daysAgo(1), done: true, quality: 4 });
+    upsertWarmupLog({ date: daysAgo(2), done: true, quality: 4 });
+    expect(warmupStreak()).toBe(2);
+  });
+
+  it('warmupStreak: пропуск разрывает серию', () => {
+    upsertWarmupLog({ date: daysAgo(0), done: true, quality: 4 });
+    upsertWarmupLog({ date: daysAgo(1), done: false, quality: null });
+    upsertWarmupLog({ date: daysAgo(2), done: true, quality: 4 });
+    expect(warmupStreak()).toBe(1);
+  });
+
+  it('correlateWarmupWithPerformance: без сессий → n 0 и null', () => {
+    upsertWarmupLog({ date: daysAgo(1), done: true, quality: 5 });
+    const link = correlateWarmupWithPerformance([]);
+    expect(link.n).toBe(0);
+    expect(link.pearson).toBeNull();
+  });
+
+  it('correlateWarmupWithPerformance: качество растёт с e1RM → положительный r и корзины', () => {
+    upsertWarmupLog({ date: '2026-01-01', done: true, quality: 2 });
+    upsertWarmupLog({ date: '2026-01-02', done: true, quality: 3 });
+    upsertWarmupLog({ date: '2026-01-03', done: true, quality: 5 });
+    const sessions = [
+      { date: '2026-01-01', e1rm: 100 },
+      { date: '2026-01-02', e1rm: 110 },
+      { date: '2026-01-03', e1rm: 130 },
+    ];
+    const link = correlateWarmupWithPerformance(sessions);
+    expect(link.n).toBe(3);
+    expect(link.pearson).not.toBeNull();
+    expect(link.pearson as number).toBeGreaterThan(0);
+    const high = link.buckets.find(b => b.level === 'high')!;
+    expect(high.avgE1RM).toBe(130);
+    const low = link.buckets.find(b => b.level === 'low')!;
+    expect(low.avgE1RM).toBe(100);
+  });
+
+  it('buildWarmupInsights с сессиями: инсайт про связь при |r| ≥ 0.3', () => {
+    upsertWarmupLog({ date: '2026-01-01', done: true, quality: 2 });
+    upsertWarmupLog({ date: '2026-01-02', done: true, quality: 3 });
+    upsertWarmupLog({ date: '2026-01-03', done: true, quality: 5 });
+    const sessions = [
+      { date: '2026-01-01', e1rm: 100 },
+      { date: '2026-01-02', e1rm: 110 },
+      { date: '2026-01-03', e1rm: 130 },
+    ];
+    const out = buildWarmupInsights(sessions);
+    expect(out.some(s => s.includes('Связь качества разминки с e1RM'))).toBe(true);
   });
 });
 

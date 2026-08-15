@@ -282,7 +282,77 @@ export function warmupLogForDate(date: string): WarmupLogEntry | null {
 
 export const WARMUP_SKIP_REASONS = ['не было времени', 'устал', 'забыл', 'зал был занят', 'другое'];
 
-export function buildWarmupInsights(): string[] {
+function isoOf(d: Date): string { return d.toISOString().slice(0, 10); }
+
+/** Серия: сколько дней подряд разминка выполнялась (с сегодня или вчера, если сегодня ещё не отмечено). */
+export function warmupStreak(): number {
+  const log = loadWarmupLog();
+  if (log.length === 0) return 0;
+  const doneByDate = new Map(log.map(e => [e.date, e.done]));
+  const today = new Date();
+  let cursor = today;
+  if (doneByDate.get(isoOf(cursor)) !== true) {
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+    cursor = yesterday;
+  }
+  let streak = 0;
+  while (doneByDate.get(isoOf(cursor)) === true) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+export interface WarmupPerformanceLink {
+  /** Корреляция Пирсона качества разминки ↔ e1RM сессии того же дня. */
+  pearson: number | null;
+  /** Средний e1RM по корзинам качества. */
+  buckets: { level: 'low' | 'mid' | 'high'; range: string; avgE1RM: number; n: number }[];
+  n: number;
+}
+
+function pearson(xs: number[], ys: number[]): number | null {
+  if (xs.length < 3 || xs.length !== ys.length) return null;
+  const n = xs.length;
+  const mx = xs.reduce((s, v) => s + v, 0) / n;
+  const my = ys.reduce((s, v) => s + v, 0) / n;
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - mx) * (ys[i] - my);
+    dx += (xs[i] - mx) ** 2;
+    dy += (ys[i] - my) ** 2;
+  }
+  if (dx === 0 || dy === 0) return null;
+  return Math.round(num / Math.sqrt(dx * dy) * 100) / 100;
+}
+
+/** Связь качества разминки дня с лучшим e1RM сессии того же дня. */
+export function correlateWarmupWithPerformance(sessions: { date: string; e1rm: number }[]): WarmupPerformanceLink {
+  const byDate = new Map((sessions || []).map(s => [s.date, s.e1rm]));
+  const pairs: { q: number; e1rm: number }[] = [];
+  for (const e of loadWarmupLog()) {
+    if (e.quality === null) continue;
+    const perf = byDate.get(e.date);
+    if (perf !== undefined && perf > 0) pairs.push({ q: e.quality, e1rm: perf });
+  }
+  const r = pearson(pairs.map(p => p.q), pairs.map(p => p.e1rm));
+  const bucket = (level: 'low' | 'mid' | 'high', filter: (q: number) => boolean, range: string) => {
+    const items = pairs.filter(p => filter(p.q));
+    const avg = items.length > 0 ? Math.round(items.reduce((s, p) => s + p.e1rm, 0) / items.length) : 0;
+    return { level, range, avgE1RM: avg, n: items.length };
+  };
+  return {
+    pearson: r,
+    buckets: [
+      bucket('low', q => q <= 2, 'качество 1-2'),
+      bucket('mid', q => q === 3, 'качество 3'),
+      bucket('high', q => q >= 4, 'качество 4-5'),
+    ],
+    n: pairs.length,
+  };
+}
+
+export function buildWarmupInsights(sessions?: { date: string; e1rm: number }[]): string[] {
   const out: string[] = [];
   const adh = warmupAdherence(30);
   if (adh.total >= 3) {
@@ -300,6 +370,14 @@ export function buildWarmupInsights(): string[] {
   const topSkip = Object.entries(skipCounts).sort((a, b) => b[1] - a[1])[0];
   if (topSkip && topSkip[1] >= 3) {
     out.push(`Частая причина пропуска разминки: «${topSkip[0]}» (${topSkip[1]} раз за 30 дней). Решение: делайте разминку первой в тренировке или сократите её до минимума.`);
+  }
+  const streak = warmupStreak();
+  if (streak >= 3) out.push(`Серия: разминка выполнена ${streak} дней подряд — отличный ритм. Неделя без пропусков заметно снижает риск травм.`);
+  if (Array.isArray(sessions) && sessions.length >= 3) {
+    const link = correlateWarmupWithPerformance(sessions);
+    if (link.n >= 3 && link.pearson !== null && Math.abs(link.pearson) >= 0.3) {
+      out.push(`Связь качества разминки с e1RM сессии: r = ${link.pearson} (n=${link.n}). ${link.pearson > 0 ? 'Качественная разминка заметно влияет на рабочие веса — не сокращайте её.' : 'Обратная связь — проверьте сон/стресс и усталость в эти дни.'}`);
+    }
   }
   if (out.length === 0) out.push('Пока мало данных: отмечайте разминку после тренировок — появятся приверженность и тренд качества.');
   return out;
