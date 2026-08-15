@@ -476,23 +476,65 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   <div style={{ ...diaryLabel, color: ACCENT, marginBottom: 0 }}>📅 Сегодня</div>
                   {sleepHours != null && (
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)' }}>
-                      💤 Синхронизировано со сном: {sleepHours} ч
+                      💤 Сон: {sleepHours} ч
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Неделя объём</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{(weekVol / 1000).toFixed(1)}т</div>
+                {/* Компактная сводка дня: три показателя + прогресс-кольца протоколов */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 200 }}>
+                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Неделя объём</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{(weekVol / 1000).toFixed(1)}т</div>
+                    </div>
+                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Всего сессий</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{historyWorkouts.length}</div>
+                    </div>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Всего сессий</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{historyWorkouts.length}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Последняя</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{last ? last.date.slice(5).replace('-', '.') : '—'}</div>
-                  </div>
+                  {(() => {
+                    // Прогресс-кольца: тренировка (есть план), психо-протокол, рутина мобильности
+                    const today = new Date().toISOString().slice(0, 10);
+                    const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
+                    const mindProto = loadActiveProtocol();
+                    const mobProto = loadActiveMobility();
+                    const mindItems = mindProto ? itemsForDay(mindProto, 'all') : [];
+                    const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
+                    const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
+                    const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
+                    const mindPct = mindItems.length > 0 ? Math.round(mindItems.filter(i => mindDone.includes(i.id)).length / mindItems.length * 100) : null;
+                    const mobPct = mobDaily.length > 0 ? Math.round(mobDaily.filter(i => mobDone.includes(i.id)).length / mobDaily.length * 100) : null;
+                    const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
+                      { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: () => {} },
+                      { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => setMode('mindset') },
+                      { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => setMode('mobility') },
+                    ];
+                    const hasAny = rings.some(r => r.pct !== null);
+                    if (!hasAny) return null;
+                    const Ring = ({ label, pct, color, onClick }: { label: string; pct: number | null; color: string; onClick: () => void }) => {
+                      const r = 13;
+                      const c = 2 * Math.PI * r;
+                      const v = pct === null ? 0 : Math.max(0, Math.min(100, pct));
+                      const d = v / 100 * c;
+                      return (
+                        <button type="button" onClick={onClick} title={`${label}: ${pct === null ? 'нет данных' : v + '%'}`}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          <svg width="34" height="34" viewBox="0 0 34 34">
+                            <circle cx="17" cy="17" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
+                            <circle cx="17" cy="17" r={r} fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round"
+                              strokeDasharray={`${d} ${c - d}`} transform="rotate(-90 17 17)" opacity={pct === null ? 0.25 : 1} />
+                            <text x="17" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill={pct === null ? 'rgba(255,255,255,0.35)' : color}>{pct === null ? '·' : v + '%'}</text>
+                          </svg>
+                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>{label}</span>
+                        </button>
+                      );
+                    };
+                    return (
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                        {rings.map(r => r.pct !== null && <Ring key={r.label} {...r} />)}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {planned && (
                   <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>

@@ -655,6 +655,23 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
   if (days.length === 0) return <div style={SMALL}>Нет дней в плане.</div>;
 
+  // ── Степпер фаз: безопасные переходы между этапами сессии ──
+  const PHASES: { id: typeof phase; icon: string; label: string }[] = [
+    { id: 'ready', icon: '▶️', label: 'Готов' },
+    { id: 'warmup', icon: '🤸', label: 'Разминка' },
+    { id: 'main', icon: '🏋️', label: 'Основная' },
+    { id: 'cooldown', icon: '🧘', label: 'Заминка' },
+    { id: 'done', icon: '✅', label: 'Итог' },
+  ];
+  const goPhase = (p: typeof phase) => {
+    if (p === phase) return;
+    if (p === 'ready') { if (!session) setPhase('ready'); return; }
+    if (p === 'warmup') { if (warmupBlocks.length === 0) begin(); else setPhase('warmup'); return; }
+    if (p === 'main') { if (phase === 'warmup') startMain(); else if (phase === 'main') { /* уже там */ } return; }
+    if (p === 'cooldown') { if (session) finish(); else setPhase('cooldown'); return; }
+    if (p === 'done') { exitSession(); return; }
+  };
+
   return (
     <div>
       <style>{timerAnimationStyle}</style>
@@ -665,6 +682,29 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             style={{ ...(i === dayIdx ? BTN : BTN_GHOST), opacity: phase !== 'ready' && phase !== 'done' && i !== dayIdx ? 0.35 : 1, cursor: phase !== 'ready' && phase !== 'done' && i !== dayIdx ? 'not-allowed' : 'pointer' }}
             onClick={() => setDayIdx(i)}>{d.label}</button>
         ))}
+      </div>
+
+      {/* Степпер фаз сессии */}
+      <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }} role="tablist" aria-label="Фазы сессии">
+        {PHASES.map((p, i) => {
+          const cur = PHASES.findIndex(x => x.id === phase);
+          const active = p.id === phase;
+          const doneStep = i < cur;
+          return (
+            <button key={p.id} type="button" role="tab" aria-selected={active} aria-label={p.label}
+              onClick={() => goPhase(p.id)}
+              style={{
+                flex: 1, minWidth: 56, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                background: active ? 'rgba(0,230,138,0.14)' : doneStep ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)',
+                color: active ? 'var(--accent)' : doneStep ? '#22c55e' : 'rgba(255,255,255,0.45)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              }}>
+              <span style={{ fontSize: 13 }}>{doneStep && !active ? '✓' : p.icon}</span>
+              <span>{p.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {phase === 'ready' && (
@@ -844,19 +884,26 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
              </button>
            </div>
 
-           {/* общий прогресс сессии */}
+           {/* общий прогресс сессии — «цифра дня» */}
            {(() => {
              if (!day || !Array.isArray(day.exercises)) return null;
              const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
              const doneSets = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.filter((_, si) => !!actual[keyFor(ei, si)]).length, 0);
              const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
+             const doneVol = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.reduce((ss, t, si) => ss + (actual[keyFor(ei, si)] ? t.weight * t.reps : 0), 0), 0);
              return (
-               <div style={{ marginBottom: 8 }}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Прогресс сессии</span>
-                   <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>{doneSets}/{totalSets} подходов · {pct}%</span>
+               <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.15)' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                     <span style={{ fontSize: 26, fontWeight: 800, color: pct === 100 ? '#22c55e' : ACCENT, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
+                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{doneSets}/{totalSets} подходов</span>
+                   </div>
+                   <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                     <span>⚡ {doneVol.toLocaleString()} / {planned.volume.toLocaleString()} кг</span>
+                     <span>⏱ <b style={{ color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}</b></span>
+                   </div>
                  </div>
-                 <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                 <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 6 }}>
                    <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: pct === 100 ? '#22c55e' : 'var(--accent)', transition: 'width 0.3s ease' }} />
                  </div>
                </div>

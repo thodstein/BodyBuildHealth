@@ -190,12 +190,12 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   }, [libSearch, libSlot]);
 
   const btn: React.CSSProperties = { padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 11, minHeight: 40 };
-  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
+  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
   const chip = (on: boolean, color = ACCENT): React.CSSProperties => ({
     padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
-    border: on ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.1)',
-    background: on ? `${color}22` : 'rgba(255,255,255,0.02)',
-    color: on ? color : 'rgba(255,255,255,0.55)',
+    border: on ? `1px solid ${color}` : '1px solid var(--border)',
+    background: on ? `${color}22` : 'var(--bg-secondary)',
+    color: on ? color : 'var(--text-dim)',
   });
 
   const downloadCSV = () => {
@@ -258,7 +258,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
           <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa' }}>🧘 Мобильность и гибкость</div>
           <span style={{ fontSize: 9, color: DIM }}>Собери протокол мобильности — рутина появится в сессии и в дни отдыха</span>
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
           Источник — методики Библиотеки (CARs, позвоночник, статика, PNF, нагруженная, FRC) + готовые потоки.
           Разминка/заминка тренировки уже генерируются автоматически — здесь только то, что их дополняет:
           ежедневная рутина, подготовка проблемных зон, растяжка после и сессии в дни отдыха.
@@ -303,7 +303,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
             {SLOT_ORDER.map(s => {
               const n = itemsForSlot(active, s).length;
-              return <span key={s} style={{ fontSize: 9, color: n > 0 ? SLOT_COLOR[s] : 'rgba(255,255,255,0.3)' }}>{SLOT_ICON[s]} {SLOT_LABELS[s]}: {n}</span>;
+              return <span key={s} style={{ fontSize: 9, color: n > 0 ? SLOT_COLOR[s] : 'var(--text-faint)' }}>{SLOT_ICON[s]} {SLOT_LABELS[s]}: {n}</span>;
             })}
           </div>
         )}
@@ -347,7 +347,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
             ) : (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {active.items.map((it, idx) => (
-                  <div key={it.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div key={it.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <select aria-label="Слот блока" value={it.slot} onChange={e => updateItem(idx, { slot: e.target.value as MobilitySlot })}
                         style={{ ...IN, width: 150, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>
@@ -361,7 +361,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
                         <button type="button" style={{ ...ghost, padding: '2px 8px', minHeight: 28, color: 'rgba(248,113,113,0.9)' }} onClick={() => removeItem(idx)} aria-label="Удалить блок">✕</button>
                       </div>
                     </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 4, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>
                       {it.script.length > 180 ? it.script.slice(0, 180) + '…' : it.script}
                     </div>
                     {it.sourceMethod && <div style={{ fontSize: 8, color: 'rgba(96,165,250,0.7)', marginTop: 4 }}>источник: {it.sourceMethod}</div>}
@@ -390,7 +390,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
                     {filteredLibrary.map(b => {
                       const added = active.items.some(it => it.title === b.title && it.script === b.script);
                       return (
-                        <div key={b.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div key={b.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--bg-secondary)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 9, fontWeight: 700, color: SLOT_COLOR[b.slot], minWidth: 70 }}>{SLOT_ICON[b.slot]} {SLOT_LABELS[b.slot]}</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', flex: 1, minWidth: 120 }}>{b.title}</span>
@@ -399,8 +399,8 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
                               {added ? '✓ добавлен' : '＋ добавить'}
                             </button>
                           </div>
-                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 3, lineHeight: 1.45 }}>{b.description}</div>
-                          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3, lineHeight: 1.45 }}>{b.description}</div>
+                          <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 2 }}>
                             {b.durationMin} мин · {b.targetAreas?.join(' · ')}
                           </div>
                         </div>
@@ -455,10 +455,10 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {slotItems.map(it => (
-                  <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
+                  <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>· {it.durationMin} мин</span></div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>{it.script}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45 }}>{it.script}</div>
                       {it.exercises && it.exercises.length > 0 && (
                         <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {it.exercises.slice(0, 6).map((e, i) => (
@@ -498,9 +498,9 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
                     onClick={() => setCheckin(p => ({ ...p, romScore: v }))}
                     style={{
                       flex: 1, minHeight: 36, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                      border: checkin.romScore === v ? '1px solid rgba(96,165,250,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                      background: checkin.romScore === v ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
-                      color: checkin.romScore === v ? '#60a5fa' : 'rgba(255,255,255,0.55)',
+                      border: checkin.romScore === v ? '1px solid rgba(96,165,250,0.5)' : '1px solid var(--border)',
+                      background: checkin.romScore === v ? 'rgba(96,165,250,0.15)' : 'var(--bg-secondary)',
+                      color: checkin.romScore === v ? '#60a5fa' : 'var(--text-dim)',
                     }}>
                     {v}
                   </button>
@@ -530,15 +530,15 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
                   height={70}
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8 }}>
-                  <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                  <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: DIM }}>Чек-инов · 30д</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa' }}>{trends.count}</div>
                   </div>
-                  <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                  <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: DIM }}>Средний ROM</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: '#a78bfa' }}>{trends.avgRom > 0 ? trends.avgRom.toFixed(1) : '—'}</div>
                   </div>
-                  <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', textAlign: 'center' }}>
+                  <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: DIM }}>Приверженность</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: adherence.pct >= 70 ? '#22c55e' : adherence.pct >= 40 ? '#f59e0b' : '#ef4444' }}>
                       {adherence.total > 0 ? `${adherence.pct}%` : '—'}

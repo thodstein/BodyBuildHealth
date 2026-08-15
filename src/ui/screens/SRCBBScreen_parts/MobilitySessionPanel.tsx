@@ -21,7 +21,7 @@ import {
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = 'var(--text-dim)';
 const SLOT_ICON: Record<string, string> = { daily: '🌅', pre: '🏋️', post: '🧘', rest_day: '🛌' };
 
 function todayKey(): string {
@@ -46,7 +46,7 @@ function CheckboxList({ items, progress, onToggle }: {
               <div style={{ fontSize: 10, fontWeight: 600, color: done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
                 {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({it.durationMin} мин)</span>
               </div>
-              {!done && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
+              {!done && <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
             </div>
           </div>
         );
@@ -91,7 +91,7 @@ export const MobilitySessionPanel: React.FC = () => {
       <CheckboxList items={daily} progress={progress} onToggle={toggle} />
       {pre.length > 0 && <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', margin: '6px 0 4px' }}>🏋️ {SLOT_LABELS.pre}</div>}
       <CheckboxList items={pre} progress={progress} onToggle={toggle} />
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+      <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 6 }}>
         Разминка/заминка тренировки генерируются отдельно — здесь только рутина и подготовка проблемных зон.
       </div>
     </div>
@@ -139,15 +139,15 @@ export const MobilityPostPanel: React.FC<{ sessionId?: string }> = ({ sessionId 
       <div style={{ fontSize: 9, color: DIM, margin: '4px 0 8px' }}>Статика/PNF/нагруженная — после сессии, до ухода из зала.</div>
       <CheckboxList items={post} progress={progress} onToggle={toggle} />
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 4 }}>ROM / ощущения в суставах (1-5):</div>
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>ROM / ощущения в суставах (1-5):</div>
         <div style={{ display: 'flex', gap: 4 }} role="radiogroup" aria-label="ROM">
           {[1, 2, 3, 4, 5].map(v => (
             <button key={v} type="button" role="radio" aria-checked={romScore === v} aria-label={`ROM ${v}`} onClick={() => setRomScore(v)}
               style={{
                 flex: 1, minHeight: 32, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                border: romScore === v ? '1px solid rgba(96,165,250,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                background: romScore === v ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
-                color: romScore === v ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+                border: romScore === v ? '1px solid rgba(96,165,250,0.5)' : '1px solid var(--border)',
+                background: romScore === v ? 'rgba(96,165,250,0.15)' : 'var(--bg-secondary)',
+                color: romScore === v ? '#60a5fa' : 'var(--text-dim)',
               }}>
               {v}
             </button>
@@ -189,15 +189,15 @@ export const MobilityCheckinInline: React.FC<{ date: string; sessionId?: string 
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div style={{ flex: 1, minWidth: 120 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>Рутина/сессия</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Рутина/сессия</div>
           <div style={{ display: 'flex', gap: 3 }}>
             {([true, false] as const).map(v => (
               <button key={String(v)} type="button" onClick={() => { setDone(v); setSaved(false); }}
                 style={{
                   flex: 1, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, minHeight: 32,
-                  border: done === v ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
-                  background: done === v ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
-                  color: done === v ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+                  border: done === v ? '1px solid #60a5fa' : '1px solid var(--border)',
+                  background: done === v ? 'rgba(96,165,250,0.15)' : 'var(--bg-secondary)',
+                  color: done === v ? '#60a5fa' : 'var(--text-dim)',
                 }}>
                 {v ? '✓ выполнено' : '✕ нет'}
               </button>
@@ -205,9 +205,9 @@ export const MobilityCheckinInline: React.FC<{ date: string; sessionId?: string 
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 140 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>ROM (1-5)</div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>ROM (1-5)</div>
           <select aria-label="ROM" value={romScore ?? ''} onChange={e => { setRomScore(e.target.value ? +e.target.value : null); setSaved(false); }}
-            style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, minHeight: 32 }}>
+            style={{ width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--input-bg)', border: '1px solid var(--border)', color: '#fff', fontSize: 11, minHeight: 32 }}>
             <option value="">—</option>
             {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
           </select>

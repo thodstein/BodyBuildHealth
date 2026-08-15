@@ -15,7 +15,9 @@ import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog } from '../../../../core/types';
 import { MobilityTab } from '../MobilityTab';
 import { WorkoutWeekCard } from '../diary-cards';
+import { ZONES } from '../nav';
 import { MobilitySessionPanel, MobilityPostPanel, MobilityCheckinInline } from '../../SRCBBScreen_parts/MobilitySessionPanel';
+import { SessionPlayer } from '../../SRCBBScreen_parts/SessionPlayer';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
@@ -612,5 +614,61 @@ describe('Импорт протокола JSON', () => {
     fireEvent.click(screen.getByRole('button', { name: /Импортировать протокол/ }));
     expect(screen.getByText(/Не удалось разобрать JSON/)).toBeTruthy();
     expect(loadProtocols().length).toBe(0);
+  });
+});
+
+describe('Визуальные улучшения (степпер, кольца, спарклайн, категории)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('SessionPlayer рендерит степпер фаз сессии', () => {
+    const html = renderToStaticMarkup(
+      <SessionPlayer days={[{ label: 'День 1', exercises: [{ name: 'Жим', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 5, rir: 2 }] }] }]} weekNumber={1} focus="X" />,
+    );
+    expect(html).toContain('Готов');
+    expect(html).toContain('Разминка');
+    expect(html).toContain('Основная');
+    expect(html).toContain('Заминка');
+    expect(html).toContain('Итог');
+  });
+
+  it('блок «Сегодня» рендерит прогресс-кольца при активных протоколах', () => {
+    const mp = buildPresetProtocol('both');
+    upsertProtocol(mp);
+    setActiveProtocol(mp.id);
+    const mob = buildPresetMobility('both');
+    upsertMobilityProtocol(mob);
+    setActiveMobility(mob.id);
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...{
+      diary: { checkProgressionAlerts: async () => [] } as any, diaryStats: [], diaryProgress: [], historyWorkouts: [],
+      macrocycle: null, selectedWeek: 1, level: 'intermediate', onRefresh: () => {}, trainingOutput: null,
+      goal: 'bulk', daysPerWeek: 4, splitType: 'auto', periodizationType: 'auto', mesoLength: 12,
+      tprofile: { weakPoints: [], bodyWeight: 80, onCourse: false, courseIntensity: 1, goal: 'bulk', level: 'intermediate' },
+      linked: { profile: { settings: { personal: { height: 175 } } } },
+    }} initialMode="record" />);
+    expect(html).toContain('Психо');
+    expect(html).toContain('Рутина');
+    expect(html).toContain('svg');
+  });
+
+  it('WorkoutWeekCard рендерит спарклайн e1RM при переданной серии', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const w = { id: 'w1', date: today, duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'fullbody', exercises: [] } as WorkoutLog;
+    const html = renderToStaticMarkup(<WorkoutWeekCard weekLabel="Неделя 1" workouts={[w]} e1rmSeries={[80, 85, 90, 95]} expanded onToggle={() => {}} />);
+    expect(html).toContain('svg');
+    expect(html).toContain('Тренд лучшего e1RM');
+  });
+
+  it('WorkoutWeekCard без серии не рендерит спарклайн', () => {
+    const html = renderToStaticMarkup(<WorkoutWeekCard weekLabel="Неделя 1" workouts={[]} expanded onToggle={() => {}} />);
+    expect(html).not.toContain('Тренд лучшего e1RM');
+  });
+
+  it('nav: зона diary имеет категории', () => {
+    const cats = ZONES.diary.categories;
+    expect(cats).toBeTruthy();
+    expect(cats!.length).toBe(4);
+    const all = cats!.flatMap(c => c.tabs);
+    expect(all).toContain('mindset');
+    expect(all).toContain('mobility');
   });
 });

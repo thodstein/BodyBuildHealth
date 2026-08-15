@@ -45,6 +45,12 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     // «История тренировок» и «Сводка недели» — ТОЛЬКО подвкладка дневника
     // (не дублируются на экранах ББ-авто/ПЛ-авто).
     tabs: ['diary', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'mindset', 'mobility', 'reports'],
+    categories: [
+      { label: 'Запись и день', icon: '✍️', tabs: ['diary', 'calendar'] },
+      { label: 'Анализ и сила', icon: '📊', tabs: ['analytics', 'progress', 'mmc_tracking'] },
+      { label: 'Психика и восстановление', icon: '🧠', tabs: ['mindset', 'mobility', 'checkin'] },
+      { label: 'Инструменты', icon: '🧰', tabs: ['reports'] },
+    ],
   },
   calculators: {
     title: '⚡ Интеллект тренировки',

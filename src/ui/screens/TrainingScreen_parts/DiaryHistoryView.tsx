@@ -759,6 +759,11 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               weekLabel={week}
               workouts={workouts}
               prevWorkouts={wi < filteredHistory.length - 1 ? filteredHistory[wi + 1][1] : undefined}
+              e1rmSeries={(() => {
+                // Тренд лучшего e1RM по последним 12 сессиям (для спарклайна)
+                const sorted = [...historyWorkouts].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+                return sorted.slice(-12).map(w => Math.max(0, ...(Array.isArray(w.exercises) ? w.exercises : []).map((e: any) => e.estimated1RM || 0)));
+              })()}
               expanded={historyExpanded === '__all__' || historyExpanded === week}
               onToggle={() => setHistoryExpanded((prev: string | null) => prev === week ? null : week)}
               onEdit={handleEditWorkout}

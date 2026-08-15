@@ -22,7 +22,9 @@ export const WorkoutWeekCard: React.FC<{
   confirmDeleteId?: string | null;
   onConfirmDelete?: (id: string) => void;
   onCancelDelete?: () => void;
-}> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle, onEdit, onDelete, confirmDeleteId, onConfirmDelete, onCancelDelete }) => {
+  /** Тренд лучшего e1RM по последним сессиям (для спарклайна в шапке недели). */
+  e1rmSeries?: number[];
+}> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle, onEdit, onDelete, confirmDeleteId, onConfirmDelete, onCancelDelete, e1rmSeries }) => {
   const previousByExercise = new Map<string, number>();
   (prevWorkouts || []).forEach(workout => workout.exercises.forEach(exercise => {
     previousByExercise.set(exercise.exerciseId, Math.max(previousByExercise.get(exercise.exerciseId) || 0, exercise.estimated1RM || 0));
@@ -44,10 +46,15 @@ export const WorkoutWeekCard: React.FC<{
           <strong style={{ color: ACCENT, fontSize: 12 }}>{weekLabel}</strong>
           {isDeload && <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 700 }}>ДЕЛОУД</span>}
         </div>
-        <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff' }}>
+        <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff', alignItems: 'center' }}>
           <span>{workouts.length} трен.</span>
           <span>{totalSets} подходов</span>
           <span>{(totalVol / 1000).toFixed(1)}т кг</span>
+          {e1rmSeries && e1rmSeries.length >= 2 && (
+            <span title="Тренд лучшего e1RM по последним сессиям" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <MiniLineChart data={e1rmSeries} width={72} height={20} showDots={false} color="#f59e0b" />
+            </span>
+          )}
         </div>
       </div>
       {expanded && workouts.map(workout => (

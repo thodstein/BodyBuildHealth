@@ -199,9 +199,9 @@ function gatherAnthropometry(dateFrom: string, dateTo: string): ReportSection {
 
   if (recentComp.length > 0 || prevComp.length > 0) {
     const prevEntry = prevComp[0] || recentComp[0];
-    const curEntry = recentComp[recentComp.length - 1];
-    const lbmPrev = prevEntry.weightKg && prevEntry.bodyFatPercent ? prevEntry.weightKg * (1 - prevEntry.bodyFatPercent / 100) : undefined;
-    const lbmCur = curEntry.weightKg && curEntry.bodyFatPercent ? curEntry.weightKg * (1 - curEntry.bodyFatPercent / 100) : undefined;
+    const curEntry = recentComp.length > 0 ? recentComp[recentComp.length - 1] : undefined;
+    const lbmPrev = prevEntry && prevEntry.weightKg && prevEntry.bodyFatPercent ? prevEntry.weightKg * (1 - prevEntry.bodyFatPercent / 100) : undefined;
+    const lbmCur = curEntry && curEntry.weightKg && curEntry.bodyFatPercent ? curEntry.weightKg * (1 - curEntry.bodyFatPercent / 100) : undefined;
     metrics.push({ label: 'Мышечная масса (LBM)', unit: 'кг', prev: lbmPrev, current: lbmCur });
   }
 
