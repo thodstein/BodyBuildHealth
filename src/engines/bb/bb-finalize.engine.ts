@@ -1366,6 +1366,49 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
   }
 }
 
+/** Лимит упражнений сессии (10/14/18) применяется пост-фактум: слабые
+ *  группы могут привести к перебору в buildSession (спец-слоты), а проходы
+ *  только не дают ДОБАВЛЯТЬ сверх лимита. Удаляем лишние: изоляции-дубли
+ *  сначала, затем accessory, сохраняя минимум 1 упражнение мышцы. */
+function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): void {
+  const iso = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
+  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
+  for (const week of plan.weeks) {
+    for (const session of week.sessions) {
+      const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      if (working().length <= maxEx) continue;
+      // Изоляции по имени (в спец-планах они primary — но дубли паттернов
+      // всё равно лишние), затем accessory-не-изоляции; compound не трогаем.
+      const isoRemovable = (ex: any) => iso(ex.name || '');
+      let candidates = working().filter(isoRemovable).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+      for (const ex of candidates) {
+        if (working().length <= maxEx) break;
+        const count = working().filter((x: any) => x.muscle === ex.muscle).length;
+        if (count <= 1) continue;
+        session.exercises = session.exercises.filter((x: any) => x !== ex);
+      }
+      if (working().length > maxEx) {
+        // Изоляции с дублем мышцы исчерпаны — удаляем любые изоляции,
+        // кроме мелких мышц (calves/abs/forearms/traps — у них нет compound).
+        candidates = working().filter((ex: any) => iso(ex.name || '') && !/calves|abs|forearms|traps/.test(ex.muscle)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        for (const ex of candidates) {
+          if (working().length <= maxEx) break;
+          session.exercises = session.exercises.filter((x: any) => x !== ex);
+        }
+      }
+      if (working().length > maxEx) {
+        candidates = working().filter((e: any) => e.role === 'accessory').sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        for (const ex of candidates) {
+          if (working().length <= maxEx) break;
+          const count = working().filter((x: any) => x.muscle === ex.muscle).length;
+          if (count <= 1) continue;
+          session.exercises = session.exercises.filter((x: any) => x !== ex);
+        }
+      }
+    }
+  }
+}
+
 /** Суперсеты-антагонисты: пары грудь↔спина, бицепс↔трицепс, квадры↔хамсы.
  *  Помечаем supersetWith + comment (лимиты не меняются), максимум 3 пары/сессию. */
 const ANTAGONIST_PAIRS: Array<[string, string]> = [
@@ -2320,11 +2363,39 @@ for (const week of next.weeks) {
             if (need <= 0) break;
           }
         }
+        // Экстремальные капы (лаб-коррекция/дефицит/плохое восстановление):
+        // indirect от compound физически не влезает — итеративно режем
+        // compound-сеты (жимы/тяги, дающие indirect на эту мышцу) до 1,
+        // пересчитывая effective после каждого прохода.
+        for (let iter = 0; iter < 20; iter++) {
+          let indirect2 = 0;
+          let direct2 = 0;
+          for (const s of week.sessions) for (const e of s.exercises) {
+            if ((e as any).warmupActivator) continue;
+            if (e.muscle === muscle) direct2 += e.sets || 0;
+            for (const c of indirectMuscleContributions(e)) if (c.muscle === muscle) indirect2 += (e.sets || 0) * c.coefficient;
+          }
+          const eff2 = direct2 + indirect2;
+          if (eff2 <= cap * 1.15) break;
+          const target2 = Math.max(0, Math.floor(cap - indirect2));
+          const need2 = Math.max(0, direct2 - target2);
+          if (need2 <= 0) break;
+          const comps = week.sessions.flatMap(s => s.exercises).filter((e: any) => !(e as any).warmupActivator && (e.sets || 0) > 1 && !isIsolationName(e.name || '') && indirectMuscleContributions(e).some((c: any) => c.muscle === muscle));
+          if (!comps.length) break;
+          const e2 = comps[0];
+          e2.sets -= 1;
+          if (Array.isArray(e2.workSets) && e2.workSets.length > e2.sets) e2.workSets = e2.workSets.slice(0, e2.sets);
+        }
       }
     }
 
 
   }
+  // Лимит упражнений сессии пост-фактум (слабые группы могут дать перебор в buildSession).
+  if (!options.preserveSource && (next as any).pattern?.id) {
+    enforceSessionExerciseLimit(next, options);
+  }
+
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет
   // фактический объём, а не пустой/устаревший объект.
   next.weeklyVolume = Object.fromEntries(next.weeks.map(week => [
