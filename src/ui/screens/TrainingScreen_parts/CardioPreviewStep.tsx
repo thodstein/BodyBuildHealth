@@ -8,6 +8,7 @@ import {
   type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
+import { CardioProgressCard } from './CardioProgressCard';
 
 const CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
@@ -105,6 +106,7 @@ export const CardioPreviewStep: React.FC<{
         </div>
       )}
 
+      <CardioProgressCard cycle={cycle} />
       <CardioVolumeChart cycle={cycle} />
 
       <div style={CARD}>

@@ -9,8 +9,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioAutoTunePanel, CARDIO_AUTO_TUNE_KEY } from '../CardioAutoTunePanel';
 import { CardioWeekEditor } from '../CardioWeekEditor';
 import { CardioVolumeChart } from '../CardioVolumeChart';
+import { CardioSessionTimer } from '../CardioSessionTimer';
+import { CardioProgressCard } from '../CardioProgressCard';
 import { buildCardioCycle, loadCardioCycles } from '../../../../engines/lms/cardio.engine';
-import { saveCardioLogEntry } from '../../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, loadCardioLog } from '../../../../engines/lms/cardio-diary.engine';
 
 const CYCLES_KEY = 'he_cardio_cycles';
 const LOG_KEY = 'he_cardio_sessions';
@@ -132,5 +134,39 @@ describe('CardioVolumeChart', () => {
     render(<CardioVolumeChart cycle={c} />);
     fireEvent.click(screen.getByRole('button', { name: /Показать/ }));
     expect(screen.getByText(/Пик:/)).toBeTruthy();
+  });
+});
+
+describe('CardioSessionTimer', () => {
+  it('SSR: показывает быстрый старт', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-1' });
+    const html = renderToStaticMarkup(<CardioSessionTimer cycle={c} />);
+    expect(html).toContain('Быстрый старт сессии');
+  });
+
+  it('CSR: старт → завершить → сохранить записывает сессию в дневник', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-2' });
+    const { unmount } = render(<CardioSessionTimer cycle={c} />);
+    const startBtn = screen.getAllByRole('button', { name: /Старт/ })[0];
+    fireEvent.click(startBtn);
+    expect(screen.getByRole('button', { name: /Пауза/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Завершить/ }));
+    const rpe = screen.getByRole('textbox', { name: /RPE/ });
+    fireEvent.change(rpe, { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить в дневник/ }));
+    expect(screen.getByText(/Сессия записана/)).toBeTruthy();
+    const log = loadCardioLog();
+    expect(log.length).toBe(1);
+    expect(log[0].rpe).toBe(6);
+    unmount();
+  });
+});
+
+describe('CardioProgressCard', () => {
+  it('SSR: показывает позицию в цикле', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 12, id: 'p-1' });
+    const html = renderToStaticMarkup(<CardioProgressCard cycle={c} />);
+    expect(html).toContain('Прогресс цикла');
+    expect(html).toContain('из 12');
   });
 });

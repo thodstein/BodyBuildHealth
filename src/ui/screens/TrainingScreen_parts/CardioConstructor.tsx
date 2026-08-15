@@ -23,6 +23,7 @@ import {
   deserializeMacro, serializeMacro, deserializeBbMacro, serializeBbMacro,
   attachCardioToMacro, detachCardioFromMacro,
 } from '../../../engines/lms/macrocycle.engine';
+import { getProfile } from '../../../core/profile-manager';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { CardioParamsStep, type PhaseSplitState } from './CardioParamsStep';
@@ -74,6 +75,15 @@ function loadWizard(): Partial<WizardState> {
   } catch { return {}; }
 }
 
+/** Вес из профиля (personal.weight), если wizard-сохранение отсутствует. */
+function profileWeight(): number | undefined {
+  try {
+    const p = getProfile();
+    const w = p?.settings?.personal?.weight;
+    return typeof w === 'number' && w > 0 ? w : undefined;
+  } catch { return undefined; }
+}
+
 function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -109,7 +119,7 @@ export const CardioConstructor: React.FC = () => {
   const [totalWeeks, setTotalWeeks] = useState(wizard.totalWeeks ?? 12);
   const [daysAvailable, setDaysAvailable] = useState(wizard.daysAvailable ?? 5);
   const [recoveryLow, setRecoveryLow] = useState(wizard.recoveryLow ?? false);
-  const [bodyWeight, setBodyWeight] = useState(wizard.bodyWeight ?? 80);
+  const [bodyWeight, setBodyWeight] = useState(wizard.bodyWeight ?? profileWeight() ?? 80);
   const [phaseSplit, setPhaseSplit] = useState<PhaseSplitState>({
     auto: wizard.phaseAuto ?? true,
     base: wizard.phaseBase ?? 0,
