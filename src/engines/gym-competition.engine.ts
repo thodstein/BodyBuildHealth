@@ -189,27 +189,27 @@ export function calculatePlates(
   };
 }
 
-export function getPlateLoadingOrder(targetWeight: number, barWeight: number = 20): string[] {
-  const result = calculatePlates(targetWeight, barWeight);
+export function getPlateLoadingOrder(targetWeight: number, barWeight: number = 20, unit: WeightUnit = 'kg'): string[] {
+  const result = calculatePlates(targetWeight, barWeight, unit);
+  const unitLabel = unit === 'kg' ? 'кг' : 'lb';
   const steps: string[] = [];
 
-  steps.push(`Пустой гриф: ${barWeight} кг`);
+  steps.push(`Пустой гриф: ${barWeight} ${unitLabel}`);
 
   let current = barWeight;
   for (const pp of result.platesPerSide) {
     for (let i = 0; i < pp.count; i++) {
       current += pp.plate * 2;
-      steps.push(`+ ${pp.plate}кг ×2 = ${current} кг`);
+      steps.push(`+ ${pp.plate}${unitLabel} ×2 = ${current} ${unitLabel}`);
     }
   }
 
-  steps.push(`Итого: ${result.actualWeight} кг (цель: ${targetWeight} кг)`);
+  steps.push(`Итого: ${result.actualWeight} ${unitLabel} (цель: ${targetWeight} ${unitLabel})`);
   return steps;
 }
 
 /** Common warmup plate loading for powerlifting */
-export function warmupPlateSequence(workingWeight: number): { set: number; weight: number; plates: string; reps: number; restMin: number }[] {
-  const bar = 20;
+export function warmupPlateSequence(workingWeight: number, barWeight: number = 20, unit: WeightUnit = 'kg', availablePlates?: number[]): { set: number; weight: number; plates: string; reps: number; restMin: number }[] {
   const steps = [0.2, 0.4, 0.6, 0.75, 0.85].map((pct, i) => ({
     set: i + 1,
     weight: Math.round(workingWeight * pct * 0.5) * 2,
@@ -219,7 +219,7 @@ export function warmupPlateSequence(workingWeight: number): { set: number; weigh
   }));
 
   for (const step of steps) {
-    const result = calculatePlates(Math.max(bar, step.weight));
+    const result = calculatePlates(Math.max(barWeight, step.weight), barWeight, unit, availablePlates);
     step.plates = result.platesPerSide.map(p => `${p.plate}×${p.count}`).join(' + ') || 'пустой';
   }
 

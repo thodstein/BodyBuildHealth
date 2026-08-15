@@ -24,6 +24,7 @@ import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-ca
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from './MindsetSessionPanels';
 import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel';
+import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
 
   const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
@@ -122,6 +123,8 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
    const [supersetMode, setSupersetMode] = useState<boolean>(false);
    const [circuitMode, setCircuitMode] = useState<boolean>(false);
     const [supersetExercises, setSupersetExercises] = useState<number[]>([]);
+    // Подкладка «Калькулятор блинов»: доступный вес применяется к упражнению текущей сессии
+    const [plateOpen, setPlateOpen] = useState<boolean>(false);
     const [autoStartRest, setAutoStartRest] = useState<boolean>(true);
     const [exerciseProgress, setExerciseProgress] = useState<Record<string, { completed: number; total: number }>>({});
     const [restHistory, setRestHistory] = useState<{ exercise: string; duration: number; timestamp: string }[]>([]);
@@ -575,6 +578,25 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   const repsFor = (ex: any) => ex?.targetSets?.[0]?.reps ?? ex?.reps ?? 10;
   const rirFor = (ex: any) => ex?.targetSets?.[0]?.rir ?? ex?.rir ?? 2;
 
+  // «Калькулятор блинов» → применить доступный вес к выбранному упражнению
+  // (вес подставляется только в НЕзалогированные сеты; выполненные не трогаются)
+  const applyPlateWeight = useCallback((w: number, exId?: string) => {
+    if (!day || !Array.isArray(day.exercises)) return;
+    const ei = exId != null && exId !== '' ? Number(exId) : NaN;
+    if (!Number.isFinite(ei) || !day.exercises[ei]) return;
+    const ex = day.exercises[ei];
+    setActual(prev => {
+      const next = { ...prev };
+      (Array.isArray(ex.targetSets) ? ex.targetSets : []).forEach((t, si) => {
+        const k = keyFor(ei, si);
+        const existing = next[k];
+        if (existing && existing.rpe > 0) return; // сет уже залогирован
+        next[k] = { weight: w, reps: existing?.reps ?? t.reps, rpe: 0 };
+      });
+      return next;
+    });
+  }, [day]);
+
   // Плановые метрики дня
   const planned = useMemo(() => {
     if (!day) return { sets: 0, volume: 0 };
@@ -919,6 +941,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
              <button onClick={toggleCircuitMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: circuitMode?'1px solid #8b5cf6':'1px solid var(--border)', background: circuitMode?'rgba(139,92,246,0.12)':'var(--bg-secondary)', color: circuitMode?'#8b5cf6':'var(--text-dim)' }}>
                ⭕ Круг
              </button>
+             <button onClick={() => setPlateOpen(v => !v)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: plateOpen?'1px solid #00e68a':'1px solid var(--border)', background: plateOpen?'rgba(0,230,138,0.12)':'var(--bg-secondary)', color: plateOpen?'#00e68a':'var(--text-dim)' }}>
+               🧮 Блины
+             </button>
              {(supersetMode || circuitMode) && (
                <span style={{ fontSize: 9, color: 'var(--text-dim)', alignSelf: 'center' }}>
                  {supersetMode ? 'Выберите 2+ упражнения' : 'Минимальный отдых между упражнениями'}
@@ -946,6 +971,20 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>· длительность, мин:</span>
             <input style={{ ...IN, width: 64 }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
           </div>
+          {/* 🧮 Калькулятор блинов: подкладка с выбором упражнения текущей сессии */}
+          {plateOpen && (
+            <div style={{ ...CARD, marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>🧮 Калькулятор блинов</div>
+                <button onClick={() => setPlateOpen(false)} style={{ padding: '2px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11, minHeight: 28 }} aria-label="Закрыть калькулятор блинов">✕</button>
+              </div>
+              <PlateCalcTab
+                exerciseOptions={day.exercises.map((ex, ei) => ({ id: String(ei), label: ex.name, weight: ex.targetSets[0]?.weight || 0 }))}
+                onApply={applyPlateWeight}
+                applyLabel="✅ Применить к упражнению"
+              />
+            </div>
+          )}
           {day.exercises.map((ex, ei) => (
                <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid var(--bg-secondary)', 
                  background: supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.05)' : 'rgba(139,92,246,0.05)') : 'transparent',

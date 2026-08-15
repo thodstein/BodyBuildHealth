@@ -66,12 +66,14 @@ export interface PlateCalcTabProps {
   /** Начальный вес из плана (синхронизируется при изменении) */
   initialWeight?: number;
   /** Колбэк: применить фактический доступный вес к плану */
-  onApply?: (actualWeight: number) => void;
+  onApply?: (actualWeight: number, exerciseId?: string) => void;
   /** Метка для кнопки Apply (зависит от контекста) */
   applyLabel?: string;
+  /** Упражнения текущей сессии (проведение тренировки): id, название, рабочий вес */
+  exerciseOptions?: { id: string; label: string; weight?: number }[];
 }
 
-export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApply, applyLabel }) => {
+export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApply, applyLabel, exerciseOptions }) => {
   const [unit, setUnit] = useState<Unit>('metric');
   const [barId, setBarId] = useState('men_olympic');
   const [barWeight, setBarWeight] = useState(20);
@@ -79,11 +81,23 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   const [customPlates, setCustomPlates] = useState<string>('');
   const [oneRM, setOneRM] = useState<number>(0);
   const [applied, setApplied] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<string>('');
   const [savedPresets, setSavedPresets] = useState<Array<{ id: number; name: string; unit: string; barWeight: number; targetWeight: number; plates?: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_plate_presets') || '[]'); } catch { return []; } });
 
   useEffect(() => {
     if (initialWeight && initialWeight > 0) setTargetWeight(initialWeight);
   }, [initialWeight]);
+
+  // Синхронизация селектора упражнений (проведение тренировки)
+  useEffect(() => {
+    if (!exerciseOptions || exerciseOptions.length === 0) return;
+    setSelectedExercise(prev => (exerciseOptions.some(o => o.id === prev) ? prev : exerciseOptions[0].id));
+  }, [exerciseOptions]);
+
+  const selectedOpt = exerciseOptions?.find(o => o.id === selectedExercise);
+  useEffect(() => {
+    if (selectedOpt && selectedOpt.weight && selectedOpt.weight > 0) setTargetWeight(selectedOpt.weight);
+  }, [selectedOpt]);
 
   const availablePlates = useMemo(
     () => customPlates.trim() ? customPlates.split(/[\s,]+/).map(Number).filter(n => n > 0) : (unit === 'metric' ? METRIC_PLATES : IMPERIAL_PLATES),
@@ -106,8 +120,8 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
 
   const wUnit: WeightUnit = unit === 'metric' ? 'kg' : 'lbs';
   const plates = useMemo(() => calculatePlates(targetWeight, barWeight, wUnit, availablePlates), [targetWeight, barWeight, wUnit, availablePlates]);
-  const order = useMemo(() => getPlateLoadingOrder(targetWeight, barWeight), [targetWeight, barWeight]);
-  const warmup = useMemo(() => warmupPlateSequence(targetWeight), [targetWeight]);
+  const order = useMemo(() => getPlateLoadingOrder(targetWeight, barWeight, wUnit), [targetWeight, barWeight, wUnit]);
+  const warmup = useMemo(() => warmupPlateSequence(targetWeight, barWeight, wUnit, availablePlates), [targetWeight, barWeight, wUnit, availablePlates]);
   const displayAlt = unit === 'metric' ? `${kgToLb(targetWeight)} lb` : `${lbToKg(targetWeight)} кг`;
   const deviation = Math.abs(plates.deviation);
   const devColor = deviation < 0.5 ? ACCENT : deviation > 2 ? '#ef4444' : '#f59e0b';
@@ -118,9 +132,9 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   const handleApply = useCallback(() => {
     if (!onApply) return;
     setApplied(true);
-    onApply(plates.actualWeight);
+    onApply(plates.actualWeight, exerciseOptions ? selectedExercise : undefined);
     setTimeout(() => setApplied(false), 1800);
-  }, [onApply, plates.actualWeight]);
+  }, [onApply, plates.actualWeight, exerciseOptions, selectedExercise]);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
@@ -138,11 +152,22 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         Расчёт набора блинов на гриф под рабочий вес. Все системы единиц, 8 типов грифов,
         1ПМ-пресеты, SVG-визуализация, разминка, порядок навешивания, экспорт.
         {initialWeight && <span style={{ color: ACCENT }}> · Вес из плана: {initialWeight} {unitLabel}</span>}
+        {selectedOpt && <span style={{ color: ACCENT }}> · Упражнение: {selectedOpt.label}</span>}
       </div>
 
       {/* ⚙️ Параметры */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>⚙️ Параметры</div>
+        {exerciseOptions && exerciseOptions.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <PopupSelect
+              label="Упражнение текущей сессии"
+              value={selectedExercise}
+              options={exerciseOptions.map(o => ({ id: o.id, label: o.label, desc: o.weight && o.weight > 0 ? `рабочий вес ${o.weight} ${unitLabel}` : 'вес тела/без веса' }))}
+              onChange={v => setSelectedExercise(v as string)}
+            />
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupSelect label="Система единиц" value={unit} options={unitOpts} onChange={v => { setUnit(v as Unit); setTargetWeight(100); }} />
           <PopupSelect label="Тип грифа" value={barId} options={barOptions} onChange={v => applyBar(v as string)} />
@@ -265,7 +290,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
                   if (p.plate >= 5) els.push(<text key={`txr-${idx}-${j}`} x={xR - w / 2} y={cy + 2} textAnchor="middle" fill="#fff" fontSize={5} fontWeight={700}>{p.plate}</text>);
                 }
               });
-              els.push(<text x={cx} y={58} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize={8}>Гриф {barWeight} {unitLabel} · {plates.totalPlates} × 2 = {plates.totalPlates * 2} блинов</text>);
+              els.push(<text key="bar-label" x={cx} y={58} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize={8}>Гриф {barWeight} {unitLabel} · {plates.totalPlates} × 2 = {plates.totalPlates * 2} блинов</text>);
               return els;
             })()}
           </svg>
