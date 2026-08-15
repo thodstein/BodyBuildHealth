@@ -19,7 +19,8 @@ import { getProfile } from '../../../core/profile-manager';
 import {
   deserializeBBPrepConfig, legacyConfigFromProfile,
   buildBBContestPrep, CONTEST_CATEGORY_LABELS, PEAK_PHASE_COLORS, isoDiffDays, isoToday,
-  type BBContestPrepConfig,
+  planFromStored, configFromPlan, prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,
+  type BBContestPrepConfig, type BBContestPrepPlan,
 } from '../../../engines/bb/bb-contest-prep.engine';
 
 const defaultOpenConfig = () => {
@@ -38,7 +39,15 @@ export const BBContestPrepCard: React.FC<{
   compact?: boolean;
   onOpenConfig?: () => void;
 }> = ({ competition, compact, onOpenConfig }) => {
+  const plan: BBContestPrepPlan | null = useMemo(() => {
+    try {
+      const s = getProfile().settings as any;
+      return planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
+    } catch { return null; }
+  }, []);
+
   const cfg: BBContestPrepConfig | null = useMemo(() => {
+    if (plan) return configFromPlan(plan);
     try {
       const s = getProfile().settings as any;
       const raw = s?.goals?.bbPeakConfig;
@@ -48,12 +57,17 @@ export const BBContestPrepCard: React.FC<{
       }
       return legacyConfigFromProfile(s?.goals, s?.personal);
     } catch { return null; }
-  }, []);
+  }, [plan]);
 
   const summary = useMemo(() => {
     if (!cfg) return null;
     try { return buildBBContestPrep(cfg); } catch { return null; }
   }, [cfg]);
+
+  const phaseNow = useMemo(() => {
+    if (!plan) return null;
+    try { return prepPhaseForDate(plan, isoToday()); } catch { return null; }
+  }, [plan]);
 
   const statusColor = cfg ? '#22c55e' : 'rgba(255,255,255,0.55)';
 
@@ -95,10 +109,42 @@ export const BBContestPrepCard: React.FC<{
           <div>
             Шоу <b style={{ color: '#fff' }}>{cfg.showDate}</b> · {CONTEST_CATEGORY_LABELS[cfg.category] ?? cfg.category} · {cfg.weightKg} кг
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.55)' }}>
-            Тапер {cfg.weeksOut} нед ({cfg.trainingProtocol}) · карбс {cfg.carbLoadStrategy} · вода {cfg.waterStrategy} · Na {cfg.sodiumStrategy}
-          </div>
-          {summary && !compact && (
+          {plan && (
+            <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+              {plan.preparation.weeks} нед подготовки · taper {plan.taper.weeks} нед · пик-неделя 7 дн
+              {phaseNow && (
+                <span style={{ fontWeight: 700, color: PREP_PHASE_COLORS[phaseNow.key], marginLeft: 6 }}>
+                  📍 {PREP_PHASE_LABELS[phaseNow.key]}{phaseNow.key !== 'show_day' ? ` (нед ${phaseNow.weekStart} из ${plan.phases.reduce((m, p) => Math.max(m, p.weekEnd), 0)})` : ''}
+                </span>
+              )}
+            </div>
+          )}
+          {!plan && (
+            <div style={{ color: 'rgba(255,255,255,0.55)' }}>
+              Тапер {cfg.weeksOut} нед ({cfg.trainingProtocol}) · карбс {cfg.carbLoadStrategy} · вода {cfg.waterStrategy} · Na {cfg.sodiumStrategy}
+            </div>
+          )}
+          {plan && !compact && (
+            <div style={{ display: 'flex', gap: 1, alignItems: 'center', marginTop: 5 }} title="Фазы цикла по неделям">
+              {(() => {
+                const maxWeek = plan.phases.reduce((m, p) => Math.max(m, p.weekEnd), 0);
+                const cells = [] as { color: string; label: string; week: number }[];
+                for (let wk = 1; wk <= maxWeek; wk++) {
+                  const p = plan.phases.find(q => q.key !== 'show_day' && wk >= q.weekStart && wk <= q.weekEnd);
+                  cells.push({ color: p?.color ?? 'rgba(255,255,255,0.06)', label: p ? `${PREP_PHASE_LABELS[p.key]} ${wk}` : `Нед ${wk}`, week: wk });
+                }
+                return cells.map((c, i) => (
+                  <span key={i} title={c.label} style={{
+                    width: 5, height: 12, borderRadius: 1, flexShrink: 0,
+                    background: c.color,
+                    boxShadow: phaseNow && phaseNow.weekStart === c.week ? '0 0 5px #fff' : 'none',
+                    opacity: 0.9,
+                  }} />
+                ));
+              })()}
+            </div>
+          )}
+          {summary && compact && (
             <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
               Пик-неделя: {summary.peakWeek[0]?.phaseLabel} → {summary.peakWeek[6]?.phaseLabel} ({summary.peakWeek[6]?.kcal} ккал в день шоу)
             </div>
