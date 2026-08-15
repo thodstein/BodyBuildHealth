@@ -288,9 +288,11 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         <CalcSection icon="🏆" title="Шоу-пик (ББ) — единая система тапера" accent="#ec4899" desc={`${bbCountdownText} · Тренировочный тапер (Библиотека методик) + пик-неделя 7 дней: карбс, вода, натрий, позы`}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>📅 Дата шоу</div>
-              <input type="date" value={bbCfg.showDate} onChange={e => bbPatch({ showDate: e.target.value })}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, minHeight: 40, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }} />
+              <div style={{ width: '100%', minHeight: 40, boxSizing: 'border-box', borderRadius: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+                <span style={{ fontSize: 8.5, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.4 }}>📅 Дата шоу</span>
+                <input type="date" value={bbCfg.showDate} onChange={e => bbPatch({ showDate: e.target.value })}
+                  style={{ width: '100%', border: 'none', background: 'transparent', color: '#ec4899', fontSize: 12, fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: 0 }} />
+              </div>
             </div>
             <PopupSelect label="Категория" value={bbCfg.category} options={bbCats.map(c => ({ id: c, label: CONTEST_CATEGORY_LABELS[c] }))} onChange={v => bbPatch({ category: v as BBContestCategory })} />
             <PopupNumber label="Вес тела" value={bbCfg.weightKg} min={40} max={200} suffix="кг" onChange={v => bbPatch({ weightKg: v })} />
