@@ -87,7 +87,7 @@ export const UserLifestyleSection: React.FC = React.memo(function UserLifestyleS
         <PopupValueEditor
           label="Базовый HRV (коэф.)"
           value={lifestyle.baselineHrvRatio}
-          unit="коэф. 0.5-1.5"
+          unit="коэф."
           type="number"
           min={0.5} max={1.5} step={0.05}
           onChange={v => updateLifestyle({ baselineHrvRatio: v ?? 1 })}

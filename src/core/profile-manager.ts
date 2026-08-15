@@ -318,6 +318,7 @@ export function pushSnapshot(): void {
     existing.push(snap);
     if (existing.length > SNAPSHOTS_MAX) existing.shift();
     localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(existing));
+    invalidateSnapshotsCountCache();
   } catch {}
 }
 
@@ -327,6 +328,21 @@ export function getSnapshots(): ProfileSnapshot[] {
   } catch { return []; }
 }
 
+/* Кэш количества снапшотов: чтение без JSON.parse на каждый notify (вызовы из UI-подписок). */
+let snapshotsCountDirty = true;
+let snapshotsCountCache = 0;
+function invalidateSnapshotsCountCache(): void { snapshotsCountDirty = true; }
+
+/** Количество сохранённых снапшотов (с кэшем — без парсинга на каждый вызов). */
+export function getSnapshotsCount(): number {
+  if (snapshotsCountDirty) {
+    snapshotsCountDirty = false;
+    try {
+      snapshotsCountCache = JSON.parse(localStorage.getItem(SNAPSHOTS_KEY) || '[]').length;
+    } catch { snapshotsCountCache = 0; }
+  }
+  return snapshotsCountCache;
+}
 export function undoLastSnapshot(): boolean {
   const snaps = getSnapshots();
   if (snaps.length === 0) return false;
@@ -349,12 +365,24 @@ export function undoLastSnapshot(): boolean {
       }
     }
     notifyAll();
+    invalidateSnapshotsCountCache();
     return true;
   } catch { return false; }
 }
 
 export function clearSnapshots(): void {
   try { localStorage.removeItem(SNAPSHOTS_KEY); } catch {}
+  invalidateSnapshotsCountCache();
+}
+
+/** Только для тестов: сброс модульного состояния (версии секций, кэши снапшотов). */
+export function _resetProfileModuleStateForTests(): void {
+  profileVersion = 0;
+  for (const sec of Object.keys(sectionVersions)) sectionVersions[sec] = 0;
+  for (const k of Object.keys(sectionSnapshots)) delete sectionSnapshots[k];
+  parsedProfile = null;
+  parsedProfileVersion = -1;
+  snapshotsCountDirty = true;
 }
 
 export function setRole(role: UserRole): void {

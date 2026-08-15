@@ -3,7 +3,7 @@
  * Hero-картинка (full-width) + сводка + pill-вкладки (как в NutritionScreen).
  */
 import React, { useEffect, useState } from 'react';
-import { useProfileRefresh, getSnapshots, undoLastSnapshot } from '../../../core/profile-manager';
+import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
@@ -58,7 +58,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   }, [settings]);
 
   useEffect(() => {
-    const refresh = () => setUndoAvailable(getSnapshots().length > 0);
+    const refresh = () => setUndoAvailable(getSnapshotsCount() > 0);
     refresh();
     const unsub = onAnyProfileChange(refresh);
     return unsub;
@@ -134,7 +134,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
           </div>
           {undoAvailable && (
             <button
-              onClick={() => { undoLastSnapshot(); setUndoAvailable(getSnapshots().length > 0); }}
+              onClick={() => { undoLastSnapshot(); setUndoAvailable(getSnapshotsCount() > 0); }}
               title="Отменить последнее изменение"
               aria-label="Отменить последнее изменение"
               style={{

@@ -148,7 +148,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           />
           <PopupValueEditor
             label="Monte Carlo прогонов"
-            value={String(system.mcRuns || 1000)}
+            value={system.mcRuns ? String(system.mcRuns) : undefined}
             type="select"
             options={MC_RUNS}
             onChange={v => update({ mcRuns: Number(v) })}

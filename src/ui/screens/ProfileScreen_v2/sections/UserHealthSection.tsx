@@ -147,7 +147,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
           />
           <PopupValueEditor
             label="HDL"
-            value={health.hdlLow ? 'low' : 'normal'}
+            value={health.hdlLow === undefined ? undefined : health.hdlLow ? 'low' : 'normal'}
             type="select"
             options={HDL_OPTIONS}
             onChange={v => updateHealth({ hdlLow: v === 'low' })}

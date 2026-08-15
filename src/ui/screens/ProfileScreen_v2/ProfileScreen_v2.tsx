@@ -9,7 +9,7 @@ import { ProfileUserTab } from './ProfileUserTab';
 import { ProfileDiariesTab } from './ProfileDiariesTab';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
 import { ReportsScreen } from '../ReportsScreen';
-import { useProfileRefresh, getSnapshots, undoLastSnapshot } from '../../../core/profile-manager';
+import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
 
@@ -74,9 +74,9 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 
   // Подписка на event-bus вместо polling
   useEffect(() => {
-    setUndoAvailable(getSnapshots().length > 0);
+    setUndoAvailable(getSnapshotsCount() > 0);
     const unsub = onAnyProfileChange(() => {
-      setUndoAvailable(getSnapshots().length > 0);
+      setUndoAvailable(getSnapshotsCount() > 0);
     });
     return unsub;
   }, []);

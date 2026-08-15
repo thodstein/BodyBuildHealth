@@ -1,7 +1,8 @@
 /**
  * ProfileScreen_v2/ui.ts — общие утилиты UI для нового Профиля.
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 
 export const colors = {
   bg: 'rgba(28,28,32,0.65)',
@@ -324,6 +325,8 @@ export const AccordionSection: React.FC<{
       id={id}
       style={{
         ...glassCard,
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         padding: 0,
         overflow: 'hidden',
         scrollMarginTop: 70, // для smooth scroll с учётом sticky quick-jump
@@ -444,16 +447,31 @@ export const PopupValueEditor: React.FC<{
 
   const hasValue = value !== undefined && value !== null && value !== '' && value !== 0;
 
+  const option = type === 'select' && options
+    ? options.find(o => o.id === String(value))
+    : undefined;
+
   const displayValue = () => {
     if (!hasValue) return placeholder || '—';
+    if (option) return option.label;
     if (unit) return `${value} ${unit}`;
     return String(value);
   };
 
-  const openPopup = () => {
+  const openPopup = useCallback(() => {
     setLocal(value !== undefined && value !== null && value !== 0 ? String(value) : '');
     setOpen(true);
-  };
+  }, [value]);
+
+  // Escape закрывает попап; обработчик живёт на window, пока попап открыт.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open]);
 
   const commit = () => {
     if (type === 'number') {
@@ -482,11 +500,12 @@ export const PopupValueEditor: React.FC<{
         onClick={openPopup}
         aria-label={`${label}: ${displayValue()}`}
         style={{
-          ...glassCard,
-          background: 'rgba(255,255,255,0.04)',
+          background: 'rgba(255,255,255,0.05)',
+          borderRadius: 12,
+          border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
+          boxShadow: hasValue ? `0 2px 14px ${c}14` : 'none',
           padding: '10px 12px',
           cursor: 'pointer',
-          border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-start',
@@ -497,7 +516,6 @@ export const PopupValueEditor: React.FC<{
           color: colors.text,
           minHeight: 58,
           transition: 'all 0.15s',
-          boxShadow: hasValue ? `0 2px 14px ${c}14` : undefined,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.borderColor = `${c}66`;
@@ -522,12 +540,16 @@ export const PopupValueEditor: React.FC<{
         </span>
       </button>
 
-      {open && (
+      {open && ReactDOM.createPortal(
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={label}
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
           }}
           onClick={() => setOpen(false)}
         >
@@ -625,7 +647,7 @@ export const PopupValueEditor: React.FC<{
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };

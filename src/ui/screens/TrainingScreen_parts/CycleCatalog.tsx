@@ -151,6 +151,16 @@ export const CycleCatalog: React.FC<Props> = (p) => {
   const [freq, setFreq] = React.useState('all');
   const [author, setAuthor] = React.useState('all');
   const [showRec, setShowRec] = React.useState(false);
+  // ⭐ Избранные циклы (he_cycle_fav)
+  const [favs, setFavs] = React.useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('he_cycle_fav') || '[]'); } catch { return []; }
+  });
+  const [favOnly, setFavOnly] = React.useState(false);
+  React.useEffect(() => {
+    try { localStorage.setItem('he_cycle_fav', JSON.stringify(favs)); } catch { /* ignore */ }
+  }, [favs]);
+  const toggleFav = (id: string) => setFavs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const favCycles = React.useMemo(() => LMS_CYCLES.filter(c => favs.includes(c.meta.id)), [favs]);
 
   const base = React.useMemo(() => {
     if (cat === 'all') return LMS_CYCLES;
@@ -165,6 +175,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     const q = search.trim().toLowerCase();
     return base.filter(c => {
       const m = c.meta;
+      if (favOnly && !favs.includes(m.id)) return false;
       if (focus !== 'all' && focusKeyOf(c, cat) !== focus) return false;
       if (levelF !== 'all' && m.level !== levelF) return false;
       if (period !== 'all' && m.period !== period) return false;
@@ -174,7 +185,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
       if (q && !(`${m.title} ${m.description} ${m.howItWorks}`.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [base, focus, levelF, period, weeks, freq, author, search]);
+  }, [base, focus, levelF, period, weeks, freq, author, search, favOnly, favs]);
 
   const grouped = React.useMemo(() => {
     const map = new Map<string, SRCycleTemplate[]>();
@@ -304,10 +315,34 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Найдено: <b style={{ color: 'var(--accent)' }}>{filtered.length}</b> циклов</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Найдено: <b style={{ color: 'var(--accent)' }}>{filtered.length}</b> циклов</div>
+            <Chip label={`⭐ Избранное (${favs.length})`} active={favOnly} onClick={() => setFavOnly(v => !v)} />
+          </div>
           <button onClick={resetFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)', cursor: 'pointer' }}>↺ Сбросить</button>
         </div>
       </div>
+
+      {/* ⭐ Избранные циклы */}
+      {favCycles.length > 0 && (
+        <div style={{ background: 'rgba(250,204,21,0.05)', borderRadius: 12, border: '1px solid rgba(250,204,21,0.18)', padding: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#facc15', marginBottom: 6 }}>⭐ Избранные циклы ({favCycles.length})</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {favCycles.map(c => {
+              const m = c.meta;
+              return (
+                <div key={m.id} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(250,204,21,0.15)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#facc15', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</div>
+                    <button aria-label={`Убрать из избранного ${m.title}`} onClick={() => toggleFav(m.id)} style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15 }} title="Убрать из избранного">⭐</button>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{m.level} · {m.weeks} нед · {m.sessionsPerWeek} дн/нед · {PERIOD_LABELS[m.period] || m.period}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Рекомендуемые для меня ── */}
       <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 10 }}>
@@ -351,10 +386,16 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                 accent="#00e68a"
                 short={
                   <div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 5 }}>
-                      {chips.map((ch, i) => (
-                        <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
-                      ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {chips.map((ch, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                        ))}
+                      </div>
+                      <button aria-label={favs.includes(m.id) ? `Убрать из избранного ${m.title}` : `В избранное ${m.title}`}
+                        onClick={e => { e.stopPropagation(); toggleFav(m.id); }}
+                        style={{ minWidth: 40, minHeight: 40, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, flexShrink: 0, filter: favs.includes(m.id) ? 'none' : 'grayscale(1)', opacity: favs.includes(m.id) ? 1 : 0.4 }}
+                        title={favs.includes(m.id) ? 'Убрать из избранного' : 'В избранное'}>⭐</button>
                     </div>
                     <div>{m.description}</div>
                   </div>
