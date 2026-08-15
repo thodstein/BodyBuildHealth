@@ -132,7 +132,7 @@ describe('дедуп стратегий прикидов (канон — competi
 
 describe('утилиты', () => {
   it('TAPER_MODE_LABELS и TAPER_WEIGHT_GOAL_LABELS покрывают все ключи', () => {
-    expect(Object.keys(TAPER_MODE_LABELS)).toEqual(['classic', 'pl', 'pro']);
+    expect(Object.keys(TAPER_MODE_LABELS)).toEqual(['classic', 'pl', 'pro', 'wf']);
     expect(Object.keys(TAPER_WEIGHT_GOAL_LABELS)).toEqual(['lose', 'gain', 'maintain', 'auto']);
   });
 

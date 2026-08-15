@@ -35,7 +35,7 @@ import { getPeakingProtocol } from '../peaking-protocols.engine';
 import { taperCurve, type TaperWeek } from '../pro/mesocycle-progression.engine';
 import { taperWeeksForFatigue } from '../pro/taper.engine';
 
-export type TaperMode = 'classic' | 'pl' | 'pro';
+export type TaperMode = 'classic' | 'pl' | 'pro' | 'wf';
 export type TaperWeightGoal = 'lose' | 'gain' | 'maintain' | 'auto';
 export type PeakWeekLayout = 'attempts' | 'light';
 
@@ -78,12 +78,14 @@ export const TAPER_MODE_LABELS: Record<TaperMode, string> = {
   classic: '📉 Классический (Bosquet, разгрузка)',
   pl: '🏁 ПЛ-пик-протокол (3 нед, интенсификация)',
   pro: '🎯 Про (усталость-зависимый, прайминг)',
+  wf: '🎢 Classic WF (4 нед: перегрузка → суперкомпенсация)',
 };
 
 export const TAPER_MODE_DESCS: Record<TaperMode, string> = {
   classic: 'Интенсивность сохранена, RIR вверх — объём ×0.65/×0.45 за 2 нед',
   pl: 'Объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0, синглы',
   pro: 'Длительность по усталости (1-3 нед), объём ~0.65/0.45/0.40, инт. ~92%, прайминг',
+  wf: '2 нед перегрузка (объём ×1.15-1.20, инт. 70-75%) → 2 нед суперкомпенсация (×0.60/×0.40, инт. 90-100%)',
 };
 
 export const TAPER_WEIGHT_GOAL_LABELS: Record<TaperWeightGoal, string> = {
@@ -146,6 +148,25 @@ export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
       rirShift: t.rir,
       label: t.week === weeks ? 'Финальная (прайминг)' : `Taper нед ${t.week}`,
       focus: t.rationale + weightNote,
+    }));
+  }
+
+  if (mode === 'wf') {
+    // Classic WF (Библиотека): 2 нед перегрузка (объём ×1.15/×1.20, инт. 70/75%)
+    // → 2 нед суперкомпенсация (×0.60/×0.40, инт. 90/100%). При n < 4 — последние
+    // N недель протокола (финал — суперкомпенсация). n <= 2 — только реализация.
+    const proto = getPeakingProtocol('classic');
+    const offset = Math.max(0, proto.weeks.length - n);
+    const sel = proto.weeks.slice(offset, offset + n);
+    return sel.map((pw, i) => ({
+      week: i + 1,
+      volumePct: r2(pw.volumePct * wGoalMult),
+      intensityPct: pw.intensityPct,
+      intensityMode: 'set_pct' as const,
+      rirShift: pw.rirMin,
+      rirTarget: pw.rirMin,
+      label: pw.label,
+      focus: pw.focus + weightNote,
     }));
   }
 

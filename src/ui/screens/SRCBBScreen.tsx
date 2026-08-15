@@ -3,7 +3,8 @@ import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lm
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { applyMacroTaperToPLWeeks, type MacroTaperOpts } from '../../engines/lms/lms-macro-taper.engine';
-import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
+import { recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
+import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type PeakWeekLayout, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
@@ -276,6 +277,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
   const [peakMode, setPeakMode] = useState<TaperMode>(_plSaved?.plPeakMode ?? 'pl');
   // Весовая цель тапера: сгонка к категории (объём ×0.9) / набор / стабильно / авто.
   const [taperWeightGoal, setTaperWeightGoal] = useState<TaperWeightGoal>(_plSaved?.plTaperWeightGoal ?? 'auto');
+  // Раскладка финальной недели: прикиды или только разминка (контрольные старты).
+  const [peakLayout, setPeakLayout] = useState<PeakWeekLayout>(_plSaved?.plPeakLayout ?? 'attempts');
   // Пост-соревновательная неделя после meet week.
   const [postMeetOn, setPostMeetOn] = useState<boolean>(_plSaved?.plPostMeetOn ?? true);
   // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
@@ -295,7 +298,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plMeetList: meetList, plMainMeetId: mainMeetId })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, meetList, mainMeetId]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
@@ -506,6 +509,31 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     setSubView('plan');
     try { saveBridgeSessions(lmsPlanToSessions(combined)); }
     catch (error) { setMethodNote(`Мост план→сессия: ${(error as Error).message}`); }
+  };
+
+  // ── 🧠 Тренерский слой (lms-taper-coach.engine): контекст спортсмена + подбор ──
+  const buildCoachCtx = (): TaperCoachCtx => {
+    const lastWk = builtSrc?.weeks[builtSrc.weeks.length - 1];
+    return {
+      fatigue: linked.readiness?.fatigue ?? 30,
+      acwr: acwrData,
+      currentWeight: bw,
+      targetWeight: targetBw,
+      actualPm: Object.fromEntries(Object.entries(taperActualPm).filter(([, v]) => v > 0)),
+      plannedPm: Object.fromEntries(Object.entries(taperPlannedPm).filter(([, v]) => v > 0)),
+      forecastPm: lastWk?.pmRow ?? undefined,
+      weeksToMeet,
+      weeklyK: builtSrc?.template?.meta?.correctionPct ?? 0.005,
+    };
+  };
+  const applyTaperRecommendation = (r: ReturnType<typeof recommendTaperConfig>) => {
+    setPeakMode(r.mode);
+    setTaperWeeksToAdd(r.taperWeeks);
+    setTaperWeightGoal(r.weightGoal);
+    setMockMeetOn(r.mockMeet);
+    setPostMeetOn(r.postMeet);
+    setAttemptStrategy(r.strategy);
+    setMethodNote(`🤖 Тренер подобрал тапер: ${r.rationale.join(' ')}`);
   };
 
   // ── BB ──
@@ -1349,11 +1377,16 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                       { id: 'aggressive', label: MEET_STRATEGY_LABEL.aggressive, desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
                     ]}
                   />
-                  <PopupSelect label="Раскладка тапера" value={peakMode} onChange={v => setPeakMode(v as TaperMode)} hint={`ПЛ-пик: 3-нед протокол Библиотеки — объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0, синглы на интенсивной неделе, финал — разминка + прикиды. Classic: разгрузка Bosquet (интенсивность сохранена, RIR +1/+2). Pro: усталость-зависимая кривая — объём ~0.65/0.45/0.40, инт. ~92%, прайминг.${peakMode === 'pl' && taperWeeksToAdd !== 3 ? ` ⚠ Протокол рассчитан на 3 недели (сейчас ${taperWeeksToAdd}) — будет использован сокращённый/повторный профиль.` : ''}`} options={([
+                  <PopupSelect label="Раскладка тапера" value={peakMode} onChange={v => setPeakMode(v as TaperMode)} hint={`ПЛ-пик: 3-нед протокол Библиотеки — объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0, синглы на интенсивной неделе, финал — разминка + прикиды. Classic: разгрузка Bosquet (интенсивность сохранена, RIR +1/+2). Pro: усталость-зависимая кривая — объём ~0.65/0.45/0.40, инт. ~92%, прайминг. Classic WF: 2 нед перегрузка → суперкомпенсация.${peakMode === 'pl' && taperWeeksToAdd !== 3 ? ` ⚠ Протокол рассчитан на 3 недели (сейчас ${taperWeeksToAdd}) — будет использован сокращённый/повторный профиль.` : ''}`} options={([
                     { id: 'pl', label: '🏁 ПЛ-пик-протокол (3 нед, интенсификация)' },
                     { id: 'classic', label: '📉 Классический тапер (Bosquet, разгрузка)' },
                     { id: 'pro', label: '🎯 Про (усталость-зависимый, прайминг)' },
+                    { id: 'wf', label: '🎢 Classic WF (4 нед: перегрузка → суперкомпенсация)' },
                   ] as { id: TaperMode; label: string }[])} />
+                  <PopupSelect label="Раскладка финальной недели" value={peakLayout} onChange={v => setPeakLayout(v as PeakWeekLayout)} hint="Attempts: прикиды соревновательного дня на финальной тапер-неделе (опенер/вторая/третья). Light: только разминка 50/70/90% без прикидов — для контрольных стартов" options={([
+                    { id: 'attempts', label: '🏁 Прикиды соревновательного дня' },
+                    { id: 'light', label: '🎭 Только разминка (без прикидов)' },
+                  ] as { id: PeakWeekLayout; label: string }[])} />
                   <PopupSelect label="Весовая цель тапера" value={taperWeightGoal} onChange={v => setTaperWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории: объём тапера ×0.9 (дефицит → MRV ниже, Helms 2022). Набор/стабильно: полный объём. Авто — по текущему/целевому весу" options={([
                     { id: 'auto', label: '🤖 Авто (по весу)' },
                     { id: 'lose', label: '⬇ Сброс к категории' },
@@ -1396,6 +1429,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                         nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
                         meetData,
                         peakMode,
+                        peakLayout,
                       });
                       setTaperPlan(next);
                       const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
@@ -1491,6 +1525,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                           : undefined,
                         nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
                         peakMode,
+                        peakLayout,
                       });
                       setBuiltSrc(next);
                       const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
@@ -1543,6 +1578,50 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(234,179,8,0.45)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#eab308' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(234,179,8,0.1)' : 'transparent' }}
                     title="Сохранить цикл с тапером как соревновательный — появится в дневнике тренировок (подвкладка «🏁 Соревнования») с прикидами и составом мезоцикла"
                   >🏆 Сохранить как соревновательный</button>
+                </div>
+                {/* 🧠 ТРЕНЕР: авто-подбор схемы + вердикт по готовности к старту */}
+                <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>🧠 Тренерская работа</div>
+                    <button
+                      onClick={() => { try { applyTaperRecommendation(recommendTaperConfig(buildCoachCtx())); } catch (error) { setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`); } }}
+                      style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+                      title="Автоматически подобрать схему тапера, длительность, весовую цель, mock meet и пост-старт под ваши усталость/ACWR/вес/план ПМ"
+                    >🤖 Подобрать тапер автоматически</button>
+                  </div>
+                  {builtSrc && taperNote && (() => {
+                    try {
+                      const verdict = coachPLPeakPlan(builtSrc, buildCoachCtx());
+                      const scoreColor = verdict.score >= 85 ? '#22c55e' : verdict.score >= 65 ? '#eab308' : verdict.score >= 40 ? '#f97316' : '#ef4444';
+                      const feas = pmFeasibility(buildCoachCtx());
+                      const projected = builtSrc.weeks[builtSrc.weeks.length - 1]?.pmRow
+                        ? projectPmToMeet(builtSrc.weeks[builtSrc.weeks.length - 1].pmRow, builtSrc.template?.meta?.correctionPct ?? 0.005, weeksToMeet) : null;
+                      return (
+                        <div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
+                            <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor }}>{verdict.score}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{verdict.label}</span>
+                            {projected && (() => {
+                              const sq = projected['Присед'] ?? projected['Приседания со штангой'];
+                              if (!sq) return null;
+                              return <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>· прогноз к старту: присед ≈ {sq} кг</span>;
+                            })()}
+                          </div>
+                          {verdict.notes.slice(0, 6).map((n, i) => (
+                            <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : 'rgba(255,255,255,0.7)', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
+                          ))}
+                          {feas.status !== 'realistic' && feas.lifts.length > 0 && (
+                            <div style={{ fontSize: 10, color: feas.status === 'unrealistic' ? '#f87171' : '#fbbf24', marginTop: 3 }}>🎯 {feas.summary}</div>
+                          )}
+                          <button
+                            onClick={() => { try { applyTaperRecommendation(verdict.actions ?? recommendTaperConfig(buildCoachCtx())); } catch (error) { setMethodNote(`⚠ Ошибка: ${(error as Error).message}`); } }}
+                            style={{ ...BTN_GHOST, marginTop: 6, minHeight: 36, fontSize: 10, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', background: 'rgba(0,230,138,0.06)' }}
+                            title="Применить рекомендуемые настройки тапера (схема/длительность/весовая цель/mock/пост-старт) — затем нажмите «📉 Добавить тапер к плану»"
+                          >✅ Применить рекомендации тренера</button>
+                        </div>
+                      );
+                    } catch { return null; }
+                  })()}
                 </div>
                 {/* 📋 ТАПЕР-ПЛАН: отдельная свёрнутая карточка (не встраивается в weeks цикла) */}
                 <ExpandableCard
@@ -3015,8 +3094,13 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 8 }}>🏁 Тапер/пик в макроцикле (ПЛ)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 6, marginBottom: 6 }}>
-            <PopupSelect label="Раскладка тапера" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%) или про-кривая по усталости" options={(['classic', 'pl', 'pro'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
+            <PopupSelect label="Раскладка тапера" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация)" options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
             <PopupSelect label="Весовая цель тапера" value={macroWeightGoal} onChange={v => setMacroWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём" options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g], desc: '' }))} />
+            <button
+              onClick={() => { try { const r = recommendTaperConfig(buildCoachCtx()); setMacroTaperMode(r.mode); setMacroWeightGoal(r.weightGoal); setMacroMockMeet(r.mockMeet); setMacroPostMeet(r.postMeet); setMethodNote(`🤖 Тренер подобрал тапер макроцикла: ${r.rationale.join(' ')}`); } catch (error) { setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`); } }}
+              style={{ alignSelf: 'flex-end', minHeight: 40, borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '8px 12px', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+              title="Подобрать схему/весовую цель тапера макроцикла под усталость, ACWR, вес и план ПМ"
+            >🤖 Подобрать</button>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : 'rgba(255,255,255,0.6)' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
