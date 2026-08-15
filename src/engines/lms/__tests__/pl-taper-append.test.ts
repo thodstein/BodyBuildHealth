@@ -96,7 +96,7 @@ describe('appendPLTaperWeeks', () => {
     expect(withAr.progressionRationale).toContain('Авторегуляция применена к таперу');
   });
 
-  it('meetAttempts не масштабируются в движке (единая точка — UI-рендер), workSets прикидов — масштабируются', () => {
+  it('meetAttempts масштабируются авторегуляцией в движке (единая точка — движок), workSets прикидов — тоже', () => {
     const plan = buildBase(6);
     const withMeet = appendPLTaperWeeks(plan, 2, {
       meetWeek: { strategy: 'balanced' },
@@ -107,8 +107,8 @@ describe('appendPLTaperWeeks', () => {
     expect(meetWk!.meetAttempts).toBeTruthy();
     const noAr = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' } });
     const meetNoAr = noAr.weeks.find(w => w.meetWeek)!;
-    // meetAttempts (карточки прикидов) — без масштабирования в движке
-    expect(meetWk!.meetAttempts!.lifts[0].opener).toBe(meetNoAr.meetAttempts!.lifts[0].opener);
+    // meetAttempts (карточки прикидов) — масштабированы в движке (×0.9)
+    expect(meetWk!.meetAttempts!.lifts[0].opener).toBeCloseTo(Math.round(meetNoAr.meetAttempts!.lifts[0].opener * 0.9 * 10) / 10, 1);
     // workSets прикидочных синглов — масштабированы (×0.9)
     const wsAr = meetWk!.days[0].exercises.find(e => e.workSets.some(ws => ws.reps === 1 && ws.sets === 1))!.workSets[0];
     const wsNoAr = meetNoAr.days[0].exercises.find(e => e.workSets.some(ws => ws.reps === 1 && ws.sets === 1))!.workSets[0];

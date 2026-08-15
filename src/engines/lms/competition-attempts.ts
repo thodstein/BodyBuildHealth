@@ -70,5 +70,22 @@ export function meetAttemptsFor(pm: number, strategy: MeetStrategy = 'balanced')
 
 export interface MeetAttemptsInfo {
   strategy: MeetStrategy;
-  lifts: { name: string; opener: number; second: number; third: number; target: number }[];
+  lifts: {
+    name: string;
+    opener: number;
+    second: number;
+    third: number;
+    target: number;
+    /** Разминочная последовательность к опенеру (40→90% от опенера), канон MEET_WARMUP_STEPS. */
+    warmup: { pct: number; weight: number; reps: number }[];
+  }[];
+}
+
+/** Разминочная последовательность к опенеру (40→90%), с весами и повторами. */
+export function warmupToOpener(opener: number, round = (v: number) => Math.round(v / 2.5) * 2.5): { pct: number; weight: number; reps: number }[] {
+  return MEET_WARMUP_STEPS.map(p => ({
+    pct: p,
+    weight: round(opener * p),
+    reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1,
+  }));
 }

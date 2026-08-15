@@ -19,12 +19,12 @@ import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 
 import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
-import { getPeakingProtocol } from '../peaking-protocols.engine';
 import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
 import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
-import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
+import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
+import { buildPLTaperCurve, summarizeTaperCurve, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -119,6 +119,8 @@ export interface LMSPlanWeek {
   mockMeet?: boolean;
   /** Неделя соревнований в конце тапера — прикиды (опенер/вторая/третья) как подходы дня старта. */
   meetWeek?: boolean;
+  /** Восстановительная неделя ПОСЛЕ соревнований (post-meet): объём ×0.5, RIR +3. */
+  postMeet?: boolean;
   /** Прикиды соревновательного дня (выход на пик до 105%) — вешается на финальную тапер-неделю. */
   meetAttempts?: MeetAttemptsInfo;
   /** Пометка недели тапера/прикидов (напр. «план федерации выше факта — прикиды от потолка»). */
@@ -1269,10 +1271,10 @@ export function computeMeetAttemptsFromPmRow(pmRow: Record<string, number>, stra
   if (liftKeys.length === 0) return null;
   return {
     strategy,
-    lifts: liftKeys.map(name => ({
-      name,
-      ...meetAttemptsFor(pmRow[name], strategy),
-    })),
+    lifts: liftKeys.map(name => {
+      const att = meetAttemptsFor(pmRow[name], strategy);
+      return { name, ...att, warmup: warmupToOpener(att.opener) };
+    }),
   };
 }
 
@@ -1286,6 +1288,8 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
   const lastIdx = weeks.length - 1;
   const prevIdx = lastIdx - 1;
   if (prevIdx < 0) return weeks;
+  // Канон (lms-taper.engine): классика Bosquet — объём ×0.65/×0.45, RIR +1/+2.
+  const curve = buildPLTaperCurve({ taperWeeks: 2, mode: 'classic' });
 
   const weekVolume = (wk: LMSPlanWeek): number => {
     let v = 0;
@@ -1309,8 +1313,8 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
        const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
        if (phase === 'deload') return wk;
       if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
-     const volumeMult = idx === prevIdx ? 0.65 : 0.45;
-     const rirAdd = idx === prevIdx ? 1 : 2;
+     const volumeMult = curve[idx === prevIdx ? 0 : 1].volumePct;
+     const rirAdd = curve[idx === prevIdx ? 0 : 1].rirShift;
      const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
      const currentSets = Math.max(1, weekVolume(wk));
      const setScale = targetSets / currentSets;
@@ -1394,16 +1398,25 @@ export function appendPLTaperWeeks(
       actualPm?: Record<string, number>;
       plannedPm?: Record<string, number>;
     };
-    /** Режим пика: 'classic' — разгрузка Bosquet (интенсивность сохранена, RIR вверх);
-     *  'pl' — 3-нед ПЛ-пик-протокол Библиотеки (объём 85/75/60%, интенсивность 90/95/100%,
-     *  RIR 1-2/0-1/0, синглы/двойки на интенсивной неделе). */
-    peakMode?: 'classic' | 'pl';
+    /** Режим пика (канон lms-taper.engine): 'classic' — разгрузка Bosquet (интенсивность
+     *  сохранена, RIR вверх); 'pl' — 3-нед ПЛ-пик-протокол Библиотеки (объём 85/75/60%,
+     *  интенсивность 90/95/100%, RIR 1-2/0-1/0, синглы на интенсивной неделе);
+     *  'pro' — усталость-зависимая кривая (объём ~0.65/0.45/0.40, инт. ~92%, прайминг). */
+    peakMode?: TaperMode;
+    /** Весовая цель тапера: 'lose' — сгонка (объём ×0.9, MRV ниже на дефиците, Helms 2022),
+     *  'gain' — набор к категории, 'maintain'/'auto' — вес стабилен. */
+    weightGoal?: TaperWeightGoal;
+    /** Восстановительная неделя ПОСЛЕ недели соревнований (post-meet): лёгкий объём,
+     *  высокий RIR — возврат к тренировкам без перегруза. */
+    postMeet?: { volumeMult?: number };
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   const last = plan.weeks[plan.weeks.length - 1];
   const nextWeekNum = last.week + 1;
   const lastPhase = mesocyclePhaseForWeek(last.week, plan.weeks.length);
+  // Канон: единая кривая тапера (lms-taper.engine) — режим × весовая цель.
+  const taperCurvePoints = buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal });
 
   // ── PED-адаптация по аналогии с buildLMSPlan (строки 697-762) ──
   const activePeds = (opts?.peds ?? []).filter(ped => {
@@ -1495,7 +1508,7 @@ export function appendPLTaperWeeks(
     return { row, capped };
   };
 
-  const buildTaperWeek = (idx: number, volumeMult: number, rirAdd: number): LMSPlanWeek => {
+  const buildTaperWeek = (idx: number, pt: TaperCurvePoint): LMSPlanWeek => {
     // Прогрессия ПМ продолжается по курсу (как buildLMSPlan:757-762): +k за неделю,
     // НО если задан ФАКТИЧЕСКИЙ ПМ после цикла (реально поднятый) — тапер строится
     // от него (разница ПМ: факт вместо прогноза), прогрессия в тапере = 0.
@@ -1507,29 +1520,49 @@ export function appendPLTaperWeeks(
         ? Math.round(actual * 10) / 10
         : Math.round(pm * pmGrowth * 10) / 10;
     }
+    const isFinal = idx === taperWeeks - 1;
+    // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
+    // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
+    const protocolFinal = isFinal && pt.intensityMode === 'set_pct' && pt.intensityPct >= 1.0;
     const days = last.days.map(d => {
       const exercises = d.exercises.map(e => {
         // Подготовительные прикиды на тапер-неделях (кроме финальной):
         // пробный сингл ~80% от ПМ недели для основных движений — «прощупать»
         // траекторию перед соревнованием, не нагружая (разгрузка сохраняется).
         const isMain = e.load === 'main' || e.load === 'Тяжелая';
-        const prepSets = (!(idx === taperWeeks - 1) && isMain)
+        // Подготовительные прикиды — только в разгрузочных режимах (классика/pro):
+        // пробный сингл ~80% от ПМ недели «прощупать траекторию» перед соревнованием.
+        // В ПЛ-протоколе (set_pct) интенсивность диктует сам протокол — prepSets не нужны.
+        const prepSets = (!isFinal && isMain && pt.intensityMode === 'preserve')
           ? [{ sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.8) * 10) / 10, rir: 2, pct: 0.8 }]
           : [];
+        if (protocolFinal && isMain) {
+          const warmup = [
+            { sets: 1, reps: 3, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.5) * 10) / 10, rir: 3, pct: 0.5 },
+            { sets: 1, reps: 2, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.7) * 10) / 10, rir: 2, pct: 0.7 },
+            { sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.9) * 10) / 10, rir: 1, pct: 0.9 },
+          ];
+          return { ...e, rir: pt.rirTarget ?? 0, workSets: warmup };
+        }
         return {
           ...e,
-          rir: e.rir + rirAdd,
+          rir: pt.rirTarget != null ? pt.rirTarget : e.rir + pt.rirShift,
           workSets: [
             ...prepSets,
             ...e.workSets.map(ws => {
               const pm = pmRow[e.name] ?? e.pm;
-              // Вес пересчитывается от нового ПМ — ровно как workWeight(pm, pct) в buildLMSPlan.
-              const weight = Math.round(workWeight(pm, ws.pct) * 10) / 10;
+              // Интенсивность: классика — сохранена (вес от прежнего pct);
+              // pl/pro — по канону (абсолютный % ПМ, синглы на интенсивной неделе).
+              const pct = isMain && pt.intensityMode === 'set_pct' && pt.intensityPct > 0 ? pt.intensityPct : ws.pct;
+              const reps = isMain && pt.singles ? 1 : ws.reps;
+              const weight = Math.round(workWeight(pm, pct) * 10) / 10;
               return {
                 ...ws,
-                sets: Math.max(1, Math.round(ws.sets * volumeMult * (e.load === 'main' ? 1 : pedVolFloor))),
+                sets: Math.max(1, Math.round(ws.sets * pt.volumePct * (isMain ? 1 : pedVolFloor))),
+                reps,
+                pct,
                 weight,
-                rir: ws.rir + rirAdd,
+                rir: pt.rirTarget != null ? pt.rirTarget : ws.rir + pt.rirShift,
               };
             }),
           ],
@@ -1549,6 +1582,7 @@ export function appendPLTaperWeeks(
       sourcePhaseOrigin: 'inferred' as const,
       macroPhase: 'competition' as const,
       taperWeek: true,
+      ...(pt.label ? { taperNote: pt.label + (pt.focus ? `: ${pt.focus}` : '') } : {}),
     };
     // Выход на пик 105% (или выбранной стратегии): прикиды дня соревнований
     // от ПМ финальной тапер-недели (или планируемого ПМ федерации — если задан).
@@ -1559,77 +1593,6 @@ export function appendPLTaperWeeks(
       if (attempts) {
         week.meetAttempts = attempts;
         if (capped.length > 0) week.taperNote = `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`;
-      }
-    }
-    return week;
-  };
-
-  // ── ПЛ-пик-неделя по протоколу Библиотеки (peaking-protocols.engine, 'pl'):
-  // объём 85/75/60%, интенсивность 90/95/100% от ПМ, RIR 1-2/0-1/0,
-  // синглы/двойки на интенсивной неделе. Финальная — прикиды (как в buildTaperWeek).
-  const buildPeakWeek = (idx: number, pw: { label: string; volumePct: number; intensityPct: number; rirMin: number; rirMax: number; focus: string }): LMSPlanWeek => {
-    const pmGrowth = opts?.meetData?.actualPm ? 1 : Math.pow(1 + k, idx + 1);
-    const pmRow: Record<string, number> = {};
-    for (const [name, pm] of Object.entries(last.pmRow)) {
-      const actual = opts?.meetData?.actualPm?.[name];
-      pmRow[name] = actual != null && actual > 0 ? Math.round(actual * 10) / 10 : Math.round(pm * pmGrowth * 10) / 10;
-    }
-    const isFinal = idx === taperWeeks - 1;
-    const days = last.days.map(d => {
-      const exercises = d.exercises.map(e => {
-        const isMain = e.load === 'main' || e.load === 'Тяжелая';
-        const pm = pmRow[e.name] ?? e.pm;
-        // Финальная (соревновательная) неделя: основные лифты — только РАЗМИНКА
-        // (50/70/90% × 3/2/1) + прикиды (meetAttempts) отдельно: «разминка → открытие →
-        // 2-3 прохода», НЕ рабочие сеты на 100% (иначе перегрузка + дубль прикидов).
-        if (isFinal && isMain) {
-          const warmup = [
-            { sets: 1, reps: 3, weight: Math.round(workWeight(pm, 0.5) * 10) / 10, rir: 3, pct: 0.5 },
-            { sets: 1, reps: 2, weight: Math.round(workWeight(pm, 0.7) * 10) / 10, rir: 2, pct: 0.7 },
-            { sets: 1, reps: 1, weight: Math.round(workWeight(pm, 0.9) * 10) / 10, rir: 1, pct: 0.9 },
-          ];
-          return { ...e, rir: 0, workSets: warmup };
-        }
-        return {
-          ...e,
-          rir: isMain ? pw.rirMin : e.rir + 1,
-          workSets: e.workSets.map(ws => {
-            // Интенсивность по протоколу для основных лифтов (90/95/100% ПМ);
-            // на интенсивной неделе — синглы (reps 1).
-            const pct = isMain ? pw.intensityPct : ws.pct;
-            const reps = isMain && idx === 1 ? 1 : ws.reps;
-            return {
-              ...ws,
-              sets: Math.max(1, Math.round(ws.sets * pw.volumePct * (isMain ? 1 : pedVolFloor))),
-              reps,
-              weight: Math.round(workWeight(pm, pct) * 10) / 10,
-              rir: isMain ? pw.rirMin : ws.rir + 1,
-            };
-          }),
-        };
-      });
-      const metricsEx: SRExercise[] = exercises.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
-      }));
-      return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
-    });
-    const week: LMSPlanWeek = {
-      week: nextWeekNum + offsetBefore + idx,
-      pmRow,
-      days,
-      sourcePhase: 'peak' as MesocyclePhase,
-      sourcePhaseOrigin: 'inferred' as const,
-      macroPhase: 'competition' as const,
-      taperWeek: true,
-      taperNote: `${pw.label}: ${pw.focus}`,
-    };
-    if (isFinal) {
-      const { row, capped } = resolveAttemptRow(week.pmRow);
-      const attempts = computeMeetAttemptsFromPmRow(row, peakStrategy);
-      if (attempts) {
-        week.meetAttempts = attempts;
-        if (capped.length > 0) week.taperNote += ` План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`;
       }
     }
     return week;
@@ -1718,28 +1681,46 @@ export function appendPLTaperWeeks(
     const wk = buildAttemptsWeek(0, 'mock');
     if (wk) extra.push(wk);
   }
-  // Режим пика: 'classic' — разгрузка Bosquet (интенсивность сохранена);
-  // 'pl' — 3-нед ПЛ-пик-протокол Библиотеки (объём 85/75/60%, интенсивность 90/95/100%, RIR→0).
-  // При taperWeeks < 3 берём ПОСЛЕДНИЕ N недель протокола (финал всегда — соревновательная
-  // 100% с прикидами; при 1 нед — только соревновательная, при 2 — интенсивная + соревновательная).
-  const plPeakProto = opts?.peakMode === 'pl' ? getPeakingProtocol('pl') : null;
-  const plOffset = plPeakProto ? Math.max(0, plPeakProto.weeks.length - taperWeeks) : 0;
+  // Раскладка пика — канон (lms-taper.engine): 'classic' — разгрузка Bosquet;
+  // 'pl' — 3-нед протокол Библиотеки (при taperWeeks < 3 — последние N недель
+  // протокола, финал всегда соревновательный 100% с прикидами);
+  // 'pro' — усталость-зависимая кривая с праймингом.
+  const taperMode: TaperMode = opts?.peakMode ?? 'classic';
   for (let i = 0; i < taperWeeks; i++) {
-    if (plPeakProto) {
-      const pw = plPeakProto.weeks[Math.min(plOffset + i, plPeakProto.weeks.length - 1)];
-      extra.push(buildPeakWeek(i, pw));
-      continue;
-    }
-    // Классическая taper-кривая (как applyPLTaper): последняя неделя ×0.45 RIR+2,
-    // предпоследняя ×0.65 RIR+1; для более длинных — плавное снижение 0.9 → 0.45.
-    const progress = (i + 1) / taperWeeks;
-    const volumeMult = Math.max(0.4, 0.9 - progress * 0.45);
-    const rirAdd = i === taperWeeks - 1 ? 2 : 1;
-    extra.push(buildTaperWeek(i, volumeMult, rirAdd));
+    extra.push(buildTaperWeek(i, taperCurvePoints[i]));
   }
   if (meetWeekOn) {
     const wk = buildAttemptsWeek(extra.length, 'meet');
     if (wk) extra.push(wk);
+  }
+  // Пост-соревновательная неделя (post-meet): лёгкий объём, высокий RIR —
+  // возврат к тренировкам после прикидок без перегруза.
+  if (opts?.postMeet) {
+    const baseWk = extra[extra.length - 1] ?? last;
+    const pmRow: Record<string, number> = { ...baseWk.pmRow };
+    const volMult = Math.max(0.3, Math.min(1, opts.postMeet.volumeMult ?? 0.5));
+    const days = baseWk.days.map(d => {
+      const exercises = d.exercises.map(e => ({
+        ...e,
+        rir: e.rir + 3,
+        workSets: e.workSets.map(ws => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * volMult)), rir: ws.rir + 3 })),
+      }));
+      const metricsEx: SRExercise[] = exercises.map(pe => ({
+        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
+        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      }));
+      return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
+    });
+    extra.push({
+      week: nextWeekNum + extra.length,
+      pmRow,
+      days,
+      sourcePhase: 'deload' as MesocyclePhase,
+      sourcePhaseOrigin: 'inferred' as const,
+      macroPhase: 'transition' as const,
+      postMeet: true,
+      taperNote: `Восстановление после соревнований: объём ×${volMult}, RIR +3 — полная разгрузка, возврат к базовому объёму со следующей недели.`,
+    });
   }
 
   // ── Авторегуляция («АВТО»): масштабирование применяется ко ВСЕМ добавленным
@@ -1761,8 +1742,18 @@ export function appendPLTaperWeeks(
         }
       }
       if (wk.meetAttempts) {
-        // meetAttempts НЕ масштабируются здесь — карточки прикидов показываются
-        // с авторегуляцией на лету (единая точка в UI-рендере).
+        // Прикиды масштабируются авторегуляцией ЗДЕСЬ (единая точка в движке) —
+        // веса прикидов соответствуют скорректированным тренировочным весам недели.
+        wk.meetAttempts = {
+          ...wk.meetAttempts,
+          lifts: wk.meetAttempts.lifts.map(l => ({
+            ...l,
+            opener: Math.round(l.opener * ar.topSetPctMultiplier * 10) / 10,
+            second: Math.round(l.second * ar.topSetPctMultiplier * 10) / 10,
+            third: Math.round(l.third * ar.topSetPctMultiplier * 10) / 10,
+            target: Math.round(l.target * ar.topSetPctMultiplier * 10) / 10,
+          })),
+        };
       }
     }
   }
@@ -1781,17 +1772,29 @@ export function appendPLTaperWeeks(
   // Выход на пик: описание стратегии прикидов финальной недели (как в тапер-калькуляторе).
   const peakPct = MEET_STRATEGY_PCT_LABEL[peakStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced;
   const peakLabel = peakStrategy === 'aggressive' ? 'агрессивная' : peakStrategy === 'conservative' ? 'консервативная' : 'сбалансированная';
+  const weightGoalNote = opts?.weightGoal === 'lose'
+    ? ' ⬇ Сгонка к категории: объём тапера ×0.9 (дефицит → MRV ниже, Helms 2022).'
+    : opts?.weightGoal === 'gain'
+      ? ' ⬆ Набор к категории: объём тапера полный (профицит — полное восстановление).'
+      : '';
   const peakNote = opts?.peakMode === 'pl'
     ? ` 🏁 ПЛ-пик-протокол (3 нед): объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0; прикиды соревновательного дня ${peakPct} (${peakLabel}).`
-    : ` 🏁 Выход на пик: прикиды соревновательного дня ${peakPct} от ПМ финальной недели (${peakLabel} стратегия).`;
+    : opts?.peakMode === 'pro'
+      ? ` 🎯 Про-тапер (усталость-зависимый): объём ~0.65/0.45/0.40, интенсивность ~92% ПМ, прайминг; прикиды соревновательного дня ${peakPct} (${peakLabel}).`
+      : ` 🏁 Выход на пик: прикиды соревновательного дня ${peakPct} от ПМ финальной недели (${peakLabel} стратегия).`;
   const mockWk = weeks.find(w => w.mockMeet);
   const meetWk = weeks.find(w => w.meetWeek);
+  const postMeetWk = weeks.find(w => w.postMeet);
   const mockNote = mockWk
     ? ` 🎯 Имитация соревнований (mock meet): неделя ${mockWk.week} — прикиды-синглы ${MEET_STRATEGY_PCT_LABEL[mockStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} от ПМ, аксессуары ×0.5.`
     : '';
   const meetNote = meetWk
     ? ` 🏁 Неделя соревнований: ${meetWk.week} — прикиды (${MEET_STRATEGY_PCT_LABEL[meetStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}) как подходы дня старта (опенер/вторая/третья ×1).`
     : '';
+  const postMeetNote = postMeetWk
+    ? ` 🔄 Пост-соревновательная неделя: ${postMeetWk.week} — объём ×${opts?.postMeet?.volumeMult ?? 0.5}, RIR +3 (восстановление после старта).`
+    : '';
+  const taperCurveSummary = summarizeTaperCurve(taperCurvePoints);
 
   // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
   // и PED-множителя — иначе peakWeek/статусы остаются от исходного плана.
@@ -1806,9 +1809,11 @@ export function appendPLTaperWeeks(
     cycleMetrics,
     plVolumeLandmarks,
     progressionRationale: plan.progressionRationale +
-      ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005).` +
+      ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — ${taperCurveSummary} (${taperMode === 'pl' ? 'ПЛ-пик-протокол' : taperMode === 'pro' ? 'про-тапер по усталости' : 'Bosquet 2005'}).` +
+      weightGoalNote +
       mockNote +
       meetNote +
+      postMeetNote +
       peakNote +
       pedNote +
       nutritionTaperNote +

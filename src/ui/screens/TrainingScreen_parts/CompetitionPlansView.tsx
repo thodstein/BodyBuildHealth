@@ -57,6 +57,7 @@ export function removeCompetitionPlan(id: string): void {
 function weekKind(w: LMSBuildOutput['weeks'][number]): { label: string; color: string } {
   if (w.meetWeek) return { label: `🏁 Соревнования (${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? 'balanced'] ?? MEET_STRATEGY_PCT_LABEL.balanced})`, color: '#eab308' };
   if (w.mockMeet) return { label: '🎯 Mock meet (прикиды-синглы)', color: '#a78bfa' };
+  if (w.postMeet) return { label: '🔄 Пост-старт (восстановление)', color: '#34d399' };
   if (w.taperWeek) return { label: `📉 Тапер (${Math.round(w.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0) / Math.max(1, w.days.length))} сетов/день)`, color: '#f59e0b' };
   return { label: '🔵 Цикл (оригинал)', color: '#60a5fa' };
 }

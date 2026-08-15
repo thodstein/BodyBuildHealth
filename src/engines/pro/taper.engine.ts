@@ -4,6 +4,7 @@
  * peak-week протокол: прикиды (opener/2nd/3rd), тайминг последних тяжёлых, план соревновательного дня.
  */
 import { taperCurve, type TaperWeek } from "./mesocycle-progression.engine";
+import { MEET_STRATEGY_PCT, MEET_WARMUP_STEPS } from "../lms/competition-attempts";
 
 export type AttemptStrategy = "conservative" | "balanced" | "aggressive";
 export type Lift = "squat" | "bench" | "deadlift";
@@ -35,16 +36,13 @@ export function taperWeeksForFatigue(fatigue: number): number {
 /** Последние тяжёлые движения: deadlift раньше всех (самое taxing), bench позднее всех. */
 export const LAST_HEAVY_DAYS: Record<Lift, number> = { squat: 8, bench: 4, deadlift: 12 };
 
-/** Прикиды соревновательного дня (% от текущего 1RM). */
+/** Прикиды соревновательного дня (% от текущего 1RM).
+ *  Проценты — КАНОН из competition-attempts.MEET_STRATEGY_PCT (единый источник для PL). */
 export function peakWeekAttempts(
   current1RM: Record<Lift, number>,
   strategy: AttemptStrategy = "balanced"
 ): PeakWeekAttempts {
-  const pct = strategy === "conservative"
-    ? { opener: 0.90, second: 0.955, third: 1.00 }
-    : strategy === "aggressive"
-    ? { opener: 0.93, second: 0.97, third: 1.05 }
-    : { opener: 0.92, second: 0.96, third: 1.02 };
+  const pct = MEET_STRATEGY_PCT[strategy] ?? MEET_STRATEGY_PCT.balanced;
   const mk = (lift: Lift): AttemptSet => ({
     lift,
     opener: r05(current1RM[lift] * pct.opener),
@@ -56,10 +54,9 @@ export function peakWeekAttempts(
   return { squat: mk("squat"), bench: mk("bench"), deadlift: mk("deadlift"), strategy };
 }
 
-/** Разминочная последовательность блинов под опенер (REUSE gym-competition можно; здесь упрощённо). */
+/** Разминочная последовательность блинов под опенер (канон MEET_WARMUP_STEPS из PL-движка). */
 export function warmupSequence(opener: number): { percent: number; weight: number; reps: number }[] {
-  const steps = [0.40, 0.55, 0.70, 0.80, 0.90];
-  return steps.map(p => ({ percent: p, weight: r05(opener * p), reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
+  return MEET_WARMUP_STEPS.map(p => ({ percent: p, weight: r05(opener * p), reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
 }
 
 /** Полный taper-план: объём/интенсивность из P7 taperCurve + сессии прайминга + прикиды. */
