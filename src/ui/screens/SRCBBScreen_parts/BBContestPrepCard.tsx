@@ -18,7 +18,7 @@ import React, { useMemo } from 'react';
 import { getProfile } from '../../../core/profile-manager';
 import {
   deserializeBBPrepConfig, legacyConfigFromProfile,
-  buildBBContestPrep, CONTEST_CATEGORY_LABELS,
+  buildBBContestPrep, CONTEST_CATEGORY_LABELS, PEAK_PHASE_COLORS, isoDiffDays, isoToday,
   type BBContestPrepConfig,
 } from '../../../engines/bb/bb-contest-prep.engine';
 
@@ -57,17 +57,35 @@ export const BBContestPrepCard: React.FC<{
 
   const statusColor = cfg ? '#22c55e' : 'rgba(255,255,255,0.55)';
 
+  const daysLeft = useMemo(() => {
+    if (!cfg) return null;
+    try { return isoDiffDays(isoToday(), cfg.showDate); } catch { return null; }
+  }, [cfg]);
+  const countdown = daysLeft == null ? null : daysLeft < 0
+    ? { text: `🎬 прошло (${-daysLeft} дн)`, color: '#94a3b8' }
+    : daysLeft === 0
+      ? { text: '🎬 сегодня!', color: '#fbbf24' }
+      : daysLeft <= 7
+        ? { text: `⏳ ${daysLeft} дн`, color: '#f87171' }
+        : { text: `⏳ ${daysLeft} дн`, color: '#4ade80' };
+
   return (
     <div style={{
-      marginTop: 6, padding: 8, borderRadius: 8,
-      background: 'rgba(245,158,11,0.05)', border: '1px dashed rgba(245,158,11,0.35)',
+      marginTop: 6, padding: 10, borderRadius: 10,
+      background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(24,24,27,0.5))',
+      border: '1px dashed rgba(245,158,11,0.4)',
       fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
         <span style={{ fontSize: 12 }}>🏁</span>
         <b style={{ color: '#f59e0b' }}>Тапер ББ</b>
+        {countdown && (
+          <span style={{ fontSize: 9, fontWeight: 800, color: countdown.color, padding: '1px 6px', borderRadius: 999, background: countdown.color + '18', border: `1px solid ${countdown.color}44` }}>
+            {countdown.text}
+          </span>
+        )}
         {cfg && (
-          <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, color: statusColor, padding: '1px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.1)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, color: statusColor, padding: '1px 6px', borderRadius: 999, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)' }}>
             ● активен
           </span>
         )}
@@ -83,6 +101,18 @@ export const BBContestPrepCard: React.FC<{
           {summary && !compact && (
             <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
               Пик-неделя: {summary.peakWeek[0]?.phaseLabel} → {summary.peakWeek[6]?.phaseLabel} ({summary.peakWeek[6]?.kcal} ккал в день шоу)
+            </div>
+          )}
+          {summary && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 5 }} title="Фазы пик-недели: деплеция → загрузка → пик → шоу">
+              {summary.peakWeek.map(d => (
+                <span key={d.day} title={`D-${7 - d.day}: ${d.phaseLabel}`} style={{
+                  width: 10, height: 10, borderRadius: 3, flexShrink: 0,
+                  background: PEAK_PHASE_COLORS[d.phase],
+                  boxShadow: d.day === 7 ? `0 0 6px ${PEAK_PHASE_COLORS[d.phase]}` : 'none',
+                  opacity: 0.9,
+                }} />
+              ))}
             </div>
           )}
           {competition && cfg.showDate && (
@@ -101,8 +131,9 @@ export const BBContestPrepCard: React.FC<{
         type="button"
         onClick={onOpenConfig || defaultOpenConfig}
         style={{
-          width: '100%', marginTop: 6, padding: '8px 10px', minHeight: 44, borderRadius: 8, cursor: 'pointer',
-          fontSize: 10, fontWeight: 700, border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+          width: '100%', marginTop: 8, padding: '9px 10px', minHeight: 44, borderRadius: 10, cursor: 'pointer',
+          fontSize: 10, fontWeight: 800, border: '1px solid rgba(245,158,11,0.45)', background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+          transition: 'all 0.15s',
         }}
       >
         ⚙ {cfg ? 'Настроить тапер ББ' : 'Создать тапер ББ'}
