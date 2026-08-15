@@ -42,7 +42,7 @@ export const IndividualPlanResults: React.FC = () => {
     DAY_LABELS, trainingDays, planView, setPlanView, weekPlan, setWeekPlan,
     monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan,
     selectedWeek, setSelectedWeek,
-    generated, setGenerated, dayPlan, threeDayPlan, resultsRef,
+    generated, setGenerated, dayPlan, threeDayPlan, resultsRef, planBusy,
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
@@ -373,20 +373,20 @@ export const IndividualPlanResults: React.FC = () => {
               color: planDays === 1 ? '#000' : 'rgba(255,255,255,0.85)',
               fontWeight:700, fontSize:11,
             }}>📅 1 день</button>
-            <button onClick={() => { setPlanDays(3); generatePlan(3); }} style={{
+            <button onClick={() => { setPlanDays(3); generatePlan(3, undefined, undefined, { async: true }); }} style={{
               padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
               background: planDays === 3 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
               border: planDays === 3 ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: planDays === 3 ? '#000' : 'rgba(255,255,255,0.85)',
               fontWeight:700, fontSize:11,
-            }}>📅 3 дня</button>
-            <button onClick={() => { setPlanDays(7); setPlanView('calendar'); generatePlan(7); }} style={{
+            }}>{planBusy && planDays === 3 ? '⏳…' : '📅 3 дня'}</button>
+            <button onClick={() => { setPlanDays(7); setPlanView('calendar'); generatePlan(7, undefined, undefined, { async: true }); }} style={{
               padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
               background: planDays === 7 && !monthPlanMode ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
               border: planDays === 7 && !monthPlanMode ? 'none' : '1px solid rgba(255,255,255,0.06)',
               color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.85)',
               fontWeight:700, fontSize:11,
-            }}>📆 Неделя</button>
+            }}>{planBusy && planDays === 7 ? '⏳…' : '📆 Неделя'}</button>
           </div>
           {planDays === 1 && generated && (
             <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'11px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:4, marginBottom:6, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
@@ -427,8 +427,8 @@ export const IndividualPlanResults: React.FC = () => {
             }}>📅 {planView === 'calendar' ? 'Список' : 'Календарь'}</button>
           )}
           {planDays !== 1 && !monthPlanMode && (
-            <button onClick={() => generatePlan(planDays)} style={{ marginTop: 0, marginBottom:6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
-              🔄 Перегенерировать {planDays === 3 ? '3 дня' : 'неделю'}
+            <button onClick={() => generatePlan(planDays, undefined, undefined, { async: true })} style={{ marginTop: 0, marginBottom:6, padding: '8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>
+              {planBusy ? '⏳ Генерация…' : `🔄 Перегенерировать ${planDays === 3 ? '3 дня' : 'неделю'}`}
             </button>
           )}
           {monthPlanMode && monthPlan.length > 0 && (

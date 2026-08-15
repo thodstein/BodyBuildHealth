@@ -540,6 +540,23 @@ export function buildTrainingTaper(cfg: BBContestPrepConfig): TrainingTaperWeek[
 // Пик-неделя: 7 дней (день 7 = шоу)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Кэш buildPeakWeek: пик-неделя вызывается per-day из hot path планировщика
+// (nutritionTargetsForPrepDate для каждого дня плана) — повторные сборки
+// с одинаковыми ключами не пересчитываются.
+const _peakWeekCache = new Map<string, PeakWeekDayPlan[]>();
+function peakWeekCached(eff: BBContestPrepConfig): PeakWeekDayPlan[] {
+  const key = `${eff.sex}|${eff.category}|${eff.weightKg}|${eff.carbLoadStrategy}|${eff.waterStrategy}|${eff.sodiumStrategy}|${eff.showDate}|${eff.preferLowFiberCarbs ? 1 : 0}|${eff.creatineStrategy ?? ''}|${eff.allergens?.join(',') ?? ''}`;
+  const hit = _peakWeekCache.get(key);
+  if (hit) return hit;
+  const built = buildPeakWeek(eff);
+  if (_peakWeekCache.size >= 32) {
+    const firstKey = _peakWeekCache.keys().next().value;
+    if (firstKey) _peakWeekCache.delete(firstKey);
+  }
+  _peakWeekCache.set(key, built);
+  return built;
+}
+
 interface DayTraining {
   type: string;
   minutes: number;
@@ -814,7 +831,7 @@ export function peakWeekDayForDate(dateIso: string, cfg: BBContestPrepConfig): P
   const showDate = resolveShowDate(cfg);
   const diff = daysBetween(dateIso, showDate); // дней от date до шоу
   if (diff < 0 || diff > 6) return null;
-  const peakWeek = buildPeakWeek({ ...cfg, showDate });
+  const peakWeek = peakWeekCached({ ...cfg, showDate });
   // diff = дней от date до шоу: 0 → шоу (день 7), 6 → день 1 (D-6).
   return peakWeek[6 - diff] ?? null;
 }
@@ -919,7 +936,7 @@ function toPeakWeekSession(
 export function applyTrainingTaperToBBPlan(
   plan: BBPlan,
   rawCfg: BBContestPrepConfig,
-  opts?: { weekNumber?: number },
+  opts?: { weekNumber?: number; force?: boolean },
 ): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan as BBPlanWithPrep;
   const v = validateBBContestPrepConfig(rawCfg);
@@ -927,6 +944,7 @@ export function applyTrainingTaperToBBPlan(
   const base = applyForcedModes(rawCfg);
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const existing = (plan as BBPlanWithPrep).contestPrep;
+  const force = opts?.force === true;
 
   const taper = buildTrainingTaper(cfg);
   const n = taper.length;
@@ -950,7 +968,9 @@ export function applyTrainingTaperToBBPlan(
     const wk = weeks[idx];
     const t = usedTaper[i];
     if (!t) break;
-    if (weekAlreadyPrepped(wk)) continue; // idempotent per-week (другое соревнование)
+    // Без force: идемпотентно пропускаем уже наложенные недели (другое соревнование).
+    // С force: ОБНОВЛЯЕМ наложенный ранее taper (пользователь изменил настройки).
+    if (weekAlreadyPrepped(wk) && !force) continue;
 
     // Guard: не резать уже разгруженные недели (anti-двойное снижение, как PL-taper).
     const isDeload = wk.deload === true || wk.phase === 'deload'
@@ -1002,16 +1022,16 @@ export function applyTrainingTaperToBBPlan(
   // Неделя шоу → пик-неделя (памп/деплеция, отдых).
   if (windowLen > 0) {
     const wk = weeks[endIdx];
-    // Guard только против ПРОШЛЫХ применений (peakWeek), а не против собственного
-    // тапер-прохода этой недели — тапер и пик-трансформация в одном вызове совместимы.
-    if (wk.peakWeek !== true) {
+    // Guard только против ПРОШЛЫХ применений (peakWeek) при !force; с force —
+    // пересобираем пик-неделю по актуальным настройкам (обновление плана).
+    if (wk.peakWeek !== true || force) {
       const peakWeek = buildPeakWeek(cfg);
       wk.phase = 'peaking';
       wk.taper = true;
       wk.peakWeek = true;
       wk.sessions = wk.sessions.map((s: any, si: number) => toPeakWeekSession(s, si, cfg, peakWeek));
       wk.prepProtocol = `Пик-неделя: ${PHASES_BY_STRATEGY[cfg.carbLoadStrategy].map(p => PHASE_LABELS_RU[p]).join(' → ')}`;
-      appliedWeeks.push(endIdx + 1);
+      if (!appliedWeeks.includes(endIdx + 1)) appliedWeeks.push(endIdx + 1);
     }
   }
 
@@ -1100,6 +1120,7 @@ export interface ContestPrepApplyOpts {
   prepWeeks?: number;      // недели подготовки (включая финальную), дефолт 12
   taperWeeks?: number;     // недели тапера (1-4), дефолт cfg.weeksOut
   weekNumber?: number;     // неделя шоу (1-index), дефолт последняя
+  force?: boolean;         // перезаписать уже наложенный taper/пик актуальными настройками
 }
 
 /**
@@ -1135,7 +1156,8 @@ export function applyContestPrepToBBPlan(
   }
 
   // 2) Taper + пик-неделя на последние taperWeeks+1 недель.
-  const tapered = applyTrainingTaperToBBPlan(basePlan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber }) as BBPlanWithPrep;
+  //    force=true: повторное наложение ОБНОВЛЯЕТ уже размеченные недели (изменения настроек).
+  const tapered = applyTrainingTaperToBBPlan(basePlan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true }) as BBPlanWithPrep;
   const weeks = tapered.weeks as any[];
   const total = weeks.length;
   const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);

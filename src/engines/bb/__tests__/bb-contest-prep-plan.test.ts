@@ -344,6 +344,22 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(twice.weeks[twice.weeks.length - 1].peakWeek).toBe(true);
   });
 
+  it('force=true ОБНОВЛЯЕТ наложенный taper при изменении настроек (иначе недели пропускаются)', () => {
+    const plan = makePlan(10);
+    const v2 = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 7, taperWeeks: 2 }) as BBPlanWithPrep;
+    // Без force: те же настройки → наборы не меняются (недели пропущены).
+    const same = applyContestPrepToBBPlan(v2, baseConfig(), { prepWeeks: 7, taperWeeks: 2 }) as BBPlanWithPrep;
+    expect(same.weeks[8].sessions[0].exercises[0].sets).toBe(v2.weeks[8].sessions[0].exercises[0].sets);
+    // С force: taperWeeks 2→3 — неделя 7 (0-index) попадает в taper и объём режется сильнее.
+    const v3 = applyContestPrepToBBPlan(v2, baseConfig(), { prepWeeks: 6, taperWeeks: 3, force: true }) as BBPlanWithPrep;
+    expect(v3.weeks.length).toBe(v2.weeks.length);
+    expect(v3.weeks[7].contestPhase).toBe('taper');
+    expect(v3.weeks[7].sessions[0].exercises[0].sets).toBeLessThan(v2.weeks[7].sessions[0].exercises[0].sets);
+    // Пик-неделя пересобрана (не пропущена) и по-прежнему привязана к концу.
+    expect(v3.weeks[v3.weeks.length - 1].peakWeek).toBe(true);
+    expect(v3.weeks[v3.weeks.length - 1].contestPhase).toBe('peak_week');
+  });
+
   it('пик-неделя остаётся привязанной к концу плана после достройки', () => {
     const plan = makePlan(4);
     const cfg = baseConfig();

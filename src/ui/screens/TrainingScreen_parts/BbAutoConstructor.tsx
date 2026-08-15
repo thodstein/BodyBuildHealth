@@ -397,6 +397,7 @@ export const BbAutoConstructor: React.FC = () => {
         const updated = applyContestPrepToBBPlan(builtPlan, cfg, {
           prepWeeks: plan.preparation.weeks,
           taperWeeks: plan.taper.weeks,
+          force: true, // обновить уже наложенный taper/пик актуальными настройками
         });
         setBuiltPlan(updated);
         setPrepApplied(true);
@@ -445,6 +446,7 @@ export const BbAutoConstructor: React.FC = () => {
       const updated = applyContestPrepToBBPlan(builtPlan, buildContestPrepConfig(), {
         prepWeeks: plan.preparation.weeks,
         taperWeeks: plan.taper.weeks,
+        force: true,
       });
       setBuiltPlan(updated);
     }
@@ -464,6 +466,7 @@ export const BbAutoConstructor: React.FC = () => {
       const updated = applyContestPrepToBBPlan(base, buildContestPrepConfig(), {
         prepWeeks: newWeeks,
         taperWeeks: replanned.taper.weeks,
+        force: true,
       });
       setBuiltPlan(updated);
     }
@@ -2522,6 +2525,21 @@ export const BbAutoConstructor: React.FC = () => {
         <div style={{ marginTop:10 }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>
             Неделя {wk.week} из {W.length} · <span style={{ color:PHASE_COLORS[currentPhase] }}>{PHASE_LABELS[currentPhase]}</span>
+            {(wk as any).contestPhase && (
+              <span style={{
+                marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800,
+                color: PREP_PHASE_COLORS[(wk as any).contestPhase] ?? '#f472b6',
+                background: (PREP_PHASE_COLORS[(wk as any).contestPhase] ?? '#f472b6') + '22',
+                border: `1px solid ${(PREP_PHASE_COLORS[(wk as any).contestPhase] ?? '#f472b6')}55`,
+              }}>
+                {(wk as any).contestPhase === 'preparation' ? '🏁 Подготовка' : (wk as any).contestPhase === 'final_preparation' ? '🏁 Финальная подготовка' : (wk as any).contestPhase === 'taper' ? '📉 Тапер' : '🎭 Пик-неделя'}
+              </span>
+            )}
+            {wk.peakWeek === true && !(wk as any).contestPhase && (
+              <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.15)', border: '1px solid rgba(236,72,153,0.4)' }}>
+                🎭 Пик-неделя
+              </span>
+            )}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
             {W.map(w => {
@@ -3776,6 +3794,55 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               ))}
             </div>
+
+            {/* 📉 Недели taper — тренировочный цикл, наложенный на план */}
+            {prepApplied && builtPlan && (() => {
+              const taperWeeksList = builtPlan.weeks
+                .filter((w: any) => w.contestPhase === 'taper' || w.contestPhase === 'peak_week')
+                .map((w: any, wi: number) => {
+                  const totalSets = w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+                  const rirMin = Math.min(...w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.rir ?? 3)));
+                  const firstEx = w.sessions[0]?.exercises?.[0];
+                  return { w, wi, totalSets, rirMin, firstEx };
+                });
+              if (taperWeeksList.length === 0) return null;
+              return (
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#f472b6', marginBottom:4 }}>📉 Недели taper (тренировочный цикл в плане)</div>
+                  <div style={{ overflowX:'auto' }}>
+                    <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse', minWidth:460 }}>
+                      <thead>
+                        <tr style={{ color:'rgba(255,255,255,0.5)', textAlign:'left' }}>
+                          <th style={{ padding:'4px 6px' }}>Нед</th>
+                          <th style={{ padding:'4px 6px' }}>Фаза</th>
+                          <th style={{ padding:'4px 6px', textAlign:'right' }}>Сетов</th>
+                          <th style={{ padding:'4px 6px', textAlign:'right' }}>RIR</th>
+                          <th style={{ padding:'4px 6px' }}>Нагрузка</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {taperWeeksList.map(({ w, wi, totalSets, rirMin, firstEx }) => (
+                          <tr key={wi} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding:'4px 6px', fontWeight:700 }}>{(w as any).week}</td>
+                            <td style={{ padding:'4px 6px', color: PREP_PHASE_COLORS[(w as any).contestPhase] ?? '#f472b6', fontWeight:700 }}>
+                              {(w as any).contestPhase === 'peak_week' ? '🎭 Пик-неделя' : 'Тапер'}
+                            </td>
+                            <td style={{ padding:'4px 6px', textAlign:'right' }}>{totalSets}</td>
+                            <td style={{ padding:'4px 6px', textAlign:'right' }}>{rirMin}–4</td>
+                            <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.55)' }}>
+                              {firstEx ? `${firstEx.name}${firstEx.workSets?.[0]?.weight ? ` · ${firstEx.workSets[0].weight} кг` : ''}` : 'памп/отдых'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:3 }}>
+                    Объём снижается, веса сохраняются, RIR 2–4, без отказа и новых упражнений. Изменения настроек ниже пересобирают эти недели.
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 🧪 Test Peak Week */}
             <div style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>

@@ -141,6 +141,7 @@ export interface PlanCtx {
   trainingDays: boolean[]; setTrainingDays: (v: any) => void;
   DAY_LABELS: string[];
   generated: boolean; setGenerated: (v: boolean) => void;
+  planBusy: boolean;
   planDays: 1 | 3 | 7; setPlanDays: (v: 1 | 3 | 7) => void;
   selectedDayIndex: number; setSelectedDayIndex: (v: number) => void;
   planView: 'list' | 'calendar'; setPlanView: (v: 'list' | 'calendar') => void;
@@ -183,7 +184,7 @@ export interface PlanCtx {
   removeFoodItem: (a: number, b: number, c: number) => void;
   replaceMealWithRecipe: (recipe: Recipe, mealIdx: number, dayIdx?: number) => void;
   addFoodToMeal: (dayIdx: number, mealIdx: number, food: any) => void;
-  generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean }) => void;
+  generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean }) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
   loadSavedPlan: (plan: SavedPlan) => void;
@@ -915,6 +916,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const isTrainDay = (offset: number): boolean => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset);
   const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const [generated, setGenerated] = useState(false);
+  // ⏳ Признак неблокирующей генерации (3/7 дней с yield) — кнопки показывают «⏳».
+  const [planBusy, setPlanBusy] = useState(false);
   const [planDays, setPlanDays] = useState<1 | 3 | 7>(() => { try { const v = parseInt(localStorage.getItem("he_plan_days") || "1"); return (v === 3 || v === 7) ? v : 1; } catch { return 1; } });
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => { try { return parseInt(localStorage.getItem("he_plan_day_idx") || "0") || 0; } catch { return 0; } });
   const [planView, setPlanView] = useState<'list' | 'calendar'>(() => { try { return (localStorage.getItem("he_plan_view") === "calendar") ? "calendar" : "list"; } catch { return "list"; } });
@@ -1534,7 +1537,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   // ─── Generate Plan ───
-   const generatePlan = (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean }) => {
+   const generatePlan = async (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean }) => {
+     // ⏳ Неблокирующая генерация 3/7 дней: yield между днями, чтобы UI не фризил.
+     const isAsync = opts?.async === true;
+     const maybeYield = async () => { if (isAsync) await new Promise<void>(r => setTimeout(() => r(), 20)); };
+     if (isAsync) { try { setPlanBusy(true); setErrorMsg(null); } catch {} }
      try {
      // P1-fix: опция skipUndo для массовой генерации (месяц) — иначе 5×saveUndo заполняет
      // undoStack (cap=5) и уничтожает историю отмен пользователя.
@@ -1816,11 +1823,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         };
       };
 
+      await maybeYield();
       const d1 = buildOneDay(dayIdx);
       let d2: any = null, d3: any = null, weekDays: any[] = [], weekData: any = null;
       setDayPlan(d1);
       if (days >= 3) {
-        d2 = buildOneDay(1); d3 = buildOneDay(2);
+        await maybeYield();
+        d2 = buildOneDay(1); await maybeYield(); d3 = buildOneDay(2);
         setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: (d1?.totals?.kcal || 0) + (d2?.totals?.kcal || 0) + (d3?.totals?.kcal || 0), p: (d1?.totals?.p || 0) + (d2?.totals?.p || 0) + (d3?.totals?.p || 0), f: (d1?.totals?.f || 0) + (d2?.totals?.f || 0) + (d3?.totals?.f || 0), c: (d1?.totals?.c || 0) + (d2?.totals?.c || 0) + (d3?.totals?.c || 0), fiber: (d1?.totals?.fiber||0) + (d2?.totals?.fiber||0) + (d3?.totals?.fiber||0) } });
       }
       if (days >= 7) {
@@ -1828,7 +1837,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // продолжается через границу недель (раньше каждый месяц-week рестартовал паттерн,
         // давая две тренировки подряд на стыке недель).
         const _weekBase = weekIndex !== undefined ? weekIndex * 7 : 0;
-        weekDays = Array.from({ length: 7 }, (_, i) => buildOneDay(_weekBase + i));
+        const _weekAcc: any[] = [];
+        for (let _i = 0; _i < 7; _i++) {
+          await maybeYield();
+          _weekAcc.push(buildOneDay(_weekBase + _i));
+        }
+        weekDays = _weekAcc;
         weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + (d?.totals?.kcal || 0), 0), p: weekDays.reduce((s: any,d: any) => s + (d?.totals?.p || 0), 0), f: weekDays.reduce((s: any,d: any) => s + (d?.totals?.f || 0), 0), c: weekDays.reduce((s: any,d: any) => s + (d?.totals?.c || 0), 0) }};
         if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
         else setWeekPlan(weekData);
@@ -2692,6 +2706,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       try { localStorage.setItem('he_planner_last_error', JSON.stringify({ message, at: new Date().toISOString() })); } catch {}
       setErrorMsg(message);
     }
+    if (isAsync) setPlanBusy(false);
   };
 
 const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -2887,7 +2902,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     workStartTime, setWorkStartTime, workEndTime, setWorkEndTime,
     workDays, setWorkDays, workScheduleType, setWorkScheduleType,
     trainingDays, setTrainingDays, DAY_LABELS,
-    generated, setGenerated, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex,
+    generated, setGenerated, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex, planBusy,
     planView, setPlanView, dayPlan, setDayPlan, threeDayPlan, setThreeDayPlan,
     weekPlan, setWeekPlan, shoppingList, setShoppingList, waterCalc, setWaterCalc,
     savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
