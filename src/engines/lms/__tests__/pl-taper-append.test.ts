@@ -516,20 +516,21 @@ describe('appendPLTaperWeeks', () => {
     expect(meet.week).toBeGreaterThan(next.weeks[baseLen + 1].week);
   });
 
-  it('meet week: подходы = прикиды из карточек (опенер/вторая/третья ×1, третья RIR0)', () => {
+  it('meet week: подходы = прайминг 60/70% + прикиды из карточек (опенер/вторая/третья ×1, третья RIR0)', () => {
     const plan = buildBase(6);
     const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'aggressive' } });
     const meet = next.weeks[next.weeks.length - 1];
     const squatEx = meet.days.flatMap(d => d.exercises).find(e => /присед/i.test(e.name));
     expect(squatEx).toBeDefined();
     const sets = squatEx!.workSets;
-    expect(sets).toHaveLength(3);
+    expect(sets).toHaveLength(5); // 🔥 прайминг 60/70% + опенер/вторая/третья
     expect(sets.every(s => s.reps === 1 && s.sets === 1)).toBe(true);
     const attempts = meet.meetAttempts!.lifts.find(l => /присед/i.test(l.name))!;
-    expect(sets[0].weight).toBe(attempts.opener);
-    expect(sets[2].weight).toBe(attempts.third);
-    expect(sets[2].rir).toBe(0);
-    expect(sets[2].weight).toBeGreaterThan(meet.pmRow[squatEx!.name]); // 105% > ПМ
+    expect(sets[0].weight).toBeLessThan(attempts.opener); // прайминг легче опенера
+    expect(sets[2].weight).toBe(attempts.opener);
+    expect(sets[4].weight).toBe(attempts.third);
+    expect(sets[4].rir).toBe(0);
+    expect(sets[4].weight).toBeGreaterThan(meet.pmRow[squatEx!.name]); // 105% > ПМ
   });
 
   it('meet week: комбинация mock + taper + meet — порядок: mock → тапер → соревнования', () => {
@@ -574,12 +575,14 @@ describe('appendPLTaperWeeks', () => {
     const meet = next.weeks[next.weeks.length - 1];
     const squatEx = meet.days.flatMap(d => d.exercises).find(e => /присед/i.test(e.name))!;
     const pm = meet.pmRow[squatEx.name];
-    // pct вычисляется от ПМ недели: опенер ≈ 93%, третья ≈ 105% (округление до 2.5 кг)
-    expect(squatEx.workSets[0].pct).toBeCloseTo(0.93, 1);
-    expect(squatEx.workSets[2].pct).toBeCloseTo(1.05, 1);
-    // Проценты растут: опенер < вторая < третья
-    expect(squatEx.workSets[0].pct).toBeLessThan(squatEx.workSets[1].pct);
-    expect(squatEx.workSets[1].pct).toBeLessThan(squatEx.workSets[2].pct);
+    // Сеты: 🔥 прайминг 60/70% (за 1-2 дня) + опенер ≈ 93%, вторая ≈ 97%, третья ≈ 105%
+    expect(squatEx.workSets[0].pct).toBeCloseTo(0.6, 2);
+    expect(squatEx.workSets[1].pct).toBeCloseTo(0.7, 2);
+    expect(squatEx.workSets[2].pct).toBeCloseTo(0.93, 1);
+    expect(squatEx.workSets[4].pct).toBeCloseTo(1.05, 1);
+    // Прикиды растут: опенер < вторая < третья
+    expect(squatEx.workSets[2].pct).toBeLessThan(squatEx.workSets[3].pct);
+    expect(squatEx.workSets[3].pct).toBeLessThan(squatEx.workSets[4].pct);
     expect(pm).toBeGreaterThan(0);
   });
 
@@ -607,9 +610,10 @@ describe('appendPLTaperWeeks', () => {
     const comp = meet.days.flatMap(d => d.exercises).filter(e => /присед|жим.*леж|станов/i.test(e.name));
     expect(comp.length).toBeGreaterThan(0);
     const squat = comp.find(e => /присед/i.test(e.name))!;
-    expect(squat.workSets).toHaveLength(3);
+    expect(squat.workSets).toHaveLength(5); // 🔥 прайминг 60/70% + опенер/вторая/третья
     expect(squat.workSets.every(s => s.reps === 1 && s.sets === 1)).toBe(true);
-    expect(squat.workSets[2].pct).toBeCloseTo(1.05, 1);
+    expect(squat.workSets[0].pct).toBeCloseTo(0.6, 2);
+    expect(squat.workSets[4].pct).toBeCloseTo(1.05, 1);
   });
 
   // ── Паритет стратегий: «Сбалансированная» (дефолт) не хуже новых ──

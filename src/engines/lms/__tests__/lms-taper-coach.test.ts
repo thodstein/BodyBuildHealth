@@ -6,8 +6,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   pmFeasibility, recommendTaperConfig, coachPLPeakPlan, projectPmToMeet, liftKeyOf,
+  sRPEAdjustment, scoreTaperScenario, compareTaperScenarios, evaluateMeetAttemptsFromDiary,
 } from '../lms-taper-coach.engine';
 import type { LMSBuildOutput, LMSPlanWeek } from '../lms-builder.engine';
+import type { MeetAttemptsInfo } from '../competition-attempts';
 
 const mkEx = (name: string, pct: number, sets: number, load?: string, reps = 3) => ({
   name, group: 'Грудь', coef: 1, mnosz: 1, pm: 200, rir: 2,
@@ -225,5 +227,142 @@ describe('вспомогательные', () => {
     expect(liftKeyOf('Жим ногами')).toBeNull();
     expect(liftKeyOf('Становая тяга')).toBe('deadlift');
     expect(liftKeyOf('Тяга к поясу')).toBeNull();
+  });
+});
+
+// ═══════════ ПУНКТ 1 — sRPE-тренд нагрузки ═══════════
+describe('sRPEAdjustment (дневник-интеграция)', () => {
+  const day = (n: number, rpe: number, dur = 60) => {
+    const d = new Date('2026-08-16T00:00:00');
+    d.setDate(d.getDate() - n);
+    return { date: d.toISOString().slice(0, 10), sRPE: rpe, durationMin: dur };
+  };
+
+  it('перегруз последних 14 дней (+50%) → тапер длиннее и глубже', () => {
+    const sessions = [
+      ...Array.from({ length: 4 }, (_, i) => day(1 + i, 8)),   // последние: 4×480
+      ...Array.from({ length: 4 }, (_, i) => day(15 + i, 5)),  // предыдущие: 4×300
+    ];
+    const adj = sRPEAdjustment(sessions);
+    expect(adj.taperWeeksDelta).toBe(1);
+    expect(adj.volumeMult).toBeCloseTo(0.9, 2);
+    expect(adj.note).toContain('перегруз');
+  });
+
+  it('недогруз последних 14 дней → тапер короче', () => {
+    const sessions = [
+      ...Array.from({ length: 4 }, (_, i) => day(1 + i, 4)),   // 4×240
+      ...Array.from({ length: 4 }, (_, i) => day(15 + i, 8)),  // 4×480
+    ];
+    const adj = sRPEAdjustment(sessions);
+    expect(adj.taperWeeksDelta).toBe(-1);
+    expect(adj.volumeMult).toBeCloseTo(1.05, 2);
+  });
+
+  it('мало данных / стабильная нагрузка → без коррекции', () => {
+    expect(sRPEAdjustment([]).taperWeeksDelta).toBe(0);
+    expect(sRPEAdjustment(undefined).taperWeeksDelta).toBe(0);
+    const stable = [
+      ...Array.from({ length: 4 }, (_, i) => day(1 + i, 6)),
+      ...Array.from({ length: 4 }, (_, i) => day(15 + i, 6)),
+    ];
+    expect(sRPEAdjustment(stable).taperWeeksDelta).toBe(0);
+    expect(sRPEAdjustment(stable).note).toBeNull();
+  });
+
+  it('recommendTaperConfig учитывает sRPE-перегруз (длиннее + классика)', () => {
+    const sessions = [
+      ...Array.from({ length: 4 }, (_, i) => day(1 + i, 8)),
+      ...Array.from({ length: 4 }, (_, i) => day(15 + i, 4)),
+    ];
+    const base = recommendTaperConfig({ ...baseCtx(), fatigue: 30, recentSessions: sessions });
+    const plain = recommendTaperConfig({ ...baseCtx(), fatigue: 30 });
+    expect(base.taperWeeks).toBeGreaterThanOrEqual(plain.taperWeeks);
+    expect(base.rationale.some(r => r.includes('перегруз'))).toBe(true);
+  });
+});
+
+// ═══════════ ПУНКТ 3 — тайминг по календарю ═══════════
+describe('coachPLPeakPlan + meetDate (календарь)', () => {
+  it('при заданной дате старта — заметка с конкретными датами последних тяжёлых', () => {
+    const v = coachPLPeakPlan(balancedPlan(), { ...baseCtx(), meetDate: '2026-09-20' });
+    const d = v.notes.find(n => n.icon === '📅');
+    expect(d).toBeTruthy();
+    expect(d!.text).toContain('2026-09-12'); // присед за 8 дн
+    expect(d!.text).toContain('2026-09-16'); // жим за 4 дн
+    expect(d!.text).toContain('2026-09-08'); // тяга за 12 дн
+    expect(d!.text).toContain('2026-09-18'); // прайминг за 2 дн
+  });
+});
+
+// ═══════════ ПУНКТ 4 — сравнение сценариев ═══════════
+describe('scoreTaperScenario / compareTaperScenarios', () => {
+  it('оценка сценария: целевой финальный объём → высокий score', () => {
+    const s = scoreTaperScenario({ id: 'classic-2', mode: 'classic', taperWeeks: 2 }, baseCtx());
+    expect(s.score).toBeGreaterThan(50);
+    expect(s.summary).toContain('классика 2 нед');
+  });
+
+  it('короткий тапер при опасном ACWR штрафуется', () => {
+    const short = scoreTaperScenario({ id: 'classic-1', mode: 'classic', taperWeeks: 1 }, { ...baseCtx(), acwr: { ratio: 1.7, zone: 'dangerous' } });
+    const long = scoreTaperScenario({ id: 'classic-3', mode: 'classic', taperWeeks: 3 }, { ...baseCtx(), acwr: { ratio: 1.7, zone: 'dangerous' } });
+    expect(short.score).toBeLessThan(long.score);
+  });
+
+  it('compareTaperScenarios возвращает отсортированные результаты и лучший', () => {
+    const { results, best } = compareTaperScenarios(baseCtx());
+    expect(results.length).toBeGreaterThanOrEqual(5);
+    expect(results[0].scenario.id).toBe(best.scenario.id);
+    // scores отсортированы по убыванию
+    for (let i = 1; i < results.length; i++) expect(results[i - 1].score).toBeGreaterThanOrEqual(results[i].score);
+  });
+});
+
+// ═══════════ ПУНКТ 5 — оценка прикидов из дневника ═══════════
+describe('evaluateMeetAttemptsFromDiary', () => {
+  const attempts: MeetAttemptsInfo = {
+    strategy: 'balanced',
+    lifts: [
+      { name: 'Присед', opener: 185, second: 192.5, third: 202.5, target: 202.5, warmup: [] },
+      { name: 'Жим лежа', opener: 130, second: 135, third: 142.5, target: 142.5, warmup: [] },
+    ],
+  };
+
+  it('третья взята → conservative + рекомендация агрессивнее', () => {
+    const evalRes = evaluateMeetAttemptsFromDiary(attempts, [
+      { date: '2026-08-10', exercises: [{ name: 'Присед', sets: [{ weightKg: 205, reps: 1 }] }] },
+      { date: '2026-08-10', exercises: [{ name: 'Жим лежа', sets: [{ weightKg: 145, reps: 1 }] }] },
+    ]);
+    expect(evalRes).toBeTruthy();
+    expect(evalRes!.lifts.every(l => l.made === 'third')).toBe(true);
+    expect(evalRes!.lifts.every(l => l.verdict === 'conservative')).toBe(true);
+    expect(evalRes!.nextStrategy).toBe('aggressive');
+  });
+
+  it('только опенер → aggressive + рекомендация консервативнее', () => {
+    const evalRes = evaluateMeetAttemptsFromDiary(attempts, [
+      { date: '2026-08-10', exercises: [{ name: 'Присед', sets: [{ weightKg: 185, reps: 1 }, { weightKg: 180, reps: 1 }] }] },
+      { date: '2026-08-10', exercises: [{ name: 'Жим лежа', sets: [{ weightKg: 120, reps: 3 }] }] },
+    ]);
+    expect(evalRes).toBeTruthy();
+    expect(evalRes!.lifts[0].made).toBe('opener');
+    expect(evalRes!.lifts[1].made).toBe('none');
+    expect(evalRes!.lifts[0].verdict).toBe('aggressive');
+    expect(evalRes!.nextStrategy).toBe('conservative');
+  });
+
+  it('смешанный результат → balanced', () => {
+    const evalRes = evaluateMeetAttemptsFromDiary(attempts, [
+      { date: '2026-08-10', exercises: [{ name: 'Присед', sets: [{ weightKg: 200, reps: 1 }] }] },
+      { date: '2026-08-10', exercises: [{ name: 'Жим лежа', sets: [{ weightKg: 130, reps: 1 }] }] },
+    ]);
+    expect(evalRes!.lifts[0].verdict).toBe('optimal'); // 200 < третья 202.5 → вторая взята
+    expect(evalRes!.lifts[1].verdict).toBe('aggressive'); // 130 = опенер
+    expect(evalRes!.nextStrategy).toBe('balanced');
+  });
+
+  it('без прикидов или без сессий → null', () => {
+    expect(evaluateMeetAttemptsFromDiary(null, [])).toBeNull();
+    expect(evaluateMeetAttemptsFromDiary(attempts, [])).not.toBeNull();
   });
 });

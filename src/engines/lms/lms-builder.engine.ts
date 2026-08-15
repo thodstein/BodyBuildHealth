@@ -1413,6 +1413,9 @@ export function appendPLTaperWeeks(
      *  дня на финальной тапер-неделе; 'light' — только разминка 50/70/90% без прикидов
      *  (контрольные старты; mock meet/неделя соревнований всегда с прикидами). */
     peakLayout?: PeakWeekLayout;
+    /** Прайминг-синглы 60/70% в неделе соревнований (за 1-2 дня до старта):
+     *  активация ЦНС без утомления. По умолчанию вкл. */
+    priming?: boolean;
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1658,7 +1661,15 @@ export function appendPLTaperWeeks(
             weight,
             rir,
           });
-          return { ...e, rir: 1, workSets: [mk(lift.opener, 2), mk(lift.second, 1), mk(lift.third, 0)] };
+          // 🔥 Прайминг за 1-2 дня до старта (только в неделе соревнований):
+          // синглы 60/70% — активация ЦНС без утомления.
+          const priming = (kind === 'meet' && opts?.priming !== false)
+            ? [
+                { sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.6) * 10) / 10, rir: 3, pct: 0.6 },
+                { sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.7) * 10) / 10, rir: 3, pct: 0.7 },
+              ]
+            : [];
+          return { ...e, rir: 1, workSets: [...priming, mk(lift.opener, 2), mk(lift.second, 1), mk(lift.third, 0)] };
         }
         return {
           ...e,
@@ -1681,7 +1692,9 @@ export function appendPLTaperWeeks(
       macroPhase: 'competition' as const,
       [kind === 'mock' ? 'mockMeet' : 'meetWeek']: true,
       meetAttempts: attempts,
-      ...(capped.length > 0 ? { taperNote: `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` } : {}),
+      taperNote: kind === 'meet' && opts?.priming !== false
+        ? '🔥 прайминг за 1-2 дня до старта: синглы 60/70% на основных лифтах (активация ЦНС), затем прикиды.' + (capped.length > 0 ? ` План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` : '')
+        : (capped.length > 0 ? `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` : undefined),
     };
   };
 
@@ -1809,7 +1822,7 @@ export function appendPLTaperWeeks(
     ? ` 🎯 Имитация соревнований (mock meet): неделя ${mockWk.week} — прикиды-синглы ${MEET_STRATEGY_PCT_LABEL[mockStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} от ПМ, аксессуары ×0.5.`
     : '';
   const meetNote = meetWk
-    ? ` 🏁 Неделя соревнований: ${meetWk.week} — прикиды (${MEET_STRATEGY_PCT_LABEL[meetStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}) как подходы дня старта (опенер/вторая/третья ×1).`
+    ? ` 🏁 Неделя соревнований: ${meetWk.week} — прикиды (${MEET_STRATEGY_PCT_LABEL[meetStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}) как подходы дня старта (опенер/вторая/третья ×1)${opts?.priming !== false ? ' + 🔥 прайминг-синглы 60/70% за 1-2 дня' : ''}.`
     : '';
   const postMeetNote = postMeetWk
     ? ` 🔄 Пост-соревновательная неделя: ${postMeetWk.week} — объём ×${opts?.postMeet?.volumeMult ?? 0.5}, RIR +3 (восстановление после старта).`

@@ -150,3 +150,35 @@ describe('appendPLTaperWeeks: все схемы — прикиды на фина
     }
   });
 });
+
+describe('appendPLTaperWeeks: 🔥 прайминг в неделе соревнований', () => {
+  it('meet-неделя получает прайминг-синглы 60/70% перед прикидами', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' } });
+    const meet = next.weeks.find(w => w.meetWeek)!;
+    const main = meet.days.flatMap(d => d.exercises.filter(e => e.load === 'main' || e.load === 'Тяжелая'));
+    const mainEx = main[0];
+    const pcts = mainEx.workSets.map(ws => ws.pct);
+    expect(pcts[0]).toBeCloseTo(0.6, 2);
+    expect(pcts[1]).toBeCloseTo(0.7, 2);
+    expect(pcts.slice(2).length).toBeGreaterThanOrEqual(3); // опенер/вторая/третья
+    expect(mainEx.workSets[0].rir).toBe(3); // прайминг — лёгкий
+    expect(meet.taperNote).toContain('прайминг');
+  });
+
+  it('mock meet НЕ получает прайминг (это репетиция, не старт)', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { mockMeet: { strategy: 'balanced' } });
+    const mock = next.weeks.find(w => w.mockMeet)!;
+    const pcts = mock.days.flatMap(d => d.exercises.filter(e => e.load === 'main' || e.load === 'Тяжелая')).flatMap(e => e.workSets.map(ws => ws.pct));
+    expect(pcts[0]).not.toBeCloseTo(0.6, 2); // нет 60% прайминга первым
+  });
+
+  it('priming: false — прайминг отключается', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { meetWeek: { strategy: 'balanced' }, priming: false });
+    const meet = next.weeks.find(w => w.meetWeek)!;
+    const pcts = meet.days.flatMap(d => d.exercises.filter(e => e.load === 'main' || e.load === 'Тяжелая')).flatMap(e => e.workSets.map(ws => ws.pct));
+    expect(pcts[0]).not.toBeCloseTo(0.6, 2);
+  });
+});

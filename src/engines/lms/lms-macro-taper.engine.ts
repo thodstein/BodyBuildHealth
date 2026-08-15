@@ -124,7 +124,14 @@ function toAttemptsWeek(wk: LMSPlanWeek, kind: 'mock' | 'meet', strategy: MeetSt
           pct: Math.round((weight / Math.max(1, wk.pmRow[e.name] ?? e.pm)) * 1000) / 1000,
           reps: 1, sets: 1, weight, rir,
         });
-        return { ...e, rir: 1, workSets: [mk(lift.opener, 2), mk(lift.second, 1), mk(lift.third, 0)] };
+        // 🔥 Прайминг за 1-2 дня до старта (только в неделе соревнований).
+        const priming = kind === 'meet'
+          ? [
+              { sets: 1, reps: 1, weight: Math.round(workWeight(wk.pmRow[e.name] ?? e.pm, 0.6) * 10) / 10, rir: 3, pct: 0.6 },
+              { sets: 1, reps: 1, weight: Math.round(workWeight(wk.pmRow[e.name] ?? e.pm, 0.7) * 10) / 10, rir: 3, pct: 0.7 },
+            ]
+          : [];
+        return { ...e, rir: 1, workSets: [...priming, mk(lift.opener, 2), mk(lift.second, 1), mk(lift.third, 0)] };
       }
       return {
         ...e,
@@ -141,7 +148,7 @@ function toAttemptsWeek(wk: LMSPlanWeek, kind: 'mock' | 'meet', strategy: MeetSt
     meetAttempts: attempts,
     taperNote: kind === 'mock'
       ? '🎯 Имитация соревнований (mock meet): прикиды-синглы (опенер RIR2 → вторая RIR1 → третья RIR0), аксессуары ×0.5.'
-      : `🏁 Соревнования: прикиды (опенер/вторая/третья ×1) как подходы дня старта, аксессуары ×0.5.`,
+      : '🏁 Соревнования: прикиды (опенер/вторая/третья ×1) как подходы дня старта + 🔥 прайминг-синглы 60/70% за 1-2 дня, аксессуары ×0.5.',
   };
 }
 

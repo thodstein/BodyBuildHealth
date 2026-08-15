@@ -11,11 +11,12 @@
  * Все функции чистые и покрыты тестами (lms-taper-coach.test.ts).
  */
 import type { LMSBuildOutput, LMSPlanWeek } from './lms-builder.engine';
-import { buildPLTaperCurve, taperWeeksByFatigue, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
+import { buildPLTaperCurve, taperWeeksByFatigue, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { LAST_HEAVY_DAYS, type Lift } from '../pro/taper.engine';
 import { norm } from '../norm';
+import { toDailyLoads, type TrainingSession } from '../pro/training-load.engine';
 import type { ACWRZone } from '../pro/training-load.engine';
-import type { MeetStrategy } from './competition-attempts';
+import type { MeetAttemptsInfo, MeetStrategy } from './competition-attempts';
 
 export interface TaperCoachAcwr { ratio: number; zone: ACWRZone }
 
@@ -24,6 +25,10 @@ export interface TaperCoachCtx {
   fatigue?: number;
   /** ACWR из дневника sRPE. */
   acwr?: TaperCoachAcwr;
+  /** sRPE-сессии дневника (последние ~4 недели) — тренд нагрузки для коррекции тапера. */
+  recentSessions?: TrainingSession[];
+  /** Дата старта (ISO) — тайминг последних тяжёлых по календарю. */
+  meetDate?: string;
   /** Текущий вес тела (кг). */
   currentWeight?: number;
   /** Целевой вес категории (кг). */
@@ -115,12 +120,16 @@ export function recommendTaperConfig(ctx: TaperCoachCtx): TaperConfigRecommendat
   const rationale: string[] = [];
   const fatigue = ctx.fatigue != null && Number.isFinite(ctx.fatigue) ? Math.max(0, Math.min(100, ctx.fatigue)) : undefined;
   const zone = ctx.acwr?.zone;
+  // 📈 Дневник-интеграция: тренд sRPE-нагрузки последних 14 дней vs предыдущих.
+  const sRpe = sRPEAdjustment(ctx.recentSessions);
+  if (sRpe.note) rationale.push(sRpe.note);
 
-  // ── Длительность: по усталости, коррекция по ACWR ──
+  // ── Длительность: по усталости, коррекция по ACWR и тренду нагрузки ──
   let taperWeeks = taperWeeksByFatigue(fatigue) ?? 2;
   if (zone === 'dangerous') { taperWeeks = Math.min(4, taperWeeks + 1); rationale.push('⛔ ACWR в опасной зоне — тапер длиннее (глубокая разгрузка).'); }
   else if (zone === 'caution') { rationale.push('⚠ ACWR осторожная зона — разгрузка обязательна.'); }
   else if (zone === 'undertrained') { taperWeeks = Math.max(1, taperWeeks - 1); rationale.push('🔵 Недогруз (ACWR < 0.8) — тапер короче, глубокой усталости нет.'); }
+  taperWeeks = Math.max(1, Math.min(4, taperWeeks + sRpe.taperWeeksDelta));
   if (fatigue != null && fatigue >= 70) rationale.push(`🔥 Усталость ${Math.round(fatigue)}/100 — длинный тапер ${taperWeeks} нед.`);
 
   // ── Режим: перегруз → classic; цель PR → pl; низкая усталость → pro ──
@@ -131,7 +140,7 @@ export function recommendTaperConfig(ctx: TaperCoachCtx): TaperConfigRecommendat
   const actualMax = Math.max(0, ...Object.values(ctx.actualPm ?? {}).filter(v => v > 0));
   const baseMax = actualMax > 0 ? actualMax : forecastMax;
   const chasingPR = plannedMax > 0 && baseMax > 0 && plannedMax > baseMax * 1.02;
-  if (zone === 'dangerous' || zone === 'caution' || (fatigue != null && fatigue >= 70)) {
+  if (zone === 'dangerous' || zone === 'caution' || (fatigue != null && fatigue >= 70) || sRpe.taperWeeksDelta > 0) {
     mode = 'classic';
   } else if (chasingPR) {
     mode = 'pl';
@@ -242,16 +251,21 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
     if (!weeks.some(w => w.mockMeet)) { score -= 5; notes.push({ severity: 'info', icon: '🎯', text: 'Mock meet отсутствует — имитация прикидок за 10-14 дней до старта проверяет стратегию на практике.' }); }
     if (!weeks.some(w => w.postMeet)) { score -= 5; notes.push({ severity: 'info', icon: '🔄', text: 'Пост-соревновательная неделя отсутствует — восстановление после прикидок (×0.5, RIR +3) снижает риск перетренированности.' }); }
     notes.push({ severity: 'info', icon: '⏱', text: `Последние тяжёлые перед стартом: присед за ${LAST_HEAVY_DAYS.squat} дн, жим за ${LAST_HEAVY_DAYS.bench} дн, тяга за ${LAST_HEAVY_DAYS.deadlift} дн до старта; за 1-2 дня — только лёгкий прайминг 60-75% (синглы), ЦНС должна прийти свежей.` });
+    // 📅 Тайминг по календарю: конкретные даты (если известна дата старта).
+    if (ctx?.meetDate) {
+      notes.push({ severity: 'info', icon: '📅', text: `По календарю (старт ${ctx.meetDate}): последний тяжёлый присед — не позднее ${isoAddDays(ctx.meetDate, -LAST_HEAVY_DAYS.squat)}, жим — ${isoAddDays(ctx.meetDate, -LAST_HEAVY_DAYS.bench)}, тяга — ${isoAddDays(ctx.meetDate, -LAST_HEAVY_DAYS.deadlift)}. Прайминг-синглы 60-75% — ${isoAddDays(ctx.meetDate, -2)}.` });
+    }
   } else if (taperWeeksList.length > 0) {
     notes.push({ severity: 'info', icon: '🏁', text: 'Тапер применён, но недели соревнований нет — добавьте «🏁 Неделю соревнований в конце», чтобы получить прикиды дня старта.' });
   }
 
-  // ── Усталость vs длительность тапера ──
+  // ── Усталость vs длительность тапера (с учётом тренда нагрузки) ──
   if (ctx?.fatigue != null && taperWeeksList.length > 0) {
-    const recommended = taperWeeksByFatigue(ctx.fatigue) ?? 2;
+    const sRpe = sRPEAdjustment(ctx.recentSessions);
+    const recommended = Math.max(1, Math.min(4, (taperWeeksByFatigue(ctx.fatigue) ?? 2) + sRpe.taperWeeksDelta));
     if (taperWeeksList.length < recommended) {
       score -= 10;
-      notes.push({ severity: 'warn', icon: '🔥', text: `Усталость ${Math.round(ctx.fatigue)}/100 требует тапера ${recommended} нед, в плане ${taperWeeksList.length} — удлините тапер.` });
+      notes.push({ severity: 'warn', icon: '🔥', text: `Усталость ${Math.round(ctx.fatigue)}/100 (с учётом тренда нагрузки) требует тапера ${recommended} нед, в плане ${taperWeeksList.length} — удлините тапер.` });
     }
   }
 
@@ -260,6 +274,14 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
     if (ctx.acwr.zone === 'dangerous') { score -= 25; notes.push({ severity: 'danger', icon: '⛔', text: `ACWR ${ctx.acwr.ratio.toFixed(2)} — опасная зона: перед пиком обязателен глубокий тапер (объём ×0.45-0.5, RIR +2).` }); }
     else if (ctx.acwr.zone === 'caution') { score -= 10; notes.push({ severity: 'warn', icon: '⚠', text: `ACWR ${ctx.acwr.ratio.toFixed(2)} — осторожная зона: снизьте объём финальных недель, добавьте RIR.` }); }
     else if (ctx.acwr.zone === 'undertrained') { score -= 4; notes.push({ severity: 'info', icon: '🔵', text: 'ACWR < 0.8 — недогруз: тапер можно короче, добавьте прайминг-интенсивность.' }); }
+  }
+
+  // ── Тренд нагрузки по дневнику (sRPE) ──
+  const sRpeNote = sRPEAdjustment(ctx?.recentSessions).note;
+  if (sRpeNote && taperWeeksList.length > 0) {
+    const overload = sRpeNote.startsWith('📈');
+    score -= overload ? 10 : 4;
+    notes.push({ severity: overload ? 'warn' : 'info', icon: overload ? '📈' : '📉', text: sRpeNote });
   }
 
   // ── Достижимость плана ПМ ──
@@ -298,6 +320,213 @@ export function liftKeyOf(name: string): Lift | null {
   if (/жим/.test(n) && !/ногами|стоя|армейск/.test(n)) return 'bench';
   if (/станов/.test(n)) return 'deadlift';
   return null;
+}
+
+const isoAddDays = (iso: string, days: number): string => {
+  const d = new Date(iso + 'T00:00:00Z');
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ПУНКТ 1 — Дневник-интеграция: тренд sRPE-нагрузки последних недель
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface SRpeAdjustment {
+  /** Сдвиг длительности тапера: -1 (короче) / 0 / +1 (длиннее). */
+  taperWeeksDelta: number;
+  /** Множитель объёма тапера: перегруз → 0.9, недогруз → 1.05. */
+  volumeMult: number;
+  /** Человекочитаемое пояснение (null — данных мало). */
+  note: string | null;
+}
+
+/**
+ * Тренд нагрузки по sRPE-дневнику: сумма за последние 14 дней vs предыдущие 14.
+ * Перегруз (> +30%) → тапер длиннее и глубже; недогруз (< -30%) → короче и чуть
+ * интенсивнее (усталость не накоплена — нечего разгружать).
+ */
+export function sRPEAdjustment(sessions?: TrainingSession[]): SRpeAdjustment {
+  const out: SRpeAdjustment = { taperWeeksDelta: 0, volumeMult: 1, note: null };
+  if (!sessions || sessions.length < 3) return out;
+  const loads = toDailyLoads(sessions);
+  const dates = loads.map(l => l.date).sort();
+  const today = dates[dates.length - 1];
+  const cutoff = (d: string, days: number) => isoAddDays(d, -days);
+  let recent = 0, prev = 0;
+  for (const l of loads) {
+    if (l.date > cutoff(today, 14)) recent += l.load;
+    else if (l.date > cutoff(today, 28)) prev += l.load;
+  }
+  if (prev <= 0) return out;
+  const ratio = recent / prev;
+  if (ratio > 1.3) {
+    out.taperWeeksDelta = 1;
+    out.volumeMult = 0.9;
+    out.note = `📈 Нагрузка последних 14 дней +${Math.round((ratio - 1) * 100)}% к предыдущим — перегруз: тапер длиннее и глубже (объём ×0.9).`;
+  } else if (ratio < 0.7) {
+    out.taperWeeksDelta = -1;
+    out.volumeMult = 1.05;
+    out.note = `📉 Нагрузка последних 14 дней −${Math.round((1 - ratio) * 100)}% — недогруз: тапер короче, добавьте интенсивности (объём ×1.05).`;
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ПУНКТ 4 — Сравнение сценариев тапера («что если classic 3 нед vs pl 2 нед»)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface TaperScenario {
+  id: string;
+  mode: TaperMode;
+  taperWeeks: number;
+}
+
+export interface ScenarioScore {
+  scenario: TaperScenario;
+  score: number;
+  summary: string;
+  notes: string[];
+}
+
+/** Оценка одного сценария: профиль кривой + соответствие усталости/ACWR/нагрузке. */
+export function scoreTaperScenario(scenario: TaperScenario, ctx?: TaperCoachCtx): ScenarioScore {
+  const notes: string[] = [];
+  let score = 100;
+  const curve = buildPLTaperCurve({ taperWeeks: scenario.taperWeeks, mode: scenario.mode });
+  const final = curve[curve.length - 1];
+  const sRpe = sRPEAdjustment(ctx?.recentSessions);
+
+  // Объём финальной недели (цель 40-60% — суперкомпенсация без потери стимула).
+  const finalVol = final.volumePct;
+  if (finalVol > 0.75) { score -= 25; notes.push(`Объём финала ${Math.round(finalVol * 100)}% — разгрузка недостаточна (цель 40-60%).`); }
+  else if (finalVol > 0.62) { score -= 15; notes.push(`Объём финала ${Math.round(finalVol * 100)}% — на грани, следите за RIR.`); }
+  else if (finalVol < 0.4) { score -= 5; notes.push(`Объём финала ${Math.round(finalVol * 100)}% — глубокая разгрузка, не теряйте интенсивность.`); }
+  else notes.push(`Объём финала ${Math.round(finalVol * 100)}% — целевой диапазон разгрузки.`);
+
+  // Длительность vs рекомендуемая (усталость + тренд нагрузки).
+  const recommended = Math.max(1, Math.min(4, (taperWeeksByFatigue(ctx?.fatigue) ?? 2) + sRpe.taperWeeksDelta));
+  if (scenario.taperWeeks < recommended) { score -= 20; notes.push(`Короче рекомендации (${recommended} нед) — усталость не успеет разгрузиться.`); }
+  else if (scenario.taperWeeks > recommended + 1) { score -= 5; notes.push(`Длиннее рекомендации — риск потери стимула на длинной разгрузке.`); }
+
+  // ACWR-риск при коротких сценариях.
+  if (ctx?.acwr?.zone === 'dangerous' && scenario.taperWeeks <= 1) { score -= 20; notes.push('Опасная зона ACWR при 1-недельном тапере — разгрузка недостаточна.'); }
+  else if (ctx?.acwr?.zone === 'caution' && scenario.taperWeeks <= 1) { score -= 10; notes.push('Осторожная зона ACWR — минимум 2 недели тапера.'); }
+  else if (ctx?.acwr?.zone === 'undertrained' && scenario.taperWeeks >= 3) { score -= 10; notes.push('Недогруз: длинный тапер избыточен — короче + прайминг.'); }
+
+  // Сгонка веса при высоком объёме.
+  const cutting = ctx?.currentWeight != null && ctx?.targetWeight != null && (ctx.currentWeight - ctx.targetWeight) > 1;
+  if (cutting && finalVol > 0.6) { score -= 10; notes.push('Сгонка + высокий объём финала — дефицит тормозит восстановление, режьте объём сильнее.'); }
+
+  // sRPE-тренд.
+  if (sRpe.note) {
+    if (sRpe.taperWeeksDelta > 0 && scenario.taperWeeks < recommended) { score -= 15; notes.push('Перегруз по дневнику — нужен более длинный тапер.'); }
+    if (sRpe.taperWeeksDelta < 0 && scenario.taperWeeks > recommended) { score -= 10; notes.push('Недогруз по дневнику — длинный тапер избыточен.'); }
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const modeLabel = scenario.mode === 'pl' ? 'ПЛ-пик' : scenario.mode === 'pro' ? 'про-тапер' : scenario.mode === 'wf' ? 'Classic WF' : 'классика';
+  return {
+    scenario,
+    score,
+    summary: `${modeLabel} ${scenario.taperWeeks} нед: финал объём ${Math.round(finalVol * 100)}%, RIR ${final.rirTarget != null ? `→${final.rirTarget}` : `+${final.rirShift}`}`,
+    notes,
+  };
+}
+
+/** Сравнение сценариев тапера (по умолчанию — практичный набор). */
+export function compareTaperScenarios(ctx?: TaperCoachCtx, scenarios?: TaperScenario[]): { results: ScenarioScore[]; best: ScenarioScore } {
+  const list: TaperScenario[] = scenarios ?? [
+    { id: 'classic-1', mode: 'classic', taperWeeks: 1 },
+    { id: 'classic-2', mode: 'classic', taperWeeks: 2 },
+    { id: 'classic-3', mode: 'classic', taperWeeks: 3 },
+    { id: 'pl-3', mode: 'pl', taperWeeks: 3 },
+    { id: 'pro-2', mode: 'pro', taperWeeks: 2 },
+    { id: 'pro-3', mode: 'pro', taperWeeks: 3 },
+    { id: 'wf-4', mode: 'wf', taperWeeks: 4 },
+  ];
+  const results = list.map(s => scoreTaperScenario(s, ctx));
+  results.sort((a, b) => b.score - a.score);
+  return { results, best: results[0] };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ПУНКТ 5 — Оценка прикидов из дневника (после mock meet / соревнований)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface DiaryLiftSession {
+  date?: string;
+  exercises: { name: string; sets: { weightKg: number; reps: number }[] }[];
+}
+
+export interface MeetEvaluationLift {
+  name: string;
+  plannedOpener: number;
+  plannedSecond: number;
+  plannedThird: number;
+  actualBest: number;
+  made: 'third' | 'second' | 'opener' | 'none';
+  verdict: 'conservative' | 'optimal' | 'aggressive';
+}
+
+export interface MeetEvaluation {
+  lifts: MeetEvaluationLift[];
+  summary: string;
+  nextStrategy: MeetStrategy;
+}
+
+const matchLiftName = (name: string, lifts: { name: string }[]) => {
+  const n = norm(name);
+  const exact = lifts.find(l => norm(l.name) === n);
+  if (exact) return exact;
+  if (/присед|сквот/.test(n)) return lifts.find(l => /присед|сквот/.test(norm(l.name)));
+  if (/жим/.test(n) && !/ногами|стоя|армейск/.test(n)) return lifts.find(l => /жим/.test(norm(l.name)) && !/ногами|стоя|армейск/.test(norm(l.name)));
+  if (/станов/.test(n)) return lifts.find(l => /станов/.test(norm(l.name)));
+  return undefined;
+};
+
+/**
+ * Сверка плана прикидов с ФАКТИЧЕСКИМИ подходами дневника: лучший сингл по
+ * каждому лифту против опенера/второй/третьей → вердикт и рекомендация
+ * стратегии для следующего старта.
+ */
+export function evaluateMeetAttemptsFromDiary(attempts: MeetAttemptsInfo | null | undefined, sessions: DiaryLiftSession[]): MeetEvaluation | null {
+  if (!attempts || !attempts.lifts || attempts.lifts.length === 0) return null;
+  const lifts: MeetEvaluationLift[] = attempts.lifts.map(planned => {
+    let actualBest = 0;
+    for (const s of sessions ?? []) {
+      for (const ex of s.exercises ?? []) {
+        const target = matchLiftName(ex.name, attempts.lifts);
+        if (!target || target.name !== planned.name) continue;
+        for (const set of ex.sets ?? []) {
+          if ((set.reps ?? 0) === 1 && (set.weightKg ?? 0) > actualBest) actualBest = set.weightKg;
+        }
+      }
+    }
+    const made: MeetEvaluationLift['made'] = actualBest >= planned.third ? 'third' : actualBest >= planned.second ? 'second' : actualBest >= planned.opener ? 'opener' : 'none';
+    const verdict: MeetEvaluationLift['verdict'] = made === 'third' ? 'conservative' : made === 'second' ? 'optimal' : 'aggressive';
+    return { name: planned.name, plannedOpener: planned.opener, plannedSecond: planned.second, plannedThird: planned.third, actualBest, made, verdict };
+  });
+  const counters = { conservative: 0, optimal: 0, aggressive: 0 };
+  for (const l of lifts) counters[l.verdict]++;
+  // Строгое большинство: только если один вердикт доминирует над остальными.
+  const maxCount = Math.max(counters.conservative, counters.optimal, counters.aggressive);
+  const nextStrategy: MeetStrategy = maxCount === counters.conservative && counters.conservative > counters.aggressive && counters.conservative > counters.optimal
+    ? 'aggressive'
+    : maxCount === counters.aggressive && counters.aggressive > counters.conservative && counters.aggressive > counters.optimal
+      ? 'conservative'
+      : 'balanced';
+  const parts = lifts.map(l => {
+    const madeLabel = l.made === 'third' ? 'третья взята' : l.made === 'second' ? 'вторая взята' : l.made === 'opener' ? 'только опенер' : 'не взята';
+    return `${l.name}: план ${l.plannedOpener}/${l.plannedSecond}/${l.plannedThird} — факт ${l.actualBest > 0 ? l.actualBest + ' кг' : 'нет синглов'} (${madeLabel})`;
+  });
+  const verdictLabel = nextStrategy === 'aggressive' ? 'можно агрессивнее' : nextStrategy === 'conservative' ? 'снизьте проценты' : 'стратегия оправдана';
+  return {
+    lifts,
+    summary: `🩺 Оценка прикидов: ${parts.join('; ')}. Для следующего старта: ${verdictLabel}.`,
+    nextStrategy,
+  };
 }
 
 export { buildPLTaperCurve };

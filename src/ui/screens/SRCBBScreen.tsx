@@ -3,7 +3,7 @@ import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lm
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
 import { applyMacroTaperToPLWeeks, type MacroTaperOpts } from '../../engines/lms/lms-macro-taper.engine';
-import { recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
+import { recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet, compareTaperScenarios, evaluateMeetAttemptsFromDiary, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
 import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type PeakWeekLayout, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../engines/rir-matrix.engine';
@@ -26,7 +26,6 @@ import { PeakingPanel } from './SRCBBScreen_parts/PeakingPanel';
 import { RecoveryPanel } from './SRCBBScreen_parts/RecoveryPanel';
 import { ExerciseSafetyPanel } from './SRCBBScreen_parts/ExerciseSafetyPanel';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
-import { ExerciseDemoPanel } from './SRCBBScreen_parts/ExerciseDemoPanel';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
@@ -106,7 +105,7 @@ function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanM
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['autoreg', '🧠 Авторегуляция'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность'], ['demo', '🎬 Демонстрация']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['autoreg', '🧠 Авторегуляция'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -517,6 +516,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return {
       fatigue: linked.readiness?.fatigue ?? 30,
       acwr: acwrData,
+      recentSessions: loadSRPESessions(),
+      meetDate: isoAddDays(isoToday(), Math.max(0, weeksToMeet * 7)),
       currentWeight: bw,
       targetWeight: targetBw,
       actualPm: Object.fromEntries(Object.entries(taperActualPm).filter(([, v]) => v > 0)),
@@ -1115,11 +1116,31 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return [...byDate.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([d, v]) => ({ date: d, ...v }));
   }, [strengthLogs, selectedTrendEx]);
 
+  // 🔄 «Начать заново»: подтверждение сброса сборки (ПЛ-план и ББ-план + все оверлеи).
+  const [resetAsk, setResetAsk] = useState(false);
+  const resetBuild = () => {
+    setResetAsk(false);
+    // ПЛ-план: собранный цикл, добавления, правки, тапер-план.
+    setBuiltSrc(null);
+    setSrcWeek(1);
+    setSrcAdditions({});
+    setSrcEdits({});
+    setEditMode(false);
+    setPickerDay(null);
+    setTaperPlan(null);
+    // ББ-план (вкладка ББ этого экрана).
+    setBuiltBb(null);
+    setBbWeekSel(1);
+    setSubView('plan');
+    setMethodNote('🔄 Сборка сброшена — начинаем заново');
+  };
+
   return (
     <div key={mainTab} className="pl-auto-screen" style={{ padding: '12px 0', color: '#fff', width: '100%', maxWidth: '100%', margin: 0, minWidth: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
-      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', textAlign: 'center' }}>
+      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
+        <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
       </div>
       {applyPayload && (
         <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 10, fontSize: 11, color: 'var(--accent)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -1618,6 +1639,48 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             style={{ ...BTN_GHOST, marginTop: 6, minHeight: 36, fontSize: 10, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', background: 'rgba(0,230,138,0.06)' }}
                             title="Применить рекомендуемые настройки тапера (схема/длительность/весовая цель/mock/пост-старт) — затем нажмите «📉 Добавить тапер к плану»"
                           >✅ Применить рекомендации тренера</button>
+                          {/* 🔀 Сравнение сценариев тапера */}
+                          <div style={{ marginTop: 8, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>🔀 Сравнение сценариев («что если…»)</div>
+                            {(() => {
+                              const cmp = compareTaperScenarios(buildCoachCtx());
+                              return (
+                                <>
+                                  {cmp.results.slice(0, 5).map((r) => (
+                                    <div key={r.scenario.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, padding: '2px 0' }}>
+                                      <span style={{ minWidth: 26, fontWeight: 800, color: r.scenario.id === cmp.best.scenario.id ? '#00e68a' : 'rgba(255,255,255,0.5)' }}>{r.score}</span>
+                                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.8)' }}>{r.summary}</span>
+                                      {r.scenario.id === cmp.best.scenario.id && <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 700 }}>лучший</span>}
+                                    </div>
+                                  ))}
+                                  <button
+                                    onClick={() => { applyTaperRecommendation({ mode: cmp.best.scenario.mode, taperWeeks: cmp.best.scenario.taperWeeks, weightGoal: taperWeightGoal, mockMeet: mockMeetOn, postMeet: postMeetOn, strategy: attemptStrategy, rationale: [`🔀 Лучший сценарий: ${cmp.best.summary}`] }); }}
+                                    style={{ ...BTN_GHOST, marginTop: 4, minHeight: 32, fontSize: 10, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa', background: 'rgba(139,92,246,0.08)' }}
+                                    title="Применить лучший сценарий (схема + длительность) — затем «📉 Добавить тапер к плану»"
+                                  >🎯 Применить лучший сценарий</button>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          {/* 🩺 Оценка прикидов из дневника */}
+                          {(() => {
+                            const attempts = [...builtSrc.weeks].reverse().find(w => w.meetAttempts)?.meetAttempts;
+                            if (!attempts) return null;
+                            const evalRes = evaluateMeetAttemptsFromDiary(attempts, diarySessions as any);
+                            if (!evalRes) return null;
+                            return (
+                              <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.14)' }}>
+                                <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>🩺 Оценка прикидов по дневнику</div>
+                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{evalRes.summary}</div>
+                                {evalRes.nextStrategy !== attemptStrategy && (
+                                  <button
+                                    onClick={() => { setAttemptStrategy(evalRes.nextStrategy); setMethodNote(`🏁 Стратегия прикидов обновлена по факту дневника: ${MEET_STRATEGY_PCT_LABEL[evalRes.nextStrategy]} — нажмите «🔄 Обновить прикиды».`); }}
+                                    style={{ ...BTN_GHOST, marginTop: 4, minHeight: 32, fontSize: 10, border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd', background: 'rgba(96,165,250,0.08)' }}
+                                  >📌 Применить стратегию «{MEET_STRATEGY_PCT_LABEL[evalRes.nextStrategy]}»</button>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     } catch { return null; }
@@ -3153,13 +3216,28 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
       {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
       {subView === 'safety' && <ExerciseSafetyPanel />}
-      {subView === 'demo' && <ExerciseDemoPanel />}
       {subView === 'methods' && (<>
         <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}
       {subView === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
       {subView === 'prometrics' && <ProMetricsPanel />}
       {subView === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
+      {/* Модалка подтверждения «Начать заново» */}
+      {resetAsk && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', padding: 16 }}
+          onClick={() => setResetAsk(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', padding: 16, boxSizing: 'border-box', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#fb7185', marginBottom: 8 }}>🔄 Начать заново?</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: 12 }}>
+              Собранный план и все правки будут сброшены. Параметры останутся на месте — можно собрать план заново.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setResetAsk(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>Отмена</button>
+              <button onClick={resetBuild} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#f43f5e,#e11d48)', color: '#fff', fontWeight: 800, fontSize: 12, minHeight: 44 }}>🔄 Сбросить</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
