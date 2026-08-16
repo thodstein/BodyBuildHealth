@@ -96,7 +96,7 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   const targetGroups = (input.targetGroups || []).filter(Boolean);
   const groupPrep = targetGroups.length > 0 ? collectGroupPrep(targetGroups, hasBand) : null;
   const jointPrep = targetGroups.length > 0 ? collectJointPrep(targetGroups) : null;
-  const toBlockEx = (e: { id: string; sets: number; reps: number }) => ({ exerciseId: e.id, sets: e.sets, reps: e.reps });
+  const toBlockEx = (e: { id: string; sets: number; reps: number; note?: string }) => ({ exerciseId: e.id, sets: e.sets, reps: e.reps, ...(e.note ? { note: e.note } : {}) });
 
   const mobilityExs: { exerciseId: string; sets: number; reps: number }[] = groupPrep
     ? [...(jointPrep || []).map(toBlockEx), ...groupPrep.mobility.map(toBlockEx)]
@@ -141,16 +141,18 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   }
 
   // Специальная: разминочные подходы по КАЖДОМУ основному упражнению (не только первому).
-  // Рампа: первое упражнение 50/70/90%, второе 50/70%, остальные 50% (50%×5 → 70%×3 → 90%×1).
+  // Рампа по канону warmup-ramp: 50%×10 → 70%×5 → 80%×3 → 90%×1 (первое),
+  // второе 50%×10 → 70%×5, остальные 50%×10.
   const primaries = (input.primaryExercises || []).filter(Boolean).slice(0, 3);
   const specificExs: { exerciseId: string; sets: number; reps: number; intensityPct: number }[] = [];
+  const RAMP_REPS: Record<number, number> = { 50: 10, 70: 5, 80: 3, 90: 1 };
   if (primaries.length === 0) {
-    specificExs.push({ exerciseId: 'squat', sets: 3, reps: 5, intensityPct: 50 });
+    specificExs.push({ exerciseId: 'squat', sets: 1, reps: 10, intensityPct: 50 });
   } else {
     primaries.forEach((ex, i) => {
-      const ramp = i === 0 ? [50, 70, 90] : i === 1 ? [50, 70] : [50];
+      const ramp = i === 0 ? [50, 70, 80, 90] : i === 1 ? [50, 70] : [50];
       ramp.forEach(pct => {
-        specificExs.push({ exerciseId: ex, sets: 1, reps: pct >= 90 ? 1 : pct >= 70 ? 3 : 5, intensityPct: pct });
+        specificExs.push({ exerciseId: ex, sets: 1, reps: RAMP_REPS[pct], intensityPct: pct });
       });
     });
   }

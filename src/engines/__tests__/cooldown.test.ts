@@ -28,6 +28,14 @@ describe('COOLDOWN_GROUP_PREP и collectGroupCooldown', () => {
     expect(exs.map(e => e.id)).toEqual(['chest_stretch', 'shoulder_stretch']);
   });
 
+  it('подсказки упражнений передаются в блок растяжки (note)', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['chest'] });
+    const stretch = blocks.find(b => b.type === 'stretch')!;
+    const chest = stretch.exercises.find(e => e.exerciseId === 'chest_stretch');
+    expect(chest?.note).toBeTruthy();
+    expect(chest?.note).toContain('дверном проёме');
+  });
+
   it('арм-день: растяжка рук включает запястья', () => {
     const ids = collectGroupCooldown(['biceps', 'triceps']).map(e => e.id);
     expect(ids).toContain('bicep_stretch');

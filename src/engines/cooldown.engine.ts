@@ -63,8 +63,8 @@ export function generateCooldown(input: CooldownInput): CooldownBlock[] {
   // Упор на целевые группы дня (если переданы), иначе — фокус-эвристика
   const targetGroups = (input.targetGroups || []).filter(Boolean);
   const groupStretch = targetGroups.length > 0 ? collectGroupCooldown(targetGroups) : null;
-  const stretchExs: { exerciseId: string; durationSec: number }[] = groupStretch
-    ? groupStretch.map(e => ({ exerciseId: e.id, durationSec: e.durationSec }))
+  const stretchExs: { exerciseId: string; durationSec: number; note?: string }[] = groupStretch
+    ? groupStretch.map(e => ({ exerciseId: e.id, durationSec: e.durationSec, ...(e.note ? { note: e.note } : {}) }))
     : getStretchExercises(input.muscleGroupsUsed, input.riskFlags);
   if (Object.values(input.riskFlags).includes('high') && !stretchExs.some(e => e.exerciseId === 'nerve_flossing')) {
     stretchExs.push({ exerciseId: 'nerve_flossing', durationSec: 45 });

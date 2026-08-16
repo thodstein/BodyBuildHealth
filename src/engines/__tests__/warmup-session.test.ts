@@ -27,22 +27,31 @@ describe('generateWarmup', () => {
     expect(blocks.map(b => b.type)).toEqual(['general', 'mobility', 'activation', 'specific']);
   });
 
-  it('специальная часть: все основные упражнения с рампой 50/70/90 для первого', () => {
+  it('специальная часть: все основные упражнения с канон-рампой 50/70/80/90 (репы 10/5/3/1)', () => {
     const in3: WarmupInput = { ...baseInput, primaryExercises: ['squat', 'bench_press', 'deadlift'] };
     const specific = generateWarmup(in3).find(b => b.type === 'specific')!;
     expect(specific.exercises).toEqual([
-      { exerciseId: 'squat', sets: 1, reps: 5, intensityPct: 50 },
-      { exerciseId: 'squat', sets: 1, reps: 3, intensityPct: 70 },
+      { exerciseId: 'squat', sets: 1, reps: 10, intensityPct: 50 },
+      { exerciseId: 'squat', sets: 1, reps: 5, intensityPct: 70 },
+      { exerciseId: 'squat', sets: 1, reps: 3, intensityPct: 80 },
       { exerciseId: 'squat', sets: 1, reps: 1, intensityPct: 90 },
-      { exerciseId: 'bench_press', sets: 1, reps: 5, intensityPct: 50 },
-      { exerciseId: 'bench_press', sets: 1, reps: 3, intensityPct: 70 },
-      { exerciseId: 'deadlift', sets: 1, reps: 5, intensityPct: 50 },
+      { exerciseId: 'bench_press', sets: 1, reps: 10, intensityPct: 50 },
+      { exerciseId: 'bench_press', sets: 1, reps: 5, intensityPct: 70 },
+      { exerciseId: 'deadlift', sets: 1, reps: 10, intensityPct: 50 },
     ]);
   });
 
-  it('пустой список основных → fallback на squat 50%', () => {
+  it('пустой список основных → fallback на squat 50%×10', () => {
     const specific = generateWarmup({ ...baseInput, primaryExercises: [] }).find(b => b.type === 'specific')!;
-    expect(specific.exercises).toEqual([{ exerciseId: 'squat', sets: 3, reps: 5, intensityPct: 50 }]);
+    expect(specific.exercises).toEqual([{ exerciseId: 'squat', sets: 1, reps: 10, intensityPct: 50 }]);
+  });
+
+  it('подсказки упражнений из подготовки передаются в блок (note)', () => {
+    const blocks = generateWarmup({ ...baseInput, targetGroups: ['chest'] });
+    const mob = blocks.find(b => b.type === 'mobility')!;
+    const pec = mob.exercises.find(e => e.exerciseId === 'wall_pec_stretch');
+    expect(pec?.note).toBeTruthy();
+    expect(pec?.note).toContain('растяжка груди');
   });
 
   it('высокая усталость → сниженный общий блок', () => {

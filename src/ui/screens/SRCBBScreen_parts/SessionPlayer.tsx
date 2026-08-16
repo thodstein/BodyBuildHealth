@@ -930,8 +930,13 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   return (
                     <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)} />
-                      {'intensityPct' in ex && ex.intensityPct ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}
-                      {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
+                      <span style={{ flex: 1 }}>
+                        <span>
+                          {'intensityPct' in ex && ex.intensityPct ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}
+                          {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
+                        </span>
+                        {'note' in ex && ex.note ? <span style={{ display: 'block', fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{ex.note}</span> : null}
+                      </span>
                     </li>
                   );
                 })}
@@ -1310,8 +1315,13 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   return (
                     <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleCooldown(i, j)} />
-                      {cooldownLabel(ex.exerciseId)}
-                      <span style={{ color: 'var(--text-dim)', fontSize: 10 }}> · {ex.durationSec}с</span>
+                      <span style={{ flex: 1 }}>
+                        <span>
+                          {cooldownLabel(ex.exerciseId)}
+                          <span style={{ color: 'var(--text-dim)', fontSize: 10 }}> · {ex.durationSec}с</span>
+                        </span>
+                        {'note' in ex && ex.note ? <span style={{ display: 'block', fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{ex.note}</span> : null}
+                      </span>
                     </li>
                   );
                 })}

@@ -1313,14 +1313,14 @@ export interface SetScheme {
 export interface WarmupBlock {
   type: 'general' | 'mobility' | 'activation' | 'specific';
   durationSec: number;
-  exercises: { exerciseId: string; sets: number; reps: number; intensityPct?: number }[];
+  exercises: { exerciseId: string; sets: number; reps: number; intensityPct?: number; note?: string }[];
   notes?: string;
 }
 
 export interface CooldownBlock {
   type: 'stretch' | 'breathing' | 'mobility' | 'cardio';
   durationSec: number;
-  exercises: { exerciseId: string; durationSec: number }[];
+  exercises: { exerciseId: string; durationSec: number; note?: string }[];
   /** Пояснение блока (например, «Растяжка рабочих зон: грудь, спина»). */
   notes?: string;
 }
