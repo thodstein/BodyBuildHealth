@@ -2502,3 +2502,103 @@ export function buildPrepCoachJson(plan: BBContestPrepPlan): string {
   }, null, 2);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// План vs Факт тренировок (P3-4): выполнение недель prep по дневнику
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepTrainingWeekCompliance {
+  week: number;
+  phase: PrepPhaseKey | null;
+  dateStart: string;
+  dateEnd: string;
+  plannedSets: number;
+  actualSets: number;
+  pct: number; // 0..1+ (факт/план)
+  status: 'upcoming' | 'done' | 'partial' | 'missed';
+}
+
+export interface PrepTrainingCompliance {
+  weeks: PrepTrainingWeekCompliance[];
+  /** Факт/план по ПРОШЕДШИМ неделям (0..1+). */
+  overallPct: number;
+  completedWeeks: number;
+  elapsedWeeks: number;
+  recommendation: string;
+}
+
+/**
+ * Выполнение тренировочных недель contest prep по дневнику:
+ * факт-сеты (sessions[].totalSets в диапазоне дат недели) против плановых
+ * сетов недели. Недели в будущем — 'upcoming', не учитываются в overall.
+ */
+export function prepTrainingCompliance(
+  plan: BBContestPrepPlan,
+  bbWeeks: Array<{ week: number; contestPhase?: string; plannedSets: number }>,
+  sessions: Array<{ date: string; totalSets?: number }>,
+): PrepTrainingCompliance {
+  const today = isoToday();
+  const phaseByWeek = new Map<number, PrepPhaseKey>();
+  const datesByWeek = new Map<number, { start: string; end: string }>();
+  for (const p of plan.phases) {
+    if (p.key === 'show_day' || p.key === 'post_show') continue;
+    // Каждая неделя фазы — свой 7-дневный диапазон (иначе все недели фазы
+    // получают одни даты и факт-сеты считаются по всей фазе разом).
+    for (let w = p.weekStart; w <= p.weekEnd; w++) {
+      const offset = (w - p.weekStart) * 7;
+      phaseByWeek.set(w, p.key);
+      datesByWeek.set(w, { start: isoAddDays(p.dateStart, offset), end: isoAddDays(p.dateStart, offset + 6) });
+    }
+  }
+  const weekDates = (week: number): { start: string; end: string } => {
+    const d = datesByWeek.get(week);
+    return d ?? { start: '', end: '' };
+  };
+
+  const weeks: PrepTrainingWeekCompliance[] = bbWeeks
+    .filter(w => w.week >= 1)
+    .map(w => {
+      const { start, end } = weekDates(w.week);
+      const actualSets = sessions
+        .filter(s => s && start && end && s.date >= start && s.date <= end)
+        .reduce((a, s) => a + (Number(s.totalSets) || 0), 0);
+      const plannedSets = w.plannedSets || 0;
+      const pct = plannedSets > 0 ? actualSets / plannedSets : (actualSets > 0 ? 1 : 0);
+      let status: PrepTrainingWeekCompliance['status'];
+      if (!start || start > today) status = 'upcoming';
+      else if (plannedSets === 0) status = actualSets > 0 ? 'done' : 'missed';
+      else if (pct >= 0.9) status = 'done';
+      else if (pct >= 0.5) status = 'partial';
+      else status = 'missed';
+      return {
+        week: w.week,
+        phase: phaseByWeek.get(w.week) ?? null,
+        dateStart: start,
+        dateEnd: end,
+        plannedSets,
+        actualSets,
+        pct: Math.round(pct * 100) / 100,
+        status,
+      };
+    })
+    .sort((a, b) => a.week - b.week);
+
+  const elapsed = weeks.filter(w => w.status !== 'upcoming');
+  const elapsedPlanned = elapsed.reduce((a, w) => a + w.plannedSets, 0);
+  const elapsedActual = elapsed.reduce((a, w) => a + w.actualSets, 0);
+  const overallPct = elapsedPlanned > 0 ? Math.round((elapsedActual / elapsedPlanned) * 100) / 100 : 0;
+  const completedWeeks = elapsed.filter(w => w.status === 'done').length;
+
+  let recommendation: string;
+  if (elapsed.length === 0) {
+    recommendation = 'Подготовка ещё не началась — записывайте тренировки в дневник, чтобы видеть выполнение по неделям.';
+  } else if (overallPct >= 1) {
+    recommendation = `Выполнение ${Math.round(overallPct * 100)}% от плана: подготовка идёт по графику. Следите за RIR (2–3) и весом по средним 7 дней.`;
+  } else if (overallPct >= 0.7) {
+    recommendation = `Выполнение ${Math.round(overallPct * 100)}%: несколько недель недобраны. Не повышайте калории/объём — верните дисциплину, RIR 2–3.`;
+  } else {
+    recommendation = `Выполнение ${Math.round(overallPct * 100)}%: пропущены тренировки (${elapsed.length - completedWeeks} из ${elapsed.length} недель). При дефиците пропуски ускоряют потерю мышц — вернитесь к плану, объём не добавляйте.`;
+  }
+
+  return { weeks, overallPct, completedWeeks, elapsedWeeks: elapsed.length, recommendation };
+}
+

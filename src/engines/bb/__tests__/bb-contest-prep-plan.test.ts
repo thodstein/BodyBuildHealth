@@ -38,6 +38,7 @@ import {
   recordPrepAdjustment,
   buildPrepIcs,
   buildPrepCoachJson,
+  prepTrainingCompliance,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -1144,6 +1145,66 @@ describe('История корректировок и экспорт (P2/P3)', 
     expect(json.phases.length).toBeGreaterThan(0);
     expect(json.adjustments.length).toBe(1);
     expect(json.preparation.weeks).toBe(8);
+  });
+});
+
+describe('План vs Факт тренировок (prepTrainingCompliance)', () => {
+  const mkPlan = (): BBContestPrepPlan => buildBBContestPrepPlan(
+    baseConfig({ showDate: addDaysIso(todayIso(), 40) }),
+    { prepWeeks: 4, taperWeeks: 2 },
+  );
+  const mkWeeks = (n: number): Array<{ week: number; contestPhase?: string; plannedSets: number }> =>
+    Array.from({ length: n }, (_, i) => ({ week: i + 1, plannedSets: 20 }));
+
+  it('прошедшие недели считаются по датам сессий; будущие — upcoming', () => {
+    const plan = mkPlan();
+    const weeks = mkWeeks(7);
+    // Неделя 1 (диапазон [dateStart..+6]) — 20 сетов; неделя 2 (+7..+13) — 10 из 20.
+    const w1 = plan.phases.find(p => p.key === 'preparation')!;
+    const sessions = [
+      { date: w1.dateStart, totalSets: 15 },
+      { date: addDaysIso(w1.dateStart, 3), totalSets: 5 },
+      { date: addDaysIso(w1.dateStart, 7), totalSets: 10 },
+    ];
+    const res = prepTrainingCompliance(plan, weeks, sessions);
+    expect(res.weeks.length).toBe(7);
+    const wk1 = res.weeks.find(w => w.week === 1)!;
+    expect(wk1.status).toBe('done');
+    expect(wk1.actualSets).toBe(20);
+    expect(wk1.pct).toBe(1);
+    const wk2 = res.weeks.find(w => w.week === 2)!;
+    expect(wk2.actualSets).toBe(10);
+    expect(wk2.status).toBe('partial');
+    // Последняя неделя (пик) — в будущем → upcoming.
+    expect(res.weeks[res.weeks.length - 1].status).toBe('upcoming');
+    // overall по прошедшим неделям (1 и 2): 30/40 = 0.75.
+    expect(res.overallPct).toBe(0.75);
+    expect(res.elapsedWeeks).toBe(2);
+    expect(res.completedWeeks).toBe(1);
+  });
+
+  it('полное выполнение → recommendation «по графику», пропуски → «вернитесь к плану»', () => {
+    const plan = mkPlan();
+    const weeks = mkWeeks(7);
+    const w1 = plan.phases.find(p => p.key === 'preparation')!;
+    // Прошедшие недели 1 и 2: по 20 сетов каждая.
+    const full = prepTrainingCompliance(plan, weeks, [
+      { date: w1.dateStart, totalSets: 20 },
+      { date: addDaysIso(w1.dateStart, 7), totalSets: 20 },
+    ]);
+    expect(full.overallPct).toBe(1);
+    expect(full.recommendation).toMatch(/по графику/);
+    const missed = prepTrainingCompliance(plan, weeks, []);
+    expect(missed.overallPct).toBe(0);
+    expect(missed.recommendation).toMatch(/вернитесь к плану/);
+  });
+
+  it('пустой дневник и будущая подготовка → «ещё не началась»', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ showDate: addDaysIso(todayIso(), 400) }), { prepWeeks: 8, taperWeeks: 2 });
+    const res = prepTrainingCompliance(plan, mkWeeks(11), []);
+    expect(res.weeks.every(w => w.status === 'upcoming')).toBe(true);
+    expect(res.recommendation).toMatch(/ещё не началась/);
+    expect(res.overallPct).toBe(0);
   });
 });
 

@@ -71,6 +71,7 @@ import {
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
+  prepTrainingCompliance,
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
@@ -1554,7 +1555,7 @@ export const BbAutoConstructor: React.FC = () => {
   const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual'] : ['params','ped','split','plan','quality','adjust','contest','annual'];
   const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план' };
   const renderStepNav = () => (
-    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+    <div style={{ display:'flex', gap:6, flexShrink:0 }}>
       {stepList.map(s => {
         return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
       })}
@@ -3998,6 +3999,60 @@ export const BbAutoConstructor: React.FC = () => {
               );
             })()}
 
+            {/* 📈 Выполнение подготовки (план vs факт по дневнику) */}
+            {prepApplied && builtPlan && (() => {
+              try {
+                const compliance = prepTrainingCompliance(
+                  prepPlan,
+                  builtPlan.weeks.map((w: any) => ({
+                    week: (w as any).week,
+                    contestPhase: (w as any).contestPhase,
+                    plannedSets: w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((b: number, e: any) => b + (e.sets || 0), 0), 0),
+                  })),
+                  loadSessions().map(s => ({ date: s.date, totalSets: s.totalSets })),
+                );
+                const shown = compliance.weeks.slice(0, 8);
+                const statusColor: Record<string, string> = { done: '#4ade80', partial: '#fbbf24', missed: '#f87171', upcoming: 'rgba(255,255,255,0.4)' };
+                const statusLabel: Record<string, string> = { done: '✓', partial: '◐', missed: '✗', upcoming: '…' };
+                return (
+                  <div style={{ marginBottom:10 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#4ade80', marginBottom:4 }}>
+                      📈 Выполнение подготовки · {Math.round(compliance.overallPct * 100)}% от плана · завершено недель: {compliance.completedWeeks}/{compliance.elapsedWeeks}
+                    </div>
+                    <div style={{ overflowX:'auto' }}>
+                      <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse', minWidth:460 }}>
+                        <thead>
+                          <tr style={{ color:'rgba(255,255,255,0.5)', textAlign:'left' }}>
+                            <th style={{ padding:'4px 6px' }}>Нед</th>
+                            <th style={{ padding:'4px 6px' }}>Фаза</th>
+                            <th style={{ padding:'4px 6px', textAlign:'right' }}>План</th>
+                            <th style={{ padding:'4px 6px', textAlign:'right' }}>Факт</th>
+                            <th style={{ padding:'4px 6px', textAlign:'right' }}>%</th>
+                            <th style={{ padding:'4px 6px' }}>Статус</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shown.map(c => (
+                            <tr key={c.week} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding:'4px 6px', fontWeight:700 }}>{c.week}</td>
+                              <td style={{ padding:'4px 6px', color: PREP_PHASE_COLORS[c.phase ?? 'preparation'] ?? 'rgba(255,255,255,0.7)' }}>
+                                {c.phase === 'preparation' ? 'Подготовка' : c.phase === 'final_preparation' ? 'Финальная' : c.phase === 'taper' ? 'Тапер' : 'Пик'}
+                              </td>
+                              <td style={{ padding:'4px 6px', textAlign:'right' }}>{c.plannedSets}</td>
+                              <td style={{ padding:'4px 6px', textAlign:'right' }}>{c.actualSets}</td>
+                              <td style={{ padding:'4px 6px', textAlign:'right' }}>{Math.round(c.pct * 100)}%</td>
+                              <td style={{ padding:'4px 6px', color: statusColor[c.status] ?? 'rgba(255,255,255,0.5)', fontWeight:700 }}>{statusLabel[c.status] ?? c.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:3 }}>{compliance.recommendation}</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
             {/* 🧪 Test Peak Week */}
             <div style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Week (не меняет основной план)</div>
@@ -4363,14 +4418,19 @@ export const BbAutoConstructor: React.FC = () => {
 
   return (
     <div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
-        <div style={{ flex:1 }}>{renderStepNav()}</div>
+      {/* Заголовок ББ-авто + кнопка «Начать заново» (как в ПЛ-авто) */}
+      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>💪 ББ-авто</span>
+        <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
+      </div>
+      {/* Шаги конструктора + инструменты — горизонтальный ряд (как в ПЛ-авто) */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none', alignItems: 'center' }}>
+        {renderStepNav()}
         <button
           onClick={() => setShowTools(true)}
           title="Библиотека инструментов"
           style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
         >⚙️</button>
-        <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding:'5px 10px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(244,63,94,0.35)', background:'rgba(244,63,94,0.08)', color:'#fb7185', minHeight:30, flexShrink:0 }}>🔄 Начать заново</button>
       </div>
       {showTools && (
         <div className="bb-tools-modal-backdrop" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
