@@ -1,5 +1,31 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Диагностика движения: полный раунд A–E (Aug 16 2026, uncommitted)
+
+Полный анализ «слабые мышцы → слабые точки → мёртвые точки → движение штанги» + доработки по плану A–E. Слои: `weakpoint-pl.ts` (24 диагноза 7 движений) → `lift-diagnostics.engine.ts` (углы/биомеханика для bench/squat/deadlift + bar-path 5 отклонений) → `lift-assistance.engine.ts` (пулы muscle/weak/sticking/bar, топ-1 ⭐, `protocolFromCycle`) → инъекция в план (`injectPLWeakPoints`/`injectDiagnosticExercises` в lms-builder) → UI (`PlDeadpointsBarPathCard` — единый калькулятор; `StickingPointAnalysisCard` — по дневнику).
+
+### Исправлено (этот раунд)
+- **A1**: удалён мёртвый `sticking_mid` из типа `WeakPoint` (weakpoint-pl) + лейблы в `PlDeadpointsBarPathCard` и `SRCBBScreen.tsx` (PL_WEAKPOINT_LABELS — 1 строка, файл был чист от WIP).
+- **A2**: удалён мёртвый дубль `STICKING_POINTS` (англ., 10 записей) + `getStickingPoint/getStickingPointFixes/getAllStickingPoints` из `block-designer.engine.ts` — импортов в проекте не было (файл вообще нигде не импортируется).
+- **B**: канонический `phaseForReps(reps, lift)` в `lift-diagnostics.engine` (reps ≤2 → фаза макс. момента, 3–5 → mid/`*_mid`, ≥6 → null «неопределено») — ЕДИНЫЙ для карточек. `PlDeadpointsBarPathCard.diaryHint` переведён на него (раньше маппил reps≤3 → lockout, что противоречило StickingPointAnalysisCard: reps≤3 → bottom). **`StickingPointAnalysisCard.tsx` НЕ трогался** (зона дневникового агента) — расхождение с его старой эвристикой задокументировано здесь; владелец может перейти на `phaseForReps`.
+- **C**: `injectDiagnosticExercises` получил `template` и считает протокол из раскладки цикла ТЕМ ЖЕ алгоритмом, что `protocolFromCycle` в карточке (`diagnosticGroupForExercise` + `diagnosticProtocolFromCycle`, fallback 3×10@60% RIR2) — **показанный в UI протокол = вписанный в план** (было фикс 3×10@60% RIR3). Группа упражнения резолвится в PL-группу (было всегда 'accessory').
+- **D**: `weakpointsHandler` (planner-bridge-handlers) теперь принимает `plWeakPoints` и `diagnosticExerciseMap/diagnosticDayMap` — упражнения попадают в неделю 1 **custom-ПЛ** программы (тяжёлый 3×8 по pct диагноза + памп 3×12@60% RIR3; диагностические — 3×10@60% RIR2, дни из dayMap). Программы из каталога циклов (без customWeeks) НЕ конвертируются — toast «пропущены». `planner-bridge.ts` — doc-комментарий kind.
+- **E**: персистентность карточки — ключ `he_pl_diagnostic_card_v1` (lift/phase/issues/planWeakPoints/weakMuscleGroups/weakMuscleSubs/selected/days), валидация формы при загрузке, битые данные → дефолт.
+
+### Тесты (этот раунд: +11 новых, 2 обновлены)
+- `lift-diagnostics.test.ts` (+5): каноническая эвристика (макс. момент/середина/null/некорректные reps/неизвестное движение) — **15/15**.
+- `pl-deadpoints-barpath-card.test.tsx` (+3): diaryHint по канонической эвристике (reps≥6 без подсказки), персистентность remount, битый storage — **21/21** (afterEach чистит `he_pl_diagnostic_card_v1`).
+- `planner-bridge-handlers.test.ts` (+3): диагностика → custom-ПЛ неделя 1 (+ дни), программа из каталога → пропуск с предупреждением, без диагностики — прежнее поведение — **20/20**.
+- `pl-auto-key-tests-coverage.test.ts` (+1): 4.24 протокол из раскладки цикла — **24/24**.
+
+### Проверено
+- `tsc --noEmit` — **0 ошибок по проекту**.
+- Полный прогон vitest: **5697/5699** — падают только 2 не связанных с этой работой: `bb-macrocycle.test.ts` (чужой v7-формат сериализации) и `bb-training-recommendations.test.ts` (`weeklySetsByMuscle` по каталогу — падает изолированно, файлы движка/каталога не трогались; вероятно, vitest-рантайм EXERCISE_CATALOG — известная проблема с 16 упражнениями).
+- Затронутые области: lms+pro+карточка+bridge **702/702**; SRCBBScreen_parts 73/73; annual-training 37/37.
+- `vite build` не запускался (чужие WIP в worktree: ExerciseLab*/LoadManagementHub/TrainingSafetyHub/cardio.engine).
+
+---
+
 ## Годовой план по конструкторам (Aug 16 2026, uncommitted)
 
 Целевая модель: **годовой план отвечает за КАЛЕНДАРЬ и КОМПОЗИЦИЮ, а не за генерацию тренировок** — каждый блок года собирается СВОИМ конструктором (ПЛ-блоки — СРЦ-циклами, ББ-блоки — ББ-авто, ручные — в редакторе), taper/peak накладываются внутри блока.

@@ -5,7 +5,10 @@ import React from 'react';
 import { PlDeadpointsBarPathCard } from '../PlDeadpointsBarPathCard';
 import { CYCLE_01 } from '../../../../data/lms-cycles/cycle-01';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem('he_pl_diagnostic_card_v1');
+});
 
 describe('PlDeadpointsBarPathCard (единый калькулятор движения)', () => {
   it('рендерится с 7 движениями и заголовком', () => {
@@ -185,20 +188,49 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     }
   });
 
-  it('показывает подсказку из дневника о частых срывах в фазе', () => {
+  it('показывает подсказку из дневника о частых срывах в фазе (каноническая эвристика)', () => {
     const sessions = [{
       sessionId: 's1', date: '2026-08-10', exercises: [{
         exerciseId: 'squat_1', exerciseName: 'Приседания со штангой', pattern: 'squat', muscleGroup: 'legs', order: 0,
         sets: [
-          { setNumber: 1, weightKg: 100, reps: 3, rpe: 9, rir: 1, isPR: false, notes: '' },
+          { setNumber: 1, weightKg: 100, reps: 2, rpe: 9, rir: 1, isPR: false, notes: '' },
           { setNumber: 2, weightKg: 100, reps: 2, rpe: 9.5, rir: 0.5, isPR: false, notes: '' },
         ], totalVolume: 500, best1RM: 110, avgRPE: 9.2,
-      }], totalVolume: 500, totalSets: 2, totalReps: 5, avgIntensity: 90, prCount: 0, notes: '',
+      }], totalVolume: 500, totalSets: 2, totalReps: 4, avgIntensity: 90, prCount: 0, notes: '',
     }];
     render(<PlDeadpointsBarPathCard sessions={sessions as any} />);
-    // Тяжёлые подходы (RPE≥8) по 2-3 повтора → фаза «Дожим» (lockout)
+    // reps ≤ 2 → фаза максимального момента (для приседа — «Низ (выход из ямы)»)
     expect(screen.getByText(/2 из 2 тяжёлых подходов/)).toBeTruthy();
-    expect(screen.getByText(/срываются в фазе «Дожим»/)).toBeTruthy();
+    expect(screen.getByText(/срываются в фазе «Низ \(выход из ямы\)»/)).toBeTruthy();
+  });
+
+  it('подсказка из дневника не показывается при reps ≥ 6 (фаза не определена)', () => {
+    const sessions = [{
+      sessionId: 's1', date: '2026-08-10', exercises: [{
+        exerciseId: 'squat_1', exerciseName: 'Приседания со штангой', pattern: 'squat', muscleGroup: 'legs', order: 0,
+        sets: [
+          { setNumber: 1, weightKg: 80, reps: 6, rpe: 9, rir: 1, isPR: false, notes: '' },
+        ], totalVolume: 480, best1RM: 100, avgRPE: 9, prCount: 0, notes: '',
+      }], totalVolume: 480, totalSets: 1, totalReps: 6, avgIntensity: 80, prCount: 0, notes: '',
+    }];
+    render(<PlDeadpointsBarPathCard sessions={sessions as any} />);
+    expect(screen.queryByText(/тяжёлых подходов/)).toBeNull();
+  });
+
+  it('персистентность: выбранное движение/фаза восстанавливаются после remount', () => {
+    const { unmount } = render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    fireEvent.click(screen.getByText('Жим лёжа'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Дожим' })[0]);
+    unmount();
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    // bench + lockout восстановлены: заголовок диагноза «Дожим» и чипы жима
+    expect(screen.getAllByText('Дожим').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('персистентность: битые данные в storage не ломают карточку', () => {
+    localStorage.setItem('he_pl_diagnostic_card_v1', '{not-json');
+    const html = renderToStaticMarkup(<PlDeadpointsBarPathCard dayCount={3} />);
+    expect(html).toContain('Мёртвые точки');
   });
 
   it('SVG-схема отображается для движения с отклонениями', () => {

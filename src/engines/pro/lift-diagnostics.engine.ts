@@ -3,7 +3,7 @@
  * Расширяет weakpoint-pl + biomechanics: sticking points по углам суставов (присед/жим/тяга),
  * биомеханическая причина (момент рычага), bar-path-анализ, слабая мышца → корректирующие.
  */
-import { diagnoseWeakPoint } from "../lms/weakpoint-pl";
+import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT } from "../lms/weakpoint-pl";
 import type { Lift, WeakPoint } from "../lms/weakpoint-pl";
 
 export interface StickingPointInfo {
@@ -200,4 +200,34 @@ export function diagnoseMovement(lift: Lift, phase: WeakPoint): MovementDiagnosi
 /** Все доступные слабые фазы по движению. */
 export function stickingPhases(lift: Lift): WeakPoint[] {
   return Object.keys(STICKING_POINTS[lift] || {}) as WeakPoint[];
+}
+
+/**
+ * Каноническая эвристика «фаза срыва по числу повторений» — ЕДИНЫЙ источник
+ * для всех карточек диагностики (был разнобой: PlDeadpointsBarPathCard и
+ * StickingPointAnalysisCard маппили одни и те же повторы в разные фазы).
+ *
+ * Низкая достоверность: по числу повторений фаза определяется только
+ * предположительно. Правило:
+ *  - reps ≤ 2 → фаза максимального момента силы (низ/старт/сход с груди);
+ *  - reps 3–5 → середина амплитуды (mid), если у движения она есть;
+ *  - reps ≥ 6 → null (неопределено — подсказку по фазе не показывать).
+ *
+ * Возвращает null, если повторы некорректны или у движения нет подходящей фазы.
+ */
+export function phaseForReps(reps: number, lift: Lift): WeakPoint | null {
+  if (!Number.isFinite(reps) || reps <= 0) return null;
+  const phases = WEAK_POINTS_BY_LIFT[lift] ?? [];
+  if (phases.length === 0) return null;
+  const MAX_MOMENT_PHASE: Partial<Record<Lift, WeakPoint>> = {
+    bench: 'off_chest', squat: 'bottom', deadlift: 'start',
+    ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
+  };
+  let candidate: WeakPoint | null = null;
+  if (reps <= 2) candidate = MAX_MOMENT_PHASE[lift] ?? null;
+  else if (reps <= 5) {
+    if (phases.includes('mid')) candidate = 'mid';
+    else candidate = phases.find(p => p.endsWith('_mid')) ?? null;
+  }
+  return candidate && phases.includes(candidate) ? candidate : null;
 }

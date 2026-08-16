@@ -5,7 +5,7 @@
  * Extracted from ProgramEditorView.tsx to eliminate the 14-branch if/else chain.
  */
 import type { PlannerApply } from './planner-bridge';
-import type { UserProgram, UserWeek, UserBlock } from '../../../engines/user-program/user-program.types';
+import type { UserProgram, UserWeek, UserBlock, PLProgramBody, PLExercise, PLSet } from '../../../engines/user-program/user-program.types';
 import { newId } from '../../../engines/user-program/user-program.types';
 import type { TrainingProfile } from './training-profile';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
@@ -17,6 +17,7 @@ import type { MacrocycleDesign } from '../../../engines/periodization-designer.e
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 import { clampRir } from '../../../engines/bb/bb-utils';
+import { diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import {
   importProgramIntoAnnualBlock,
 } from '../../../engines/annual-training/block-builders.engine';
@@ -83,14 +84,103 @@ const priHandler: Handler = (payload, { program: p, update, showToast }) => {
   showToast('🔗 Готовность применена: ' + payload.label);
 };
 
+/** ПЛ-упражнение каталога СРЦ → lift ручной программы (custom PL). */
+function plLiftOf(exerciseName: string, fallback: 'accessory'): PLExercise['lift'] {
+  const n = exerciseName.toLowerCase();
+  if (/присед|squat/.test(n)) return 'squat';
+  if (/жим/.test(n) && !/стоя|наклон/.test(n)) return 'bench';
+  if (/станов|тяга|deadlift/.test(n)) return 'dead';
+  return fallback;
+}
+
+/**
+ * Добавление диагностических ассистентов в custom-ПЛ программу (D1):
+ *  - диагностические упражнения карточки (diagnosticExerciseMap) — в указанные
+ *    дни (diagnosticDayMap) или в первый день недели 1, по 1 упражнению на день;
+ *  - слабые точки СРЦ (plWeakPoints) — тяжёлый 3×8 (pct из diagnoseWeakPoint)
+ *    + памп 3×12 @60% по тому же принципу, что SRCBBScreen.
+ * Программы из каталога циклов (sourceCycleId без customWeeks) не конвертируются —
+ * возвращается null, ассерсты копируются только в custom-программы.
+ */
+function appendDiagnosticsToPL(
+  pl: PLProgramBody,
+  plWeakPoints: { lift: string; weakPoint: string; days?: number[] }[],
+  diagnosticExerciseMap: Record<string, string[]>,
+  diagnosticDayMap: Record<string, number[]>,
+): PLProgramBody | null {
+  const diagNames = Object.values(diagnosticExerciseMap ?? {}).flatMap(list =>
+    Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : []);
+  const wpPairs = (plWeakPoints ?? []).filter(x => x && typeof x.lift === 'string' && typeof x.weakPoint === 'string');
+  if (diagNames.length === 0 && wpPairs.length === 0) return null;
+  if (!pl.customWeeks || pl.customWeeks.length === 0) return null;
+
+  const weeks = pl.customWeeks.map(w => ({ ...w, days: w.days.map(d => ({ ...d, exercises: [...d.exercises] })) }));
+  const firstWeek = weeks[0];
+  const dayCount = firstWeek.days.length;
+  if (dayCount === 0) return null;
+  const dayOf = (idx: number | undefined): number => {
+    const i = typeof idx === 'number' && Number.isFinite(idx) ? idx - 1 : 0;
+    if (i < 0 || i >= dayCount) return 0;
+    return i;
+  };
+  const pushExercise = (dayIdx: number, name: string, sets: PLSet[], muscle: string) => {
+    const target = weeks[0].days[dayIdx];
+    if (!target) return;
+    if (target.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())) return;
+    target.exercises.push({ name, lift: plLiftOf(name, 'accessory'), muscle, sets });
+  };
+
+  // Диагностические упражнения: per-key списки, дни из diagnosticDayMap (1-based), циклом.
+  for (const [key, list] of Object.entries(diagnosticExerciseMap ?? {})) {
+    const names = Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [];
+    const configuredDays = (diagnosticDayMap?.[key] ?? []).filter((d): d is number => typeof d === 'number');
+    names.forEach((name, index) => {
+      const dayIdx = configuredDays.length > 0 ? dayOf(configuredDays[index % configuredDays.length]) : dayOf(undefined);
+      pushExercise(dayIdx, name, [{ pct: 0.6, reps: 10, sets: 3, rir: 2 }], 'accessory');
+    });
+  }
+
+  // Слабые точки СРЦ: тяжёлый + памп-вариант (как в SRCBSScreen).
+  for (const wp of wpPairs) {
+    const diag = diagnoseWeakPoint(wp.lift as Lift, wp.weakPoint as WeakPoint);
+    const muscle = LIFT_GROUP_RU[wp.lift as Lift] ?? 'accessory';
+    const names = diag.assistance.slice(0, 2);
+    if (names.length === 0) continue;
+    const days = (wp.days ?? []).filter((d): d is number => typeof d === 'number');
+    pushExercise(days.length > 0 ? dayOf(days[0]) : dayOf(undefined), names[0], [{ pct: diag.intensityPct, reps: 8, sets: 3, rir: 2 }], muscle);
+    if (names[1]) {
+      pushExercise(days.length > 1 ? dayOf(days[1]) : dayOf(undefined), names[1], [{ pct: 0.6, reps: 12, sets: 3, rir: 3 }], muscle);
+    }
+  }
+
+  return { ...pl, customWeeks: weeks };
+}
+
+const LIFT_GROUP_RU: Partial<Record<Lift, string>> = {
+  bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest',
+};
+
 const weakpointsHandler: Handler = (payload, { program: p, onChange, showToast, tprofile }) => {
   const groups: string[] = payload.data.groups ?? [];
+  const plWeakPoints: { lift: string; weakPoint: string; days?: number[] }[] = Array.isArray(payload.data.plWeakPoints) ? payload.data.plWeakPoints : [];
+  const diagnosticExerciseMap: Record<string, string[]> = payload.data.diagnosticExerciseMap ?? {};
+  const diagnosticDayMap: Record<string, number[]> = payload.data.diagnosticDayMap ?? {};
+  const hasDiagnostics = plWeakPoints.length > 0 || Object.keys(diagnosticExerciseMap).length > 0;
   let next = { ...p };
   if (p.bb) next = { ...next, bb: { ...p.bb, constraints: { ...(p.bb.constraints ?? { equipment: [] }) } } };
-  if (p.pl) next = { ...next, pl: { ...p.pl, weakPoints: groups } };
+  let skippedDiagnostics = false;
+  if (p.pl) {
+    const plBody: PLProgramBody = { ...p.pl, weakPoints: groups };
+    next = { ...next, pl: plBody };
+    if (hasDiagnostics) {
+      const extended = appendDiagnosticsToPL(plBody, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap);
+      if (extended) next = { ...next, pl: extended };
+      else skippedDiagnostics = true;
+    }
+  }
   onChange(next);
   saveTrainingProfile({ ...tprofile, weakPoints: groups });
-  showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет'));
+  showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет') + (skippedDiagnostics ? ' · диагностические упражнения пропущены (программа из каталога циклов, не custom)' : ''));
 };
 
 const pmHandler: Handler = (payload, { program: p, onChange, showToast }) => {

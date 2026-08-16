@@ -270,4 +270,21 @@ describe('PL-auto key coverage 4.1-4.15', () => {
 
       expect(daysWithAssistant).toEqual([0, 2]);
     });
+
+    it('4.24 diagnostic assistant: протокол из раскладки цикла (не фикс 3×10@60% RIR3)', () => {
+      const name = 'Протокольный ассистент';
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        diagnosticExerciseMap: { 'bench|barpath|forward_drift': [name] },
+        currentReadiness: 100 });
+      const injected = p.weeks[0].days[0].exercises.find(e => e.name === name);
+      expect(injected).toBeTruthy();
+      // Протокол = set-блок первого аксессуара раскладки цикла (как в карточке диагностики)
+      const layouts: any = CYCLE_01.weeks && CYCLE_01.weeks.length > 0 ? CYCLE_01.weeks : [CYCLE_01.week1];
+      const acc = layouts.flatMap((days: any[]) => days.flatMap((day: any) => day.exercises.filter((s: any) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0)))[0];
+      const first = acc.sets[0];
+      expect(injected!.workSets[0].pct).toBe(first.pct);
+      expect(injected!.workSets[0].reps).toBe(Math.max(2, first.reps));
+      expect(injected!.workSets[0].sets).toBe(Math.max(1, first.sets));
+      expect(injected!.workSets[0].rir).toBe(first.rir ?? 2);
+    });
   });

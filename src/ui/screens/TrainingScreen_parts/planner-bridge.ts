@@ -5,7 +5,7 @@
  * Поддерживаемые kind:
  *  - split     : { cycle: string[][], name }                       — структура дней (группы мышц)
  *  - pm        : { squat?, bench?, dead?, lift?, value? }          — предельные максимумы (все или один)
- *  - weakpoints: { groups: string[], lift? }                      — слабые группы для приоритета
+ *  - weakpoints: { groups: string[], lift?, plWeakPoints?, diagnosticExerciseMap?, diagnosticDayMap?, weakGroupExerciseMap?, weakGroupDayMap? } — слабые группы + диагностика движения (карточка «Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги»)
  *  - pri       : { volumeMult, rirShift }                          — готовность → объём/RIR
  *  - tempo     : { eccentric, bottomPause, concentric, topPause, label } — темп повторений
  *  - rir       : { rirShift, label }                               — корректировка RIR

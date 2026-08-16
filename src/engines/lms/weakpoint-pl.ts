@@ -26,7 +26,7 @@ function findExerciseByLabel(label: string): Exercise | undefined {
 }
 
 export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press';
-export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom' | 'sticking_mid'
+export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom'
   | 'ohp_start' | 'ohp_mid' | 'ohp_lockout'
   | 'row_start' | 'row_mid' | 'row_squeeze'
   | 'pd_top' | 'pd_mid' | 'pd_squeeze'

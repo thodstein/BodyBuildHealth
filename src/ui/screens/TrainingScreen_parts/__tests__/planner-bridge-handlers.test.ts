@@ -193,6 +193,51 @@ describe('planner bridge handlers', () => {
     expect(ok).toBe(true);
     expect(ctx.onChange).toHaveBeenCalled();
   });
+
+  it('weakpoints + диагностика: упражнения попадают в custom-ПЛ неделю 1', () => {
+    const ctx = context('pl');
+    ctx.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: ['chest'],
+      plWeakPoints: [{ lift: 'bench', weakPoint: 'lockout', days: [1] }],
+      diagnosticExerciseMap: { 'bench|barpath|forward_drift': ['Мой ассистент'] },
+      diagnosticDayMap: { 'bench|barpath|forward_drift': [3] },
+    }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    expect(applied.pl.weakPoints).toEqual(['chest']);
+    const week1 = applied.pl.customWeeks[0];
+    const allNames = week1.days.flatMap((d: any) => d.exercises.map((e: any) => e.name));
+    expect(allNames).toContain('Мой ассистент');
+    // «Мой ассистент» — в указанный день 3
+    expect(week1.days[2].exercises.map((e: any) => e.name)).toContain('Мой ассистент');
+    // Слабые точки дают тяжёлый + памп ассистенты из диагностики
+    expect(allNames.length).toBeGreaterThan(2);
+  });
+
+  it('weakpoints + диагностика: программа из каталога циклов — упражнения пропущены с предупреждением', () => {
+    const ctx = context('pl');
+    const prog = createBlank('pl');
+    prog.pl!.sourceCycleId = 'cycle-01';
+    prog.pl!.customWeeks = undefined as any;
+    ctx.program = prog;
+    applyBridgePayloadDispatch(payload('weakpoints', {
+      groups: ['back'],
+      diagnosticExerciseMap: { 'bench|barpath|forward_drift': ['Мой ассистент'] },
+    }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    expect(applied.pl.weakPoints).toEqual(['back']);
+    expect(applied.pl.customWeeks).toBeUndefined();
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('пропущены'));
+  });
+
+  it('weakpoints без диагностики сохраняет прежнее поведение (только группы)', () => {
+    const ctx = context('pl');
+    ctx.program = createBlank('pl');
+    applyBridgePayloadDispatch(payload('weakpoints', { groups: ['legs'] }), ctx);
+    const applied = ctx.onChange.mock.calls[0][0];
+    expect(applied.pl.weakPoints).toEqual(['legs']);
+    expect(ctx.showToast).toHaveBeenCalledWith('🔗 Слабые группы: legs');
+  });
 });
 
 describe('annual_block bridge (блок года → редактор → обратно)', () => {

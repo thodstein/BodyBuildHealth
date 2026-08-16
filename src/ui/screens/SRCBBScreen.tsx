@@ -572,7 +572,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
   const PL_WEAKPOINT_LABELS: Record<WeakPoint, string> = {
-    off_chest: 'Сход с груди', mid: 'Середина', lockout: 'Дожим', start: 'Старт', bottom: 'Низ', sticking_mid: 'Застревание',
+    off_chest: 'Сход с груди', mid: 'Середина', lockout: 'Дожим', start: 'Старт', bottom: 'Низ',
     ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим',
     row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
     pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',

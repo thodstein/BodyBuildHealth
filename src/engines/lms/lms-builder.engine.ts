@@ -682,12 +682,46 @@ function injectPLWeakPoints(
   }
 }
 
+/** Группа ПЛ-пула, в которую входит упражнение (для подбора протокола аксессуара). */
+function diagnosticGroupForExercise(name: string): string | null {
+  const n = norm(name);
+  for (const group of Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS)) {
+    if (getExercisesByGroup(group).some(e => norm(e.name) === n)) return group;
+  }
+  const ex = findCatalogExerciseByLabel(name);
+  if (ex) return (trueMuscleOf(ex) ?? (ex.group as string)) ?? null;
+  return null;
+}
+
+/**
+ * Протокол для впрыскиваемого диагностического упражнения — вычисляется из
+ * раскладки цикла ТЕМ ЖЕ алгоритмом, что protocolFromCycle в карточке
+ * диагностики (lift-assistance.engine): set-блоки аксессуара цикла на целевую
+ * группу. Показанный в UI протокол и вписанный в план совпадают по построению.
+ */
+function diagnosticProtocolFromCycle(template: SRCycleTemplate | undefined, exerciseName: string): { pct: number; reps: number; sets: number; rir: number } {
+  const fallback = { pct: 0.6, reps: 10, sets: 3, rir: 2 };
+  if (!template) return fallback;
+  const layouts = template.weeks && template.weeks.length > 0 ? template.weeks : [template.week1];
+  const accSpecs: SRExerciseSpec[] = layouts.flatMap(days => days.flatMap(day =>
+    day.exercises.filter(spec => spec.load !== 'Тяжелая' && spec.sets && spec.sets.length > 0)));
+  if (accSpecs.length === 0) return fallback;
+  const group = diagnosticGroupForExercise(exerciseName);
+  const allowed = group ? (PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? []) : [];
+  const match = accSpecs.find(spec => allowed.includes(sourcePattern(spec)));
+  const spec = match ?? accSpecs[0];
+  const first = spec?.sets?.[0];
+  if (!first) return fallback;
+  return { pct: first.pct, reps: Math.max(2, first.reps), sets: Math.max(1, first.sets), rir: first.rir ?? 2 };
+}
+
 function injectDiagnosticExercises(
   days: LMSPlanDay[],
   exerciseMap: Record<string, string[]> | undefined,
   dayMap: Record<string, number[]> | undefined,
   pmRow: Record<string, number>,
   fallbackPm: number,
+  template?: SRCycleTemplate,
 ): void {
   if (!exerciseMap) return;
 
@@ -744,15 +778,16 @@ function injectDiagnosticExercises(
       if (!day) continue;
       if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
       const pm = pmRow[name] ?? fallbackPm;
+      const protocol = diagnosticProtocolFromCycle(template, name);
       day.exercises.push({
         name,
-        group: 'accessory',
+        group: diagnosticGroupForExercise(name) ?? 'accessory',
         coef: 0.3,
         mnosz: 1,
         load: 'Средняя',
         pm,
-        rir: 3,
-        workSets: [{ pct: 0.6, reps: 10, sets: 3, weight: workWeight(pm, 0.6), rir: 3 }],
+        rir: protocol.rir,
+        workSets: [{ pct: protocol.pct, reps: protocol.reps, sets: protocol.sets, weight: workWeight(pm, protocol.pct), rir: protocol.rir }],
       });
     }
   }
@@ -1007,7 +1042,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
     }
-    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80);
+    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template);
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
     // PL-логика:

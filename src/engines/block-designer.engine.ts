@@ -6,7 +6,6 @@
  * Nutrient Timing: peri-workout nutrition, circadian optimization
  * Warmup Library: 15+ specific warmup routines
  * Body Fat: 5 estimation methods with visual guide
- * Strength Curve: sticking point analysis by exercise
  *
  * @module block-designer-engine
  */
@@ -64,15 +63,6 @@ export interface BodyFatMethod {
   formula: string;
   instructions: string[];
   sites?: { name: string; location: string }[];
-}
-
-export interface StickingPoint {
-  exercise: string;
-  point: string;
-  romPercent: number;
-  weakMuscles: string[];
-  fixExercises: string[];
-  description: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -399,82 +389,3 @@ const BODY_FAT_METHODS: BodyFatMethod[] = [
 ];
 
 export function getBodyFatMethods(): BodyFatMethod[] { return BODY_FAT_METHODS; }
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 6. Strength Curve / Sticking Point Analysis
-// ═══════════════════════════════════════════════════════════════════════════
-
-const STICKING_POINTS: StickingPoint[] = [
-  {
-    exercise: 'back_squat', point: 'Из нижней точки (0-30% ROM)',
-    romPercent: 20, weakMuscles: ['Квадрицепсы', 'Ягодичные'],
-    fixExercises: ['Pause Squat (2-3 сек внизу)', 'Pin Squat (с нижних пинов)', 'Anderson Squat'],
-    description: 'Не можете встать из нижней точки. Нет стартовой силы. Решение: паузные приседы, Anderson, front squat.',
-  },
-  {
-    exercise: 'back_squat', point: 'Середина подъёма (40-60% ROM)',
-    romPercent: 50, weakMuscles: ['Ягодичные', 'Бицепс бедра'],
-    fixExercises: ['Banded Squat', 'Box Squat (широкий)', 'Hip Thrust'],
-    description: 'Проходите низ, но застреваете в середине. Слабые ягодицы и задняя цепь.',
-  },
-  {
-    exercise: 'bench_press', point: 'От груди (0-30% ROM)',
-    romPercent: 25, weakMuscles: ['Грудные', 'Передние дельты'],
-    fixExercises: ['Spoto Press', 'Pause Bench (2-3 сек)', 'DB Bench (глубокий)'],
-    description: 'Не можете оторвать от груди. Слабый старт. Решение: Spoto press, паузный жим.',
-  },
-  {
-    exercise: 'bench_press', point: 'Середина (40-60% ROM)',
-    romPercent: 50, weakMuscles: ['Грудные', 'Lat engagement'],
-    fixExercises: ['Board Press (2-3 доски)', 'Floor Press', 'Band-resisted Bench'],
-    description: 'Гриф замедляется на полпути. Скоростная работа + board press.',
-  },
-  {
-    exercise: 'bench_press', point: 'Локаут (70-100% ROM)',
-    romPercent: 85, weakMuscles: ['Трицепс'],
-    fixExercises: ['Close-Grip Bench', 'Board Press (3-4 доски)', 'Tricep Pushdown (heavy)', 'Dips (weighted)'],
-    description: 'Не дожимаете последние 10-15 см. Слабый трицепс. Решение: close-grip bench, heavy dips.',
-  },
-  {
-    exercise: 'deadlift_conventional', point: 'От пола (0-20% ROM)',
-    romPercent: 15, weakMuscles: ['Квадрицепсы', 'Ягодичные'],
-    fixExercises: ['Deficit Deadlift (2-4 см)', 'Pause DL (below knee)', 'Front Squat'],
-    description: 'Гриф не отрывается от пола. Слабые ноги. Deficit deadlift + front squat.',
-  },
-  {
-    exercise: 'deadlift_conventional', point: 'На уровне колен (50-70% ROM)',
-    romPercent: 60, weakMuscles: ['Ягодичные', 'Бицепс бедра', 'Верх спины'],
-    fixExercises: ['Block Pull (ниже колен)', 'Rack Pull (на уровне колен)', 'RDL', 'Snatch Grip DL'],
-    description: 'Застреваете на уровне колен. Слабая задняя цепь и верх спины.',
-  },
-  {
-    exercise: 'deadlift_conventional', point: 'Локаут (80-100% ROM)',
-    romPercent: 90, weakMuscles: ['Ягодичные', 'Трапеции'],
-    fixExercises: ['Rack Pull (выше колен)', 'Hip Thrust (heavy)', 'Shrugs (heavy)', 'Block Pull (высокий)'],
-    description: 'Не можете завершить тягу. Слабые ягодицы и хват.',
-  },
-  {
-    exercise: 'overhead_press', point: 'От ключиц (0-30% ROM)',
-    romPercent: 20, weakMuscles: ['Передние дельты'],
-    fixExercises: ['Z-Press', 'Push Press (overload)', 'Seated DB Press'],
-    description: 'Тяжело сдвинуть с плеч. Слабые передние дельты.',
-  },
-  {
-    exercise: 'overhead_press', point: 'Локаут (80-100% ROM)',
-    romPercent: 90, weakMuscles: ['Трицепс', 'Верх трапеций'],
-    fixExercises: ['Close-Grip Bench', 'Tricep Pushdown', 'Overhead Tricep Extension', 'Shrugs'],
-    description: 'Не дожимаете последние 5-10 см. Трицепс.',
-  },
-];
-
-export function getStickingPoint(exercise: string): StickingPoint[] {
-  return STICKING_POINTS.filter(s => s.exercise === exercise);
-}
-
-export function getStickingPointFixes(exercise: string, romPercent: number): StickingPoint | undefined {
-  return STICKING_POINTS
-    .filter(s => s.exercise === exercise)
-    .sort((a, b) => Math.abs(a.romPercent - romPercent) - Math.abs(b.romPercent - romPercent))[0];
-}
-
-export function getAllStickingPoints(): StickingPoint[] { return STICKING_POINTS; }

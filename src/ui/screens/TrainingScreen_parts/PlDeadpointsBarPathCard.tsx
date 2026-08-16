@@ -7,14 +7,14 @@
  * цикла (rankPLAssistanceForIssue) + SVG-схема траектории. Добавление в ПЛ-авто —
  * одно на выбор / все рекомендуемые / все сразу.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  diagnoseMovement, barPathAnalysis, barPathIssuesForLift, BAR_PATH_ISSUES,
+  diagnoseMovement, barPathAnalysis, barPathIssuesForLift, BAR_PATH_ISSUES, phaseForReps,
   type BarPathIssue,
 } from '../../../engines/pro/lift-diagnostics.engine';
 import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections, protocolFromCycle, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
-import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
@@ -88,7 +88,7 @@ const ISSUE_RU: Record<BarPathIssue, string> = {
 /** Русские подписи фаз (слабых точек) — для селектора и схемы. */
 const PHASE_RU: Record<string, string> = {
   off_chest: 'Сход со груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт',
-  bottom: 'Низ (выход из ямы)', sticking_mid: 'Зависание в середине',
+  bottom: 'Низ (выход из ямы)',
   ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим вверх',
   row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
   pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
@@ -105,6 +105,81 @@ const LIFT_PHASES: Record<Lift, WeakPoint[]> = {
   incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
 };
 const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
+
+/* ── Персистентность выбора карточки (he_pl_diagnostic_card_v1) ─────────────
+ * Выбор пользователя (движение/фаза/отклонения/отмеченные упражнения/слабые
+ * точки плана) переживает перезагрузку — раньше терялся при remount. */
+
+const DIAG_CARD_KEY = 'he_pl_diagnostic_card_v1';
+
+interface DiagnosticCardState {
+  lift: Lift;
+  phase: WeakPoint | '';
+  issues: BarPathIssue[];
+  planWeakPoints: { lift: Lift; weakPoint: WeakPoint }[];
+  weakMuscleGroups: string[];
+  weakMuscleSubs: string[];
+  selected: Record<string, string[]>;
+  days: Record<string, number[]>;
+}
+
+const LIFT_KEYS = new Set<Lift>(Object.keys(LIFT_RU) as Lift[]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cleanStringMap(raw: unknown): Record<string, string[]> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, string[]> = {};
+  for (const [key, list] of Object.entries(raw)) {
+    if (!Array.isArray(list)) continue;
+    const names = list.filter((n): n is string => typeof n === 'string').slice(0, 40);
+    if (names.length > 0) out[key.slice(0, 120)] = names;
+  }
+  return out;
+}
+
+function cleanDayMap(raw: unknown): Record<string, number[]> {
+  if (!isRecord(raw)) return {};
+  const out: Record<string, number[]> = {};
+  for (const [key, list] of Object.entries(raw)) {
+    if (!Array.isArray(list)) continue;
+    const days = list.filter((d): d is number => typeof d === 'number' && Number.isFinite(d) && d >= 1 && d <= 7).slice(0, 7);
+    if (days.length > 0) out[key.slice(0, 120)] = days;
+  }
+  return out;
+}
+
+function loadDiagnosticCardState(): DiagnosticCardState {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DIAG_CARD_KEY) || 'null');
+    if (!isRecord(raw)) throw new Error('bad shape');
+    const lift = LIFT_KEYS.has(raw.lift as Lift) ? (raw.lift as Lift) : 'squat';
+    const validPhases = LIFT_PHASES[lift] ?? [];
+    const phase = typeof raw.phase === 'string' && (validPhases as string[]).includes(raw.phase) ? (raw.phase as WeakPoint) : '';
+    const issues = Array.isArray(raw.issues) ? (raw.issues as BarPathIssue[]).filter(i => barPathIssuesForLift(lift).includes(i)) : [];
+    const planWeakPoints = Array.isArray(raw.planWeakPoints)
+      ? (raw.planWeakPoints as any[]).filter(p => p && LIFT_KEYS.has(p.lift) && typeof p.weakPoint === 'string' && ((WEAK_POINTS_BY_LIFT[p.lift as Lift] ?? []) as string[]).includes(p.weakPoint)).map(p => ({ lift: p.lift as Lift, weakPoint: p.weakPoint as WeakPoint }))
+      : [];
+    const weakMuscleGroups = Array.isArray(raw.weakMuscleGroups) ? raw.weakMuscleGroups.filter((g): g is string => typeof g === 'string' && WEAK_MUSCLE_DETAIL.some(d => d.id === g)) : [];
+    const weakMuscleSubs = Array.isArray(raw.weakMuscleSubs)
+      ? raw.weakMuscleSubs.filter((s): s is string => {
+        if (typeof s !== 'string') return false;
+        const [g] = s.split('|');
+        const detail = WEAK_MUSCLE_DETAIL.find(d => d.id === g);
+        return !!detail && detail.subs.some(sub => sub.sub === s.split('|')[1]);
+      })
+      : [];
+    return { lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected: cleanStringMap(raw.selected), days: cleanDayMap(raw.days) };
+  } catch {
+    return { lift: 'squat', phase: '', issues: [], planWeakPoints: [], weakMuscleGroups: [], weakMuscleSubs: [], selected: {}, days: {} };
+  }
+}
+
+function saveDiagnosticCardState(state: DiagnosticCardState): void {
+  try { localStorage.setItem(DIAG_CARD_KEY, JSON.stringify(state)); } catch { /* quota — молча пропускаем */ }
+}
 
 const CARD: React.CSSProperties = {
   padding: 12, borderRadius: 10, background: 'rgba(24,24,27,0.45)',
@@ -180,17 +255,21 @@ const BarPathSvg: React.FC<{
 };
 
 export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: SRCycleTemplate | null; sessions?: any[] }> = ({ dayCount = 7, template = null, sessions = [] }) => {
-  const [lift, setLift] = useState<Lift>('squat');
-  const [phase, setPhase] = useState<WeakPoint | ''>('');
-  const [issues, setIssues] = useState<BarPathIssue[]>([]);
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
-  const [days, setDays] = useState<Record<string, number[]>>({});
+  const initialCardState = useMemo(loadDiagnosticCardState, []);
+  const [lift, setLift] = useState<Lift>(initialCardState.lift);
+  const [phase, setPhase] = useState<WeakPoint | ''>(initialCardState.phase);
+  const [issues, setIssues] = useState<BarPathIssue[]>(initialCardState.issues);
+  const [selected, setSelected] = useState<Record<string, string[]>>(initialCardState.selected);
+  const [days, setDays] = useState<Record<string, number[]>>(initialCardState.days);
   const [savedFocus, setSavedFocus] = useState(false);
   // 🎯 Слабые точки, добавляемые в план ПЛ-авто (как бывшая верхняя карточка «Слабые точки СРЦ»).
-  const [planWeakPoints, setPlanWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
+  const [planWeakPoints, setPlanWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>(initialCardState.planWeakPoints);
   // 💪 Слабые мышцы (подгруппы) — по циклу, как бывшая верхняя карточка «Слабые группы мышц».
-  const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>([]);
-  const [weakMuscleSubs, setWeakMuscleSubs] = useState<string[]>([]);
+  const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>(initialCardState.weakMuscleGroups);
+  const [weakMuscleSubs, setWeakMuscleSubs] = useState<string[]>(initialCardState.weakMuscleSubs);
+  useEffect(() => {
+    saveDiagnosticCardState({ lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days });
+  }, [lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days]);
   const toggleWeakMuscle = (g: string) => setWeakMuscleGroups(cur => {
     if (cur.includes(g)) return cur.filter(x => x !== g);
     return [...cur, g];
@@ -252,14 +331,15 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           const isHard = rpe >= 8 && weight > 0 && reps > 0;
           if (!isHard) continue;
           totalHard += 1;
-          // Фаза по повторениям (эвристика) — только для 3 классических движений
-          const cand = reps <= 3 ? 'lockout' : reps <= 5 ? 'mid' : 'bottom';
-          const phases = LIFT_PHASES[lift];
-          if (phases.includes(cand as WeakPoint)) phaseCounts[cand] = (phaseCounts[cand] || 0) + 1;
+          // Фаза по повторениям — каноническая эвристика (низкая достоверность);
+          // ≥6 повторений → фаза не определяется и в статистику не идёт.
+          const cand = phaseForReps(reps, lift);
+          if (cand) phaseCounts[cand] = (phaseCounts[cand] || 0) + 1;
         }
       }
     }
     if (totalHard === 0) return null;
+    if (Object.keys(phaseCounts).length === 0) return null;
     const top = Object.entries(phaseCounts).sort((a, b) => b[1] - a[1])[0];
     return top ? { phase: top[0] as WeakPoint, count: top[1], totalHard } : null;
   }, [sessions, lift]);
@@ -409,7 +489,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         </div>
         {diaryHint && (
           <div style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 10, color: '#fbbf24', lineHeight: 1.5 }}>
-            📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов ({lift === 'squat' ? 'присед' : lift === 'bench' ? 'жим' : lift === 'deadlift' ? 'тяга' : LIFT_RU[lift]}) срываются в фазе «{PHASE_RU[diaryHint.phase]}». Присмотритесь к ней — подсказка, не авто-выбор.
+            📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов ({lift === 'squat' ? 'присед' : lift === 'bench' ? 'жим' : lift === 'deadlift' ? 'тяга' : LIFT_RU[lift]}) срываются в фазе «{PHASE_RU[diaryHint.phase]}». Эвристика по повторениям (низкая достоверность) — подсказка, не авто-выбор.
           </div>
         )}
         {movement && (

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   diagnoseLift, stickingPhases, barPathAnalysis, barPathIssuesForLift, barPathIssuesForPhase,
-  diagnoseMovement, BAR_PATH_ISSUES,
+  diagnoseMovement, BAR_PATH_ISSUES, phaseForReps,
 } from '../lift-diagnostics.engine';
 
 describe('lift-diagnostics', () => {
@@ -67,5 +67,40 @@ describe('bar-path расширение (движение-специфичнос
   it('barPathAnalysis пустой список issues → пустые диагнозы', () => {
     const result = barPathAnalysis('squat', []);
     expect(result.diagnoses).toHaveLength(0);
+  });
+});
+
+describe('phaseForReps — каноническая эвристика фазы срыва по повторениям', () => {
+  it('reps ≤ 2 → фаза максимального момента для каждого движения', () => {
+    expect(phaseForReps(2, 'squat')).toBe('bottom');
+    expect(phaseForReps(1, 'bench')).toBe('off_chest');
+    expect(phaseForReps(2, 'deadlift')).toBe('start');
+    expect(phaseForReps(1, 'ohp')).toBe('ohp_start');
+    expect(phaseForReps(2, 'row')).toBe('row_start');
+    expect(phaseForReps(1, 'pulldown')).toBe('pd_top');
+    expect(phaseForReps(2, 'incline_press')).toBe('inc_off');
+  });
+
+  it('reps 3–5 → середина амплитуды (mid), если фаза есть у движения', () => {
+    expect(phaseForReps(3, 'squat')).toBe('mid');
+    expect(phaseForReps(5, 'bench')).toBe('mid');
+    expect(phaseForReps(4, 'deadlift')).toBe('mid');
+    expect(phaseForReps(3, 'ohp')).toBe('ohp_mid');
+  });
+
+  it('reps ≥ 6 → null (фаза не определяется)', () => {
+    expect(phaseForReps(6, 'squat')).toBeNull();
+    expect(phaseForReps(10, 'bench')).toBeNull();
+    expect(phaseForReps(12, 'deadlift')).toBeNull();
+  });
+
+  it('некорректные повторения → null', () => {
+    expect(phaseForReps(0, 'squat')).toBeNull();
+    expect(phaseForReps(-1, 'bench')).toBeNull();
+    expect(phaseForReps(NaN, 'deadlift')).toBeNull();
+  });
+
+  it('неизвестное движение → null', () => {
+    expect(phaseForReps(3, 'sticking_mid' as any)).toBeNull();
   });
 });
