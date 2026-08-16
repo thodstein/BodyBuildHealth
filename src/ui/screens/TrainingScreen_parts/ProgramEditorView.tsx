@@ -1114,8 +1114,21 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
             sleepHours: loadTrainingProfile().sleepHours,
             stressLevel: loadTrainingProfile().stressLevel,
           },
-          plan: dir === 'bb' && program.bb
-            ? { weeks: program.bb.weeks as any }
+          plan: program.bb
+            ? {
+                weeks: program.bb.weeks.map(week => ({
+                  sessions: week.sessions.map(session => ({
+                    exercises: session.blocks.map(block => ({
+                      id: block.exerciseName,
+                      name: block.exerciseName,
+                      sets: block.sets.length,
+                      reps: Number(block.sets[0]?.reps) || undefined,
+                      weight: block.sets[0]?.weight,
+                      rir: block.sets[0]?.rir,
+                    })),
+                  })),
+                })),
+              }
             : undefined,
         }} compact={false} />
       )}

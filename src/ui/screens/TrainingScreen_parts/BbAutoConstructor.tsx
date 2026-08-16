@@ -70,7 +70,8 @@ import {
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
-  buildPostShowPlan, buildContestPrepPrintHtml,
+  buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
+  type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey,
@@ -326,6 +327,8 @@ export const BbAutoConstructor: React.FC = () => {
   // 🏁 Contest Prep (Этап 8): опциональный полный цикл подготовки
   const [prepPlan, setPrepPlan] = useState<BBContestPrepPlan | null>(null);
   const [prepApplied, setPrepApplied] = useState(false);
+  /** Snapshot плана ДО применения contest prep — для блока «Сравнение до/после». */
+  const [prepBasePlan, setPrepBasePlan] = useState<BBPlan | null>(null);
   const [prepShowDate, setPrepShowDate] = useState<string>(() => {
     try {
       const prof = (linked.profile?.settings ?? {}) as any;
@@ -410,7 +413,12 @@ export const BbAutoConstructor: React.FC = () => {
       });
       setPrepPlan(plan);
       if (applyToPlan) {
-        const updated = applyContestPrepToBBPlan(builtPlan, cfg, {
+        // Сохраняем ручные правки пользователя (exerciseEdits) перед пересборкой prep:
+        // иначе повторный taper клонирует план БЕЗ правок и они теряются.
+        const baseWithEdits = Object.keys(exerciseEdits).length > 0 ? applyEditsToPlan(builtPlan) : builtPlan;
+        // Snapshot ДО применения — для блока «Сравнение до/после».
+        setPrepBasePlan(structuredClone(baseWithEdits) as BBPlan);
+        const updated = applyContestPrepToBBPlan(baseWithEdits, cfg, {
           prepWeeks: plan.preparation.weeks,
           taperWeeks: plan.taper.weeks,
           prepVolumeMult: prepVolumeMode,
@@ -2000,7 +2008,21 @@ export const BbAutoConstructor: React.FC = () => {
           trainingYears: bbTrainingYears,
           level: bbLevel,
         },
-      }} compact />
+        plan: builtPlan ? {
+          weeks: builtPlan.weeks.map(week => ({
+            sessions: week.sessions.map(session => ({
+              exercises: session.exercises.map(exercise => ({
+                id: exercise.exerciseName,
+                name: exercise.name,
+                sets: exercise.sets,
+                reps: exercise.repsRange?.[0],
+                weight: exercise.workSets?.[0]?.weight,
+                rir: exercise.rir,
+              })),
+            })),
+          })),
+        } : undefined,
+      }} compact={!builtPlan} />
       {/* PRO: Mobility restrictions — biomechanics-based exercise filtering */}
       <div style={{ marginTop:8 }}>
         <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>🦴 Ограничения мобильности (биомеханика)</div>
