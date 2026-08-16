@@ -2,21 +2,10 @@
  * Только инструменты, релевантные планированию — каждый подключён к planner-bridge.
  * Состав подобран под режим (ПЛ-авто / ББ-авто / Ручной сбор). */
 import React, { useState } from 'react';
-import { ExpandableCard, CalcSection, PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
-
-// ПЛ-специфичные
-import { RelativeStrengthCalcTab } from './RelativeStrengthCalcTab';
-import PeakingProtocolTab from './PeakingProtocolTab';
-import { TaperPlannerTab } from './TaperPlannerTab';
 
 // Общие (сила/нагрузка/периодизация)
-import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
-import { OneRmCalcTab } from './OneRmCalcTab';
-import { VBTCalcTab } from './VBTCalcTab';
 import { PeriodizationDesignerTab } from './PeriodizationDesignerTab';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
-import MesoCorrectionCard from './MesoCorrectionCard';
-import { DEFAULT_PROFILE } from './training-profile';
 import { loadTrainingProfile } from './training-profile';
 import { DiagnosticsHub } from './DiagnosticsHub';
 import { StrengthAnalysisHub } from './StrengthAnalysisHub';
@@ -45,19 +34,9 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
       />
     ) },
     { id: 'intelligence-strength', title: 'Анализ силы', icon: '🏋️', short: 'Интеллектуальный анализ силы: 1RM, VBT, относительная сила, нормативы и аналитика.', render: () => <StrengthAnalysisHub /> },
-    { id: 'str', title: 'Аналитика силы', icon: '💪', short: 'Процентиль, уровень, соотношения, объёмные ориентиры.', render: () => <StrengthAnalyticsCard /> },
-    { id: '1rm', title: 'Калькулятор 1RM', icon: '🎯', short: 'Оценка максимума по весу и повторениям → ПМ планировщику.', render: () => <OneRmCalcTab /> },
-    { id: 'relstr', title: 'Относительная сила', icon: '⚖️', short: 'Wilks/DOTS/GL — определение слабейшего движения.', render: () => <RelativeStrengthCalcTab /> },
     { id: 'safety', title: 'Безопасность и нагрузка', icon: '🛡', short: 'Единый инструмент: безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио, разгрузка.', render: () => <TrainingSafetyHub /> },
     { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR по неделям → стартовый объём планировщику.', render: () => <MesocycleProgressionCard weeks={12} startVolumeSets={18} startIntensityPct={0.75} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
-    { id: 'mesocorr', title: 'Коррекция мезо', icon: '🔧', short: 'Авто-корректировка объёма/RIR/deload по данным.', render: () => {
-      const emptyProfile = { ...DEFAULT_PROFILE, goal: 'strength' as const, workMax: {} };
-      return <MesoCorrectionCard profile={emptyProfile} acwr={1} monotony={1} avgReadiness={80} mesoWeeks={12} missedSessions={0} exercises={[]} currentVolume={18} currentRir={2} />;
-    } },
-    { id: 'peak', title: 'Пик-протокол', icon: '⚡', short: 'Пиковая фаза: объём ↓, RIR→0, интенсивность ↑.', render: () => <PeakingProtocolTab /> },
-    { id: 'taper', title: 'Taper-планер', icon: '🏁', short: 'Тейпер к соревнованию: объём ↓, прикиды, таймлайн.', render: () => <TaperPlannerTab /> },
     { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз на таймлайн.', render: () => <PeriodizationDesignerTab /> },
-    { id: 'comp', title: 'Соревнование', icon: '🏆', short: 'Категория, стратегия подходов, таймлайн, восстановление.', render: () => <div style={{padding:12,fontSize:11,color:'var(--text-dim)'}}>🏋️ Соревнование перенесено в инструмент «Пиковая фаза» внутри ПЛ-авто (вкладка «Пик» → режим «Соревнование»).</div> },
   ],
 
   // ═══ ББ-АВТО ═══
