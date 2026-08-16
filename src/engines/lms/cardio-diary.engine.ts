@@ -156,7 +156,6 @@ export function computeCardioAdvice(
   opts: { acwr?: number | null; recoveryLow?: boolean; referenceIso?: string } = {},
 ): CardioAdvice {
   const stats = cardioLogStats(log, 7, opts.referenceIso);
-  const avgMinutes = cycle.totalWeeks > 0 ? Math.round(cycle.totalKcal / cycle.totalWeeks / 7) : 0;
   const plannedWeekly = cycle.weeks.length > 0 ? Math.round(cycle.weeks.reduce((s, w) => s + w.totalMinutes, 0) / cycle.weeks.length) : 0;
   if (opts.acwr != null && opts.acwr >= 1.5) {
     return { action: 'reduce', reason: `ACWR ${opts.acwr.toFixed(2)} — опасная зона: кардио-объём снизить, HIIT исключить.` };

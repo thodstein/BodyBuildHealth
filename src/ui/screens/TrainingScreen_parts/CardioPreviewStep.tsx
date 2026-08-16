@@ -137,6 +137,21 @@ export const CardioPreviewStep: React.FC<{
 
   const visibleWeeks = showAllWeeks || (cycle?.totalWeeks ?? 0) <= 16 ? (cycle?.weeks ?? []) : (cycle?.weeks ?? []).slice(0, 12);
 
+  const goTo = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const NAV = [
+    { id: 'sec-overview', label: '📊 Обзор' },
+    { id: 'sec-variants', label: '⇄ Варианты' },
+    { id: 'sec-phases', label: '🗂 Фазы' },
+    { id: 'sec-quality', label: '📊 Качество' },
+    { id: 'sec-nutrition', label: '🍽 Питание' },
+    { id: 'sec-weeks', label: '🗓 Недели' },
+    { id: 'sec-rationale', label: '💡 Обоснование' },
+  ];
+
   const previewImprove = () => {
     if (!cycle) return;
     const r = improveCardioCycle(cycle, { daysAvailable, recoveryLow });
@@ -172,7 +187,7 @@ export const CardioPreviewStep: React.FC<{
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <style>{`@media (max-width:480px){.cardio-day-grid{display:grid!important;grid-template-columns:repeat(4,1fr)}.cardio-day-grid>div{min-width:0!important}}`}</style>
-      <div style={CARD}>
+      <div style={CARD} id="sec-overview">
         <div style={ROW}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>{cycle.name}</span>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
@@ -185,17 +200,24 @@ export const CardioPreviewStep: React.FC<{
             </div>
           ))}
         </div>
-        <div style={ROW}>
-          <button style={BTN_PRIMARY} onClick={onBuild}>🔄 Пересобрать цикл</button>
-          <button style={BTN} onClick={onEditConfig} title="Загрузить параметры, из которых собран этот цикл, для редактирования">⚙️ Изменить параметры</button>
-          <button style={BTN} onClick={copyKcal} aria-label="Скопировать ккал">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <button style={{ ...BTN_PRIMARY, flex: '1 1 140px' }} onClick={onBuild}>🔄 Пересобрать цикл</button>
+          <button style={{ ...BTN, flex: '1 1 140px' }} onClick={onEditConfig} title="Загрузить параметры, из которых собран этот цикл, для редактирования">⚙️ Изменить параметры</button>
+          <button style={{ ...BTN, flex: '1 1 140px' }} onClick={copyKcal} aria-label="Скопировать ккал">
             {kcalFlash ? '✅ Ккал в буфере' : '🔥 Ккал в буфер'}
           </button>
         </div>
       </div>
 
+      {/* Якорная навигация по секциям */}
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {NAV.map(n => (
+          <button key={n.id} style={{ ...BTN, minHeight: 30, padding: '5px 10px', fontSize: 10 }} onClick={() => goTo(n.id)} aria-label={`К разделу ${n.label}`}>{n.label}</button>
+        ))}
+      </div>
+
       {/* Варианты нагрузки */}
-      <div style={CARD}>
+      <div style={CARD} id="sec-variants">
         <div style={LABEL}>⇄ Варианты нагрузки</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {variants.map(v => (
@@ -228,7 +250,7 @@ export const CardioPreviewStep: React.FC<{
 
       {/* Питание для кардио */}
       {nutritionNotes.length > 0 && (
-        <div style={CARD}>
+        <div style={CARD} id="sec-nutrition">
           <div style={LABEL}>🍽 Питание для кардио</div>
           {nutritionNotes.map((n, i) => (
             <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {n}</div>
@@ -238,7 +260,7 @@ export const CardioPreviewStep: React.FC<{
 
       {/* Качество + улучшить */}
       {quality && (
-        <div style={CARD}>
+        <div style={CARD} id="sec-quality">
           <div style={ROW}>
             <span style={LABEL}>📊 Качество цикла</span>
             <span style={{ fontSize: 16, fontWeight: 800, color: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }}>{quality.score}</span>
@@ -285,7 +307,7 @@ export const CardioPreviewStep: React.FC<{
       </div>
 
       {/* План по фазам */}
-      <div style={CARD}>
+      <div style={CARD} id="sec-phases">
         <div style={LABEL}>🗂 План по фазам</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {phasesPlan.map(p => (
@@ -317,7 +339,7 @@ export const CardioPreviewStep: React.FC<{
       )}
 
       {/* Неделя по дням */}
-      <div style={CARD}>
+      <div style={CARD} id="sec-weeks">
         <div style={ROW}>
           <span style={LABEL}>🗓 Неделя по дням</span>
           <button style={BTN} onClick={() => setWeekNo(Math.max(1, weekNo - 1))} aria-label="Предыдущая неделя">−</button>
@@ -398,7 +420,7 @@ export const CardioPreviewStep: React.FC<{
       </div>
 
       {cycle.rationale.length > 0 && (
-        <div style={CARD}>
+        <div style={CARD} id="sec-rationale">
           <div style={LABEL}>💡 Обоснование</div>
           {cycle.rationale.map((r, i) => (
             <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>• {r}</div>

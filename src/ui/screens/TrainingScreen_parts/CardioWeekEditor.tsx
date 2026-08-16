@@ -109,7 +109,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const scaleMinutes = (mult: number) => saveWeek(w => ({
     ...w,
-    sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult))) })),
+    sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult)), 80, s.equipment) })),
   }));
 
   const updateSession = (idx: number, patch: Partial<CardioSession>) => saveWeek(w => ({
@@ -117,7 +117,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     sessions: w.sessions.map((s, i) => {
       if (i !== idx) return s;
       const next = { ...s, ...patch };
-      next.kcalPerSession = kcalForCardio(next.type, next.durationMin);
+      next.kcalPerSession = kcalForCardio(next.type, next.durationMin, 80, next.equipment);
       return next;
     }),
   }));
@@ -126,7 +126,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const addSession = () => saveWeek(w => ({
     ...w,
-    sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30), purpose: 'Ручная сессия' }],
+    sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, 80, undefined), purpose: 'Ручная сессия' }],
   }));
 
   if (!cycle || !week) return null;

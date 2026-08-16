@@ -244,6 +244,17 @@ export const CARDIO_PRESETS: CardioPreset[] = [
 /** Оценка расхода ккал/мин по типу (для ~80кг атлета, поправка через вес). */
 const KCAL_PER_MIN: Record<CardioType, number> = { zone2: 7, miss: 10, hiit: 14, recovery: 5 };
 
+/** MET-множитель по оборудованию (относительно бега = 1.0). Низкоударные
+ *  виды сжигают меньше за минуту при той же продолжительности. */
+const EQUIPMENT_MET: Record<CardioEquipment, number> = {
+  running: 1.0,
+  swimming: 0.82,
+  cycling: 0.77,
+  rowing: 0.71,
+  elliptical: 0.51,
+  walking: 0.44,
+};
+
 export const MAX_CYCLE_WEEKS = 104;
 export const DELOAD_INTERVAL = 4;
 
@@ -275,9 +286,10 @@ const TYPE_INTENSITY: Record<CardioType, 'low' | 'moderate' | 'high'> = {
 
 // ─── Расчёт ───
 
-export function kcalForCardio(type: CardioType, durationMin: number, bodyWeight: number = 80): number {
+export function kcalForCardio(type: CardioType, durationMin: number, bodyWeight: number = 80, equipment?: CardioEquipment): number {
   const base = KCAL_PER_MIN[type] * durationMin;
-  return Math.round(base * (bodyWeight / 80));
+  const met = equipment ? (EQUIPMENT_MET[equipment] ?? 1.0) : 1.0;
+  return Math.round(base * met * (bodyWeight / 80));
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -525,7 +537,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
 
   for (let w = 1; w <= totalWeeks; w++) {
     const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit, taperWeeks, peakWeek);
-    const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition';
+    const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition' && phase !== 'taper' && phase !== 'peak';
     let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow);
     if (deload) {
       sessions = sessions
@@ -541,7 +553,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       return {
         ...s,
         durationMin: dur,
-        kcalPerSession: kcalForCardio(s.type, dur, bw),
+        kcalPerSession: kcalForCardio(s.type, dur, bw, equip),
         equipment: equip,
         targetHr: zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr,
       };
@@ -742,7 +754,7 @@ export function bumpCardioZone2Volume(cycle: CardioCycle, addMin = 15): CardioCy
     const sessions = w.sessions.map(s => {
       if (s.type !== 'zone2') return s;
       const durationMin = s.durationMin + addMin;
-      return { ...s, durationMin, kcalPerSession: kcalForCardio('zone2', durationMin, 80) };
+      return { ...s, durationMin, kcalPerSession: kcalForCardio('zone2', durationMin, 80, s.equipment) };
     });
     return rebuildWeek(w, sessions, ['⚖️ Zone 2 +' + addMin + ' мин (коррекция по весу)']);
   });
@@ -1074,28 +1086,34 @@ const CARDIO_TYPE_RU: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HII
  * открывается в ручном конструкторе и может выполняться как обычная программа.
  */
 export function cardioCycleToUserProgram(cycle: CardioCycle): import('../user-program/user-program.types').UserProgram {
-  const weeks: import('../user-program/user-program.types').UserWeek[] = cycle.weeks.map(w => ({
-    week: w.week,
-    phase: CARDIO_TO_PHASE[w.phase] ?? 'accumulation',
-    deload: w.deload,
-    sessions: w.sessions.map(s => ({
-      id: newId('ses'),
-      name: `Кардио: ${CARDIO_TYPE_RU[s.type]} ${s.durationMin} мин`,
-      dayOfWeek: s.dayOfWeek,
-      focus: 'cardio',
-      estimatedMin: s.durationMin,
-      blocks: [{
-        id: newId('blk'),
-        type: 'accessory',
-        exerciseName: `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}`,
-        muscle: 'cardio',
-        role: 'primary',
-        sets: [{ reps: 1, rir: 0, weight: 0, restSec: 60 }],
-        note: `${s.purpose}${s.targetHr?.max ? ` · ЧСС ${s.targetHr.min}-${s.targetHr.max}` : ''}`,
-        character: s.type === 'hiit' ? 'тяж' : s.type === 'recovery' ? 'лёг' : 'памп',
-      }],
-    })),
-  }));
+  const weeks: import('../user-program/user-program.types').UserWeek[] = cycle.weeks.map(w => {
+    const sessions: import('../user-program/user-program.types').UserSession[] = [];
+    for (const s of w.sessions) {
+      // Раскрываем weeklyFrequency в отдельные дни (день недели сдвигается),
+      // чтобы программа отражала реальную частоту, а не одну сессию.
+      for (let k = 0; k < s.weeklyFrequency; k++) {
+        const dayOfWeek = s.dayOfWeek != null ? (s.dayOfWeek + k) % 7 : undefined;
+        sessions.push({
+          id: newId('ses'),
+          name: `Кардио: ${CARDIO_TYPE_RU[s.type]} ${s.durationMin} мин`,
+          dayOfWeek,
+          focus: 'cardio',
+          estimatedMin: s.durationMin,
+          blocks: [{
+            id: newId('blk'),
+            type: 'accessory',
+            exerciseName: `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}`,
+            muscle: 'cardio',
+            role: 'primary',
+            sets: [{ reps: 1, rir: 0, weight: 0, restSec: 60 }],
+            note: `${s.purpose}${s.targetHr?.max ? ` · ЧСС ${s.targetHr.min}-${s.targetHr.max}` : ''}`,
+            character: s.type === 'hiit' ? 'тяж' : s.type === 'recovery' ? 'лёг' : 'памп',
+          }],
+        });
+      }
+    }
+    return { week: w.week, phase: CARDIO_TO_PHASE[w.phase] ?? 'accumulation', deload: w.deload, sessions };
+  });
   const now = new Date().toISOString();
   const avgFreq = Math.max(1, Math.round(cycle.weeks.reduce((sum, w) => sum + w.sessions.reduce((a, x) => a + x.weeklyFrequency, 0), 0) / Math.max(1, cycle.totalWeeks)));
   return {
@@ -1364,7 +1382,8 @@ export function autoTuneCardioCycle(
     if (w.deload || w.taper || w.phase === 'peak' || w.phase === 'transition') return w;
     const start = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (w.week - 1) * 7);
     const startIso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
-    const endIso = startIso + '+7';
+    const end = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + w.week * 7);
+    const endIso = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
     const done = log.filter(e => e.completed && e.date >= startIso && e.date < endIso);
     const plannedSessions = w.sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     const pct = plannedSessions > 0 ? done.length / plannedSessions : 0;

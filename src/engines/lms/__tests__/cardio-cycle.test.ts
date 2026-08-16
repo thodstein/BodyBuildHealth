@@ -1113,3 +1113,74 @@ describe('cardioNutritionNotes', () => {
     expect(notes.join('\n')).toContain('1.8-2.0 г/кг = 171 г/сут');
   });
 });
+
+// ─── Аудит качества: окно недели авто-подстройки, делод+taper, ккал по оборудованию ───
+
+describe('аудит: окно недели autoTune (баг +7)', () => {
+  const REF = '2026-01-05';
+
+  it('сессии в середине/конце недели учитыются (не только первый день)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    // Все сессии недели 1 выполнены (даты с ведущими нулями 05..07).
+    const log = Array.from({ length: planned }, (_, i) => ({ date: `2026-01-${String(5 + i).padStart(2, '0')}`, durationMin: 30, rpe: 5, completed: true }));
+    const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
+    expect(r.changes).toEqual([]);
+    expect(r.advice.action).toBe('keep');
+  });
+
+  it('выполнена только половина недели → частота −1 (корректный подсчёт)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    // Выполнена 1 из 3 сессий (только первый день) → pct < 60% → частота −1.
+    const log = [{ date: '2026-01-05', durationMin: 30, rpe: 5, completed: true }];
+    const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
+    const freqAfter = r.cycle.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    expect(freqAfter).toBeLessThan(planned);
+    expect(r.changes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('аудит: делод не накладывается на taper/peak (двойное снижение)', () => {
+  it('taper-неделя на делод-интервале не режется дважды', () => {
+    // Соревнование на неделе 5, taperWeeks 4 → недели 2-4 taper; делод-интервал на неделе 4.
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, taperWeeks: 4, competitions: [{ id: 'c', name: 'Шоу', week: 5 }] });
+    const w4 = c.weeks.find(w => w.week === 4)!;
+    expect(w4.phase).toBe('taper');
+    // Делод не должен быть помечен на taper-неделе (иначе двойное ×0.6).
+    expect(w4.deload).toBe(false);
+  });
+
+  it('обычная делод-неделя (не taper) остаётся помеченной', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const w4 = c.weeks.find(w => w.week === 4)!;
+    expect(w4.deload).toBe(true);
+  });
+});
+
+describe('аудит: ккал по оборудованию (MET)', () => {
+  it('ходьба сжигает меньше бега за ту же минуту', () => {
+    const run = kcalForCardio('zone2', 30, 80, 'running');
+    const walk = kcalForCardio('zone2', 30, 80, 'walking');
+    expect(walk).toBeLessThan(run);
+  });
+
+  it('без оборудования — поведение как раньше (бег)', () => {
+    expect(kcalForCardio('zone2', 30, 80)).toBe(kcalForCardio('zone2', 30, 80, 'running'));
+  });
+
+  it('цикл учитывает оборудован��е в ккал недели', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, equipment: ['walking'], lowImpact: true });
+    expect(c.weeks[0].sessions.every(s => s.equipment === 'walking')).toBe(true);
+  });
+});
+
+describe('аудит: экспорт в программу сохраняет частоту', () => {
+  it('zone2 ×3 → 3 сессии по дням в программе', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const p = cardioCycleToUserProgram(c);
+    const w1 = p.bb!.weeks[0];
+    const freq = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
+    expect(w1.sessions.length).toBe(freq);
+  });
+});
