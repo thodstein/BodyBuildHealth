@@ -1555,7 +1555,7 @@ export const BbAutoConstructor: React.FC = () => {
   const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual'] : ['params','ped','split','plan','quality','adjust','contest','annual'];
   const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план' };
   const renderStepNav = () => (
-    <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
       {stepList.map(s => {
         return <button key={s} onClick={() => { if ((s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={STEP_PILL(step === s)}>{stepLabels[s]}</button>;
       })}
@@ -4423,8 +4423,8 @@ export const BbAutoConstructor: React.FC = () => {
         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>💪 ББ-авто</span>
         <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
       </div>
-      {/* Шаги конструктора + инструменты — горизонтальный ряд (как в ПЛ-авто) */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none', alignItems: 'center' }}>
+      {/* Шаги конструктора + инструменты — ряд с переносом, помещается на экране без прокрутки */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         {renderStepNav()}
         <button
           onClick={() => setShowTools(true)}
