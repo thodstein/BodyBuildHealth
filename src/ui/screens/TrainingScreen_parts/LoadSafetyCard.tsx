@@ -8,7 +8,6 @@ import { autoRegulate, loadForRPE, rpeFromLoad } from '../../../engines/pro/auto
 import { loadTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
 import { PopupNumber, PopupSelect, PopupToggle, CalcSection, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
-import { TrainingSafetyHub } from './TrainingSafetyHub';
 
 const ACCENT = '#00e68a';
 const APPLY_BOX: React.CSSProperties = { marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' };
@@ -109,12 +108,6 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
               </div>}
             </div>
           </CalcSection>
-          <TrainingSafetyHub input={{
-            source: 'cardio',
-            profile: { injuries: injuries.split(',').map(s => ({ muscle: s.trim() })).filter(x => x.muscle), currentPain: currentPain.split(',').map(s => s.trim()).filter(Boolean), jointLimitations },
-            workload: { acwrRatio: acwr },
-            cardio: { type: cardioType, daysPerWeek: cardioDays, durationMin: cardioPlan.sessions[0]?.durationMin || 30, goal: cardioGoal },
-          }} />
           </>
         );
       case 'ortho':

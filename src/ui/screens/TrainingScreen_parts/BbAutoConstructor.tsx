@@ -88,10 +88,6 @@ import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
-import { TrainingSafetyHub } from './TrainingSafetyHub';
-import { applySafetyReportToBBPlan } from '../../../engines/bb/bb-safety-adapter.engine';
-import { trainingSafetyGate } from '../../../engines/training-safety-gate.engine';
-import type { TrainingSafetyReport } from '../../../engines/training-safety.types';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
@@ -286,7 +282,6 @@ export const BbAutoConstructor: React.FC = () => {
 
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
-  const [latestSafetyReport, setLatestSafetyReport] = useState<TrainingSafetyReport | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
   const [autoRegOn, setAutoRegOn] = useState(false);
   const [specializationMode, setSpecializationMode] = useState(false);
@@ -1259,19 +1254,9 @@ export const BbAutoConstructor: React.FC = () => {
     return revalidateEditedPlan(editedPlan);
   };
 
-  const canSaveWithSafety = (): boolean => {
-    if (!latestSafetyReport) return true;
-    const gate = trainingSafetyGate(latestSafetyReport);
-    if (gate.allowed) return true;
-    if (gate.requiresConfirmation && window.confirm(gate.message)) return true;
-    flash(`🛡 ${gate.message}`);
-    return false;
-  };
-
   const handleSavePlan = () => {
     try {
       const planToSave = applyEditsToPlan(builtPlan!);
-      if (!canSaveWithSafety()) return;
       const saveSafety = calculatePlanSafetyScore(planToSave, {
         acwrRatio: calculateACWR(),
         injuryCount: injuries.length,
@@ -1286,7 +1271,6 @@ export const BbAutoConstructor: React.FC = () => {
   const handleSaveToMyPlans = () => {
     if (!builtPlan) return;
     const exportPlan = applyEditsToPlan(builtPlan);
-    if (!canSaveWithSafety()) return;
     const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuryCount: injuries.length });
     if (saveSafety.riskLevel === 'dangerous') { flash(`План небезопасен: SafetyScore ${saveSafety.score}/100.`); return; }
     if (!exportPlan.validation?.valid) { flash('План нельзя сохранить: исправьте ошибки валидации.'); return; }
@@ -1316,7 +1300,6 @@ export const BbAutoConstructor: React.FC = () => {
 
   const handleSaveVariant = () => {
     if (!builtPlan || !metrics) return;
-    if (!canSaveWithSafety()) return;
     const exportPlan = applyEditsToPlan(builtPlan);
     if (!exportPlan.validation?.valid) { flash('Вариант нельзя сохранить: исправьте ошибки валидации.'); return; }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
@@ -1375,7 +1358,6 @@ export const BbAutoConstructor: React.FC = () => {
   /** Сохранить собранный ББ-план в «Мои программы» (UserProgram) — канонический путь редактирования. */
   const handleSaveAsUserProgram = () => {
     if (!builtPlan) return;
-    if (!canSaveWithSafety()) return;
     const exportPlan = applyEditsToPlan(builtPlan);
     if (!exportPlan.validation?.valid) { flash('Программу нельзя сохранить: исправьте ошибки валидации.'); return; }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
@@ -2071,38 +2053,6 @@ export const BbAutoConstructor: React.FC = () => {
           onChange={setInjuries}
         />
       </div>
-      <TrainingSafetyHub input={{
-        source: 'bb_auto',
-        profile: {
-          injuries,
-          techniqueIssues: mobilityRestrictions,
-          avoidAxialLoad: (prof as any).avoidAxialLoad,
-          trainingYears: bbTrainingYears,
-          level: bbLevel,
-        },
-        plan: builtPlan ? {
-          weeks: builtPlan.weeks.map(week => ({
-            sessions: week.sessions.map(session => ({
-              exercises: session.exercises.map(exercise => ({
-                id: exercise.exerciseName,
-                name: exercise.name,
-                sets: exercise.sets,
-                reps: exercise.repsRange?.[0],
-                weight: exercise.workSets?.[0]?.weight,
-                rir: exercise.rir,
-              })),
-            })),
-          })),
-        } : undefined,
-      }} compact={!builtPlan} onReport={setLatestSafetyReport} onApply={builtPlan ? report => {
-        const result = applySafetyReportToBBPlan(builtPlan, report);
-        if (result.applied) {
-          setBuiltPlan(result.plan);
-          flash('🛡 Safety-корректировка применена к копии плана');
-        } else {
-          flash(`🛡 ${result.skipped.join('; ')}`);
-        }
-      } : undefined} />
       {/* PRO: Mobility restrictions — biomechanics-based exercise filtering */}
       <div style={{ marginTop:8 }}>
         <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>🦴 Ограничения мобильности (биомеханика)</div>
