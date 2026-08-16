@@ -1762,9 +1762,11 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
     },
     peakWeek: {
       enabled: true,
-      strategy: cfg.experienceLevel === 'beginner' || cfg.prepCount === 0
-        ? 'conservative'
-        : cfg.carbLoadStrategy === 'front' ? 'moderate' : 'conservative',
+      // Стратегия по опыту: новичок/первый пик — консервативная, продвинутый — умеренная,
+      // тестированный протокол — через resolvePeakStrategy (testPeakWeekId).
+      strategy: cfg.experienceLevel === 'advanced' && cfg.prepCount > 0
+        ? 'moderate'
+        : 'conservative',
       waterMode: allowedManipulation && (cfg.waterStrategy === 'classic' || cfg.waterStrategy === 'moderate') ? 'moderate' : 'stable',
       sodiumMode: allowedManipulation && cfg.sodiumStrategy !== 'constant' ? 'moderate' : 'stable',
       carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate',

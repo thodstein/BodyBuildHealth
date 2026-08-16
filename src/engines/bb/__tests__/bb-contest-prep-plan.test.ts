@@ -341,6 +341,15 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(prepWk.sessions[0].exercises[0].rir).toBe(baseWk.sessions[0].exercises[0].rir);
   });
 
+  it('стратегия пик-недели зависит от опыта: новичок → conservative, продвинутый с опытом пиков → moderate', () => {
+    const beginner = buildBBContestPrepPlan(baseConfig({ experienceLevel: 'beginner', prepCount: 0 }));
+    expect(beginner.peakWeek.strategy).toBe('conservative');
+    const advanced = buildBBContestPrepPlan(baseConfig({ experienceLevel: 'advanced', prepCount: 3 }));
+    expect(advanced.peakWeek.strategy).toBe('moderate');
+    const intermediateFirst = buildBBContestPrepPlan(baseConfig({ experienceLevel: 'intermediate', prepCount: 0 }));
+    expect(intermediateFirst.peakWeek.strategy).toBe('conservative');
+  });
+
   it('РЕЖИМ ПОДГОТОВКИ: недели подготовки получают RIR 1–3 (не RIR 0), отказные техники убраны, веса сохранены', () => {
     const plan = makePlan(8);
     // Интенсификационные недели с RIR 0 и dropset-техникой на последнем сете.

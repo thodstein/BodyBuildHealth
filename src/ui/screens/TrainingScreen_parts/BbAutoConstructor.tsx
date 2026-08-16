@@ -358,16 +358,27 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepContraExtra, setPrepContraExtra] = useState<string[]>([]);
   const allPrepContra = useMemo(() => Array.from(new Set([...prepContra, ...prepContraExtra])), [prepContra, prepContraExtra]);
 
+  /** Тренировочный стаж для contest prep (из bbTrainingYears / bbLevel). */
+  const expYearsForPrep = useMemo(
+    () => (Number(bbTrainingYears) > 0 ? Number(bbTrainingYears) : (bbLevel === 'advanced' ? 7 : bbLevel === 'beginner' ? 1 : 3)),
+    [bbTrainingYears, bbLevel],
+  );
   const buildContestPrepConfig = (): BBContestPrepConfig => {
     const prof = (linked.profile?.settings ?? {}) as any;
     const catProfile = CATEGORY_PROFILES[peakWeekCategory] ?? CATEGORY_PROFILES.mens_physique;
     const sex: 'male' | 'female' = catProfile.sex;
+    // Тренировочный стаж → опыт для prep (влияет на стратегию пик-недели и предупреждения).
+    const expYears = expYearsForPrep;
+    const experienceLevel: 'beginner' | 'intermediate' | 'advanced' =
+      expYears >= 5 || bbLevel === 'advanced' ? 'advanced'
+        : expYears < 2 || bbLevel === 'beginner' ? 'beginner'
+          : 'intermediate';
     const base: BBContestPrepConfig = {
       sex,
       category: peakWeekCategory,
       weightKg: Math.max(40, Math.min(200, Number(prof?.personal?.weight) || 80)),
       bodyFatPct: Number(prof?.personal?.bodyFat) > 0 ? Number(prof?.personal?.bodyFat) : undefined,
-      experienceLevel: 'intermediate',
+      experienceLevel,
       enhanced: peds.length > 0,
       prepCount: 0,
       showDate: prepShowDate,
@@ -3679,6 +3690,7 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:3 }}>
                 {prepVolumeMode === 1.0 ? 'Объём как в плане, RIR 1–3, без отказных техник, веса сохраняются' : 'Объём ×0.85 (дефицит), RIR 2–3, без отказных техник'}
+                {' · '}{peds.length > 0 ? '💉 на курсе — восстановление выше, объём можно сохранять (×1.0)' : expYearsForPrep >= 2 ? 'natural: при дефиците рекомендуем ×0.85' : 'новичок: объём не снижать (×1.0), RIR 2–3'}
               </div>
             </div>
           </div>
@@ -3710,6 +3722,11 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
             <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:8 }}>
               {prepPlan.preparation.weeks} нед подготовки (финал {prepPlan.preparation.finalWeeks}) · taper {prepPlan.taper.weeks} нед · пик-неделя 7 дн · темп {prepPlan.preparation.targetRatePctPerWeek}%/нед · {prepPlan.preparation.currentCalories} ккал · {prepPlan.preparation.stepsPerDay} шагов
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginBottom:8 }}>
+              {peds.length > 0 ? '💉 курс: объём ×1.0 (восстановление выше)' : '🌱 natural'} · стаж {expYearsForPrep} г ({prepPlan.safety.requiresReview ? '' : ''}{' '}
+              {(() => { const e = buildContestPrepConfig().experienceLevel; return e === 'advanced' ? 'продвинутый' : e === 'beginner' ? 'новичок' : 'средний'; })()}
+              ) · режим подготовки: объём {Math.round((prepPlan.preparation.volumeMult ?? 1) * 100)}%
             </div>
             {phaseNow && (
               <div style={{ fontSize:11, fontWeight:700, color:PREP_PHASE_COLORS[phaseNow.key], marginBottom:4 }}>
