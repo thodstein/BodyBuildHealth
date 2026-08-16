@@ -28,7 +28,7 @@ import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
 import { PLTaperProvider, usePLTaper } from './SRCBBScreen_parts/taper-state';
 import { RecoveryPanel } from './SRCBBScreen_parts/RecoveryPanel';
-import { ExerciseSafetyPanel } from './SRCBBScreen_parts/ExerciseSafetyPanel';
+import { TrainingSafetyHub } from './TrainingScreen_parts/TrainingSafetyHub';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
@@ -1727,7 +1727,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       }} />}
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
       {subView === 'recovery' && (<><RecoveryPanel /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
-      {subView === 'safety' && <ExerciseSafetyPanel />}
+      {subView === 'safety' && <TrainingSafetyHub />}
       {subView === 'methods' && (<>
         <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}

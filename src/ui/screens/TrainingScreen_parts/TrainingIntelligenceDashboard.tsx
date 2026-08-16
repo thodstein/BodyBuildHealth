@@ -47,7 +47,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '🏋️', label: 'Сила', desc: '1RM, VBT, нормативы, относительная сила, аналитика', tab: 'strength_analysis',
           badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
-        { icon: '📈', label: 'Нагрузка', desc: 'sRPE, ACWR, монотонность, усталость, готовность', tab: 'load_management',
+        { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио', tab: 'load_management',
           badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
       ],
     },
@@ -73,7 +73,6 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       icon: '⚕', label: 'Периодизация', color: '#f59e0b',
       tools: [
         { icon: '📅', label: 'Фазы и циклы', desc: 'Дизайнер периодизации, делод, прогрессия', tab: 'periodization_hub' },
-        { icon: '🫀', label: 'Нагрузка и безопасность', desc: 'Кардио, ортопедия, распределение недели', tab: 'load_safety' },
       ],
     },
     {
