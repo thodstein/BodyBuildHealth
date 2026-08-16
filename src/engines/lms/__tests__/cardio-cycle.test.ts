@@ -1531,3 +1531,27 @@ describe('cardioYearPlan / buildCardioYearText', () => {
     expect(text).toContain('Итого: 12 нед');
   });
 });
+
+// ─── Цикл без taper (taper: false) ───
+
+describe('buildCardioCycle — taper: false (цикл без taper-кривой)', () => {
+  it('со стартом и taper:false — нет taper-недель, перед стартом contest_prep, неделя старта peak', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, taper: false, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    expect(c.weeks.some(w => w.phase === 'taper')).toBe(false);
+    expect(c.weeks.find(w => w.week === 6)!.phase).toBe('peak');
+    // Недели до старта — наращивание (contest_prep), не taper.
+    expect(c.weeks.find(w => w.week === 5)!.phase).toBe('contest_prep');
+    expect(c.weeks.find(w => w.week === 1)!.phase).toBe('contest_prep');
+  });
+
+  it('taper:false + peakWeek:false — неделя старта обычная (maintenance), без taper', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, taper: false, peakWeek: false, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    expect(c.weeks.some(w => w.phase === 'taper')).toBe(false);
+    expect(c.weeks.find(w => w.week === 6)!.phase).not.toBe('taper');
+  });
+
+  it('по умолчанию (taper не задан) — taper строится к старту', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    expect(c.weeks.some(w => w.phase === 'taper')).toBe(true);
+  });
+});

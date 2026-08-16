@@ -657,6 +657,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       phaseSplit: input.phaseSplit ? { ...input.phaseSplit } : undefined,
       taperWeeks: input.taperWeeks,
       peakWeek: input.peakWeek,
+      taper: input.taper,
       level: input.level,
       equipment: input.equipment ? [...input.equipment] : undefined,
       lowImpact: input.lowImpact,

@@ -16,9 +16,11 @@ export const CardioCompsStep: React.FC<{
   totalWeeks: number;
   taperWeeks: number;
   setTaperWeeks: (n: number) => void;
+  taperEnabled: boolean;
+  setTaperEnabled: (v: boolean) => void;
   peakWeek: boolean;
   setPeakWeek: (v: boolean) => void;
-}> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, setTaperWeeks, peakWeek, setPeakWeek }) => {
+}> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek }) => {
   const add = () => {
     const week = Math.min(Math.max(1, Math.round(Number(draft.week) || 0)), totalWeeks);
     if (!draft.name.trim() || week < 1) return;
@@ -50,18 +52,29 @@ export const CardioCompsStep: React.FC<{
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper будет построен автоматически.</InfoBanner>}
       </SectionCard>
 
-      <GroupHeading icon="📉" text="Taper перед стартом" desc="Объём снижается (×0.6-0.7), HIIT убирается (Bosquet 2005)." />
+      <GroupHeading icon="📉" text="Taper перед стартом" desc="Плавное снижение объёма к старту (Bosquet 2005) — можно отключить." />
       <SectionCard title="📉 Taper перед стартом">
         <div style={ROW}>
-          <span style={LABEL}>Недель taper</span>
-          <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
-          <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{taperWeeks}</span>
-          <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
+          <ChipToggle active={taperEnabled} onClick={() => setTaperEnabled(!taperEnabled)}>
+            {taperEnabled ? '📉 Taper: вкл' : 'Taper: выкл'}
+          </ChipToggle>
+          {taperEnabled && (
+            <>
+              <span style={LABEL}>Недель taper</span>
+              <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
+              <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{taperWeeks}</span>
+              <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
+            </>
+          )}
           <ChipToggle active={peakWeek} onClick={() => setPeakWeek(!peakWeek)}>
             {peakWeek ? '🏔 Пик-неделя: вкл' : 'Пик-неделя: выкл'}
           </ChipToggle>
         </div>
-        <div style={HINT}>Taper: объём снижается (×0.6-0.7), HIIT убирается (Bosquet 2005). Пик-неделя — только лёгкое recovery кардио в день старта.</div>
+        <div style={HINT}>
+          {taperEnabled
+            ? 'Taper: объём снижается плавно (×0.85→×0.4), HIIT убирается (Bosquet 2005). Пик-неделя — только лёгкое recovery в день старта.'
+            : 'Taper выключен: перед стартом цикл продолжает наращивание (contest_prep), без снижения объёма.'}
+        </div>
       </SectionCard>
     </div>
   );

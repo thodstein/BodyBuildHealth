@@ -69,6 +69,7 @@ interface WizardState {
   recoveryLow: boolean;
   bodyWeight: number;
   taperWeeks: number;
+  taperEnabled: boolean;
   peakWeek: boolean;
   phaseAuto: boolean;
   phaseBase: number;
@@ -190,6 +191,7 @@ export const CardioConstructor: React.FC = () => {
     maintenance: wizard.phaseMaint ?? 0,
   });
   const [taperWeeks, setTaperWeeks] = useState(wizard.taperWeeks ?? 2);
+  const [taperEnabled, setTaperEnabled] = useState(wizard.taperEnabled ?? true);
   const [peakWeek, setPeakWeek] = useState(wizard.peakWeek ?? true);
   const [level, setLevel] = useState<CardioLevel>(wizard.level ?? 'intermediate');
   const [equipment, setEquipment] = useState<CardioEquipment[]>(wizard.equipment ?? []);
@@ -287,6 +289,7 @@ export const CardioConstructor: React.FC = () => {
       bodyWeight,
       competitions: comps,
       taperWeeks,
+      taper: taperEnabled,
       peakWeek,
       level,
       recoveryLow,
@@ -327,6 +330,7 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.bodyWeight != null) setBodyWeight(cfg.bodyWeight);
     setComps(cfg.competitions ? cfg.competitions.map(c => ({ ...c })) : []);
     setTaperWeeks(cfg.taperWeeks ?? taperWeeks);
+    setTaperEnabled(cfg.taper ?? taperEnabled);
     setPeakWeek(cfg.peakWeek ?? peakWeek);
     setLevel(cfg.level ?? level);
     setEquipment(cfg.equipment ? [...cfg.equipment] : []);
@@ -453,14 +457,14 @@ export const CardioConstructor: React.FC = () => {
   useEffect(() => {
     try {
       const s: WizardState = {
-        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek,
+        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -678,7 +682,7 @@ export const CardioConstructor: React.FC = () => {
       )}
       {step === 'comps' && (
         <CardioCompsStep comps={comps} setComps={setComps} draft={compDraft} setDraft={setCompDraft} totalWeeks={totalWeeks}
-          taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} peakWeek={peakWeek} setPeakWeek={setPeakWeek} />
+          taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} taperEnabled={taperEnabled} setTaperEnabled={setTaperEnabled} peakWeek={peakWeek} setPeakWeek={setPeakWeek} />
       )}
       {step === 'preview' && (
         <>
