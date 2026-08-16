@@ -1970,3 +1970,59 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
     }
   }
 }
+
+// ─── Год кардио: последовательность циклов (этап 6) ───
+
+export interface CardioYearBlock {
+  cycle: CardioCycle;
+  /** Неделя года (1-индекс) начала блока — продолжение предыдущего цикла. */
+  startWeek: number;
+  totalWeeks: number;
+  summary: ReturnType<typeof cardioCycleSummary>;
+}
+
+export interface CardioYearPlan {
+  blocks: CardioYearBlock[];
+  totalWeeks: number;
+  avgMinutesPerWeek: number;
+  avgKcalPerWeek: number;
+  goals: CardioGoal[];
+}
+
+/**
+ * Собрать «год кардио» из последовательности циклов: блоки встают подряд
+ * (неделя 1 = старт первого цикла), сводка — средние по всему году.
+ * Пустой список → null.
+ */
+export function cardioYearPlan(cycles: CardioCycle[]): CardioYearPlan | null {
+  if (!Array.isArray(cycles) || cycles.length === 0) return null;
+  let cursor = 1;
+  const blocks: CardioYearBlock[] = [];
+  for (const cycle of cycles) {
+    const summary = cardioCycleSummary(cycle);
+    blocks.push({ cycle, startWeek: cursor, totalWeeks: cycle.totalWeeks, summary });
+    cursor += cycle.totalWeeks;
+  }
+  const totalWeeks = cursor - 1;
+  const totalMinutes = blocks.reduce((s, b) => s + b.summary.avgMinutesPerWeek * b.totalWeeks, 0);
+  const totalKcal = blocks.reduce((s, b) => s + b.summary.avgKcalPerWeek * b.totalWeeks, 0);
+  return {
+    blocks,
+    totalWeeks,
+    avgMinutesPerWeek: totalWeeks > 0 ? Math.round(totalMinutes / totalWeeks) : 0,
+    avgKcalPerWeek: totalWeeks > 0 ? Math.round(totalKcal / totalWeeks) : 0,
+    goals: cycles.map(c => c.goal),
+  };
+}
+
+/** Текстовая сводка «года кардио» для буфера/печати. */
+export function buildCardioYearText(plan: CardioYearPlan): string {
+  const lines: string[] = [];
+  lines.push('📆 Год кардио');
+  for (const b of plan.blocks) {
+    const end = b.startWeek + b.totalWeeks - 1;
+    lines.push(`  ${String(b.startWeek).padStart(2, ' ')}–${String(end).padStart(2, ' ')} нед · ${b.cycle.name} · ${CARDIO_GOAL_LABELS[b.cycle.goal]} · ${b.summary.avgMinutesPerWeek} мин/нед · ${b.summary.avgKcalPerWeek} ккал/нед`);
+  }
+  lines.push(`Итого: ${plan.totalWeeks} нед · в среднем ${plan.avgMinutesPerWeek} мин/нед · ${plan.avgKcalPerWeek} ккал/нед`);
+  return lines.join('\n');
+}

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import {
   cardioCycleSummary, buildCardioSummaryText, cardioCycleToUserProgram, CARDIO_GOAL_LABELS,
   cardioToNutritionPayload, buildCardioTcx,
+  loadCardioCycles, cardioYearPlan, buildCardioYearText,
   type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import { CARDIO_KCAL_NOTE_KEY } from './planner-bridge-handlers';
@@ -40,6 +41,20 @@ export const CardioManageStep: React.FC<{
 }> = ({ cycle, library, scenarios, link, macroLink, comparison, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario }) => {
   const [copyFlash, setCopyFlash] = useState(false);
   const [nutriFlash, setNutriFlash] = useState(false);
+  const [yearFlash, setYearFlash] = useState(false);
+
+  /** «📆 Год кардио»: последовательность циклов из библиотеки → сводка в буфер. */
+  const copyYear = () => {
+    const cycles = loadCardioCycles().slice(0, 4);
+    const plan = cardioYearPlan(cycles);
+    if (!plan) { setYearFlash(true); window.setTimeout(() => setYearFlash(false), 2500); return; }
+    const text = buildCardioYearText(plan);
+    try {
+      navigator.clipboard.writeText(text).then(() => setYearFlash(true)).catch(() => { setYearFlash(true); });
+    } catch { setYearFlash(true); }
+    if (!navigator.clipboard) setYearFlash(true);
+    window.setTimeout(() => setYearFlash(false), 2500);
+  };
 
   const copySummary = () => {
     if (!cycle) return;
@@ -168,6 +183,9 @@ export const CardioManageStep: React.FC<{
             </button>
             <button style={{ ...BTN, borderColor: 'rgba(250,204,21,0.4)', color: '#facc15' }} onClick={sendToNutrition} title="Передать расход кардио (ккал/нед + сегодня) в планировщик питания — заметка + буфер">
               {nutriFlash ? '✅ Расход передан' : '🍽 В питание'}
+            </button>
+            <button style={{ ...BTN, borderColor: 'rgba(34,197,94,0.4)', color: '#22c55e' }} onClick={copyYear} title="Сводка «Год кардио»: последовательность циклов из библиотеки (до 4) в буфер">
+              {yearFlash ? '✅ Год в буфере' : '📆 Год кардио'}
             </button>
           </div>
         </SectionCard>

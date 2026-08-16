@@ -19,7 +19,7 @@ import {
   cardioProfileFactors, cardioNutritionNotes,
   cycleBodyWeight, recalcSessionKcal, rescheduleCardioSession,
   cardioToNutritionPayload, legDaysFromBBPlan, buildCardioTcx,
-  lthrZones, runningVdot,
+  lthrZones, runningVdot, cardioYearPlan, buildCardioYearText,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -1497,5 +1497,37 @@ describe('runningVdot', () => {
   it('некорректный ввод → null', () => {
     expect(runningVdot(0, 25)).toBeNull();
     expect(runningVdot(5, 0)).toBeNull();
+  });
+});
+
+// ─── Год кардио: последовательность циклов (этап 6) ───
+
+describe('cardioYearPlan / buildCardioYearText', () => {
+  it('блоки встают подряд: недели года без разрывов', () => {
+    const a = buildCardioCycle({ goal: 'health', totalWeeks: 12, id: 'y1', name: 'База' });
+    const b = buildCardioCycle({ goal: 'cut', totalWeeks: 16, id: 'y2', name: 'Сушка' });
+    const c = buildCardioCycle({ goal: 'recovery', totalWeeks: 4, id: 'y3', name: 'Переход' });
+    const plan = cardioYearPlan([a, b, c])!;
+    expect(plan).not.toBeNull();
+    expect(plan.totalWeeks).toBe(32);
+    expect(plan.blocks).toHaveLength(3);
+    expect(plan.blocks[0].startWeek).toBe(1);
+    expect(plan.blocks[1].startWeek).toBe(13);
+    expect(plan.blocks[2].startWeek).toBe(29);
+    expect(plan.goals).toEqual(['health', 'cut', 'recovery']);
+    expect(plan.avgMinutesPerWeek).toBeGreaterThan(0);
+  });
+
+  it('пустой список → null', () => {
+    expect(cardioYearPlan([])).toBeNull();
+  });
+
+  it('buildCardioYearText: диаграмма недель + итог', () => {
+    const a = buildCardioCycle({ goal: 'health', totalWeeks: 12, id: 'y4', name: 'База' });
+    const plan = cardioYearPlan([a])!;
+    const text = buildCardioYearText(plan);
+    expect(text).toContain('Год кардио');
+    expect(text).toContain('1–12 нед');
+    expect(text).toContain('Итого: 12 нед');
   });
 });
