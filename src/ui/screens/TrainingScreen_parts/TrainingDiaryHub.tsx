@@ -28,6 +28,7 @@ import AllExercisesTrendCard from './AllExercisesTrendCard';
 import StandardForecastCard from './StandardForecastCard';
 import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
+import { BBContestPrepActiveCard } from './BBContestPrepActiveCard';
 import { TrainingRecommendationsCard } from './TrainingRecommendationsCard';
 import { loadRirCalibrationStats } from '../../../engines/meso-correction.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -472,6 +473,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
             <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
           </div>
+          {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
+          <BBContestPrepActiveCard onOpen={() => {
+            try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
+            window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_planning_track', newValue: 'bb' }));
+          }} />
           <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;

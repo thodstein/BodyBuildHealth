@@ -472,10 +472,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
-            {/* 🏁 Активный contest prep — сводная карточка на главном экране тренировок */}
-            <div style={{ marginBottom: 8 }}>
-              <BBContestPrepActiveCard onOpen={() => { hapticImpact('light'); setPage('tabs'); switchPlanningTrack('bb'); setZone('planner'); }} />
-            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
@@ -717,7 +713,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 };
 
 import { MyTrainingTab } from './TrainingScreen_parts/MyTrainingTab';
-import { BBContestPrepActiveCard } from './TrainingScreen_parts/BBContestPrepActiveCard';
 import ExerciseLabCatalog from './TrainingScreen_parts/ExerciseLabCatalog';
 import { CalcQualityTab } from './TrainingScreen_parts/CalcQualityTab';
 import { MuscleProgressCard } from './TrainingScreen_parts/MuscleProgressCard';
