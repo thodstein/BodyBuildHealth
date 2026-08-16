@@ -45,4 +45,19 @@ describe('training-safety.engine', () => {
     expect(report.score).toBeGreaterThanOrEqual(80);
     expect(report.issues).toHaveLength(0);
   });
+
+  it('does not mutate the BB exercise and set context', () => {
+    const input = {
+      source: 'bb_auto' as const,
+      profile: { avoidAxialLoad: true },
+      plan: {
+        weeks: [{ sessions: [{ exercises: [{ id: 'back_squat', name: 'Присед', sets: 4, reps: 6, weight: 120, rir: 2 }] }] }],
+      },
+    };
+    const before = JSON.parse(JSON.stringify(input));
+
+    analyzeTrainingSafety(input);
+
+    expect(input).toEqual(before);
+  });
 });
