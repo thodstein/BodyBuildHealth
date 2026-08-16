@@ -12,7 +12,7 @@ import {
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
-  cardioSessionsForDate, cardioEquipmentLabel,
+  cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel,
   type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import {
@@ -365,6 +365,14 @@ export const CardioConstructor: React.FC = () => {
 
   const todayCardio = useMemo(() => (cycle ? cardioSessionsForDate(cycle, todayIso()) : null), [cycle]);
 
+  const nextStartInfo = useMemo(() => {
+    if (!cycle) return null;
+    const w = cardioWeekForDate(cycle, todayIso());
+    const current = w?.week ?? 1;
+    const start = cycle.weeks.find(x => x.week >= current && (x.phase === 'taper' || x.phase === 'peak'));
+    return start ? { week: start.week, left: Math.max(0, start.week - current) } : null;
+  }, [cycle]);
+
   const stepIdx = STEPS.findIndex(s => s.id === step);
   const goNext = () => {
     if (step === 'preview' && !cycle) { build(); return; }
@@ -383,10 +391,19 @@ export const CardioConstructor: React.FC = () => {
               🔄 авто-режим
             </div>
           )}
-          {todayCardio && todayCardio.sessions.length > 0 && (
-            <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px' }}>
-              🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')}
+          {nextStartInfo && nextStartInfo.left > 0 && (
+            <div style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 16, padding: '3px 10px' }}>
+              🏁 до старта: {nextStartInfo.left} нед
             </div>
+          )}
+          {todayCardio && todayCardio.sessions.length > 0 && (
+            <button
+              onClick={() => setStep('diary')}
+              title="Перейти к дневнику и быстрому старту"
+              style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px', cursor: 'pointer' }}
+            >
+              🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')} ▶️
+            </button>
           )}
           {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
         </div>

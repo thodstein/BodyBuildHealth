@@ -148,6 +148,17 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByText(/Дневник выполнения кардио/)).toBeTruthy();
   });
 
+  it('«Сегодня» в шапке ведёт на шаг «Дневник» (быстрый старт)', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const todayBtn = screen.getByRole('button', { name: /Сегодня/ });
+    expect(todayBtn).toBeTruthy();
+    fireEvent.click(todayBtn);
+    expect(screen.getByText(/Быстрый старт сессии/)).toBeTruthy();
+  });
+
   it('переименование активного цикла сохраняется', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));

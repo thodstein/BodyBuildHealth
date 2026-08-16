@@ -3,7 +3,7 @@
  * 🔄 Авто-режим (подстройка по дневнику с diff-подтверждением),
  * 🎯 Пульс-зоны (Karvonen) и 🔔 «Сегодня».
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   autoTuneCardioCycle, cardioHeartZones, cardioSessionsForDate, cardioCycleSummary,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
@@ -67,6 +67,7 @@ export const CardioAutoTunePanel: React.FC<{
     setAutoMode(v);
     try { localStorage.setItem(CARDIO_AUTO_TUNE_KEY, v ? '1' : '0'); } catch { /* ignore */ }
     flashMsg(v ? '🔄 Авто-режим включён: подстройка по дневнику и ACWR' : 'Авто-режим выключен');
+    if (v && cycle) previewTune();
   };
 
   const previewTune = () => {
@@ -75,6 +76,15 @@ export const CardioAutoTunePanel: React.FC<{
     if (r.changes.length === 0) { flashMsg('✅ Дневник соответствует плану — изменений нет'); return; }
     setPending({ changes: r.changes, reason: r.advice.reason });
   };
+
+  // Авто-режим: при изменении цикла/дневника автоматически показываем
+  // предпросмотр подстройки (без применения — решение за пользователем).
+  const previewTuneRef = useRef(previewTune);
+  previewTuneRef.current = previewTune;
+  useEffect(() => {
+    if (autoMode && cycle) previewTuneRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMode, cycle]);
 
   const applyTune = () => {
     if (!cycle || !pending) return;

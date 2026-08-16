@@ -73,6 +73,14 @@ describe('CardioAutoTunePanel — CSR', () => {
     expect(screen.getByText(/изменений нет/)).toBeTruthy();
   });
 
+  it('авто-режим: предпросмотр подстройки показывается автоматически', () => {
+    localStorage.setItem(CARDIO_AUTO_TUNE_KEY, '1');
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'tune-auto' });
+    const { unmount } = render(<CardioAutoTunePanel cycle={c} acwr={1.6} />);
+    expect(screen.getByText(/Предпросмотр изменений/)).toBeTruthy();
+    unmount();
+  });
+
   it('toggle авто-режима пишет флаг в localStorage', () => {
     render(<CardioAutoTunePanel cycle={null} />);
     fireEvent.click(screen.getByRole('button', { name: /Включён|Выключен/ }));
