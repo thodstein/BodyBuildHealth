@@ -8,18 +8,22 @@
  *
  * Отображение-онли: вкладка НЕ влияет на планирование/авторегуляцию.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DIM, diaryCard } from './diary-tokens';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
 import {
   loadCooldownLog, cooldownAdherence, cooldownQualityTrend, buildCooldownInsights,
   exportCooldownCheckinsCSV, cooldownStreak, correlateCooldownWithReadiness, cooldownWeeklyAdherence,
+  cooldownLabel, upsertCooldownLog, cooldownLogForDate,
 } from '../../../engines/cooldown.engine';
+import {
+  STRETCH_FOCUSES, buildStretchSession, stretchExerciseLabel, upsertStretchLog, stretchStats,
+  type StretchFocus, type StretchSessionPlan,
+} from '../../../engines/stretch-session.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { collectGroupCooldown } from '../../../engines/cooldown-day.engine';
 import { groupsFromExercises, prepGroupLabels, canonicalizeGroups } from '../../../engines/warmup-day.engine';
-import { cooldownLabel } from '../../../engines/cooldown.engine';
 
 const CARD = diaryCard;
 const COOLDOWN_COLOR = '#38bdf8';
@@ -42,6 +46,42 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
     log.slice(-30).forEach(e => { if (e.skippedReason) counts[e.skippedReason] = (counts[e.skippedReason] || 0) + 1; });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [log]);
+
+  // ── Сессия растяжки ──
+  const [stretchFocus, setStretchFocus] = useState<StretchFocus>('fullbody');
+  const [stretchDur, setStretchDur] = useState(15);
+  const [stretchPlan, setStretchPlan] = useState<StretchSessionPlan | null>(null);
+  const [stretchDone, setStretchDone] = useState<Set<string>>(new Set());
+  const [stretchSaved, setStretchSaved] = useState(false);
+  const [timer, setTimer] = useState<{ id: string; remaining: number; total: number } | null>(null);
+  const timerRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!timer) return;
+    timerRef.current = window.setInterval(() => {
+      setTimer(p => {
+        if (!p) return p;
+        if (p.remaining <= 1) {
+          setStretchDone(prev => new Set(prev).add(p.id));
+          return null;
+        }
+        return { ...p, remaining: p.remaining - 1 };
+      });
+    }, 1000);
+    return () => { if (timerRef.current !== null) window.clearInterval(timerRef.current); };
+  }, [timer ? timer.id : null]);
+  const stretchStatsMemo = useMemo(() => stretchStats(), [tick, stretchSaved]);
+  const totalStretch = stretchPlan ? stretchPlan.blocks.reduce((s, b) => s + b.exercises.length, 0) : 0;
+  const doneStretch = stretchDone.size;
+  const startStretchTimer = (id: string, sec: number) => { setTimer({ id, remaining: sec, total: sec }); };
+  const saveStretchSession = () => {
+    const date = new Date().toISOString().slice(0, 10);
+    upsertStretchLog({ date, focus: stretchFocus, durationMin: stretchDur, done: true, quality: 4 });
+    if (!cooldownLogForDate(date)) {
+      upsertCooldownLog({ date, done: true, quality: 4, note: 'Сессия растяжки' });
+    }
+    setStretchSaved(true);
+    setTick(t => t + 1);
+  };
 
   // ── Печатный отчёт ──
   const printReport = useCallback(() => {
@@ -142,6 +182,92 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           Сегодня
         </div>
         <CooldownCheckinInline date={new Date().toISOString().slice(0, 10)} onSaved={refresh} />
+      </div>
+
+      {/* ── Сессия растяжки (день отдыха / глубокая заминка) ── */}
+      <div style={CARD}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>🧘 Сессия растяжки</div>
+          {stretchStatsMemo.count > 0 && (
+            <span style={{ fontSize: 9, color: DIM }}>
+              {stretchStatsMemo.count} сессий · {stretchStatsMemo.totalMin} мин · эта неделя: <b style={{ color: '#a78bfa' }}>{stretchStatsMemo.weekMin} мин</b>
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+          {STRETCH_FOCUSES.map(f => (
+            <button key={f.id} type="button" onClick={() => { setStretchFocus(f.id); setStretchPlan(null); setStretchDone(new Set()); setStretchSaved(false); }}
+              title={f.hint} style={{ padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
+                border: stretchFocus === f.id ? '1px solid #38bdf8' : '1px solid var(--border)',
+                background: stretchFocus === f.id ? 'rgba(56,189,248,0.15)' : 'var(--bg-secondary)',
+                color: stretchFocus === f.id ? '#38bdf8' : 'var(--text-dim)' }}>
+              {f.icon} {f.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 9, color: DIM }}>Длительность:</span>
+          {[10, 15, 20].map(m => (
+            <button key={m} type="button" onClick={() => { setStretchDur(m); setStretchPlan(null); setStretchDone(new Set()); setStretchSaved(false); }}
+              style={{ padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
+                border: stretchDur === m ? '1px solid #38bdf8' : '1px solid var(--border)',
+                background: stretchDur === m ? 'rgba(56,189,248,0.15)' : 'var(--bg-secondary)',
+                color: stretchDur === m ? '#38bdf8' : 'var(--text-dim)' }}>
+              {m} мин
+            </button>
+          ))}
+          {!stretchPlan && (
+            <button type="button" onClick={() => { setStretchPlan(buildStretchSession(stretchFocus, stretchDur)); setStretchDone(new Set()); setStretchSaved(false); }}
+              style={{ padding: '5px 14px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 32, border: 'none', background: 'linear-gradient(135deg,#38bdf8,#0284c7)', color: '#000' }}>
+              ▶ Собрать и начать
+            </button>
+          )}
+        </div>
+        {stretchPlan && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>
+              {stretchPlan.focusLabel} · ~{Math.round(stretchPlan.totalSec / 60)} мин · {doneStretch}/{totalStretch} выполнено
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {stretchPlan.blocks.map((b, bi) => {
+                const ex = b.exercises[0];
+                const isDone = stretchDone.has(ex.id);
+                const isActive = timer?.id === ex.id;
+                return (
+                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+                    <span style={{ fontWeight: 700, color: isDone ? '#22c55e' : '#fff', flex: 1 }}>{stretchExerciseLabel(ex.id)}</span>
+                    {ex.note && <span style={{ fontSize: 8, color: DIM }}>{ex.note}</span>}
+                    <span style={{ color: DIM, fontSize: 9 }}>{ex.sets}×{ex.durationSec}с</span>
+                    {isActive ? (
+                      <span style={{ color: '#38bdf8', fontWeight: 700, minWidth: 34, textAlign: 'center' }}>{timer!.remaining}с</span>
+                    ) : (
+                      <button type="button" disabled={isDone} onClick={() => startStretchTimer(ex.id, ex.durationSec)}
+                        style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(56,189,248,0.3)', background: 'rgba(56,189,248,0.1)', color: isDone ? 'var(--text-faint)' : '#38bdf8', minHeight: 24 }}>
+                        {isDone ? '✓' : '⏱'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {timer && (
+              <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 6 }}>
+                <div style={{ height: '100%', width: `${(timer.total - timer.remaining) / timer.total * 100}%`, background: '#38bdf8', transition: 'width 1s linear' }} />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button type="button" disabled={doneStretch < totalStretch || stretchSaved} onClick={saveStretchSession}
+                style={{ flex: 1, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 38, border: 'none',
+                  background: doneStretch >= totalStretch && !stretchSaved ? 'linear-gradient(135deg,#38bdf8,#0284c7)' : 'rgba(255,255,255,0.08)', color: doneStretch >= totalStretch && !stretchSaved ? '#000' : 'var(--text-dim)' }}>
+                {stretchSaved ? '✓ Сессия сохранена' : doneStretch >= totalStretch ? '✓ Завершить и сохранить' : `Выполнено ${doneStretch}/${totalStretch}`}
+              </button>
+              <button type="button" onClick={() => { setStretchPlan(null); setStretchDone(new Set()); setTimer(null); }}
+                style={{ padding: '7px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 10, minHeight: 38, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-dim)' }}>
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Сводка 30 дней ── */}

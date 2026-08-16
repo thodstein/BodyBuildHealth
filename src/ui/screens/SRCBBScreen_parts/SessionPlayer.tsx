@@ -116,6 +116,22 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   const [cooldownBlocks, setCooldownBlocks] = useState<CooldownBlock[]>([]);
   const [warmupDone, setWarmupDone] = useState<Record<string, boolean>>({});
   const [cooldownDone, setCooldownDone] = useState<Record<string, boolean>>({});
+  // Таймер растяжки в фазе заминки (обратный отсчёт и автопроверка)
+  const [coolTimer, setCoolTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
+  useEffect(() => {
+    if (!coolTimer) return;
+    const t = window.setInterval(() => {
+      setCoolTimer(p => {
+        if (!p) return p;
+        if (p.remaining <= 1) {
+          setCooldownDone(prev => ({ ...prev, [`c_${p.i}_${p.j}`]: true }));
+          return null;
+        }
+        return { ...p, remaining: p.remaining - 1 };
+      });
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [coolTimer ? `${coolTimer.i}_${coolTimer.j}` : null]);
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
   const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
    const [exDone, setExDone] = useState<Record<string, boolean>>({});
@@ -1312,6 +1328,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
                 {b.exercises.map((ex, j) => {
                   const isDone = cooldownDone[`c_${i}_${j}`];
+                  const isTimer = coolTimer && coolTimer.i === i && coolTimer.j === j;
                   return (
                     <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleCooldown(i, j)} />
@@ -1322,6 +1339,15 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                         </span>
                         {'note' in ex && ex.note ? <span style={{ display: 'block', fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{ex.note}</span> : null}
                       </span>
+                      {isTimer ? (
+                        <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 12, minWidth: 34, textAlign: 'center' }}>{coolTimer!.remaining}с</span>
+                      ) : (
+                        <button type="button" disabled={isDone} onClick={() => setCoolTimer({ i, j, remaining: ex.durationSec, total: ex.durationSec })}
+                          style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(56,189,248,0.3)', background: 'rgba(56,189,248,0.1)', color: isDone ? 'var(--text-faint)' : '#38bdf8', minHeight: 24 }}
+                          aria-label={`Таймер ${cooldownLabel(ex.exerciseId)}`}>
+                          {isDone ? '✓' : '⏱'}
+                        </button>
+                      )}
                     </li>
                   );
                 })}

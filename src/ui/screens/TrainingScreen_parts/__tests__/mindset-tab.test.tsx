@@ -372,6 +372,14 @@ describe('Заминка (чек-ин, бейджи, вкладка)', () => {
     expect(html).toContain('Персональные инсайты');
   });
 
+  it('CooldownDiaryView (SSR): карточка «Сессия растяжки» с фокусами', () => {
+    const html = renderToStaticMarkup(<CooldownDiaryView />);
+    expect(html).toContain('Сессия растяжки');
+    expect(html).toContain('Всё тело');
+    expect(html).toContain('Бёдра и ягодицы');
+    expect(html).toContain('Собрать и начать');
+  });
+
   it('WarmupDiaryView с планом дня: предпросмотр групп/суставов', () => {
     const planDay = { name: 'Грудь и спина', exercises: [{ name: 'Жим лёжа' }, { name: 'Тяга верхнего блока' }] };
     const html = renderToStaticMarkup(<WarmupDiaryView planDay={planDay} />);
