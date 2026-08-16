@@ -1,5 +1,24 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Кардио-конструктор: структуризация вкладок + единый UI-слой (Aug 17 2026, pushed c7f0ab8aa)
+
+Структуризация всех вкладок кардио-конструктора: чёткая навигация по секциям, групповые
+заголовки, единый стиль. **Только UI — движок не менялся.**
+
+- **NEW `CardioUI.tsx`** — единый UI-слой: стили (CARD/CARD_ACCENT/ROW/LABEL/HINT/BTN/BTN_PRIMARY/
+  BTN_DANGER/BTN_SMALL/INPUT/CHIP/CHIP_ACTIVE/PHASE_COLOR) + компоненты (SectionCard, StatTile,
+  Stepper, ChipToggle, NoteList, InfoBanner, SectionNav, GroupHeading). На него переведены все
+  14 кардио-компонентов.
+- **Параметры**: якорная навигация (⚡ Старт / 🎯 Цель / 👤 Параметры / 🦵 Дни ног / 📊 Факторы /
+  🧩 Фазы / 👁 Итог) + GroupHeading с описаниями + акцентная карточка «Итог» (метрики + баннеры).
+- **Старты**: GroupHeading + SectionCard + InfoBanner + ChipToggle.
+- **Предпросмотр**: общий PHASE_COLOR, единый стиль (якорная навигация по 7 секциям была).
+- **Управление**: навигация (🔗 Интеграции / 📤 Экспорт / 🛠 Неделя / 📚 Библиотека / 📸 Сценарии).
+- **Дневник**: группы «📅 Сегодня / ⚡ Сессия / 📊 Контроль цикла / 🔄 Автоматизация и зоны / 📓 Журнал».
+- Конструктор недели, LinkCard, DayCard, ProgressCard, AutoTunePanel, DiaryPanel, Timer, UserCard,
+  VolumeChart — единые стили (кнопки/карточки/чипы/инпуты из CardioUI).
+- Проверено: 71/71 тестов (constructor 14, user-flow 17, pro-panels 30, link-card 10), tsc 0.
+
 ## Отображение фишек ББ-плана: дроп-сеты/суперсеты/FST-7/GVT/DUP в UI (Aug 16 2026, pushed)
 
 Жалоба: «ББ-авто не видно дроп-сетов, FST и других фишек — нужна пометка ДРОП СЕТ/СПЛИТ, подходы расписать конкретно». Анализ: фишки **генерируются движком** (autoAssignIntensityTechniques/applyIntensityTechniqueToExercise/markAntagonistSupersets/applyVolumeScheme/DUP), но **не выживают/не видны**: (1) расширенные мини-сеты техник обрезаются `syncBBPlanSetShape` (инвариант `sets === workSets.length`, валидатор `sets_mismatch`); (2) план-шаг показывает плоскую сводку `sets×reps`; (3) метки спрятаны в свёрнутом `<details>`; (4) «💡 Техника» читала EXERCISE_CATALOG, а не применённую.
