@@ -347,18 +347,22 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(twice.weeks[twice.weeks.length - 1].peakWeek).toBe(true);
   });
 
-  it('force=true ОБНОВЛЯЕТ наложенный taper при изменении настроек (иначе недели пропускаются)', () => {
+  it('force=true пересобирает границы фаз БЕЗ накопления кривой (недели с нашим prepProtocol не режутся повторно)', () => {
     const plan = makePlan(10);
     const v2 = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 7, taperWeeks: 2 }) as BBPlanWithPrep;
     // Без force: те же настройки → наборы не меняются (недели пропущены).
     const same = applyContestPrepToBBPlan(v2, baseConfig(), { prepWeeks: 7, taperWeeks: 2 }) as BBPlanWithPrep;
     expect(same.weeks[8].sessions[0].exercises[0].sets).toBe(v2.weeks[8].sessions[0].exercises[0].sets);
-    // С force: taperWeeks 2→3 — неделя 7 (0-index) попадает в taper и объём режется сильнее.
+    // С force: taperWeeks 2→3 — неделя 7 (0-index) попадает в taper-окно и получает
+    // канонический taper (была «Финальная подготовка»); неделя 8 (уже taper) НЕ накапливает.
     const v3 = applyContestPrepToBBPlan(v2, baseConfig(), { prepWeeks: 6, taperWeeks: 3, force: true }) as BBPlanWithPrep;
     expect(v3.weeks.length).toBe(v2.weeks.length);
     expect(v3.weeks[7].contestPhase).toBe('taper');
-    expect(v3.weeks[7].sessions[0].exercises[0].sets).toBeLessThan(v2.weeks[7].sessions[0].exercises[0].sets);
-    // Пик-неделя пересобрана (не пропущена) и по-прежнему привязана к концу.
+    expect(String(v3.weeks[7].prepProtocol || '')).toMatch(/— (Taper|Финал|Подводящая)/);
+    expect(v3.weeks[7].sessions[0].exercises[0].rir).toBeGreaterThanOrEqual(2);
+    // Неделя 8: была taper (0.85×10=9) — не умножена повторно (осталась 9, а не 0.7×9).
+    expect(v3.weeks[8].sessions[0].exercises[0].sets).toBe(v2.weeks[8].sessions[0].exercises[0].sets);
+    // Пик-неделя пересобрана и привязана к концу.
     expect(v3.weeks[v3.weeks.length - 1].peakWeek).toBe(true);
     expect(v3.weeks[v3.weeks.length - 1].contestPhase).toBe('peak_week');
   });
@@ -375,9 +379,9 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(meta?.phases?.find(p => p.key === 'peak_week')?.dateEnd).toBe(cfg.showDate);
   });
 
-  it('авто-taper финализатора (taper:true без prepProtocol) не трактуется как deload — наш taper накладывается поверх', () => {
+  it("авто-taper'нутые недели финализатора не режутся повторно и не помечаются как «разгрузка»", () => {
     // Имитация плана, где applyTaperToFinalWeeks уже порезал последние 2 недели
-    // (объём 0.5/0.75, метка taper:true, БЕЗ deload-флага).
+    // (объём 0.5/0.75, метка taper:true, БЕЗ deload-флага и prepProtocol).
     const plan = makePlan(8);
     const weeks = plan.weeks.map((w, i) => {
       if (i < 6) return w;
@@ -390,12 +394,14 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
         })),
       };
     });
+    const setsBefore = (weeks[6] as any).sessions[0].exercises[0].sets;
     const out = applyTrainingTaperToBBPlan({ ...plan, weeks } as any, baseConfig({ weeksOut: 2 })) as BBPlanWithPrep;
-    // Недели 6,7 (0-index) — в нашем taper-окне, получают prepProtocol (не «Пропущена (разгрузка)»).
-    expect(out.weeks[6].prepProtocol).toBeTruthy();
-    expect(String(out.weeks[6].prepProtocol || '')).not.toMatch(/Пропущена/);
-    expect(out.weeks[7].prepProtocol).toBeTruthy();
-    expect(String(out.weeks[7].prepProtocol || '')).not.toMatch(/Пропущена/);
+    // Объём авто-taper'нутой недели 6 (не последняя) не изменился — не режем поверх уже порезанного.
+    expect(out.weeks[6].sessions[0].exercises[0].sets).toBe(setsBefore);
+    // Она НЕ помечается как «Пропущена (разгрузка)» — это не deload, а готовый taper.
+    expect(out.weeks[6].prepProtocol).toBeFalsy();
+    // Последняя неделя окна по-прежнему превращается в пик-неделю.
+    expect(out.weeks[7].peakWeek).toBe(true);
   });
 
   it('applyTaperToFinalWeeks НЕ режет prep-размеченные планы (защита от двойного taper при повторной финализации)', () => {

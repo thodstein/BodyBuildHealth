@@ -969,17 +969,23 @@ export function applyTrainingTaperToBBPlan(
     const t = usedTaper[i];
     if (!t) break;
     // Без force: идемпотентно пропускаем уже наложенные недели (другое соревнование).
-    // С force: ОБНОВЛЯЕМ наложенный ранее taper (пользователь изменил настройки).
     if (weekAlreadyPrepped(wk) && !force) continue;
+    // С force: НЕ пересобираем недели с НАШИМ prepProtocol — у них нет базового объёма
+    // (умножение поверх уже порезанного = накопление кривой ×0.85×0.85). Границы фаз
+    // пересобираются в applyContestPrepToBBPlan: новые недели окна получают taper,
+    // старые сохраняют корректную кривую. Пик-неделя пересобирается отдельным блоком.
+    const ourProtocol = typeof wk.prepProtocol === 'string' ? wk.prepProtocol : '';
+    const isOurPrep = ourProtocol.length > 0 && !ourProtocol.startsWith('Пропущена');
+    if (isOurPrep && force) continue;
+    // Авто-taper'нутые недели (taper:true без prepProtocol) — следы финализатора
+    // (applyTaperToFinalWeeks): это уже сбалансированный taper по Bosquet (0.75/0.5,
+    // RIR +1/+2) — не трогаем (не deload, но и не пересобираем).
+    const autoTaperMarked = wk.taper === true && !isOurPrep && !wk.peakWeek;
+    if (autoTaperMarked) continue;
 
     // Guard: не резать уже разгруженные недели (anti-двойное снижение, как PL-taper).
-    // Исключение: недели с меткой taper (без prepProtocol) — это следы АВТО-taper
-    // финализатора (applyTaperToFinalWeeks), а не настоящий deload: наш канонический
-    // taper накладывается ПОВЕРХ существующего (пользователь просил «обновлять план»),
-    // иначе prep-кривая искажается (недели <60% объёма молча пропускались).
-    const autoTaperMarked = wk.taper === true && !wk.prepProtocol && !wk.peakWeek;
-    const isDeload = !autoTaperMarked && (wk.deload === true || wk.phase === 'deload'
-      || (idx > 0 && weekVolume(wk) < weekVolume(weeks[idx - 1]) * 0.6));
+    const isDeload = wk.deload === true || wk.phase === 'deload'
+      || (idx > 0 && weekVolume(wk) < weekVolume(weeks[idx - 1]) * 0.6);
     if (isDeload) {
       wk.phase = wk.phase ?? 'deload';
       wk.taper = true;
@@ -1187,11 +1193,14 @@ export function applyContestPrepToBBPlan(
 
   // 3) Финальная подготовка: объём ×0.9, RIR 2–3, интенсивность сохраняется,
   //    спец-мышца щадится (×1.25 к множителю, ≤1.0), deload не трогаем.
+  //    Идемпотентна: недели с prepProtocol (уже модулированы ранее) пропускаются,
+  //    иначе повторный force-пересбор (смена даты/недель) режет объём ×0.9×0.9.
   const FINAL_PREP_VOLUME = 0.9;
   for (let i = finalStart0; i <= prepEnd0; i++) {
     const wk = weeks[i];
     if (!wk) continue;
     if (wk.deload === true || wk.phase === 'deload') continue; // anti-двойной deload
+    if (typeof wk.prepProtocol === 'string' && wk.prepProtocol.startsWith('Финальная подготовка')) continue; // уже модулирована
     for (const s of wk.sessions) {
       s.exercises = s.exercises.map((e: any) => {
         const isSpec = muscleMatchesSpecialization(e.muscle, cfg.specialization);
