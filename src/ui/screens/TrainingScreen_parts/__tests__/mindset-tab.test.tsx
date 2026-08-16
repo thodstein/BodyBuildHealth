@@ -318,6 +318,14 @@ describe('Разминка в блоке «Сегодня»', () => {
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" historyWorkouts={[] as any} />);
     expect(html).not.toContain('Разминка сегодня не отмечена');
   });
+
+  it('TrainingDiaryHub с mode warmup рендерит вкладку разминки', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="warmup" />);
+    expect(html).toContain('🔥 Разминка');
+    expect(html).toContain('Сводка · 30 дней');
+    expect(html).toContain('Персональные инсайты');
+    expect(html).toContain('Разминочная рампа');
+  });
 });
 
 describe('MobilityTab (SSR-смок)', () => {
