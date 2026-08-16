@@ -7,7 +7,7 @@ import {
   WARMUP_DIARY_KEY, WARMUP_DIARY_CAP, WARMUP_SKIP_REASONS, WARMUP_LABELS, warmupLabel,
   sanitizeWarmupLog, loadWarmupLog, upsertWarmupLog, latestWarmupLog,
   warmupAdherence, warmupQualityTrend, warmupLogForDate, buildWarmupInsights, exportWarmupCheckinsCSV,
-  warmupStreak, correlateWarmupWithPerformance,
+  warmupStreak, correlateWarmupWithPerformance, warmupWeeklyAdherence, warmupWeeklyTrendInsight,
 } from '../warmup.engine';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -172,6 +172,49 @@ describe('Серия и связь с e1RM', () => {
     ];
     const out = buildWarmupInsights(sessions);
     expect(out.some(s => s.includes('Связь качества разминки с e1RM'))).toBe(true);
+  });
+
+  it('warmupWeeklyAdherence: недели с данными и без, pct по неделе', () => {
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7;
+    const monday = new Date(now); monday.setDate(now.getDate() - dow);
+    const iso = (d: Date) => { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; };
+    const day0 = iso(monday); // понедельник текущей недели
+    upsertWarmupLog({ date: day0, done: true, quality: 4 });
+    upsertWarmupLog({ date: iso(new Date(monday.getTime() + 86400000)), done: false, quality: null }); // вторник
+    const prevMon = new Date(monday); prevMon.setDate(prevMon.getDate() - 7);
+    upsertWarmupLog({ date: iso(prevMon), done: true, quality: 4 });
+    const wk = warmupWeeklyAdherence(8);
+    expect(wk.length).toBe(8);
+    const last = wk[wk.length - 1]; // текущая неделя
+    expect(last.total).toBe(2);
+    expect(last.pct).toBe(50);
+    expect(last.label).toMatch(/^W\d+$/);
+    const prev = wk[wk.length - 2];
+    expect(prev.total).toBe(1);
+    expect(prev.pct).toBe(100);
+    expect(wk[0].total).toBe(0);
+  });
+
+  it('warmupWeeklyTrendInsight: падение приверженности → инсайт; без данных → null', () => {
+    expect(warmupWeeklyTrendInsight()).toBeNull();
+    const now = new Date();
+    const dow = (now.getDay() + 6) % 7;
+    const monday = new Date(now); monday.setDate(now.getDate() - dow);
+    const iso = (d: Date) => { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${day}`; };
+    // прошлая неделя: 5 дней выполнено (100%), текущая: 1 из 5 (20%)
+    const prevMon = new Date(monday); prevMon.setDate(prevMon.getDate() - 7);
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(prevMon); d.setDate(prevMon.getDate() + i);
+      upsertWarmupLog({ date: iso(d), done: true, quality: 4 });
+    }
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      upsertWarmupLog({ date: iso(d), done: i === 0, quality: i === 0 ? 4 : null });
+    }
+    const insight = warmupWeeklyTrendInsight();
+    expect(insight).not.toBeNull();
+    expect(insight).toContain('ниже прошлой');
   });
 });
 

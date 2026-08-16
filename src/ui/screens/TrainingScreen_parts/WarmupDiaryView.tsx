@@ -10,11 +10,11 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { ACCENT, DIM, diaryCard } from './diary-tokens';
-import { MiniLineChart } from './DiaryChart';
+import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
 import {
   loadWarmupLog, warmupAdherence, warmupQualityTrend, buildWarmupInsights,
-  exportWarmupCheckinsCSV, warmupStreak, correlateWarmupWithPerformance,
+  exportWarmupCheckinsCSV, warmupStreak, correlateWarmupWithPerformance, warmupWeeklyAdherence,
 } from '../../../engines/warmup.engine';
 import { sessionsBestE1RM } from '../../../engines/mindset-protocol.engine';
 import { collectGroupPrep, groupsFromExercises, prepGroupLabels } from '../../../engines/warmup-day.engine';
@@ -34,6 +34,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
   const adherence = useMemo(() => warmupAdherence(30), [tick]);
   const quality = useMemo(() => warmupQualityTrend(30), [tick]);
   const streak = useMemo(() => warmupStreak(), [tick]);
+  const weekly = useMemo(() => warmupWeeklyAdherence(8), [tick]);
   const perfs = useMemo(() => sessionsBestE1RM((historyWorkouts || []) as any[]), [historyWorkouts]);
   const insights = useMemo(() => buildWarmupInsights(perfs), [tick, perfs]);
   const link = useMemo(() => correlateWarmupWithPerformance(perfs), [tick, perfs]);
@@ -184,6 +185,20 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
                   color={WARMUP_COLOR}
                   height={50}
                   ySuffix="/5"
+                />
+              </div>
+            )}
+            {weekly.filter(p => p.total > 0).length >= 2 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Приверженность по неделям</div>
+                <MiniBarChart
+                  data={weekly.map(p => ({
+                    value: p.pct,
+                    label: p.label,
+                    color: p.total === 0 ? 'rgba(255,255,255,0.08)' : p.pct >= 80 ? '#22c55e' : p.pct >= 50 ? '#f59e0b' : '#ef4444',
+                  }))}
+                  height={60}
+                  valueSuffix="%"
                 />
               </div>
             )}

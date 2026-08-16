@@ -1,6 +1,7 @@
 import type { WarmupBlock } from '../core/types';
 import { collectGroupPrep, prepGroupLabels } from './warmup-day.engine';
 import { collectJointPrep, jointPrepLabels } from './warmup-joints.engine';
+import { getISOWeekNumber } from './workout-logger.engine';
 export type { WarmupBlock };
 
 export interface WarmupInput {
@@ -344,6 +345,64 @@ export function warmupLogForDate(date: string): WarmupLogEntry | null {
   return loadWarmupLog().find(e => e.date === date.slice(0, 10)) || null;
 }
 
+export interface WeeklyAdherencePoint {
+  /** Подпись недели (W-номер ISO). */
+  label: string;
+  pct: number;
+  done: number;
+  total: number;
+}
+
+function localIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Приверженность по календарным неделям (Пн-начало): доля выполненных дней. */
+export function warmupWeeklyAdherence(weeks = 8): WeeklyAdherencePoint[] {
+  const log = loadWarmupLog();
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // 0 = Пн
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dow);
+  const out: WeeklyAdherencePoint[] = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const start = new Date(monday);
+    start.setDate(monday.getDate() - w * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    const s = localIso(start);
+    const e = localIso(end);
+    const weekLog = log.filter(x => x.date >= s && x.date < e);
+    const done = weekLog.filter(x => x.done).length;
+    out.push({
+      label: `W${getISOWeekNumber(s)}`,
+      pct: weekLog.length > 0 ? Math.round(done / weekLog.length * 100) : 0,
+      done,
+      total: weekLog.length,
+    });
+  }
+  return out;
+}
+
+/** Инсайт тренда приверженности неделя-к-неделе (текущая vs предыдущая с данными). */
+export function warmupWeeklyTrendInsight(): string | null {
+  const wk = warmupWeeklyAdherence(8).filter(p => p.total > 0);
+  if (wk.length < 2) return null;
+  const last = wk[wk.length - 1];
+  const prev = wk[wk.length - 2];
+  if (prev.total === 0) return null;
+  if (last.pct < prev.pct - 20) {
+    return `Приверженность разминки на этой неделе ниже прошлой (${last.pct}% vs ${prev.pct}%). Верните ритуал: минимум 3 минуты перед тренировкой.`;
+  }
+  if (last.pct > prev.pct + 20 && last.pct > 0) {
+    return `Приверженность разминки выросла (${last.pct}% vs ${prev.pct}%) — отличный импульс, держите ритм.`;
+  }
+  return null;
+}
+
 export const WARMUP_SKIP_REASONS = ['не было времени', 'устал', 'забыл', 'зал был занят', 'другое'];
 
 function isoOf(d: Date): string { return d.toISOString().slice(0, 10); }
@@ -437,6 +496,8 @@ export function buildWarmupInsights(sessions?: { date: string; e1rm: number }[])
   }
   const streak = warmupStreak();
   if (streak >= 3) out.push(`Серия: разминка выполнена ${streak} дней подряд — отличный ритм. Неделя без пропусков заметно снижает риск травм.`);
+  const weeklyTrend = warmupWeeklyTrendInsight();
+  if (weeklyTrend) out.push(weeklyTrend);
   if (Array.isArray(sessions) && sessions.length >= 3) {
     const link = correlateWarmupWithPerformance(sessions);
     if (link.n >= 3 && link.pearson !== null && Math.abs(link.pearson) >= 0.3) {

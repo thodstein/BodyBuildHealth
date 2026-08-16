@@ -1,6 +1,8 @@
 import type { CooldownBlock } from '../core/types';
 import { collectGroupCooldown, prepGroupLabelsCooldown } from './cooldown-day.engine';
 import { canonicalizeGroups } from './warmup-day.engine';
+import { getISOWeekNumber } from './workout-logger.engine';
+import type { WeeklyAdherencePoint } from './warmup.engine';
 export type { CooldownBlock };
 export interface CooldownInput {
   muscleGroupsUsed: string[];
@@ -260,6 +262,56 @@ export function cooldownLogForDate(date: string): CooldownLogEntry | null {
   return loadCooldownLog().find(e => e.date === date.slice(0, 10)) || null;
 }
 
+function localIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Приверженность по календарным неделям (Пн-начало): доля выполненных дней. */
+export function cooldownWeeklyAdherence(weeks = 8): WeeklyAdherencePoint[] {
+  const log = loadCooldownLog();
+  const now = new Date();
+  const dow = (now.getDay() + 6) % 7; // 0 = Пн
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dow);
+  const out: WeeklyAdherencePoint[] = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const start = new Date(monday);
+    start.setDate(monday.getDate() - w * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    const s = localIso(start);
+    const e = localIso(end);
+    const weekLog = log.filter(x => x.date >= s && x.date < e);
+    const done = weekLog.filter(x => x.done).length;
+    out.push({
+      label: `W${getISOWeekNumber(s)}`,
+      pct: weekLog.length > 0 ? Math.round(done / weekLog.length * 100) : 0,
+      done,
+      total: weekLog.length,
+    });
+  }
+  return out;
+}
+
+/** Инсайт тренда приверженности неделя-к-неделе (текущая vs предыдущая с данными). */
+export function cooldownWeeklyTrendInsight(): string | null {
+  const wk = cooldownWeeklyAdherence(8).filter(p => p.total > 0);
+  if (wk.length < 2) return null;
+  const last = wk[wk.length - 1];
+  const prev = wk[wk.length - 2];
+  if (prev.total === 0) return null;
+  if (last.pct < prev.pct - 20) {
+    return `Приверженность заминки на этой неделе ниже прошлой (${last.pct}% vs ${prev.pct}%). Минимум: 2 минуты дыхания + растяжка рабочих зон до душа.`;
+  }
+  if (last.pct > prev.pct + 20 && last.pct > 0) {
+    return `Приверженность заминки выросла (${last.pct}% vs ${prev.pct}%) — восстановление становится привычкой.`;
+  }
+  return null;
+}
+
 export const COOLDOWN_SKIP_REASONS = ['не было времени', 'устал', 'забыл', 'нужно уходить', 'другое'];
 
 function isoOf(d: Date): string { return d.toISOString().slice(0, 10); }
@@ -359,6 +411,8 @@ export function buildCooldownInsights(readiness?: { date: string; recovery: numb
   }
   const streak = cooldownStreak();
   if (streak >= 3) out.push(`Серия: заминка выполнена ${streak} дней подряд — отличный ритм восстановления.`);
+  const weeklyTrend = cooldownWeeklyTrendInsight();
+  if (weeklyTrend) out.push(weeklyTrend);
   if (Array.isArray(readiness) && readiness.length >= 3) {
     const link = correlateCooldownWithReadiness(readiness);
     if (link.n >= 3 && link.pearson !== null && Math.abs(link.pearson) >= 0.3) {

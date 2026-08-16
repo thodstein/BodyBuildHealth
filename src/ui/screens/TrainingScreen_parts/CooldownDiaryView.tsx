@@ -10,11 +10,11 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { DIM, diaryCard } from './diary-tokens';
-import { MiniLineChart } from './DiaryChart';
+import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
 import {
   loadCooldownLog, cooldownAdherence, cooldownQualityTrend, buildCooldownInsights,
-  exportCooldownCheckinsCSV, cooldownStreak, correlateCooldownWithReadiness,
+  exportCooldownCheckinsCSV, cooldownStreak, correlateCooldownWithReadiness, cooldownWeeklyAdherence,
 } from '../../../engines/cooldown.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { collectGroupCooldown } from '../../../engines/cooldown-day.engine';
@@ -32,7 +32,10 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
   const adherence = useMemo(() => cooldownAdherence(30), [tick]);
   const quality = useMemo(() => cooldownQualityTrend(30), [tick]);
   const streak = useMemo(() => cooldownStreak(), [tick]);
-  const insights = useMemo(() => buildCooldownInsights(), [tick]);
+  const weekly = useMemo(() => cooldownWeeklyAdherence(8), [tick]);
+  const readiness = useMemo(() => loadReadinessHistory(), [tick]);
+  const insights = useMemo(() => buildCooldownInsights(readiness), [tick, readiness]);
+  const link = useMemo(() => correlateCooldownWithReadiness(readiness), [tick, readiness]);
 
   const skipCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -186,6 +189,37 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
                   height={50}
                   ySuffix="/5"
                 />
+              </div>
+            )}
+            {weekly.filter(p => p.total > 0).length >= 2 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Приверженность по неделям</div>
+                <MiniBarChart
+                  data={weekly.map(p => ({
+                    value: p.pct,
+                    label: p.label,
+                    color: p.total === 0 ? 'rgba(255,255,255,0.08)' : p.pct >= 80 ? '#22c55e' : p.pct >= 50 ? '#f59e0b' : '#ef4444',
+                  }))}
+                  height={60}
+                  valueSuffix="%"
+                />
+              </div>
+            )}
+            {link.n >= 3 && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Заминка → готовность на следующий день (n={link.n}):</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                  {link.buckets.map(b => (
+                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 8, color: DIM }}>{b.range}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgRecovery}%` : '—'}</div>
+                      <div style={{ fontSize: 8, color: DIM }}>{b.n} дней</div>
+                    </div>
+                  ))}
+                </div>
+                {link.pearson !== null && Math.abs(link.pearson) >= 0.3 && (
+                  <div style={{ fontSize: 9, color: '#a78bfa', marginTop: 4 }}>r = {link.pearson} — {link.pearson > 0 ? 'качественная заминка связана с готовностью завтра' : 'обратная связь (сон/питание?)'}</div>
+                )}
               </div>
             )}
             {skipCounts.length > 0 && (
