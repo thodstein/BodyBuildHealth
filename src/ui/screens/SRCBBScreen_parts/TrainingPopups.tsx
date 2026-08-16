@@ -49,9 +49,9 @@ export const PopupNumber: React.FC<{
   const [edit, setEdit] = useState(String(value));
   const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
-    <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
-      <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{display}</div>
+      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+      <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>
@@ -84,8 +84,8 @@ export const PopupSelect: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
-        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? sel.label : 'Выбрать…'}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <PortalOverlay onClose={() => setOpen(false)}>
@@ -144,10 +144,10 @@ export const PopupSelectSmart: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
           {label}{isSuggested && value && suggestedIds!.has(value) && <span style={{ color: '#f59e0b', marginLeft: 4 }}>★</span>}
         </div>
-        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{sel ? sel.label : 'Выбрать…'}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <PortalOverlay onClose={() => setOpen(false)}>
@@ -203,8 +203,8 @@ export const PopupText: React.FC<{
   const [edit, setEdit] = useState(value);
   return <>
     <button onClick={() => { setEdit(value); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>{value || 'Введите...'}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{value || 'Введите...'}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>

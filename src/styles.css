@@ -541,19 +541,40 @@
   box-sizing: border-box;
 }
 .training-modal-dialog > .macrocycle-panel { width: 100%; }
+/* Годовой планировщик: собственная тёмная поверхность — значения читаются в
+   любой теме (светлая/Telegram). Выбор значений по кнопке: карточки + попап-чипы. */
+.macrocycle-panel {
+  --text: #FFFFFF;
+  --text-dim: rgba(255,255,255,0.66);
+  --text-light: rgba(255,255,255,0.92);
+  --card-bg: #181b22;
+  --border-light: rgba(255,255,255,0.12);
+  --input-bg: rgba(118,118,128,0.14);
+  --input-border: rgba(255,255,255,0.14);
+  --accent-line: rgba(0,230,138,0.45);
+  --accent-dim: rgba(0,230,138,0.12);
+  --accent-contrast: #06281c;
+}
 .macrocycle-control-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.macrocycle-control-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 82px !important; padding: 12px; border: 1px solid var(--border-light, rgba(255,255,255,0.12)); border-radius: 12px; background: var(--card-bg, #181b22); color: var(--text, #fff); text-align: left; cursor: pointer; }
-.macrocycle-control-card span { color: var(--text-dim); font-size: 10px; }
-.macrocycle-control-card strong { font-size: 13px; color: var(--accent); }
-.macrocycle-control-card small { color: var(--text-dim); font-size: 10px; }
-.macrocycle-control-popup { margin-top: 10px; padding: 12px; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--card-bg, #181b22); box-shadow: 0 12px 32px rgba(0,0,0,0.25); }
-.macrocycle-control-popup__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--text); }
-.macrocycle-control-popup__header button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--text-dim); cursor: pointer; }
+.macrocycle-control-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 82px !important; padding: 12px 14px; border: 1px solid var(--border-light, rgba(255,255,255,0.12)); border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)), var(--card-bg, #181b22); color: #fff; text-align: left; cursor: pointer; transition: transform 0.12s ease, border-color 0.12s ease; }
+.macrocycle-control-card:hover { border-color: rgba(0,230,138,0.4); transform: translateY(-1px); }
+.macrocycle-control-card:active { transform: translateY(0); }
+.macrocycle-control-card span { color: var(--text-dim, rgba(255,255,255,0.66)); font-size: 10px; max-width: 100%; }
+.macrocycle-control-card strong { font-size: 13px; color: var(--accent, #00e68a); max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.macrocycle-control-card small { color: var(--text-dim, rgba(255,255,255,0.66)); font-size: 10px; }
+.macrocycle-control-popup { margin-top: 10px; padding: 12px; border: 1px solid var(--accent-line, rgba(0,230,138,0.45)); border-radius: 14px; background: #18181b; box-shadow: 0 12px 32px rgba(0,0,0,0.35); }
+.macrocycle-control-popup__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: #fff; }
+.macrocycle-control-popup__header button { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: rgba(255,255,255,0.66); cursor: pointer; font-size: 15px; }
 .macrocycle-popup-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; }
-.macrocycle-popup-options button, .macrocycle-popup-input button { min-height: 44px; padding: 8px 10px; border: 1px solid var(--border-light); border-radius: 10px; background: var(--input-bg); color: var(--text); cursor: pointer; }
-.macrocycle-popup-options button.is-active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
-.macrocycle-popup-input { display: flex; flex-direction: column; gap: 8px; color: var(--text-dim); font-size: 11px; }
-.macrocycle-popup-input input { min-height: 44px; padding: 8px; border: 1px solid var(--input-border); border-radius: 10px; background: var(--input-bg); color: var(--text); font-size: 16px; }
+.macrocycle-popup-options button,
+.macrocycle-popup-input button { min-height: 44px; padding: 8px 10px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; background: rgba(255,255,255,0.04); color: #fff; cursor: pointer; font-weight: 600; transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease; }
+.macrocycle-popup-options button:hover,
+.macrocycle-popup-input button:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.24); }
+.macrocycle-popup-options button:active,
+.macrocycle-popup-input button:active { transform: scale(0.98); }
+.macrocycle-popup-options button.is-active { background: linear-gradient(135deg, rgba(0,230,138,0.22), rgba(0,230,138,0.1)); border-color: var(--accent, #00e68a); color: #00e68a; font-weight: 800; box-shadow: 0 0 0 1px rgba(0,230,138,0.15), 0 2px 10px rgba(0,230,138,0.12); }
+.macrocycle-popup-input { display: flex; flex-direction: column; gap: 8px; color: rgba(255,255,255,0.66); font-size: 11px; }
+.macrocycle-popup-input input { min-height: 44px; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.14); border-radius: 10px; background: rgba(0,0,0,0.3); color: #fff; font-size: 16px; }
 
 @media (max-width: 480px) {
   /* TrainingScreen is already inside the app's single scroll container (main).
@@ -611,9 +632,9 @@
   .macrocycle-control-card { min-width: 0; padding: 9px; }
   .macrocycle-control-card strong,
   .macrocycle-control-card small,
-  .macrocycle-control-card span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .macrocycle-control-card span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
   .macrocycle-popup-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .macrocycle-popup-options button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .macrocycle-popup-options button { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .macrocycle-competition-row {
     grid-template-columns: minmax(0, 1fr) 56px 76px 44px !important;
     gap: 2px !important;
