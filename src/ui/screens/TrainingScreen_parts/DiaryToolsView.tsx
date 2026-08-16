@@ -13,6 +13,7 @@ import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { exportMobilityCheckinsCSV, loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
+import { restoreDiaryExtras } from '../../../engines/diary-backup.engine';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -358,6 +359,9 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   reports: trainingArchive,
                   rirCalibration: (() => { try { return JSON.parse(localStorage.getItem('he_rir_calibration') || 'null'); } catch { return null; } })(),
                   mmc: (() => { try { return JSON.parse(localStorage.getItem('he_mmc_data') || '[]'); } catch { return []; } })(),
+                  warmupDiary: loadWarmupLog(),
+                  mindsetChecks: loadCheckins(),
+                  mobilityChecks: loadMobilityCheckins(),
                 };
                 const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -383,18 +387,22 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const existing = historyWorkouts;
                         const existingIds = new Set(existing.map((w: any) => w.id || w.date));
                         const newWorkouts = data.workouts.filter((w: any) => !existingIds.has(w.id || w.date));
-                        if (newWorkouts.length === 0) { alert('Все тренировки уже есть в дневнике'); return; }
                         // Запись через единый слой: IDB + зеркало в localStorage (he_workout_log_v2)
                         for (const w of newWorkouts) {
                           await diary.saveWorkoutLog(w);
                         }
+                        let addedMeasurements = 0;
                         if (data.measurements?.length) {
                           const existM = loadMeasurements();
                           const existDates = new Set(existM.map((m: any) => m.date));
                           const newM = data.measurements.filter((m: any) => !existDates.has(m.date));
-                          if (newM.length) { try { newM.forEach((m: any) => saveMeasurement(m)); } catch {} }
+                          if (newM.length) { try { newM.forEach((m: any) => saveMeasurement(m)); addedMeasurements = newM.length; } catch {} }
                         }
-                        alert(`Импортировано: ${newWorkouts.length} тренировок${data.measurements?.length ? `, ${data.measurements.length} замеров` : ''}`);
+                        // Восстановление дневников разминки/психо/мобильности (мерж: добавляются только отсутствующие)
+                        const extras = restoreDiaryExtras(data);
+                        const totalAdded = newWorkouts.length + addedMeasurements + extras.warmup + extras.mind + extras.mob;
+                        if (totalAdded === 0) { alert('Все данные уже есть в дневнике'); return; }
+                        alert(`Импортировано: ${newWorkouts.length} тренировок, ${addedMeasurements} замеров, ${extras.warmup} записей разминки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
                         onRefresh();
                       } catch { alert('Ошибка чтения файла'); }
                     })();

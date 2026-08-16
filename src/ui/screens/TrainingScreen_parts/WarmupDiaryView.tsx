@@ -17,6 +17,7 @@ import {
   exportWarmupCheckinsCSV, warmupStreak, correlateWarmupWithPerformance,
 } from '../../../engines/warmup.engine';
 import { sessionsBestE1RM } from '../../../engines/mindset-protocol.engine';
+import { WarmupRampCard } from './diary-cards';
 import type { WorkoutLog } from '../../../core/types';
 
 const CARD = diaryCard;
@@ -212,6 +213,9 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[] }> = ({ 
           </div>
         </div>
       )}
+
+      {/* ── Калькулятор разминочной рампы ── */}
+      <WarmupRampCard />
 
       <div style={{ display: 'flex', gap: 6 }}>
         <button type="button" style={{ ...ghost, flex: 1, marginTop: 2 }} onClick={refresh} aria-label="Обновить данные">🔄 Обновить данные</button>
