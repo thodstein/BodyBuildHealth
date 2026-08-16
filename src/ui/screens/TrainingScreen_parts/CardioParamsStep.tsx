@@ -68,7 +68,8 @@ export const CardioParamsStep: React.FC<{
   setLowImpact: (v: boolean) => void;
   age: string;
   setAge: (v: string) => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge }) => {
+  onReset: () => void;
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -250,7 +251,10 @@ export const CardioParamsStep: React.FC<{
 
       {/* Живой предпросмотр */}
       <div style={{ ...CARD, borderColor: 'rgba(0,230,138,0.25)' }}>
-        <div style={LABEL}>👁 Предпросмотр цикла</div>
+        <div style={ROW}>
+          <span style={LABEL}>👁 Предпросмотр цикла</span>
+          <button style={{ ...BTN, minHeight: 30, padding: '4px 10px' }} onClick={onReset} aria-label="Сбросить параметры">⟲ Сбросить</button>
+        </div>
         {s && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>

@@ -9,6 +9,8 @@ import {
   cardioWeekForDate, cardioSessionsForDate, cardioHeartZones,
   spreadSessionsAcrossDays, cardioVolumeSeries, autoTuneCardioCycle,
   cardioQualityReport,
+  saveCardioCycleVersion, loadCardioCycleVersions, latestCardioCycleVersion,
+  restoreCardioCycleVersion, clearCardioCycleHistory,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -600,5 +602,45 @@ describe('персонализация подбора', () => {
     const a = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
     expect(a.weeks[0].sessions[0].equipment).toBe('running');
     expect(a.weeks[0].sessions[0].targetHr).toBeUndefined();
+  });
+});
+
+// ─── История версий (undo) ───
+
+describe('история версий цикла', () => {
+  const HIST_KEY = 'he_cardio_cycle_history';
+  beforeEach(() => { try { localStorage.removeItem(HIST_KEY); } catch { /* ignore */ } });
+
+  it('save → latest → restore → clear', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'h-1' });
+    const modified = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'h-1', level: 'advanced' });
+    saveCardioCycleVersion(c, 'до подстройки');
+    expect(latestCardioCycleVersion('h-1')?.reason).toBe('до подстройки');
+    const restored = restoreCardioCycleVersion('h-1');
+    expect(restored?.id).toBe('h-1');
+    expect(latestCardioCycleVersion('h-1')).toBeNull();
+    expect(loadCardioCycleVersions()).toHaveLength(0);
+  });
+
+  it('cap 5 версий на цикл', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'h-2' });
+    for (let i = 0; i < 7; i++) saveCardioCycleVersion({ ...c, name: `v${i}` }, `правка ${i}`);
+    const versions = loadCardioCycleVersions().filter(v => v.cycleId === 'h-2');
+    expect(versions.length).toBeLessThanOrEqual(5);
+  });
+
+  it('clear удаляет историю конкретного цикла', () => {
+    const a = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'h-a' });
+    const b = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'h-b' });
+    saveCardioCycleVersion(a, 'a');
+    saveCardioCycleVersion(b, 'b');
+    clearCardioCycleHistory('h-a');
+    expect(latestCardioCycleVersion('h-a')).toBeNull();
+    expect(latestCardioCycleVersion('h-b')).not.toBeNull();
+  });
+
+  it('повреждённые данные → пустой список', () => {
+    try { localStorage.setItem(HIST_KEY, '{bad'); } catch { /* ignore */ }
+    expect(loadCardioCycleVersions()).toEqual([]);
   });
 });

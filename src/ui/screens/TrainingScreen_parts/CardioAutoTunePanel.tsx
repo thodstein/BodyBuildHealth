@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import {
   autoTuneCardioCycle, cardioHeartZones, cardioSessionsForDate, cardioCycleSummary,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
+  saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
@@ -78,12 +79,25 @@ export const CardioAutoTunePanel: React.FC<{
   const applyTune = () => {
     if (!cycle || !pending) return;
     const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    saveCardioCycleVersion(cycle, 'авто-подстройка');
     saveCardioCycle(r.cycle);
     setActiveCardioCycle(r.cycle);
     setPending(null);
     onChanged?.();
     flashMsg(`✅ Подстройка применена: ${r.changes.length} изменений (${r.advice.action})`);
   };
+
+  const undoVersion = () => {
+    if (!cycle) return;
+    const restored = restoreCardioCycleVersion(cycle.id);
+    if (!restored) { flashMsg('⚠ Нет сохранённых версий для отмены'); return; }
+    saveCardioCycle(restored);
+    setActiveCardioCycle(restored);
+    onChanged?.();
+    flashMsg('↩ Версия восстановлена');
+  };
+
+  const hasVersion = cycle ? latestCardioCycleVersion(cycle.id) != null : false;
 
   return (
     <div style={CARD}>
@@ -97,6 +111,7 @@ export const CardioAutoTunePanel: React.FC<{
           {autoMode ? '🟢 Включён' : '⚪ Выключен'}
         </button>
         <button style={BTN} onClick={previewTune} title="Показать, что изменится по текущему дневнику">🔄 Подстроить сейчас</button>
+        {hasVersion && <button style={BTN} onClick={undoVersion} title="Отменить последнюю авто-подстройку/правку">↩ Вернуть версию</button>}
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
 

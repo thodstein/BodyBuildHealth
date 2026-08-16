@@ -50,6 +50,18 @@ describe('CardioAutoTunePanel — CSR', () => {
     for (const w of tuned) expect(w.sessions.some(s => s.type === 'hiit')).toBe(false);
   });
 
+  it('после применения подстройки доступна отмена версии (undo)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'tune-u1' });
+    render(<CardioAutoTunePanel cycle={c} acwr={1.6} />);
+    fireEvent.click(screen.getByRole('button', { name: /Подстроить сейчас/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Применить/ }));
+    expect(screen.getByRole('button', { name: /Вернуть версию/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Вернуть версию/ }));
+    expect(screen.getByText(/Версия восстановлена/)).toBeTruthy();
+    const restored = loadCardioCycles().find(x => x.id === 'tune-u1')!;
+    expect(restored.weeks[0].totalMinutes).toBe(c.weeks[0].totalMinutes);
+  });
+
   it('соответствие плану → «изменений нет»', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'tune-2' });
     const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
@@ -118,6 +130,17 @@ describe('CardioWeekEditor', () => {
     const expected = week.sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
     expect(week.totalMinutes).toBe(expected);
     expect(week.sessions[0].durationMin).toBe(50);
+  });
+
+  it('копия недели: «⧉ В след. неделю» переносит сессии', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'we-5' });
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /В след. неделю/ }));
+    const saved = loadCardioCycles().find(x => x.id === 'we-5')!;
+    const w1 = saved.weeks[0];
+    const w2 = saved.weeks[1];
+    expect(w2.sessions.map(s => `${s.type}:${s.durationMin}`)).toEqual(w1.sessions.map(s => `${s.type}:${s.durationMin}`));
+    expect(w2.totalMinutes).toBe(w1.totalMinutes);
   });
 });
 

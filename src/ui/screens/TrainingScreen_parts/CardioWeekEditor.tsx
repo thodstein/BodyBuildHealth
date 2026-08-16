@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react';
 import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
+  saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 
@@ -61,12 +62,39 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const saveWeek = (patch: (w: CardioWeek) => CardioWeek) => {
     if (!cycle || !week) return;
+    saveCardioCycleVersion(cycle, `правка недели ${week.week}`);
     const next = { ...cycle, weeks: cycle.weeks.map(w => (w.week === week.week ? rebuildTotals(patch(w)) : w)) };
     saveCardioCycle(next);
     setActiveCardioCycle(next);
     onChanged?.();
     flashMsg('💾 Неделя обновлена');
   };
+
+  const undoVersion = () => {
+    if (!cycle) return;
+    const restored = restoreCardioCycleVersion(cycle.id);
+    if (!restored) { flashMsg('⚠ Нет сохранённых версий'); return; }
+    saveCardioCycle(restored);
+    setActiveCardioCycle(restored);
+    onChanged?.();
+    flashMsg('↩ Версия недели восстановлена');
+  };
+
+  const copyToNext = () => {
+    if (!cycle || !week || week.week >= cycle.totalWeeks) return;
+    saveCardioCycleVersion(cycle, 'копия недели');
+    const next = {
+      ...cycle,
+      weeks: cycle.weeks.map(w => (w.week === week.week + 1 ? { ...rebuildTotals({ ...week, week: week.week + 1 }), phase: w.phase, deload: w.deload, taper: w.taper, rationale: w.rationale } : w)),
+    };
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setWeekNo(Math.min(cycle.totalWeeks, week.week + 1));
+    onChanged?.();
+    flashMsg(`⧉ Неделя ${week.week} скопирована в неделю ${week.week + 1}`);
+  };
+
+  const hasVersion = cycle ? latestCardioCycleVersion(cycle.id) != null : false;
 
   const scaleMinutes = (mult: number) => saveWeek(w => ({
     ...w,
@@ -121,6 +149,8 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
         <button style={BTN} onClick={() => scaleMinutes(0.9)} title="−10% минут на неделе">−10% мин</button>
         <button style={BTN_PRIMARY} onClick={() => scaleMinutes(1.1)} title="+10% минут на неделе">+10% мин</button>
         <button style={BTN} onClick={() => setEditSessions(v => !v)}>{editSessions ? '▾ Скрыть сессии' : '✏️ Редактировать сессии'}</button>
+        {week.week < cycle.totalWeeks && <button style={BTN} onClick={copyToNext} title="Скопировать сессии недели в следующую">⧉ В след. неделю</button>}
+        {hasVersion && <button style={BTN} onClick={undoVersion} title="Отменить последнюю правку">↩ Вернуть</button>}
       </div>
 
       {editSessions && (

@@ -517,6 +517,56 @@ export function setActiveCardioCycle(cycle: CardioCycle | null): void {
   } catch { /* ignore */ }
 }
 
+// ─── История версий цикла (undo авто-подстройки/правок) ───
+
+export const CARDIO_HISTORY_KEY = 'he_cardio_cycle_history';
+const CARDIO_HISTORY_CAP = 5;
+
+export interface CardioCycleVersion {
+  id: string;
+  cycleId: string;
+  savedAt: string;
+  reason: string;
+  cycle: CardioCycle;
+}
+
+export function loadCardioCycleVersions(): CardioCycleVersion[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CARDIO_HISTORY_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is CardioCycleVersion => !!x && typeof x === 'object' && x.cycleId && x.cycle) : [];
+  } catch { return []; }
+}
+
+/** Снапшот текущей версии цикла перед изменением (для undo). */
+export function saveCardioCycleVersion(cycle: CardioCycle, reason: string): void {
+  if (!cycle) return;
+  const all = loadCardioCycleVersions().filter(v => v.cycleId !== cycle.id);
+  all.unshift({ id: `v-${Date.now()}`, cycleId: cycle.id, savedAt: new Date().toISOString(), reason, cycle });
+  try { localStorage.setItem(CARDIO_HISTORY_KEY, JSON.stringify(all.slice(0, CARDIO_HISTORY_CAP))); } catch { /* ignore */ }
+}
+
+/** Последняя версия цикла для undo (или null). */
+export function latestCardioCycleVersion(cycleId: string): CardioCycleVersion | null {
+  return loadCardioCycleVersions().find(v => v.cycleId === cycleId) ?? null;
+}
+
+/** Восстановить версию: возвращает цикл и удаляет снапшот из истории. */
+export function restoreCardioCycleVersion(cycleId: string): CardioCycle | null {
+  const all = loadCardioCycleVersions();
+  const idx = all.findIndex(v => v.cycleId === cycleId);
+  if (idx < 0) return null;
+  const [version] = all.splice(idx, 1);
+  try { localStorage.setItem(CARDIO_HISTORY_KEY, JSON.stringify(all)); } catch { /* ignore */ }
+  return version.cycle;
+}
+
+/** Очистить историю версий цикла (при полном удалении цикла). */
+export function clearCardioCycleHistory(cycleId: string): void {
+  try {
+    localStorage.setItem(CARDIO_HISTORY_KEY, JSON.stringify(loadCardioCycleVersions().filter(v => v.cycleId !== cycleId)));
+  } catch { /* ignore */ }
+}
+
 /** Миграция старого недельного CardioPlan → однонедельный CardioCycle. */
 export function cardioPlanToCycle(plan: CardioPlan, goal: CardioGoal = 'maintenance'): CardioCycle {
   const week: CardioWeek = {

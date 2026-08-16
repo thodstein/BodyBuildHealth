@@ -295,6 +295,27 @@ export const CardioConstructor: React.FC = () => {
     flashMsg('✏️ Цикл переименован');
   };
 
+  const resetParams = () => {
+    setGoal('cut');
+    setTotalWeeks(12);
+    setDaysAvailable(5);
+    setRecoveryLow(false);
+    setBodyWeight(profileWeight() ?? 80);
+    setPhaseSplit({ auto: true, base: 0, build: 0, maintenance: 0 });
+    setTaperWeeks(2);
+    setPeakWeek(true);
+    setLevel('intermediate');
+    setEquipment([]);
+    setLowImpact(false);
+    setAge('30');
+    setComps([]);
+    flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
+  };
+
+  const autoModeOn = useMemo(() => {
+    try { return localStorage.getItem('he_cardio_auto_tune') === '1'; } catch { return false; }
+  }, [flash, cycle]);
+
   const todayCardio = useMemo(() => (cycle ? cardioSessionsForDate(cycle, todayIso()) : null), [cycle]);
 
   const stepIdx = STEPS.findIndex(s => s.id === step);
@@ -310,6 +331,11 @@ export const CardioConstructor: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>❤️ Кардио-конструктор</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {autoModeOn && (
+            <div style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: 16, padding: '3px 10px' }} title="Авто-режим: подстройка по дневнику на шаге «Дневник»">
+              🔄 авто-режим
+            </div>
+          )}
           {todayCardio && todayCardio.sessions.length > 0 && (
             <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px' }}>
               🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')}
@@ -360,6 +386,7 @@ export const CardioConstructor: React.FC = () => {
           equipment={equipment} setEquipment={setEquipment}
           lowImpact={lowImpact} setLowImpact={setLowImpact}
           age={age} setAge={setAge}
+          onReset={resetParams}
         />
       )}
       {step === 'comps' && (
