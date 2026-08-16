@@ -315,12 +315,12 @@ export const IndividualPlanResults: React.FC = () => {
         // generatePlan стал async (неблокирующая генерация 3/7 дней) — ОБЯЗАТЕЛЬНО await:
         // иначе недели месяца генерируются конкурентно и расы на общих recentFoodIds/hardWindow
         // портят выбор продуктов и перекрывают weekPlan.
-        try { await generatePlan(7, w, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
+        try { await generatePlan(7, w, undefined, { skipUndo: true, async: true }); } catch (e: any) { try { console.warn('[Planner] month week', w, 'failed:', e); } catch {} }
       }
       await new Promise<void>(r => setTimeout(() => r(), 100));
       setSelectedWeek(0);
       // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
-      try { await generatePlan(7, 0, undefined, { skipUndo: true }); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
+      try { await generatePlan(7, 0, undefined, { skipUndo: true, async: true }); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
     } finally {
       _monthRunningRef.current = false;
     }

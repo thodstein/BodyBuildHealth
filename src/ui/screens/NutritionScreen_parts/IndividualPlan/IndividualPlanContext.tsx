@@ -1538,9 +1538,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   // ─── Generate Plan ───
    const generatePlan = async (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean }) => {
-     // ⏳ Неблокирующая генерация 3/7 дней: yield между днями, чтобы UI не фризил.
-     const isAsync = opts?.async === true;
-     const maybeYield = async () => { if (isAsync) await new Promise<void>(r => setTimeout(() => r(), 20)); };
+      // ⏳ Неблокирующая генерация 3/7 дней: yield между днями, чтобы UI не фризил.
+      // Многодневная генерация (3/7) ВСЕГДА неблокирующая — независимо от вызывающего
+      // (месяц и другие точки входа не обязаны помнить про { async: true }).
+      const isAsync = opts?.async === true || days >= 3;
+      const maybeYield = async () => { if (isAsync) await new Promise<void>(r => setTimeout(() => r(), 20)); };
      if (isAsync) { try { setPlanBusy(true); setErrorMsg(null); } catch {} }
      try {
      // P1-fix: опция skipUndo для массовой генерации (месяц) — иначе 5×saveUndo заполняет
@@ -2634,10 +2636,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       };
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
+    await maybeYield();
     const d1 = buildDay(dayIdx, isTrainDay(dayIdx));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
+    await maybeYield();
     const d2 = days >= 3 ? buildDay(1, isTrainDay(1)) : null;
+    await maybeYield();
     const d3 = days >= 3 ? buildDay(2, isTrainDay(2)) : null;
     setDayPlan(d1);
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
@@ -2645,7 +2650,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (days >= 7) {
       // FIX train-bind: смещение месяца (см. V2-путь) — плавающий график не рвётся на границе недель
       const _weekBase = weekIndex !== undefined ? weekIndex * 7 : 0;
-      weekDays = Array.from({ length: 7 }, (_, i) => buildDay(_weekBase + i, isTrainDay(_weekBase + i)));
+      const _weekAcc: any[] = [];
+      for (let _i = 0; _i < 7; _i++) {
+        await maybeYield();
+        _weekAcc.push(buildDay(_weekBase + _i, isTrainDay(_weekBase + _i)));
+      }
+      weekDays = _weekAcc;
       if (periodizationEnabled) {
         const pWeek = weekIndex !== undefined ? weekIndex % 5 : 0;
         if (pWeek === 0 || pWeek === 4) {
