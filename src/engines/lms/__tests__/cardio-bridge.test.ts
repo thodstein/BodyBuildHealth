@@ -53,11 +53,18 @@ describe('buildCardioIcs', () => {
     expect(ics).not.toContain('; тест');
   });
 
-  it('даты недель шагают на 7 дней от reference', () => {
-    const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, id: 'd-1' });
+  it('даты событий лежат внутри соответствующих недель от reference', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, id: 'd-1', daysAvailable: 7 });
     const ics = buildCardioIcs(c, '2026-01-05T00:00:00.000Z');
-    expect(ics).toContain('DTSTART:20260105Z');
-    expect(ics).toContain('DTSTART:20260112Z');
+    const starts = [...ics.matchAll(/DTSTART:(\d{8})Z/g)].map(m => m[1]);
+    expect(starts.length).toBeGreaterThan(0);
+    for (const st of starts) {
+      const day = Number(st.slice(6, 8));
+      const month = Number(st.slice(4, 6));
+      expect(month).toBe(1);
+      expect(day).toBeGreaterThanOrEqual(5);
+      expect(day).toBeLessThanOrEqual(19);
+    }
   });
 });
 

@@ -4,10 +4,11 @@
  */
 import React, { useState } from 'react';
 import {
-  cardioCycleSummary, buildCardioSummaryText, CARDIO_GOAL_LABELS,
+  cardioCycleSummary, buildCardioSummaryText, cardioCycleToUserProgram, CARDIO_GOAL_LABELS,
   type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
+import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
 
 const CARD: React.CSSProperties = {
@@ -70,6 +71,16 @@ export const CardioManageStep: React.FC<{
     } catch { /* ignore */ }
   };
 
+  const sendToProgram = () => {
+    if (!cycle) return;
+    try {
+      const prog = cardioCycleToUserProgram(cycle);
+      applyToPlanner({ kind: 'program', label: cycle.name, data: { program: prog } });
+      setCopyFlash(true);
+      window.setTimeout(() => setCopyFlash(false), 2500);
+    } catch { /* ignore */ }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Интеграция с силовым планом */}
@@ -119,6 +130,9 @@ export const CardioManageStep: React.FC<{
             <button style={BTN} onClick={() => onPrint(cycle)}>🖨 Печать / PDF</button>
             <button style={BTN} onClick={copySummary} aria-label="Скопировать сводку">
               {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
+            </button>
+            <button style={{ ...BTN, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToProgram} title="Открыть кардио-цикл как отдельную программу в ручном конструкторе (выполнение как обычная программа)">
+              {copyFlash ? '✅ Отправлено' : '📦 Как отдельную программу'}
             </button>
           </div>
         </div>

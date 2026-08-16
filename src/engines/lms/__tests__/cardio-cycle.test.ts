@@ -14,7 +14,7 @@ import {
   buildCardioSummaryText,
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
-  cardioWeightAdvice, buildCardioIcs, cardioNextSession,
+  cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -919,5 +919,32 @@ describe('cardioNextSession', () => {
   it('null вне цикла', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, daysAvailable: 7 });
     expect(cardioNextSession(c, '2026-03-01', '2026-01-05')).toBeNull();
+  });
+});
+
+// ─── Конвертация в UserProgram ───
+
+describe('cardioCycleToUserProgram', () => {
+  it('строит UserProgram: meta, недели, сессии по дням, блоки с упражнениями', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 3, daysAvailable: 4, id: 'prog-1', name: 'Кардио сушка' });
+    const p = cardioCycleToUserProgram(c);
+    expect(p.meta.title).toBe('Кардио сушка');
+    expect(p.meta.weeks).toBe(3);
+    expect(p.meta.direction).toBe('bb');
+    expect(p.meta.tags).toContain('cardio');
+    expect(p.bb!.weeks).toHaveLength(3);
+    const w1 = p.bb!.weeks[0];
+    expect(w1.sessions.length).toBeGreaterThan(0);
+    expect(w1.sessions[0].dayOfWeek).not.toBeUndefined();
+    expect(w1.sessions[0].blocks[0].exerciseName).toContain('Кардио');
+    expect(w1.sessions[0].blocks[0].muscle).toBe('cardio');
+  });
+
+  it('фазы taper/peak отображаются как deload/peaking', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    const p = cardioCycleToUserProgram(c);
+    const last = p.bb!.weeks[p.bb!.weeks.length - 1];
+    expect(last.phase).toBe('peaking');
+    expect(p.bb!.weeks[4].phase).toBe('deload');
   });
 });

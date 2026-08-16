@@ -7,6 +7,7 @@
  * делодами, taper/peak перед соревнованиями, адаптацией к силовому плану
  * и привязкой к PL/BB макроциклу. Полная спецификация: docs/CARDIO-CYCLE-INTEGRATION-PLAN.md
  */
+import { newId } from '../user-program/user-program.types';
 
 // ─── Базовые типы (обратно-совместимо с T7) ───
 
@@ -911,6 +912,76 @@ export function cardioNextSession(cycle: CardioCycle, dateIso: string, reference
     if (s) return { date: iso, week: week.week, session: s };
   }
   return null;
+}
+
+// ─── Конвертация в UserProgram (отдельная тренировочная программа) ───
+
+const CARDIO_TO_PHASE: Record<CardioPhase, 'accumulation' | 'intensification' | 'deload' | 'peaking'> = {
+  base: 'accumulation',
+  build: 'intensification',
+  maintenance: 'accumulation',
+  contest_prep: 'intensification',
+  taper: 'deload',
+  peak: 'peaking',
+  transition: 'deload',
+};
+
+const CARDIO_TYPE_RU: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
+
+/**
+ * Экспорт CardioCycle как самостоятельной UserProgram (BB-структура) —
+ * открывается в ручном конструкторе и может выполняться как обычная программа.
+ */
+export function cardioCycleToUserProgram(cycle: CardioCycle): import('../user-program/user-program.types').UserProgram {
+  const weeks: import('../user-program/user-program.types').UserWeek[] = cycle.weeks.map(w => ({
+    week: w.week,
+    phase: CARDIO_TO_PHASE[w.phase] ?? 'accumulation',
+    deload: w.deload,
+    sessions: w.sessions.map(s => ({
+      id: newId('ses'),
+      name: `Кардио: ${CARDIO_TYPE_RU[s.type]} ${s.durationMin} мин`,
+      dayOfWeek: s.dayOfWeek,
+      focus: 'cardio',
+      estimatedMin: s.durationMin,
+      blocks: [{
+        id: newId('blk'),
+        type: 'accessory',
+        exerciseName: `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}`,
+        muscle: 'cardio',
+        role: 'primary',
+        sets: [{ reps: 1, rir: 0, weight: 0, restSec: 60 }],
+        note: `${s.purpose}${s.targetHr?.max ? ` · ЧСС ${s.targetHr.min}-${s.targetHr.max}` : ''}`,
+        character: s.type === 'hiit' ? 'тяж' : s.type === 'recovery' ? 'лёг' : 'памп',
+      }],
+    })),
+  }));
+  const now = new Date().toISOString();
+  const avgFreq = Math.max(1, Math.round(cycle.weeks.reduce((sum, w) => sum + w.sessions.reduce((a, x) => a + x.weeklyFrequency, 0), 0) / Math.max(1, cycle.totalWeeks)));
+  return {
+    meta: {
+      id: newId('prog'),
+      title: cycle.name,
+      author: 'Кардио-конструктор',
+      goal: cycle.goal,
+      level: 'intermediate',
+      daysPerWeek: Math.min(7, avgFreq),
+      weeks: cycle.totalWeeks,
+      direction: 'bb',
+      createdAt: now,
+      updatedAt: now,
+      source: 'from_build',
+      tags: ['cardio'],
+      trainingFocus: 'endurance',
+    },
+    bb: {
+      direction: 'bb',
+      microcycleTemplate: { daySlots: [] },
+      weeks,
+      volumeBudget: {},
+      progression: { loadStrategy: 'linear', deloadProtocol: 'mini', intensityTechniques: [] },
+      constraints: { equipment: (cycle.weeks[0]?.sessions ?? []).map(s => s.equipment ? cardioEquipmentLabel(s.equipment) : '').filter(Boolean) },
+    },
+  };
 }
 
 // ─── Текстовая сводка (копирование в буфер) ───
