@@ -791,6 +791,30 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
   return lines.join('\r\n');
 }
 
+// ─── Текстовая сводка (копирование в буфер) ───
+
+/** Текстовое расписание цикла для буфера обмена. */
+export function buildCardioSummaryText(cycle: CardioCycle): string {
+  const s = cardioCycleSummary(cycle);
+  const lines: string[] = [];
+  lines.push(`❤️ ${cycle.name}`);
+  lines.push(`Цель: ${CARDIO_GOAL_LABELS[cycle.goal]} · ${cycle.totalWeeks} нед · в среднем ${s.avgMinutesPerWeek} мин/нед · ${s.avgKcalPerWeek} ккал/нед · ${s.hiitWeeks} HIIT-нед`);
+  if (cycle.linkedCompetitionIds?.length) lines.push(`Старты: ${cycle.linkedCompetitionIds.length}`);
+  lines.push('── Недели ──');
+  for (const w of cycle.weeks) {
+    const sessions = w.sessions
+      .map(x => `${x.type.toUpperCase()} ${x.durationMin}×${x.weeklyFrequency}${x.equipment ? ' (' + cardioEquipmentLabel(x.equipment) + ')' : ''}${x.targetHr?.max ? ' ЧСС ' + x.targetHr.min + '-' + x.targetHr.max : ''}`)
+      .join(', ');
+    const marks = [w.deload ? 'делод' : null, w.taper ? 'taper' : null].filter(Boolean).join('+');
+    lines.push(`Нед ${w.week} · ${CARDIO_PHASE_LABELS[w.phase]}${marks ? ' · ' + marks : ''}: ${sessions} — ${w.totalMinutes} мин, ${w.totalKcal} ккал`);
+  }
+  if (cycle.rationale.length > 0) {
+    lines.push('── Обоснование ──');
+    lines.push(...cycle.rationale);
+  }
+  return lines.join('\n');
+}
+
 // ─── Печатная сводка ───
 
 function escHtml(value: string): string {

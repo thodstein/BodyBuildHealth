@@ -11,6 +11,7 @@ import {
   cardioQualityReport,
   saveCardioCycleVersion, loadCardioCycleVersions, latestCardioCycleVersion,
   restoreCardioCycleVersion, clearCardioCycleHistory,
+  buildCardioSummaryText,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -656,5 +657,26 @@ describe('история версий цикла', () => {
   it('повреждённые данные → пустой список', () => {
     try { localStorage.setItem(HIST_KEY, '{bad'); } catch { /* ignore */ }
     expect(loadCardioCycleVersions()).toEqual([]);
+  });
+});
+
+// ─── Текстовая сводка ───
+
+describe('buildCardioSummaryText', () => {
+  it('содержит заголовок, цель, недели с сессиями и обоснование', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, name: 'Сушка-цикл' });
+    const t = buildCardioSummaryText(c);
+    expect(t).toContain('Сушка-цикл');
+    expect(t).toContain('Цель: сушка');
+    expect(t).toContain('Нед 1 · База');
+    expect(t).toContain('мин,');
+    expect(t).toContain('Обоснование');
+  });
+
+  it('включает оборудование и целевой ЧСС при персонализации', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 3, equipment: ['cycling'], age: 40 });
+    const t = buildCardioSummaryText(c);
+    expect(t).toContain('(Вело)');
+    expect(t).toContain('ЧСС');
   });
 });

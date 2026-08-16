@@ -2,9 +2,9 @@
  * CardioManageStep.tsx — шаг 4 мастера кардио: интеграции (ПЛ/ББ/ручной,
  * годовой план), экспорт (.ics/печать), библиотека с карточками, редактор недели.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  cardioCycleSummary, CARDIO_GOAL_LABELS,
+  cardioCycleSummary, buildCardioSummaryText, CARDIO_GOAL_LABELS,
   type CardioCycle,
 } from '../../../engines/lms/cardio.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
@@ -42,6 +42,30 @@ export const CardioManageStep: React.FC<{
   onRemove: (c: CardioCycle) => void;
   onChanged: () => void;
 }> = ({ cycle, library, link, macroLink, comparison, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged }) => {
+  const [copyFlash, setCopyFlash] = useState(false);
+
+  const copySummary = () => {
+    if (!cycle) return;
+    const text = buildCardioSummaryText(cycle);
+    try {
+      navigator.clipboard.writeText(text).then(() => setCopyFlash(true)).catch(() => fallbackCopy(text));
+    } catch { fallbackCopy(text); }
+    if (!navigator.clipboard) fallbackCopy(text);
+    window.setTimeout(() => setCopyFlash(false), 2500);
+  };
+
+  const fallbackCopy = (text: string) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopyFlash(true);
+    } catch { /* ignore */ }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Интеграция с силовым планом */}
@@ -89,6 +113,9 @@ export const CardioManageStep: React.FC<{
           <div style={ROW}>
             <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
             <button style={BTN} onClick={() => onPrint(cycle)}>🖨 Печать / PDF</button>
+            <button style={BTN} onClick={copySummary} aria-label="Скопировать сводку">
+              {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
+            </button>
           </div>
         </div>
       )}
