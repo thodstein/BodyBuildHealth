@@ -9,6 +9,7 @@ import {
   velocityLoss,
   thresholdForIntent,
   velocityLossZone,
+  diagnoseVelocity,
   LOAD_VELOCITY_PROFILE,
   INTENT_ZONES,
   VL_THRESHOLDS,
@@ -106,5 +107,46 @@ describe('LOAD_VELOCITY_PROFILE', () => {
         expect(tbl[i][0]).toBeLessThan(tbl[i - 1][0]);
       }
     }
+  });
+});
+
+describe('diagnoseVelocity — ручной ввод скорости → потеря/фаза/e1RM', () => {
+  it('высокая потеря (>20%) → exceeded + фаза максимального момента', () => {
+    const d = diagnoseVelocity('squat', 0.75, 0.45);
+    expect(d.lossPct).toBe(40);
+    expect(d.exceeded).toBe(true);
+    expect(d.suggestedPhase).toBe('bottom');
+    expect(d.zone).toContain('стоп');
+  });
+
+  it('умеренная потеря (<20%) → без фазы', () => {
+    const d = diagnoseVelocity('bench', 0.6, 0.54);
+    expect(d.exceeded).toBe(false);
+    expect(d.suggestedPhase).toBeNull();
+  });
+
+  it('e1RM по скорости с весом (bench, последний повтор)', () => {
+    const d = diagnoseVelocity('bench', 0.50, 0.40, 100);
+    expect(d.e1RMByVelocity).not.toBeNull();
+    expect(d.e1RMByVelocity!).toBeGreaterThan(100);
+  });
+
+  it('без веса — e1RMByVelocity null', () => {
+    const d = diagnoseVelocity('deadlift', 0.62, 0.50);
+    expect(d.e1RMByVelocity).toBeNull();
+  });
+
+  it('pulldown/incline_press маппятся на ближайший LVP (row/bench) без ошибок', () => {
+    const d1 = diagnoseVelocity('pulldown', 0.7, 0.5);
+    expect(Number.isFinite(d1.lossPct)).toBe(true);
+    const d2 = diagnoseVelocity('incline_press', 0.6, 0.45, 80);
+    expect(d2.e1RMByVelocity).not.toBeNull();
+  });
+
+  it('некорректные скорости — нулевая потеря, без фазы', () => {
+    const d = diagnoseVelocity('squat', 0, 0);
+    expect(d.lossPct).toBe(0);
+    expect(d.exceeded).toBe(false);
+    expect(d.suggestedPhase).toBeNull();
   });
 });

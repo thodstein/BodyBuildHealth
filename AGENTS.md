@@ -1,5 +1,23 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Диагностика движения: раунд 4 — MRV-кап починён, асимметрия, VBT-ввод, e1RM-тренд (Aug 16 2026, uncommitted)
+
+Поверх раунда 3 (74195a58b). **Ни один пункт не перестраивает исходный цикл** — все изменения аддитивные/отображение:
+
+- **MRV-кап починен для legs/arms/core** (был no-op): `groupOfExercise` возвращает `trueMuscleOf` (quads/biceps/abs), а слабые группы/диагностика сравнивают с ключами legs/arms/core → weeklySets всегда 0 → кап не срабатывал. Добавлен `plGroupOfMuscle` (muscle → PL-группа) в `weakSetsThisWeek` и `weeklyGroupSets`. **Бюджет составных групп = СУММА MRV мышц** (`MRV_BUDGET_MUSCLES`: legs=quads+hams+glutes+calves, arms=biceps+triceps+forearms, core=abs; единый `groupMrvBudgetFor`) — для legs отдельный quads-MRV (20) душил бы сразу (PL-цикл сам ног-тяжёлый ~30 сетов); суммарный бюджет (70) даёт кап при реальном переборе. Chest/back/shoulders — без изменений.
+- **Асимметрия сторон**: при отклонении `asymmetric` — чипы «Левая/Правая» (state `asymSide`, персистентность `he_pl_diagnostic_card_v1`), строка в диагнозе «Слабее: N сторона → унилатеральная работа».
+- **VBT: ручной ввод скоростей** (по уточнению — поля ввода, не парсинг дневника): блок «3.5 · ⚡ VBT» в карточке — лучший/последний повтор (м/с) + вес (кг); `diagnoseVelocity` (NEW в vbt.engine): потеря скорости → зона (`velocityLossZone`) → при превышении порога (20%) вероятная фаза срыва (максимальный момент) + e1RM по скорости (`estimate1RMFromVelocity`, pulldown→row, incline_press→bench) + **корректирующие упражнения фазы** (анализ + «➕ Добавить коррекции VBT в план»). План/цикл не меняется.
+- **e1RM-тренд в `StickingPointAnalysisCard`**: `priorMax` (лучший e1RM за 28–56 дней) → строка «e1RM-тренд (28 дн): ▼/▲/→ X% (priorMax кг)» с цветом (≤−5% красный, ≤+1% жёлтый, рост зелёный).
+
+### Тесты (раунд 4: +11)
+- `vbt.test.ts` (+6): diagnoseVelocity (потеря→фаза, без фазы, e1RM по весу, без веса, pulldown/incline маппинг, некорректные скорости).
+- `pl-deadpoints-barpath-card.test.tsx` (+3): асимметрия чипы+строка, VBT ввод→потеря/фаза/коррекции, некорректные скорости → подсказка — **25/25**.
+- `sticking-point-analysis-card.test.tsx` (+2): e1RM-тренд ▼ −6%, ▲ +11% — **9/9**.
+- Затронутые области **883/885** — 2 падения чужие: `cardio-cycle.test.ts` (cardio.engine — чужой WIP, падает изолированно) и `macrocycle-panel-cycle-slots` A5 «По дневнику» (сломан чужими коммитами 874e39cfd/443c30bd0…, в round-3 проходил).
+- `tsc` чист по моим файлам; осталось 3 ошибки в чужом `bb-show-coach.engine.ts` (NEW чужой файл, не трогаю) + 4 в `diary-cards.tsx`.
+
+---
+
 ## Диагностика движения: раунд 3 — полный StickingPointAnalysisCard + MRV/notes инъекции (Aug 16 2026, uncommitted)
 
 Поверх раунда 2 (5f921b43b):

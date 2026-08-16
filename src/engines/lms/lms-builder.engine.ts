@@ -348,6 +348,37 @@ function groupOfExercise(name: string, fallback: string): string {
   return fallback;
 }
 
+/** Мышца (trueMuscleOf) → ключ PL-группы (для MRV-подсчёта слабых групп/диагностики).
+ *  trueMuscleOf возвращает granular-ключи (quads/hamstrings/biceps/abs...), а слабые
+ *  группы и диагностика оперируют ключами legs/arms/core — иначе MRV-бюджет для них
+ *  никогда не считался (weeklySets всегда 0 → кап не срабатывал). */
+function plGroupOfMuscle(muscle: string): string {
+  if (['legs', 'quads', 'hamstrings', 'glutes', 'calves', 'lower_back'].includes(muscle)) return 'legs';
+  if (['arms', 'biceps', 'triceps', 'forearms'].includes(muscle)) return 'arms';
+  if (['core', 'abs'].includes(muscle)) return 'core';
+  return muscle; // chest/back/shoulders уже совпадают
+}
+
+/** Мышцы, чьи MRV суммируются в бюджет составной PL-группы (legs/arms).
+ *  Для legs отдельный MRV quads был бы слишком жёстким (PL-цикл сам по себе
+ *  ног-тяжёлый ~30 сетов > quads 20) — бюджет = сумма мышц группы. */
+const MRV_BUDGET_MUSCLES: Record<string, string[]> = {
+  legs: ['quads', 'hamstrings', 'glutes', 'calves'],
+  arms: ['biceps', 'triceps', 'forearms'],
+  core: ['abs'],
+};
+
+/** MRV-бюджет группы: сумма MRV входящих мышц × (PED/recovery × ACWR × авторег). */
+function groupMrvBudgetFor(vrLevel: 'beginner' | 'intermediate' | 'advanced', combinedMrvMult: number, acwrVolMod: number, arVolMult: number, group: string): number | null {
+  try {
+    const muscles = MRV_BUDGET_MUSCLES[group] ?? [group];
+    const sum = muscles.reduce((acc, m) => acc + (getVolumeLandmarks(vrLevel, m)?.mrv ?? 0), 0);
+    if (sum <= 0) return null;
+    const mult = Math.max(1, combinedMrvMult) * acwrVolMod * arVolMult;
+    return Math.round(sum * mult);
+  } catch { return null; }
+}
+
 /**
  * PL-specific assistance patterns for weak MUSCLE GROUPS.
  *
@@ -803,19 +834,13 @@ function injectDiagnosticExercises(
     return light == null ? [heavy] : [heavy, light];
   };
 
-  // MRV-бюджет группы (та же схема, что у слабых групп: legs→quads, core→abs).
+  // MRV-бюджет группы (та же схема, что у слабых групп: сумма MRV мышц составной группы).
   const groupMrvBudget = (group: string): number | null => {
     if (!mrvParams) return null;
-    try {
-      const mrvMuscle = group === 'legs' ? 'quads' : group === 'core' ? 'abs' : group === 'arms' ? 'arms' : group;
-      const lm = getVolumeLandmarks(mrvParams.vrLevel, mrvMuscle);
-      if (!lm) return null;
-      const mult = Math.max(1, mrvParams.combinedMrvMult) * mrvParams.acwrVolMod * mrvParams.arVolMult;
-      return Math.round(lm.mrv * mult);
-    } catch { return null; }
+    return groupMrvBudgetFor(mrvParams.vrLevel, mrvParams.combinedMrvMult, mrvParams.acwrVolMod, mrvParams.arVolMult, group);
   };
   const weeklyGroupSets = (group: string): number => days.reduce((sum, d) => sum + d.exercises
-    .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === group)
+    .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
     .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
 
   for (const [key, names] of Object.entries(exerciseMap)) {
@@ -1155,19 +1180,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // Тренерский MRV-бюджет слабой группы: суммарные сеты группы за неделю
           // не должны превышать MRV мышцы, скорректированный PED/recovery и
           // ACWR/авторегуляцией. Пользовательский ручной выбор не ограничивается.
-          const weakMrv = (() => {
-            try {
-              const mrvMuscle = wg === 'legs' ? 'quads' : wg === 'core' ? 'abs' : wg === 'arms' ? 'arms' : wg;
-              // vrLevel — нормализованный уровень атлета (novice→beginner, II-KMS→intermediate,
-              // KMS-MS/MS-MSMK→advanced): ориентиры MEV/MAV/MRV зависят от уровня спортсмена.
-              const lm = getVolumeLandmarks(vrLevel, mrvMuscle);
-              if (!lm) return null;
-              const mult = Math.max(1, combinedMrvMult) * acwrVolMod * arVolMult;
-              return Math.round(lm.mrv * mult);
-            } catch { return null; }
-          })();
+          const weakMrv = groupMrvBudgetFor(vrLevel, combinedMrvMult, acwrVolMod, arVolMult, wg);
           const weakSetsThisWeek = (): number => days.reduce((sum, d) => sum + d.exercises
-            .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
+            .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === wg)
             .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
           const noMrvCap = Boolean(selectedExercises && selectedExercises.length > 0);
 

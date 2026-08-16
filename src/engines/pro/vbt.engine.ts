@@ -126,3 +126,53 @@ export function velocityLossZone(lossPct: number): string {
   if (lossPct < 40) return 'зона метаболического стресса';
   return 'превышение — стоп, отказ близко';
 }
+
+import type { Lift, WeakPoint } from '../lms/weakpoint-pl';
+
+/** Фаза максимального момента (бар замедляется сильнее всего) — кандидат при высокой потере скорости. */
+const VELOCITY_STICKING_PHASE: Record<Lift, WeakPoint> = {
+  bench: 'off_chest', squat: 'bottom', deadlift: 'start',
+  ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
+};
+
+export interface VelocityDiagnosis {
+  lossPct: number;
+  zone: string;
+  exceeded: boolean;
+  /** Вероятная фаза срыва при превышении порога (фаза максимального момента), иначе null. */
+  suggestedPhase: WeakPoint | null;
+  /** e1RM по скорости (если заданы вес и скорость), иначе null. */
+  e1RMByVelocity: number | null;
+}
+
+/**
+ * Диагностика по ручному вводу скорости штанги (VBT): скорость лучшего и
+ * последнего повтора (м/с) → потеря скорости → зона/отказ → вероятная фаза
+ * срыва (максимальный момент) + e1RM по скорости (опционально вес).
+ * Чистая функция — не трогает план/цикл.
+ */
+export function diagnoseVelocity(
+  lift: Lift,
+  bestVelocity: number,
+  lastVelocity: number,
+  weightKg?: number,
+  threshold: VelocityLossThreshold = 20,
+): VelocityDiagnosis {
+  const vl = velocityLoss([bestVelocity, lastVelocity], threshold);
+  const lossPct = vl?.lossPct ?? 0;
+  const exceeded = !!vl?.exceeded;
+  // LVP есть для squat/bench/deadlift/ohp/row; pulldown→row (вертикальная тяга),
+  // incline_press→bench (жимовый паттерн) — ближайшие профили.
+  const vbtLift: VBTLift = lift === 'pulldown' ? 'row' : lift === 'incline_press' ? 'bench' : lift;
+  let e1RMByVelocity: number | null = null;
+  if (weightKg && weightKg > 0 && lastVelocity > 0) {
+    e1RMByVelocity = estimate1RMFromVelocity(vbtLift, lastVelocity, weightKg).e1RM || null;
+  }
+  return {
+    lossPct,
+    zone: velocityLossZone(lossPct),
+    exceeded,
+    suggestedPhase: exceeded ? (VELOCITY_STICKING_PHASE[lift] ?? null) : null,
+    e1RMByVelocity,
+  };
+}

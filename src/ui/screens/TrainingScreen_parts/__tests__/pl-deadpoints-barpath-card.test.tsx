@@ -260,4 +260,37 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто/)).toBeTruthy();
     expect(screen.getByText(/Сохранить фокус-группу/)).toBeTruthy();
   });
+
+  it('асимметрия: чипы «Левая/Правая» и строка в диагнозе', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    // Включить отклонение asymmetric (кнопка есть у всех движений)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Асимметрия сторон' })[0]);
+    expect(screen.getByText(/Какая сторона слабее/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Правая' }));
+    expect(screen.getByText(/Слабее: правая сторона → приоритет унилатеральной работе/)).toBeTruthy();
+    // Повторный клик снимает выбор
+    fireEvent.click(screen.getByRole('button', { name: /Правая ✓/ }));
+    expect(screen.queryByText(/Слабее: правая сторона/)).toBeNull();
+  });
+
+  it('VBT: ручной ввод скоростей даёт потерю/фазу и коррекции', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    expect(screen.getByText(/3.5 · ⚡ VBT/)).toBeTruthy();
+    // Ввод: лучший 0.75, последний 0.45 → 40% потери → exceeded → фаза
+    fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.75' } });
+    fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.45' } });
+    expect(screen.getByText(/Потеря скорости: 40%/)).toBeTruthy();
+    expect(screen.getByText(/Отказ близко — вероятная слабая фаза/)).toBeTruthy();
+    // Для squat → фаза «Низ (выход из ямы)»
+    expect(screen.getAllByText(/«Низ \(выход из ямы\)»/).length).toBeGreaterThanOrEqual(1);
+    // Коррекции VBT добавляются в план
+    expect(screen.getByText(/➕ Добавить коррекции VBT в план/)).toBeTruthy();
+  });
+
+  it('VBT: некорректные скорости — подсказка без расчёта', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.3' } });
+    fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.5' } });
+    expect(screen.getByText(/последний повтор не может быть быстрее лучшего/)).toBeTruthy();
+  });
 });

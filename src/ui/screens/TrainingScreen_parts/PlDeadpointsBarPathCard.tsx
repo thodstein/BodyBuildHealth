@@ -16,6 +16,7 @@ import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrec
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm } from '../../../engines/pro/weak-muscle-detection.engine';
+import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
@@ -123,6 +124,12 @@ interface DiagnosticCardState {
   weakMuscleSubs: string[];
   selected: Record<string, string[]>;
   days: Record<string, number[]>;
+  /** Слабее сторона для отклонения «asymmetric». */
+  asymSide: 'left' | 'right' | null;
+  /** VBT: ручной ввод скоростей (м/с) и веса (кг) — строки инпутов. */
+  vbtBest: string;
+  vbtLast: string;
+  vbtWeight: string;
 }
 
 const LIFT_KEYS = new Set<Lift>(Object.keys(LIFT_RU) as Lift[]);
@@ -173,9 +180,11 @@ function loadDiagnosticCardState(): DiagnosticCardState {
         return !!detail && detail.subs.some(sub => sub.sub === s.split('|')[1]);
       })
       : [];
-    return { lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected: cleanStringMap(raw.selected), days: cleanDayMap(raw.days) };
+    const asymSide = raw.asymSide === 'left' || raw.asymSide === 'right' ? (raw.asymSide as 'left' | 'right') : null;
+    const str = (v: unknown): string => typeof v === 'string' ? v.slice(0, 20) : '';
+    return { lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected: cleanStringMap(raw.selected), days: cleanDayMap(raw.days), asymSide, vbtBest: str(raw.vbtBest), vbtLast: str(raw.vbtLast), vbtWeight: str(raw.vbtWeight) };
   } catch {
-    return { lift: 'squat', phase: '', issues: [], planWeakPoints: [], weakMuscleGroups: [], weakMuscleSubs: [], selected: {}, days: {} };
+    return { lift: 'squat', phase: '', issues: [], planWeakPoints: [], weakMuscleGroups: [], weakMuscleSubs: [], selected: {}, days: {}, asymSide: null, vbtBest: '', vbtLast: '', vbtWeight: '' };
   }
 }
 
@@ -269,9 +278,15 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   // 💪 Слабые мышцы (подгруппы) — по циклу, как бывшая верхняя карточка «Слабые группы мышц».
   const [weakMuscleGroups, setWeakMuscleGroups] = useState<string[]>(initialCardState.weakMuscleGroups);
   const [weakMuscleSubs, setWeakMuscleSubs] = useState<string[]>(initialCardState.weakMuscleSubs);
+  // ⚖️ Слабее сторона для отклонения «asymmetric» (bar-path).
+  const [asymSide, setAsymSide] = useState<'left' | 'right' | null>(initialCardState.asymSide);
+  // ⚡ VBT: ручной ввод скорости штанги (м/с) для диагностики потери скорости.
+  const [vbtBest, setVbtBest] = useState<string>(initialCardState.vbtBest ?? '');
+  const [vbtLast, setVbtLast] = useState<string>(initialCardState.vbtLast ?? '');
+  const [vbtWeight, setVbtWeight] = useState<string>(initialCardState.vbtWeight ?? '');
   useEffect(() => {
-    saveDiagnosticCardState({ lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days });
-  }, [lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days]);
+    saveDiagnosticCardState({ lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days, asymSide, vbtBest, vbtLast, vbtWeight });
+  }, [lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days, asymSide, vbtBest, vbtLast, vbtWeight]);
   const toggleWeakMuscle = (g: string) => setWeakMuscleGroups(cur => {
     if (cur.includes(g)) return cur.filter(x => x !== g);
     return [...cur, g];
@@ -600,6 +615,59 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         )}
       </div>
 
+      {/* ═══ 3.5. VBT: скорость штанги (ручной ввод) ═══ */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#f472b6' }}>3.5 · ⚡ VBT: скорость штанги (м/с) · {LIFT_RU[lift]}</div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
+          Введите скорость лучшего и последнего повтора (м/с) — потерю скорости и вероятную фазу срыва. План не меняется, это диагностика.
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+          <label style={{ fontSize: 10, color: DIM }}>Лучший повтор (м/с):
+            <input type="number" step="0.01" min="0" value={vbtBest} onChange={e => setVbtBest(e.target.value)} placeholder="0.60" style={{ width: 70, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+          </label>
+          <label style={{ fontSize: 10, color: DIM }}>Последний (м/с):
+            <input type="number" step="0.01" min="0" value={vbtLast} onChange={e => setVbtLast(e.target.value)} placeholder="0.40" style={{ width: 70, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+          </label>
+          <label style={{ fontSize: 10, color: DIM }}>Вес (кг, для e1RM):
+            <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e => setVbtWeight(e.target.value)} placeholder="100" style={{ width: 64, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+          </label>
+        </div>
+        {(() => {
+          const best = parseFloat(vbtBest);
+          const last = parseFloat(vbtLast);
+          if (!Number.isFinite(best) || !Number.isFinite(last) || best <= 0 || last <= 0 || last > best) {
+            return <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Введите скорости (последний повтор не может быть быстрее лучшего).</div>;
+          }
+          const weight = parseFloat(vbtWeight);
+          const d = diagnoseVelocity(lift, best, last, Number.isFinite(weight) && weight > 0 ? weight : undefined);
+          const vbtSticking = d.suggestedPhase ? analyzeStickingCorrections(lift, d.suggestedPhase, template ?? undefined) : null;
+          return (
+            <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: d.exceeded ? 'rgba(239,68,68,0.07)' : 'rgba(244,114,182,0.05)', border: `1px solid ${d.exceeded ? 'rgba(239,68,68,0.25)' : 'rgba(244,114,182,0.2)'}` }}>
+              <div style={{ fontSize: 10, color: '#f472b6', fontWeight: 700 }}>
+                Потеря скорости: {d.lossPct}% · {d.zone}
+              </div>
+              {d.e1RMByVelocity != null && (
+                <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>e1RM по скорости (последний повтор): {d.e1RMByVelocity} кг</div>
+              )}
+              {d.exceeded && d.suggestedPhase && (
+                <div style={{ marginTop: 4, fontSize: 10, color: '#fbbf24', lineHeight: 1.4 }}>
+                  ⚠ Отказ близко — вероятная слабая фаза «{PHASE_RU[d.suggestedPhase] || d.suggestedPhase}» (максимальный момент). Коррекции ниже.
+                </div>
+              )}
+              {vbtSticking && vbtSticking.items.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  {vbtSticking.items.slice(0, 3).map((item, idx) => (
+                    <ExerciseRow key={idx} item={item} selected={selected[`${lift}|vbt|${d.suggestedPhase}`]?.includes(item.exercise.name) ?? false}
+                      onToggle={() => toggleExercise(`${lift}|vbt|${d.suggestedPhase}`, item.exercise.name)} onAdd={() => addToPlan(`${lift}|vbt|${d.suggestedPhase}`, [item.exercise.name])} />
+                  ))}
+                  <button onClick={() => addToPlan(`${lift}|vbt|${d.suggestedPhase}`, vbtSticking!.items.slice(0, 3).map(i => i.exercise.name))} style={{ ...btn, marginTop: 5, background: 'rgba(244,114,182,0.12)', color: '#f472b6', border: '1px solid rgba(244,114,182,0.3)' }}>➕ Добавить коррекции VBT в план</button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
+
       {/* ═══ 4. Движение штанги (bar-path) ═══ */}
       {applicableIssues.length > 0 && (
         <div style={CARD}>
@@ -610,10 +678,24 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
               return <button key={issue} onClick={() => toggleIssue(issue)} style={{ minHeight: 34, padding: '5px 8px', borderRadius: 7, cursor: 'pointer', border: on ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(168,85,247,0.14)' : 'transparent', color: on ? '#c084fc' : DIM, fontSize: 10 }}>{ISSUE_RU[issue]}</button>;
             })}
           </div>
+          {issues.includes('asymmetric') && (
+            <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>⚖️ Какая сторона слабее? (для подбора унилатеральной работы)</div>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {(['left', 'right'] as const).map(side => {
+                  const on = asymSide === side;
+                  return <button key={side} onClick={() => setAsymSide(cur => cur === side ? null : side)} style={{ minHeight: 30, padding: '4px 12px', borderRadius: 7, cursor: 'pointer', border: on ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: on ? 'rgba(168,85,247,0.18)' : 'transparent', color: on ? '#c084fc' : DIM, fontSize: 10, fontWeight: 700 }}>{side === 'left' ? 'Левая' : 'Правая'}{on ? ' ✓' : ''}</button>;
+                })}
+              </div>
+            </div>
+          )}
           <BarPathSvg lift={lift} issues={issues} onIssue={toggleIssue} onPhase={p => setPhase(p)} activePhase={effectivePhase} phases={phases} />
           {barPath && barPath.diagnoses.map(item => (
             <div key={item.issue} style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#c084fc' }}>{ISSUE_RU[item.issue]}{item.relatedPhase ? ` · связана с фазой ${item.relatedPhase}` : ''}</div>
+              {item.issue === 'asymmetric' && asymSide && (
+                <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>⚖️ Слабее: {asymSide === 'left' ? 'левая' : 'правая'} сторона → приоритет унилатеральной работе (выпады, тяга гантели одной рукой, болгарские сплит-приседы).</div>
+              )}
               <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{item.cause} <span style={{ color: ACCENT }}>→ {item.correction}</span></div>
               <div style={{ marginTop: 4 }}>
                 {issueAnalyses[item.issue]?.items.map((a, idx) => (

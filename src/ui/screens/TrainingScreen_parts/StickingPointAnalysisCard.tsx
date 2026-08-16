@@ -9,6 +9,10 @@ interface LiftFailureData {
   lift: Lift;
   label: string;
   currentMax: number;
+  /** Лучший e1RM в предыдущем 28-дневном окне (тренд). 0 = нет данных. */
+  priorMax: number;
+  /** Δ% (currentMax − priorMax) / priorMax × 100; null если priorMax = 0. */
+  e1rmDeltaPct: number | null;
   totalFailedSets: number;
   failureRate: number;
   likelyPhase: WeakPoint | null;
@@ -16,17 +20,26 @@ interface LiftFailureData {
   sumoHardSets: number;
 }
 
+const TREND_WINDOW_DAYS = 28;
+
 function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): LiftFailureData | null {
   const phaseCounts: Record<string, number> = {};
   let totalHard = 0;
   let sumoHard = 0;
   let currentMax = 0;
+  let priorMax = 0;
   let hasLift = false;
+  // Окна по датам: текущее (0..28 дн) и предыдущее (28..56 дн) от последней сессии.
+  const dated = sessions.filter(w => w && typeof w.date === 'string' && !Number.isNaN(Date.parse(w.date)));
+  const maxDate = dated.length > 0 ? dated.reduce((m, w) => Math.max(m, Date.parse(w.date)), 0) : 0;
+  const ageOf = (date: string): number => maxDate > 0 ? Math.max(0, Math.floor((maxDate - Date.parse(date)) / 86400000)) : 0;
   sessions.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     if (!aliases.some(a => en.includes(a))) return;
     hasLift = true;
     const isSumo = lift === 'deadlift' && /сумо|sumo/.test(en);
+    const age = ageOf(w.date ?? '');
+    const isPrior = age >= TREND_WINDOW_DAYS && age < TREND_WINDOW_DAYS * 2;
     (e.sets || []).forEach((s: any) => {
       const weight = s.weight || 0;
       const reps = s.reps || 0;
@@ -34,7 +47,10 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
       // Конвертируем RIR→RPE (RPE = 10 − RIR), чтобы тяжёлые подходы определялись корректно.
       const rpe = (s.rpe && s.rpe > 0) ? s.rpe : (s.rir != null ? 10 - s.rir : 0);
       const e1rm = epley1RM(weight, reps);
-      if (Number.isFinite(e1rm) && e1rm > currentMax) currentMax = Math.round(e1rm);
+      if (Number.isFinite(e1rm)) {
+        if (isPrior && e1rm > priorMax) priorMax = Math.round(e1rm);
+        else if (!isPrior && e1rm > currentMax) currentMax = Math.round(e1rm);
+      }
       // Тяжёлый подход (RPE ≥ 8 / низкие повторы без RPE): кандидат в срыв.
       const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0);
       if (!isHard) return;
@@ -67,6 +83,8 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
   return {
     lift, label: labels[lift] || lift,
     currentMax,
+    priorMax,
+    e1rmDeltaPct: priorMax > 0 ? Math.round(((currentMax - priorMax) / priorMax) * 1000) / 10 : null,
     totalFailedSets: totalHard,
     failureRate: totalSets > 0 ? Math.round((totalHard / totalSets) * 100) : 0,
     likelyPhase,
@@ -151,6 +169,14 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
             <span style={{ color: 'var(--text-dim)' }}>Текущий максимум:</span>
             <span style={{ fontWeight: 600, color: '#00e68a' }}>{active.currentMax} кг</span>
           </div>
+          {active.e1rmDeltaPct != null && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10 }}>
+              <span style={{ color: 'var(--text-dim)' }}>e1RM-тренд (28 дн):</span>
+              <span style={{ fontWeight: 600, color: active.e1rmDeltaPct <= -5 ? '#ef4444' : active.e1rmDeltaPct <= 1 ? '#f59e0b' : '#22c55e' }}>
+                {active.e1rmDeltaPct > 0 ? '▲ +' : active.e1rmDeltaPct < 0 ? '▼ ' : '→ '}{active.e1rmDeltaPct}% ({active.priorMax} кг)
+              </span>
+            </div>
+          )}
           {active.totalFailedSets > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 10 }}>
               <span style={{ color: 'var(--text-dim)' }}>Тяжёлых подходов (RPE≥8):</span>

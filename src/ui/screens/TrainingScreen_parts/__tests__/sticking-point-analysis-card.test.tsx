@@ -91,4 +91,23 @@ describe('StickingPointAnalysisCard (полный инструмент по дн
       window.dispatchEvent = orig;
     }
   });
+
+  it('e1RM-тренд: падение за 28 дней показывает ▼ и %', () => {
+    const sessions = [
+      wl('2026-06-15', [{ name: 'Приседания со штангой', sets: [{ weight: 150, reps: 3, rir: 1, rpe: 9 }] }]),
+      wl('2026-07-15', [{ name: 'Приседания со штангой', sets: [{ weight: 140, reps: 3, rir: 1, rpe: 9 }] }]),
+    ];
+    render(<StickingPointAnalysisCard sessions={sessions} />);
+    expect(screen.getByText(/e1RM-тренд \(28 дн\):/)).toBeTruthy();
+    expect(screen.getByText(/▼ -6/)).toBeTruthy();
+  });
+
+  it('e1RM-тренд: рост показывает ▲ без тревоги', () => {
+    const sessions = [
+      wl('2026-06-15', [{ name: 'Жим штанги лёжа', sets: [{ weight: 90, reps: 3, rir: 1, rpe: 9 }] }]),
+      wl('2026-07-15', [{ name: 'Жим штанги лёжа', sets: [{ weight: 100, reps: 3, rir: 1, rpe: 9 }] }]),
+    ];
+    render(<StickingPointAnalysisCard sessions={sessions} />);
+    expect(screen.getByText(/▲ \+11/)).toBeTruthy();
+  });
 });
