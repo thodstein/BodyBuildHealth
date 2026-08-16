@@ -19,6 +19,7 @@ import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engine
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { TaperCoachCard } from './TaperCoachCard';
+import { usePLTaper } from './taper-state';
 
 const BTN: React.CSSProperties = { background: '#00e68a', color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: '#00e68a', border: '1px solid var(--accent-dim)' };
@@ -37,32 +38,6 @@ export interface PLCompetitionTabApi {
   setBuiltSrc: (p: LMSBuildOutput) => void;
   /** Показать сообщение пользователю (methodNote). */
   onNote: (m: string) => void;
-  taper: {
-    meetList: PLMeetListItem[];
-    setMeetList: (fn: (cur: PLMeetListItem[]) => PLMeetListItem[]) => void;
-    mainMeetId: string;
-    setMainMeetId: (id: string) => void;
-    applyMainMeet: (m: PLMeetListItem) => void;
-    addMeet: () => void;
-    removeMeet: (id: string) => void;
-    bw: number; setBw: (v: number) => void;
-    targetBw: number; setTargetBw: (v: number) => void;
-    weeksToMeet: number; setWeeksToMeet: (v: number) => void;
-    taperWeeksToAdd: number; setTaperWeeksToAdd: (v: number) => void;
-    attemptStrategy: MeetStrategy; setAttemptStrategy: (v: MeetStrategy) => void;
-    peakMode: TaperMode; setPeakMode: (v: TaperMode) => void;
-    peakLayout: PeakWeekLayout; setPeakLayout: (v: PeakWeekLayout) => void;
-    taperWeightGoal: TaperWeightGoal; setTaperWeightGoal: (v: TaperWeightGoal) => void;
-    taperFed: string; setTaperFed: (v: string) => void;
-    taperActualPm: Record<string, number>; setTaperActualPm: (fn: (p: Record<string, number>) => Record<string, number>) => void;
-    taperPlannedPm: Record<string, number>; setTaperPlannedPm: (fn: (p: Record<string, number>) => Record<string, number>) => void;
-    taperAttemptOverride: Record<string, number[]>; setTaperAttemptOverride: (fn: (cur: Record<string, number[]>) => Record<string, number[]>) => void;
-    mockMeetOn: boolean; setMockMeetOn: (fn: (v: boolean) => boolean) => void;
-    meetWeekOn: boolean; setMeetWeekOn: (fn: (v: boolean) => boolean) => void;
-    postMeetOn: boolean; setPostMeetOn: (fn: (v: boolean) => boolean) => void;
-    taperNote: string; setTaperNote: (v: string) => void;
-    taperPlan: LMSBuildOutput | null; setTaperPlan: (p: LMSBuildOutput | null) => void;
-  };
   cycle: {
     peds: PED[];
     pedDoses: Record<string, number>;
@@ -84,9 +59,10 @@ export interface PLCompetitionTabApi {
 
 export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }) => {
   const { builtSrc, setBuiltSrc, onNote } = api;
-  const t = api.taper;
   const cyc = api.cycle;
   const coach = api.coach;
+  // 🏁 Тапер-state (сезон/параметры/прикиды/mock/meet/пост) — из контекста (taper-state.tsx).
+  const t = usePLTaper();
   const {
     meetList, setMeetList, mainMeetId, setMainMeetId, applyMainMeet, addMeet, removeMeet,
     bw, setBw, targetBw, setTargetBw, weeksToMeet, setWeeksToMeet,

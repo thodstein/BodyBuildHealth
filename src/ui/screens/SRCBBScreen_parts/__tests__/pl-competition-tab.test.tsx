@@ -11,22 +11,6 @@ const api = (): PLCompetitionTabApi => ({
   builtSrc: null,
   setBuiltSrc: () => {},
   onNote: () => {},
-  taper: {
-    meetList: [{ id: 'm1', name: 'Шоу 1', weeksToStart: 8, fed: 'ipf', plannedPm: { 'Присед': 200 }, strategy: 'balanced' }],
-    setMeetList: () => {},
-    mainMeetId: 'm1', setMainMeetId: () => {},
-    applyMainMeet: () => {}, addMeet: () => {}, removeMeet: () => {},
-    bw: 82, setBw: () => {}, targetBw: 80, setTargetBw: () => {},
-    weeksToMeet: 8, setWeeksToMeet: () => {}, taperWeeksToAdd: 2, setTaperWeeksToAdd: () => {},
-    attemptStrategy: 'balanced', setAttemptStrategy: () => {},
-    peakMode: 'classic', setPeakMode: () => {}, peakLayout: 'attempts', setPeakLayout: () => {},
-    taperWeightGoal: 'auto', setTaperWeightGoal: () => {},
-    taperFed: 'ipf', setTaperFed: () => {},
-    taperActualPm: {}, setTaperActualPm: () => {}, taperPlannedPm: {}, setTaperPlannedPm: () => {},
-    taperAttemptOverride: {}, setTaperAttemptOverride: () => {},
-    mockMeetOn: true, setMockMeetOn: () => {}, meetWeekOn: true, setMeetWeekOn: () => {}, postMeetOn: true, setPostMeetOn: () => {},
-    taperNote: '', setTaperNote: () => {}, taperPlan: null, setTaperPlan: () => {},
-  },
   cycle: {
     peds: [], pedDoses: {}, courseIntensity: 'moderate', pedAuto: false,
     autoRegMode: 'off', autoRegResult: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never,
@@ -43,7 +27,7 @@ describe('PLCompetitionTab', () => {
   it('рендерит сезон, параметры и тренерскую карточку', () => {
     render(<PLCompetitionTab api={api()} />);
     expect(screen.getByText(/Соревнования сезона \+ тапер/)).toBeTruthy();
-    expect(screen.getByDisplayValue('Шоу 1')).toBeTruthy();
+    expect(screen.getByDisplayValue('Соревнование 1')).toBeTruthy();
     expect(screen.getByText(/Стратегия прикидов/)).toBeTruthy();
     expect(screen.getByText(/Подобрать тапер автоматически/)).toBeTruthy();
     expect(screen.getAllByText(/Сгенерировать тапер-план/).length).toBeGreaterThan(0);

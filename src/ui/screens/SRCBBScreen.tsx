@@ -25,6 +25,7 @@ import { AutoregPanel } from './SRCBBScreen_parts/AutoregPanel';
 import { PeakingPanel } from './SRCBBScreen_parts/PeakingPanel';
 import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
+import { PLTaperProvider, usePLTaper } from './SRCBBScreen_parts/taper-state';
 import { RecoveryPanel } from './SRCBBScreen_parts/RecoveryPanel';
 import { ExerciseSafetyPanel } from './SRCBBScreen_parts/ExerciseSafetyPanel';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
@@ -104,7 +105,19 @@ function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanM
   };
 }
 
-export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
+export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) => {
+  // Обёртка: предоставляет тапер-state (сезон/параметры/прикиды) через контекст —
+  // SRCBBScreen и вкладка «🏁 Соревнования» читают его без пропс-дриллинга.
+  const _saved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
+  const _prof = (() => { try { return loadTrainingProfile(); } catch { return {} as ReturnType<typeof loadTrainingProfile>; } })();
+  return (
+    <PLTaperProvider saved={_saved} profBodyWeight={_prof.bodyWeight}>
+      <SRCBBScreenInner {...props} />
+    </PLTaperProvider>
+  );
+};
+
+const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
     pl: [['plan', '📋 План цикла'], ['competition', '🏁 Соревнования'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['autoreg', '🧠 Авторегуляция'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность']].map(([k, l]) => ({ key: k, label: l })),
@@ -139,11 +152,21 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     // панель строила ПЛ-макроцикл, а «Применить» не находило цикл в блоке.
     setMacroGoal(mainTab === 'bb' ? 'bodybuilding' : (dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'));
   }, [dir, mainTab]);
-  const [bw, setBw] = useState<number>(_plSaved?.plBw ?? _profPL.bodyWeight ?? 85);
   const [days, setDays] = useState<number>(_plSaved?.plDays ?? 3);
   const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
   const [pmBench, setPmBench] = useState<number>(_plSaved?.pmBench ?? _profPL.pmBench ?? 100);
   const [pmDead, setPmDead] = useState<number>(_plSaved?.pmDead ?? _profPL.pmDead ?? 140);
+  // 🏁 Тапер-state (сезон/параметры/прикиды/mock/meet/пост/тапер-план) — из хука+контекста.
+  const {
+    bw, setBw, targetBw, setTargetBw, weeksToMeet, setWeeksToMeet,
+    taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
+    peakMode, setPeakMode, peakLayout, setPeakLayout, taperWeightGoal, setTaperWeightGoal,
+    taperFed, setTaperFed, taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
+    taperAttemptOverride, setTaperAttemptOverride,
+    mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
+    taperNote, setTaperNote, taperPlan, setTaperPlan,
+    meetList, setMeetList, mainMeetId, setMainMeetId, applyMainMeet, addMeet, removeMeet,
+  } = usePLTaper();
   const [exercisePMs, setExercisePMs] = useState<Record<string, number>>(_plSaved?.exercisePMs ?? {});
   const initExercisePMs = (cycleId: string) => {
     const tpl = getCycleById(cycleId);
@@ -216,74 +239,8 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
     return saved || 'cycle-01';
   });
   const [cycleWeeks, setCycleWeeks] = useState<number>(_plSaved?.cycleWeeks ?? 12);
-  // 🏁 Соревнование + тапер: целевой вес (категория), недель до соревнования, тапер-недель к активному циклу.
-  const [targetBw, setTargetBw] = useState<number>(_plSaved?.plTargetBw ?? bw);
-  const [weeksToMeet, setWeeksToMeet] = useState<number>(_plSaved?.plWeeksToMeet ?? 8);
-  const [taperWeeksToAdd, setTaperWeeksToAdd] = useState<number>(_plSaved?.plTaperWeeksToAdd ?? 2);
-  const [taperNote, setTaperNote] = useState<string>(_plSaved?.plTaperNote ?? '');
-  // Стратегия прикидов соревновательного дня (выход на пик: агрессивная — 93/97/105%).
-  const [attemptStrategy, setAttemptStrategy] = useState<MeetStrategy>(_plSaved?.plAttemptStrategy ?? 'balanced');
-  // Имитация соревнований (mock meet) — прикиды-синглы за 10-14 дней до старта.
-  const [mockMeetOn, setMockMeetOn] = useState<boolean>(_plSaved?.plMockMeet ?? false);
-  // Неделя соревнований в конце тапера — прикиды как подходы дня старта (по умолчанию ВКЛ: план готов полностью).
-  const [meetWeekOn, setMeetWeekOn] = useState<boolean>(_plSaved?.plMeetWeek ?? true);
-  // 🏁 Данные к соревнованиям (тапер строится под РАЗНИЦУ ПМ):
-  // фактический ПМ после цикла (реально поднятый) и планируемый ПМ в федерации.
-  const [taperActualPm, setTaperActualPm] = useState<Record<string, number>>(_plSaved?.plTaperActualPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
-  const [taperPlannedPm, setTaperPlannedPm] = useState<Record<string, number>>(_plSaved?.plTaperPlannedPm ?? { 'Присед': 0, 'Жим лежа': 0, 'Становая тяга': 0 });
-  const [taperFed, setTaperFed] = useState<string>(_plSaved?.plTaperFed ?? 'fpr');
-  // Ручная корректировка прикидов: { имя лифта: [опенер, вторая, третья] } (если задано — перекрывает расчёт)
-  const [taperAttemptOverride, setTaperAttemptOverride] = useState<Record<string, number[]>>({});
-  // 🏁 Несколько соревнований сезона с выбором ГЛАВНОГО (по главному строится тапер-план).
-  interface MeetListItem { id: string; name: string; weeksToStart: number; fed: string; plannedPm: Record<string, number>; strategy: MeetStrategy }
-  const [meetList, setMeetList] = useState<MeetListItem[]>(() => {
-    const saved = _plSaved?.plMeetList as MeetListItem[] | undefined;
-    if (Array.isArray(saved) && saved.length > 0) return saved;
-    return [{ id: 'm1', name: 'Соревнование 1', weeksToStart: weeksToMeet, fed: taperFed, plannedPm: { ...taperPlannedPm }, strategy: attemptStrategy }];
-  });
-  const [mainMeetId, setMainMeetId] = useState<string>((_plSaved?.plMainMeetId as string) ?? 'm1');
-  const mainMeet = meetList.find(m => m.id === mainMeetId) ?? meetList[0];
-  // Синхронизация: локальные поля = главное соревнование.
-  const applyMainMeet = (m: MeetListItem) => {
-    setWeeksToMeet(m.weeksToStart);
-    setTaperFed(m.fed);
-    setTaperPlannedPm({ ...m.plannedPm });
-    setAttemptStrategy(m.strategy);
-  };
-  const updateMainMeet = (patch: Partial<MeetListItem>) => {
-    setMeetList(cur => cur.map(m => m.id === mainMeetId ? { ...m, ...patch } : m));
-  };
-  const addMeet = () => {
-    const last = meetList[meetList.length - 1];
-    const id = 'm' + Date.now();
-    const item: MeetListItem = {
-      id,
-      name: `Соревнование ${meetList.length + 1}`,
-      weeksToStart: (last?.weeksToStart ?? 8) + 6,
-      fed: last?.fed ?? 'fpr',
-      plannedPm: { ...(last?.plannedPm ?? {}) },
-      strategy: last?.strategy ?? 'balanced',
-    };
-    setMeetList(cur => [...cur, item]);
-  };
-  const removeMeet = (id: string) => {
-    setMeetList(cur => cur.length <= 1 ? cur : cur.filter(m => m.id !== id));
-    if (id === mainMeetId) {
-      const next = meetList.find(m => m.id !== id);
-      if (next) { setMainMeetId(next.id); applyMainMeet(next); }
-    }
-  };
-  // Режим пика (канон lms-taper.engine): classic — разгрузка Bosquet;
-  // pl — 3-нед ПЛ-пик-протокол Библиотеки; pro — усталость-зависимая кривая.
-  const [peakMode, setPeakMode] = useState<TaperMode>(_plSaved?.plPeakMode ?? 'pl');
-  // Весовая цель тапера: сгонка к категории (объём ×0.9) / набор / стабильно / авто.
-  const [taperWeightGoal, setTaperWeightGoal] = useState<TaperWeightGoal>(_plSaved?.plTaperWeightGoal ?? 'auto');
-  // Раскладка финальной недели: прикиды или только разминка (контрольные старты).
-  const [peakLayout, setPeakLayout] = useState<PeakWeekLayout>(_plSaved?.plPeakLayout ?? 'attempts');
-  // Пост-соревновательная неделя после meet week.
-  const [postMeetOn, setPostMeetOn] = useState<boolean>(_plSaved?.plPostMeetOn ?? true);
   // 📋 Тапер-план: ОТДЕЛЬНАЯ свёрнутая карточка (не встраивается в weeks цикла).
-  const [taperPlan, setTaperPlan] = useState<LMSBuildOutput | null>(null);
+  // (state — в taper-state.tsx через usePLTaper())
   // Календарь мезоцикла: показывать оригинальный цикл или с учётом тапера.
   const [calendarView, setCalendarView] = useState<'original' | 'tapered'>('tapered');
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
@@ -2527,17 +2484,6 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
         builtSrc,
         setBuiltSrc: p => setBuiltSrc(p),
         onNote: setMethodNote,
-        taper: {
-          meetList, setMeetList, mainMeetId, setMainMeetId, applyMainMeet, addMeet, removeMeet,
-          bw, setBw, targetBw, setTargetBw, weeksToMeet, setWeeksToMeet,
-          taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
-          peakMode, setPeakMode, peakLayout, setPeakLayout, taperWeightGoal, setTaperWeightGoal,
-          taperFed, setTaperFed,
-          taperActualPm, setTaperActualPm, taperPlannedPm, setTaperPlannedPm,
-          taperAttemptOverride, setTaperAttemptOverride,
-          mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
-          taperNote, setTaperNote, taperPlan, setTaperPlan,
-        },
         cycle: {
           peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult,
           plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead,
