@@ -1,0 +1,351 @@
+/**
+ * annual-training-engine.test.ts — годовой план, собранный по конструкторам.
+ * Покрывает: ключи/хэши, создание плана из макро, синхронизацию (stale),
+ * сборку блоков ПЛ/ББ/ручной, taper-идемпотентность, пик-неделю ББ,
+ * композицию года.
+ */
+import { describe, it, expect } from 'vitest';
+import {
+  stableHash, macroBlockKey, blockKindFromMacro, isBBMacroShape,
+  annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
+  composeAnnualProgram, applyBlockTaperToWeeks,
+  directionFromKinds, planStatusFromBlocks, defaultConfigForRef,
+} from '../block-builders.engine';
+import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
+import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
+
+const CYCLE_ID = LMS_CYCLES[0]?.meta.id ?? 'cycle_unknown';
+
+function makePLMacro(overrides: Partial<MacroBlock>[] = []): Macrocycle {
+  const base: MacroBlock[] = [
+    { phase: 'endurance', weeks: 8, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'Выносливость' },
+    { phase: 'strength', weeks: 8, weekOffset: 9, kind: 'BB', description: 'Силовой BB' },
+    { phase: 'peak', weeks: 2, weekOffset: 17, kind: 'SRC', cycleId: CYCLE_ID, description: 'Пик' },
+    { phase: 'competition', weeks: 1, weekOffset: 19, kind: 'SRC', description: 'Старт' },
+    { phase: 'transition', weeks: 2, weekOffset: 20, kind: 'SRC', cycleId: CYCLE_ID, description: 'Переход' },
+  ];
+  const blocks = overrides.length > 0 ? base.map((b, i) => ({ ...b, ...(overrides[i] ?? {}) })) : base;
+  return { blocks, totalWeeks: 21, rationale: [] };
+}
+
+function makeBBMacro(): BBMacrocycle {
+  return {
+    blocks: [
+      { phase: 'hypertrophy', weeks: 8, weekOffset: 1, description: 'Гипертрофия', trainingFocus: 'hypertrophy' },
+      { phase: 'strength', weeks: 4, weekOffset: 9, description: 'Сила', trainingFocus: 'strength' },
+      { phase: 'contest_prep', weeks: 6, weekOffset: 13, description: 'Prep', trainingFocus: 'endurance' },
+      { phase: 'transition', weeks: 2, weekOffset: 19, description: 'Переход', trainingFocus: 'hypertrophy' },
+    ],
+    totalWeeks: 20,
+    trainingFocus: 'hypertrophy',
+    rationale: [],
+  };
+}
+
+const PEAK_CFG = {
+  sex: 'male', category: 'mens_physique', weightKg: 80,
+  experienceLevel: 'intermediate', enhanced: false, prepCount: 1,
+  showDate: '2026-09-01', weeksOut: 3,
+  trainingProtocol: 'bb', carbLoadStrategy: 'moderate',
+  waterStrategy: 'minimal', sodiumStrategy: 'constant',
+};
+
+const DEFAULT_OPTS = { daysPerWeek: 4, level: 'intermediate' };
+
+describe('ключи и хэши', () => {
+  it('stableHash: детерминирован и чувствителен к изменениям', () => {
+    expect(stableHash({ a: 1, b: [2, 3] })).toBe(stableHash({ a: 1, b: [2, 3] }));
+    expect(stableHash({ a: 1 })).not.toBe(stableHash({ a: 2 }));
+    expect(stableHash({ a: 1, b: 2 })).not.toBe(stableHash({ b: 2, a: 1 }));
+  });
+
+  it('macroBlockKey: изменение layout меняет ключ', () => {
+    const block: MacroBlock = { phase: 'strength', weeks: 8, weekOffset: 9, kind: 'SRC', cycleId: CYCLE_ID, description: '' };
+    expect(macroBlockKey(block, 1)).toBe(macroBlockKey(block, 1));
+    expect(macroBlockKey({ ...block, weeks: 9 }, 1)).not.toBe(macroBlockKey(block, 1));
+    expect(macroBlockKey({ ...block, cycleId: 'other' }, 1)).not.toBe(macroBlockKey(block, 1));
+  });
+
+  it('blockKindFromMacro: SRC→PL, BB→BB', () => {
+    expect(blockKindFromMacro({ phase: 'strength', weeks: 4, weekOffset: 1, kind: 'SRC', description: '' })).toBe('PL');
+    expect(blockKindFromMacro({ phase: 'strength', weeks: 4, weekOffset: 1, kind: 'BB', description: '' })).toBe('BB');
+  });
+
+  it('isBBMacroShape: по trainingFocus', () => {
+    expect(isBBMacroShape(makeBBMacro())).toBe(true);
+    expect(isBBMacroShape(makePLMacro())).toBe(false);
+  });
+
+  it('directionFromKinds / planStatusFromBlocks', () => {
+    expect(directionFromKinds(['PL', 'PL'])).toBe('pl');
+    expect(directionFromKinds(['BB'])).toBe('bb');
+    expect(directionFromKinds(['PL', 'BB'])).toBe('mixed');
+    expect(planStatusFromBlocks([{ status: 'unbuilt' } as any])).toBe('draft');
+    expect(planStatusFromBlocks([{ status: 'built' } as any])).toBe('built');
+    expect(planStatusFromBlocks([{ status: 'built' } as any, { status: 'unbuilt' } as any])).toBe('partial');
+    expect(planStatusFromBlocks([{ status: 'stale' } as any])).toBe('stale');
+  });
+});
+
+describe('создание плана из макро', () => {
+  it('PL-макро: kind из блоков, direction mixed, все unbuilt', () => {
+    const plan = annualPlanFromMacro(makePLMacro());
+    expect(plan.totalWeeks).toBe(21);
+    expect(plan.blocks).toHaveLength(5);
+    expect(plan.blocks.map(b => b.ref.kind)).toEqual(['PL', 'BB', 'PL', 'PL', 'PL']);
+    expect(plan.direction).toBe('mixed');
+    expect(plan.status).toBe('draft');
+    expect(plan.blocks.every(b => b.status === 'unbuilt')).toBe(true);
+    expect(plan.macroRef?.source).toBe('pl');
+  });
+
+  it('BB-макро: все блоки BB, cycleId не подставляется', () => {
+    const plan = annualPlanFromMacro(makeBBMacro());
+    expect(plan.direction).toBe('bb');
+    expect(plan.blocks.every(b => b.ref.kind === 'BB')).toBe(true);
+    expect(plan.blocks.every(b => !b.ref.cycleId)).toBe(true);
+    expect(plan.macroRef?.source).toBe('bb');
+  });
+
+  it('defaultConfigForRef: PL-блок получает cycleId по умолчанию', () => {
+    const ref = { blockKey: 'k', blockIndex: 0, kind: 'PL' as const, phase: 'peak', startWeek: 17, weeks: 2, cycleId: CYCLE_ID };
+    expect(defaultConfigForRef(ref).cycleId).toBe(CYCLE_ID);
+    expect(defaultConfigForRef({ ...ref, kind: 'BB' as const, cycleId: undefined }).cycleId).toBeUndefined();
+  });
+});
+
+describe('синхронизация и stale', () => {
+  it('layout не изменился → статус и результат сохраняются', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    const synced = syncAnnualPlan({ ...plan, blocks: [built, ...plan.blocks.slice(1)] }, macro);
+    expect(synced.blocks[0].status).toBe('built');
+    expect(synced.blocks[0].result).toEqual(built.result);
+  });
+
+  it('layout изменился (недели) → статус stale, результат НЕ перезаписан', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    plan.blocks[0].status = 'built';
+    const savedResult = { blockKey: plan.blocks[0].ref.blockKey, kind: 'PL' as const, weeks: [], program: null, bbPlan: null, warnings: [], taperApplied: false, peakApplied: false, configHash: 'old' };
+    plan.blocks[0].result = savedResult;
+    const changed = makePLMacro([{ weeks: 10 }]);
+    const synced = syncAnnualPlan(plan, changed);
+    expect(synced.blocks[0].ref.weeks).toBe(10);
+    expect(synced.blocks[0].status).toBe('stale');
+    expect(synced.blocks[0].result).toEqual(savedResult);
+    expect(synced.status).toBe('stale');
+  });
+
+  it('конфиг изменён после сборки → stale', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, {});
+    expect(built.status).toBe('built');
+    const edited = { ...built, config: { ...built.config, taper: { enabled: true } } };
+    const synced = syncAnnualPlan({ ...plan, blocks: [edited, ...plan.blocks.slice(1)] }, macro);
+    expect(synced.blocks[0].status).toBe('stale');
+  });
+});
+
+describe('сборка блоков', () => {
+  it('PL-блок: СРЦ-цикл → недели с упражнениями + program.pl.sourceCycleId', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const state = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    expect(state.status).toBe('built');
+    expect(state.result!.weeks).toHaveLength(8);
+    const totalBlocks = state.result!.weeks.reduce((s, w) => s + w.sessions.reduce((ss, ses) => ss + ses.blocks.length, 0), 0);
+    expect(totalBlocks).toBeGreaterThan(0);
+    expect(state.result!.program?.pl?.sourceCycleId).toBe(CYCLE_ID);
+    expect(state.result!.weeks[0].phase).toBe('accumulation');
+  });
+
+  it('PL-блок без цикла: скелет + предупреждение, не ошибка', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const state = { ...plan.blocks[3], config: { ...plan.blocks[3].config, cycleId: undefined } };
+    const built = buildAnnualBlock(state, plan, macro, {});
+    expect(built.status).toBe('built');
+    expect(built.result!.warnings.some(w => w.includes('без СРЦ-цикла'))).toBe(true);
+    expect(built.result!.weeks).toHaveLength(1);
+  });
+
+  it('PL taper: финальная ×0.45/RIR+2, предпоследняя ×0.65/RIR+1, идемпотентно', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const block = plan.blocks[0];
+    const built = buildAnnualBlock({ ...block, config: { ...block.config, taper: { enabled: true } } }, plan, macro, DEFAULT_OPTS);
+    expect(built.result!.taperApplied).toBe(true);
+    const weeks = built.result!.weeks;
+    expect(weeks[7].sessions.some(s => s.blocks.some(b => b.note?.includes('[annual-taper:0.45]')))).toBe(true);
+    expect(weeks[6].sessions.some(s => s.blocks.some(b => b.note?.includes('[annual-taper:0.65]')))).toBe(true);
+    const twice = applyBlockTaperToWeeks(weeks, 2);
+    expect(twice).toEqual(weeks);
+  });
+
+  it('BB-блок: autodraft → недели длины блока + program.bb', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS);
+    expect(built.status).toBe('built');
+    expect(built.result!.weeks).toHaveLength(8);
+    expect(built.result!.program?.bb?.weeks).toHaveLength(8);
+    expect(built.result!.weeks[0].phase).toBe('intensification');
+    expect(built.result!.bbPlan).toBeTruthy();
+  });
+
+  it('BB-блок длиннее 16 недель: зацикливается без ошибки', () => {
+    const macro: Macrocycle = {
+      blocks: [{ phase: 'hypertrophy', weeks: 20, weekOffset: 1, kind: 'BB', description: 'длинный' }],
+      totalWeeks: 20, rationale: [],
+    };
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    expect(built.status).toBe('built');
+    expect(built.result!.weeks).toHaveLength(20);
+  });
+
+  it('BB пик-неделя: применяется к последней неделе contest_prep-блока', () => {
+    const macro = makeBBMacro();
+    const plan = annualPlanFromMacro(macro);
+    const state = plan.blocks[2];
+    const built = buildAnnualBlock({
+      ...state,
+      config: { ...state.config, peakWeek: true, peakConfig: PEAK_CFG as any },
+    }, plan, macro, DEFAULT_OPTS);
+    expect(built.status).toBe('built');
+    expect(built.result!.peakApplied).toBe(true);
+    expect(built.result!.weeks[5].phase).toBe('peaking');
+  });
+
+  it('MANUAL-блок: скелет фаз + копия структуры из блока-шаблона', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const bbBuilt = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS);
+    const planWithResult = { ...plan, blocks: [...plan.blocks] };
+    planWithResult.blocks[1] = bbBuilt; // сохранить результат шаблона в план
+    const manual: Macrocycle = {
+      blocks: [{ phase: 'transition', weeks: 3, weekOffset: 22, kind: 'SRC', cycleId: undefined as any, description: 'ручной' }],
+      totalWeeks: 24, rationale: [],
+    };
+    const manualPlan = annualPlanFromMacro(manual);
+    const state = {
+      ...manualPlan.blocks[0],
+      ref: { ...manualPlan.blocks[0].ref, kind: 'MANUAL' as const },
+      config: { daysPerWeek: 3, templateFromBlockKey: bbBuilt.ref.blockKey },
+    };
+    const planWithTemplate = { ...manualPlan, blocks: [state, ...planWithResult.blocks] };
+    const built = buildAnnualBlock(state, planWithTemplate as any, macro, {});
+    expect(built.status).toBe('built');
+    expect(built.result!.weeks).toHaveLength(3);
+    expect(built.result!.weeks[0].phase).toBe('deload');
+    expect(built.result!.weeks.some(w => w.sessions.some(s => s.blocks.length > 0))).toBe(true);
+    expect(built.result!.warnings.some(w => w.includes('скопирована'))).toBe(true);
+  });
+});
+
+describe('сборка года', () => {
+  it('собирает только unbuilt; второй запуск ничего не пересобирает', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const first = buildAnnualPlan(plan, macro, DEFAULT_OPTS);
+    expect(first.built).toBe(plan.blocks.length);
+    expect(first.failed).toBe(0);
+    expect(first.plan.status).toBe('built');
+    const second = buildAnnualPlan(first.plan, macro, DEFAULT_OPTS);
+    expect(second.built).toBe(0);
+    expect(second.skipped).toBe(plan.blocks.length);
+  });
+
+  it('rebuild=all пересобирает все блоки', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const first = buildAnnualPlan(plan, macro, DEFAULT_OPTS);
+    const all = buildAnnualPlan(first.plan, macro, { ...DEFAULT_OPTS, rebuild: 'all' });
+    expect(all.built).toBe(plan.blocks.length);
+    expect(all.skipped).toBe(0);
+  });
+
+  it('ошибка одного блока не ломает остальные (частичная сборка)', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const broken = { ...plan.blocks[2], ref: { ...plan.blocks[2].ref, kind: 'XXX' as any } };
+    // sync:false — собрать блоки «как есть» (оркестратор уже синхронизировал план).
+    const outcome = buildAnnualPlan(
+      { ...plan, blocks: [plan.blocks[0], broken] },
+      macro,
+      { ...DEFAULT_OPTS, sync: false } as any,
+    );
+    expect(outcome.built).toBe(1);
+    expect(outcome.failed).toBe(1);
+    expect(outcome.errors[0].blockKey).toBe(broken.ref.blockKey);
+    expect(outcome.plan.status).toBe('partial');
+    expect(outcome.plan.blocks[0].status).toBe('built');
+    expect(outcome.plan.blocks[1].status).toBe('error');
+  });
+
+  it('неизвестный kind блока → status error с понятным сообщением', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const state = { ...plan.blocks[0], ref: { ...plan.blocks[0].ref, kind: 'XXX' as any } };
+    const built = buildAnnualBlock(state, plan, macro, {});
+    expect(built.status).toBe('error');
+    expect(built.error).toContain('Неизвестный тип конструктора');
+  });
+});
+
+describe('композиция года', () => {
+  it('только BB → bb-программа с суммарными неделями', () => {
+    const macro = makeBBMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualPlan(plan, macro, DEFAULT_OPTS);
+    const prog = composeAnnualProgram(built.plan, 'Год ББ');
+    expect(prog!.meta.direction).toBe('bb');
+    expect(prog!.bb!.weeks).toHaveLength(20);
+    expect(prog!.meta.weeks).toBe(20);
+  });
+
+  it('смешанный год → hybrid: plRef из PL-блока + bbWeeks', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualPlan(plan, macro, DEFAULT_OPTS);
+    const prog = composeAnnualProgram(built.plan);
+    expect(prog!.meta.direction).toBe('hybrid');
+    expect(prog!.hybrid!.plRef.sourceCycleId).toBe(CYCLE_ID);
+    expect(prog!.hybrid!.bbWeeks).toHaveLength(21);
+  });
+
+  it('только PL → программа первого PL-блока со сводкой блоков', () => {
+    const macro: Macrocycle = {
+      blocks: [
+        { phase: 'endurance', weeks: 6, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'A' },
+        { phase: 'strength', weeks: 6, weekOffset: 7, kind: 'SRC', cycleId: CYCLE_ID, description: 'B' },
+      ],
+      totalWeeks: 12, rationale: [],
+    };
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualPlan(plan, macro, DEFAULT_OPTS);
+    const prog = composeAnnualProgram(built.plan);
+    expect(prog!.meta.direction).toBe('pl');
+    expect(prog!.pl!.sourceCycleId).toBe(CYCLE_ID);
+    expect(prog!.meta.weeks).toBe(12);
+    expect(prog!.pl!.notes).toContain('нед 1-6');
+  });
+
+  it('не собранные блоки → предупреждение в notes', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const one = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    const partialPlan = { ...plan, blocks: [one, ...plan.blocks.slice(1)] };
+    const prog = composeAnnualProgram(partialPlan);
+    expect(prog!.meta.notes).toContain('не собран');
+  });
+
+  it('нет собранных блоков → null', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    expect(composeAnnualProgram(plan)).toBeNull();
+  });
+});

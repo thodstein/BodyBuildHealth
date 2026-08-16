@@ -31,6 +31,12 @@ import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines/pro/training-load.engine';
 import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardio.engine';
+import {
+  annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
+  composeAnnualProgram, planStatusFromBlocks,
+} from '../../../engines/annual-training/block-builders.engine';
+import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
+import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 
 /** Кардио-фазы (кардио-слой в «Итог года»). */
 const CARDIO_PHASE_LABEL_RU: Record<string, string> = {
@@ -450,6 +456,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [copyFlash, setCopyFlash] = useState(false);
   // Статус «📦 Весь год → программа».
   const [yearNote, setYearNote] = useState<string | null>(null);
+  // 🧩 Годовой план по конструкторам (состояния блоков ПЛ/ББ/ручной + результат сборки).
+  const [annualPlan, setAnnualPlan] = useState<AnnualTrainingPlan | null>(() => loadAnnualTrainingPlan());
+  const [annualStatusNote, setAnnualStatusNote] = useState<string | null>(null);
   // 🎭 Пик-неделя (тапер ББ): развёрнутый протокол в карточке prep-блока + применение в сборщике.
   const [peakWeekOpen, setPeakWeekOpen] = useState(false);
   const [builderPeakWeek, setBuilderPeakWeek] = useState(true);
@@ -768,6 +777,66 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
       setBuilderMsg('🚀 План передан в ББ-авто — откройте шаг «План».');
     } catch { setBuilderMsg('Не удалось сохранить план в ББ-авто.'); }
+  };
+
+  // ── 🧩 Сборка года по конструкторам: каждый блок — своим конструктором ──
+  const currentMacroSource = () => (isBB ? bbMacro : macro);
+  // Авто-синхронизация состояния блоков с текущей макро-разметкой (без сборки):
+  // правка макро сразу подсвечивает «устаревшие» блоки, результат не теряется.
+  useEffect(() => {
+    const src = currentMacroSource();
+    if (!src) return;
+    try {
+      const existing = loadAnnualTrainingPlan();
+      const plan = existing ? syncAnnualPlan(existing, src) : annualPlanFromMacro(src);
+      setAnnualPlan(plan);
+    } catch { /* ignore */ }
+  }, [macro, bbMacro, isBB]);
+  const runAnnualBuild = (mode: 'all' | 'block' | 'export') => {
+    const src = currentMacroSource();
+    if (!src) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
+    try {
+      if (mode === 'export') {
+        const plan = loadAnnualTrainingPlan();
+        if (!plan || !plan.blocks.some(b => b.status === 'built' && b.result)) {
+          setAnnualStatusNote('⚠ Сначала соберите хотя бы один блок («📦 Собрать весь год» или «⚙️ Собрать блок»)');
+          return;
+        }
+        const prog = composeAnnualProgram(plan);
+        if (!prog) { setAnnualStatusNote('⚠ Не удалось собрать программу года'); return; }
+        applyToPlanner({ kind: 'program', label: prog.meta.title, data: { program: prog } });
+        setAnnualStatusNote(`✅ «${prog.meta.title}» передана в ручной конструктор — подтвердите в баннере «Калькулятор рекомендует»`);
+        return;
+      }
+      let plan = loadAnnualTrainingPlan() ?? annualPlanFromMacro(src);
+      if (mode === 'block') {
+        plan = syncAnnualPlan(plan, src);
+        if (selectedBlockIdx < 0 || selectedBlockIdx >= plan.blocks.length) {
+          setAnnualStatusNote('⚠ Выберите блок на таймлайне (клик по карточке блока)');
+          return;
+        }
+        const next = buildAnnualBlock(plan.blocks[selectedBlockIdx], plan, src, { daysPerWeek: 4, level: effLevel });
+        const blocks = plan.blocks.map((b, i) => (i === selectedBlockIdx ? next : b));
+        plan = saveAnnualTrainingPlan({ ...plan, blocks, status: planStatusFromBlocks(blocks), updatedAt: new Date().toISOString() });
+        setAnnualPlan(plan);
+        if (next.status === 'built') {
+          const warn = next.result?.warnings?.length ? ` · ⚠ ${next.result.warnings[0]}` : '';
+          setAnnualStatusNote(`✅ Блок «${next.ref.description ?? next.ref.phase}» собран (${next.ref.kind}${warn})`);
+        } else {
+          setAnnualStatusNote(`⚠ Блок не собран: ${next.error ?? 'неизвестная ошибка'}`);
+        }
+        return;
+      }
+      const outcome = buildAnnualPlan(plan, src, { daysPerWeek: 4, level: effLevel });
+      plan = saveAnnualTrainingPlan(outcome.plan);
+      setAnnualPlan(plan);
+      const parts = [`собрано +${outcome.built}`];
+      if (outcome.skipped) parts.push(`готовых пропущено ${outcome.skipped}`);
+      if (outcome.failed) parts.push(`ошибок ${outcome.failed}`);
+      setAnnualStatusNote(`📦 Годовой план: ${parts.join(' · ')}${outcome.failed ? ` (первая: ${outcome.errors[0]?.message})` : ''}`);
+    } catch (e) {
+      setAnnualStatusNote(`⚠ Сборка года: ${(e as Error).message}`);
+    }
   };
 
   // 📋 Копировать текстовую сводку макроцикла (буфер обмена, фоллбэк execCommand).
@@ -1665,6 +1734,60 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               </>
             )}
             </>
+          )}
+
+          {/* 🧩 Сборка года по конструкторам: каждый блок — своим конструктором (ПЛ/ББ/ручной) */}
+          {(isBB ? bbMacro : macro) && (
+            <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.22)' }} className="macrocycle-annual-build">
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>
+                🧩 Сборка года по конструкторам
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginBottom: 6 }}>
+                Каждый блок года собирается СВОИМ конструктором: ПЛ-блоки — СРЦ-циклами, ББ-блоки — ББ-авто, ручные — в редакторе. Собранные блоки не пересобираются без изменений; правка макро помечает блок «устарел».
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => runAnnualBuild('all')} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44, border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa' }}
+                  title="Собрать все несобранные/устаревшие блоки их конструкторами">
+                  📦 Собрать весь год
+                </button>
+                <button type="button" onClick={() => runAnnualBuild('block')} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                  title="Собрать выбранный блок его конструктором">
+                  ⚙️ Собрать блок
+                </button>
+                <button type="button" onClick={() => runAnnualBuild('export')} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                  title="Объединить собранные блоки в одну программу и передать в ручной конструктор">
+                  📥 В ручной режим
+                </button>
+              </div>
+              {annualPlan && (
+                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+                  {(() => {
+                    const built = annualPlan.blocks.filter(b => b.status === 'built').length;
+                    const stale = annualPlan.blocks.filter(b => b.status === 'stale').length;
+                    const errs = annualPlan.blocks.filter(b => b.status === 'error').length;
+                    return `Блоки: ${annualPlan.blocks.length} · ✅ ${built}${stale ? ` · ⚠ устарело ${stale}` : ''}${errs ? ` · ❌ ошибок ${errs}` : ''} · статус: ${annualPlan.status}`;
+                  })()}
+                  {annualPlan.blocks.map((b, i) => {
+                    const statusIcon = b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
+                    const kindIcon = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍';
+                    const note = b.status === 'stale' ? ' — изменился: пересоберите' : b.status === 'error' ? ` — ${b.error ?? 'ошибка'}` : b.status === 'unbuilt' ? ' — не собран' : '';
+                    return (
+                      <div key={b.ref.blockKey} onClick={() => setSelectedBlockIdx(i)} style={{ cursor: 'pointer', opacity: b.status === 'built' ? 1 : 0.75, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        {statusIcon} нед {b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1} · {b.ref.phase} · {kindIcon}{note}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {annualStatusNote && (
+                <div role="status" style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, fontSize: 11, lineHeight: 1.5,
+                  background: annualStatusNote.startsWith('⚠') ? 'rgba(245,158,11,0.08)' : 'rgba(0,230,138,0.08)',
+                  border: `1px solid ${annualStatusNote.startsWith('⚠') ? 'rgba(245,158,11,0.3)' : 'rgba(0,230,138,0.25)'}`,
+                  color: annualStatusNote.startsWith('⚠') ? '#f59e0b' : '#00e68a' }}>
+                  {annualStatusNote}
+                </div>
+              )}
+            </div>
           )}
 
           {/* 📊 Итог года: фазы с долями и прогресс-барами */}

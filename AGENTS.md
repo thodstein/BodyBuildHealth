@@ -1,5 +1,28 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Годовой план по конструкторам (Aug 16 2026, uncommitted)
+
+Целевая модель: **годовой план отвечает за КАЛЕНДАРЬ и КОМПОЗИЦИЮ, а не за генерацию тренировок** — каждый блок года собирается СВОИМ конструктором (ПЛ-блоки — СРЦ-циклами, ББ-блоки — ББ-авто, ручные — в редакторе), taper/peak накладываются внутри блока.
+
+### Движок `src/engines/annual-training/` (NEW, 4 файла)
+- **`annual-training.types.ts`**: `AnnualTrainingPlan` (id/version/totalWeeks/direction pl|bb|hybrid|mixed/macroRef/blocks/status draft|partial|built|stale), `AnnualBlockState` (ref + config + status unbuilt|built|stale|error + result + builtAt + error), `AnnualBlockRef` (blockKey/blockIndex/kind PL|BB|MANUAL/phase/startWeek/weeks/competitionId/cycleId), `AnnualBlockConfig` (cycleId/daysPerWeek/splitPattern/goal/level/trainingFocus/weakPoints/equipment/focusGroup/specialization/taper{enabled,weeks}/peakWeek/peakConfig/templateFromBlockKey), `AnnualBlockBuildResult` (weeks UserWeek[]/program/bbPlan/warnings/taperApplied/peakApplied/configHash), `AnnualBuildOptions` (+`sync?: boolean` — false: собирать блоки «как есть» без синхронизации).
+- **`block-builders.engine.ts`**: `stableHash` (FNV-1a), `macroBlockKey(block, idx)` (layout-поля + cycleId — изменение → новый ключ → stale), `annualPlanFromMacro(macro)` (kind: SRC→PL, BB→BB; BBMacrocycle→все BB), `syncAnnualPlan(plan, macro)` (**изменение layout/конфига НЕ перезаписывает результат — помечает 'stale'**; match по key, fallback по index), `buildAnnualBlock` (dispatch: PL→`cycleTemplateToFullProgram`→UserWeek+program.pl; BB→`autodraftBBPlan` (кап 16 нед → зацикливание), пик-неделя через `applyPeakWeekOverlayToBBPlan` на last week блока; MANUAL→скелет фаз `makeEmptySessionsForWeek` + копия структуры из `templateFromBlockKey`), `buildAnnualPlan` (sync → сборка только unbuilt/stale/error, `rebuild:'all'` — все; ошибки изолированы), `applyBlockPhaseToWeeks` (BB_PHASE_MOD/PL_PHASE_MOD: объём×mult, RIR в диапазон, transition→deload; **фаза применяется ОДИН раз на уровне недель** — без двойного применения), `applyBlockTaperToWeeks` (финальная ×0.45/RIR+2, предпоследние ×0.65/RIR+1; идемпотентно по метке `[annual-taper:N]`), `composeAnnualProgram` (только BB→bb-программа; PL+BB→hybrid c plRef+bbWeeks; только PL→первый PL-блок со сводкой; meta.notes = сводка + «не собран»-предупреждения), `mergeBlockWeeks` (перенумерация 1..totalWeeks).
+- **`annual-training-storage.ts`**: ключ `he_annual_training_plan_v1`; `save/load/removeAnnualTrainingPlan` (валидация формы `isAnnualTrainingPlanShape`), `migrateAnnualPlanFromMacroStorage` (he_bb_macro приоритетнее he_pl_macro; существующий годовой план приоритетнее макро).
+- `macrocycle.engine.ts` НЕ изменялся (сериализация v7/v8 — зона другого агента); связь блоков — производный `blockKey`.
+
+### UI (MacrocyclePanel.tsx)
+- Карточка **«🧩 Сборка года по конструкторам»** (после действий года, перед «Итог года»): кнопки «📦 Собрать весь год» / «⚙️ Собрать блок» (по `selectedBlockIdx`) / «📥 В ручной режим» (composeAnnualProgram → `applyToPlanner kind 'program'`); список блоков с иконками ✅/⚠/❌, kind (ПЛ/ББ/✍), «изменился: пересоберите» для stale; клик по строке выбирает блок на таймлайне.
+- Авто-синхронизация (useEffect на macro/bbMacro): правка макро сразу подсвечивает stale-блоки, результат не теряется.
+- `runAnnualBuild('all'|'block'|'export')` — статус-флеши «📦 Годовой план: собрано +N · готовых пропущено M · ошибок K».
+
+### Тесты (45 новых)
+- `annual-training-engine.test.ts` (27): хэши/ключи, план из PL/BB макро, sync (layout без изменений / изменён→stale с сохранением результата / конфиг изменён→stale), сборка PL (цикл→недели+program.pl), PL без цикла (скелет+warning), taper-идемпотентность, BB-блок 8 нед/20 нед (зацикливание), пик-неделя contest_prep (peakApplied, фаза peaking), MANUAL скелет+шаблон, сборка года (только missing / rebuild all / частичная при ошибке), композиция (bb/hybrid/pl/notes/null).
+- `annual-training-storage.test.ts` (11): roundtrip, битый JSON/форма, remove, миграция (BB-приоритет, стабильный id, существующий план не перезаписывается).
+- `macrocycle-panel-annual-build.test.tsx` (7): карточка после сборки макро, «Собрать весь год» (все built, PL-блоки с sourceCycleId), «Собрать блок» (только выбранный), экспорт без блоков (предупреждение), экспорт после сборки (мост he_planner_apply, kind program), stale после смены недели соревнования, десериализация макро с cycleId.
+- Проверено: tsc 0 по моим файлам (ошибки в чужом WIP: cardio.engine.ts битый импорт, BbAutoConstructor PrepAdjustment — файлы других агентов не трогаю); annual-training 38/38, panel-annual-build 7/7, смежные macrocycle/bridge 143/143.
+
+---
+
 ## Contest Prep — полноценный адаптивный цикл (Aug 16 2026, uncommitted)
 
 Терминология разделена: **подготовка** (недели/месяцы дефицита) → **taper** (1-4 нед: объём ↓, интенсивность сохраняется) → **peak week** (7 дней, привязана к дате шоу) → **show day** → **post-show**. Canonical engine — `bb-contest-prep.engine.ts` (расширен, все новые функции экспортированы).
