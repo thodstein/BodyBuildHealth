@@ -590,6 +590,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* Training Score Card перенесён в подвкладку Восстановление тренировочного блока */}
 
+      {/* 🏁 Активный contest prep — сводная карточка (видна на всех зонах тренировок) */}
+      <BBContestPrepActiveCard onOpen={() => { hapticImpact('light'); switchPlanningTrack('bb'); setZone('planner'); }} />
+
       {/* ═══════════ PLAN TAB ═══════════ */}
       
       {/* ═══════════ ПЛАНИРОВЩИК (зона) — сегментированный ПЛ/ББ ═══════════ */}
@@ -713,6 +716,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 };
 
 import { MyTrainingTab } from './TrainingScreen_parts/MyTrainingTab';
+import { BBContestPrepActiveCard } from './TrainingScreen_parts/BBContestPrepActiveCard';
 import ExerciseLabCatalog from './TrainingScreen_parts/ExerciseLabCatalog';
 import { CalcQualityTab } from './TrainingScreen_parts/CalcQualityTab';
 import { MuscleProgressCard } from './TrainingScreen_parts/MuscleProgressCard';

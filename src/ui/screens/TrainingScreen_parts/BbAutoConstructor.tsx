@@ -187,6 +187,42 @@ export function armHeadLabel(pattern: string): string {
 
 /** Мини-чип для параметров упражнения (общий из training-ui). */
 
+/* ─── Годовой план → ББ-авто: маппер контекста блока (he_bb_plan_saved_ctx) ─── */
+
+/** Параметры шага «🏁 Contest prep», предзаполненные из контекста блока года. */
+export interface AnnualBlockCtxToPrepPatch {
+  peakWeekCategory: BBContestCategory;
+  peakSpec: ContestSpecialization;
+  prepShowDate: string;
+  prepTaperWeeks: number;
+  prepWeeks: number;
+  prepWaterMode: PrepWaterMode;
+  prepSodiumMode: PrepSodiumMode;
+  prepCarbMode: PrepCarbMode;
+  prepConfirmedManip: boolean;
+}
+
+/** Чистый маппер peakConfig блока годового плана → предзаполнение шага contest. */
+export function annualBlockCtxToPrepPatch(
+  ctx: { peakWeek?: boolean; weeks?: number; peakConfig?: Record<string, unknown> | null },
+): AnnualBlockCtxToPrepPatch | null {
+  if (!ctx.peakWeek || !ctx.peakConfig) return null;
+  const cfg = ctx.peakConfig as Partial<BBContestPrepConfig>;
+  const category = cfg.category && cfg.category in CATEGORY_PROFILES
+    ? (cfg.category as BBContestCategory) : 'mens_physique';
+  return {
+    peakWeekCategory: category,
+    peakSpec: cfg.specialization ?? 'none',
+    prepShowDate: cfg.showDate ?? isoAddDays(isoToday(), 8 * 7),
+    prepTaperWeeks: Number.isFinite(cfg.weeksOut) ? Math.min(4, Math.max(1, Math.round(cfg.weeksOut!))) : 2,
+    prepWeeks: ctx.weeks && ctx.weeks > 0 ? Math.min(52, Math.max(1, Math.round(ctx.weeks))) : 12,
+    prepWaterMode: cfg.waterStrategy === 'moderate' ? 'moderate' : 'stable',
+    prepSodiumMode: cfg.sodiumStrategy === 'cut_2d' || cfg.sodiumStrategy === 'cut_3d' ? 'moderate' : 'stable',
+    prepCarbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate',
+    prepConfirmedManip: !!cfg.confirmedManipulation,
+  };
+}
+
 function computePhases(totalWeeks: number): { week: number; phase: BBPhase }[] {
   const phases: { week: number; phase: BBPhase }[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
@@ -511,13 +547,24 @@ export const BbAutoConstructor: React.FC = () => {
     flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
   };
 
-  /** 🖨 Печать полной сводки contest prep (фазы/тапер/пик-неделя/шоу-день/post-show). */
+  /** 🖨 Печать полной сводки contest prep (фазы/тапер/пик-неделя/шоу-день/post-show + история + выполнение). */
   const handlePrintPrepSummary = () => {
     if (!prepPlan) return;
     try {
+      const compliance = (prepApplied && builtPlan)
+        ? prepTrainingCompliance(
+            prepPlan,
+            builtPlan.weeks.map((w: any) => ({
+              week: (w as any).week,
+              contestPhase: (w as any).contestPhase,
+              plannedSets: w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((b: number, e: any) => b + (e.sets || 0), 0), 0),
+            })),
+            loadSessions().map(s => ({ date: s.date, totalSets: s.totalSets })),
+          )
+        : undefined;
       const win = window.open('', '_blank', 'width=900,height=700');
       if (!win) { flash('Браузер заблокировал окно печати — разрешите всплывающие окна'); return; }
-      win.document.write(buildContestPrepPrintHtml(prepPlan));
+      win.document.write(buildContestPrepPrintHtml(prepPlan, { compliance }));
       win.document.close();
       win.focus();
       setTimeout(() => { try { win.print(); } catch { /* ignore */ } }, 300);
@@ -891,6 +938,7 @@ export const BbAutoConstructor: React.FC = () => {
           setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
           setBbWeekSel(1);
           setStep('plan');
+          applyAnnualBlockCtx(consumeAnnualBlockCtx());
         }
       }
     } catch {}
@@ -907,12 +955,41 @@ export const BbAutoConstructor: React.FC = () => {
           setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
           setBbWeekSel(1);
           setStep('plan');
+          applyAnnualBlockCtx(consumeAnnualBlockCtx());
         }
       } catch { /* ignore */ }
     };
     window.addEventListener('he-bb-plan-saved', onExternalPlan);
     return () => window.removeEventListener('he-bb-plan-saved', onExternalPlan);
   }, []);
+
+  /* ─── Годовой план → ББ-авто: контекст блока (he_bb_plan_saved_ctx) ─── */
+
+  const consumeAnnualBlockCtx = (): { peakWeek?: boolean; weeks?: number; peakConfig?: Record<string, unknown> | null } | null => {
+    try {
+      const raw = localStorage.getItem('he_bb_plan_saved_ctx');
+      if (!raw) return null;
+      localStorage.removeItem('he_bb_plan_saved_ctx');
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch { return null; }
+  };
+
+  const applyAnnualBlockCtx = (ctx: { peakWeek?: boolean; weeks?: number; peakConfig?: Record<string, unknown> | null } | null) => {
+    const patch = ctx ? annualBlockCtxToPrepPatch(ctx) : null;
+    if (!patch) return;
+    setPeakWeekCategory(patch.peakWeekCategory);
+    setPeakSpec(patch.peakSpec);
+    setPrepShowDate(patch.prepShowDate);
+    setPrepTaperWeeks(patch.prepTaperWeeks);
+    setPrepWeeks(patch.prepWeeks);
+    setPrepWaterMode(patch.prepWaterMode);
+    setPrepSodiumMode(patch.prepSodiumMode);
+    setPrepCarbMode(patch.prepCarbMode);
+    setPrepConfirmedManip(patch.prepConfirmedManip);
+    setStep('contest');
+    flash('🏁 Блок годового плана: пик-неделя предзаполнена — проверьте и соберите Contest prep');
+  };
 
   const revalidateEditedPlan = (plan: BBPlan): BBPlan => {
     const edited = structuredClone(plan) as BBPlan;

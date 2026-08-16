@@ -1047,6 +1047,19 @@ describe('Печать сводки contest prep (buildContestPrepPrintHtml)', (
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;script&gt;');
   });
+
+  it('с compliance: секция «Выполнение тренировок» с планом/фактом/итогом', () => {
+    const plan = buildBBContestPrepPlan(baseConfig(), { prepWeeks: 8, taperWeeks: 2 });
+    const compliance = prepTrainingCompliance(
+      plan,
+      Array.from({ length: 11 }, (_, i) => ({ week: i + 1, plannedSets: 20 })),
+      [],
+    );
+    const html = buildContestPrepPrintHtml(plan, { compliance });
+    expect(html).toContain('Выполнение тренировок');
+    expect(html).toContain('Итого: 0% от плана');
+    expect(html).toContain('upcoming');
+  });
 });
 
 describe('E2E-путь пользователя: buildBBPlan → prep → режим → revalidate (ручная коррекция)', () => {

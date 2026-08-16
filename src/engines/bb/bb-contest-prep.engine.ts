@@ -2355,7 +2355,7 @@ function escHtml(s: string): string {
 }
 
 /** Полная HTML-сводка contest prep для печати (фазы/тапер/пик-неделя/шоу-день/post-show). */
-export function buildContestPrepPrintHtml(plan: BBContestPrepPlan): string {
+export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance }): string {
   const profile = CATEGORY_PROFILES[plan.category];
   const post = buildPostShowPlan(plan);
   const peakWeek = buildPeakWeek(configFromPlan(plan));
@@ -2404,6 +2404,12 @@ ${timeline.map(t => `<tr><td>${t.time}</td><td><b>${escHtml(t.action)}</b></td><
 
 <h2>⚖️ Адаптация по весу</h2>
 <div class="muted">Анализ средних за 7 дней; целевой темп ${plan.preparation.targetRatePctPerWeek}%/нед. Одна переменная за раз: калории ±150–175 ИЛИ кардио ±20 мин/нед. В taper/пик корректировки запрещены.</div>
+
+${extra?.compliance ? `<h2>📈 Выполнение тренировок (план vs факт)</h2>
+<table><tr><th>Нед</th><th>Фаза</th><th>План</th><th>Факт</th><th>%</th><th>Статус</th></tr>
+${extra.compliance.weeks.map(c => `<tr><td>${c.week}</td><td>${escHtml(c.phase ? PREP_PHASE_LABELS[c.phase] : '—')}</td><td>${c.plannedSets}</td><td>${c.actualSets}</td><td>${Math.round(c.pct * 100)}%</td><td>${c.status}</td></tr>`).join('')}
+</table>
+<div class="muted">Итого: ${Math.round(extra.compliance.overallPct * 100)}% от плана · завершено недель ${extra.compliance.completedWeeks}/${extra.compliance.elapsedWeeks}. ${escHtml(extra.compliance.recommendation)}</div>` : ''}
 
 ${plan.safety.warnings.length > 0 ? `<h2>⚠️ Предупреждения</h2><ul>${rows(plan.safety.warnings)}</ul>` : ''}
 ${plan.safety.requiresReview ? `<div class="warn">🩺 Требуется профессиональное сопровождение: ${escHtml(plan.safety.contraindications.join(', '))}. Агрессивные режимы отключены.</div>` : ''}
