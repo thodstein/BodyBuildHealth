@@ -160,6 +160,10 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
               <select value={s.type} onChange={e => updateSession(idx, { type: e.target.value as CardioType })} style={SEL} aria-label={`Тип сессии ${idx + 1}`}>
                 {TYPES.map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
               </select>
+              <select value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={e => updateSession(idx, { dayOfWeek: e.target.value === '' ? undefined : Number(e.target.value) })} style={SEL} aria-label={`День недели сессии ${idx + 1}`}>
+                <option value="">Авто</option>
+                {DAY_LABELS_RU.map((d, di) => <option key={di} value={di}>{d}</option>)}
+              </select>
               <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>мин ×</span>
               <button style={{ ...BTN, minHeight: 30, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>

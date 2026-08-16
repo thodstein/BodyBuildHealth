@@ -919,7 +919,7 @@ export function spreadSessionsAcrossDays(week: CardioWeek, referenceIso?: string
 /** Активная неделя цикла по локальной дате (неделя 1 = reference). */
 export function cardioWeekForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): CardioWeek | null {
   const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
-  const ref = referenceIso ? parseLocal(referenceIso) : new Date();
+  const ref = referenceIso ? parseLocal(referenceIso) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
   const target = parseLocal(dateIso);
   if (!Number.isFinite(target.getTime())) return null;
   const diffDays = Math.round((target.getTime() - ref.getTime()) / 86400000);
@@ -932,7 +932,7 @@ export function cardioSessionsForDate(cycle: CardioCycle, dateIso: string, refer
   const week = cardioWeekForDate(cycle, dateIso, referenceIso);
   if (!week) return null;
   const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
-  const ref = referenceIso ? parseLocal(referenceIso) : new Date();
+  const ref = referenceIso ? parseLocal(referenceIso) : (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); })();
   const target = parseLocal(dateIso);
   const dow = (target.getDay() + 6) % 7;
   const startDow = (ref.getDay() + 6) % 7;
@@ -1153,4 +1153,154 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
   }
 
   return { score: Math.max(0, Math.min(100, 100 - penalty)), findings };
+}
+
+// ─── Варианты плана и объяснение выбора (P0) ───
+
+export type CardioVariant = 'gentle' | 'base' | 'intense';
+
+export interface CardioVariantInfo {
+  id: CardioVariant;
+  label: string;
+  desc: string;
+  cycle: CardioCycle;
+  summary: ReturnType<typeof cardioCycleSummary>;
+}
+
+export const CARDIO_VARIANT_LABELS: Record<CardioVariant, string> = {
+  gentle: 'Щадящий',
+  base: 'Базовый',
+  intense: 'Интенсивный',
+};
+
+/**
+ * Три варианта нагрузки для одной цели: щадящий (новичок, без HIIT),
+ * базовый (как задано пользователем) и интенсивный (продвинутый, с HIIT).
+ */
+export function cardioPlanVariants(input: CardioCycleInput): CardioVariantInfo[] {
+  const ids: CardioVariant[] = ['gentle', 'base', 'intense'];
+  return ids.map(id => {
+    const opts: CardioCycleInput = { ...input, id: undefined, name: undefined, source: 'auto' };
+    if (id === 'gentle') {
+      opts.level = 'beginner';
+      opts.recoveryLow = true;
+    } else if (id === 'intense') {
+      opts.level = 'advanced';
+      opts.recoveryLow = false;
+    } else {
+      opts.level = input.level ?? 'intermediate';
+      opts.recoveryLow = input.recoveryLow;
+    }
+    const cycle = buildCardioCycle(opts);
+    return { id, label: CARDIO_VARIANT_LABELS[id], desc: id === 'gentle' ? 'Мягкий старт, без HIIT' : id === 'intense' ? 'Максимальный объём, HIIT' : 'Как в параметрах', cycle, summary: cardioCycleSummary(cycle) };
+  });
+}
+
+/** Текстовое объяснение, почему построен именно такой план. */
+export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle): string[] {
+  const lines: string[] = [];
+  const goal = CARDIO_GOAL_LABELS[input.goal].toLowerCase();
+  lines.push(`Цель «${goal}» определяет профиль: ${input.goal === 'cut' ? 'прогрессия Zone 2 (2×30 → 3×45) + HIIT 1×15, делоды каждые 4 нед' : input.goal === 'health' ? 'Zone 2 3-4×25-40 мин — база для здоровья ССС' : input.goal === 'mass' ? 'минимум кардио (только восстановление 1×20), чтобы не конкурировать с ростом' : input.goal === 'recovery' ? 'лёгкое кардио 2-3×25-30 для кровотока и мобильности' : input.goal === 'recomp' || input.goal === 'maintenance' ? 'умеренное Zone 2 2×25-30 для поддержания' : ''}.`);
+  const level = input.level ?? 'intermediate';
+  lines.push(`Уровень «${CARDIO_LEVEL_LABELS[level].toLowerCase()}»: объём сессий ×${CARDIO_LEVEL_MULT[level]}.`);
+  lines.push(`Доступно ${input.daysAvailable ?? 7} дн/нед — сессии распределены по ${Math.min(input.daysAvailable ?? 7, 7)} дням.`);
+  if (input.recoveryLow) lines.push('Низкое восстановление: HIIT исключён из всех недель.');
+  if (input.equipment && input.equipment.length > 0) {
+    lines.push(`Оборудование: ${input.equipment.map(e => cardioEquipmentLabel(e)).join(', ')}${input.lowImpact ? ' (низкоударное, суставы щадятся)' : ''}.`);
+  } else if (input.lowImpact) {
+    lines.push('Низкоударный режим: высокоударный бег заменён на ходьбу/вело/эллипс.');
+  }
+  if (input.age != null) {
+    const zones = cardioHeartZones(input.age, input.restingHr, undefined, input.sex);
+    lines.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''}${input.restingHr != null && input.restingHr > 0 ? `, ЧСС покоя ${input.restingHr}` : ''}: зона Z2 = ${zones[1].bpmMin}-${zones[1].bpmMax} уд/мин.`);
+  }
+  const comps = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= (input.totalWeeks ?? 12));
+  if (comps.length > 0) {
+    const tw = Math.max(1, Math.min(4, Math.round(input.taperWeeks ?? 2)));
+    lines.push(`Старты: ${comps.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${tw} нед${input.peakWeek !== false ? ' + пик-неделя' : ''} (без HIIT, объём ×0.6-0.7).`);
+  }
+  const s = cardioCycleSummary(cycle);
+  lines.push(`Итог: ${cycle.totalWeeks} нед, ${s.avgMinutesPerWeek} мин/нед, ${s.avgKcalPerWeek} ккал/нед, ${s.hiitWeeks} HIIT-недель.`);
+  return lines;
+}
+
+// ─── Улучшение цикла по отчёту качества (P1) ───
+
+/**
+ * Авто-исправления по отчёту качества:
+ * - сушка/рекомпозиция без HIIT (и восстановление позволяет) → добавить HIIT на build/maintenance;
+ * - здоровье/рекомпозиция с малым объёмом → увеличить частоту zone2 на maintenance-неделях;
+ * - возвращает копию цикла + список изменений (для подтверждения).
+ */
+export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: number; recoveryLow?: boolean } = {}): CardioTuneResult {
+  const changes: CardioTuneChange[] = [];
+  const daysAvailable = opts.daysAvailable ?? 7;
+  const recoveryLow = opts.recoveryLow ?? false;
+  const s = cardioCycleSummary(cycle);
+  const weeks = cycle.weeks.map(w => {
+    let sessions = w.sessions;
+    // 1. HIIT для cut/recomp
+    if ((cycle.goal === 'cut' || cycle.goal === 'recomp') && s.hiitWeeks === 0 && !recoveryLow && daysAvailable >= 3) {
+      if ((w.phase === 'build' || w.phase === 'maintenance') && !w.deload && !w.taper && !w.sessions.some(x => x.type === 'hiit')) {
+        sessions = [...sessions, mkSession('hiit', 15, 1, 'HIIT добавлен авто-улучшением (EPOC, ЖСС)', 80)];
+        changes.push({ week: w.week, label: 'HIIT 15×1 добавлен', from: 'нет', to: 'HIIT 15×1' });
+      }
+    }
+    // 2. Объём для health/recomp
+    if ((cycle.goal === 'health' || cycle.goal === 'recomp') && s.avgMinutesPerWeek < 90 && w.phase === 'maintenance' && !w.deload && !w.taper) {
+      const z2 = sessions.find(x => x.type === 'zone2');
+      if (z2 && z2.weeklyFrequency < daysAvailable && z2.weeklyFrequency < 6) {
+        const before = `${z2.type.toUpperCase()} ×${z2.weeklyFrequency}`;
+        sessions = sessions.map(x => (x.type === 'zone2' ? { ...x, weeklyFrequency: x.weeklyFrequency + 1 } : x));
+        changes.push({ week: w.week, label: 'Zone 2 частота +1', from: before, to: `ZONE2 ×${z2.weeklyFrequency + 1}` });
+      }
+    }
+    return rebuildWeek(w, sessions, []);
+  });
+  const cycle2: CardioCycle = { ...cycle, weeks, source: cycle.source };
+  const advice: CardioAdviceLike = changes.length > 0
+    ? { action: 'increase', reason: `Улучшение: ${changes.length} изменений (недели: ${[...new Set(changes.map(c => c.week))].join(', ')}).` }
+    : { action: 'keep', reason: 'План уже соответствует рекомендациям качества.' };
+  return { cycle: cycle2, changes, advice };
+}
+
+// ─── Протокол сессии (P1) ───
+
+export interface CardioSessionPhase {
+  name: string;
+  minutes: number;
+  note: string;
+  hrZone?: { min?: number; max?: number };
+}
+
+/** Фазы сессии по типу: разминка / основная / заминка с минутами и пульсом. */
+export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'durationMin'>, zones?: HeartZone[]): CardioSessionPhase[] {
+  const dur = Math.max(10, session.durationMin);
+  const z = (idx: number) => zones?.[idx];
+  switch (session.type) {
+    case 'hiit': {
+      const work = Math.max(5, dur - 10);
+      return [
+        { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, плавное повышение пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+        { name: 'Интервалы', minutes: work, note: '30 сек работа / 90 сек отдых (Z4 → Z1)', hrZone: z(3) ? { min: z(3)!.bpmMin, max: z(3)!.bpmMax } : undefined },
+        { name: 'Заминка', minutes: 5, note: 'Лёгкий темп до восстановления пульса', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+      ];
+    }
+    case 'recovery': {
+      const main = Math.max(5, dur - 5);
+      return [
+        { name: 'Основная', minutes: main, note: 'Очень лёгкий темп, разговорный', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+        { name: 'Заминка', minutes: 5, note: 'Ходьба, дыхание', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+      ];
+    }
+    default: {
+      const main = Math.max(5, dur - 10);
+      const isMiss = session.type === 'miss';
+      return [
+        { name: 'Разминка', minutes: 5, note: 'Лёгкий темп, подготовка к работе', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+        { name: 'Основная', minutes: main, note: isMiss ? 'Умеренный темп, Z3 (70-80%)' : 'Zone 2, разговорный темп (60-70%)', hrZone: isMiss ? (z(2) ? { min: z(2)!.bpmMin, max: z(2)!.bpmMax } : undefined) : (z(1) ? { min: z(1)!.bpmMin, max: z(1)!.bpmMax } : undefined) },
+        { name: 'Заминка', minutes: 5, note: 'Снижение темпа, растяжка', hrZone: z(0) ? { min: z(0)!.bpmMin, max: z(0)!.bpmMax } : undefined },
+      ];
+    }
+  }
 }

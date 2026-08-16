@@ -12,6 +12,7 @@ import {
   saveCardioCycleVersion, loadCardioCycleVersions, latestCardioCycleVersion,
   restoreCardioCycleVersion, clearCardioCycleHistory,
   buildCardioSummaryText,
+  cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -678,5 +679,102 @@ describe('buildCardioSummaryText', () => {
     const t = buildCardioSummaryText(c);
     expect(t).toContain('(Вело)');
     expect(t).toContain('ЧСС');
+  });
+});
+
+// ─── Варианты плана и объяснение ───
+
+describe('cardioPlanVariants', () => {
+  it('3 варианта: щадящий < базовый ≤ интенсивный по объёму', () => {
+    const v = cardioPlanVariants({ goal: 'cut', totalWeeks: 8, daysAvailable: 5 });
+    expect(v).toHaveLength(3);
+    const gentle = v.find(x => x.id === 'gentle')!;
+    const base = v.find(x => x.id === 'base')!;
+    const intense = v.find(x => x.id === 'intense')!;
+    expect(gentle.summary.avgMinutesPerWeek).toBeLessThan(base.summary.avgMinutesPerWeek);
+    expect(intense.summary.avgMinutesPerWeek).toBeGreaterThan(base.summary.avgMinutesPerWeek);
+    expect(gentle.summary.hiitWeeks).toBe(0);
+  });
+
+  it('intense для cut содержит HIIT', () => {
+    const v = cardioPlanVariants({ goal: 'cut', totalWeeks: 8, daysAvailable: 5 });
+    expect(v.find(x => x.id === 'intense')!.summary.hiitWeeks).toBeGreaterThan(0);
+  });
+});
+
+describe('explainCardioChoice', () => {
+  it('объясняет цель, уровень, оборудование, возраст и старты', () => {
+    const input = { goal: 'cut' as const, totalWeeks: 8, daysAvailable: 4, level: 'intermediate' as const, equipment: ['cycling'] as const, age: 35, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] };
+    const cycle = buildCardioCycle({ ...input, sex: 'male' });
+    const lines = explainCardioChoice({ ...input, sex: 'male' }, cycle);
+    const text = lines.join('\n');
+    expect(text).toContain('Цель «сушка»');
+    expect(text).toContain('Уровень «средний»');
+    expect(text).toContain('Вело');
+    expect(text).toContain('Z2 =');
+    expect(text).toContain('taper 2 нед');
+  });
+});
+
+// ─── Улучшение цикла ───
+
+describe('improveCardioCycle', () => {
+  it('сушка без HIIT → HIIT добавлен на build/maintenance недели', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 3, recoveryLow: true });
+    expect(c.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(false);
+    const r = improveCardioCycle(c, { daysAvailable: 3, recoveryLow: false });
+    expect(r.changes.length).toBeGreaterThan(0);
+    expect(r.cycle.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(true);
+    expect(r.cycle.weeks.filter(w => w.deload || w.taper).every(w => !w.sessions.some(s => s.type === 'hiit'))).toBe(true);
+  });
+
+  it('здоровье с малым объёмом → частота zone2 +1 на maintenance', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, daysAvailable: 1 });
+    const r = improveCardioCycle(c, { daysAvailable: 4 });
+    const changed = r.changes.filter(ch => ch.label.includes('Zone 2'));
+    expect(changed.length).toBeGreaterThan(0);
+  });
+
+  it('соответствие рекомендациям → изменений нет', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 5 });
+    const r = improveCardioCycle(c, { daysAvailable: 5, recoveryLow: false });
+    expect(r.changes).toEqual([]);
+    expect(r.advice.action).toBe('keep');
+  });
+
+  it('исходный цикл не мутируется', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 3, recoveryLow: true });
+    const before = JSON.stringify(c);
+    improveCardioCycle(c, { daysAvailable: 3, recoveryLow: false });
+    expect(JSON.stringify(c)).toBe(before);
+  });
+});
+
+// ─── Протокол сессии ───
+
+describe('cardioSessionProtocol', () => {
+  it('zone2: разминка/основная/заминка, основная в Z2', () => {
+    const p = cardioSessionProtocol({ type: 'zone2', durationMin: 40 });
+    expect(p.map(x => x.name)).toEqual(['Разминка', 'Основная', 'Заминка']);
+    expect(p[1].minutes).toBe(30);
+    expect(p[1].note).toContain('Zone 2');
+  });
+
+  it('hiit: интервалы 30/90 в Z4', () => {
+    const p = cardioSessionProtocol({ type: 'hiit', durationMin: 20 });
+    expect(p[1].name).toBe('Интервалы');
+    expect(p[1].minutes).toBe(10);
+    expect(p[1].note).toContain('30 сек');
+  });
+
+  it('recovery: без разминки', () => {
+    const p = cardioSessionProtocol({ type: 'recovery', durationMin: 30 });
+    expect(p.map(x => x.name)).not.toContain('Разминка');
+  });
+
+  it('длительность ≥10 даже для короткой сессии', () => {
+    const p = cardioSessionProtocol({ type: 'zone2', durationMin: 8 });
+    const total = p.reduce((s, x) => s + x.minutes, 0);
+    expect(total).toBeGreaterThanOrEqual(10);
   });
 });

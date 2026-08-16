@@ -1,11 +1,15 @@
 /**
- * CardioPreviewStep.tsx — шаг 3 мастера кардио: собрать цикл, карточки метрик,
- * график объёма и таблица недель (фазы/сессии/минуты/ккал).
+ * CardioPreviewStep.tsx — шаг 3 мастера кардио: варианты нагрузки + объяснение
+ * выбора, сборка, метрики, качество, «✨ Улучшить», план по фазам, taper-план,
+ * неделя по дням, график объёма, таблица недель, обоснование.
  */
 import React, { useMemo, useState } from 'react';
 import {
-  cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel, CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS,
-  type CardioCycle, type CardioType,
+  cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel,
+  cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
+  spreadSessionsAcrossDays, DAY_LABELS_RU,
+  CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
+  type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
@@ -22,6 +26,18 @@ const BTN: React.CSSProperties = {
   color: '#fff', minHeight: 44,
 };
 const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.5)', color: '#00e68a' };
+const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' };
+const VARIANT_BTN: React.CSSProperties = {
+  flex: '1 1 100px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', fontSize: 11,
+};
+const VARIANT_BTN_ACTIVE: React.CSSProperties = {
+  ...VARIANT_BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff',
+};
+const DAY_CELL: React.CSSProperties = {
+  flex: '1 1 42px', minWidth: 42, borderRadius: 8, padding: '6px 4px', textAlign: 'center',
+  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 10,
+};
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Rec' };
 const PHASE_COLOR: Record<string, string> = {
@@ -33,9 +49,18 @@ export const CardioPreviewStep: React.FC<{
   onBuild: () => void;
   onRename: (name: string) => void;
   daysAvailable: number;
-}> = ({ cycle, onBuild, onRename, daysAvailable }) => {
+  recoveryLow: boolean;
+  variant: CardioVariant;
+  onVariant: (v: CardioVariant) => void;
+  variants: ReturnType<typeof cardioPlanVariants>;
+  explanation: string[];
+  onImproved: (cycle: CardioCycle) => void;
+}> = ({ cycle, onBuild, onRename, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, onImproved }) => {
   const [showWeeks, setShowWeeks] = useState(true);
   const [nameDraft, setNameDraft] = useState('');
+  const [weekNo, setWeekNo] = useState(1);
+  const [improve, setImprove] = useState<{ changes: CardioTuneChange[]; cycle: CardioCycle } | null>(null);
+
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
   const quality = useMemo(() => (cycle ? cardioQualityReport(cycle, daysAvailable) : null), [cycle, daysAvailable]);
 
@@ -55,13 +80,7 @@ export const CardioPreviewStep: React.FC<{
         const weeks = cycle.weeks.filter(w => w.phase === o.phase);
         if (weeks.length === 0) return null;
         const minutes = weeks.reduce((s, w) => s + w.totalMinutes, 0);
-        return {
-          ...o,
-          weeks: weeks.length,
-          first: weeks[0].week,
-          last: weeks[weeks.length - 1].week,
-          avgMin: Math.round(minutes / weeks.length),
-        };
+        return { ...o, weeks: weeks.length, first: weeks[0].week, last: weeks[weeks.length - 1].week, avgMin: Math.round(minutes / weeks.length) };
       })
       .filter(Boolean) as { phase: string; label: string; weeks: number; first: number; last: number; avgMin: number }[];
   }, [cycle]);
@@ -69,13 +88,29 @@ export const CardioPreviewStep: React.FC<{
   const taperPlan = useMemo(() => {
     if (!cycle) return [];
     return cycle.weeks.filter(w => w.phase === 'taper' || w.phase === 'peak').map(w => ({
-      week: w.week,
-      phase: w.phase,
-      minutes: w.totalMinutes,
-      hiit: w.sessions.some(s => s.type === 'hiit'),
-      sessions: w.sessions.length,
+      week: w.week, phase: w.phase, minutes: w.totalMinutes, hiit: w.sessions.some(s => s.type === 'hiit'), sessions: w.sessions.length,
     }));
   }, [cycle]);
+
+  const weekDays = useMemo(() => {
+    if (!cycle) return [];
+    const clamped = Math.max(1, Math.min(cycle.totalWeeks, weekNo));
+    const w = cycle.weeks.find(x => x.week === clamped);
+    return w ? spreadSessionsAcrossDays(w) : [];
+  }, [cycle, weekNo]);
+
+  const previewImprove = () => {
+    if (!cycle) return;
+    const r = improveCardioCycle(cycle, { daysAvailable, recoveryLow });
+    if (r.changes.length === 0) { setImprove({ changes: [], cycle }); return; }
+    setImprove({ changes: r.changes, cycle: r.cycle });
+  };
+
+  const applyImprove = () => {
+    if (!improve || improve.changes.length === 0) return;
+    onImproved(improve.cycle);
+    setImprove(null);
+  };
 
   if (!cycle || !summary) {
     return (
@@ -114,13 +149,37 @@ export const CardioPreviewStep: React.FC<{
         <button style={BTN_PRIMARY} onClick={onBuild}>🔄 Пересобрать цикл</button>
       </div>
 
-      {/* Качество цикла */}
+      {/* Варианты нагрузки */}
+      <div style={CARD}>
+        <div style={LABEL}>⇄ Варианты нагрузки</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {variants.map(v => (
+            <div key={v.id} style={variant === v.id ? VARIANT_BTN_ACTIVE : VARIANT_BTN} onClick={() => onVariant(v.id)} role="button" aria-label={`Вариант: ${v.label}`}>
+              <div style={{ fontSize: 12, fontWeight: 800 }}>{v.label}</div>
+              <div style={{ marginTop: 2, opacity: 0.7 }}>{v.summary.avgMinutesPerWeek} мин/нед · {v.summary.hiitWeeks} HIIT</div>
+              <div style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }}>{v.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Почему этот план */}
+      <div style={CARD}>
+        <div style={LABEL}>💡 Почему этот план</div>
+        {explanation.map((e, i) => (
+          <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {e}</div>
+        ))}
+      </div>
+
+      {/* Качество + улучшить */}
       {quality && (
         <div style={CARD}>
           <div style={ROW}>
             <span style={LABEL}>📊 Качество цикла</span>
             <span style={{ fontSize: 16, fontWeight: 800, color: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }}>{quality.score}</span>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>/100</span>
+            <span style={{ flex: 1 }} />
+            <button style={{ ...BTN, minHeight: 34, padding: '6px 14px' }} onClick={previewImprove}>✨ Улучшить</button>
           </div>
           <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
             <div style={{ width: quality.score + '%', height: '100%', borderRadius: 3, background: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }} />
@@ -130,19 +189,35 @@ export const CardioPreviewStep: React.FC<{
               {f.level === 'warn' ? '⚠ ' : f.level === 'ok' ? '✅ ' : '💡 '}{f.text}
             </div>
           ))}
+          {improve && (
+            <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {improve.changes.length === 0 ? (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>План уже соответствует рекомендациям — улучшать нечего.</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, color: '#93c5fd', fontWeight: 700 }}>Авто-улучшения ({improve.changes.length}):</div>
+                  {improve.changes.map((c, i) => (
+                    <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Нед {c.week}: <b>{c.label}</b> — {c.from} → {c.to}</div>
+                  ))}
+                  <div style={ROW}>
+                    <button style={BTN_PRIMARY} onClick={applyImprove}>✓ Применить</button>
+                    <button style={BTN_DANGER} onClick={() => setImprove(null)}>✕ Отмена</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* Переименование */}
-      {cycle && (
-        <div style={CARD}>
-          <div style={LABEL}>✏️ Название цикла</div>
-          <div style={ROW}>
-            <input value={nameDraft || cycle.name} onChange={e => setNameDraft(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Название цикла" />
-            <button style={BTN_PRIMARY} onClick={() => { if (nameDraft.trim()) { onRename(nameDraft.trim()); setNameDraft(''); } }}>💾 Переименовать</button>
-          </div>
+      <div style={CARD}>
+        <div style={LABEL}>✏️ Название цикла</div>
+        <div style={ROW}>
+          <input value={nameDraft || cycle.name} onChange={e => setNameDraft(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Название цикла" />
+          <button style={BTN_PRIMARY} onClick={() => { if (nameDraft.trim()) { onRename(nameDraft.trim()); setNameDraft(''); } }}>💾 Переименовать</button>
         </div>
-      )}
+      </div>
 
       {/* План по фазам */}
       <div style={CARD}>
@@ -175,6 +250,32 @@ export const CardioPreviewStep: React.FC<{
           ))}
         </div>
       )}
+
+      {/* Неделя по дням */}
+      <div style={CARD}>
+        <div style={ROW}>
+          <span style={LABEL}>🗓 Неделя по дням</span>
+          <button style={BTN} onClick={() => setWeekNo(Math.max(1, weekNo - 1))} aria-label="Предыдущая неделя">−</button>
+          <span style={{ fontSize: 13, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{Math.min(cycle.totalWeeks, Math.max(1, weekNo))}</span>
+          <button style={BTN} onClick={() => setWeekNo(Math.min(cycle.totalWeeks, weekNo + 1))} aria-label="Следующая неделя">+</button>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>из {cycle.totalWeeks}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {DAY_LABELS_RU.map((d, i) => {
+            const sess = weekDays.filter(s => s.dayOfWeek === i);
+            return (
+              <div key={d} style={DAY_CELL}>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 3 }}>{d}</div>
+                {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
+                  <div key={j} style={{ color: '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap' }}>
+                    {TYPE_LABEL[s.type]} {s.durationMin}м{s.equipment ? ` ${cardioEquipmentLabel(s.equipment)}` : ''}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <CardioProgressCard cycle={cycle} />
       <CardioVolumeChart cycle={cycle} />

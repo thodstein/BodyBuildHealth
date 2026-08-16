@@ -3,9 +3,10 @@
  * с таймером (пауза/завершение), ввод RPE/ЧСС и запись в дневник
  * (he_cardio_sessions) одним действием.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  cardioSessionsForDate, type CardioCycle, type CardioType,
+  cardioSessionsForDate, cardioSessionProtocol,
+  type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 
@@ -123,6 +124,22 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '8px 0' }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</div>
           <div style={{ fontSize: 40, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a' }}>{fmt(active.remainingSec)}</div>
+          {(() => {
+            const protocol = cardioSessionProtocol({ type: active.type, durationMin: active.durationMin });
+            const elapsed = active.durationMin * 60 - active.remainingSec;
+            let acc = 0;
+            const currentIdx = protocol.findIndex(p => { acc += p.minutes * 60; return elapsed < acc; });
+            const activeIdx = currentIdx >= 0 ? currentIdx : protocol.length - 1;
+            return (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {protocol.map((p, i) => (
+                  <div key={p.name} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, border: i === activeIdx ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)', background: i === activeIdx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: i === activeIdx ? '#4ade80' : 'rgba(255,255,255,0.55)' }}>
+                    {i === activeIdx ? '▶ ' : ''}{p.name} {p.minutes}м
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div style={ROW}>
             <button style={BTN} onClick={() => setActive(prev => prev ? { ...prev, paused: !prev.paused } : null)} aria-label="Пауза">
               {active.paused ? '▶️ Продолжить' : '⏸ Пауза'}

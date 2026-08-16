@@ -13,7 +13,8 @@ import {
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
   cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel,
-  type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment,
+  cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
+  type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant,
 } from '../../../engines/lms/cardio.engine';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
@@ -173,6 +174,7 @@ export const CardioConstructor: React.FC = () => {
   const [age, setAge] = useState(String(wizard.age ?? profileAge() ?? 30));
   const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
   const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
+  const [variant, setVariant] = useState<CardioVariant>('base');
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -214,16 +216,20 @@ export const CardioConstructor: React.FC = () => {
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
 
   const build = () => {
+    const vOpts = variant === 'gentle'
+      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
+      : variant === 'intense'
+        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
+        : { level, recoveryLow };
     const c = buildCardioCycle({
       goal,
       totalWeeks,
       daysAvailable,
-      recoveryLow,
       bodyWeight,
       competitions: comps,
       taperWeeks,
       peakWeek,
-      level,
+      ...vOpts,
       equipment,
       lowImpact,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
@@ -333,6 +339,39 @@ export const CardioConstructor: React.FC = () => {
     reload();
     flashMsg('✏️ Цикл переименован');
   };
+
+  const applyImproved = (improved: CardioCycle) => {
+    saveCardioCycleVersion(cycle ?? improved, '✨ авто-улучшение');
+    saveCardioCycle(improved);
+    setActiveCardioCycle(improved);
+    setCycle(improved);
+    reload();
+    flashMsg('✨ Улучшения применены');
+  };
+
+  const planVariants = useMemo(() => {
+    try {
+      return cardioPlanVariants({
+        goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
+        competitions: comps, taperWeeks, peakWeek, level, equipment, lowImpact,
+        age: Math.max(12, Math.min(90, Number(age) || 30)),
+        restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+        sex,
+        phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+      });
+    } catch { return []; }
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit]);
+
+  const planExplanation = useMemo(() => {
+    if (!cycle) return [];
+    return explainCardioChoice({
+      goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
+      competitions: comps, taperWeeks, peakWeek, level, equipment, lowImpact,
+      age: Math.max(12, Math.min(90, Number(age) || 30)),
+      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+      sex,
+    }, cycle);
+  }, [cycle, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
 
   const resetParams = () => {
     setGoal('cut');
@@ -483,7 +522,13 @@ export const CardioConstructor: React.FC = () => {
       )}
       {step === 'preview' && (
         <>
-          <CardioPreviewStep cycle={cycle} onBuild={build} onRename={renameCycle} daysAvailable={daysAvailable} />
+          <CardioPreviewStep
+            cycle={cycle} onBuild={build} onRename={renameCycle}
+            daysAvailable={daysAvailable} recoveryLow={recoveryLow}
+            variant={variant} onVariant={setVariant}
+            variants={planVariants} explanation={planExplanation}
+            onImproved={applyImproved}
+          />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={NAV_BTN} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>
           </div>

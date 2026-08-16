@@ -181,6 +181,9 @@ describe('CardioSessionTimer', () => {
     const startBtn = screen.getAllByRole('button', { name: /Старт/ })[0];
     fireEvent.click(startBtn);
     expect(screen.getByRole('button', { name: /Пауза/ })).toBeTruthy();
+    // протокол сессии виден (фазы)
+    expect(screen.getByText(/Разминка/)).toBeTruthy();
+    expect(screen.getByText(/Заминка/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Завершить/ }));
     const rpe = screen.getByRole('textbox', { name: /RPE/ });
     fireEvent.change(rpe, { target: { value: '6' } });
