@@ -8,10 +8,10 @@ import { describe, it, expect } from 'vitest';
 import {
   stableHash, macroBlockKey, blockKindFromMacro, isBBMacroShape,
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
-  composeAnnualProgram, applyBlockTaperToWeeks,
+  composeAnnualProgram, applyBlockTaperToWeeks, mergeBlockWeeks,
   directionFromKinds, planStatusFromBlocks, defaultConfigForRef,
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
-  importProgramIntoAnnualBlock,
+  importProgramIntoAnnualBlock, validateAnnualPlan,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -364,6 +364,81 @@ describe('правки блоков (конфиг/ручной roundtrip)', () =
     expect(next.blocks[1].status).toBe('built');
     expect(next.blocks[1].result!.program?.meta.title).toBe('Отредактировано вручную');
     expect(next.blocks[1].result!.warnings.some(w => w.includes('Импортировано'))).toBe(true);
+  });
+});
+
+describe('валидация разметки года', () => {
+  it('целостная разметка → нет предупреждений', () => {
+    const plan = annualPlanFromMacro(makePLMacro());
+    const v = validateAnnualPlan(plan);
+    expect(v.gaps).toHaveLength(0);
+    expect(v.overlaps).toHaveLength(0);
+    expect(v.totalMismatch).toBe(false);
+    expect(v.warnings).toHaveLength(0);
+  });
+
+  it('пропуск недель между блоками → gap', () => {
+    const macro: Macrocycle = {
+      blocks: [
+        { phase: 'endurance', weeks: 4, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'A' },
+        { phase: 'strength', weeks: 4, weekOffset: 7, kind: 'SRC', cycleId: CYCLE_ID, description: 'B' },
+      ],
+      totalWeeks: 10, rationale: [],
+    };
+    const v = validateAnnualPlan(annualPlanFromMacro(macro));
+    expect(v.gaps).toEqual([{ from: 5, to: 6 }]);
+    expect(v.warnings.some(w => w.includes('пропуск нед 5–6'))).toBe(true);
+  });
+
+  it('перекрытие блоков → overlap', () => {
+    const macro: Macrocycle = {
+      blocks: [
+        { phase: 'endurance', weeks: 5, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'A' },
+        { phase: 'strength', weeks: 4, weekOffset: 4, kind: 'SRC', cycleId: CYCLE_ID, description: 'B' },
+      ],
+      totalWeeks: 7, rationale: [],
+    };
+    const v = validateAnnualPlan(annualPlanFromMacro(macro));
+    expect(v.overlaps).toHaveLength(1);
+    expect(v.warnings.some(w => w.includes('перекрытие'))).toBe(true);
+  });
+
+  it('сумма недель ≠ totalWeeks → totalMismatch', () => {
+    const macro: Macrocycle = {
+      blocks: [{ phase: 'endurance', weeks: 6, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'A' }],
+      totalWeeks: 10, rationale: [],
+    };
+    const v = validateAnnualPlan(annualPlanFromMacro(macro));
+    expect(v.totalMismatch).toBe(true);
+    expect(v.warnings.some(w => w.includes('≠ 10'))).toBe(true);
+  });
+
+  it('E2E 52 недели: сборка года → композиция покрывает все недели без разрывов', () => {
+    const macro: Macrocycle = {
+      blocks: [
+        { phase: 'endurance', weeks: 13, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'Выносливость' },
+        { phase: 'strength', weeks: 13, weekOffset: 14, kind: 'BB', description: 'Силовой BB' },
+        { phase: 'peak', weeks: 4, weekOffset: 27, kind: 'SRC', cycleId: CYCLE_ID, description: 'Пик' },
+        { phase: 'competition', weeks: 1, weekOffset: 31, kind: 'SRC', description: 'Старт' },
+        { phase: 'transition', weeks: 4, weekOffset: 32, kind: 'BB', description: 'Переход BB' },
+        { phase: 'endurance', weeks: 17, weekOffset: 36, kind: 'SRC', cycleId: CYCLE_ID, description: 'База-2' },
+      ],
+      totalWeeks: 52, rationale: [],
+    };
+    const plan = annualPlanFromMacro(macro);
+    const outcome = buildAnnualPlan(plan, macro, DEFAULT_OPTS);
+    expect(outcome.failed).toBe(0);
+    expect(outcome.plan.status).toBe('built');
+    expect(validateAnnualPlan(outcome.plan).warnings).toHaveLength(0);
+    const merged = mergeBlockWeeks(outcome.plan);
+    expect(merged).toHaveLength(52);
+    expect(merged[0].week).toBe(1);
+    expect(merged[51].week).toBe(52);
+    const prog = composeAnnualProgram(outcome.plan);
+    expect(prog!.meta.direction).toBe('hybrid');
+    expect(prog!.hybrid!.bbWeeks).toHaveLength(52);
+    // Несобранных блоков нет → в notes нет предупреждений «не собран».
+    expect(prog!.meta.notes).not.toContain('не собран');
   });
 });
 

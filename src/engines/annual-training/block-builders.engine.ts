@@ -602,6 +602,49 @@ function findBlockIndex(plan: AnnualTrainingPlan, blockKey: string): number {
   return plan.blocks.findIndex(b => b.ref.blockKey === blockKey);
 }
 
+/** Результат проверки разметки годового плана (календарная целостность). */
+export interface AnnualPlanValidation {
+  /** Пропуски недель между блоками (неделя 1-индекс). */
+  gaps: { from: number; to: number }[];
+  /** Перекрытия блоков (соседние блоки пересекаются по неделям). */
+  overlaps: { from: number; to: number; blockKeys: string[] }[];
+  /** Сумма недель блоков ≠ totalWeeks. */
+  totalMismatch: boolean;
+  /** Недели за пределами 1..totalWeeks. */
+  outOfRange: string[];
+  warnings: string[];
+}
+
+/**
+ * Проверить календарную целостность годового плана: блоки должны покрывать
+ * недели 1..totalWeeks без пропусков и перекрытий.
+ */
+export function validateAnnualPlan(plan: AnnualTrainingPlan): AnnualPlanValidation {
+  const warnings: string[] = [];
+  const gaps: AnnualPlanValidation['gaps'] = [];
+  const overlaps: AnnualPlanValidation['overlaps'] = [];
+  const outOfRange: string[] = [];
+  const sorted = [...plan.blocks].sort((a, b) => a.ref.startWeek - b.ref.startWeek);
+  let cursor = 1;
+  for (const b of sorted) {
+    if (b.ref.startWeek < 1 || b.ref.startWeek + b.ref.weeks - 1 > plan.totalWeeks) {
+      outOfRange.push(b.ref.blockKey);
+    }
+    if (b.ref.startWeek > cursor) {
+      gaps.push({ from: cursor, to: b.ref.startWeek - 1 });
+      warnings.push(`пропуск нед ${cursor}–${b.ref.startWeek - 1}`);
+    }
+    if (b.ref.startWeek < cursor) {
+      overlaps.push({ from: b.ref.startWeek, to: cursor - 1, blockKeys: [b.ref.blockKey] });
+      warnings.push(`перекрытие нед ${b.ref.startWeek}–${cursor - 1}`);
+    }
+    cursor = Math.max(cursor, b.ref.startWeek + b.ref.weeks);
+  }
+  const totalMismatch = cursor - 1 !== plan.totalWeeks;
+  if (totalMismatch) warnings.push(`сумма недель блоков ${cursor - 1} ≠ ${plan.totalWeeks}`);
+  return { gaps, overlaps, totalMismatch, outOfRange, warnings };
+}
+
 /**
  * Изменить конфиг блока (цикл/сплит/taper/peak и т.д.).
  * Собранный блок помечается 'stale' — результат сохраняется, пользователь

@@ -34,6 +34,7 @@ import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardi
 import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
+  validateAnnualPlan,
 } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -792,6 +793,16 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setAnnualPlan(plan);
     } catch { /* ignore */ }
   }, [macro, bbMacro, isBB]);
+  // Живое обновление: ручной конструктор вернул блок (completeAnnualBlockImport)
+  // или другой экран изменил план → перечитать хранилище.
+  useEffect(() => {
+    const onUpdated = () => {
+      const fresh = loadAnnualTrainingPlan();
+      if (fresh) setAnnualPlan(fresh);
+    };
+    window.addEventListener('he-annual-training-plan-updated', onUpdated);
+    return () => window.removeEventListener('he-annual-training-plan-updated', onUpdated);
+  }, []);
 
   /** Пик-неделя по умолчанию для BB-блока: профиль (вес/пол/категория) +
    *  сохранённый bbPeakConfig; дата шоу из соревнования блока или оценка. */
@@ -1840,6 +1851,15 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   📥 В ручной режим
                 </button>
               </div>
+              {annualPlan && (() => {
+                const v = validateAnnualPlan(annualPlan);
+                if (v.warnings.length === 0) return null;
+                return (
+                  <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, fontSize: 10, lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
+                    ⚠ Разметка года: {v.warnings.join('; ')}
+                  </div>
+                );
+              })()}
               {annualPlan && (
                 <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
                   {(() => {
@@ -1936,11 +1956,26 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           onChange={e => applyAnnualConfig(b.ref.blockKey, { taper: { enabled: e.target.checked, weeks: 2 } })} />
                         📉 Taper внутри блока (2 нед)
                       </label>
-                      <button type="button" onClick={() => runAnnualBuild('editor')}
-                        style={{ ...BTN_GHOST, marginLeft: 'auto', fontSize: 10, padding: '4px 10px', minHeight: 32 }}
-                        title="Открыть собранный блок в ручном конструкторе; после сохранения изменения вернутся в блок">
-                        ✍ В редактор
-                      </button>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {b.ref.kind === 'BB' && b.status === 'built' && Boolean(b.result?.bbPlan) && (
+                          <button type="button" onClick={() => {
+                            try {
+                              localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: b.result!.bbPlan, date: new Date().toISOString() }));
+                              window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
+                              setAnnualStatusNote('🚀 Блок передан в ББ-авто — откройте шаг «План» в ББ-авто');
+                            } catch { setAnnualStatusNote('⚠ Не удалось передать блок в ББ-авто'); }
+                          }}
+                            style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                            title="Передать собранный BBPlan блока в ББ-авто (шаг «План»)">
+                            🚀 В ББ-авто
+                          </button>
+                        )}
+                        <button type="button" onClick={() => runAnnualBuild('editor')}
+                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                          title="Открыть собранный блок в ручном конструкторе; после сохранения изменения вернутся в блок">
+                          ✍ В редактор
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

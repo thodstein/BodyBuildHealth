@@ -165,6 +165,38 @@ describe('MacrocyclePanel — сборка года по конструктор�
     expect(bb.config.peakConfig).toBeTruthy();
     expect((bb.config.peakConfig as any).category).toBe('mens_physique');
   });
+
+  it('🚀 В ББ-авто: собранный BB-блок передаётся через he_bb_plan_saved', async () => {
+    const macro = buildPlMacroFixture();
+    localStorage.setItem('he_pl_macro', serializeMacro(macro));
+    render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
+    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    fireEvent.click(screen.getByText(/strength · ББ/));
+    await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
+    fireEvent.click(screen.getByText('⚙️ Собрать блок'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[1].status).toBe('built'), { timeout: 30000 });
+    await waitFor(() => expect(screen.getByText('🚀 В ББ-авто')).toBeTruthy());
+    fireEvent.click(screen.getByText('🚀 В ББ-авто'));
+    await waitFor(() => expect(screen.getByText(/🚀 Блок передан в ББ-авто/)).toBeTruthy());
+    const saved = JSON.parse(localStorage.getItem('he_bb_plan_saved') || 'null');
+    expect(saved).toBeTruthy();
+    expect(saved.plan?.weeks?.length).toBe(6);
+  });
+
+  it('живое обновление: событие he-annual-training-plan-updated перечитывает план', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText('📦 Собрать весь год'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.status).toBe('built'), { timeout: 30000 });
+    // Имитация внешнего обновления (roundtrip из ручного конструктора).
+    const plan = loadAnnualTrainingPlan()!;
+    plan.blocks[0].result!.warnings = ['Импортировано из ручного конструктора.'];
+    localStorage.setItem(ANNUAL_PLAN_KEY, JSON.stringify(plan));
+    window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated', { detail: { planId: plan.id } }));
+    await waitFor(() => {
+      const stored = loadAnnualTrainingPlan();
+      expect(stored!.blocks[0].result!.warnings).toContain('Импортировано из ручного конструктора.');
+    });
+  });
 });
 
 /** ПЛ-макроцикл с 3 блоками (два SRC + один BB). */
