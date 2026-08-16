@@ -123,6 +123,10 @@ export interface CardioCycleInput {
   lowImpact?: boolean;
   /** Возраст — для целевых пульс-зон сессий (Karvonen/ЧССмакс). */
   age?: number;
+  /** ЧСС покоя — для пульс-зон по резерву (Karvonen). */
+  restingHr?: number;
+  /** Пол — для формулы ЧССмакс (женщины 226-age). */
+  sex?: 'male' | 'female';
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
@@ -418,7 +422,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const lowImpact = !!input.lowImpact;
   const equipmentPool = (input.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
   const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
-  const zones = input.age != null ? cardioHeartZones(input.age) : undefined;
+  const zones = input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex) : undefined;
   const profile = profileForGoal(input.goal);
   const weeks: CardioWeek[] = [];
   let totalKcal = 0;
@@ -473,7 +477,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   if (input.level && input.level !== 'intermediate') cycle.rationale.push(`Уровень: ${CARDIO_LEVEL_LABELS[input.level].toLowerCase()} (объём ×${levelMult}).`);
   if (equipmentPool.length > 0) cycle.rationale.push(`Оборудование: ${equipmentPool.map(e => cardioEquipmentLabel(e)).join(', ')}${lowImpact ? ' (низкоударное)' : ''}.`);
   else if (lowImpact) cycle.rationale.push('Оборудование: низкоударное (ходьба/вело/эллипс по умолчанию).');
-  if (input.age != null) cycle.rationale.push(`Возраст ${input.age} — целевые пульс-зоны сессий заданы.`);
+  if (input.age != null) cycle.rationale.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''} — целевые пульс-зоны сессий заданы${input.restingHr != null && input.restingHr > 0 ? ` (ЧСС покоя ${input.restingHr})` : ''}.`);
   if (recoveryLow) cycle.rationale.push('Низкое восстановление: HIIT исключён.');
   if (competitions.length > 0) {
     cycle.rationale.push(`Соревнования: ${competitions.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}.`);
@@ -923,10 +927,11 @@ export interface HeartZone {
   purpose: string;
 }
 
-/** Пульс-зоны (упрощённый метод: % от ЧССмакс), для zone2 — 60-70%. */
-export function cardioHeartZones(age: number, restingHr?: number, maxHr?: number): HeartZone[] {
+/** Пульс-зоны (Karvonen с резервом при restingHr; иначе % от ЧССмакс).
+ *  ЧССмакс: мужчины 220-возраст, женщины 226-возраст. */
+export function cardioHeartZones(age: number, restingHr?: number, maxHr?: number, sex?: 'male' | 'female'): HeartZone[] {
   const a = Math.max(12, Math.min(90, age));
-  const hrmax = maxHr && maxHr > 0 ? maxHr : 220 - a;
+  const hrmax = maxHr && maxHr > 0 ? maxHr : sex === 'female' ? 226 - a : 220 - a;
   const rest = restingHr && restingHr > 0 ? Math.max(30, Math.min(100, restingHr)) : undefined;
   const ranges: { zone: number; label: string; min: number; max: number; purpose: string }[] = [
     { zone: 1, label: 'Z1 Recovery', min: 50, max: 60, purpose: 'Восстановление, разминка' },

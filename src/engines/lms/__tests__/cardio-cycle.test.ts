@@ -603,6 +603,20 @@ describe('персонализация подбора', () => {
     expect(a.weeks[0].sessions[0].equipment).toBe('running');
     expect(a.weeks[0].sessions[0].targetHr).toBeUndefined();
   });
+
+  it('sex: женщины — ЧССмакс 226−возраст (зоны шире)', () => {
+    const m = cardioHeartZones(30, undefined, undefined, 'male');
+    const f = cardioHeartZones(30, undefined, undefined, 'female');
+    expect(m[1].bpmMax).toBe(Math.round(190 * 0.7));
+    expect(f[1].bpmMax).toBe(Math.round(196 * 0.7));
+  });
+
+  it('restingHr: Karvonen-резерв в целевых зонах сессий', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, age: 40, restingHr: 60, sex: 'male' });
+    const z2 = c.weeks[0].sessions.find(s => s.type === 'zone2')!;
+    expect(z2.targetHr?.min).toBe(Math.round(60 + 120 * 0.6));
+    expect(z2.targetHr?.max).toBe(Math.round(60 + 120 * 0.7));
+  });
 });
 
 // ─── История версий (undo) ───

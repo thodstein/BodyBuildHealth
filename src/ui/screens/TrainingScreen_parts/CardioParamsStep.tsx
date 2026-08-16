@@ -68,8 +68,13 @@ export const CardioParamsStep: React.FC<{
   setLowImpact: (v: boolean) => void;
   age: string;
   setAge: (v: string) => void;
+  sex: 'male' | 'female';
+  setSex: (s: 'male' | 'female') => void;
+  restingHr: string;
+  setRestingHr: (v: string) => void;
+  onFromProfile: () => void;
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, onReset }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, onFromProfile, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -94,12 +99,14 @@ export const CardioParamsStep: React.FC<{
         equipment,
         lowImpact,
         age: ageNum,
+        restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+        sex,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         source: 'auto',
       });
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek, level, equipment, lowImpact, age]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -204,6 +211,31 @@ export const CardioParamsStep: React.FC<{
       </div>
 
       {/* Персонализация: уровень, оборудование, суставы, возраст */}
+      <div style={CARD}>
+        <div style={ROW}>
+          <span style={LABEL}>👤 Параметры пользователя</span>
+          <button style={{ ...BTN, minHeight: 32, padding: '5px 12px' }} onClick={onFromProfile} aria-label="Из профиля">📋 Из профиля</button>
+        </div>
+        <div style={ROW}>
+          <span style={LABEL}>Пол</span>
+          <button
+            style={sex === 'male' ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+            onClick={() => setSex('male')}
+            aria-label="Пол: мужской"
+          >♂ Мужской</button>
+          <button
+            style={sex === 'female' ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+            onClick={() => setSex('female')}
+            aria-label="Пол: женский"
+          >♀ Женский</button>
+          <span style={{ ...LABEL, marginLeft: 10 }}>ЧСС покоя</span>
+          <input type="number" value={restingHr} onChange={e => setRestingHr(e.target.value)} inputMode="numeric" style={{ width: 70, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="ЧСС покоя" />
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст.
+        </div>
+      </div>
+
       <div style={CARD}>
         <div style={LABEL}>🎚 Уровень подготовки</div>
         <div style={ROW}>

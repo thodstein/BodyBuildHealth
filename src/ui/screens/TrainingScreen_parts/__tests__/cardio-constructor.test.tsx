@@ -48,6 +48,9 @@ describe('CardioConstructor — SSR', () => {
     expect(html).toContain('Быстрые старты');
     expect(html).toContain('Структура фаз');
     expect(html).toContain('Предпросмотр цикла');
+    expect(html).toContain('Параметры пользователя');
+    expect(html).toContain('Из профиля');
+    expect(html).toContain('ЧСС покоя');
   });
 });
 

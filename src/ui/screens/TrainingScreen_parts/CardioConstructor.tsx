@@ -70,6 +70,8 @@ interface WizardState {
   equipment: CardioEquipment[];
   lowImpact: boolean;
   age: number;
+  sex: 'male' | 'female';
+  restingHr: number;
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -85,6 +87,33 @@ function profileWeight(): number | undefined {
     const p = getProfile();
     const w = p?.settings?.personal?.weight;
     return typeof w === 'number' && w > 0 ? w : undefined;
+  } catch { return undefined; }
+}
+
+/** Возраст из профиля. */
+function profileAge(): number | undefined {
+  try {
+    const a = getProfile()?.settings?.personal?.age;
+    return typeof a === 'number' && a > 0 ? a : undefined;
+  } catch { return undefined; }
+}
+
+/** Пол из профиля. */
+function profileSex(): 'male' | 'female' | undefined {
+  try {
+    const s = getProfile()?.settings?.personal?.sex;
+    return s === 'female' || s === 'male' ? s : undefined;
+  } catch { return undefined; }
+}
+
+/** ЧСС покоя из профиля (lifestyle.restingHR, fallback health.heartRate). */
+function profileRestingHr(): number | undefined {
+  try {
+    const p = getProfile();
+    const lr = p?.settings?.lifestyle?.restingHR;
+    if (typeof lr === 'number' && lr > 0) return lr;
+    const hr = p?.settings?.health?.heartRate;
+    return typeof hr === 'number' && hr > 0 ? hr : undefined;
   } catch { return undefined; }
 }
 
@@ -135,7 +164,9 @@ export const CardioConstructor: React.FC = () => {
   const [level, setLevel] = useState<CardioLevel>(wizard.level ?? 'intermediate');
   const [equipment, setEquipment] = useState<CardioEquipment[]>(wizard.equipment ?? []);
   const [lowImpact, setLowImpact] = useState(wizard.lowImpact ?? false);
-  const [age, setAge] = useState(String(wizard.age ?? 30));
+  const [age, setAge] = useState(String(wizard.age ?? profileAge() ?? 30));
+  const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
+  const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -190,6 +221,8 @@ export const CardioConstructor: React.FC = () => {
       equipment,
       lowImpact,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
+      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+      sex,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     });
     saveCardioCycle(c);
@@ -279,11 +312,11 @@ export const CardioConstructor: React.FC = () => {
       const s: WizardState = {
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
-        level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)),
+        level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify(s));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -307,9 +340,23 @@ export const CardioConstructor: React.FC = () => {
     setLevel('intermediate');
     setEquipment([]);
     setLowImpact(false);
-    setAge('30');
+    setAge(String(profileAge() ?? 30));
+    setSex(profileSex() ?? 'male');
+    setRestingHr(String(profileRestingHr() ?? ''));
     setComps([]);
     flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
+  };
+
+  const fromProfile = () => {
+    const w = profileWeight();
+    const a = profileAge();
+    const s = profileSex();
+    const r = profileRestingHr();
+    if (w != null) setBodyWeight(w);
+    if (a != null) setAge(String(a));
+    if (s != null) setSex(s);
+    if (r != null) setRestingHr(String(r));
+    flashMsg('📋 Параметры пользователя загружены из профиля');
   };
 
   const autoModeOn = useMemo(() => {
@@ -386,6 +433,9 @@ export const CardioConstructor: React.FC = () => {
           equipment={equipment} setEquipment={setEquipment}
           lowImpact={lowImpact} setLowImpact={setLowImpact}
           age={age} setAge={setAge}
+          sex={sex} setSex={setSex}
+          restingHr={restingHr} setRestingHr={setRestingHr}
+          onFromProfile={fromProfile}
           onReset={resetParams}
         />
       )}
