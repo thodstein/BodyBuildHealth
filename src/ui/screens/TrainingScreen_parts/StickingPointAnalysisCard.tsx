@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import type { WorkoutLog } from '../../../core/types';
-import { diagnoseLift, stickingPhases } from '../../../engines/pro/lift-diagnostics.engine';
-import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { diagnoseLift, phaseForReps } from '../../../engines/pro/lift-diagnostics.engine';
+import { epley1RM } from '../../../engines/e1rm';
+import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { applyToPlanner } from './planner-bridge';
 
 interface LiftFailureData {
@@ -12,57 +13,50 @@ interface LiftFailureData {
   failureRate: number;
   likelyPhase: WeakPoint | null;
   diagnosis: any;
-}
-
-// Фаза по диапазону повторений (валидируется по доступным фазам конкретного движения)
-function phaseForReps(reps: number, lift: Lift): WeakPoint {
-  const phases = stickingPhases(lift);
-  let cand: WeakPoint;
-  if (reps <= 3) cand = 'bottom';
-  else if (reps <= 5) cand = 'mid';
-  else cand = lift === 'squat' ? 'bottom' : 'mid';
-  if (phases.includes(cand)) return cand;
-  return phases.includes('mid') ? 'mid' : (phases[0] || 'mid');
+  sumoHardSets: number;
 }
 
 function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): LiftFailureData | null {
-  const failedSets: { phaseHint: WeakPoint; set: any; exerciseName: string }[] = [];
+  const phaseCounts: Record<string, number> = {};
+  let totalHard = 0;
+  let sumoHard = 0;
   let currentMax = 0;
   let hasLift = false;
   sessions.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     if (!aliases.some(a => en.includes(a))) return;
     hasLift = true;
-      (e.sets || []).forEach((s: any) => {
-        const weight = s.weight || 0;
-        const reps = s.reps || 0;
-        // RPE может отсутствовать в логе (поле опционально), но RIR всегда есть.
-        // Конвертируем RIR→RPE (RPE = 10 − RIR), чтобы тяжёлые подходы определялись корректно.
-        const rpe = (s.rpe && s.rpe > 0) ? s.rpe : (s.rir != null ? 10 - s.rir : 0);
-        const e1rm = weight * (1 + reps / 30);
-        if (e1rm > currentMax) currentMax = Math.round(e1rm);
-        // Индикаторы близкого срыва / срыва:
-        //  - RPE ≥ 8 (тяжёлый подход, ≤2 повторений в запасе)
-        //  - явная отметка failed
-        //  - низкие повторы при отсутствии RPE (max-попытка)
-        const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0) || (!!s.failed);
-      if (isHard) {
-        const phaseHint = phaseForReps(reps, lift);
-        failedSets.push({ phaseHint, set: s, exerciseName: e.exerciseName || '' });
-      }
+    const isSumo = lift === 'deadlift' && /сумо|sumo/.test(en);
+    (e.sets || []).forEach((s: any) => {
+      const weight = s.weight || 0;
+      const reps = s.reps || 0;
+      // RPE может отсутствовать в логе (поле опционально), но RIR всегда есть.
+      // Конвертируем RIR→RPE (RPE = 10 − RIR), чтобы тяжёлые подходы определялись корректно.
+      const rpe = (s.rpe && s.rpe > 0) ? s.rpe : (s.rir != null ? 10 - s.rir : 0);
+      const e1rm = epley1RM(weight, reps);
+      if (Number.isFinite(e1rm) && e1rm > currentMax) currentMax = Math.round(e1rm);
+      // Тяжёлый подход (RPE ≥ 8 / низкие повторы без RPE): кандидат в срыв.
+      const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0);
+      if (!isHard) return;
+      totalHard += 1;
+      // Фаза срыва: сумо → sumo_start/sumo_lockout (эвристика); иначе каноническая
+      // phaseForReps (reps ≥ 6 → фаза не определяется, подход учитывается как тяжёлый).
+      const phaseHint = isSumo
+        ? (reps <= 2 ? 'sumo_start' : reps <= 5 ? 'sumo_lockout' : null)
+        : phaseForReps(reps, lift);
+      if (isSumo) sumoHard += 1;
+      if (phaseHint) phaseCounts[phaseHint] = (phaseCounts[phaseHint] || 0) + 1;
     });
   }));
   if (!hasLift) return null;
   // Наиболее вероятная слабая фаза = модальная фаза по зафиксированным срывам
-  const phaseCounts: Record<string, number> = {};
-  failedSets.forEach(f => { phaseCounts[f.phaseHint] = (phaseCounts[f.phaseHint] || 0) + 1; });
-  const phases = stickingPhases(lift);
+  const phases = WEAK_POINTS_BY_LIFT[lift] ?? [];
   let likelyPhase: WeakPoint | null;
-  if (failedSets.length > 0) {
+  if (totalHard > 0 && Object.keys(phaseCounts).length > 0) {
     const top = Object.entries(phaseCounts).sort((a, b) => b[1] - a[1])[0];
-    likelyPhase = (phases.includes(top[0] as WeakPoint) ? top[0] : (phases[0] || null)) as WeakPoint | null;
+    likelyPhase = (phases.includes(top[0] as WeakPoint) ? top[0] : null) as WeakPoint | null;
   } else {
-    likelyPhase = phases.length > 0 ? phases[0] : null;
+    likelyPhase = null;
   }
   const diagnosis = likelyPhase ? diagnoseLift(lift, likelyPhase) : null;
   const totalSets = sessions.reduce((s, w: any) => s + (w.exercises || []).reduce((ss: number, e: any) => {
@@ -73,10 +67,11 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
   return {
     lift, label: labels[lift] || lift,
     currentMax,
-    totalFailedSets: failedSets.length,
-    failureRate: totalSets > 0 ? Math.round((failedSets.length / totalSets) * 100) : 0,
+    totalFailedSets: totalHard,
+    failureRate: totalSets > 0 ? Math.round((totalHard / totalSets) * 100) : 0,
     likelyPhase,
     diagnosis,
+    sumoHardSets: sumoHard,
   };
 }
 
@@ -96,6 +91,20 @@ const PHASE_LABELS: Record<string, string> = {
   lockout: 'Дожим',
   start: 'Старт',
   bottom: 'Яма (нижняя точка)',
+  sumo_start: 'Сумо: старт (срыв)',
+  sumo_lockout: 'Сумо: дожим (замыкание)',
+  ohp_start: 'Старт с плеч',
+  ohp_mid: 'Середина',
+  ohp_lockout: 'Дожим вверх',
+  row_start: 'Старт (съём)',
+  row_mid: 'Середина',
+  row_squeeze: 'Сведение лопаток',
+  pd_top: 'Верх (старт)',
+  pd_mid: 'Середина',
+  pd_squeeze: 'Сведение к груди',
+  inc_off: 'Сход с груди (верх)',
+  inc_mid: 'Середина',
+  inc_lockout: 'Дожим',
 };
 
 const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
@@ -103,7 +112,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
 
   const analysis = useMemo(() => {
     if (!sessions.length) return [];
-    const lifts: Lift[] = ['bench', 'squat', 'deadlift'];
+    const lifts: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'];
     return lifts.map(l => detectFailures(sessions, l, LIFT_ALIASES[l])).filter(Boolean) as LiftFailureData[];
   }, [sessions]);
 
@@ -113,7 +122,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
         🔬 Анализ мёртвых точек (sticking points)
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-        Нет данных по приседу, жиму лёжа или становой тяге. Чтобы рассчитать срывы, выполните эти упражнения через «▶ Проведение тренировки» — тяжёлые подходы (RPE≥8 по данным RIR) будут отмечены автоматически.
+        Нет данных по приседу, жиму лёжа, становой тяге и другим движениям. Чтобы рассчитать срывы, выполните эти упражнения через «▶ Проведение тренировки» — тяжёлые подходы (RPE≥8 по данным RIR) будут отмечены автоматически.
       </div>
     </div>
   );
@@ -125,7 +134,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
         🔬 Анализ мёртвых точек (sticking points)
       </div>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
         {analysis.map(a => (
           <button key={a.lift} onClick={() => setSelectedLift(a.lift)} style={{
             flex: 1, padding: '4px 6px', borderRadius: 6, border: a.lift === selectedLift ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
@@ -146,6 +155,11 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 10 }}>
               <span style={{ color: 'var(--text-dim)' }}>Тяжёлых подходов (RPE≥8):</span>
               <span style={{ fontWeight: 600, color: '#ef4444' }}>{active.totalFailedSets} сетов ({active.failureRate}%)</span>
+            </div>
+          )}
+          {active.sumoHardSets > 0 && (
+            <div style={{ marginBottom: 6, padding: 4, borderRadius: 6, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)', fontSize: 10, color: '#60a5fa' }}>
+              🤸 Сумо-тяга: {active.sumoHardSets} тяжёлых подходов — проверьте фазы «Сумо: старт» и «Сумо: дожим».
             </div>
           )}
           {active.likelyPhase && (
@@ -183,7 +197,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
           )}
         </div>
       )}
-{active && active.diagnosis && active.diagnosis.weakMuscles && active.diagnosis.weakMuscles.length > 0 && (() => { const mapM = (m: string) => { const l = m.toLowerCase(); if (/трицеп|бицеп|arm/.test(l)) return 'arms'; if (/дельт|плеч|shoulder/.test(l)) return 'shoulders'; if (/груд|chest|pec/.test(l)) return 'chest'; if (/спин|широк|трап|back|lat/.test(l)) return 'back'; if (/квадр|ягод|икр|бедр|ног|leg|quad|glute|calf/.test(l)) return 'legs'; if (/пресс|кор|core|ab/.test(l)) return 'core'; return null; }; const groups = Array.from(new Set(active.diagnosis.weakMuscles.map(mapM).filter(Boolean) as string[])); return (
+{active && active.diagnosis && active.diagnosis.weakMuscles && active.diagnosis.weakMuscles.length > 0 && (() => { const mapM = (m: string) => { const l = m.toLowerCase(); if (/трицеп|бицеп|arm/.test(l)) return 'arms'; if (/дельт|плеч|shoulder/.test(l)) return 'shoulders'; if (/груд|chest|pec/.test(l)) return 'chest'; if (/спин|широк|трап|back|lat|разгибат/.test(l)) return 'back'; if (/квадр|ягод|икр|бедр|ног|привод|leg|quad|glute|calf|adductor/.test(l)) return 'legs'; if (/пресс|кор|core|ab/.test(l)) return 'core'; return null; }; const groups = Array.from(new Set(active.diagnosis.weakMuscles.map(mapM).filter(Boolean) as string[])); return (
       <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>🔗 Слабые мышцы по срывам «{active.label}»: {active.diagnosis.weakMuscles.join(', ')} → приоритет групп планировщику.</div>
         <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Срывы ' + active.label + ': ' + groups.join(', '), data: { groups, lift: active.lift } })} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}>🛠 Слабые мышцы → планировщик</button>

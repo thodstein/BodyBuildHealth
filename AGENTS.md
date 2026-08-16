@@ -1,5 +1,32 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Диагностика движения: раунд 3 — полный StickingPointAnalysisCard + MRV/notes инъекции (Aug 16 2026, uncommitted)
+
+Поверх раунда 2 (5f921b43b):
+
+- **`StickingPointAnalysisCard` — полный инструмент по дневнику** (переписан):
+  - канонический `phaseForReps` (была своя эвристика reps≤3→bottom, противоречила карточке) — расхождение из раунда A–E закрыто;
+  - **все 7 движений** (было 3: bench/squat/deadlift) — вкладки жим стоя/тяга/пулдаун/наклонная;
+  - **sumo-детекция**: имя упражнения с «сумо» → фазы `sumo_start`/`sumo_lockout` + блок «🤸 Сумо-тяга: N тяжёлых подходов»;
+  - `epley1RM` вместо `weight*(1+reps/30)`; удалена мёртвая ветка `!!s.failed` (поля нет в WorkoutLog);
+  - расширены `PHASE_LABELS` (сумо/ohp/row/pd/inc) и `mapM` (+приводящие→legs);
+  - reps ≥ 6 → фаза не определяется (тяжёлый подход учитывается, фазы нет).
+- **Sumo-подсказка в `PlDeadpointsBarPathCard.diaryHint`**: тяжёлые подходы сумо считаются отдельно (`sumoHard`/`sumoPhase`), блок «🤸 Сумо: N тяжёлых подходов — вероятная фаза …».
+- **`injectDiagnosticExercises` — полный набор правил** (паритет со слабыми группами):
+  - per-day dedup (повтор ассистента в РАЗНЫХ днях — тяжёлый+памп — намеренная фича, НЕ week-dedup);
+  - day cap ≤ 10;
+  - **MRV-бюджет группы** (`getVolumeLandmarks` × PED/recovery × ACWR × авторег) — при переборе skip с note;
+  - **notes в `progressionRationale`**: `🔥 Диагностика: … → день N (3×6 @45% RIR 2) · группа … ≤ MRV …` и `⚠ … не добавлен — объём … > MRV …` (канал `weakNotes`).
+- `tsc` чист по моим файлам; **4 ошибки в чужом `diary-cards.tsx`** (дубль `loadCheckins`/`loadMobilityCheckins` — закоммиченный WIP дневникового агента, не трогаю).
+
+### Тесты (раунд 3: +8)
+- NEW `sticking-point-analysis-card.test.tsx` (7): пустое состояние, присед/жим каноническая фаза, reps≥6 без фазы, 7 движений, сумо, «Слабые мышцы → планировщик» (groups legs).
+- `pl-deadpoints-barpath-card.test.tsx` (+1): сумо-подсказка — **22/22**.
+- `pl-auto-key-tests-coverage.test.ts` (+2): 4.26 per-day dedup, 4.27 MRV-бюджет с note — **27/27**.
+- Затронутые области **838/838** (pro + lms + карточки + bridge + SRCBBScreen_parts).
+
+---
+
 ## Диагностика движения: раунд 2 — A3/sumo/лимит/parity/e1RM-детекция (Aug 16 2026, uncommitted)
 
 Поверх раунда A–E (d080442b):

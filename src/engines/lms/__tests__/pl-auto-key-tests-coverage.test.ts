@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { autoRegulate } from '../../pro/autoregulation-pro.engine';
 import { buildDiaryAutoreg } from '../../pro/diary-autoreg.engine';
-import { buildLMSPlan, getPLVolumeLandmarks, getPLWeakPointRecommendations } from '../lms-builder.engine';
+import { buildLMSPlan, getPLVolumeLandmarks, getPLWeakPointRecommendations, diagnosticProtocolFromCycle } from '../lms-builder.engine';
 import { calcTonnage } from '../lms-metrics.engine';
 import { computePLPlanFeedback } from '../lms-progression-feedback.engine';
 import { rankCycles } from '../lms-selector.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { getExercisesByGroup } from '../../../core/exercise-catalog';
+import { getVolumeLandmarks } from '../../volume-landmarks.engine';
+import { diagnoseWeakPoint } from '../weakpoint-pl';
 import type { WorkoutSession } from '../workout-logger.engine';
 import type { WorkoutLog } from '../../../core/types';
 
@@ -297,5 +299,35 @@ describe('PL-auto key coverage 4.1-4.15', () => {
       expect(dayLengths.every(len => len <= 10)).toBe(true);
       const injectedCount = p.weeks[0].days.reduce((sum, day) => sum + day.exercises.filter(e => e.name.startsWith('Ассистент')).length, 0);
       expect(injectedCount).toBeGreaterThan(0);
+    });
+
+    it('4.26 diagnostic assistant: per-day dedup — в одном дне упражнение не дублируется', () => {
+      const diag = diagnoseWeakPoint('bench', 'lockout');
+      const firstName = diag.assistance[0];
+      expect(firstName).toBeTruthy();
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        plWeakPoints: [{ lift: 'bench', weakPoint: 'lockout' }],
+        diagnosticExerciseMap: { 'bench|lockout': [firstName] },
+        currentReadiness: 100 });
+      // Инвариант per-day dedup: ни в одном дне упражнение не встречается дважды.
+      const perDayCounts = p.weeks[0].days.map(d => d.exercises.filter(e => e.name === firstName).length);
+      expect(perDayCounts.every(c => c <= 1)).toBe(true);
+    });
+
+    it('4.27 diagnostic assistant: MRV-бюджет группы — при переборе пропускается с note', () => {
+      const chestNames = Array.from(new Set(getExercisesByGroup('chest').map(e => e.name)));
+      const protocol = diagnosticProtocolFromCycle(CYCLE_01, chestNames[0]);
+      const S = Math.max(1, protocol.sets);
+      const budget = Math.round(getVolumeLandmarks('intermediate', 'chest').mrv);
+      const N = Math.floor(budget / S) + 4;
+      const names = chestNames.slice(0, N);
+      expect(names.length).toBe(N);
+      // Ключ 'squat|chest' → авто-дни тяжёлый+лёгкий (2 дня), чтобы day cap не сработал раньше MRV.
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        diagnosticExerciseMap: { 'squat|chest': names },
+        currentReadiness: 100 });
+      const injected = p.weeks[0].days.flatMap(d => d.exercises).filter(e => names.includes(e.name)).length;
+      expect(injected).toBeLessThan(names.length);
+      expect(p.progressionRationale).toContain('не добавлен');
     });
   });

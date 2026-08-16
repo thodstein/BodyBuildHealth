@@ -324,11 +324,14 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
     };
     const aliases = LIFT_ALIASES[lift] ?? [];
     const phaseCounts: Record<string, number> = {};
+    const sumoPhaseCounts: Record<string, number> = {};
     let totalHard = 0;
+    let sumoHard = 0;
     for (const w of sessions) {
       for (const e of (w.exercises || [])) {
         const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
         if (!aliases.some(a => en.includes(a))) continue;
+        const isSumo = lift === 'deadlift' && /сумо|sumo/.test(en);
         for (const s of (e.sets || [])) {
           const weight = s.weightKg || 0;
           const reps = s.reps || 0;
@@ -336,6 +339,13 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           const isHard = rpe >= 8 && weight > 0 && reps > 0;
           if (!isHard) continue;
           totalHard += 1;
+          if (isSumo) {
+            sumoHard += 1;
+            // Сумо: срыв обычно в старте (низкие повторы) или замыкании бёдер.
+            const sumoCand = reps <= 2 ? 'sumo_start' : reps <= 5 ? 'sumo_lockout' : null;
+            if (sumoCand) sumoPhaseCounts[sumoCand] = (sumoPhaseCounts[sumoCand] || 0) + 1;
+            continue;
+          }
           // Фаза по повторениям — каноническая эвристика (низкая достоверность);
           // ≥6 повторений → фаза не определяется и в статистику не идёт.
           const cand = phaseForReps(reps, lift);
@@ -344,9 +354,10 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       }
     }
     if (totalHard === 0) return null;
-    if (Object.keys(phaseCounts).length === 0) return null;
-    const top = Object.entries(phaseCounts).sort((a, b) => b[1] - a[1])[0];
-    return top ? { phase: top[0] as WeakPoint, count: top[1], totalHard } : null;
+    const allCounts = { ...phaseCounts, ...sumoPhaseCounts };
+    if (Object.keys(allCounts).length === 0) return null;
+    const top = Object.entries(allCounts).sort((a, b) => b[1] - a[1])[0];
+    return { phase: top[0] as WeakPoint, count: top[1], totalHard, sumoHard, sumoPhase: Object.entries(sumoPhaseCounts).sort((a, b) => b[1] - a[1])[0]?.[0] as WeakPoint | undefined };
   }, [sessions, lift]);
 
   const phases = useMemo(() => (LIFT_PHASES[lift] ?? []).filter(p => {
@@ -510,6 +521,11 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         {diaryHint && (
           <div style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 10, color: '#fbbf24', lineHeight: 1.5 }}>
             📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов ({lift === 'squat' ? 'присед' : lift === 'bench' ? 'жим' : lift === 'deadlift' ? 'тяга' : LIFT_RU[lift]}) срываются в фазе «{PHASE_RU[diaryHint.phase]}». Эвристика по повторениям (низкая достоверность) — подсказка, не авто-выбор.
+            {lift === 'deadlift' && diaryHint.sumoHard > 0 && (
+              <div style={{ marginTop: 3 }}>
+                🤸 Сумо: {diaryHint.sumoHard} тяжёлых подходов{diaryHint.sumoPhase ? ` — вероятная фаза «${PHASE_RU[diaryHint.sumoPhase]}»` : ''} — проверьте фазы «Сумо: старт» и «Сумо: дожим».
+              </div>
+            )}
           </div>
         )}
         {movement && (

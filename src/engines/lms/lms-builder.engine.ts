@@ -736,6 +736,27 @@ export function diagnosticProtocolFromCycle(template: SRCycleTemplate | undefine
   return { pct: first.pct, reps: Math.max(2, first.reps), sets: Math.max(1, first.sets), rir: first.rir ?? 2 };
 }
 
+/** Параметры MRV-бюджета для диагностических ассистентов (паритет со слабыми группами). */
+interface DiagnosticMrvParams {
+  vrLevel: 'beginner' | 'intermediate' | 'advanced';
+  combinedMrvMult: number;
+  acwrVolMod: number;
+  arVolMult: number;
+}
+
+/**
+ * Инъекция диагностических упражнений карточки «Слабые мышцы → Слабые точки →
+ * Мёртвые точки → Движение штанги» (diagnosticExerciseMap).
+ *
+ * Полный набор правил:
+ *  - протокол из раскладки цикла (diagnosticProtocolFromCycle — parity с карточкой);
+ *  - per-day dedup: упражнение не дублируется в ОДНОМ дне (повтор ассистента в
+ *    разных днях — тяжёлый + памп — намеренная фича, как у слабых точек);
+ *  - day cap ≤ 10 (паритет со слабыми группами);
+ *  - MRV-бюджет группы (паритет со слабыми группами): суммарные сеты группы за
+ *    неделю не превышают MRV мышцы × (PED/recovery × ACWR × авторегуляция);
+ *    при превышении — skip с предупреждением в notes.
+ */
 function injectDiagnosticExercises(
   days: LMSPlanDay[],
   exerciseMap: Record<string, string[]> | undefined,
@@ -743,6 +764,8 @@ function injectDiagnosticExercises(
   pmRow: Record<string, number>,
   fallbackPm: number,
   template?: SRCycleTemplate,
+  mrvParams?: DiagnosticMrvParams,
+  notes?: string[],
 ): void {
   if (!exerciseMap) return;
 
@@ -780,6 +803,21 @@ function injectDiagnosticExercises(
     return light == null ? [heavy] : [heavy, light];
   };
 
+  // MRV-бюджет группы (та же схема, что у слабых групп: legs→quads, core→abs).
+  const groupMrvBudget = (group: string): number | null => {
+    if (!mrvParams) return null;
+    try {
+      const mrvMuscle = group === 'legs' ? 'quads' : group === 'core' ? 'abs' : group === 'arms' ? 'arms' : group;
+      const lm = getVolumeLandmarks(mrvParams.vrLevel, mrvMuscle);
+      if (!lm) return null;
+      const mult = Math.max(1, mrvParams.combinedMrvMult) * mrvParams.acwrVolMod * mrvParams.arVolMult;
+      return Math.round(lm.mrv * mult);
+    } catch { return null; }
+  };
+  const weeklyGroupSets = (group: string): number => days.reduce((sum, d) => sum + d.exercises
+    .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === group)
+    .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
+
   for (const [key, names] of Object.entries(exerciseMap)) {
     if (!names?.length) continue;
     const configuredDays = dayMap?.[key];
@@ -797,14 +835,26 @@ function injectDiagnosticExercises(
     for (const { dayIndex, name } of placements) {
       const day = days[dayIndex];
       if (!day) continue;
+      // Per-day dedup: упражнение уже есть в этом дне (слабые точки/группы/другой ключ).
+      // Повтор одного ассистента в РАЗНЫХ днях (тяжёлый + памп) — намеренная фича.
       if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
       // Day cap (паритет со слабыми группами): упражнений ≤ 10 на сессию.
       if (day.exercises.length >= 10) continue;
       const pm = pmRow[name] ?? fallbackPm;
       const protocol = diagnosticProtocolFromCycle(template, name);
+      const group = diagnosticGroupForExercise(name);
+      // MRV-бюджет группы: не добавляем, если недельный объём группы выйдет за MRV.
+      if (group) {
+        const budget = groupMrvBudget(group);
+        const addedSets = Math.max(1, protocol.sets);
+        if (budget != null && weeklyGroupSets(group) + addedSets > budget) {
+          notes?.push(`⚠ Диагностика: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + addedSets} сетов > MRV ${budget} (уровень ×${Math.max(1, mrvParams!.combinedMrvMult).toFixed(2)} PED/восст ×${mrvParams!.acwrVolMod} ACWR ×${mrvParams!.arVolMult} авторег).`);
+          continue;
+        }
+      }
       day.exercises.push({
         name,
-        group: diagnosticGroupForExercise(name) ?? 'accessory',
+        group: group ?? 'accessory',
         coef: 0.3,
         mnosz: 1,
         load: 'Средняя',
@@ -812,6 +862,7 @@ function injectDiagnosticExercises(
         rir: protocol.rir,
         workSets: [{ pct: protocol.pct, reps: protocol.reps, sets: protocol.sets, weight: workWeight(pm, protocol.pct), rir: protocol.rir }],
       });
+      notes?.push(`🔥 Диагностика: ${name} → день ${dayIndex + 1} (${protocol.sets}×${protocol.reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}) · группа ${group ?? '—'}${group ? ` ≤ MRV ${groupMrvBudget(group) ?? '—'}` : ''}.`);
     }
   }
 }
@@ -1065,7 +1116,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     if (input.plWeakPoints && input.plWeakPoints.length) {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
     }
-    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template);
+    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes);
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
     // PL-логика:

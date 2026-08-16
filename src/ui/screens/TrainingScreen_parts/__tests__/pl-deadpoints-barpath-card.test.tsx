@@ -218,6 +218,22 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.queryByText(/тяжёлых подходов/)).toBeNull();
   });
 
+  it('сумо-тяга в дневнике → подсказка «Сумо» с вероятной фазой', () => {
+    const sessions = [{
+      sessionId: 's1', date: '2026-08-10', exercises: [{
+        exerciseId: 'dl_1', exerciseName: 'Становая тяга сумо', pattern: 'deadlift', muscleGroup: 'back', order: 0,
+        sets: [
+          { setNumber: 1, weightKg: 180, reps: 2, rpe: 9, rir: 1, isPR: false, notes: '' },
+          { setNumber: 2, weightKg: 180, reps: 2, rpe: 9.5, rir: 0.5, isPR: false, notes: '' },
+        ], totalVolume: 720, best1RM: 210, avgRPE: 9.2,
+      }], totalVolume: 720, totalSets: 2, totalReps: 4, avgIntensity: 90, prCount: 0, notes: '',
+    }];
+    render(<PlDeadpointsBarPathCard sessions={sessions as any} />);
+    fireEvent.click(screen.getByText('Становая тяга'));
+    expect(screen.getByText(/🤸 Сумо: 2 тяжёлых подходов/)).toBeTruthy();
+    expect(screen.getByText(/срываются в фазе «Сумо: старт \(срыв\)»/)).toBeTruthy();
+  });
+
   it('персистентность: выбранное движение/фаза восстанавливаются после remount', () => {
     const { unmount } = render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Жим лёжа'));
