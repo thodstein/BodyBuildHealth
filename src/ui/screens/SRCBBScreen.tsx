@@ -26,7 +26,6 @@ import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
 import { PLTaperProvider, usePLTaper } from './SRCBBScreen_parts/taper-state';
-import { TrainingSafetyHub } from './TrainingScreen_parts/TrainingSafetyHub';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
@@ -119,7 +118,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['competition', '🏁 Соревнования'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план'], ['autoreg', '🧠 Авторегуляция'], ['recovery', '🔋 Восстановление'], ['safety', '🛡 Безопасность']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['competition', '🏁 Соревнования'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -1306,7 +1305,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       )}
 
       {mainTab === 'pl' && subView === 'tools' && (
-        <PlannerToolsPanel mode="pl" />
+        <>
+          <PlannerToolsPanel mode="pl" />
+          <div style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div>
+            <TrainingScoreCard workoutsPerWeek={days} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal="strength" experience={(level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={bw} age={30} sex={'male'} />
+          </div>
+          <ReadinessForecastCard />
+        </>
       )}
 
       {mainTab === 'bb' && subView === 'plan' && (
@@ -1708,7 +1714,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         }
       }} />}
       {subView === 'macro' && <div style={{ marginTop: 8 }}><CardioLinkCard /></div>}
-      {subView === 'autoreg' && <TrainingSafetyHub initialSection="autoreg" />}
       {subView === 'competition' && <PLCompetitionTab api={{
         builtSrc,
         setBuiltSrc: p => setBuiltSrc(p),
@@ -1724,8 +1729,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         },
       }} />}
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
-      {subView === 'recovery' && (<><TrainingSafetyHub initialSection="recovery" /><div style={{ marginTop: 10 }}><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div><TrainingScoreCard workoutsPerWeek={mainTab === 'pl' ? days : bbDays} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal={mainTab === 'pl' ? 'strength' : 'hypertrophy'} experience={(mainTab === 'pl' ? (level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') : (bbLevel === 'beginner' ? 'beginner' : bbLevel === 'intermediate' ? 'intermediate' : 'advanced')) as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={mainTab === 'pl' ? bw : 80} age={30} sex={'male'} /></div><ReadinessForecastCard /></>)}
-      {subView === 'safety' && <TrainingSafetyHub />}
       {subView === 'methods' && (<>
         <MethodsTab linked={linked} trainingOutput={null} diaryStats={[] as any} historyWorkouts={[] as any} goal={mainTab === 'pl' ? goal : bbGoal} level={mainTab === 'pl' ? level : bbLevel} daysPerWeek={mainTab === 'pl' ? days : bbDays} recovery={linked.readiness?.recovery ?? 80} fatigue={linked.readiness?.fatigue ?? 30} appliedMethods={appliedMethods} onToggleMethod={(name, cat) => setAppliedMethods(prev => { const n = { ...prev }; if (n[cat] === name) delete n[cat]; else n[cat] = name; return n; })} onApplyComposition={() => { const keys = Object.keys(appliedMethods); if (keys.length > 0) { const h = deriveHints(appliedMethods); setMethodHints(h); setMethodNote(`✓ Применена методология: ${h.label}${h.volumeMult !== 1 ? ' · объём×' + h.volumeMult : ''}${h.technique ? ' · техн: ' + h.technique : ''}`); } else { setMethodHints({ volumeMult: 1, technique: null, label: '' }); setMethodNote('Выберите методики (по одной из категории)'); } }} />
       </>)}
