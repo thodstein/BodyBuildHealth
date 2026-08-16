@@ -5,7 +5,7 @@
 import React, { useMemo } from 'react';
 import {
   buildCardioCycle, cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PRESETS,
-  CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS,
+  CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS, DAY_LABELS_RU,
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
@@ -72,8 +72,10 @@ export const CardioParamsStep: React.FC<{
   setSex: (s: 'male' | 'female') => void;
   restingHr: string;
   setRestingHr: (v: string) => void;
+  legDays: number[];
+  setLegDays: (d: number[]) => void;
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, onReset }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -100,12 +102,13 @@ export const CardioParamsStep: React.FC<{
         age: ageNum,
         restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
         sex,
+        legDays,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         source: 'auto',
       });
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex, legDays]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -197,6 +200,25 @@ export const CardioParamsStep: React.FC<{
             </div>
           </div>
         )}
+      </div>
+
+      <div style={CARD}>
+        <div style={LABEL}>🏋️ Дни тяжёлых ног (кардио не ставится в эти дни)</div>
+        <div style={ROW}>
+          {DAY_LABELS_RU.map((d, i) => (
+            <button
+              key={d}
+              style={legDays.includes(i) ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
+              onClick={() => setLegDays(legDays.includes(i) ? legDays.filter(x => x !== i) : [...legDays, i])}
+              aria-label={`Ноги: ${d}`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Zone 2 / MISS / HIIT не попадут на эти дни; recovery — в любой день.
+        </div>
       </div>
 
       <div style={CARD}>

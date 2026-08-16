@@ -13,6 +13,8 @@ import {
   restoreCardioCycleVersion, clearCardioCycleHistory,
   buildCardioSummaryText,
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
+  assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
+  cardioWeightAdvice,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -317,11 +319,22 @@ describe('даты и раскладка', () => {
     expect(cardioWeekForDate(c, '2026-02-02', '2026-01-05')).toBeNull();
   });
 
-  it('spreadSessionsAcrossDays: сессии получают последовательные дни недели', () => {
-    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 2 });
-    const spread = spreadSessionsAcrossDays(c.weeks[0], '2026-01-05');
-    expect(spread.length).toBeGreaterThan(0);
+  it('spreadSessionsAcrossDays: сессии без дня получают последовательные дни недели', () => {
+    const sessions = [
+      { type: 'zone2' as const, durationMin: 30, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 210, purpose: 'a' },
+      { type: 'recovery' as const, durationMin: 20, weeklyFrequency: 1, intensity: 'low' as const, kcalPerSession: 100, purpose: 'b' },
+    ];
+    const week: CardioWeek = { week: 1, phase: 'base', sessions, totalMinutes: 80, totalKcal: 520, deload: false, taper: false, rationale: [] };
+    const spread = spreadSessionsAcrossDays(week, '2026-01-05');
     expect(spread[0].dayOfWeek).toBe(0);
+    expect(spread[1].dayOfWeek).toBe(1);
+  });
+
+  it('spreadSessionsAcrossDays: заданный день сохраняется', () => {
+    const sessions = [{ type: 'zone2' as const, durationMin: 30, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 210, purpose: 'a', dayOfWeek: 5 }];
+    const week: CardioWeek = { week: 1, phase: 'base', sessions, totalMinutes: 60, totalKcal: 420, deload: false, taper: false, rationale: [] };
+    const spread = spreadSessionsAcrossDays(week, '2026-01-05');
+    expect(spread[0].dayOfWeek).toBe(5);
   });
 
   it('cardioSessionsForDate: на дату попадают только сессии соответствующего дня', () => {
@@ -776,5 +789,95 @@ describe('cardioSessionProtocol', () => {
     const p = cardioSessionProtocol({ type: 'zone2', durationMin: 8 });
     const total = p.reduce((s, x) => s + x.minutes, 0);
     expect(total).toBeGreaterThanOrEqual(10);
+  });
+});
+
+// ─── Дни тяжёлых ног (раскладка) ───
+
+describe('assignSessionDays / legDays', () => {
+  it('zone2/miss/hiit не попадают в дни тяжёлых ног', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, daysAvailable: 5, legDays: [0, 3] });
+    for (const w of c.weeks) {
+      for (const s of w.sessions) {
+        if (s.type !== 'recovery') {
+          expect([0, 3]).not.toContain(s.dayOfWeek);
+        }
+      }
+    }
+  });
+
+  it('без legDays распределение как раньше (все дни доступны)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, daysAvailable: 7 });
+    const days = c.weeks[0].sessions.map(s => s.dayOfWeek);
+    expect(days.every(d => d != null && d >= 0 && d <= 6)).toBe(true);
+  });
+
+  it('assignSessionDays: заданный день сохраняется', () => {
+    const sessions = [{ type: 'zone2' as const, durationMin: 30, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 210, purpose: 'x', dayOfWeek: 5 }];
+    const out = assignSessionDays(sessions, [0, 1, 2, 3, 4]);
+    expect(out[0].dayOfWeek).toBe(5);
+  });
+});
+
+// ─── Сценарии-снапшоты ───
+
+describe('сценарии (he_cardio_scenarios)', () => {
+  const SC_KEY = 'he_cardio_scenarios';
+  beforeEach(() => { try { localStorage.removeItem(SC_KEY); } catch { /* ignore */ } });
+
+  it('save → load → remove', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'sc-1' });
+    saveCardioScenario(c, 'Сушка к шоу');
+    const all = loadCardioScenarios();
+    expect(all).toHaveLength(1);
+    expect(all[0].name).toBe('Сушка к шоу');
+    removeCardioScenario(all[0].id);
+    expect(loadCardioScenarios()).toHaveLength(0);
+  });
+
+  it('cap 6 сценариев', () => {
+    for (let i = 0; i < 8; i++) saveCardioScenario(buildCardioCycle({ goal: 'health', totalWeeks: 4, id: `c-${i}` }), `Сценарий ${i}`);
+    expect(loadCardioScenarios().length).toBeLessThanOrEqual(6);
+  });
+
+  it('повреждённые данные → пустой список', () => {
+    try { localStorage.setItem(SC_KEY, '{bad'); } catch { /* ignore */ }
+    expect(loadCardioScenarios()).toEqual([]);
+  });
+});
+
+// ─── Совет по весу (плато на сушке) ───
+
+describe('cardioWeightAdvice', () => {
+  const REF = '2026-08-16';
+  it('плато веса → increase (добавить Z2)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const log = [
+      { date: '2026-08-01', weight: 80 },
+      { date: '2026-08-06', weight: 79.8 },
+      { date: '2026-08-11', weight: 79.7 },
+      { date: '2026-08-15', weight: 79.7 },
+    ];
+    const a = cardioWeightAdvice(log, c, REF);
+    expect(a.action).toBe('increase');
+    expect(a.reason).toContain('Zone 2');
+  });
+
+  it('темп в норме → keep', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const log = [
+      { date: '2026-08-01', weight: 81 },
+      { date: '2026-08-06', weight: 80.2 },
+      { date: '2026-08-11', weight: 79.4 },
+      { date: '2026-08-15', weight: 78.6 },
+    ];
+    const a = cardioWeightAdvice(log, c, REF);
+    expect(a.action).toBe('keep');
+  });
+
+  it('не сушка → keep', () => {
+    const c = buildCardioCycle({ goal: 'mass', totalWeeks: 8 });
+    const a = cardioWeightAdvice([{ date: '2026-08-01', weight: 80 }, { date: '2026-08-15', weight: 80 }], c, REF);
+    expect(a.action).toBe('keep');
   });
 });

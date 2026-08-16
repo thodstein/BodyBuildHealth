@@ -14,7 +14,8 @@ import {
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
   cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel,
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
-  type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant,
+  loadCardioScenarios, saveCardioScenario, removeCardioScenario,
+  type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
@@ -25,6 +26,7 @@ import {
   attachCardioToMacro, detachCardioFromMacro,
 } from '../../../engines/lms/macrocycle.engine';
 import { getProfile, updateSection } from '../../../core/profile-manager';
+import { getLatestBp } from '../../../core/bp-hr-data';
 import { CardioUserCard } from './CardioUserCard';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -74,6 +76,7 @@ interface WizardState {
   age: number;
   sex: 'male' | 'female';
   restingHr: number;
+  legDays: number[];
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -175,6 +178,7 @@ export const CardioConstructor: React.FC = () => {
   const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
   const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
   const [variant, setVariant] = useState<CardioVariant>('base');
+  const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
 
@@ -185,6 +189,7 @@ export const CardioConstructor: React.FC = () => {
   const [macroLink, setMacroLink] = useState<{ kind: 'pl' | 'bb'; cycleId?: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [comparison, setComparison] = useState<string | null>(null);
+  const [scenarios, setScenarios] = useState<CardioScenario[]>(() => loadCardioScenarios());
 
   const readMacroLink = useCallback(() => {
     try {
@@ -235,6 +240,7 @@ export const CardioConstructor: React.FC = () => {
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex,
+      legDays,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     });
     saveCardioCycle(c);
@@ -311,6 +317,26 @@ export const CardioConstructor: React.FC = () => {
     reload();
   };
 
+  const saveScenario = () => {
+    if (!cycle) { flashMsg('⚠ Сначала соберите кардио-цикл'); return; }
+    saveCardioScenario(cycle);
+    setScenarios(loadCardioScenarios());
+    flashMsg('📸 Сценарий сохранён');
+  };
+
+  const loadScenario = (sc: CardioScenario) => {
+    saveCardioCycle(sc.cycle);
+    setActiveCardioCycle(sc.cycle);
+    setCycle(sc.cycle);
+    reload();
+    flashMsg(`📸 Загружен сценарий «${sc.name}»`);
+  };
+
+  const deleteScenario = (id: string) => {
+    removeCardioScenario(id);
+    setScenarios(loadCardioScenarios());
+  };
+
   const acwrValue = useMemo(() => {
     try {
       const srpe = loadSRPESessions();
@@ -324,11 +350,11 @@ export const CardioConstructor: React.FC = () => {
       const s: WizardState = {
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
-        level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0,
+        level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -388,6 +414,7 @@ export const CardioConstructor: React.FC = () => {
     setAge(String(profileAge() ?? 30));
     setSex(profileSex() ?? 'male');
     setRestingHr(String(profileRestingHr() ?? ''));
+    setLegDays([]);
     setComps([]);
     flashMsg('⟲ Параметры сброшены к значениям по умолчанию');
   };
@@ -402,6 +429,18 @@ export const CardioConstructor: React.FC = () => {
     if (s != null) setSex(s);
     if (r != null) setRestingHr(String(r));
     flashMsg('📋 Параметры пользователя загружены из профиля');
+  };
+
+  const fromDiaryHr = () => {
+    try {
+      const b = getLatestBp();
+      if (b && b.hr > 0) {
+        setRestingHr(String(b.hr));
+        flashMsg(`❤️ ЧСС покоя из дневника АД: ${b.hr} уд/мин`);
+      } else {
+        flashMsg('⚠ В дневнике АД нет записей с пульсом');
+      }
+    } catch { flashMsg('⚠ Не удалось прочитать дневник АД'); }
   };
 
   const saveToProfile = () => {
@@ -468,7 +507,7 @@ export const CardioConstructor: React.FC = () => {
       </div>
 
       {/* Графа пользователя */}
-      <CardioUserCard age={age} sex={sex} weight={bodyWeight} restingHr={restingHr} level={level} onFromProfile={fromProfile} onSaveProfile={saveToProfile} />
+      <CardioUserCard age={age} sex={sex} weight={bodyWeight} restingHr={restingHr} level={level} onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} />
 
       {/* Степпер */}
       <div style={{ display: 'flex', gap: 4, padding: 6, borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', overflowX: 'auto', scrollbarWidth: 'none' }}>
@@ -513,6 +552,7 @@ export const CardioConstructor: React.FC = () => {
           age={age} setAge={setAge}
           sex={sex} setSex={setSex}
           restingHr={restingHr} setRestingHr={setRestingHr}
+          legDays={legDays} setLegDays={setLegDays}
           onReset={resetParams}
         />
       )}
@@ -537,9 +577,11 @@ export const CardioConstructor: React.FC = () => {
       {step === 'manage' && (
         <CardioManageStep
           cycle={cycle} library={library} link={link} macroLink={macroLink} comparison={comparison}
+          scenarios={scenarios}
           onLinkTo={linkTo} onUnlink={unlink} onAttachMacro={attachMacro} onDetachMacro={detachMacro}
           onExport={downloadIcs} onPrint={printCycle} onDuplicate={duplicate} onActivate={activate}
           onCompare={compareWith} onRemove={removeCycle} onChanged={refreshActive}
+          onSaveScenario={saveScenario} onLoadScenario={loadScenario} onRemoveScenario={deleteScenario}
         />
       )}
       {step === 'diary' && (

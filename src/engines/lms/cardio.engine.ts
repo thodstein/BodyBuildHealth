@@ -127,6 +127,8 @@ export interface CardioCycleInput {
   restingHr?: number;
   /** Пол — для формулы ЧССмакс (женщины 226-age). */
   sex?: 'male' | 'female';
+  /** Дни тяжёлых ног (0-6, Пн=0): zone2/miss/hiit не ставятся в эти дни. */
+  legDays?: number[];
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
@@ -452,6 +454,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       };
     });
     if (daysAvailable < 7) sessions = capSessionsToDays(sessions, daysAvailable);
+    sessions = assignSessionDays(sessions, input.legDays);
     const weekMinutes = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
     const weekKcal = sessions.reduce((s, x) => s + x.kcalPerSession * x.weeklyFrequency, 0);
     totalMinutes += weekMinutes;
@@ -519,6 +522,92 @@ export function setActiveCardioCycle(cycle: CardioCycle | null): void {
     if (cycle) localStorage.setItem(ACTIVE_CARDIO_CYCLE_KEY, JSON.stringify(cycle));
     else localStorage.removeItem(ACTIVE_CARDIO_CYCLE_KEY);
   } catch { /* ignore */ }
+}
+
+// ─── Сценарии-снапшоты (как «📸 Сценарии года» макро) ───
+
+export const CARDIO_SCENARIOS_KEY = 'he_cardio_scenarios';
+const CARDIO_SCENARIOS_CAP = 6;
+
+export interface CardioScenario {
+  id: string;
+  name: string;
+  savedAt: string;
+  cycle: CardioCycle;
+}
+
+export function loadCardioScenarios(): CardioScenario[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CARDIO_SCENARIOS_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is CardioScenario => !!x && typeof x === 'object' && x.cycle && Array.isArray(x.cycle.weeks)) : [];
+  } catch { return []; }
+}
+
+export function saveCardioScenario(cycle: CardioCycle, name?: string): CardioScenario {
+  const all = loadCardioScenarios();
+  const sc: CardioScenario = { id: `sc-${Date.now()}`, name: name?.trim() || cycle.name, savedAt: new Date().toISOString(), cycle };
+  all.unshift(sc);
+  try { localStorage.setItem(CARDIO_SCENARIOS_KEY, JSON.stringify(all.slice(0, CARDIO_SCENARIOS_CAP))); } catch { /* ignore */ }
+  return sc;
+}
+
+export function removeCardioScenario(id: string): void {
+  try {
+    localStorage.setItem(CARDIO_SCENARIOS_KEY, JSON.stringify(loadCardioScenarios().filter(s => s.id !== id)));
+  } catch { /* ignore */ }
+}
+
+/** Чистая функция: распределить сессии по дням недели (Пн=0),
+ *  пропуская дни тяжёлых ног для zone2/miss/hiit (recovery — в любой день). */
+export function assignSessionDays(sessions: CardioSession[], legDays?: number[]): CardioSession[] {
+  const blocked = new Set((legDays ?? []).filter(d => d >= 0 && d <= 6));
+  const out: CardioSession[] = [];
+  const now = new Date();
+  let day = (now.getDay() + 6) % 7;
+  const avoid = (t: CardioType) => t !== 'recovery' && blocked.size > 0;
+  for (const s of sessions) {
+    if (s.dayOfWeek != null) { out.push(s); continue; }
+    if (avoid(s.type)) {
+      let guard = 0;
+      while (blocked.has(day) && guard < 7) { day = (day + 1) % 7; guard++; }
+    }
+    out.push({ ...s, dayOfWeek: day });
+    day = (day + 1) % 7;
+  }
+  return out;
+}
+
+// ─── Совет по динамике веса (плато на сушке) ───
+
+export interface CardioWeightAdvice {
+  action: 'increase' | 'keep';
+  reason: string;
+}
+
+/** Плато веса 10-14 дней на cut/recomp → рекомендация добавить 10-15 мин Zone 2. */
+export function cardioWeightAdvice(
+  weightLog: { date: string; weight: number }[],
+  cycle: CardioCycle,
+  referenceIso?: string,
+): CardioWeightAdvice {
+  if (cycle.goal !== 'cut' && cycle.goal !== 'recomp') {
+    return { action: 'keep', reason: 'Совет по весу актуален для сушки/рекомпозиции.' };
+  }
+  const sorted = [...weightLog].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (sorted.length < 2) return { action: 'keep', reason: 'Недостаточно замеров веса для анализа.' };
+  const ref = referenceIso ? new Date(referenceIso) : new Date();
+  const refIso = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}-${String(ref.getDate()).padStart(2, '0')}`;
+  const recent = sorted.filter(e => e.date <= refIso).slice(-4);
+  if (recent.length < 2) return { action: 'keep', reason: 'Недостаточно свежих замеров.' };
+  const first = recent[0];
+  const last = recent[recent.length - 1];
+  const delta = last.weight - first.weight;
+  const spanDays = Math.max(1, Math.round((new Date(last.date).getTime() - new Date(first.date).getTime()) / 86400000));
+  const weekly = (delta / spanDays) * 7;
+  if (Math.abs(weekly) < 0.25) {
+    return { action: 'increase', reason: `Вес стоит (${delta >= 0 ? '+' : ''}${delta.toFixed(1)} кг за ${spanDays} дн) — добавьте 10-15 мин Zone 2 на неделю (одна переменная за раз).` };
+  }
+  return { action: 'keep', reason: `Темп снижения веса ${Math.abs(weekly).toFixed(2)} кг/нед — в норме, кардио менять не нужно.` };
 }
 
 // ─── История версий цикла (undo авто-подстройки/правок) ───

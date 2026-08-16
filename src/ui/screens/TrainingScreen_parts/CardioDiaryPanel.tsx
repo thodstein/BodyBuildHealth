@@ -9,7 +9,8 @@ import {
   type CardioLogEntry,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
-import type { CardioCycle, CardioType } from '../../../engines/lms/cardio.engine';
+import { cardioWeightAdvice, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
+import { getWeightLog } from '../../../engines/profile-store';
 
 const BTN: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
@@ -109,6 +110,20 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       <div style={{ fontSize: 12, fontWeight: 700, color: ADVICE_COLOR[advice.action] }}>
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
       </div>
+      {(() => {
+        if (!cycle || (cycle.goal !== 'cut' && cycle.goal !== 'recomp')) return null;
+        try {
+          const w = getWeightLog();
+          if (!Array.isArray(w) || w.length === 0) return null;
+          const wa = cardioWeightAdvice(w, cycle);
+          if (wa.action !== 'increase') return null;
+          return (
+            <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '6px 8px' }} role="status">
+              ⚖️ {wa.reason}
+            </div>
+          );
+        } catch { return null; }
+      })()}
 
       {log.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -14,6 +14,7 @@ const PROFILE_KEY = 'he_profile_v2';
 const WIZARD_KEY = 'he_cardio_wizard_state';
 const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
+const SC_KEY = 'he_cardio_scenarios';
 
 function seedProfile(patch: Record<string, unknown>) {
   const base = {
@@ -43,6 +44,7 @@ beforeEach(() => {
     localStorage.removeItem(WIZARD_KEY);
     localStorage.removeItem(CYCLES_KEY);
     localStorage.removeItem(ACTIVE_KEY);
+    localStorage.removeItem(SC_KEY);
   } catch { /* ignore */ }
 });
 
@@ -160,5 +162,33 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     expect(screen.getByText(/Неделя по дням/)).toBeTruthy();
     for (const d of ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']) expect(screen.getByText(d)).toBeTruthy();
+  });
+
+  it('дни тяжёлых ног: zone2-сессии не ставятся в выбранные дни', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Чт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const saved = loadCardioCycles()[0];
+    for (const w of saved.weeks) {
+      for (const s of w.sessions) {
+        if (s.type !== 'recovery') expect([0, 3]).not.toContain(s.dayOfWeek);
+      }
+    }
+  });
+
+  it('сценарии: сохранение и загрузка через шаг «Управление»', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить сценарий/ }));
+    expect(screen.getByText(/Сценарии \(1\/6\)/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Загрузить/ })).toBeTruthy();
   });
 });

@@ -25,7 +25,8 @@ export const CardioUserCard: React.FC<{
   level: CardioLevel;
   onFromProfile: () => void;
   onSaveProfile: () => void;
-}> = ({ age, sex, weight, restingHr, level, onFromProfile, onSaveProfile }) => {
+  onFromDiaryHr: () => void;
+}> = ({ age, sex, weight, restingHr, level, onFromProfile, onSaveProfile, onFromDiaryHr }) => {
   const items: { label: string; value: string }[] = [
     { label: 'Возраст', value: age || '—' },
     { label: 'Пол', value: sex === 'female' ? '♀' : '♂' },
@@ -45,6 +46,7 @@ export const CardioUserCard: React.FC<{
         ))}
       </div>
       <button style={BTN} onClick={onFromProfile} title="Загрузить возраст/вес/пол/ЧСС покоя из профиля">📋 Из профиля</button>
+      <button style={BTN} onClick={onFromDiaryHr} title="ЧСС покоя из последней записи дневника АД">❤️ Из дневника АД</button>
       <button style={BTN_ACCENT} onClick={onSaveProfile} title="Сохранить возраст/вес/пол/ЧСС покоя в профиль">💾 В профиль</button>
     </div>
   );

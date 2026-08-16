@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   cardioCycleSummary, buildCardioSummaryText, CARDIO_GOAL_LABELS,
-  type CardioCycle,
+  type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
@@ -27,6 +27,7 @@ const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.
 export const CardioManageStep: React.FC<{
   cycle: CardioCycle | null;
   library: CardioCycle[];
+  scenarios: CardioScenario[];
   link: CardioLink | null;
   macroLink: { kind: 'pl' | 'bb'; cycleId?: string } | null;
   comparison: string | null;
@@ -38,10 +39,13 @@ export const CardioManageStep: React.FC<{
   onPrint: (c: CardioCycle) => void;
   onDuplicate: (c: CardioCycle) => void;
   onActivate: (c: CardioCycle) => void;
+  onSaveScenario: () => void;
+  onLoadScenario: (sc: CardioScenario) => void;
+  onRemoveScenario: (id: string) => void;
   onCompare: (c: CardioCycle) => void;
   onRemove: (c: CardioCycle) => void;
   onChanged: () => void;
-}> = ({ cycle, library, link, macroLink, comparison, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged }) => {
+}> = ({ cycle, library, scenarios, link, macroLink, comparison, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario }) => {
   const [copyFlash, setCopyFlash] = useState(false);
 
   const copySummary = () => {
@@ -153,6 +157,31 @@ export const CardioManageStep: React.FC<{
             {comparison}
           </div>
         )}
+      </div>
+
+      {/* Сценарии */}
+      <div style={CARD}>
+        <div style={ROW}>
+          <span style={LABEL}>📸 Сценарии ({scenarios.length}/6)</span>
+          <span style={{ flex: 1 }} />
+          <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
+        </div>
+        {scenarios.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Сценариев нет — сохраните текущий цикл для сравнения вариантов.</div>}
+        {scenarios.map(sc => {
+          const s = cardioCycleSummary(sc.cycle);
+          return (
+            <div key={sc.id} style={{ padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={ROW}>
+                <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.name}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{new Date(sc.savedAt).toLocaleDateString('ru-RU')} · {sc.cycle.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {s.hiitWeeks} HIIT</span>
+              </div>
+              <div style={ROW}>
+                <button style={{ ...BTN_PRIMARY, minHeight: 32, padding: '5px 10px' }} onClick={() => onLoadScenario(sc)}>Загрузить</button>
+                <button style={{ ...BTN_DANGER, minHeight: 32, padding: '5px 10px' }} onClick={() => onRemoveScenario(sc.id)}>🗑</button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
