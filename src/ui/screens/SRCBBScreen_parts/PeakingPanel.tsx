@@ -12,6 +12,8 @@ import {
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildPLTaperCurve, taperWeeksByFatigue, TAPER_MODE_LABELS, type TaperMode } from '../../../engines/lms/lms-taper.engine';
 import { meetAttemptsFor, MEET_STRATEGY_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
+import { scoreBBShowPrep } from '../../../engines/bb/bb-show-coach.engine';
+import { buildBBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 800, color: ACCENT, margin: '4px 0 10px' };
@@ -330,6 +332,31 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
                 {bbResult.readiness.note}
               </div>
             </CalcSection>
+
+            {/* 🧠 Тренерский score ББ-шоу-пика (bb-show-coach.engine) */}
+            {(() => {
+              try {
+                const plan = buildBBContestPrepPlan({ ...bbCfg, ...bbValidation.forced });
+                const verdict = scoreBBShowPrep({ plan, currentBodyFatPct: bbCfg.bodyFatPct });
+                const c = verdict.score >= 85 ? '#22c55e' : verdict.score >= 65 ? '#eab308' : verdict.score >= 40 ? '#f97316' : '#ef4444';
+                return (
+                  <CalcSection icon="🧠" title="Тренерский score готовности к шоу" accent={c}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 26, fontWeight: 800, color: c }}>{verdict.score}/100</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{verdict.label}</span>
+                    </div>
+                    {verdict.notes.slice(0, 6).map((n, i) => (
+                      <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : 'rgba(255,255,255,0.7)', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
+                    ))}
+                    {verdict.actions.length > 0 && (
+                      <div style={{ marginTop: 4, fontSize: 10, color: '#4ade80', lineHeight: 1.4 }}>
+                        {verdict.actions.map((a, i) => <div key={i}>→ {a}</div>)}
+                      </div>
+                    )}
+                  </CalcSection>
+                );
+              } catch { return null; }
+            })()}
 
             <CalcSection icon="📉" title="Тапер тренировок" accent="#a855f7" desc="Кривая из Библиотеки методик — накладывается на последние недели плана ББ">
               {bbResult.taper.map(t => (
