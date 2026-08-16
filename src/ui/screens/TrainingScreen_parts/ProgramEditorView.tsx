@@ -58,6 +58,8 @@ import type { ManualMode } from './ProgramManagerPanel';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 import { TrainingSafetyHub } from './TrainingSafetyHub';
+import { trainingSafetyGate } from '../../../engines/training-safety-gate.engine';
+import type { TrainingSafetyReport } from '../../../engines/training-safety.types';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -107,6 +109,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
   const [tprofile, updateTProfile] = useTrainingProfile();
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [latestSafetyReport, setLatestSafetyReport] = useState<TrainingSafetyReport | null>(null);
 
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
@@ -264,16 +267,25 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (ok) {
       onBack();
     } else {
-      if (onSave('Ручная правка') !== false) onBack();
+      if (handleSave('Ручная правка')) onBack();
     }
   };
   // U5: при ручном сохранении — обновляем baseline
-  const handleSave = useCallback((note?: string) => {
+  const handleSave = useCallback((note?: string): boolean => {
+    if (latestSafetyReport) {
+      const gate = trainingSafetyGate(latestSafetyReport);
+      if (!gate.allowed && (!gate.requiresConfirmation || !window.confirm(gate.message))) {
+        showToast(`🛡 ${gate.message}`, 'warning');
+        return false;
+      }
+    }
     if (onSave(note) !== false) {
       lastSavedRef.current = JSON.stringify(program);
       setIsDirty(false);
+      return true;
     }
-  }, [program, onSave]);
+    return false;
+  }, [program, onSave, latestSafetyReport, showToast]);
 
   // P5: «⚡ Заполнить автоматически» — реальная интеллектуальная сборка через
   // buildBBPlan (BB) + LMS-cycles (PL). Пользователь получает рабочую программу
@@ -306,9 +318,16 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
 
   // «🚚 К выполнению» — поддерживает BB и PL.
-   const [execWeek, setExecWeek] = useState(1);
-   const sendToExecution = useCallback(() => {
-    let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
+    const [execWeek, setExecWeek] = useState(1);
+    const sendToExecution = useCallback(() => {
+     if (latestSafetyReport) {
+       const gate = trainingSafetyGate(latestSafetyReport);
+       if (!gate.allowed && (!gate.requiresConfirmation || !window.confirm(gate.message))) {
+         showToast(`🛡 ${gate.message}`, 'warning');
+         return;
+       }
+     }
+     let days: { label: string; exercises: { name: string; muscleGroup: string; targetSets: { weight: number; reps: number; rir: number }[] }[] }[] = [];
 
     if (dir === 'bb' && program.bb) {
       const wi = Math.max(0, Math.min(execWeek - 1, program.bb.weeks.length - 1));
@@ -424,7 +443,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       }
     }
     showToast('🚚 Отправлено к выполнению — откройте зону «▶ Тренировка»');
-   }, [program, dir, showToast, execWeek]);
+   }, [program, dir, showToast, execWeek, latestSafetyReport]);
 
   /** 🖨 PDF-печать программы — print-friendly окно с таблицами */
   const printProgram = useCallback(() => {
@@ -1130,7 +1149,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
                 })),
               }
             : undefined,
-        }} compact={false} />
+        }} compact={false} onReport={setLatestSafetyReport} />
       )}
 
       {!showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
