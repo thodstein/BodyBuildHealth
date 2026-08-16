@@ -120,6 +120,8 @@ export interface CardioCycleInput {
   phaseSplit?: { base?: number; build?: number; maintenance?: number };
   /** Длина taper-окна перед стартом (1-4, по умолчанию 2). */
   taperWeeks?: number;
+  /** Строить taper перед стартами (по умолчанию true; false → старт без taper-кривой). */
+  taper?: boolean;
   /** Строить пик-неделю старта (по умолчанию true; false → неделя старта лёгкая taper). */
   peakWeek?: boolean;
   /** Уровень подготовки (корректирует стартовый объём: 0.8/1/1.15). */
@@ -385,9 +387,20 @@ export function cardioPhaseForWeek(
   phaseSplit?: { base?: number; build?: number; maintenance?: number },
   taperWeeks = 2,
   peakWeek = true,
+  taperEnabled = true,
 ): CardioPhase {
   const comp = competitions?.find(c => c.week === week);
-  if (comp) return peakWeek ? 'peak' : 'taper';
+  if (comp) return peakWeek ? 'peak' : (taperEnabled ? 'taper' : 'maintenance');
+  if (!taperEnabled) {
+    // Без taper: недели до старта — наращивание (contest_prep), без taper-кривой.
+    const upcoming = competitions?.find(c => c.week > week);
+    if (upcoming) return 'contest_prep';
+    if (week === totalWeeks) return 'transition';
+    const t = totalWeeks;
+    if (week <= Math.ceil(t * 0.33)) return 'base';
+    if (week <= Math.ceil(t * 0.66)) return 'build';
+    return 'maintenance';
+  }
   const beforeComp = competitions?.find(c => c.week > week && c.week - week <= taperWeeks);
   if (beforeComp && week <= beforeComp.week) return 'taper';
   const upcoming = competitions?.find(c => c.week > week);
@@ -542,6 +555,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const competitions = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= totalWeeks);
   const taperWeeks = clamp(Math.round(input.taperWeeks ?? 2), 1, 4);
   const peakWeek = input.peakWeek !== false;
+  const taperEnabled = input.taper !== false;
   const phaseSplit = input.phaseSplit
     ? {
         base: input.phaseSplit.base != null ? clamp(Math.round(input.phaseSplit.base), 0, Math.max(0, totalWeeks - 2)) : 0,
@@ -571,7 +585,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   let totalMinutes = 0;
 
   for (let w = 1; w <= totalWeeks; w++) {
-    const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit, taperWeeks, peakWeek);
+    const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit, taperWeeks, peakWeek, taperEnabled);
     const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition' && phase !== 'taper' && phase !== 'peak';
     // Объём недели: непрерывная прогрессия рабочих недель (cut/recomp/health/maintenance)
     // + плавная taper-кривая к старту. mass/recovery и делоды — без прогрессии.

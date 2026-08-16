@@ -1852,6 +1852,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             );
           })()}
 
+          {/* 🎯 Действия: применение макроцикла, сохранение, экспорт, год → конструкторы */}
+          <SectionHead icon="🎯" title="Действия" />
           {onApplyMacrocycle && (isBB ? bbMacro : macro) && (
             <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
               🗓 Применить весь макроцикл
@@ -2267,9 +2269,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             const activeLabel = blocks.find(b => b.isActive)?.label ?? null;
             return (
               <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-year-stats">
-                <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
-                  📊 Итог года — {total} нед{comps.length > 0 ? ` · 🏁 ${comps.length} соревн.` : ''}{activeLabel ? ` · 📍 сейчас: ${activeLabel}` : ''}
-                </div>
+                <SectionHead icon="📊" title={`Итог года — ${total} нед`} right={<span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{comps.length > 0 ? `🏁 ${comps.length} соревн.` : ''}{activeLabel ? ` · 📍 сейчас: ${activeLabel}` : ''}</span>} />
                 {blocks.map((b, i) => (
                   <div key={i} style={{ marginBottom: 4, padding: b.isActive ? '4px 6px' : 0, borderRadius: 6, background: b.isActive ? b.color + '14' : 'transparent', border: b.isActive ? `1px solid ${b.color}40` : '1px solid transparent' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, fontSize: 10 }}>
@@ -2385,14 +2385,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
 
           {/* 📸 Сценарии года: снапшоты для сравнения планов */}
           <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-scenarios">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: 0.3 }}>📸 Сценарии года</span>
-              <button type="button" onClick={() => {
+            <SectionHead icon="📸" title="Сценарии года" right={<button type="button" onClick={() => {
                 const src = isBB ? bbMacro : macro;
                 if (!src) return;
                 setScenarios(saveMacroScenario(`Сценарий ${scenarios.length + 1} · ${src.totalWeeks} нед`, src));
-              }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }} title="Снимок текущего макроцикла как сценарий">📸 Снимок</button>
-            </div>
+              }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }} title="Снимок текущего макроцикла как сценарий">📸 Снимок</button>} />
             {scenarios.length === 0 && (
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
                 Сохраните сценарий (например, соревнование в июне), перестройте план (например, сентябрь) — и сравните фазы.

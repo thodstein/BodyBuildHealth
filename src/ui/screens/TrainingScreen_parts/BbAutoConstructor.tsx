@@ -2137,26 +2137,36 @@ export const BbAutoConstructor: React.FC = () => {
         />
       </div>
       {/* PRO: Mobility restrictions — biomechanics-based exercise filtering */}
-      <div style={{ marginTop:8 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>🦴 Ограничения мобильности (биомеханика)</div>
+      <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.18)' }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b' }}>🦴 Ограничения мобильности</div>
+          <span style={{ fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:999, background:'rgba(245,158,11,0.12)', color:'#f59e0b', border:'1px solid rgba(245,158,11,0.3)' }}>биомеханика</span>
+        </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.45, marginBottom:8 }}>
+          Если какое-то движение даётся тяжело из-за ограниченной подвижности сустава — отметьте зону. Такие упражнения будут <b style={{ color:'#fbbf24' }}>заменены</b> на биомеханически безопасные альтернативы.
+        </div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
           {([
-            { id: 'shoulder', label: ' плечи (OHP/behind neck)' },
-            { id: 'hip', label: '🦵 таз (deep squats/sissy)' },
-            { id: 'ankle', label: '🦶 голеностоп (squats/lunges)' },
-            { id: 'lower_back', label: '🔙 поясница (deadlift/row)' },
-            { id: 'wrist', label: '✋ запястья (barbell curl)' },
+            { id: 'shoulder', icon: '🤸', label: 'Плечи', desc: 'жим над головой, за голову, тяга к подбородку' },
+            { id: 'hip', icon: '🦵', label: 'Таз', desc: 'глубокие приседы, sissy, гоблет' },
+            { id: 'ankle', icon: '🦶', label: 'Голеностоп', desc: 'приседания, выпады, болгарские' },
+            { id: 'lower_back', icon: '🔙', label: 'Поясница', desc: 'становая, тяга в наклоне, RDL' },
+            { id: 'wrist', icon: '✋', label: 'Запястья', desc: 'сгибания со штангой, франц. жим' },
           ] as const).map(r => {
             const active = mobilityRestrictions.includes(r.id);
             return (
               <button key={r.id} onClick={() => setMobilityRestrictions(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
-                style={{ padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'transparent', color: active ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>
-                {r.label}
+                style={{ padding:'7px 10px', borderRadius:10, fontSize:11, cursor:'pointer', textAlign:'left', minWidth:'110px', flex:'1 1 auto',
+                  border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}>
+                <div style={{ fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>{r.icon} {r.label} {active && <span style={{ marginLeft:'auto', fontSize:10 }}>✕</span>}</div>
+                <div style={{ fontSize:8.5, opacity:0.75, marginTop:2, lineHeight:1.3 }}>{r.desc}</div>
               </button>
             );
           })}
         </div>
-        <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Исключает упражнения, требующие мобильности, которую вы ограничиваете. Заменяет на биомеханически безопасные альтернативы.</div>
+        <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.42)', lineHeight:1.45 }}>
+          💡 <b style={{ color:'rgba(255,255,255,0.6)' }}>Чем отличается от «Травм»:</b> травмы защищают <b>мышцу</b> (исключение или щадящая нагрузка), а мобильность — конкретные <b>движения</b>. Работают вместе, не дублируя друг друга.
+        </div>
       </div>
 
       <button style={{ ...BTN, width:'100%', marginTop:12 }} onClick={() => setStep('ped')}>Далее: PED и рабочие веса →</button>

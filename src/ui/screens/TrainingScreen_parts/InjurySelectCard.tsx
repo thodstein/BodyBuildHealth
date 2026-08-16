@@ -133,8 +133,21 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
             <div style={topBar} />
             <div style={sheetBody}>
               <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 }}>🤕 Травмы и ограничения</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 10, lineHeight: 1.4 }}>
-                Выберите травмированные мышцы или добавьте свою. По умолчанию группа исключается (упражнения заменяются безопасными аналогами). Нажмите «⚡ Щадящая» в списке — появятся ползунки веса, объёма и повторений для точной настройки нагрузки. Даты «с/до» = период активности.
+              <div style={{ padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', marginBottom: 10 }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
+                  Отметьте травмированные мышцы — план <b style={{ color: '#f87171' }}>защитит их</b>. Два режима на каждую травму:
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span style={{ flex: '1 1 45%', padding: '5px 7px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 9, lineHeight: 1.4 }}>
+                    <b style={{ color: '#f87171' }}>⛔ Исключить</b><br />упражнения заменяются безопасными аналогами
+                  </span>
+                  <span style={{ flex: '1 1 45%', padding: '5px 7px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', fontSize: 9, lineHeight: 1.4 }}>
+                    <b style={{ color: '#fbbf24' }}>⚡ Щадящая</b><br />мышца остаётся, но вес/объём/повторы снижаются
+                  </span>
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginTop: 6 }}>
+                  Даты «с/до» = период активности; после заживления нагрузка плавно возвращается (50% → 75% → 100%).
+                </div>
               </div>
 
               {/* Quick toggle: common injury locations */}
@@ -179,7 +192,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
               {/* Custom muscle input */}
               <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>✏️ Своя травма</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                <input type="text" value={customMuscle} onChange={e => setCustomMuscle(e.target.value)} placeholder="Мышца/зона (en)"
+                <input type="text" value={customMuscle} onChange={e => setCustomMuscle(e.target.value)} placeholder="Мышца/зона (на англ.)"
                   style={{
                     flex: 1, padding: '8px 10px', borderRadius: 8, fontSize: 11,
                     background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',

@@ -87,12 +87,13 @@ export interface ProgramEditorProps {
   onSave: (note?: string) => boolean | void;
   onBack: () => void;
   onNext?: () => void;
+  estep?: 'meta' | 'weeks';
   mode: ManualMode;
   onMode: (m: ManualMode) => void;
   autoFillOnMount?: boolean;
 }
 
-export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, onNext, mode, onMode, autoFillOnMount = false }) => {
+export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, onNext, estep = 'weeks', mode, onMode, autoFillOnMount = false }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   // P4: Undo/Redo — snapshot перед каждым onChange, чтобы Ctrl+Z работал из редактора
@@ -515,10 +516,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     setTimeout(() => { w.print(); }, 300);
     }, [program, dir, showToast]);
 
-   return (
-     <div className="manual-constructor manual-constructor--editor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* V2: Sticky header — always visible during scroll */}
-        <div className="manual-constructor__sticky-header editor-topbar" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+return (
+      <div className="manual-constructor manual-constructor--editor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+       {/* Шапка не липкая — скроллится вместе с контентом */}
+        <div className="manual-constructor__header editor-topbar" style={{ background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
@@ -577,7 +578,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
           {onNext && (
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={onNext}>Далее: Итог →</button>
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={onNext}>Далее: {estep === 'meta' ? 'Недели' : 'Итог'} →</button>
           )}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
           {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
