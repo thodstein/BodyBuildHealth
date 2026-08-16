@@ -24,6 +24,7 @@ import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
+import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
@@ -1282,7 +1283,7 @@ export const BbAutoConstructor: React.FC = () => {
       const playerDays = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
-           const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2 }));
+           const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2, technique: ws.technique }));
           return { name: e.name, muscleGroup: e.muscle, notes: [e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '', targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
@@ -1555,6 +1556,7 @@ export const BbAutoConstructor: React.FC = () => {
             weight: ws.weight || 0,
             reps: ws.reps || 0,
             rir: ws.rir ?? e.rir ?? 2,
+            technique: ws.technique,
           }));
           return { name: e.name, muscleGroup: e.muscle, notes: e.comment || e.rationale || '', targetSets, restSec: e.restSeconds || 90 };
         }),
@@ -1576,9 +1578,11 @@ export const BbAutoConstructor: React.FC = () => {
     const weeksHtml = plan.weeks.map(wk => {
       const sessionsHtml = wk.sessions.map((s, si) => {
         const exsHtml = s.exercises.map(e => {
-          const sets = (e.workSets || []).map(ws => `${ws.reps}×${ws.weight}кг @RIR${ws.rir ?? e.rir}`).join(', ');
+          const feat = exerciseFeatureBadges(e).map(b => b.label).join(' · ');
+          const chain = techniqueChainParts(e);
+          const sets = [...(e.workSets || []).map(ws => `${ws.reps}×${ws.weight}кг @RIR${ws.rir ?? e.rir}`), ...(chain ? [chain.label + ': ' + chain.parts.join(' → ')] : [])].join(', ');
           const sub = e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : '';
-          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}${sub ? ' · ' + esc(sub) : ''}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.comment || '')}</td></tr>`;
+          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}${sub ? ' · ' + esc(sub) : ''}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(feat ? '💥 ' + feat : '')}${esc(e.comment || '')}</td></tr>`;
         }).join('');
         const restNote = s.exercises.length === 0 ? `<p style="font-size:11px;color:#888;margin:6px 0">😴 Полный отдых — позирование, растяжка, сон 8–9 ч.${(s as any).comment ? ' ' + esc((s as any).comment) : ''}</p>` : '';
         return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(s.sessionTag) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
@@ -1596,12 +1600,14 @@ export const BbAutoConstructor: React.FC = () => {
   const handleExportCSV = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий'].join(',')];
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема'].join(',')];
     for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
         for (const ex of s.exercises) {
           const ws = ex.workSets || [];
+          const chain = techniqueChainParts(ex);
+          const feat = [...exerciseFeatureBadges(ex).map(b => b.label), ...(chain ? [chain.label + ': ' + chain.parts.join(' -> ')] : [])].join('; ');
           for (let i = 0; i < (ws.length || ex.sets); i++) {
             const set = ws[i] || { reps: ex.repsRange?.[0] || 10, weight: 0, rir: ex.rir };
             const esc = (v: any) => `"${String(v || '').replace(/"/g, '""')}"`;
@@ -2896,7 +2902,11 @@ export const BbAutoConstructor: React.FC = () => {
                     const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
                     const isCompound = isCompoundEx(e);
                     const _cat = EXERCISE_CATALOG.find(c => c.name === (e.exerciseName || e.name));
-                    const technique = _cat?.technique || ((_cat as any)?.targetMuscle ? 'Акцент: ' + (_cat as any).targetMuscle : '');
+                    const techniqueBase = _cat?.technique || ((_cat as any)?.targetMuscle ? 'Акцент: ' + (_cat as any).targetMuscle : '');
+                    const appliedTech = techniqueLabel(lastSetTechnique(e));
+                    const technique = appliedTech ? `💥 ${appliedTech} — финальный подход по технике. ` + (techniqueBase ? '· ' + techniqueBase : '') : techniqueBase;
+                    const featureBadges = exerciseFeatureBadges(e, dupMode);
+                    const { lines: setLines, chain: setChain } = planSetsBreakdown(e, edit);
                     const charColor = e.character === 'тяж' ? '#ef4444' : '#60a5fa';
                     
                     return (
@@ -2945,6 +2955,11 @@ export const BbAutoConstructor: React.FC = () => {
                                   ⭐ Специализация
                                 </span>
                               )}
+                              {featureBadges.map((fb, fbi) => (
+                                <span key={fbi} style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:fb.color+'20', color:fb.color, border:'0.5px solid '+fb.color+'35' }}>
+                                  {fb.icon} {fb.label}
+                                </span>
+                              ))}
                             </div>
                           </div>
                           <div style={{ display:'flex', gap:6, marginLeft:8 }}>
@@ -2981,6 +2996,23 @@ export const BbAutoConstructor: React.FC = () => {
                           {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.55)" />}
                           <Chip label="Группа" value={e.muscle} color="rgba(255,255,255,0.55)" />
                         </div>
+
+                        {/* Разбивка по подходам (включая дроп-цепочки финального сета) */}
+                        {(setLines.length > 0 || setChain) && (
+                          <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.07)' }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.55)', marginBottom:4 }}>📋 Подходы</div>
+                            <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+                              {setLines.map((ln, li) => (
+                                <span key={li} style={{ fontSize:11, fontFamily:'monospace', padding:'2px 7px', borderRadius:5, background:'rgba(34,197,94,0.1)', color:'#86efac', border:'0.5px solid rgba(34,197,94,0.25)' }}>{ln}</span>
+                              ))}
+                              {setChain && (
+                                <span style={{ fontSize:11, fontFamily:'monospace', fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(248,113,113,0.12)', color:'#fca5a5', border:'0.5px solid rgba(248,113,113,0.35)' }}>
+                                  💥 {setChain.label}: {setChain.parts.join(' → ')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Комментарий и полная тренерская инструкция */}
                         <details style={{ marginTop:6 }} open={false}>
@@ -3703,11 +3735,14 @@ export const BbAutoConstructor: React.FC = () => {
                   const catEx = EXERCISE_CATALOG.find(x => x.name === e.name);
                   const isComp = isCompoundEx(e);
                   const altExercises = getExercisesByGroup(e.muscle).filter(x => x.name !== e.name).slice(0, 5);
+                  const editBadges = exerciseFeatureBadges(e, dupMode);
+                  const { lines: editSetLines, chain: editSetChain } = planSetsBreakdown(e, edit);
                   return <div key={ei} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ fontWeight:700, fontSize:11, color:'#fff', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color:'rgba(255,255,255,0.4)' }}>({e.muscle})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
                       {(e as any).warmupActivator && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', marginLeft:6 }}>🔥 Разминка</span>}
                       {e.muscle === 'back' && backSubgroupLabel((e as any).backSubgroup) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(45,212,191,0.15)', color:'#2dd4bf', marginLeft:6 }}>{backSubgroupLabel((e as any).backSubgroup)}</span>}
                       {['biceps', 'triceps', 'forearms'].includes(e.muscle) && armHeadLabel((e as any).movementPattern) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(232,121,249,0.15)', color:'#e879f9', marginLeft:6 }}>{armHeadLabel((e as any).movementPattern)}</span>}
+                      {editBadges.map((fb, fbi) => <span key={fbi} style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:fb.color+'20', color:fb.color, marginLeft:6 }}>{fb.icon} {fb.label}</span>)}
                     </div>
                     <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
                       <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:45, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
@@ -3718,6 +3753,12 @@ export const BbAutoConstructor: React.FC = () => {
                       <button onClick={() => handleMoveExercise(si, ei, -1)} disabled={ei === 0} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===0?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===0?'transparent':'rgba(96,165,250,0.06)', color:ei===0?'rgba(255,255,255,0.2)':'#60a5fa' }}>↑</button>
                       <button onClick={() => handleMoveExercise(si, ei, 1)} disabled={ei === s.exercises.length - 1} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===s.exercises.length-1?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===s.exercises.length-1?'transparent':'rgba(96,165,250,0.06)', color:ei===s.exercises.length-1?'rgba(255,255,255,0.2)':'#60a5fa' }}>↓</button>
                     </div>
+                    {(editSetLines.length > 0 || editSetChain) && (
+                      <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.07)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+                        {editSetLines.map((ln, li) => <span key={li} style={{ fontSize:11, fontFamily:'monospace', padding:'2px 7px', borderRadius:5, background:'rgba(34,197,94,0.1)', color:'#86efac', border:'0.5px solid rgba(34,197,94,0.25)' }}>{ln}</span>)}
+                        {editSetChain && <span style={{ fontSize:11, fontFamily:'monospace', fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(248,113,113,0.12)', color:'#fca5a5', border:'0.5px solid rgba(248,113,113,0.35)' }}>💥 {editSetChain.label}: {editSetChain.parts.join(' → ')}</span>}
+                      </div>
+                    )}
                     {altExercises.length > 0 && <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Альтернативы: {altExercises.map(x => x.name).join(', ')}</div>}
                     <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>💡 {exerciseComment(e, weakPoints, bbFocus, currentPhase)}</div>
                   </div>;

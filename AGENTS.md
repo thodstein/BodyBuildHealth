@@ -1,5 +1,18 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Отображение фишек ББ-плана: дроп-сеты/суперсеты/FST-7/GVT/DUP в UI (Aug 16 2026, pushed)
+
+Жалоба: «ББ-авто не видно дроп-сетов, FST и других фишек — нужна пометка ДРОП СЕТ/СПЛИТ, подходы расписать конкретно». Анализ: фишки **генерируются движком** (autoAssignIntensityTechniques/applyIntensityTechniqueToExercise/markAntagonistSupersets/applyVolumeScheme/DUP), но **не выживают/не видны**: (1) расширенные мини-сеты техник обрезаются `syncBBPlanSetShape` (инвариант `sets === workSets.length`, валидатор `sets_mismatch`); (2) план-шаг показывает плоскую сводку `sets×reps`; (3) метки спрятаны в свёрнутом `<details>`; (4) «💡 Техника» читала EXERCISE_CATALOG, а не применённую.
+
+**Решение**: дроп-мини-сеты — ТОЛЬКО отображение (render-only, как buildWarmup), учёт/капы MRV НЕ трогаем. Всё — UI-слой, движок без изменений.
+
+- NEW `src/ui/screens/TrainingScreen_parts/bb-technique-display.ts` — чистые хелперы (UI-only, не меняют workSets/e.sets): `lastSetTechnique`/`techniqueLabel` (обе системы имён: drop_set/dropset и т.д.); `techniqueChainParts(ex, editedWeight?)` — цепочки: дроп `reps×w → 6×w×0.8 → 4×w×0.64`, rest-pause (мини-сеты через 15с), myo-reps (активация + 4×4×5с), 21s (7+7+7), негативы (темп 4-2-1-0), pause_rep, механический дроп, rest_pause_cluster; `volumeSchemeLabel` (FST-7/GVT 10×10/8×8 Gironda из comment), `supersetLabel`, `exerciseFeatureBadges(ex, dupMode)`, `workSetsBreakdown`/`planSetsBreakdown` (по-сетовая разбивка с учётом inline-правки).
+- MOD `BbAutoConstructor.tsx`: план-шаг — бейджи фишек на карточке упражнения (💥 техника · 🔗 Суперсет с «X» · 📦 FST-7/GVT/8×8 · 🌊 DUP) + блок «📋 Подходы» с по-сетовой разбивкой и дроп-цепочкой (пересчитывается от `exerciseEdits`); «💡 Техника выполнения» — применённая (каталог fallback); «Редактор упражнений» (Коррекция) — те же бейджи + разбивка; PDF — метки + цепочка в «Вес/Reps»; CSV — колонка «Техника/Схема»; проброс `technique: ws.technique` в `targetSets` (обе конвертации).
+- MOD `SessionPlayer.tsx`: `PlayerSet += technique?` (UI-тип); бейдж 💥 в «Детали дня» и на ряду упражнения + подсказка цепочки на последнем сете (title).
+- NEW `bb-technique-display.test.tsx` — 18 тестов: цепочки всех техник (веса ×0.8/×0.64 с округлением 0.1), детект схем/суперсета/DUP, inline-правка веса, SSR SessionPlayer (бейдж виден / без техники нет).
+
+Проверено: tsc 0; bb-technique-display 18/18; bb-auto-smoke 5/5; mindset-tab 82/82; diary-hub-tabs 12/12; SRCBBScreen 79/80; движок BB 1185/1186; полный прогон 5833/5869 — падения пред-существующие/чужие (bb-training-recommendations vitest-каталог; macrocycle-panel-cycle-slots; cardio-constructor/user-flow — `totalWeeks` в чужом CardioParamsStep WIP; bb-macrocycle v7; course-sync/profile флейки). Учёт/капы MRV байт-в-байт прежние (движок/валидатор не тронуты).
+
 ## Кардио-конструктор: полное выполнение плана до «хорошего уровня» (Aug 16 2026, uncommitted)
 
 Полный цикл доработки по `docs/CARDIO-GOOD-LEVEL-PLAN.md` (анализ + 6 этапов). **282 теста в области зелёные, tsc 0 по моим файлам** (в проекте 6 чужих ошибок: bb-technique-display/BbAutoConstructor — параллельный агент). Файлы других агентов не тронуты (TrainingDiaryHub, IndividualPlanContext, SRCBBScreen, MacrocyclePanel, annual-training — чужой WIP).

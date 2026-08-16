@@ -25,6 +25,7 @@ import { recordMMC } from '../../../engines/mmc-tracking.engine';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from './MindsetSessionPanels';
 import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel';
 import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
+import { techniqueLabel, techniqueChainParts } from '../TrainingScreen_parts/bb-technique-display';
 
   const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
@@ -81,7 +82,7 @@ const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, m
 const SMALL: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 12, lineHeight: 1.4 };
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
 
-export interface PlayerSet { weight: number; reps: number; rir: number }
+export interface PlayerSet { weight: number; reps: number; rir: number; technique?: string }
 export interface PlayerExercise {
   name: string;
   muscleGroup: string;
@@ -873,7 +874,16 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                       return (
                         <div key={ei} style={{ ...ROW, gap: 8, alignItems: 'flex-start' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>{ex.name}</div>
+                            <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>
+                              {ex.name}
+                              {(() => {
+                                const t = ex.targetSets[ex.targetSets.length - 1]?.technique;
+                                const lbl = techniqueLabel(t);
+                                return lbl ? (
+                                  <span style={{ fontSize: 9, marginLeft: 6, color: '#f87171', fontWeight: 700 }} title={techniqueChainParts({ workSets: ex.targetSets.map(s => ({ reps: s.reps, weight: s.weight, rir: s.rir, technique: s.technique })) })?.parts.join(' → ') || lbl}>💥 {lbl}</span>
+                                ) : null;
+                              })()}
+                            </div>
                             <div style={{ fontSize: 9, color: 'var(--text-faint)' }}>
                               {ex.muscleGroup || ex.group || ''}{plates ? ` · ${plates}` : ''}
                             </div>
@@ -1075,6 +1085,13 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                    )}
                    <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, flex: 1 }}>
                      {ex.name} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({ex.muscleGroup})</span>
+                     {(() => {
+                       const t = ex.targetSets[ex.targetSets.length - 1]?.technique;
+                       const lbl = techniqueLabel(t);
+                       return lbl ? (
+                         <span style={{ fontSize: 9, marginLeft: 6, color: '#f87171', fontWeight: 700 }} title="Техника на последнем подходе">💥 {lbl}</span>
+                       ) : null;
+                     })()}
                      {supersetExercises.includes(ei) && (
                        <span style={{ fontSize: 9, marginLeft: 6, color: supersetMode ? '#f59e0b' : '#8b5cf6' }}>
                          {supersetMode ? '🔄 Суперсет' : '⭕ Круг'}
@@ -1112,6 +1129,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                    <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
                      <span style={{ color: 'var(--text-dim)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
                      <span style={{ color: 'var(--text-dim)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
+                     {t.technique && (
+                       <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title={techniqueChainParts({ workSets: [{ reps: t.reps, weight: t.weight, rir: t.rir, technique: t.technique }] })?.parts.join(' → ') || ''}>💥 {techniqueLabel(t.technique)}</span>
+                     )}
                      {t.weight > 0 && (
                        <span style={{ fontSize: 9, color: 'var(--text-faint)', width: '100%', paddingLeft: 52 }}>
                          🏋️ {formatPlates(t.weight)}
