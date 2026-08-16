@@ -498,6 +498,7 @@ function buildWeekSessions(
   week: number,
   bw: number,
   recoveryLow: boolean,
+  volumeMult = 1,
 ): { sessions: CardioSession[]; rationale: string[] } {
   if (phase === 'peak') {
     return {
@@ -505,29 +506,31 @@ function buildWeekSessions(
       rationale: ['Пик-неделя: без HIIT и утомляющего кардио.'],
     };
   }
+  // contest_prep = наращивание (прогрессирующий пул), а не готовый maintenance.
   const poolRaw: RampProfileEntry[] =
-    phase === 'base' ? profile.base : phase === 'build' ? profile.build : profile.maintenance;
-  // Чередование альтернатив в build-фазе: нечётная неделя цикла → MISS (Z3),
+    phase === 'base' ? profile.base : (phase === 'build' || phase === 'contest_prep') ? profile.build : profile.maintenance;
+  // Чередование альтернатив в build/prep: нечётная неделя цикла → MISS (Z3),
   // чётная → HIIT; если нужного типа в профиле нет — альтернатива не включается.
   let pool = poolRaw;
-  if (phase === 'build' && poolRaw.some(p => p.alt)) {
+  if ((phase === 'build' || phase === 'contest_prep') && poolRaw.some(p => p.alt)) {
     const wantHiit = week % 2 === 0;
     pool = poolRaw.filter(p => !p.alt || p.type === (wantHiit ? 'hiit' : 'miss'));
   }
   const sessions: CardioSession[] = [];
   const rationale: string[] = [];
-  const mult = phase === 'taper' || phase === 'transition' ? profile.taperMult : 1;
+  const mult = volumeMult;
   for (const p of pool) {
     if (p.type === 'hiit' && (recoveryLow || phase === 'taper' || phase === 'transition')) continue;
     const dur = Math.max(10, Math.round(p.dur * mult));
-    const freq = Math.max(1, Math.round(p.freq * mult));
+    // Прогрессия (mult>1) растёт только длительностью; taper (mult<1) — и частотой.
+    const freq = mult < 1 ? Math.max(1, Math.round(p.freq * mult)) : p.freq;
     if (freq <= 0) continue;
     sessions.push(mkSession(p.type, dur, freq, p.purpose, bw));
   }
   if (phase === 'transition') {
     rationale.push('Переход: лёгкая активность для восстановления.');
   }
-  if (phase === 'taper') rationale.push('Taper: объём снижен, интенсивность сохранена (Bosquet 2005).');
+  if (phase === 'taper') rationale.push('Taper: объём снижается плавно к старту, интенсивность сохранена (Bosquet 2005).');
   return { sessions, rationale };
 }
 
@@ -570,7 +573,19 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   for (let w = 1; w <= totalWeeks; w++) {
     const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit, taperWeeks, peakWeek);
     const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition' && phase !== 'taper' && phase !== 'peak';
-    let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow);
+    // Объём недели: непрерывная прогрессия рабочих недель (cut/recomp/health/maintenance)
+    // + плавная taper-кривая к старту. mass/recovery и делоды — без прогрессии.
+    let volumeMult = 1;
+    if (phase === 'taper') {
+      const nextComp = competitions.find(c => c.week > w);
+      const dist = nextComp ? nextComp.week - w : taperWeeks; // 1..taperWeeks
+      volumeMult = 0.4 + 0.15 * Math.max(0, dist - 1); // 1→0.4, 2→0.55, 3→0.7, 4→0.85
+    } else if (phase === 'transition') {
+      volumeMult = profile.taperMult;
+    } else if (!deload && phase !== 'peak' && ['cut', 'recomp', 'health', 'maintenance'].includes(input.goal)) {
+      volumeMult = Math.min(1.3, 1 + 0.04 * (w - 1));
+    }
+    let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow, volumeMult);
     if (deload) {
       sessions = sessions
         .filter(s => s.type !== 'hiit' && s.type !== 'miss')

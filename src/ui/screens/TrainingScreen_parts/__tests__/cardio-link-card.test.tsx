@@ -92,13 +92,14 @@ describe('CardioLinkCard — CSR', () => {
     const d = new Date();
     d.setDate(d.getDate() - 14);
     const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    // cut 6 нед: неделя 3 = build (zone2 40×1 при daysAvailable=1), неделя 1 = base (30×1).
+    // cut 6 нед: неделя 3 = build (zone2 40×1 при daysAvailable=1, с прогрессией ~43 мин),
+    // неделя 1 = base (30×1).
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'cc-start', startDate: start, daysAvailable: 1 });
     saveCardioCycle(c);
     setCardioLink({ cycleId: 'cc-start', sport: 'pl', linkedAt: 'x' });
     render(<CardioLinkCard />);
-    // «Сегодня» и «Следующая сессия» обе показывают неделю 3 (40 мин), не неделю 1 (30 мин).
-    expect(screen.getAllByText(/40 мин/).length).toBeGreaterThan(0);
+    // «Сегодня» и «Следующая сессия» обе показывают неделю 3 (build ~43 мин), не неделю 1 (30 мин).
+    expect(screen.getAllByText(/43 мин/).length).toBeGreaterThan(0);
   });
 
   it('показывает «⏭ Следующая сессия» и кнопку «▶ Старт»', () => {

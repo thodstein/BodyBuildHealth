@@ -131,7 +131,8 @@ describe('computeCardioAdvice', () => {
   });
 
   it('RPE ≥ 8 → reduce', () => {
-    const log = [entry({ date: '2026-01-05', durationMin: 60, rpe: 9, completed: true })];
+    // Объём цикла с прогрессией ~130 мин/нед: 90 мин ≥ 60% плана, чтобы RPE-перегруз сработал.
+    const log = [entry({ date: '2026-01-05', durationMin: 90, rpe: 9, completed: true })];
     const a = computeCardioAdvice(c, log, { referenceIso: REF });
     expect(a.action).toBe('reduce');
     expect(a.reason).toContain('RPE');
