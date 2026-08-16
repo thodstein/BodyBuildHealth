@@ -339,6 +339,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepWaterMode, setPrepWaterMode] = useState<PrepWaterMode>('stable');
   const [prepSodiumMode, setPrepSodiumMode] = useState<PrepSodiumMode>('stable');
   const [prepCarbMode, setPrepCarbMode] = useState<PrepCarbMode>('moderate');
+  // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
+  // (RIR 1–3, без отказа, объём как в плане), 0.85 = поддерживающий объём при дефиците.
+  const [prepVolumeMode, setPrepVolumeMode] = useState<number>(1.0);
   const [prepConfirmedManip, setPrepConfirmedManip] = useState(false);
   const [prepBusy, setPrepBusy] = useState(false);
   const prepContra = useMemo(() => {
@@ -390,6 +393,7 @@ export const BbAutoConstructor: React.FC = () => {
       const plan = buildBBContestPrepPlan(cfg, {
         prepWeeks: Math.min(52, Math.max(1, prepWeeks)),
         taperWeeks: Math.min(4, Math.max(1, prepTaperWeeks)),
+        prepVolumeMult: prepVolumeMode,
         source: 'bb_auto',
       });
       setPrepPlan(plan);
@@ -397,6 +401,7 @@ export const BbAutoConstructor: React.FC = () => {
         const updated = applyContestPrepToBBPlan(builtPlan, cfg, {
           prepWeeks: plan.preparation.weeks,
           taperWeeks: plan.taper.weeks,
+          prepVolumeMult: prepVolumeMode,
           force: true, // обновить уже наложенный taper/пик актуальными настройками
         });
         setBuiltPlan(updated);
@@ -445,6 +450,7 @@ export const BbAutoConstructor: React.FC = () => {
       const updated = applyContestPrepToBBPlan(builtPlan, buildContestPrepConfig(), {
         prepWeeks: plan.preparation.weeks,
         taperWeeks: plan.taper.weeks,
+        prepVolumeMult: prepVolumeMode,
         force: true,
       });
       setBuiltPlan(updated);
@@ -465,6 +471,7 @@ export const BbAutoConstructor: React.FC = () => {
       const updated = applyContestPrepToBBPlan(base, buildContestPrepConfig(), {
         prepWeeks: newWeeks,
         taperWeeks: replanned.taper.weeks,
+        prepVolumeMult: prepVolumeMode,
         force: true,
       });
       setBuiltPlan(updated);
@@ -550,6 +557,7 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepWaterMode(stored.peakWeek.waterMode);
       setPrepSodiumMode(stored.peakWeek.sodiumMode);
       setPrepCarbMode(stored.peakWeek.carbMode);
+      if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3658,6 +3666,19 @@ export const BbAutoConstructor: React.FC = () => {
                     {m === 'conservative' ? 'Консервативная' : m === 'moderate' ? 'Умеренная' : 'Высокая'}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>🏋️ Режим подготовки</div>
+              <div style={{ display:'flex', gap:6 }}>
+                {([1.0, 0.85] as number[]).map(m => (
+                  <button key={m} onClick={() => setPrepVolumeMode(m)} style={{ ...BTN_GHOST, background: prepVolumeMode === m ? 'rgba(96,165,250,0.2)' : 'transparent', borderColor: prepVolumeMode === m ? '#60a5fa' : undefined, color: prepVolumeMode === m ? '#60a5fa' : undefined }}>
+                    {m === 1.0 ? 'Сохранение (RIR 1–3)' : 'Поддерживающий ×0.85'}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:3 }}>
+                {prepVolumeMode === 1.0 ? 'Объём как в плане, RIR 1–3, без отказных техник, веса сохраняются' : 'Объём ×0.85 (дефицит), RIR 2–3, без отказных техник'}
               </div>
             </div>
           </div>

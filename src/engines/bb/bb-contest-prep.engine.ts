@@ -1132,6 +1132,10 @@ export interface ContestPrepApplyOpts {
   taperWeeks?: number;     // недели тапера (1-4), дефолт cfg.weeksOut
   weekNumber?: number;     // неделя шоу (1-index), дефолт последняя
   force?: boolean;         // перезаписать уже наложенный taper/пик актуальными настройками
+  /** Режим подготовки: множитель объёма недель подготовки. 1.0 — сохранение
+   *  (объём как в плане, RIR 1–3, без отказа); 0.85 — поддерживающий объём
+   *  при дефиците (Helms 2022). По умолчанию 1.0. */
+  prepVolumeMult?: number;
 }
 
 /**
@@ -1184,6 +1188,41 @@ export function applyContestPrepToBBPlan(
 
   for (let i = 0; i < total; i++) {
     weeks[i] = { ...weeks[i], contestPhase: byIdx.get(i) ?? 'preparation' };
+  }
+
+  // 2.5) РЕЖИМ ПОДГОТОВКИ (тренировочная логика недель подготовки):
+  //   - RIR 1–3 (никакого авто-отказа RIR 0 из интенсификации mass-плана);
+  //   - отказные интенсив-техники (dropset/rest_pause/myo_rep/negative) убираются;
+  //   - объём по выбору: 1.0 = как в плане (сохранение), 0.85 = поддерживающий
+  //     при дефиците (Helms 2022: объём снижают, силу сохраняют);
+  //   - веса (интенсивность) сохраняются;
+  //   - deload-недели не трогаются; идемпотентно (метка prepProtocol 'Подготовка').
+  const prepVolumeMult = Math.min(1, Math.max(0.75, Number(opts.prepVolumeMult) || 1));
+  for (let i = 0; i < finalStart0; i++) {
+    const wk = weeks[i];
+    if (!wk) continue;
+    if (wk.deload === true || wk.phase === 'deload') continue; // разгрузка остаётся
+    const prepMark = String(wk.prepProtocol || '');
+    if (prepMark.startsWith('Подготовка') && !(opts.force === true)) continue; // идемпотентно
+    for (const s of wk.sessions) {
+      s.exercises = s.exercises.map((e: any) => {
+        const baseSets = (e as any)._baseSets ?? e.sets;
+        (e as any)._baseSets = baseSets; // база для пересчёта при force (без накопления)
+        const newSets = prepVolumeMult < 1 ? Math.max(2, Math.round(baseSets * prepVolumeMult)) : e.sets;
+        const rir = clamp(Number(e.rir) || 2, 1, 3);
+        const workSets = (e.workSets || []).map((w: any) => ({ ...w, rir, technique: undefined }));
+        return {
+          ...e,
+          sets: newSets,
+          rir,
+          workSets: newSets >= workSets.length ? workSets : workSets.slice(0, newSets),
+          comment: prepMark.startsWith('Подготовка')
+            ? e.comment
+            : `${e.comment || ''} 🏁 Режим подготовки: RIR 1–3, без отказа${prepVolumeMult < 1 ? `, объём ×${Math.round(prepVolumeMult * 100)}%` : ''}, веса сохраняются.`,
+        };
+      });
+    }
+    wk.prepProtocol = `Подготовка: RIR 1–3, без отказа${prepVolumeMult < 1 ? `, объём ×${Math.round(prepVolumeMult * 100)}%` : ''}`;
   }
 
   // 3) Финальная подготовка: объём ×0.9, RIR 2–3, интенсивность сохраняется,
@@ -1490,6 +1529,8 @@ export interface BBContestPrepPlan {
     currentCalories: number;
     stepsPerDay: number;
     cardioMinutesPerWeek: number;
+    /** Множитель объёма недель подготовки (1.0 = сохранение / 0.85 = поддерживающий при дефиците). */
+    volumeMult?: number;
   };
 
   taper: {
@@ -1647,6 +1688,8 @@ export interface BuildPrepPlanOpts {
   stepsPerDay?: number;
   cardioMinutesPerWeek?: number;
   targetRatePctPerWeek?: number;
+  /** Множитель объёма недель подготовки (1.0 / 0.85). */
+  prepVolumeMult?: number;
   trainingPlanId?: string;
   nutritionPlanId?: string;
   testPeakWeekId?: string;
@@ -1708,6 +1751,7 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       currentCalories: opts.currentCalories ?? estimatePrepCalories(cfg.weightKg, targetRate),
       stepsPerDay: opts.stepsPerDay ?? 8000,
       cardioMinutesPerWeek: opts.cardioMinutesPerWeek ?? 0,
+      volumeMult: opts.prepVolumeMult != null ? Math.min(1, Math.max(0.75, opts.prepVolumeMult)) : undefined,
     },
     taper: {
       enabled: taperWeeks > 0,

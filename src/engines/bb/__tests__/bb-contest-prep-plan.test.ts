@@ -341,6 +341,54 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(prepWk.sessions[0].exercises[0].rir).toBe(baseWk.sessions[0].exercises[0].rir);
   });
 
+  it('РЕЖИМ ПОДГОТОВКИ: недели подготовки получают RIR 1–3 (не RIR 0), отказные техники убраны, веса сохранены', () => {
+    const plan = makePlan(8);
+    // Интенсификационные недели с RIR 0 и dropset-техникой на последнем сете.
+    plan.weeks.forEach((w: any, wi: number) => {
+      if (wi < 4) return;
+      w.sessions.forEach((s: any) => s.exercises.forEach((e: any) => {
+        e.rir = 0;
+        if (e.workSets?.length) e.workSets[e.workSets.length - 1].technique = 'dropset';
+      }));
+    });
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 5, taperWeeks: 2 }) as BBPlanWithPrep;
+    // План 8: prep 0..2 (3 недели), финальная 3..4, taper 5..6, пик 7.
+    for (let wi = 0; wi < 3; wi++) {
+      const w = out.weeks[wi];
+      const ps = plan.weeks[wi] as any;
+      for (let si = 0; si < w.sessions.length; si++) {
+        const s = w.sessions[si];
+        for (let ei = 0; ei < s.exercises.length; ei++) {
+          const e = s.exercises[ei];
+          expect(e.rir).toBeGreaterThanOrEqual(1);
+          expect(e.rir).toBeLessThanOrEqual(3);
+          for (const ws of e.workSets || []) expect((ws as any).technique).toBeUndefined();
+          expect(e.workSets[0].weight).toBe(ps.sessions[si].exercises[ei].workSets[0].weight);
+        }
+      }
+      expect(String(w.prepProtocol || '')).toMatch(/Подготовка/);
+    }
+  });
+
+  it('РЕЖИМ ПОДГОТОВКИ поддерживающий: prepVolumeMult 0.85 режет объём от базы (без накопления при повторном force)', () => {
+    const plan = makePlan(8);
+    const out1 = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 5, taperWeeks: 2, prepVolumeMult: 0.85 }) as BBPlanWithPrep;
+    const ex1 = out1.weeks[0].sessions[0].exercises[0];
+    expect(ex1.sets).toBe(Math.max(2, Math.round(plan.weeks[0].sessions[0].exercises[0].sets * 0.85)));
+    // Повторный force-пересбор: объём НЕ накапливается (от базы _baseSets).
+    const out2 = applyContestPrepToBBPlan(out1, baseConfig(), { prepWeeks: 5, taperWeeks: 2, prepVolumeMult: 0.85, force: true }) as BBPlanWithPrep;
+    expect(out2.weeks[0].sessions[0].exercises[0].sets).toBe(ex1.sets);
+  });
+
+  it('РЕЖИМ ПОДГОТОВКИ: deload-недели подготовки не трогаются', () => {
+    const plan = makePlan(8);
+    plan.weeks[1] = { ...plan.weeks[1], deload: true, phase: 'deload' } as any;
+    const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 5, taperWeeks: 2 }) as BBPlanWithPrep;
+    const deloadWk = out.weeks[1];
+    expect(deloadWk.prepProtocol).toBeFalsy();
+    expect(deloadWk.sessions[0].exercises[0].sets).toBe(plan.weeks[1].sessions[0].exercises[0].sets);
+  });
+
   it('taper НЕ переделывает весь цикл: чистая подготовка идентична исходной (объём/веса/RIR/упражнения), меняются только финальная/taper/пик', () => {
     const plan = makePlan(12);
     const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 9, taperWeeks: 2 }) as BBPlanWithPrep;
