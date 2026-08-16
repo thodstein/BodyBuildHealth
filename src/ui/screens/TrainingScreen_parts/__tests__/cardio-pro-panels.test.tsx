@@ -6,7 +6,7 @@ import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CardioAutoTunePanel, CARDIO_AUTO_TUNE_KEY } from '../CardioAutoTunePanel';
+import { CardioAutoTunePanel, CARDIO_AUTO_TUNE_KEY, CARDIO_AUTO_APPLY_KEY } from '../CardioAutoTunePanel';
 import { CardioWeekEditor } from '../CardioWeekEditor';
 import { CardioVolumeChart } from '../CardioVolumeChart';
 import { CardioSessionTimer } from '../CardioSessionTimer';
@@ -78,6 +78,21 @@ describe('CardioAutoTunePanel — CSR', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'tune-auto' });
     const { unmount } = render(<CardioAutoTunePanel cycle={c} acwr={1.6} />);
     expect(screen.getByText(/Предпросмотр изменений/)).toBeTruthy();
+    unmount();
+  });
+
+  it('авто-применение: подстройка применяется сразу и сохраняет undo-версию', () => {
+    localStorage.setItem(CARDIO_AUTO_TUNE_KEY, '1');
+    localStorage.setItem(CARDIO_AUTO_APPLY_KEY, '1');
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, id: 'tune-apply' });
+    const { unmount } = render(<CardioAutoTunePanel cycle={c} acwr={1.6} />);
+    expect(screen.getByText(/Подстройка применена/)).toBeTruthy();
+    const saved = loadCardioCycles().find(x => x.id === 'tune-apply');
+    expect(saved).toBeTruthy();
+    const tuned = saved!.weeks.filter(w => !w.deload && !w.taper && w.phase !== 'transition');
+    for (const w of tuned) expect(w.sessions.some(s => s.type === 'hiit')).toBe(false);
+    const versions = JSON.parse(localStorage.getItem('he_cardio_cycle_history') ?? '[]');
+    expect(versions.some((v: any) => v.cycleId === 'tune-apply')).toBe(true);
     unmount();
   });
 
@@ -192,6 +207,19 @@ describe('CardioSessionTimer', () => {
     const log = loadCardioLog();
     expect(log.length).toBe(1);
     expect(log[0].rpe).toBe(6);
+    unmount();
+  });
+
+  it('«⏭ Пропустить» записывает completed:false', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-3' });
+    const { unmount } = render(<CardioSessionTimer cycle={c} />);
+    const skipBtn = screen.getAllByRole('button', { name: /Пропустить/ })[0];
+    fireEvent.click(skipBtn);
+    expect(screen.getByText(/отмечена пропущенной/)).toBeTruthy();
+    const log = loadCardioLog();
+    expect(log.length).toBe(1);
+    expect(log[0].completed).toBe(false);
+    expect(log[0].notes).toBe('пропущена');
     unmount();
   });
 });

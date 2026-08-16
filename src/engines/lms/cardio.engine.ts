@@ -1042,6 +1042,16 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
     const marks = [w.deload ? 'делод' : null, w.taper ? 'taper' : null].filter(Boolean).join(' + ');
     return `<tr><td>${w.week}</td><td>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td><td>${escHtml(sessions)}</td><td>${w.totalMinutes}</td><td>${w.totalKcal}</td><td>${escHtml(marks)}</td></tr>`;
   }).join('');
+  const dayRows = cycle.weeks.map(w => {
+    const cells = DAY_LABELS_RU.map((d, di) => {
+      const sess = spreadSessionsAcrossDays(w).filter(s => s.dayOfWeek === di);
+      const content = sess.length === 0
+        ? '—'
+        : sess.map(s => `${s.type.toUpperCase()} ${s.durationMin}м${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? '<br>ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join('<br>');
+      return `<td style="vertical-align:top;font-size:11px">${escHtml(content)}</td>`;
+    }).join('');
+    return `<tr><td style="font-weight:700;font-size:11px">Нед ${w.week}<br>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td>${cells}</tr>`;
+  }).join('');
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${escHtml(cycle.name)}</title>
 <style>body{font-family:system-ui,sans-serif;padding:24px;color:#111}table{border-collapse:collapse;width:100%;margin-top:12px}
 th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px;text-align:left}th{background:#f0f0f0}h2{font-size:18px}</style></head>
@@ -1050,6 +1060,7 @@ th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px;text-align:left}th{b
 ${cycle.rationale.map(r => `<p style="font-size:12px;color:#555">${escHtml(r)}</p>`).join('')}
 <h3>Фазы</h3><table><tr><th>Фаза</th><th>Недель</th></tr>${phaseRows}</table>
 <h3>Недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Сессии</th><th>Мин</th><th>Ккал</th><th>Метки</th></tr>${weekRows}</table>
+<h3>🗓 Недели по дням (Пн-Вс)</h3><table><tr><th>Неделя</th><th>Пн</th><th>Вт</th><th>Ср</th><th>Чт</th><th>Пт</th><th>Сб</th><th>Вс</th></tr>${dayRows}</table>
 </body></html>`;
 }
 

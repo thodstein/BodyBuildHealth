@@ -83,4 +83,11 @@ describe('buildCardioPrintHtml', () => {
     expect(html).toContain('ZONE2');
     expect(html).toContain('Цель: сушка');
   });
+
+  it('содержит «неделю по дням» (Пн-Вс)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 2 });
+    const html = buildCardioPrintHtml(c);
+    expect(html).toContain('Недели по дням');
+    for (const d of ['<th>Пн</th>', '<th>Вт</th>', '<th>Вс</th>']) expect(html).toContain(d);
+  });
 });

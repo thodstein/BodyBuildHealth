@@ -388,6 +388,7 @@ export const CardioConstructor: React.FC = () => {
   };
 
   const planVariants = useMemo(() => {
+    if (step !== 'preview') return [];
     try {
       return cardioPlanVariants({
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
@@ -398,10 +399,10 @@ export const CardioConstructor: React.FC = () => {
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
       });
     } catch { return []; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit]);
+  }, [step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit]);
 
   const planExplanation = useMemo(() => {
-    if (!cycle) return [];
+    if (!cycle || step !== 'preview') return [];
     return explainCardioChoice({
       goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
       competitions: comps, taperWeeks, peakWeek, level, equipment, lowImpact,
@@ -409,7 +410,7 @@ export const CardioConstructor: React.FC = () => {
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex,
     }, cycle);
-  }, [cycle, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
+  }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
 
   const resetParams = () => {
     setGoal('cut');

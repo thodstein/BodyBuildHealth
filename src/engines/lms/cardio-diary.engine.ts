@@ -165,6 +165,11 @@ export function computeCardioAdvice(
     return { action: 'reduce', reason: 'Низкое восстановление: убрать HIIT, оставить лёгкое кардио.' };
   }
   if (stats.sessions === 0) {
+    const from = dateDaysAgo(7, opts.referenceIso);
+    const skipped = log.filter(e => !e.completed && e.date >= from).length;
+    if (skipped > 0) {
+      return { action: 'keep', reason: `За 7 дней пропущено ${skipped} сессий — начните со следующей по плану.` };
+    }
     return { action: 'keep', reason: 'За 7 дней кардио не записано — начните с плана недели.' };
   }
   const ratio = plannedWeekly > 0 ? stats.minutes / plannedWeekly : 1;

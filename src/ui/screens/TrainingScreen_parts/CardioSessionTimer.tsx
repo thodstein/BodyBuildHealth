@@ -115,6 +115,23 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
     flashMsg('💾 Сессия записана в дневник');
   };
 
+  const skip = (type: CardioType, durationMin: number) => {
+    saveCardioLogEntry({
+      id: 'c-' + Date.now(),
+      date: todayIso(),
+      type,
+      durationMin,
+      completed: false,
+      notes: 'пропущена',
+    });
+    if (active) {
+      if (timerRef.current != null) window.clearInterval(timerRef.current);
+      setActive(null);
+    }
+    onSaved?.();
+    flashMsg('⏭ Сессия отмечена пропущенной (учитывается в рекомендациях)');
+  };
+
   return (
     <div style={CARD}>
       <div style={LABEL}>⚡ Быстрый старт сессии</div>
@@ -145,6 +162,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
               {active.paused ? '▶️ Продолжить' : '⏸ Пауза'}
             </button>
             <button style={BTN_DANGER} onClick={finishNow}>⏹ Завершить</button>
+            <button style={BTN} onClick={() => skip(active.type, active.durationMin)} title="Отметить сессию пропущенной">⏭ Пропустить</button>
           </div>
         </div>
       )}
@@ -169,6 +187,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <div key={i} style={ROW}>
               <span style={{ fontSize: 12, flex: 1 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин</span>
               <button style={BTN_PRIMARY} onClick={() => start(s.type, s.durationMin)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+              <button style={BTN} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
             </div>
           ))}
         </div>

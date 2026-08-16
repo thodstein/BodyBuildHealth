@@ -31,6 +31,7 @@ const INPUT: React.CSSProperties = {
 };
 
 export const CARDIO_AUTO_TUNE_KEY = 'he_cardio_auto_tune';
+export const CARDIO_AUTO_APPLY_KEY = 'he_cardio_auto_apply';
 
 function todayIso(): string {
   const d = new Date();
@@ -44,6 +45,9 @@ export const CardioAutoTunePanel: React.FC<{
 }> = ({ cycle, acwr, onChanged }) => {
   const [autoMode, setAutoMode] = useState<boolean>(() => {
     try { return localStorage.getItem(CARDIO_AUTO_TUNE_KEY) === '1'; } catch { return false; }
+  });
+  const [autoApply, setAutoApply] = useState<boolean>(() => {
+    try { return localStorage.getItem(CARDIO_AUTO_APPLY_KEY) === '1'; } catch { return false; }
   });
   const [pending, setPending] = useState<{ changes: CardioTuneChange[]; reason: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -70,25 +74,16 @@ export const CardioAutoTunePanel: React.FC<{
     if (v && cycle) previewTune();
   };
 
-  const previewTune = () => {
-    if (!cycle) { flashMsg('⚠ Сначала соберите кардио-цикл'); return; }
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
-    if (r.changes.length === 0) { flashMsg('✅ Дневник соответствует плану — изменений нет'); return; }
-    setPending({ changes: r.changes, reason: r.advice.reason });
+  const toggleAutoApply = (v: boolean) => {
+    setAutoApply(v);
+    try { localStorage.setItem(CARDIO_AUTO_APPLY_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+    flashMsg(v ? '⚡ Авто-применение включено: подстройки применяются сразу (с undo)' : 'Авто-применение выключено: только предпросмотр');
   };
 
-  // Авто-режим: при изменении цикла/дневника автоматически показываем
-  // предпросмотр подстройки (без применения — решение за пользователем).
-  const previewTuneRef = useRef(previewTune);
-  previewTuneRef.current = previewTune;
-  useEffect(() => {
-    if (autoMode && cycle) previewTuneRef.current();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMode, cycle]);
-
   const applyTune = () => {
-    if (!cycle || !pending) return;
+    if (!cycle) return;
     const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    if (r.changes.length === 0) return;
     saveCardioCycleVersion(cycle, 'авто-подстройка');
     saveCardioCycle(r.cycle);
     setActiveCardioCycle(r.cycle);
@@ -96,6 +91,29 @@ export const CardioAutoTunePanel: React.FC<{
     onChanged?.();
     flashMsg(`✅ Подстройка применена: ${r.changes.length} изменений (${r.advice.action})`);
   };
+
+  const previewTune = () => {
+    if (!cycle) { flashMsg('⚠ Сначала соберите кардио-цикл'); return; }
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    if (r.changes.length === 0) { flashMsg('✅ Дневник соответствует плану — изменений нет'); return; }
+    setPending({ changes: r.changes, reason: r.advice.reason });
+  };
+
+  // Авто-режим: при изменении цикла/дневника — предпросмотр, а при
+  // включённом авто-применении — сразу применение (с undo-версией).
+  const previewTuneRef = useRef(previewTune);
+  previewTuneRef.current = previewTune;
+  const applyTuneRef = useRef(applyTune);
+  applyTuneRef.current = applyTune;
+  const autoApplyRef = useRef(autoApply);
+  autoApplyRef.current = autoApply;
+  useEffect(() => {
+    if (autoMode && cycle) {
+      if (autoApplyRef.current) applyTuneRef.current();
+      else previewTuneRef.current();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMode, autoApply, cycle]);
 
   const undoVersion = () => {
     if (!cycle) return;
@@ -121,6 +139,13 @@ export const CardioAutoTunePanel: React.FC<{
           {autoMode ? '🟢 Включён' : '⚪ Выключен'}
         </button>
         <button style={BTN} onClick={previewTune} title="Показать, что изменится по текущему дневнику">🔄 Подстроить сейчас</button>
+        <button
+          style={autoApply ? { ...BTN_PRIMARY, minHeight: 32, padding: '6px 10px' } : { ...BTN, minHeight: 32, padding: '6px 10px' }}
+          onClick={() => toggleAutoApply(!autoApply)}
+          title="Применять подстройки автоматически (с сохранением версии для отмены)"
+        >
+          {autoApply ? '⚡ Авто-применение: вкл' : '⚡ Авто-применение: выкл'}
+        </button>
         {hasVersion && <button style={BTN} onClick={undoVersion} title="Отменить последнюю авто-подстройку/правку">↩ Вернуть версию</button>}
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}

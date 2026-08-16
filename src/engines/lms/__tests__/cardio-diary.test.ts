@@ -112,6 +112,16 @@ describe('computeCardioAdvice', () => {
     expect(a.reason).toContain('не записано');
   });
 
+  it('пропуски за 7 дней → keep с упоминанием пропусков', () => {
+    const log = [
+      entry({ date: '2026-01-05', completed: false }),
+      entry({ date: '2026-01-06', completed: false }),
+    ];
+    const a = computeCardioAdvice(c, log, { referenceIso: REF });
+    expect(a.action).toBe('keep');
+    expect(a.reason).toContain('пропущено 2');
+  });
+
   it('выполнено <60% плана → increase', () => {
     const log = [entry({ date: '2026-01-05', durationMin: 15, completed: true })];
     const a = computeCardioAdvice(c, log, { referenceIso: REF });

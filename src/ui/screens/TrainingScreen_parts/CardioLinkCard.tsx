@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { getCardioLink, clearCardioLink, subscribeCardioLink, SPORT_LABELS } from '../../../engines/lms/cardio-bridge';
-import { loadCardioCycles, saveCardioCycle, setActiveCardioCycle, adaptCardioToStrength } from '../../../engines/lms/cardio.engine';
+import { loadCardioCycles, saveCardioCycle, setActiveCardioCycle, adaptCardioToStrength, cardioSessionsForDate, cardioEquipmentLabel, type CardioCycle } from '../../../engines/lms/cardio.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 
@@ -31,6 +31,7 @@ function openCardioConstructor(): void {
 export const CardioLinkCard: React.FC = () => {
   const [link, setLink] = useState(getCardioLink());
   const [cycleName, setCycleName] = useState<string | null>(null);
+  const [todayCardio, setTodayCardio] = useState<{ type: string; text: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,9 +39,21 @@ export const CardioLinkCard: React.FC = () => {
     return un;
   }, []);
   useEffect(() => {
-    if (!link) { setCycleName(null); return; }
+    if (!link) { setCycleName(null); setTodayCardio(null); return; }
     const c = loadCardioCycles().find(x => x.id === link.cycleId);
     setCycleName(c?.name ?? link.cycleId);
+    if (!c) { setTodayCardio(null); return; }
+    try {
+      const d = new Date();
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const t = cardioSessionsForDate(c, iso);
+      if (t && t.sessions.length > 0) {
+        const s = t.sessions[0];
+        setTodayCardio({ type: s.type.toUpperCase(), text: `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}` });
+      } else {
+        setTodayCardio(null);
+      }
+    } catch { setTodayCardio(null); }
   }, [link]);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
@@ -74,6 +87,11 @@ export const CardioLinkCard: React.FC = () => {
         )}
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
+      {todayCardio && (
+        <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '4px 8px' }}>
+          🔔 Сегодня: {todayCardio.text}
+        </div>
+      )}
       <div style={ROW}>
         <button style={BTN} onClick={openCardioConstructor}>🛠 Открыть кардио-конструктор</button>
         {link && (

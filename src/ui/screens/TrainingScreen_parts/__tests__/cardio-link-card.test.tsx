@@ -47,6 +47,14 @@ describe('CardioLinkCard — CSR', () => {
     expect(screen.getByRole('button', { name: /Пересчитать под ACWR/ })).toBeTruthy();
   });
 
+  it('со связью и циклом показывает «🔔 Сегодня» с сессией дня', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cc-today' });
+    saveCardioCycle(c);
+    setCardioLink({ cycleId: 'cc-today', sport: 'bb', linkedAt: 'x' });
+    render(<CardioLinkCard />);
+    expect(screen.getByText(/Сегодня:/)).toBeTruthy();
+  });
+
   it('«Открыть кардио-конструктор» пишет track=cardio и шлёт событие', () => {
     let detail: string | null = null;
     window.addEventListener('planning-track-open', (e) => { detail = (e as CustomEvent).detail as string; });
