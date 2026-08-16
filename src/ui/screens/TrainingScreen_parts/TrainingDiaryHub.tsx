@@ -156,6 +156,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // Принудительная перерисовка блока «Сегодня» (быстрые отметки рутин/протоколов)
   const [, forceHub] = useState(0);
 
+  // План на сегодня (для предпросмотра разминки/заминки во вкладках)
+  const planDayToday = useMemo(() => {
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const p = trainingOutput?.plan?.[todayIdx];
+    return p && Array.isArray(p.exercises) && p.exercises.length > 0 ? p : null;
+  }, [trainingOutput]);
+
   // Progress state
 
   // Progress state
@@ -778,8 +785,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'mmc' && <MMCTrackingCard />}
       {mode === 'mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
       {mode === 'mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
-      {mode === 'warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView historyWorkouts={historyWorkouts} /></InfoErrorBoundary>}
-      {mode === 'cooldown' && <InfoErrorBoundary label="Заминка"><CooldownDiaryView /></InfoErrorBoundary>}
+      {mode === 'warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView historyWorkouts={historyWorkouts} planDay={planDayToday} /></InfoErrorBoundary>}
+      {mode === 'cooldown' && <InfoErrorBoundary label="Заминка"><CooldownDiaryView planDay={planDayToday} /></InfoErrorBoundary>}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
       {mode === 'tools' && <DiaryToolsView hub={hub} />}

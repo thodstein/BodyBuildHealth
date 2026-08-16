@@ -209,6 +209,49 @@ export function canonicalizeGroups(g: string): CanonGroup[] {
   return canonicalize(g);
 }
 
+/** Угадывание групп по названию упражнения (для предпросмотра разминки дня). */
+const NAME_KEYWORDS: [RegExp, CanonGroup[]][] = [
+  [/присед|жим ногами|гакк|сплит|выпад|болгарск|степ-ап|фронт.*присед/i, ['quads', 'glutes']],
+  [/жим (штанги|гантелей|лёжа|на наклонной|в тренажёре|средним|узким)|разводк|отжиман|бабочк|кроссовер|пуловер|сведение/i, ['chest']],
+  [/брусья|отжимания на брусьях/i, ['chest', 'triceps']],
+  [/тяга|подтягив|верхнего блока|нижнего блока|горизонт.*тяг|широчайш|гиперэкстенз/i, ['back']],
+  [/румынск|становая|гудморнинг|бицепс бедра|сгибание ног|мертв/i, ['hamstrings', 'back']],
+  [/ягодичн|отведение ноги|ягодичный мост|hip thrust|разведение ног/i, ['glutes']],
+  [/жим стоя|армейск|махи|разводка в стороны|тяга к подбородку|дельт|протяжк|разведени.*кабель/i, ['shoulders']],
+  [/бицепс|молотк|сгибания.*гантел|подъём на бицепс/i, ['biceps']],
+  [/трицепс|французск|разгибания|kickback|экстензи/i, ['triceps']],
+  [/икры|подъёмы на носки|кальф/i, ['calves']],
+  [/пресс|скручивани|планка|подъём ног|вакуум|кранч/i, ['core']],
+  [/шраг|трапеци/i, ['traps']],
+  [/запясть|предплечь|кист/i, ['forearms']],
+];
+
+export function guessGroupsFromName(name: string): CanonGroup[] {
+  const n = String(name || '');
+  if (!n.trim()) return [];
+  const out: CanonGroup[] = [];
+  for (const [re, groups] of NAME_KEYWORDS) {
+    if (re.test(n)) {
+      for (const g of groups) if (!out.includes(g)) out.push(g);
+    }
+  }
+  return out;
+}
+
+/** Группы дня из упражнений плана (muscleGroup → canonicalize, иначе угадывание по названию). */
+export function groupsFromExercises(exercises: { name?: string; muscleGroup?: string }[]): string[] {
+  const out: string[] = [];
+  for (const ex of (exercises || [])) {
+    const raw = ex.muscleGroup || '';
+    if (raw) {
+      const canon = canonicalize(raw);
+      if (canon.length > 0) { out.push(raw); continue; }
+    }
+    for (const g of guessGroupsFromName(ex.name || '')) out.push(g);
+  }
+  return out;
+}
+
 /** Разминка для набора групп дня: мерж с дедупликацией, приоритетом и фильтром ленты. */
 export function collectGroupPrep(groups: string[], hasBand = true): WarmupGroupPrep {
   const seenMob = new Set<string>();

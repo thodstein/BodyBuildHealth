@@ -17,11 +17,14 @@ import {
   exportCooldownCheckinsCSV, cooldownStreak, correlateCooldownWithReadiness,
 } from '../../../engines/cooldown.engine';
 import { loadReadinessHistory } from './readiness-history';
+import { collectGroupCooldown } from '../../../engines/cooldown-day.engine';
+import { groupsFromExercises, prepGroupLabels } from '../../../engines/warmup-day.engine';
+import { cooldownLabel } from '../../../engines/cooldown.engine';
 
 const CARD = diaryCard;
 const COOLDOWN_COLOR = '#38bdf8';
 
-export const CooldownDiaryView: React.FC = () => {
+export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?: { name?: string; muscleGroup?: string }[] } | null }> = ({ planDay }) => {
   const [tick, setTick] = useState(0);
   const refresh = () => setTick(t => t + 1);
 
@@ -86,6 +89,39 @@ export const CooldownDiaryView: React.FC = () => {
           Заминка генерируется автоматически (дыхание + растяжка рабочих зон дня, + восстановление при усталости).
           Здесь — только факт: выполнена ли заминка, качество 1-5, причины пропуска. Вкладка только отображает — план не меняется.
         </div>
+      </div>
+
+      {/* ── Предпросмотр: заминка по плану на сегодня ── */}
+      <div style={CARD}>
+        <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
+          🧭 Заминка по плану на сегодня
+        </div>
+        {!planDay || !Array.isArray(planDay.exercises) || planDay.exercises.length === 0 ? (
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
+            Нет плана на сегодня — заминка сгенерируется автоматически при завершении сессии (дыхание + растяжка рабочих зон).
+          </div>
+        ) : (() => {
+          const groups = groupsFromExercises(planDay.exercises);
+          if (groups.length === 0) {
+            return <div style={{ fontSize: 10, color: DIM }}>Не удалось определить группы дня — заминка будет по упражнениям сессии.</div>;
+          }
+          const stretch = collectGroupCooldown(groups);
+          return (
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+                🎯 {planDay.name || 'Тренировка'} · рабочие зоны: <b style={{ color: '#fff' }}>{prepGroupLabels(groups)}</b>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {stretch.slice(0, 6).map(s => (
+                  <span key={s.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(56,189,248,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(56,189,248,0.25)' }}>
+                    {cooldownLabel(s.id)}{s.note ? ` — ${s.note}` : ''}
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 4 }}>Полный план с чекбоксами — при завершении сессии (фаза «Заминка»).</div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Чек-ин на сегодня ── */}

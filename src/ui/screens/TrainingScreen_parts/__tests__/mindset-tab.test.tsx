@@ -372,6 +372,23 @@ describe('Заминка (чек-ин, бейджи, вкладка)', () => {
     expect(html).toContain('Персональные инсайты');
   });
 
+  it('WarmupDiaryView с планом дня: предпросмотр групп/суставов', () => {
+    const planDay = { name: 'Грудь и спина', exercises: [{ name: 'Жим лёжа' }, { name: 'Тяга верхнего блока' }] };
+    const html = renderToStaticMarkup(<WarmupDiaryView planDay={planDay} />);
+    expect(html).toContain('Разминка по плану на сегодня');
+    expect(html).toContain('грудь');
+    expect(html).toContain('спина');
+    expect(html).toContain('Круги локтями');
+  });
+
+  it('CooldownDiaryView с планом дня: предпросмотр растяжки', () => {
+    const planDay = { name: 'Ноги', exercises: [{ name: 'Присед' }, { name: 'Румынская тяга' }] };
+    const html = renderToStaticMarkup(<CooldownDiaryView planDay={planDay} />);
+    expect(html).toContain('Заминка по плану на сегодня');
+    expect(html).toContain('Растяжка квадрицепса');
+    expect(html).toContain('квадрицепсы');
+  });
+
   it('TrainingDiaryHub с mode cooldown рендерит вкладку заминки', () => {
     upsertCooldownLog({ date: today, done: true, quality: 4 });
     const html = renderToStaticMarkup(<TrainingDiaryHub

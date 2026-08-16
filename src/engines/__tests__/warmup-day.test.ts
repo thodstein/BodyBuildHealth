@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   WARMUP_GROUP_PREP, CANON_GROUP_ORDER, collectGroupPrep, prepGroupLabels,
+  guessGroupsFromName, groupsFromExercises,
 } from '../warmup-day.engine';
 import { generateWarmup, type WarmupInput } from '../warmup.engine';
 
@@ -83,6 +84,29 @@ describe('prepGroupLabels', () => {
     expect(prepGroupLabels(['chest', 'back'])).toBe('грудь, спина');
     expect(prepGroupLabels(['legs'])).toBe('квадрицепсы, бицепс бедра, ягодицы, икры');
     expect(prepGroupLabels(['chest', 'ГРУДЬ'])).toBe('грудь');
+  });
+});
+
+describe('guessGroupsFromName / groupsFromExercises', () => {
+  it('русские названия упражнений → группы', () => {
+    expect(guessGroupsFromName('Жим штанги лёжа')).toEqual(['chest']);
+    expect(guessGroupsFromName('Приседания со штангой')).toEqual(['quads', 'glutes']);
+    expect(guessGroupsFromName('Тяга верхнего блока')).toEqual(['back']);
+    expect(guessGroupsFromName('Подъём на бицепс')).toEqual(['biceps']);
+    expect(guessGroupsFromName('Разгибание на трицепс')).toEqual(['triceps']);
+    expect(guessGroupsFromName('Румынская тяга')).toContain('hamstrings');
+    expect(guessGroupsFromName('Скручивания')).toEqual(['core']);
+  });
+
+  it('неизвестное название → пусто', () => {
+    expect(guessGroupsFromName('')).toEqual([]);
+    expect(guessGroupsFromName('Случайное упражнение')).toEqual([]);
+  });
+
+  it('groupsFromExercises: muscleGroup приоритетнее, иначе угадывание по имени', () => {
+    expect(groupsFromExercises([{ name: 'Жим лёжа', muscleGroup: 'chest' }])).toEqual(['chest']);
+    expect(groupsFromExercises([{ name: 'Присед', muscleGroup: '' }])).toEqual(['quads', 'glutes']);
+    expect(groupsFromExercises([{ name: 'Присед' }])).toEqual(['quads', 'glutes']);
   });
 });
 

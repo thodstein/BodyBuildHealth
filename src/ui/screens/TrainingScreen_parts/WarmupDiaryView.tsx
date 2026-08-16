@@ -17,13 +17,16 @@ import {
   exportWarmupCheckinsCSV, warmupStreak, correlateWarmupWithPerformance,
 } from '../../../engines/warmup.engine';
 import { sessionsBestE1RM } from '../../../engines/mindset-protocol.engine';
+import { collectGroupPrep, groupsFromExercises, prepGroupLabels } from '../../../engines/warmup-day.engine';
+import { collectJointPrep, jointPrepLabels } from '../../../engines/warmup-joints.engine';
+import { warmupLabel } from '../../../engines/warmup.engine';
 import { WarmupRampCard } from './diary-cards';
 import type { WorkoutLog } from '../../../core/types';
 
 const CARD = diaryCard;
 const WARMUP_COLOR = '#f97316';
 
-export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[] }> = ({ historyWorkouts }) => {
+export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay?: { name?: string; exercises?: { name?: string; muscleGroup?: string }[] } | null }> = ({ historyWorkouts, planDay }) => {
   const [tick, setTick] = useState(0);
   const refresh = () => setTick(t => t + 1);
 
@@ -90,6 +93,43 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[] }> = ({ 
           Разминочные пирамиды генерируются автоматически (единый канон: гриф 20кг×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1).
           Здесь — только факт: выполнена ли разминка, качество 1-5, причины пропуска. Вкладка только отображает — план не меняется.
         </div>
+      </div>
+
+      {/* ── Предпросмотр: разминка по плану на сегодня ── */}
+      <div style={CARD}>
+        <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
+          🧭 Разминка по плану на сегодня
+        </div>
+        {!planDay || !Array.isArray(planDay.exercises) || planDay.exercises.length === 0 ? (
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
+            Нет плана на сегодня — разминка сгенерируется автоматически при старте любой сессии (по упражнениям и оборудованию).
+          </div>
+        ) : (() => {
+          const groups = groupsFromExercises(planDay.exercises);
+          if (groups.length === 0) {
+            return <div style={{ fontSize: 10, color: DIM }}>Не удалось определить группы дня — разминка будет по упражнениям сессии.</div>;
+          }
+          const joints = collectJointPrep(groups);
+          const prep = collectGroupPrep(groups, true);
+          return (
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+                🎯 {planDay.name || 'Тренировка'} · зоны: <b style={{ color: '#fff' }}>{prepGroupLabels(groups)}</b>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                {joints.slice(0, 6).map(j => (
+                  <span key={j.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                    {warmupLabel(j.id)}{j.note ? ` — ${j.note}` : ''}
+                  </span>
+                ))}
+              </div>
+              {prep.activation.length > 0 && (
+                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Активация: {prep.activation.slice(0, 3).map(a => warmupLabel(a.id)).join(' · ')}</div>
+              )}
+              <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 4 }}>Полный план с чекбоксами — при старте сессии (фаза «Разминка»).</div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── Чек-ин на сегодня ── */}
