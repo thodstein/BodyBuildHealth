@@ -283,8 +283,24 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText(/Отказ близко — вероятная слабая фаза/)).toBeTruthy();
     // Для squat → фаза «Низ (выход из ямы)»
     expect(screen.getAllByText(/«Низ \(выход из ямы\)»/).length).toBeGreaterThanOrEqual(1);
-    // Коррекции VBT добавляются в план
-    expect(screen.getByText(/➕ Добавить коррекции VBT в план/)).toBeTruthy();
+    // Коррекции фазы с кнопками «Рекомендуемые»/«Все» (можно получить упражнения)
+    expect(screen.getByText(/🏋️ Коррекции фазы/)).toBeTruthy();
+    expect(screen.getAllByText(/➕ Рекомендуемые/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/➕ Все/).length).toBeGreaterThanOrEqual(1);
+    // Клик «➕ Все» добавляет коррекции в план (счётчик на кнопке отправки растёт)
+    fireEvent.click(screen.getAllByText(/➕ Все/)[0]);
+    expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
+  });
+
+  it('VBT: умеренная потеря (<20%) — коррекции ТЕКУЩЕЙ фазы всегда доступны', () => {
+    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
+    fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.60' } });
+    fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.55' } });
+    // Потеря ~8% — без «Отказ близко»
+    expect(screen.queryByText(/Отказ близко/)).toBeNull();
+    // Но коррекции текущей фазы (squat → «Низ (выход из ямы)») показаны
+    expect(screen.getByText(/Скорость в пределах порога/)).toBeTruthy();
+    expect(screen.getByText(/🏋️ Коррекции фазы/)).toBeTruthy();
   });
 
   it('VBT: некорректные скорости — подсказка без расчёта', () => {

@@ -640,7 +640,11 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           }
           const weight = parseFloat(vbtWeight);
           const d = diagnoseVelocity(lift, best, last, Number.isFinite(weight) && weight > 0 ? weight : undefined);
-          const vbtSticking = d.suggestedPhase ? analyzeStickingCorrections(lift, d.suggestedPhase, template ?? undefined) : null;
+          // Фаза для коррекций: при отказе — фаза максимального момента (suggested),
+          // иначе — текущая выбранная фаза движения (коррекции доступны всегда).
+          const vbtPhase = (d.suggestedPhase ?? effectivePhase) as WeakPoint | null;
+          const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;
+          const vbtKey = `${lift}|vbt|${vbtPhase ?? 'none'}`;
           return (
             <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: d.exceeded ? 'rgba(239,68,68,0.07)' : 'rgba(244,114,182,0.05)', border: `1px solid ${d.exceeded ? 'rgba(239,68,68,0.25)' : 'rgba(244,114,182,0.2)'}` }}>
               <div style={{ fontSize: 10, color: '#f472b6', fontWeight: 700 }}>
@@ -654,13 +658,29 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                   ⚠ Отказ близко — вероятная слабая фаза «{PHASE_RU[d.suggestedPhase] || d.suggestedPhase}» (максимальный момент). Коррекции ниже.
                 </div>
               )}
+              {!d.exceeded && vbtPhase && (
+                <div style={{ marginTop: 4, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+                  Скорость в пределах порога. Коррекции текущей фазы «{PHASE_RU[vbtPhase] || vbtPhase}» — ниже.
+                </div>
+              )}
               {vbtSticking && vbtSticking.items.length > 0 && (
                 <div style={{ marginTop: 6 }}>
-                  {vbtSticking.items.slice(0, 3).map((item, idx) => (
-                    <ExerciseRow key={idx} item={item} selected={selected[`${lift}|vbt|${d.suggestedPhase}`]?.includes(item.exercise.name) ?? false}
-                      onToggle={() => toggleExercise(`${lift}|vbt|${d.suggestedPhase}`, item.exercise.name)} onAdd={() => addToPlan(`${lift}|vbt|${d.suggestedPhase}`, [item.exercise.name])} />
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>
+                    🏋️ Коррекции фазы «{PHASE_RU[vbtPhase!] || vbtPhase}» (выберите и добавьте в план):
+                  </div>
+                  {vbtSticking.items.map((item, idx) => (
+                    <ExerciseRow key={idx} item={item} selected={selected[vbtKey]?.includes(item.exercise.name) ?? false}
+                      onToggle={() => toggleExercise(vbtKey, item.exercise.name)} onAdd={() => addToPlan(vbtKey, [item.exercise.name])} />
                   ))}
-                  <button onClick={() => addToPlan(`${lift}|vbt|${d.suggestedPhase}`, vbtSticking!.items.slice(0, 3).map(i => i.exercise.name))} style={{ ...btn, marginTop: 5, background: 'rgba(244,114,182,0.12)', color: '#f472b6', border: '1px solid rgba(244,114,182,0.3)' }}>➕ Добавить коррекции VBT в план</button>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <button onClick={() => addToPlan(vbtKey, vbtSticking.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
+                    <button onClick={() => addToPlan(vbtKey, vbtSticking.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(244,114,182,0.12)', color: '#f472b6', border: '1px solid rgba(244,114,182,0.3)' }}>➕ Все</button>
+                  </div>
+                </div>
+              )}
+              {(!vbtSticking || vbtSticking.items.length === 0) && (
+                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                  Коррекции для фазы «{vbtPhase ? (PHASE_RU[vbtPhase] || vbtPhase) : '—'}» не найдены в пуле — используйте слабые точки (раздел 2).
                 </div>
               )}
             </div>
