@@ -235,7 +235,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
-    expect(screen.getByText(/📊 Итог года — 12 нед/)).toBeTruthy();
+    expect(screen.getByText(/Итог года — 12 нед/)).toBeTruthy();
     expect(screen.getAllByText(/Гипертрофия/).length).toBeGreaterThan(0);
   });
 

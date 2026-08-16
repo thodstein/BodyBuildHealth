@@ -2383,6 +2383,45 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             );
           })()}
 
+          {/* 📈 Макроцикл (вертикальная картинка-график) */}
+          {(isBB ? bbMacro : macro) && (() => {
+            const src = isBB ? bbMacro! : macro!;
+            const total = Math.max(1, src.totalWeeks);
+            return (
+              <SectionCard tone="rgba(96,165,250,0.25)">
+                <SectionHead icon="📈" title={`Макроцикл (вертикально) — ${total} нед`} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {src.blocks.map((b, i) => {
+                    const pct = (b.weeks / total) * 100;
+                    const isBBb = 'cycleId' in b;
+                    const color = isBBb ? (PHASE_COLOR[b.phase as MacroPhase] ?? '#888') : (BB_PHASE_COLOR[b.phase as BBMacroPhase] ?? '#888');
+                    const label = isBBb ? (PHASE_LABEL_RU[b.phase as MacroPhase] ?? b.phase) : (BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] ?? b.phase);
+                    const icon = isBBb ? (PHASE_ICON[b.phase as MacroPhase] ?? '') : (BB_PHASE_ICON[b.phase as BBMacroPhase] ?? '');
+                    const cycTitle = 'cycleId' in b && b.cycleId ? (getCycleById(b.cycleId)?.meta.title ?? b.cycleId) : null;
+                    const isCurrent = currentWeekIdx >= b.weekOffset && currentWeekIdx < b.weekOffset + b.weeks;
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                        <div style={{ width: 6, borderRadius: 3, background: color, minHeight: 20, flexShrink: 0 }} />
+                        <div onClick={() => setSelectedBlockIdx(i)} role="button" tabIndex={0}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBlockIdx(i); } }}
+                          style={{ flex: 1, minWidth: 0, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: `${color}14`, border: `1px solid ${isCurrent ? 'rgba(255,255,255,0.6)' : `${color}30`}`, outline: isCurrent ? '1.5px solid rgba(255,255,255,0.25)' : 'none' }}
+                          title={`${label}: нед ${b.weekOffset}-${b.weekOffset + b.weeks - 1}`}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: 11, fontWeight: 800, color }}>{icon} {label}</span>
+                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', fontWeight: 700 }}>нед {b.weekOffset}–{b.weekOffset + b.weeks - 1} · {b.weeks}н · {Math.round(pct)}%</span>
+                          </div>
+                          {cycTitle && <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, marginTop: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{cycTitle}</div>}
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>📅 {formatMacroDate(macroWeekStartDate(b.weekOffset))}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>Клик по блоку — выбрать его. Маркер «📍 нед N» показывает текущую неделю.</div>
+              </SectionCard>
+            );
+          })()}
+
           {/* 📸 Сценарии года: снапшоты для сравнения планов */}
           <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-scenarios">
             <SectionHead icon="📸" title="Сценарии года" right={<button type="button" onClick={() => {
@@ -2423,9 +2462,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             })()}
           </div>
 
-          {/* Правка длительности фаз */}
-           <div className="macrocycle-phase-editor" style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>⚙️ Правка длительности фаз</div>
+          {/* ⚙️ Фазы и обоснование */}
+          <SectionCard>
+            <SectionHead icon="⚙️" title="Фазы и обоснование" />
+            <div className="macrocycle-phase-editor">
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>Правка длительности фаз</div>
              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(82px, 1fr))', gap: isCompact ? 4 : 6 }}>
               {(isBB ? BB_PHASES : PL_PHASES).map((phase: BBMacroPhase | MacroPhase) => {
                 const src = isBB ? bbMacro! : macro!;
@@ -2470,6 +2511,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Обоснование появится после построения макроцикла.</div>
             )}
           </div>
+          </SectionCard>
         </div>
       )}
 
