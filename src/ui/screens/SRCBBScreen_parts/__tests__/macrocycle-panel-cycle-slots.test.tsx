@@ -108,7 +108,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     let applied: { id: string; weeks: number } | null = null;
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={(id, weeks) => { applied = { id, weeks }; }} />);
 
-    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const timeline = document.querySelector('.macrocycle-week-cards');
     expect(timeline).toBeTruthy();
     const blocks = timeline!.querySelectorAll('[role="button"]');
     expect(blocks.length).toBe(5);
@@ -126,7 +126,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
     // Таймлайн есть (макро загружен из storage)
-    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const timeline = document.querySelector('.macrocycle-week-cards');
     expect(timeline).toBeTruthy();
     fireEvent.click(timeline!.querySelectorAll('[role="button"]')[0]);
 
@@ -156,7 +156,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
     // Найти contest_prep блок (aria-label «Подготовка: недели …»)
-    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const timeline = document.querySelector('.macrocycle-week-cards');
     const prepBlock = Array.from(timeline!.querySelectorAll('[role="button"]'))
       .find(b => (b.getAttribute('aria-label') || '').startsWith('Подготовка'));
     expect(prepBlock).toBeTruthy();
@@ -376,12 +376,12 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     expect((cells[0] as HTMLElement).title).toContain('Гипертрофия');
   });
 
-  it('таймлайн показывает дату начала блока («с dd.mm.yy») и кнопку «📅 Календарь»', () => {
+  it('таймлайн показывает дату начала блока («dd.mm.yy» в карточке) и кнопку «📅 Календарь»', () => {
     const macro = buildBbMacrocycle({ level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy' });
     localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
-    expect(screen.getAllByText(/н · с \d{2}\.\d{2}\.\d{2}/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\(\d+н\) · 📅 \d{2}\.\d{2}\.\d{2}/).length).toBeGreaterThan(0);
     expect(screen.getByText('📅 Календарь (.ics)')).toBeTruthy();
   });
 
@@ -403,7 +403,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
-    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const timeline = document.querySelector('.macrocycle-week-cards');
     const prepBlock = Array.from(timeline!.querySelectorAll('[role="button"]'))
       .find(b => (b.getAttribute('aria-label') || '').startsWith('Подготовка'));
     fireEvent.click(prepBlock!);
@@ -569,7 +569,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
-    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const timeline = document.querySelector('.macrocycle-week-cards');
     const blocks = timeline!.querySelectorAll('[role="button"]');
     const phaseOf = (el: Element) => (el.getAttribute('aria-label') || '').split(':')[0];
     const firstPhase = phaseOf(blocks[0]);
@@ -628,7 +628,7 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
     render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
 
-    const timeline = document.querySelector('.macrocycle-timeline-track');
+    const timeline = document.querySelector('.macrocycle-week-cards');
     const prepBlock = Array.from(timeline!.querySelectorAll('[role="button"]'))
       .find(b => (b.getAttribute('aria-label') || '').startsWith('Подготовка'));
     fireEvent.click(prepBlock!);

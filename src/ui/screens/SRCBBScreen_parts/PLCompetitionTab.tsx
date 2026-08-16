@@ -101,49 +101,53 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 : { score: 75, label: '✅ база' };
           const rdColor = readiness.score >= 90 ? '#22c55e' : readiness.score >= 80 ? '#eab308' : '#93c5fd';
           return (
-            <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: 6, borderRadius: 8, marginTop: 4, background: isMain ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+            <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap', padding: 8, borderRadius: 10, marginTop: 6, background: isMain ? 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.03))' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
               <button
                 onClick={() => { setMainMeetId(m.id); applyMainMeet(m); }}
                 title={isMain ? 'Главное соревнование — по нему строится тапер-план' : 'Сделать главным'}
-                style={{ minHeight: 30, padding: '3px 8px', borderRadius: 7, fontSize: 12, cursor: 'pointer', border: isMain ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)', background: isMain ? 'rgba(234,179,8,0.2)' : 'transparent', color: isMain ? '#eab308' : 'rgba(255,255,255,0.4)' }}
+                style={{ minHeight: 34, minWidth: 38, padding: '4px 8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: isMain ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.12)', background: isMain ? 'rgba(234,179,8,0.2)' : 'transparent', color: isMain ? '#eab308' : 'rgba(255,255,255,0.4)', alignSelf: 'flex-start' }}
               >{isMain ? '⭐' : '☆'}</button>
-              <input
-                value={m.name}
-                onChange={e => setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))}
-                style={{ flex: 1, minWidth: 120, padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, minHeight: 30, boxSizing: 'border-box' }}
-                placeholder="Название"
-              />
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
-                через
+              <div style={{ flex: 1, minWidth: 170 }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 3, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' }}>Название соревнования</div>
                 <input
-                  type="number"
+                  value={m.name}
+                  onChange={e => setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))}
+                  style={{ width: '100%', padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: 12, fontWeight: 700, minHeight: 34, boxSizing: 'border-box' }}
+                  placeholder="Например, «Первенство области»"
+                />
+              </div>
+              <div style={{ width: 132, flexShrink: 0 }}>
+                <PopupNumber
+                  label="Недель до старта"
                   value={m.weeksToStart}
                   min={1}
                   max={52}
-                  onChange={e => {
-                    const v = Number(e.target.value);
+                  suffix=" нед"
+                  hint={`Через сколько недель старт «${m.name}» (1–52). Готовность пересчитается автоматически.`}
+                  onChange={v => {
                     const weeks = Number.isFinite(v) && v >= 1 ? Math.min(Math.round(v), 52) : m.weeksToStart;
                     setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, weeksToStart: weeks } : x));
                     if (isMain) setWeeksToMeet(weeks);
                   }}
-                  style={{ width: 44, marginLeft: 4, padding: '3px 4px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center', minHeight: 26, boxSizing: 'border-box' }}
-                /> нед
-              </span>
-              <select
-                value={m.fed}
-                onChange={e => { setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, fed: e.target.value } : x)); if (isMain) setTaperFed(e.target.value); }}
-                style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 10, minHeight: 30, boxSizing: 'border-box' }}
-              >
-                <option value="ipf">IPF</option><option value="fpr">FPR</option><option value="wpc">WPC</option><option value="other">Другая</option>
-              </select>
-              <span title={`Готовность старта «${m.name}» через ${m.weeksToStart} нед: ${readiness.label}`} style={{ padding: '2px 7px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: rdColor + '16', border: `1px solid ${rdColor}44`, color: rdColor }}>
-                🧠 {readiness.score}%
+                />
+              </div>
+              <div style={{ width: 118, flexShrink: 0 }}>
+                <PopupSelect
+                  label="Федерация"
+                  value={m.fed}
+                  options={[{ id: 'ipf', label: 'IPF' }, { id: 'fpr', label: 'FPR' }, { id: 'wpc', label: 'WPC' }, { id: 'other', label: 'Другая' }]}
+                  hint="Федерация определяет нормативы/категории — используется в прикидах сезона"
+                  onChange={v => { setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, fed: v } : x)); if (isMain) setTaperFed(v); }}
+                />
+              </div>
+              <span title={`Готовность старта «${m.name}» через ${m.weeksToStart} нед: ${readiness.label}`} style={{ padding: '3px 9px', borderRadius: 8, fontSize: 10, fontWeight: 800, background: rdColor + '16', border: `1px solid ${rdColor}44`, color: rdColor, alignSelf: 'flex-start' }}>
+                🧠 {readiness.score}% {readiness.label}
               </span>
               <button
                 onClick={() => removeMeet(m.id)}
                 disabled={meetList.length <= 1}
                 title="Удалить соревнование"
-                style={{ minHeight: 30, padding: '3px 8px', borderRadius: 7, fontSize: 11, cursor: meetList.length <= 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171', opacity: meetList.length <= 1 ? 0.4 : 1 }}
+                style={{ minHeight: 34, minWidth: 34, padding: '4px 8px', borderRadius: 8, fontSize: 12, cursor: meetList.length <= 1 ? 'not-allowed' : 'pointer', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#f87171', opacity: meetList.length <= 1 ? 0.4 : 1, alignSelf: 'flex-start' }}
               >✕</button>
             </div>
           );

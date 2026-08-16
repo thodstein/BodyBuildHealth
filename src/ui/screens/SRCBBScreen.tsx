@@ -116,7 +116,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['competition', '🏁 Соревнования'], ['tools', '🔧 Инструменты'], ['macro', '🗓 Годовой план']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -1662,6 +1662,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : 'rgba(255,255,255,0.6)' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
             <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : 'rgba(255,255,255,0.6)' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
             <span style={{ alignSelf: 'center', fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
+          </div>
+        </div>
+      )}
+      {/* 🗓 Шапка годового планировщика — как в ББ-авто: «Строить с нуля» / «К параметрам» */}
+      {subView === 'macro' && (
+        <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>🗓 Годовое планирование {mainTab === 'pl' ? 'ПЛ' : 'ББ'}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>Постройте макроцикл и начните работу по нему — или стройте план с нуля, как раньше.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button style={{ ...BTN_GHOST, minHeight: 40, fontSize: 11 }} onClick={() => { setSubView('plan'); setMethodNote('🆕 Строим с нуля — без годового плана'); }} title="Вернуться к параметрам и собрать план без годового плана">🆕 Строить с нуля</button>
+            <button style={{ ...BTN_GHOST, minHeight: 40, fontSize: 11 }} onClick={() => setSubView('plan')} title="Вернуться к параметрам плана">← К параметрам</button>
           </div>
         </div>
       )}

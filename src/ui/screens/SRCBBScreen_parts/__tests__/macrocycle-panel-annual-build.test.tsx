@@ -250,6 +250,44 @@ describe('MacrocyclePanel — сборка года по конструктор�
     fireEvent.click(screen.getByText('✍ Ручной'));
     await waitFor(() => expect(screen.getByText(/💡 Рекомендуем: ПЛ/)).toBeTruthy());
   });
+
+  it('➕ Кросс-направление: в ПЛ-блок вставляется ББ-цикл (сушка)', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText(/^· нед 1–/));
+    await waitFor(() => expect(screen.getByText('🏋️ ББ-цикл (масса/сушка)')).toBeTruthy());
+    fireEvent.click(screen.getByText('🏋️ ББ-цикл (масса/сушка)'));
+    await waitFor(() => expect(screen.getByText('Какой ББ-цикл вставить в этот блок?')).toBeTruthy());
+    fireEvent.click(screen.getByText('Сушка'));
+    await waitFor(() => expect(screen.getByText(/Блок переключён на ББ/)).toBeTruthy());
+    const plan = loadAnnualTrainingPlan()!;
+    expect(plan.blocks[0].ref.kind).toBe('BB');
+    expect(plan.blocks[0].config.goal).toBe('cut');
+    // Блок ещё не собран — конфиг изменён, статус остаётся unbuilt (stale выставляется при наличии результата).
+    expect(plan.blocks[0].status).toBe('unbuilt');
+  });
+
+  it('📥 Из ББ-авто: сохранённый план ББ-авто импортируется в блок', async () => {
+    const macro = buildPlMacroFixture();
+    localStorage.setItem('he_pl_macro', serializeMacro(macro));
+    render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
+    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    fireEvent.click(screen.getByText(/strength · ББ/));
+    await waitFor(() => expect(screen.getByText('📥 Из ББ-авто')).toBeTruthy());
+    // Без сохранённого плана — предупреждение.
+    fireEvent.click(screen.getByText('📥 Из ББ-авто'));
+    await waitFor(() => expect(screen.getByText(/Нет сохранённого плана ББ-авто/)).toBeTruthy());
+    // Сохранить BBPlan-заглушку (как это делает ББ-авто) и импортировать.
+    localStorage.setItem('he_bb_plan_saved', JSON.stringify({
+      plan: { weeks: [{ week: 1, sessions: [], phase: 'accumulation' as const }] },
+      date: new Date().toISOString(),
+    }));
+    fireEvent.click(screen.getByText('📥 Из ББ-авто'));
+    await waitFor(() => expect(screen.getByText(/План из ББ-авто импортирован/)).toBeTruthy());
+    const plan = loadAnnualTrainingPlan()!;
+    const bb = plan.blocks.find(b => b.ref.phase === 'strength')!;
+    expect(bb.status).toBe('built');
+    expect(bb.result!.warnings?.some(w => w.includes('Импортировано'))).toBe(true);
+  });
 });
 
 /** ПЛ-макроцикл с 3 блоками (два SRC + один BB). */
