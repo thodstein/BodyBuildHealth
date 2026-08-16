@@ -1213,10 +1213,33 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             const cycleTitle = block && 'cycleId' in block && block.cycleId
               ? (getCycleById(block.cycleId)?.meta.title ?? block.cycleId)
               : null;
+            // 🧠 Готовность недели к старту (мини-тренерский score): ближе к старту —
+            // выше готовность в зоне пика; после старта — пост-восстановление.
+            const compWeek = nextComp?.week ?? null;
+            const weeksLeft = compWeek != null ? compWeek - currentWeekIdx : null;
+            const pastComp = (src.competitions ?? []).filter(c => c.week < currentWeekIdx).sort((a, b) => b.week - a.week)[0];
+            const isPostMeet = pastComp != null && compWeek == null;
+            const readiness = compWeek == null
+              ? (isPostMeet ? { score: 70, label: '🔄 пост-старт восстановление' } : null)
+              : (weeksLeft ?? 99) === 0
+                ? { score: 100, label: '🏁 Старт сегодня — пик формы' }
+                : (weeksLeft ?? 99) <= 2
+                  ? { score: 92, label: '📉 Тапер — разгрузка к пику' }
+                  : (weeksLeft ?? 99) <= 4
+                    ? { score: 85, label: '🎯 Пик-блок — готовность растёт' }
+                    : { score: 75, label: '✅ База/подготовка' };
+            const rdColor = readiness ? (readiness.score >= 90 ? '#22c55e' : readiness.score >= 80 ? '#eab308' : '#93c5fd') : 'rgba(255,255,255,0.4)';
             return (
               <div style={{ marginBottom: 8, padding: 10, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.18)' }} className="macrocycle-today-card">
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>
-                  🔔 Сегодня — нед {currentWeekIdx} ({formatMacroDate(macroWeekStartDate(currentWeekIdx))})
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>
+                    🔔 Сегодня — нед {currentWeekIdx} ({formatMacroDate(macroWeekStartDate(currentWeekIdx))})
+                  </div>
+                  {readiness && (
+                    <span title={readiness.label} style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 8, background: rdColor + '18', border: `1px solid ${rdColor}44`, color: rdColor }}>
+                      🧠 готовность {readiness.score}% · {readiness.label}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
                   {blockLabel ? `Фаза: ${blockLabel}${cycleTitle ? ` · цикл «${cycleTitle}»` : ''}` : 'Макроцикл ещё не покрывает эту неделю'}
@@ -1678,14 +1701,26 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   </div>
                 ))}
                 {comps.length > 0 && (
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
                     {[...comps].sort((a, b) => a.week - b.week).map(c => {
                       const v = COMPETITION_PRIORITY_VISUAL[c.priority];
+                      // 🧠 Матрица готовности старта: тапер-окно (непрерывные peak/competition недели перед стартом).
+                      let taperWeeks = 0;
+                      for (let wk = c.week - 1; wk >= 1; wk--) {
+                        const b = blocks.find(x => wk >= x.weekOffset && wk < x.weekOffset + x.weeks);
+                        if (b && (b.phase === 'peak' || b.phase === 'contest_prep' || b.phase === 'competition')) taperWeeks++;
+                        else break;
+                      }
+                      const taperOk = taperWeeks >= 2;
+                      const rdColor = taperOk ? '#22c55e' : taperWeeks === 1 ? '#eab308' : '#ef4444';
                       return (
-                        <div key={c.id} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <div key={c.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span>{v.icon}</span><span style={{ fontWeight: 700, color: v.color }}>[{c.priority}]</span>
                           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                           <span style={{ color: 'rgba(255,255,255,0.4)' }}>нед {c.week}{c.date ? ` (${c.date})` : ''}</span>
+                          <span title={taperOk ? 'Тапер-окно ≥2 нед перед стартом — разгрузка выполнена' : taperWeeks === 1 ? 'Тапер-окно 1 нед — разгрузка короткая, увеличьте peak-блок' : 'Нет тапер-окна перед стартом — добавьте peak-блок ≥2 нед'} style={{ padding: '1px 6px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: rdColor + '16', border: `1px solid ${rdColor}44`, color: rdColor }}>
+                            🧠 готовность {taperOk ? '100%' : taperWeeks === 1 ? '75%' : '50%'} · тапер {taperWeeks} нед
+                          </span>
                         </div>
                       );
                     })}

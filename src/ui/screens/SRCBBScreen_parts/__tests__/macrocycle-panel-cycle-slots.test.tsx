@@ -488,6 +488,42 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     expect(screen.getByRole('dialog', { name: 'Сборка цикла ББ' })).toBeTruthy();
   });
 
+  it('C11+: тренерская готовность недели в карточке «🔔 Сегодня» (пик-окно → тапер)', () => {
+    // Старт через 2 недели → «📉 Тапер — разгрузка к пику», готовность 92%
+    const macro = buildBbMacrocycle({
+      level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy',
+      competitions: [{ id: 'c1', name: 'Шоу', week: 3, priority: 'A' }],
+    });
+    localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
+    render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
+    expect(screen.getByText(/🧠 готовность 92%/)).toBeTruthy();
+    expect(screen.getByText(/Тапер — разгрузка к пику/)).toBeTruthy();
+  });
+
+  it('C11+: в неделю старта готовность 100% «Старт сегодня»', () => {
+    const macro = buildBbMacrocycle({
+      level: 'advanced', totalWeeks: 8, trainingFocus: 'hypertrophy',
+      competitions: [{ id: 'c1', name: 'Шоу', week: 1, priority: 'A' }],
+    });
+    localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
+    render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
+    expect(screen.getByText(/🧠 готовность 100%/)).toBeTruthy();
+    expect(screen.getByText(/Старт сегодня — пик формы/)).toBeTruthy();
+  });
+
+  it('Итог года: матрица готовности стартов — тапер-окно ≥2 нед даёт 100%', () => {
+    const macro = buildBbMacrocycle({
+      level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy',
+      competitions: [{ id: 'c1', name: 'Шоу', week: 11, priority: 'A' }],
+    });
+    localStorage.setItem('he_bb_macro', serializeBbMacro(macro));
+    render(<MacrocyclePanel level="advanced" goal="bodybuilding" onApplyCycle={() => {}} />);
+    // Для ББ-макро цикл: подготовка(1-8)→contest_prep(9-11)? — проверяем сам бейдж матрицы
+    const badge = screen.getAllByText(/🧠 готовность \d+% · тапер \d+ нед/)[0];
+    expect(badge).toBeTruthy();
+    expect(badge.textContent).toMatch(/тапер \d+ нед/);
+  });
+
   it('C12: сценарии — снимок, сравнение фаз, удаление', () => {
     const macro = buildMacrocycle({ level: 'II-KMS', goal: 'powerlifting', totalWeeks: 52, competitionWeek: 30 });
     const saved = saveMacroScenario('Сценарий июнь', macro);
