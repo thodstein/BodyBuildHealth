@@ -57,6 +57,7 @@ import { RirWaveChart, QualityScorePanel, PlanStatsPanel } from './ProgramEditor
 import type { ManualMode } from './ProgramManagerPanel';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
+import { TrainingSafetyHub } from './TrainingSafetyHub';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -1100,6 +1101,23 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
           onChangeConstraints={(constraints) => onChange({ ...program, bb: { ...program.bb!, constraints } })}
           onChangeProgression={(progression) => onChange({ ...program, bb: { ...program.bb!, progression } })}
         />
+      )}
+
+      {!showTableView && (
+        <TrainingSafetyHub input={{
+          source: 'manual_program',
+          profile: {
+            injuries: (loadTrainingProfile().injuries || []).map(injury => ({ muscle: injury.muscle, exclude: injury.exclude })),
+            avoidAxialLoad: loadTrainingProfile().avoidAxialLoad,
+            trainingYears: loadTrainingProfile().trainingYears,
+            level: program.meta.level,
+            sleepHours: loadTrainingProfile().sleepHours,
+            stressLevel: loadTrainingProfile().stressLevel,
+          },
+          plan: dir === 'bb' && program.bb
+            ? { weeks: program.bb.weeks as any }
+            : undefined,
+        }} compact={false} />
       )}
 
       {!showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}

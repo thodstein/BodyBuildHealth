@@ -8,6 +8,7 @@ import { autoRegulate, loadForRPE, rpeFromLoad } from '../../../engines/pro/auto
 import { loadTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
 import { PopupNumber, PopupSelect, PopupToggle, CalcSection, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { TrainingSafetyHub } from './TrainingSafetyHub';
 
 const ACCENT = '#00e68a';
 const APPLY_BOX: React.CSSProperties = { marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' };
@@ -88,6 +89,7 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
     switch (subTab) {
       case 'cardio':
         return (
+          <>
           <CalcSection icon="🏃" title="Кардио-план" accent="#3b82f6" desc="Тип кардио, цель, дней/нед — подберётся план">
             <PopupSelect label="Цель" value={cardioGoal} options={GOAL_OPTS} onChange={setCardioGoal} />
             <PopupSelect label="Тип кардио" value={cardioType} options={TYPE_OPTS} onChange={v => setCardioType(v as CardioType)} />
@@ -107,6 +109,13 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
               </div>}
             </div>
           </CalcSection>
+          <TrainingSafetyHub input={{
+            source: 'cardio',
+            profile: { injuries: injuries.split(',').map(s => ({ muscle: s.trim() })).filter(x => x.muscle), currentPain: currentPain.split(',').map(s => s.trim()).filter(Boolean), jointLimitations },
+            workload: { acwrRatio: acwr },
+            cardio: { type: cardioType, daysPerWeek: cardioDays, durationMin: cardioPlan.sessions[0]?.durationMin || 30, goal: cardioGoal },
+          }} />
+          </>
         );
       case 'ortho':
         return (

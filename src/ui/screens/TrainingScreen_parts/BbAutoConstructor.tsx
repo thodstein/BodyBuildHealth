@@ -88,7 +88,6 @@ import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { TrainingSafetyHub } from './TrainingSafetyHub';
-import type { TrainingSafetyInput } from '../../../engines/training-safety.types';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
@@ -1992,7 +1991,7 @@ export const BbAutoConstructor: React.FC = () => {
           onChange={setInjuries}
         />
       </div>
-      <TrainingSafetyHub input={useMemo<TrainingSafetyInput>(() => ({
+      <TrainingSafetyHub input={{
         source: 'bb_auto',
         profile: {
           injuries,
@@ -2001,8 +2000,7 @@ export const BbAutoConstructor: React.FC = () => {
           trainingYears: bbTrainingYears,
           level: bbLevel,
         },
-        workload: { acwrRatio: calculateACWR() },
-      }), [injuries, mobilityRestrictions, prof, bbTrainingYears, bbLevel])} compact />
+      }} compact />
       {/* PRO: Mobility restrictions — biomechanics-based exercise filtering */}
       <div style={{ marginTop:8 }}>
         <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>🦴 Ограничения мобильности (биомеханика)</div>
