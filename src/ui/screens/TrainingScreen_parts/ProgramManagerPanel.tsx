@@ -63,12 +63,13 @@ import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { completeAnnualBlockImport } from './planner-bridge-handlers';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
-import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle } from './training-ui';
+import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL } from './training-ui';
 import { GROUP_RU } from './program-types';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { distributePhases, PHASE_CONFIGS } from './phase-periodization';
@@ -99,6 +100,18 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const btn: React.CSSProperties = { ...BTN, flex: 1, minWidth: 0 };
 const ghostBtn: React.CSSProperties = { ...BTN_GHOST, flex: 1, minWidth: 0 };
+
+/** Последовательные шаги ручного конструктора (как в BB-авто):
+ * 1 «Выбор» — создать/клонировать/открыть программу (ББ/ПЛ/БВ);
+ * 2 «Редактор» — правка недель/сессий/подходов;
+ * 3 «Итог» — валидация, метрики, экспорт и сохранение. */
+type MStep = 'choose' | 'editor' | 'final';
+const MSTEP_LIST: MStep[] = ['choose', 'editor', 'final'];
+const MSTEP_LABELS: Record<MStep, string> = {
+  choose: '1 Выбор',
+  editor: '2 Редактор',
+  final: '3 Итог',
+};
 
 /** Режим конструктора: «Стандартный» (базовая сборка/загрузка/отчёт, без профиля)
  *  или «Профессиональный» (все инструменты тренера). */
@@ -174,6 +187,26 @@ export const ProgramManagerPanel: React.FC = () => {
   });
   useEffect(() => { try { localStorage.setItem('he_manual_mode', manualMode); } catch {} }, [manualMode]);
 
+  // Последовательные шаги конструктора. Создание/открытие программы
+  // автоматически переводит на шаг «Редактор», сохранение на «Итог» — обратно в выбор.
+  const [mstep, setMstep] = useState<MStep>('choose');
+  useEffect(() => {
+    if (editing && mstep === 'choose') setMstep('editor');
+  }, [editing, mstep]);
+  useEffect(() => {
+    if (!editing) setMstep('choose');
+  }, [editing]);
+
+  const renderMstepNav = () => (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {MSTEP_LIST.map(s => (
+        <button key={s} onClick={() => { if ((s === 'editor' || s === 'final') && !editing) return; setMstep(s); }} style={STEP_PILL(mstep === s)}>
+          {MSTEP_LABELS[s]}
+        </button>
+      ))}
+    </div>
+  );
+
   // F3.1: Undo/Redo history через useProgramUndo hook (извлечено из inline-кода)
   const { pushSnapshot, undo, redo } = useProgramUndo(editing, setEditing);
   const onEditChange = useCallback((next: UserProgram) => {
@@ -194,6 +227,13 @@ export const ProgramManagerPanel: React.FC = () => {
 
   const refresh = useCallback(() => setPrograms(loadUserPrograms()), []);
   const flash = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(''), 2200); }, []);
+
+  const closeEditor = useCallback(() => {
+    setEditing(null);
+    setPendingAutoFill(false);
+    setMstep('choose');
+    refresh();
+  }, [refresh]);
 
   // P2.1: визард создания ББ-программы (5 шагов: направление → цель → уровень → дни/нед → preview → save)
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -375,17 +415,145 @@ export const ProgramManagerPanel: React.FC = () => {
     return sorted;
   }, [programs, search, filterDir, sortBy]);
 
-  if (editing) {
+  // ── Шаг 3 «Итог»: сводка, валидация, метрики и финальное сохранение ──
+  const renderFinalStep = () => {
+    if (!editing) return null;
+    const p = editing;
+    const dir = p.meta.direction;
+    const issues = validateProgram(p);
+    const errCount = issues.filter(i => i.level === 'error').length;
+    const warnCount = issues.filter(i => i.level === 'warning').length;
+    // Метрики BB-плана (пиковая неделя): объём/тяж-памп/RIR/перегруз по MRV.
+    const bbMetrics = dir === 'bb' && p.bb?.weeks?.length ? (() => {
+      try {
+        const single = p.bb!.weeks!.map(w => userWeekToBBPlan(w, p.meta.level));
+        const first = single[0];
+        const merged: BBPlan = {
+          pattern: first.pattern,
+          weeks: single.map(pl => pl.weeks[0]),
+          rotationMuscleVolume: first.rotationMuscleVolume,
+          rationale: first.rationale,
+          level: p.meta.level,
+        };
+        return calcBBPlanMetrics(merged);
+      } catch { return null; }
+    })() : null;
+    const totalExercises = dir === 'bb' && p.bb?.weeks
+      ? p.bb.weeks.reduce((s, w) => s + w.sessions.reduce((ss, sess) => ss + sess.blocks.length, 0), 0)
+      : dir === 'pl' && p.pl
+        ? p.pl.schedule.length
+        : (p.hybrid?.bbWeeks ?? []).reduce((s, w) => s + (w.sessions ?? []).reduce((ss, sess) => ss + (sess.blocks ?? []).length, 0), 0);
+    const overMrv = (bbMetrics?.perMuscle ?? []).filter(m => m.status === 'exceeding_mrv').length;
+    const belowMev = (bbMetrics?.perMuscle ?? []).filter(m => m.status === 'below_mev').length;
     return (
-      <ProgramEditor
-        program={editing}
-        onChange={onEditChange}
-        onSave={commit}
-          onBack={() => { setEditing(null); setPendingAutoFill(false); refresh(); }}
+      <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Сводка программы */}
+        <div style={{ ...CARD, padding: 12, borderLeft: `3px solid ${DIR_COLOR[dir]}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{p.meta.title}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: DIR_COLOR[dir] }}>
+              {DIR_LABEL[dir]} · {SOURCE_LABEL[p.meta.source] ?? p.meta.source}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: DIM, marginTop: 4, lineHeight: 1.5 }}>
+            🎯 {GOAL_OPTS.find(g => g.id === p.meta.goal)?.label ?? p.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === p.meta.level)?.label ?? p.meta.level} · 🗓 {p.meta.daysPerWeek} дн/нед × {p.meta.weeks} нед
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+            {dir === 'bb' && bbMetrics && (
+              <>
+                <span style={{ fontSize: 10, color: DIM_STRONG }}>📦 Сетов: <b style={{ color: '#fff' }}>{bbMetrics.totalSets}</b></span>
+                <span style={{ fontSize: 10, color: DIM_STRONG }}>🏋️ Тяж {Math.round(bbMetrics.тяжPct * 100)}% · 💧 Памп {Math.round(bbMetrics.пампPct * 100)}%</span>
+                <span style={{ fontSize: 10, color: DIM_STRONG }}>RIR {bbMetrics.avgRir.toFixed(1)}</span>
+                {overMrv > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>⚠ {overMrv} групп выше MRV</span>}
+                {belowMev > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{belowMev} групп ниже MEV</span>}
+              </>
+            )}
+            <span style={{ fontSize: 10, color: DIM_STRONG }}>📝 Упражнений: <b style={{ color: '#fff' }}>{totalExercises}</b></span>
+          </div>
+        </div>
+
+        {/* Валидация */}
+        {(() => {
+          if (issues.length === 0) {
+            return (
+              <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #22c55e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>✅</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e' }}>Программа валидна</div>
+                  <div style={{ fontSize: 10, color: DIM }}>Ошибок и предупреждений нет — можно сохранять.</div>
+                </div>
+              </div>
+            );
+          }
+          const color = errCount > 0 ? '#ef4444' : '#f59e0b';
+          const icon = errCount > 0 ? '🚫' : '⚠️';
+          return (
+            <div role="alert" style={{ ...CARD, padding: 10, borderLeft: `3px solid ${color}` }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color, marginBottom: 6 }}>
+                {icon} {errCount > 0 ? `${errCount} ошибк${errCount === 1 ? 'а' : 'и'}` : `${warnCount} предупреждени${warnCount === 1 ? 'е' : 'я'}`} валидации
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {issues.slice(0, 8).map((iss, i) => (
+                  <div key={i} style={{ fontSize: 10, color: iss.level === 'error' ? '#fca5a5' : '#fbbf24', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 800 }}>{iss.level === 'error' ? '✕' : '!'}</span>
+                    <span style={{ flex: 1 }}>{iss.message}</span>
+                    <span style={{ color: DIM }}>{iss.code}</span>
+                  </div>
+                ))}
+              </div>
+              {issues.length > 8 && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>…и ещё {issues.length - 8}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Действия */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <button style={{ ...BTN, width: '100%', minHeight: 48 }} onClick={() => { if (commit('Сборка завершена')) closeEditor(); }}>
+            💾 Сохранить и завершить
+          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={ghostBtn} onClick={() => setMstep('editor')}>← Назад к редактору</button>
+            <button style={ghostBtn} onClick={() => copyProgramToClipboard(p)}>📋 В буфер</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={ghostBtn} onClick={() => {
+              const json = JSON.stringify(p, null, 2);
+              const blob = new Blob([json], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = (p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.json';
+              a.click(); URL.revokeObjectURL(url);
+              flash('📤 Экспортировано');
+            }}>📤 JSON</button>
+            <button style={ghostBtn} onClick={() => setEditing(null)}>✕ К списку</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (editing) {
+    if (mstep === 'final') {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {renderMstepNav()}
+          {renderFinalStep()}
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {renderMstepNav()}
+        <ProgramEditor
+          program={editing}
+          onChange={onEditChange}
+          onSave={commit}
+          onBack={closeEditor}
+          onNext={() => setMstep('final')}
           mode={manualMode}
           onMode={setManualMode}
           autoFillOnMount={pendingAutoFill}
-      />
+        />
+      </div>
     );
   }
 
@@ -472,6 +640,7 @@ export const ProgramManagerPanel: React.FC = () => {
   if (programs.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {renderMstepNav()}
         <div style={{ padding: '14px 12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.10))', border: '1px solid rgba(0,230,138,0.25)' }}>
           <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>✋ Ручной конструктор программ</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 1.45 }}>
@@ -565,6 +734,7 @@ export const ProgramManagerPanel: React.FC = () => {
 
   return (
     <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {renderMstepNav()}
       <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>✋ Ручной конструктор — Мои программы ({programs.length})</div>
       <div style={{ fontSize: 11, color: DIM }}>
         Создавайте программы с нуля, клонируйте готовые из библиотеки или подключайте LMS-циклы (без изменения их процентовок).

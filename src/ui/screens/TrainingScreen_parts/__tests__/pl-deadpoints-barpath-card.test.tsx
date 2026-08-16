@@ -273,22 +273,13 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.queryByText(/Слабее: правая сторона/)).toBeNull();
   });
 
-  it('VBT: коррекции фазы видны сразу (без ввода скоростей) + красивый ввод', () => {
+  it('VBT: ручной ввод скоростей даёт потерю/фазу и коррекции', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     expect(screen.getByText(/3.5 · ⚡ VBT/)).toBeTruthy();
-    // Пояснение порогов и типичный диапазон движения
-    expect(screen.getByText(/≥20% — отказ близко/)).toBeTruthy();
-    expect(screen.getByText(/Типичный диапазон Присед:/)).toBeTruthy();
-    // Коррекции текущей фазы (squat → «Низ (выход из ямы)») видны БЕЗ ввода скоростей
-    expect(screen.getByText(/🏋️ Коррекции фазы/)).toBeTruthy();
-    expect(screen.getAllByText(/➕ Все/).length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('VBT: кнопка «Заполнить типичными» + ввод даёт потерю/фазу и коррекции', () => {
-    render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
-    // Типичные значения squat: 0.75/0.50 → потеря ~33% → exceeded
-    fireEvent.click(screen.getByText(/Заполнить типичными/));
-    expect(screen.getByText(/Потеря скорости:/)).toBeTruthy();
+    // Ввод: лучший 0.75, последний 0.45 → 40% потери → exceeded → фаза
+    fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.75' } });
+    fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.45' } });
+    expect(screen.getByText(/Потеря скорости: 40%/)).toBeTruthy();
     expect(screen.getByText(/Отказ близко — вероятная слабая фаза/)).toBeTruthy();
     // Для squat → фаза «Низ (выход из ямы)»
     expect(screen.getAllByText(/«Низ \(выход из ямы\)»/).length).toBeGreaterThanOrEqual(1);
@@ -303,8 +294,8 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
 
   it('VBT: умеренная потеря (<20%) — коррекции ТЕКУЩЕЙ фазы всегда доступны', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
-    fireEvent.change(screen.getByLabelText('Скорость лучшего повтора (м/с)'), { target: { value: '0.60' } });
-    fireEvent.change(screen.getByLabelText('Скорость последнего повтора (м/с)'), { target: { value: '0.55' } });
+    fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.60' } });
+    fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.55' } });
     // Потеря ~8% — без «Отказ близко»
     expect(screen.queryByText(/Отказ близко/)).toBeNull();
     // Но коррекции текущей фазы (squat → «Низ (выход из ямы)») показаны
@@ -314,10 +305,8 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
 
   it('VBT: некорректные скорости — подсказка без расчёта', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
-    fireEvent.change(screen.getByLabelText('Скорость лучшего повтора (м/с)'), { target: { value: '0.3' } });
-    fireEvent.change(screen.getByLabelText('Скорость последнего повтора (м/с)'), { target: { value: '0.5' } });
-    expect(screen.getByText(/Последний повтор не может быть быстрее лучшего/)).toBeTruthy();
-    // Коррекции при этом всё равно видны
-    expect(screen.getByText(/🏋️ Коррекции фазы/)).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText('0.60'), { target: { value: '0.3' } });
+    fireEvent.change(screen.getByPlaceholderText('0.40'), { target: { value: '0.5' } });
+    expect(screen.getByText(/последний повтор не может быть быстрее лучшего/)).toBeTruthy();
   });
 });

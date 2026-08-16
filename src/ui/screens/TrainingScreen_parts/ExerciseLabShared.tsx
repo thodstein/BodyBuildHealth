@@ -391,3 +391,37 @@ export const TechniqueDetail: React.FC<{
     </div>
   );
 };
+
+// ════════════════════ КАРТА МЫШЦ (перенесено из демо-панели ПЛ-авто) ════════════════════
+export type BodyRegion = 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core' | 'other';
+
+/** Нормализация названия мышцы → регион тела для SVG-карты (EN/RU). */
+export function muscleToRegion(muscle: string): BodyRegion {
+  const m = (muscle || '').toLowerCase();
+  if (/pectoral|груд|chest/.test(m)) return 'chest';
+  if (/latissimus|trapezius|back|спин|широч|трап/.test(m)) return 'back';
+  if (/quad|hamstring|glute|leg|ног|ягод|квадр|бицепс бед|икр|calf/.test(m)) return 'legs';
+  if (/deltoid|shoulder|плеч/.test(m)) return 'shoulders';
+  if (/biceps|triceps|arm|рук|бицепс|трицепс|предплеч/.test(m)) return 'arms';
+  if (/abdomin|oblique|core|кор|пресс|transvers/.test(m)) return 'core';
+  return 'other';
+}
+
+/** Inline-SVG карта работающих мышц (primary — зелёный, secondary — полупрозрачный). */
+export const BodyMapSVG: React.FC<{ primary: BodyRegion[]; secondary: BodyRegion[]; size?: number }> = ({ primary, secondary, size = 110 }) => {
+  const fill = (r: BodyRegion) => primary.includes(r) ? ACCENT : secondary.includes(r) ? 'rgba(0,230,138,0.35)' : '#3a3a3c';
+  const height = Math.round(size * 200 / 120);
+  return (
+    <svg viewBox="0 0 120 220" style={{ width: size, height, display: 'block', margin: '0 auto' }} role="img" aria-label="Карта работающих мышц">
+      <circle cx="60" cy="18" r="12" fill="#4a4a4a" />
+      <path d="M30 38 Q60 30 90 38 L90 50 Q60 44 30 50 Z" fill={fill('shoulders')} />
+      <rect x="38" y="50" width="44" height="26" rx="6" fill={fill('chest')} />
+      <rect x="22" y="50" width="12" height="50" rx="6" fill={fill('arms')} />
+      <rect x="86" y="50" width="12" height="50" rx="6" fill={fill('arms')} />
+      <rect x="44" y="78" width="32" height="22" rx="5" fill={fill('core')} />
+      <rect x="36" y="48" width="48" height="56" rx="8" fill="none" stroke={fill('back')} strokeWidth="3" opacity="0.8" />
+      <rect x="44" y="100" width="14" height="70" rx="6" fill={fill('legs')} />
+      <rect x="62" y="100" width="14" height="70" rx="6" fill={fill('legs')} />
+    </svg>
+  );
+};

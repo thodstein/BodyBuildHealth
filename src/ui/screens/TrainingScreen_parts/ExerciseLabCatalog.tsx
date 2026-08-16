@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, canReplace } from '../../../core/exercise-catalog';
 import { getExerciseBio } from '../../../data/exercise-biomechanics-db';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
-import { ACCENT, DIM, SMALL, GROUP_RU, TYPE_RU, EQUIP_RU, GROUPS } from './ExerciseLabShared';
+import { ACCENT, DIM, SMALL, GROUP_RU, TYPE_RU, EQUIP_RU, GROUPS, BodyMapSVG, muscleToRegion } from './ExerciseLabShared';
 import type { Exercise } from '../../../core/types';
 
 const MUSCLE_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
@@ -57,6 +57,9 @@ const ExerciseLabCatalog: React.FC<{
 
   const selectedEx = useMemo(() => EXERCISE_CATALOG.find(e => e.id === selectedId), [selectedId]);
   const selectedBio = useMemo(() => selectedId ? getExerciseBio(selectedId) : null, [selectedId]);
+  // 🗺 Карта работающих мышц (primary/secondary → регионы тела).
+  const primaryRegions = useMemo(() => selectedBio ? [...new Set((selectedBio.primaryMuscles || []).map(muscleToRegion).filter(r => r !== 'other'))] : [], [selectedBio]);
+  const secondaryRegions = useMemo(() => selectedBio ? [...new Set((selectedBio.secondaryMuscles || []).map(muscleToRegion).filter(r => r !== 'other'))] : [], [selectedBio]);
   const visibleList = filtered.slice(0, visible);
 
   const groupOptions = [
@@ -155,6 +158,18 @@ const ExerciseLabCatalog: React.FC<{
                     {bio?.isCompetition && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.08)', color: '#f59e0b' }}>🏆 Competition</span>}
                     {bio?.isUnilateral && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>1️⃣ Унилатеральное</span>}
                   </div>
+
+                  {/* 🗺 Карта работающих мышц (из демо-панели ПЛ-авто) */}
+                  {selectedBio && (primaryRegions.length > 0 || secondaryRegions.length > 0) && (
+                    <div style={{ marginBottom: 4, display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(0,230,138,0.03)', borderRadius: 8, padding: '6px 8px' }}>
+                      <BodyMapSVG primary={primaryRegions} secondary={secondaryRegions} size={72} />
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5, minWidth: 0 }}>
+                        <b style={{ color: ACCENT }}>🗺 Карта работающих мышц:</b>
+                        <div style={{ color: ACCENT, marginTop: 2 }}>• Основные: {primaryRegions.map(r => GROUP_RU[r] || r).join(', ') || '—'}</div>
+                        <div>• Вспомогательные: {secondaryRegions.map(r => GROUP_RU[r] || r).join(', ') || '—'}</div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Техника выполнения */}
                   {ex.technique && (

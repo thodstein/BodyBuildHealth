@@ -86,12 +86,13 @@ export interface ProgramEditorProps {
   onChange: (p: UserProgram) => void;
   onSave: (note?: string) => boolean | void;
   onBack: () => void;
+  onNext?: () => void;
   mode: ManualMode;
   onMode: (m: ManualMode) => void;
   autoFillOnMount?: boolean;
 }
 
-export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, mode, onMode, autoFillOnMount = false }) => {
+export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, onNext, mode, onMode, autoFillOnMount = false }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   // P4: Undo/Redo — snapshot перед каждым onChange, чтобы Ctrl+Z работал из редактора
@@ -575,6 +576,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+          {onNext && (
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={onNext}>Далее: Итог →</button>
+          )}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
           {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>

@@ -16,7 +16,7 @@ import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrec
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm } from '../../../engines/pro/weak-muscle-detection.engine';
-import { diagnoseVelocity, LOAD_VELOCITY_PROFILE, type VBTLift } from '../../../engines/pro/vbt.engine';
+import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
@@ -108,25 +108,6 @@ const LIFT_PHASES: Record<Lift, WeakPoint[]> = {
   incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
 };
 const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
-
-/* ── VBT: диапазон скоростей движения из LVP (для подсказок ввода) ───────── */
-const VBT_LIFT_MAP: Record<Lift, VBTLift> = {
-  squat: 'squat', bench: 'bench', deadlift: 'deadlift', ohp: 'ohp', row: 'row',
-  pulldown: 'row', incline_press: 'bench',
-};
-
-/** Типичные значения для быстрого старта: [лучший, последний] по движению. */
-const VBT_TYPICAL: Record<Lift, [string, string]> = {
-  squat: ['0.75', '0.50'], bench: ['0.50', '0.35'], deadlift: ['0.62', '0.42'],
-  ohp: ['0.52', '0.36'], row: ['0.68', '0.48'], pulldown: ['0.68', '0.48'], incline_press: ['0.52', '0.36'],
-};
-
-function vbtRangeForLift(lift: Lift): { min: number; max: number } | null {
-  const tbl = LOAD_VELOCITY_PROFILE[VBT_LIFT_MAP[lift]];
-  if (!tbl || tbl.length < 2) return null;
-  // Таблица от 100%1RM (минимальная скорость) к 30% (максимальная).
-  return { min: tbl[0][1], max: tbl[tbl.length - 1][1] };
-}
 
 /* ── Персистентность выбора карточки (he_pl_diagnostic_card_v1) ─────────────
  * Выбор пользователя (движение/фаза/отклонения/отмеченные упражнения/слабые
@@ -636,77 +617,50 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
 
       {/* ═══ 3.5. VBT: скорость штанги (ручной ввод) ═══ */}
       <div style={CARD}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#f472b6' }}>3.5 · ⚡ VBT: скорость штанги · {LIFT_RU[lift]}</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#f472b6' }}>3.5 · ⚡ VBT: скорость штанги (м/с) · {LIFT_RU[lift]}</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
-          Введите скорости повторов (м/с). Потеря скорости от лучшего к последнему повтору показывает, насколько близко вы к отказу: <b style={{ color: '#f472b6' }}>&lt;10% — стабильно</b> · <b style={{ color: '#f59e0b' }}>10–20% — зона силы</b> · <b style={{ color: '#ef4444' }}>≥20% — отказ близко</b>.
+          Введите скорость лучшего и последнего повтора (м/с) — потерю скорости и вероятную фазу срыва. План не меняется, это диагностика.
         </div>
-        {(() => { const rng = vbtRangeForLift(lift); return rng && (
-          <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-            📐 Типичный диапазон {LIFT_RU[lift]}: <b style={{ color: '#f472b6' }}>{rng.min.toFixed(2)}–{rng.max.toFixed(2)} м/с</b> (от ~100%1RM к ~30%1RM).
-          </div>
-        ); })()}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8, boxSizing: 'border-box' }}>
-          <label style={{ display: 'block', fontSize: 10, color: DIM }}>
-            <div style={{ fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>⚡ Лучший повтор</div>
-            <input type="number" step="0.01" min="0" value={vbtBest} onChange={e => setVbtBest(e.target.value)} placeholder={VBT_TYPICAL[lift][0]} aria-label="Скорость лучшего повтора (м/с)"
-              style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(244,114,182,0.25)', color: '#fff', borderRadius: 8, padding: '7px 8px', fontSize: 12, outline: 'none' }} />
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 3, lineHeight: 1.3 }}>Самая быстрая скорость в подходе (1-й повтор)</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
+          <label style={{ fontSize: 10, color: DIM }}>Лучший повтор (м/с):
+            <input type="number" step="0.01" min="0" value={vbtBest} onChange={e => setVbtBest(e.target.value)} placeholder="0.60" style={{ width: 70, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
           </label>
-          <label style={{ display: 'block', fontSize: 10, color: DIM }}>
-            <div style={{ fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>⏱ Последний повтор</div>
-            <input type="number" step="0.01" min="0" value={vbtLast} onChange={e => setVbtLast(e.target.value)} placeholder={VBT_TYPICAL[lift][1]} aria-label="Скорость последнего повтора (м/с)"
-              style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(244,114,182,0.25)', color: '#fff', borderRadius: 8, padding: '7px 8px', fontSize: 12, outline: 'none' }} />
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 3, lineHeight: 1.3 }}>Скорость финального повтора (медленнее лучшего)</div>
+          <label style={{ fontSize: 10, color: DIM }}>Последний (м/с):
+            <input type="number" step="0.01" min="0" value={vbtLast} onChange={e => setVbtLast(e.target.value)} placeholder="0.40" style={{ width: 70, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
           </label>
-          <label style={{ display: 'block', fontSize: 10, color: DIM }}>
-            <div style={{ fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>🏋️ Вес (кг)</div>
-            <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e => setVbtWeight(e.target.value)} placeholder="100" aria-label="Вес штанги (кг)"
-              style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(244,114,182,0.25)', color: '#fff', borderRadius: 8, padding: '7px 8px', fontSize: 12, outline: 'none' }} />
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 3, lineHeight: 1.3 }}>Для оценки e1RM по скорости (необязательно)</div>
+          <label style={{ fontSize: 10, color: DIM }}>Вес (кг, для e1RM):
+            <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e => setVbtWeight(e.target.value)} placeholder="100" style={{ width: 64, marginLeft: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
           </label>
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-          <button onClick={() => { const [b, l] = VBT_TYPICAL[lift]; setVbtBest(b); setVbtLast(l); }} style={{ ...btn, background: 'rgba(244,114,182,0.1)', color: '#f472b6', border: '1px solid rgba(244,114,182,0.25)' }}>🎯 Заполнить типичными</button>
-          <button onClick={() => { setVbtBest(''); setVbtLast(''); setVbtWeight(''); }} style={{ ...btn, background: 'rgba(255,255,255,0.05)', color: DIM, border: '1px solid rgba(255,255,255,0.12)' }}>✕ Сбросить</button>
         </div>
         {(() => {
           const best = parseFloat(vbtBest);
           const last = parseFloat(vbtLast);
+          if (!Number.isFinite(best) || !Number.isFinite(last) || best <= 0 || last <= 0 || last > best) {
+            return <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Введите скорости (последний повтор не может быть быстрее лучшего).</div>;
+          }
           const weight = parseFloat(vbtWeight);
-          const hasVelocities = Number.isFinite(best) && Number.isFinite(last) && best > 0 && last > 0 && last <= best;
-          const d = hasVelocities ? diagnoseVelocity(lift, best, last, Number.isFinite(weight) && weight > 0 ? weight : undefined) : null;
+          const d = diagnoseVelocity(lift, best, last, Number.isFinite(weight) && weight > 0 ? weight : undefined);
           // Фаза для коррекций: при отказе — фаза максимального момента (suggested),
           // иначе — текущая выбранная фаза движения (коррекции доступны всегда).
-          const vbtPhase = (d?.suggestedPhase ?? effectivePhase) as WeakPoint | null;
+          const vbtPhase = (d.suggestedPhase ?? effectivePhase) as WeakPoint | null;
           const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;
           const vbtKey = `${lift}|vbt|${vbtPhase ?? 'none'}`;
           return (
-            <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: d?.exceeded ? 'rgba(239,68,68,0.07)' : 'rgba(244,114,182,0.05)', border: `1px solid ${d?.exceeded ? 'rgba(239,68,68,0.25)' : 'rgba(244,114,182,0.2)'}` }}>
-              {hasVelocities && d && (
-                <>
-                  <div style={{ fontSize: 10, color: '#f472b6', fontWeight: 700 }}>
-                    Потеря скорости: {d.lossPct}% · {d.zone}
-                  </div>
-                  {d.e1RMByVelocity != null && (
-                    <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>e1RM по скорости (последний повтор): {d.e1RMByVelocity} кг</div>
-                  )}
-                  {d.exceeded && d.suggestedPhase && (
-                    <div style={{ marginTop: 4, fontSize: 10, color: '#fbbf24', lineHeight: 1.4 }}>
-                      ⚠ Отказ близко — вероятная слабая фаза «{PHASE_RU[d.suggestedPhase] || d.suggestedPhase}» (максимальный момент). Коррекции ниже.
-                    </div>
-                  )}
-                  {!d.exceeded && (
-                    <div style={{ marginTop: 4, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
-                      Скорость в пределах порога. Коррекции текущей фазы — ниже.
-                    </div>
-                  )}
-                </>
+            <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: d.exceeded ? 'rgba(239,68,68,0.07)' : 'rgba(244,114,182,0.05)', border: `1px solid ${d.exceeded ? 'rgba(239,68,68,0.25)' : 'rgba(244,114,182,0.2)'}` }}>
+              <div style={{ fontSize: 10, color: '#f472b6', fontWeight: 700 }}>
+                Потеря скорости: {d.lossPct}% · {d.zone}
+              </div>
+              {d.e1RMByVelocity != null && (
+                <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>e1RM по скорости (последний повтор): {d.e1RMByVelocity} кг</div>
               )}
-              {!hasVelocities && (
-                <div style={{ fontSize: 10, color: Number.isFinite(best) && Number.isFinite(last) && best > 0 && last > 0 ? '#f59e0b' : 'rgba(255,255,255,0.45)' }}>
-                  {Number.isFinite(best) && Number.isFinite(last) && best > 0 && last > 0
-                    ? '⚠ Последний повтор не может быть быстрее лучшего — проверьте значения.'
-                    : 'Введите скорости (м/с) — коррекции текущей фазы показаны ниже сразу.'}
+              {d.exceeded && d.suggestedPhase && (
+                <div style={{ marginTop: 4, fontSize: 10, color: '#fbbf24', lineHeight: 1.4 }}>
+                  ⚠ Отказ близко — вероятная слабая фаза «{PHASE_RU[d.suggestedPhase] || d.suggestedPhase}» (максимальный момент). Коррекции ниже.
+                </div>
+              )}
+              {!d.exceeded && vbtPhase && (
+                <div style={{ marginTop: 4, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+                  Скорость в пределах порога. Коррекции текущей фазы «{PHASE_RU[vbtPhase] || vbtPhase}» — ниже.
                 </div>
               )}
               {vbtSticking && vbtSticking.items.length > 0 && (

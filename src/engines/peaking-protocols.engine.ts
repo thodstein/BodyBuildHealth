@@ -2,9 +2,7 @@
  * peaking-protocols.engine.ts — 3 протокола пиковой фазы.
  *
  * PL: 3-нед, RIR 1→0, объём −15%→−30%, интенсивность 90%→100%.
- * BB: 4-нед, RIR 2–4, объём 90→60%, интенсивность сохраняется 95→85%
- *     (каноническая кривая BB_TAPER_CURVE из bb-contest-prep.engine,
- *     Bosquet 2005 + Helms 2022 — без отказных серий и тяжёлых эксцентриков).
+ * BB: 4-нед, RIR 0→0, объём −10%→−20%, пампинг/изоляция.
  * Classic (WF): 4-нед, 2 нед «перегрузка» + 2 нед суперкомпенсация.
  */
 export type PeakingProtocol = 'pl' | 'bb' | 'classic';
@@ -41,12 +39,12 @@ const PL_PROTOCOL: PeakingProtocolOutput = {
 const BB_PROTOCOL: PeakingProtocolOutput = {
   name: 'Бодибилдинг (4-нед пик)',
   durationWeeks: 4,
-  description: 'Пик для бодибилдинга по современной модели (Bosquet 2005, Helms 2022): объём снижается 90→60%, интенсивность сохраняется (95→85%), RIR 2–4 — без отказных серий, дроп-сетов и тяжёлых эксцентриков. Гликогеновая загрузка и памп — в пик-неделе (bb-contest-prep.engine).',
+  description: 'Пик для бодибилдинга: гликогеновая загрузка, пампинг, снижение объёма для восстановления. RIR 0 — отказ в последнем подходе.',
   weeks: [
-    { week: 1, label: 'Подводящая', volumePct: 0.90, intensityPct: 0.95, rirMin: 2, rirMax: 3, focus: 'Объём слегка снижен, рабочие веса сохраняются, без отказа', deloadBefore: true },
-    { week: 2, label: 'Taper-2', volumePct: 0.85, intensityPct: 0.95, rirMin: 2, rirMax: 3, focus: 'Снижение объёма (80–90%), интенсивность сохраняется, RIR 2–3', deloadBefore: false },
-    { week: 3, label: 'Taper-1', volumePct: 0.70, intensityPct: 0.90, rirMin: 2, rirMax: 4, focus: 'Объём 60–75%, вес в разумных пределах, RIR 2–4', deloadBefore: false },
-    { week: 4, label: 'Финал', volumePct: 0.60, intensityPct: 0.85, rirMin: 2, rirMax: 4, focus: 'Минимум объёма, памп-акцент, без отказа', deloadBefore: false },
+    { week: 1, label: 'Наполнение 1', volumePct: 0.90, intensityPct: 0.80, rirMin: 0, rirMax: 1, focus: 'База + изоляция, пампинг', deloadBefore: true },
+    { week: 2, label: 'Наполнение 2', volumePct: 0.85, intensityPct: 0.85, rirMin: 0, rirMax: 1, focus: 'Увеличение углеводов, снижение КБ', deloadBefore: false },
+    { week: 3, label: 'Прорисовка', volumePct: 0.80, intensityPct: 0.90, rirMin: 0, rirMax: 0, focus: 'Дроп-сеты, пампинг-сеты, отказ', deloadBefore: false },
+    { week: 4, label: 'Шоу', volumePct: 0.70, intensityPct: 0.85, rirMin: 0, rirMax: 0, focus: 'Минимум объёма, пампинг перед выходом', deloadBefore: false },
   ],
 };
 
@@ -70,4 +68,27 @@ export const PEAKING_PROTOCOLS: Record<PeakingProtocol, PeakingProtocolOutput> =
 
 export function getPeakingProtocol(type: PeakingProtocol): PeakingProtocolOutput {
   return PEAKING_PROTOCOLS[type] || PL_PROTOCOL;
+}
+
+export function applyPeakingToMicrocycles(
+  microcycles: Array<{ weekNumber: number; mesocycleType: string; volumeMultiplier: number; rirRange: [number, number]; }>,
+  protocol: PeakingProtocol,
+  startWeek: number
+): Array<{ weekNumber: number; volumeMultiplier: number; rirRange: [number, number]; rpeTarget: number; notes: string }> {
+  const p = getPeakingProtocol(protocol);
+  const result: Array<{ weekNumber: number; volumeMultiplier: number; rirRange: [number, number]; rpeTarget: number; notes: string }> = [];
+
+  for (let i = 0; i < p.weeks.length; i++) {
+    const pw = p.weeks[i];
+    const existing = microcycles.find(m => m.weekNumber === startWeek + i);
+    const baseVol = existing?.volumeMultiplier ?? 1.0;
+    result.push({
+      weekNumber: startWeek + i,
+      volumeMultiplier: baseVol * pw.volumePct,
+      rirRange: [pw.rirMin, pw.rirMax],
+      rpeTarget: 10 - pw.rirMax,
+      notes: `${p.name} — ${pw.label}: ${pw.focus}`,
+    });
+  }
+  return result;
 }
