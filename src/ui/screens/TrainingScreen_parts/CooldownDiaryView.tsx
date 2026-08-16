@@ -18,7 +18,7 @@ import {
 } from '../../../engines/cooldown.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { collectGroupCooldown } from '../../../engines/cooldown-day.engine';
-import { groupsFromExercises, prepGroupLabels } from '../../../engines/warmup-day.engine';
+import { groupsFromExercises, prepGroupLabels, canonicalizeGroups } from '../../../engines/warmup-day.engine';
 import { cooldownLabel } from '../../../engines/cooldown.engine';
 
 const CARD = diaryCard;
@@ -106,6 +106,10 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
             return <div style={{ fontSize: 10, color: DIM }}>Не удалось определить группы дня — заминка будет по упражнениям сессии.</div>;
           }
           const stretch = collectGroupCooldown(groups);
+          const hasLegs = groups.some(g => {
+            const c = canonicalizeGroups(g);
+            return c.some(x => x === 'quads' || x === 'hamstrings' || x === 'glutes' || x === 'calves');
+          });
           return (
             <div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
@@ -117,6 +121,11 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
                     {cooldownLabel(s.id)}{s.note ? ` — ${s.note}` : ''}
                   </span>
                 ))}
+                {hasLegs && (
+                  <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }}>
+                    Фоам-роллинг ног (восстановление)
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 4 }}>Полный план с чекбоксами — при завершении сессии (фаза «Заминка»).</div>
             </div>

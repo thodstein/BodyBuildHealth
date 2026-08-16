@@ -93,6 +93,26 @@ describe('generateCooldown с targetGroups', () => {
     expect(blocks.some(b => b.type === 'cardio')).toBe(false);
   });
 
+  it('ножной день → фоам-роллинг рабочих зон', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['quads', 'hamstrings', 'glutes', 'calves'] });
+    const mob = blocks.find(b => b.type === 'mobility')!;
+    expect(mob).toBeTruthy();
+    expect(mob.exercises.map(e => e.exerciseId)).toEqual(['foam_quads', 'foam_hams', 'foam_glutes', 'foam_calves']);
+    expect(mob.durationSec).toBe(240);
+    expect(mob.notes).toContain('Фоам-роллинг');
+  });
+
+  it('верхний день без усталости → без фоам-роллинга и без восстановления', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['chest', 'back'] });
+    expect(blocks.some(b => b.type === 'mobility')).toBe(false);
+  });
+
+  it('фоам-роллинг не дублирует растяжку (stretch остаётся)', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['quads'] });
+    expect(blocks.some(b => b.type === 'stretch')).toBe(true);
+    expect(blocks.some(b => b.type === 'mobility')).toBe(true);
+  });
+
   it('длительность растяжки = сумма упражнений (не фиксированная 240)', () => {
     const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['quads', 'hamstrings', 'glutes'] });
     const stretch = blocks.find(b => b.type === 'stretch')!;

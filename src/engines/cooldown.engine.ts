@@ -1,5 +1,6 @@
 import type { CooldownBlock } from '../core/types';
 import { collectGroupCooldown, prepGroupLabelsCooldown } from './cooldown-day.engine';
+import { canonicalizeGroups } from './warmup-day.engine';
 export type { CooldownBlock };
 export interface CooldownInput {
   muscleGroupsUsed: string[];
@@ -27,6 +28,11 @@ export const COOLDOWN_LABELS: Record<string, string> = {
   triceps_stretch: 'Растяжка трицепса',
   wrist_stretch: 'Растяжка запястья (разгибатели)',
   calf_stretch: 'Растяжка икр',
+  foam_quads: 'Фоам-роллинг квадрицепсов',
+  foam_hams: 'Фоам-роллинг задней поверхности бедра',
+  foam_glutes: 'Фоам-роллинг ягодиц',
+  foam_calves: 'Фоам-роллинг икр',
+  foam_thoracic: 'Фоам-роллинг грудного отдела',
   side_bend: 'Наклон в сторону',
   neck_cars: 'CARs шеи',
   trap_stretch: 'Растяжка трапеций',
@@ -80,15 +86,29 @@ export function generateCooldown(input: CooldownInput): CooldownBlock[] {
     });
   }
 
-  if (input.fatigueScore > 0.6 || input.sessionDuration > 5400) {
+  // Восстановительный блок: ножной день → фоам-роллинг рабочих зон,
+  // иначе лёгкая мобильность (при усталости или длинной сессии)
+  const hasLegsDay = targetGroups.some(g => {
+    const c = canonicalizeGroups(g);
+    return c.some(x => x === 'quads' || x === 'hamstrings' || x === 'glutes' || x === 'calves');
+  });
+  if (hasLegsDay || input.fatigueScore > 0.6 || input.sessionDuration > 5400) {
     blocks.push({
       type: 'mobility',
-      durationSec: 180,
-      exercises: [
-        { exerciseId: 'child_pose', durationSec: 60 },
-        { exerciseId: 'cat_camel', durationSec: 60 },
-        { exerciseId: 'shoulder_stretch', durationSec: 60 },
-      ],
+      durationSec: hasLegsDay ? 240 : 180,
+      exercises: hasLegsDay
+        ? [
+            { exerciseId: 'foam_quads', durationSec: 60 },
+            { exerciseId: 'foam_hams', durationSec: 60 },
+            { exerciseId: 'foam_glutes', durationSec: 60 },
+            { exerciseId: 'foam_calves', durationSec: 60 },
+          ]
+        : [
+            { exerciseId: 'child_pose', durationSec: 60 },
+            { exerciseId: 'cat_camel', durationSec: 60 },
+            { exerciseId: 'shoulder_stretch', durationSec: 60 },
+          ],
+      notes: hasLegsDay ? 'Фоам-роллинг: медленные проходы 30-60с на зону' : undefined,
     });
   }
 

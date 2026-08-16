@@ -387,6 +387,7 @@ describe('Заминка (чек-ин, бейджи, вкладка)', () => {
     expect(html).toContain('Заминка по плану на сегодня');
     expect(html).toContain('Растяжка квадрицепса');
     expect(html).toContain('квадрицепсы');
+    expect(html).toContain('Фоам-роллинг ног');
   });
 
   it('TrainingDiaryHub с mode cooldown рендерит вкладку заминки', () => {
