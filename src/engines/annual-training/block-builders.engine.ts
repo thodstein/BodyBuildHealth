@@ -621,6 +621,42 @@ export function activeBlockForWeek(plan: AnnualTrainingPlan, week: number): Annu
   return plan.blocks.find(b => week >= b.ref.startWeek && week < b.ref.startWeek + b.ref.weeks) ?? null;
 }
 
+/** Рекомендуемый конструктор блока по фазе макро (подсказка, не авто-выбор). */
+export function recommendKindForPhase(phase: string, source: 'pl' | 'bb'): AnnualBlockKind {
+  if (source === 'bb') return 'BB';
+  // BB-фазы встречаются в ПЛ-макроцикле у BB-kind блоков (bodybuilding goal).
+  return phase === 'hypertrophy' || phase === 'contest_prep' ? 'BB' : 'PL';
+}
+
+/**
+ * Скопировать настройки блока-источника в блок-цель (конструктор + конфиг:
+ * цикл/сплит/цель/taper/пик/шаблон). Целевой блок помечается 'stale',
+ * результат сохраняется. Возвращает НОВЫЙ план.
+ */
+export function cloneBlockConfigFrom(
+  plan: AnnualTrainingPlan,
+  targetKey: string,
+  sourceKey: string,
+): AnnualTrainingPlan {
+  const targetIdx = findBlockIndex(plan, targetKey);
+  const sourceIdx = findBlockIndex(plan, sourceKey);
+  if (targetIdx < 0 || sourceIdx < 0 || targetKey === sourceKey) return plan;
+  const blocks = [...plan.blocks];
+  const source = blocks[sourceIdx];
+  const target = blocks[targetIdx];
+  const config: AnnualBlockConfig = JSON.parse(JSON.stringify(source.config ?? {}));
+  const ref = { ...target.ref, kind: source.ref.kind };
+  const status: MacroBlockBuildStatus = target.status === 'unbuilt' ? 'unbuilt' : 'stale';
+  blocks[targetIdx] = { ...target, ref, config, status };
+  return {
+    ...plan,
+    blocks,
+    direction: directionFromKinds(blocks.map(b => b.ref.kind)),
+    status: planStatusFromBlocks(blocks),
+    updatedAt: nowIso(),
+  };
+}
+
 /**
  * Проверить календарную целостность годового плана: блоки должны покрывать
  * недели 1..totalWeeks без пропусков и перекрытий.

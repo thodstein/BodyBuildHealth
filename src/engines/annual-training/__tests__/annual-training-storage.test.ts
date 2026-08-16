@@ -6,8 +6,10 @@ import {
   ANNUAL_PLAN_KEY, saveAnnualTrainingPlan, loadAnnualTrainingPlan,
   removeAnnualTrainingPlan, migrateAnnualPlanFromMacroStorage,
   isAnnualTrainingPlanShape,
+  ANNUAL_SCENARIOS_KEY, saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario,
+  restoreAnnualScenario, compareAnnualScenarios,
 } from '../annual-training-storage';
-import { annualPlanFromMacro } from '../block-builders.engine';
+import { annualPlanFromMacro, setAnnualBlockKind } from '../block-builders.engine';
 import { buildBbMacrocycle, serializeBbMacro } from '../../lms/macrocycle.engine';
 import type { AnnualTrainingPlan } from '../annual-training.types';
 
@@ -94,5 +96,64 @@ describe('миграция из макро-хранилищ', () => {
     const plan = migrateAnnualPlanFromMacroStorage();
     expect(plan!.id).toBe(existing.id);
     expect(plan!.blocks[0].status).toBe('built');
+  });
+});
+
+describe('снапшоты сборки года (сценарии)', () => {
+  beforeEach(() => localStorage.clear());
+
+  const basePlan = () => annualPlanFromMacro(buildBbMacrocycle({ level: 'intermediate', totalWeeks: 16 }));
+
+  it('save/load: снимок сохраняется и загружается', () => {
+    const plan = basePlan();
+    saveAnnualScenario(plan, 'Тест');
+    const list = loadAnnualScenarios();
+    expect(list).toHaveLength(1);
+    expect(list[0].label).toBe('Тест');
+    expect(list[0].plan.blocks).toHaveLength(plan.blocks.length);
+    expect(localStorage.getItem(ANNUAL_SCENARIOS_KEY)).toBeTruthy();
+  });
+
+  it('кап 6: старые снимки вытесняются', () => {
+    for (let i = 0; i < 8; i++) saveAnnualScenario(basePlan(), `S${i}`);
+    expect(loadAnnualScenarios()).toHaveLength(6);
+    expect(loadAnnualScenarios()[0].label).toBe('S7');
+  });
+
+  it('remove: удаляет снимок', () => {
+    saveAnnualScenario(basePlan(), 'A');
+    const id = loadAnnualScenarios()[0].id;
+    removeAnnualScenario(id);
+    expect(loadAnnualScenarios()).toHaveLength(0);
+  });
+
+  it('restore: возвращает глубокую копию (мутация не влияет на снимок)', () => {
+    saveAnnualScenario(basePlan(), 'A');
+    const id = loadAnnualScenarios()[0].id;
+    const restored = restoreAnnualScenario(id)!;
+    restored.blocks[0].status = 'built';
+    const again = restoreAnnualScenario(id)!;
+    expect(again.blocks[0].status).toBe('unbuilt');
+  });
+
+  it('compare: идентичные снапшоты → «идентичны»', () => {
+    const plan = basePlan();
+    const a = saveAnnualScenario(plan, 'A');
+    const b = saveAnnualScenario(plan, 'B');
+    const { diffs, summary } = compareAnnualScenarios(a[0], b[0]);
+    expect(diffs).toHaveLength(0);
+    expect(summary).toBe('Снапшоты идентичны');
+  });
+
+  it('compare: смена конструктора блока → дифф с kindChanged и сводкой', () => {
+    const plan = basePlan();
+    const a = saveAnnualScenario(plan, 'A');
+    const changed = setAnnualBlockKind(plan, plan.blocks[0].ref.blockKey, 'MANUAL');
+    const b = saveAnnualScenario(changed, 'B');
+    const { diffs, summary } = compareAnnualScenarios(a[0], b[0]);
+    expect(diffs.length).toBeGreaterThan(0);
+    expect(diffs[0].kindA).toBe('BB');
+    expect(diffs[0].kindB).toBe('MANUAL');
+    expect(summary).toContain('конструктор 1');
   });
 });

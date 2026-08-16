@@ -12,6 +12,7 @@ import {
   directionFromKinds, planStatusFromBlocks, defaultConfigForRef,
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
   importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
+  recommendKindForPhase, cloneBlockConfigFrom,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -423,6 +424,44 @@ describe('валидация разметки года', () => {
     expect(activeBlockForWeek(plan, 99)).toBeNull();
     expect(activeBlockForWeek(plan, 0)).toBeNull();
     expect(activeBlockForWeek(plan, NaN)).toBeNull();
+  });
+
+  it('recommendKindForPhase: BB-макро → BB; PL-фазы → PL, BB-фазы → BB', () => {
+    expect(recommendKindForPhase('hypertrophy', 'bb')).toBe('BB');
+    expect(recommendKindForPhase('contest_prep', 'bb')).toBe('BB');
+    expect(recommendKindForPhase('endurance', 'pl')).toBe('PL');
+    expect(recommendKindForPhase('strength', 'pl')).toBe('PL');
+    expect(recommendKindForPhase('peak', 'pl')).toBe('PL');
+    expect(recommendKindForPhase('competition', 'pl')).toBe('PL');
+    expect(recommendKindForPhase('transition', 'pl')).toBe('PL');
+    expect(recommendKindForPhase('hypertrophy', 'pl')).toBe('BB');
+    expect(recommendKindForPhase('contest_prep', 'pl')).toBe('BB');
+  });
+
+  it('cloneBlockConfigFrom: копирует kind+конфиг в целевой блок (unbuilt остаётся unbuilt)', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    // Блок 0: PL с циклом. Блок 1: BB, собран. Копируем настройки ББ-блока в блок 0.
+    const bbBuilt = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS);
+    const withResult = { ...plan, blocks: [plan.blocks[0], bbBuilt, ...plan.blocks.slice(2)] };
+    const next = cloneBlockConfigFrom(withResult, plan.blocks[0].ref.blockKey, bbBuilt.ref.blockKey);
+    expect(next.blocks[0].ref.kind).toBe('BB');
+    expect(next.blocks[0].config).toEqual(bbBuilt.config);
+    expect(next.blocks[0].status).toBe('unbuilt'); // не собран — stale не нужен
+    expect(next.blocks[1].status).toBe('built');
+    expect(next.direction).toBe('mixed');
+  });
+
+  it('cloneBlockConfigFrom: собранный целевой блок → stale с сохранением результата', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built0 = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    const withResult = { ...plan, blocks: [built0, ...plan.blocks.slice(1)] };
+    const next = cloneBlockConfigFrom(withResult, plan.blocks[2].ref.blockKey, built0.ref.blockKey);
+    expect(next.blocks[2].ref.kind).toBe('PL');
+    expect(next.blocks[2].config.cycleId).toBeDefined();
+    // Целевой блок (peak, не собран) — unbuilt.
+    expect(next.blocks[2].status).toBe('unbuilt');
   });
 
   it('E2E 52 недели: сборка года → композиция покрывает все недели без разрывов', () => {

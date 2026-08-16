@@ -208,6 +208,42 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const plChip = screen.getByText('ПЛ (СРЦ-цикл)');
     expect(plChip.style.border).toContain('rgb(167, 139, 250)');
   });
+
+  it('✓ В ПЛ-авто: собранный PL-блок передаёт цикл через onApplyCycle', async () => {
+    const onApplyCycle = vi.fn();
+    render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={onApplyCycle} />);
+    fireEvent.click(screen.getByText('Построить макроцикл'));
+    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    fireEvent.click(screen.getByText(/^· нед 1–/));
+    await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
+    fireEvent.click(screen.getByText('⚙️ Собрать блок'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[0].status).toBe('built'), { timeout: 30000 });
+    await waitFor(() => expect(screen.getByText('✓ В ПЛ-авто')).toBeTruthy());
+    fireEvent.click(screen.getByText('✓ В ПЛ-авто'));
+    await waitFor(() => expect(onApplyCycle).toHaveBeenCalled());
+    const [cycleId, weeks] = onApplyCycle.mock.calls[0];
+    expect(typeof cycleId).toBe('string');
+    expect(weeks).toBeGreaterThan(0);
+  });
+
+  it('📸 Снапшот: сохраняется снимок сборки; ⇄ Сравнить показывает дифф', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText('📦 Собрать весь год'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.status).toBe('built'), { timeout: 30000 });
+    fireEvent.click(screen.getByText('📸 Снапшот'));
+    await waitFor(() => expect(screen.getByText(/📸 Снапшот сохранён/)).toBeTruthy());
+    expect(screen.getAllByText(/^📸 Снапшот/).length).toBeGreaterThan(1); // кнопка + строка списка
+    fireEvent.click(screen.getByText('⇄ Сравнить'));
+    await waitFor(() => expect(screen.getByText(/⇄ .*(идентичны|изменено блоков)/)).toBeTruthy());
+  });
+
+  it('💡 Рекомендуем: подсказка конструктора для несоответствующей фазы', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText(/^· нед 1–/));
+    await waitFor(() => expect(screen.getByText('✍ Ручной')).toBeTruthy());
+    fireEvent.click(screen.getByText('✍ Ручной'));
+    await waitFor(() => expect(screen.getByText(/💡 Рекомендуем: ПЛ/)).toBeTruthy());
+  });
 });
 
 /** ПЛ-макроцикл с 3 блоками (два SRC + один BB). */

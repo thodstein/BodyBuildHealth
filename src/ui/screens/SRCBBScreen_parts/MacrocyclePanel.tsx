@@ -34,9 +34,13 @@ import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardi
 import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
-  validateAnnualPlan, activeBlockForWeek,
+  validateAnnualPlan, activeBlockForWeek, recommendKindForPhase, cloneBlockConfigFrom,
 } from '../../../engines/annual-training/block-builders.engine';
 import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-training-print';
+import {
+  saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario, restoreAnnualScenario,
+  compareAnnualScenarios, type AnnualScenario,
+} from '../../../engines/annual-training/annual-training-storage';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 
@@ -876,6 +880,43 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     win.document.close();
     win.focus();
     win.print();
+  };
+
+  // 📸 Снапшоты сборки года: сохранить/сравнить/восстановить.
+  const [scenarioList, setScenarioList] = useState<AnnualScenario[]>(loadAnnualScenarios);
+  const [scenarioNote, setScenarioNote] = useState<string | null>(null);
+  const snapshotAnnual = () => {
+    const plan = annualPlan;
+    if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
+    setScenarioList(saveAnnualScenario(plan, `Снапшот ${plan.status} · ${plan.totalWeeks} нед`));
+    setScenarioNote(`📸 Снапшот сохранён (${plan.blocks.filter(b => b.status === 'built').length} блоков собрано)`);
+  };
+  const compareScenario = (id: string) => {
+    const current = annualPlan;
+    const other = loadAnnualScenarios().find(s => s.id === id);
+    if (!current || !other) { setScenarioNote('⚠ Снапшот не найден'); return; }
+    const { summary, diffs } = compareAnnualScenarios({ id, label: '', ts: 0, plan: current }, other);
+    const first = diffs[0];
+    setScenarioNote(`⇄ ${other.label}: ${summary}${first ? ` · нед ${first.startWeek}: ${first.kindA ?? '—'}→${first.kindB ?? '—'} ${first.statusA ?? '—'}→${first.statusB ?? '—'}` : ''}`);
+  };
+  const restoreScenario = (id: string) => {
+    const restored = restoreAnnualScenario(id);
+    if (!restored) { setScenarioNote('⚠ Снапшот не найден'); return; }
+    saveAnnualTrainingPlan(restored);
+    setAnnualPlan(restored);
+    setScenarioNote(`📥 Снапшот восстановлен — ${restored.blocks.filter(b => b.status === 'built').length} собранных блоков, статус ${restored.status}`);
+  };
+  const dropScenario = (id: string) => setScenarioList(removeAnnualScenario(id));
+
+  // ⧉ Копирование настроек блока из другого блока.
+  const copyBlockFrom = (sourceKey: string) => {
+    const plan = annualPlan;
+    if (!plan || selectedBlockIdx < 0 || selectedBlockIdx >= plan.blocks.length) return;
+    const targetKey = plan.blocks[selectedBlockIdx].ref.blockKey;
+    if (sourceKey === targetKey) return;
+    const next = saveAnnualTrainingPlan(cloneBlockConfigFrom(plan, targetKey, sourceKey));
+    setAnnualPlan(next);
+    setAnnualStatusNote(`⧉ Настройки скопированы в блок «${next.blocks[selectedBlockIdx].ref.description ?? next.blocks[selectedBlockIdx].ref.phase}» — пересоберите`);
   };
 
   const runAnnualBuild = (mode: 'all' | 'block' | 'export' | 'editor') => {
@@ -1867,6 +1908,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   title="Открыть сводку года по блокам в окне печати (PDF)">
                   🖨 Сводка (PDF)
                 </button>
+                <button type="button" onClick={snapshotAnnual} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                  title="Сохранить снимок сборки года (кап 6)">
+                  📸 Снапшот
+                </button>
               </div>
               {annualPlan && (() => {
                 const v = validateAnnualPlan(annualPlan);
@@ -1874,6 +1919,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 return (
                   <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, fontSize: 10, lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
                     ⚠ Разметка года: {v.warnings.join('; ')}
+                  </div>
+                );
+              })()}
+              {annualPlan && (() => {
+                const ds = diaryMacroStats();
+                if (ds.sessions7 === 0 && ds.sessions28 === 0) return null;
+                const zone = ds.acwr ? ACWR_ZONE_LABEL[ds.acwr.zone] : null;
+                return (
+                  <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, fontSize: 10, lineHeight: 1.5,
+                    background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.18)', color: 'rgba(255,255,255,0.6)' }}>
+                    📈 Дневник: {ds.sessions7} сессий (7д) · {ds.sessions28} (28д)
+                    {ds.acwr ? ` · ⚡ ACWR ${ds.acwr.ratio} — ${zone}` : ''}
+                    {ds.lastSessionWeek != null && (
+                      <button type="button" onClick={() => setCurrentWeekIdx(ds.lastSessionWeek!)}
+                        style={{ ...BTN_GHOST, marginLeft: 6, fontSize: 9, padding: '2px 6px', minHeight: 24 }}
+                        title={`Перевести маркер на неделю последней сессии (${ds.lastSessionWeek})`}>
+                        📍 по дневнику: нед {ds.lastSessionWeek}
+                      </button>
+                    )}
                   </div>
                 );
               })()}
@@ -1913,9 +1977,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   })}
                 </div>
               )}
+              {/* 📸 Снапшоты сборки года: сравнение и восстановление */}
+              {scenarioList.length > 0 && (
+                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+                  {scenarioList.map(s => (
+                    <div key={s.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '2px 0' }}>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📸 {s.label}</span>
+                      <button type="button" onClick={() => compareScenario(s.id)} style={{ ...BTN_GHOST, fontSize: 9, padding: '2px 6px', minHeight: 26 }} title="Сравнить с текущим планом">⇄ Сравнить</button>
+                      <button type="button" onClick={() => restoreScenario(s.id)} style={{ ...BTN_GHOST, fontSize: 9, padding: '2px 6px', minHeight: 26 }} title="Восстановить этот снапшот">📥</button>
+                      <button type="button" onClick={() => dropScenario(s.id)} style={{ ...BTN_GHOST, fontSize: 9, padding: '2px 6px', minHeight: 26 }} title="Удалить снапшот">✕</button>
+                    </div>
+                  ))}
+                  {scenarioNote && <div style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{scenarioNote}</div>}
+                </div>
+              )}
               {/* ⚙️ Настройки выбранного блока (конструктор/цикл/сплит/taper/пик) */}
               {annualPlan && selectedBlockIdx >= 0 && selectedBlockIdx < annualPlan.blocks.length && (() => {
                 const b = annualPlan.blocks[selectedBlockIdx];
+                const recommended = recommendKindForPhase(b.ref.phase, isBB ? 'bb' : 'pl');
+                const otherBlocks = annualPlan.blocks.filter(x => x.ref.blockKey !== b.ref.blockKey);
                 const kindOptions: { id: AnnualBlockKind; label: string }[] = [
                   { id: 'PL', label: 'ПЛ (СРЦ-цикл)' },
                   { id: 'BB', label: 'ББ (ББ-авто)' },
@@ -1926,6 +2006,14 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   <div style={{ marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.18)' }} className="macrocycle-annual-block-config">
                     <div style={{ fontSize: 10, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>
                       ⚙️ Блок: нед {b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1} · {b.ref.phase}
+                      {recommended !== b.ref.kind && (
+                        <button type="button" onClick={() => applyAnnualKind(b.ref.blockKey, recommended)}
+                          style={{ marginLeft: 6, padding: '2px 6px', borderRadius: 8, fontSize: 9, fontWeight: 700, minHeight: 24, cursor: 'pointer',
+                            border: '1px dashed rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}
+                          title="Рекомендуемый конструктор по фазе года">
+                          💡 Рекомендуем: {recommended === 'PL' ? 'ПЛ' : recommended === 'BB' ? 'ББ' : 'ручной'}
+                        </button>
+                      )}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
                       {kindOptions.map(k => (
@@ -2003,6 +2091,21 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                             🚀 В ББ-авто
                           </button>
                         )}
+                        {b.ref.kind === 'PL' && b.status === 'built' && (b.config.cycleId ?? b.ref.cycleId) && (
+                          <button type="button" onClick={() => {
+                            const cycleId = b.config.cycleId ?? b.ref.cycleId;
+                            if (cycleId && onApplyCycle) {
+                              onApplyCycle(cycleId, b.ref.weeks);
+                              setAnnualStatusNote('✓ СРЦ-цикл блока передан в ПЛ-авто');
+                            } else {
+                              setAnnualStatusNote('⚠ Применение цикла недоступно в этом контексте');
+                            }
+                          }}
+                            style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                            title="Передать СРЦ-цикл блока в ПЛ-авто (построить план)">
+                            ✓ В ПЛ-авто
+                          </button>
+                        )}
                         <button type="button" onClick={() => runAnnualBuild('editor')}
                           style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
                           title="Открыть собранный блок в ручном конструкторе; после сохранения изменения вернутся в блок">
@@ -2010,6 +2113,19 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         </button>
                       </div>
                     </div>
+                    {otherBlocks.length > 0 && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                        <select aria-label="Копировать настройки из блока" value="" onChange={e => { if (e.target.value) copyBlockFrom(e.target.value); }}
+                          style={{ ...SEL, flex: 1, minWidth: 180, fontSize: 10 }}>
+                          <option value="">⧉ Копировать настройки из блока…</option>
+                          {otherBlocks.map(x => (
+                            <option key={x.ref.blockKey} value={x.ref.blockKey}>
+                              нед {x.ref.startWeek}–{x.ref.startWeek + x.ref.weeks - 1} · {x.ref.phase} · {x.ref.kind === 'PL' ? 'ПЛ' : x.ref.kind === 'BB' ? 'ББ' : '✍'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 );
               })()}

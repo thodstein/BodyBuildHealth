@@ -6,8 +6,8 @@
  * (конфиг конструктора + результат сборки). Макро-разметка остаётся в старых
  * ключах — план ссылается на неё через macroRef (сериализованный снимок).
  */
-import type { AnnualTrainingPlan } from './annual-training.types';
-import { annualPlanFromMacro } from './block-builders.engine';
+import type { AnnualTrainingPlan, AnnualBlockState, AnnualBlockKind } from './annual-training.types';
+import { annualPlanFromMacro, stableHash } from './block-builders.engine';
 import { deserializeMacro, deserializeBbMacro } from '../lms/macrocycle.engine';
 
 export const ANNUAL_PLAN_KEY = 'he_annual_training_plan_v1';
@@ -83,4 +83,109 @@ export function migrateAnnualPlanFromMacroStorage(
     }
   } catch { /* ignore — нет валидного макро */ }
   return null;
+}
+
+/* ─────────── Снапшоты сборки года (сценарии: сохранить/сравнить/восстановить) ── */
+
+export const ANNUAL_SCENARIOS_KEY = 'he_annual_scenarios';
+export const ANNUAL_SCENARIOS_CAP = 6;
+
+/** Снапшот годового плана (полная копия: конфиги + результаты сборки). */
+export interface AnnualScenario {
+  id: string;
+  label: string;
+  ts: number;
+  plan: AnnualTrainingPlan;
+}
+
+function scenarioStorage(): AnnualScenario[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(ANNUAL_SCENARIOS_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((s: unknown) => s && (s as AnnualScenario).plan?.blocks?.length) : [];
+  } catch { return []; }
+}
+
+/** Сохранить снимок сборки (кап 6, новые первыми). */
+export function saveAnnualScenario(plan: AnnualTrainingPlan, label: string): AnnualScenario[] {
+  const list: AnnualScenario[] = [{
+    id: 'asc_' + Date.now().toString(36),
+    label: label || `Снапшот ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
+    ts: Date.now(),
+    plan: JSON.parse(JSON.stringify(plan)) as AnnualTrainingPlan,
+  }, ...scenarioStorage()].slice(0, ANNUAL_SCENARIOS_CAP);
+  try { localStorage.setItem(ANNUAL_SCENARIOS_KEY, JSON.stringify(list)); } catch { /* quota */ }
+  return list;
+}
+
+export function loadAnnualScenarios(): AnnualScenario[] {
+  return scenarioStorage();
+}
+
+export function removeAnnualScenario(id: string): AnnualScenario[] {
+  const next = scenarioStorage().filter(s => s.id !== id);
+  try { localStorage.setItem(ANNUAL_SCENARIOS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  return next;
+}
+
+/** Восстановить снимок: вернуть глубокую копию плана (панель решает, сохранять ли). */
+export function restoreAnnualScenario(id: string): AnnualTrainingPlan | null {
+  const sc = scenarioStorage().find(s => s.id === id);
+  if (!sc) return null;
+  return JSON.parse(JSON.stringify(sc.plan)) as AnnualTrainingPlan;
+}
+
+/** Дифф блока между двумя снапшотами (по blockKey — тот же layout). */
+export interface AnnualScenarioDiff {
+  blockKey: string;
+  startWeek: number;
+  phase: string;
+  kindA?: AnnualBlockKind;
+  kindB?: AnnualBlockKind;
+  statusA?: string;
+  statusB?: string;
+  configChanged: boolean;
+  resultChanged: boolean;
+}
+
+function diffBlock(a: AnnualBlockState | undefined, b: AnnualBlockState | undefined): AnnualScenarioDiff | null {
+  const base: AnnualScenarioDiff = {
+    blockKey: (a ?? b)!.ref.blockKey,
+    startWeek: (a ?? b)!.ref.startWeek,
+    phase: (a ?? b)!.ref.phase,
+    configChanged: false,
+    resultChanged: false,
+  };
+  if (a && b) {
+    base.kindA = a.ref.kind; base.kindB = b.ref.kind;
+    base.statusA = a.status; base.statusB = b.status;
+    base.configChanged = stableHash(a.config) !== stableHash(b.config);
+    base.resultChanged = (a.result?.configHash ?? '') !== (b.result?.configHash ?? '')
+      || (a.status === 'built') !== (b.status === 'built');
+    if (!base.configChanged && !base.resultChanged && a.ref.kind === b.ref.kind && a.status === b.status) return null;
+  } else {
+    base.configChanged = true;
+    base.resultChanged = true;
+  }
+  return base;
+}
+
+/** Сравнить два снапшота: дифф по блокам + сводная строка. */
+export function compareAnnualScenarios(a: AnnualScenario, b: AnnualScenario): {
+  diffs: AnnualScenarioDiff[];
+  summary: string;
+} {
+  const mapA = new Map(a.plan.blocks.map(x => [x.ref.blockKey, x]));
+  const mapB = new Map(b.plan.blocks.map(x => [x.ref.blockKey, x]));
+  const keys = Array.from(new Set([...mapA.keys(), ...mapB.keys()]));
+  const diffs = keys
+    .map(k => diffBlock(mapA.get(k), mapB.get(k)))
+    .filter((d): d is AnnualScenarioDiff => d !== null)
+    .sort((x, y) => x.startWeek - y.startWeek);
+  const kindChanges = diffs.filter(d => d.kindA && d.kindB && d.kindA !== d.kindB).length;
+  const statusChanges = diffs.filter(d => d.statusA && d.statusB && d.statusA !== d.statusB).length;
+  const configChanges = diffs.filter(d => d.configChanged).length;
+  const summary = diffs.length === 0
+    ? 'Снапшоты идентичны'
+    : `изменено блоков: ${diffs.length} (конфиг ${configChanges} · статус ${statusChanges} · конструктор ${kindChanges})`;
+  return { diffs, summary };
 }
