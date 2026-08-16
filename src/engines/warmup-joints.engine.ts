@@ -1,0 +1,103 @@
+/**
+ * Warmup Joints Engine — суставная подготовка под суставы, задействованные
+ * целевыми группами тренировочного дня.
+ *
+ * Каждый сустав (плечи/локти/запястья/шея/позвоночник/бёдра/колени/
+ * голеностоп) имеет 1-2 коротких упражнения. Группы дня → суставы через
+ * JOINT_BY_GROUP (жимовой день: плечи+локти+запястья; ножной: бёдра+колени+
+ * голеностоп; тяговый: плечи+локти+запястья+позвоночник).
+ *
+ * collectJointPrep(groups) — мерж с дедупликацией и приоритетом порядка
+ * суставов, кап ≤ 7. Используется generateWarmup (warmup.engine) — суставы
+ * идут ПЕРВЫМИ в блоке «Суставная подготовка».
+ *
+ * @module warmup-joints-engine
+ */
+
+import { canonicalizeGroups, type CanonGroup, type WarmupPrepExercise } from './warmup-day.engine';
+
+/** Приоритетный порядок суставов (для слияния и подписей). */
+export const JOINT_ORDER = ['shoulders', 'elbows', 'wrists', 'neck', 'spine', 'hips', 'knees', 'ankles'] as const;
+export type JointKey = typeof JOINT_ORDER[number];
+
+export const JOINT_LABELS: Record<string, string> = {
+  shoulders: 'плечи', elbows: 'локти', wrists: 'запястья', neck: 'шея',
+  spine: 'позвоночник', hips: 'бёдра', knees: 'колени', ankles: 'голеностоп',
+};
+
+export const JOINT_PREP: Record<string, WarmupPrepExercise[]> = {
+  shoulders: [
+    { id: 'shoulder_circle', sets: 1, reps: 10, note: 'круги плечами назад-вперёд' },
+    { id: 'arm_circles', sets: 1, reps: 10 },
+  ],
+  elbows: [
+    { id: 'elbow_circles', sets: 1, reps: 10, note: 'рука согнута 90°, вращение предплечья' },
+  ],
+  wrists: [
+    { id: 'wrist_circles', sets: 1, reps: 10 },
+    { id: 'wrist_rocks', sets: 1, reps: 8, note: 'раскачивание кисти вперёд-назад' },
+  ],
+  neck: [
+    { id: 'neck_cars', sets: 1, reps: 5, note: 'медленно, полный круг головой' },
+  ],
+  spine: [
+    { id: 'cat_camel', sets: 1, reps: 8 },
+  ],
+  hips: [
+    { id: 'hip_circle', sets: 1, reps: 10 },
+  ],
+  knees: [
+    { id: 'knee_circles', sets: 1, reps: 10, note: 'стопы вместе, мягкие вращения коленями' },
+  ],
+  ankles: [
+    { id: 'ankle_mobility', sets: 1, reps: 10 },
+  ],
+};
+
+/** Суставы, задействованные каждой канонической группой. */
+export const JOINT_BY_GROUP: Record<CanonGroup, JointKey[]> = {
+  chest: ['shoulders', 'elbows', 'wrists'],
+  back: ['shoulders', 'elbows', 'wrists', 'spine'],
+  quads: ['hips', 'knees', 'ankles'],
+  hamstrings: ['hips', 'spine'],
+  glutes: ['hips'],
+  shoulders: ['shoulders', 'wrists', 'spine'],
+  biceps: ['elbows', 'wrists'],
+  triceps: ['elbows', 'wrists'],
+  calves: ['ankles', 'knees'],
+  core: ['spine'],
+  traps: ['neck', 'shoulders'],
+  forearms: ['wrists', 'elbows'],
+};
+
+/** Суставная подготовка для набора групп дня: мерж с дедупликацией, кап ≤ 7. */
+export function collectJointPrep(groups: string[]): WarmupPrepExercise[] {
+  const wanted = new Set<JointKey>();
+  for (const g of groups) {
+    for (const canon of canonicalizeGroups(g)) {
+      for (const j of JOINT_BY_GROUP[canon] || []) wanted.add(j);
+    }
+  }
+  const seen = new Set<string>();
+  const out: WarmupPrepExercise[] = [];
+  for (const joint of JOINT_ORDER) {
+    if (!wanted.has(joint)) continue;
+    for (const ex of JOINT_PREP[joint] || []) {
+      if (seen.has(ex.id)) continue;
+      seen.add(ex.id);
+      out.push(ex);
+    }
+  }
+  return out.slice(0, 7);
+}
+
+/** Русские подписи суставов дня («плечи, локти, запястья»). */
+export function jointPrepLabels(groups: string[]): string {
+  const wanted = new Set<JointKey>();
+  for (const g of groups) {
+    for (const canon of canonicalizeGroups(g)) {
+      for (const j of JOINT_BY_GROUP[canon] || []) wanted.add(j);
+    }
+  }
+  return JOINT_ORDER.filter(j => wanted.has(j)).map(j => JOINT_LABELS[j]).join(', ');
+}

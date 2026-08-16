@@ -87,21 +87,28 @@ describe('prepGroupLabels', () => {
 });
 
 describe('generateWarmup с targetGroups', () => {
-  it('грудной день: мобильность груди/плеч + активация отжиманиями', () => {
+  it('грудной день: суставы (плечи/локти/запястья) первыми + подготовка зон', () => {
     const blocks = generateWarmup({ ...baseInput, targetGroups: ['chest'] });
     const mob = blocks.find(b => b.type === 'mobility')!;
-    expect(mob.exercises.map(e => e.exerciseId)).toEqual(['shoulder_circle', 'thoracic_rotation', 'wall_pec_stretch']);
-    expect(mob.notes).toContain('Суставная подготовка: грудь');
+    const ids = mob.exercises.map(e => e.exerciseId);
+    expect(ids[0]).toBe('shoulder_circle');
+    expect(ids).toContain('elbow_circles');
+    expect(ids).toContain('wrist_circles');
+    expect(ids).toContain('thoracic_rotation');
+    expect(ids).toContain('wall_pec_stretch');
+    expect(mob.notes).toContain('Суставная подготовка: плечи, локти, запястья');
+    expect(mob.notes).toContain('зоны: грудь');
     const act = blocks.find(b => b.type === 'activation')!;
     expect(act.exercises.map(e => e.exerciseId)).toContain('pushup_light');
     expect(act.notes).toContain('Активация: грудь');
   });
 
-  it('нижний день: подготовка бёдер/голеностопа + ягодичный мост', () => {
+  it('нижний день: суставы бёдра/колени/голеностоп + ягодичный мост', () => {
     const blocks = generateWarmup({ ...baseInput, targetGroups: ['quads', 'hamstrings', 'glutes'] });
     const mob = blocks.find(b => b.type === 'mobility')!;
     const ids = mob.exercises.map(e => e.exerciseId);
     expect(ids).toContain('hip_circle');
+    expect(ids).toContain('knee_circles');
     expect(ids).toContain('ankle_mobility');
     const act = blocks.find(b => b.type === 'activation')!;
     expect(act.exercises.map(e => e.exerciseId)).toContain('glute_bridge');

@@ -25,6 +25,7 @@ export const COOLDOWN_LABELS: Record<string, string> = {
   nerve_flossing: 'Нейро-мобилизация',
   bicep_stretch: 'Растяжка бицепса',
   triceps_stretch: 'Растяжка трицепса',
+  wrist_stretch: 'Растяжка запястья (разгибатели)',
   calf_stretch: 'Растяжка икр',
   side_bend: 'Наклон в сторону',
   neck_cars: 'CARs шеи',

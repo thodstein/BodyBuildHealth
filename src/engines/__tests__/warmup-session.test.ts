@@ -90,7 +90,8 @@ describe('generateWarmup', () => {
 describe('Словарь названий', () => {
   it('ключевые id имеют русские названия', () => {
     for (const id of ['jumping_jack', 'arm_circles', 'leg_swings', 'hip_circle', 'ankle_mobility', 'shoulder_circle', 'thoracic_rotation', 'cat_camel', 'worlds_greatest', 'banded_clam', 'external_rotation', 'bird_dog', 'dead_bug', 'side_lying_abduction', 'wall_slide',
-      'wall_pec_stretch', 'pushup_light', 'scapular_pull', 'band_pull_apart', 'air_squat', 'lateral_band_walk', 'hip_hinge_prep', 'glute_bridge', 'rdl_light', '90_90_switch', 'ytw', 'band_curl_light', 'band_pushdown_light', 'calf_raise', 'calf_stretch', 'wrist_circles', 'neck_cars', 'wrist_flex_ext']) {
+      'wall_pec_stretch', 'pushup_light', 'scapular_pull', 'band_pull_apart', 'air_squat', 'lateral_band_walk', 'hip_hinge_prep', 'glute_bridge', 'rdl_light', '90_90_switch', 'ytw', 'band_curl_light', 'band_pushdown_light', 'calf_raise', 'calf_stretch', 'wrist_circles', 'neck_cars', 'wrist_flex_ext',
+      'wrist_rocks', 'elbow_circles', 'knee_circles']) {
       expect(WARMUP_LABELS[id], id).toBeTruthy();
     }
   });

@@ -28,6 +28,13 @@ describe('COOLDOWN_GROUP_PREP и collectGroupCooldown', () => {
     expect(exs.map(e => e.id)).toEqual(['chest_stretch', 'shoulder_stretch']);
   });
 
+  it('арм-день: растяжка рук включает запястья', () => {
+    const ids = collectGroupCooldown(['biceps', 'triceps']).map(e => e.id);
+    expect(ids).toContain('bicep_stretch');
+    expect(ids).toContain('triceps_stretch');
+    expect(ids).toContain('wrist_stretch');
+  });
+
   it('композиты: legs → квадры/задняя/ягодицы/икры с дедупликацией', () => {
     const exs = collectGroupCooldown(['legs']);
     const ids = exs.map(e => e.id);

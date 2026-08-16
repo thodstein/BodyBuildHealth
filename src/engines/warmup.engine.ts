@@ -1,5 +1,6 @@
 import type { WarmupBlock } from '../core/types';
 import { collectGroupPrep, prepGroupLabels } from './warmup-day.engine';
+import { collectJointPrep, jointPrepLabels } from './warmup-joints.engine';
 export type { WarmupBlock };
 
 export interface WarmupInput {
@@ -47,6 +48,9 @@ export const WARMUP_LABELS: Record<string, string> = {
   calf_raise: 'Подъёмы на носки',
   calf_stretch: 'Растяжка икр у стены',
   wrist_circles: 'Круги запястьями',
+  wrist_rocks: 'Раскачивание кисти',
+  elbow_circles: 'Круги локтями',
+  knee_circles: 'Круги коленями',
   neck_cars: 'CARs шеи',
   wrist_flex_ext: 'Сгибание-разгибание кисти',
   squat: 'Разминочные подходы — присед',
@@ -88,13 +92,16 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
     });
   }
 
-  // Упор на целевые группы дня (если переданы) — суставная подготовка + активация
+  // Упор на целевые группы дня (если переданы) — суставы ПЕРВЫМИ, затем подготовка зон
   const targetGroups = (input.targetGroups || []).filter(Boolean);
   const groupPrep = targetGroups.length > 0 ? collectGroupPrep(targetGroups, hasBand) : null;
+  const jointPrep = targetGroups.length > 0 ? collectJointPrep(targetGroups) : null;
   const toBlockEx = (e: { id: string; sets: number; reps: number }) => ({ exerciseId: e.id, sets: e.sets, reps: e.reps });
 
   const mobilityExs: { exerciseId: string; sets: number; reps: number }[] = groupPrep
-    ? groupPrep.mobility.map(toBlockEx)
+    ? [...(jointPrep || []).map(toBlockEx), ...groupPrep.mobility.map(toBlockEx)]
+        .filter((e, i, arr) => arr.findIndex(x => x.exerciseId === e.exerciseId) === i)
+        .slice(0, 8)
     : getMobilityExercises(input.sessionFocus, input.riskFlags);
   if (Object.values(input.riskFlags).includes('high') && !mobilityExs.some(e => e.exerciseId === 'cat_camel')) {
     mobilityExs.push({ exerciseId: 'cat_camel', sets: 1, reps: 8 });
@@ -107,7 +114,7 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
       type: 'mobility',
       durationSec: 180,
       exercises: mobilityExs,
-      notes: groupPrep ? `Суставная подготовка: ${prepGroupLabels(targetGroups)}` : 'Суставная подготовка',
+      notes: groupPrep ? `Суставная подготовка: ${jointPrepLabels(targetGroups)} · зоны: ${prepGroupLabels(targetGroups)}` : 'Суставная подготовка',
     });
   }
 

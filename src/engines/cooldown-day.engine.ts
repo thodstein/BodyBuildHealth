@@ -63,11 +63,13 @@ export const COOLDOWN_GROUP_PREP: Record<string, CooldownGroupPrep> = {
   biceps: {
     stretch: [
       { id: 'bicep_stretch', durationSec: 30, note: 'рука назад, ладонь на стену' },
+      { id: 'wrist_stretch', durationSec: 30, note: 'разгибатели запястья: ладонь вниз, пальцы к себе' },
     ],
   },
   triceps: {
     stretch: [
       { id: 'triceps_stretch', durationSec: 30, note: 'локоть за голову, лёгкое надавливание' },
+      { id: 'wrist_stretch', durationSec: 30 },
     ],
   },
   calves: {
@@ -91,6 +93,7 @@ export const COOLDOWN_GROUP_PREP: Record<string, CooldownGroupPrep> = {
   forearms: {
     stretch: [
       { id: 'wrist_flex_ext', durationSec: 30, note: 'сгибание-разгибание кисти с паузой' },
+      { id: 'wrist_stretch', durationSec: 30 },
     ],
   },
 };
