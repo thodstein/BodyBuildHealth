@@ -197,6 +197,17 @@ describe('MacrocyclePanel — сборка года по конструктор�
       expect(stored!.blocks[0].result!.warnings).toContain('Импортировано из ручного конструктора.');
     });
   });
+
+  it('📍 Текущая неделя: строка активного блока + клик выбирает его', async () => {
+    await buildPlMacroAndOpen();
+    await waitFor(() => expect(screen.getByText(/📍 Текущая неделя 1/)).toBeTruthy());
+    expect(screen.getByText(/📍 Текущая неделя 1/).textContent).toContain('endurance');
+    fireEvent.click(screen.getByText(/📍 Текущая неделя 1/));
+    await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
+    // Выбран первый блок (endurance): панель настроек показывает ПЛ-чип активным.
+    const plChip = screen.getByText('ПЛ (СРЦ-цикл)');
+    expect(plChip.style.border).toContain('rgb(167, 139, 250)');
+  });
 });
 
 /** ПЛ-макроцикл с 3 блоками (два SRC + один BB). */

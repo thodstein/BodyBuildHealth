@@ -34,7 +34,7 @@ import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardi
 import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
-  validateAnnualPlan,
+  validateAnnualPlan, activeBlockForWeek,
 } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -1857,6 +1857,22 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 return (
                   <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, fontSize: 10, lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
                     ⚠ Разметка года: {v.warnings.join('; ')}
+                  </div>
+                );
+              })()}
+              {annualPlan && (() => {
+                const active = activeBlockForWeek(annualPlan, currentWeekIdx);
+                if (!active) return null;
+                const statusIcon = active.status === 'built' ? '✅' : active.status === 'stale' ? '⚠' : active.status === 'error' ? '❌' : '·';
+                const statusLabel = active.status === 'built' ? 'собран' : active.status === 'stale' ? 'устарел' : active.status === 'error' ? 'ошибка' : 'не собран';
+                const kindIcon = active.ref.kind === 'PL' ? 'ПЛ' : active.ref.kind === 'BB' ? 'ББ' : '✍';
+                return (
+                  <div onClick={() => {
+                    const idx = annualPlan.blocks.findIndex(x => x.ref.blockKey === active.ref.blockKey);
+                    if (idx >= 0) setSelectedBlockIdx(idx);
+                  }} style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, fontSize: 10, lineHeight: 1.5, cursor: 'pointer',
+                    background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.22)', color: 'rgba(255,255,255,0.65)' }}>
+                    📍 Текущая неделя {currentWeekIdx}: нед {active.ref.startWeek}–{active.ref.startWeek + active.ref.weeks - 1} · {active.ref.phase} · {kindIcon} {statusIcon} {statusLabel} — клик: выбрать блок
                   </div>
                 );
               })()}

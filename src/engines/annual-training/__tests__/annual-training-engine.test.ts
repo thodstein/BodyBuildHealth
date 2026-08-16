@@ -11,7 +11,7 @@ import {
   composeAnnualProgram, applyBlockTaperToWeeks, mergeBlockWeeks,
   directionFromKinds, planStatusFromBlocks, defaultConfigForRef,
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
-  importProgramIntoAnnualBlock, validateAnnualPlan,
+  importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -411,6 +411,18 @@ describe('валидация разметки года', () => {
     const v = validateAnnualPlan(annualPlanFromMacro(macro));
     expect(v.totalMismatch).toBe(true);
     expect(v.warnings.some(w => w.includes('≠ 10'))).toBe(true);
+  });
+
+  it('activeBlockForWeek: находит блок недели; вне диапазона → null', () => {
+    const plan = annualPlanFromMacro(makePLMacro());
+    expect(activeBlockForWeek(plan, 1)?.ref.phase).toBe('endurance');
+    expect(activeBlockForWeek(plan, 9)?.ref.phase).toBe('strength');
+    expect(activeBlockForWeek(plan, 17)?.ref.phase).toBe('peak');
+    expect(activeBlockForWeek(plan, 19)?.ref.phase).toBe('competition');
+    expect(activeBlockForWeek(plan, 21)?.ref.phase).toBe('transition');
+    expect(activeBlockForWeek(plan, 99)).toBeNull();
+    expect(activeBlockForWeek(plan, 0)).toBeNull();
+    expect(activeBlockForWeek(plan, NaN)).toBeNull();
   });
 
   it('E2E 52 недели: сборка года → композиция покрывает все недели без разрывов', () => {

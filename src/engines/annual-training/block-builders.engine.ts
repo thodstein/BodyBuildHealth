@@ -615,6 +615,12 @@ export interface AnnualPlanValidation {
   warnings: string[];
 }
 
+/** Активный блок годового плана на неделе N (1-индекс) или null. */
+export function activeBlockForWeek(plan: AnnualTrainingPlan, week: number): AnnualBlockState | null {
+  if (!Number.isFinite(week) || week < 1) return null;
+  return plan.blocks.find(b => week >= b.ref.startWeek && week < b.ref.startWeek + b.ref.weeks) ?? null;
+}
+
 /**
  * Проверить календарную целостность годового плана: блоки должны покрывать
  * недели 1..totalWeeks без пропусков и перекрытий.
