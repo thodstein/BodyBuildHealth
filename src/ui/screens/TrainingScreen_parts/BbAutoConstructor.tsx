@@ -393,7 +393,6 @@ export const BbAutoConstructor: React.FC = () => {
         source: 'bb_auto',
       });
       setPrepPlan(plan);
-      let extendedNote = '';
       if (applyToPlan) {
         const updated = applyContestPrepToBBPlan(builtPlan, cfg, {
           prepWeeks: plan.preparation.weeks,
@@ -402,11 +401,10 @@ export const BbAutoConstructor: React.FC = () => {
         });
         setBuiltPlan(updated);
         setPrepApplied(true);
-        if (updated.weeks.length !== builtPlan.weeks.length) {
-          // Тренировочный цикл достроен под фазы prep — синхронизируем длительность плана.
-          setBbWeeks(updated.weeks.length);
-          extendedNote = ` — тренировочный цикл расширен до ${updated.weeks.length} нед (подготовка → taper → пик)`;
-        }
+        // Подготовка в плане НЕ переделывается: taper накладывается поверх последних недель.
+        const metaWarnings = ((updated as any).contestPrep?.warnings ?? []) as string[];
+        const shortPrep = metaWarnings.find(w => w.includes('короче полной подготовки'));
+        if (shortPrep) flash(`⚠ ${shortPrep.replace(/^⚠ /, '')}`);
       }
       savePrepToProfile(plan, cfg);
       try {
@@ -414,7 +412,7 @@ export const BbAutoConstructor: React.FC = () => {
           detail: { prepPlanId: plan.id, trainingPlanId: undefined, nutritionPlanId: undefined, showDate: cfg.showDate },
         }));
       } catch { /* ignore */ }
-      flash('🏁 Contest prep собран' + (applyToPlan ? ' и применён к плану' : '') + extendedNote);
+      flash('🏁 Contest prep собран' + (applyToPlan ? ' и применён к плану' : ''));
     } catch (e) {
       flash(`Не удалось собрать contest prep: ${(e as Error).message}`);
     } finally {
@@ -4089,17 +4087,11 @@ export const BbAutoConstructor: React.FC = () => {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
         <div style={{ flex:1 }}>{renderStepNav()}</div>
         <button
-          onClick={() => setResetAsk(true)}
-          title="Сбросить сборку и начать заново"
-          aria-label="Начать заново"
-          style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(244,63,94,0.35)', background:'rgba(244,63,94,0.08)', color:'#fb7185', minWidth:44, minHeight:44, flexShrink:0 }}
-        >🔄</button>
-        <button
           onClick={() => setShowTools(true)}
           title="Библиотека инструментов"
           style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
         >⚙️</button>
-        <button onClick={goAnnual} title="Годовое планирование" aria-label="Открыть годовой план" style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(0,230,138,0.35)', background:'rgba(0,230,138,0.08)', color:'#00e68a', minWidth:44, minHeight:44, flexShrink:0 }}>🗓</button>
+        <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding:'5px 10px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(244,63,94,0.35)', background:'rgba(244,63,94,0.08)', color:'#fb7185', minHeight:30, flexShrink:0 }}>🔄 Начать заново</button>
       </div>
       {showTools && (
         <div className="bb-tools-modal-backdrop" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>

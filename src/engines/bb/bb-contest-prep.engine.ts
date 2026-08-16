@@ -1135,14 +1135,16 @@ export interface ContestPrepApplyOpts {
 }
 
 /**
- * Единое применение contest prep к BB-плану — СТРОИТ тренировочный цикл:
- * 1) если план короче prepWeeks + taperWeeks + пик — ДОСТРАИВАЕТ недостающие
- *    недели подготовки в начало плана (пик привязан к концу/дате шоу);
- * 2) taper (applyTrainingTaperToBBPlan) на последние taperWeeks + пик-неделя;
- * 3) финальная подготовка (последние 2 нед подготовки): объём ×0.9, RIR 2–3,
+ * Единое применение contest prep к BB-плану — НАКЛАДЫВАЕТ фазы ПОВЕРХ
+ * существующего плана, не переделывая цикл:
+ * 1) taper (applyTrainingTaperToBBPlan) на последние taperWeeks + пик-неделя;
+ * 2) финальная подготовка (последние 2 нед подготовки): объём ×0.9, RIR 2–3,
  *    интенсивность сохраняется, спец-мышца щадится, deload не трогается;
- * 4) разметка недель фазами (wk.contestPhase: preparation/final_preparation/taper/peak_week);
- * 5) метаданные phases (BBContestPrepPlan.phases) для календаря.
+ * 3) разметка недель фазами (wk.contestPhase: preparation/final_preparation/taper/peak_week);
+ * 4) метаданные phases (BBContestPrepPlan.phases) для календаря.
+ * ПОДГОТОВКА = все недели плана до финальной/тапера БЕЗ изменений (объём 100%).
+ * Если план короче prepWeeks+taper+пик — НЕ достраивается (весь цикл не сдвигается):
+ * предупреждение + усечённая подготовка; расширять только явно (extendBBPlanPreparation).
  * НЕ мутирует входной план. Идемпотентен per-week и по длине.
  */
 export function applyContestPrepToBBPlan(
@@ -1157,18 +1159,11 @@ export function applyContestPrepToBBPlan(
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const taperWeeks = Math.min(4, Math.max(1, Math.round(opts.taperWeeks ?? cfg.weeksOut)));
   const prepWeeks = Math.max(1, Math.round(opts.prepWeeks ?? 12));
-
-  // 1) Достройка тренировочного цикла до полной длины фаз.
   const needed = prepWeeks + taperWeeks + 1;
-  let basePlan: BBPlanWithPrep = plan as BBPlanWithPrep;
-  const addedWeeks = Math.max(0, needed - basePlan.weeks.length);
-  if (addedWeeks > 0) {
-    basePlan = prependPreparationWeeks(basePlan, addedWeeks);
-  }
 
-  // 2) Taper + пик-неделя на последние taperWeeks+1 недель.
+  // 1) Taper + пик-неделя на последние taperWeeks+1 недель.
   //    force=true: повторное наложение ОБНОВЛЯЕТ уже размеченные недели (изменения настроек).
-  const tapered = applyTrainingTaperToBBPlan(basePlan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true }) as BBPlanWithPrep;
+  const tapered = applyTrainingTaperToBBPlan(plan, { ...cfg, weeksOut: Math.min(4, taperWeeks + 1) }, { weekNumber: opts.weekNumber, force: opts.force === true }) as BBPlanWithPrep;
   const weeks = tapered.weeks as any[];
   const total = weeks.length;
   const endIdx = clamp((opts.weekNumber ?? total) - 1, 0, total - 1);
@@ -1222,13 +1217,11 @@ export function applyContestPrepToBBPlan(
 
   const warnings: string[] = [];
   const notes: string[] = [];
-  if (addedWeeks > 0) {
-    notes.push(`📈 Тренировочный цикл расширен с ${basePlan.weeks.length - addedWeeks} до ${total} нед: подготовка ${usedPrep} нед → taper ${taperWeeks} нед → пик-неделя.`);
-  } else if (total > needed) {
+  if (total > needed) {
     notes.push(`📈 План длиннее минимума подготовки (${total} нед): первые ${total - needed} нед — подготовка, дальше по фазам.`);
   }
   if (usedPrep < prepWeeks) {
-    warnings.push(`⚠ План (${total} нед) короче полной подготовки ${prepWeeks}+${taperWeeks}+пик: подготовка усечена до ${usedPrep} нед. Увеличьте длительность плана для полной подготовки.`);
+    warnings.push(`⚠ План (${total} нед) короче полной подготовки ${prepWeeks}+${taperWeeks}+пик: подготовка усечена до ${usedPrep} нед. Добавьте недели подготовки (➕) или увеличьте длительность плана — весь цикл не переделывается автоматически.`);
   }
 
   const result = {
@@ -1236,7 +1229,7 @@ export function applyContestPrepToBBPlan(
     weeks,
     rationale: [
       ...(tapered.rationale || []),
-      `🗓 Contest prep: подготовка ${usedPrep} нед (объём 100%) → финальная ×0.9/RIR 2–3 → taper ${taperWeeks} нед (объём 85%→60%, интенсивность сохраняется, RIR 2–4) → пик-неделя (шоу ${cfg.showDate}).`,
+      `🗓 Contest prep: подготовка ${usedPrep} нед (объём 100%, не изменена) → финальная ×0.9/RIR 2–3 → taper ${taperWeeks} нед (объём 85%→60%, интенсивность сохраняется, RIR 2–4) → пик-неделя (шоу ${cfg.showDate}).`,
       ...notes,
     ],
   } as BBPlanWithPrep;
@@ -1249,7 +1242,9 @@ export function applyContestPrepToBBPlan(
   return result as BBPlanWithPrep;
 }
 
-/** Достроить план В НАЧАЛО недостающими неделями подготовки (клон недели 1). */
+/** Достроить план В НАЧАЛО недостающими неделями подготовки (клон недели 1).
+ *  НЕ используется автоматически (applyContestPrepToBBPlan не сдвигает цикл) —
+ *  зарезервировано для явных сценариев расширения. */
 function prependPreparationWeeks(plan: BBPlanWithPrep, addWeeks: number): BBPlanWithPrep {
   const add = Math.max(1, Math.round(addWeeks));
   const weeks = plan.weeks as any[];
