@@ -5,9 +5,11 @@
  */
 import React, { useMemo } from 'react';
 import {
-  cardioWeekForDate, CARDIO_PHASE_LABELS, type CardioCycle,
+  cardioWeekForDate, cardioNextSession, cardioEquipmentLabel, DAY_LABELS_RU, CARDIO_PHASE_LABELS, type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
+
+const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
 
 const CARD: React.CSSProperties = {
   background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
@@ -40,6 +42,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
       left: Math.max(0, cycle.totalWeeks - current),
       currentPhase: week?.phase ?? null,
       nextStart,
+      nextSession: cardioNextSession(cycle, todayIso()),
       totalWeeks: cycle.totalWeeks,
     };
   }, [cycle]);
@@ -65,6 +68,16 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
           </span>
         )}
       </div>
+      {data.nextSession && (() => {
+        const d = new Date(data.nextSession!.date);
+        const dow = (d.getDay() + 6) % 7;
+        const s = data.nextSession!.session;
+        return (
+          <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 8, padding: '5px 8px' }}>
+            ⏭ Следующая сессия: {TYPE_LABEL[s.type]} {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment)}` : ''}{s.targetHr?.max ? ` · ЧСС ${s.targetHr.min}-${s.targetHr.max}` : ''} — {DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} (нед {data.nextSession!.week})
+          </div>
+        );
+      })()}
       {data.nextStart && (
         <div style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '5px 8px' }}>
           🏁 Ближайший старт: нед {data.nextStart.week} ({CARDIO_PHASE_LABELS[data.nextStart.phase]}) — через {data.nextStart.week - data.current} нед

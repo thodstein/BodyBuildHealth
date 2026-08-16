@@ -852,7 +852,14 @@ function dayStartIso(week: number, referenceIso?: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Календарь .ics: кардио-события по неделям (тип, минуты, фаза). */
+/** Дата конкретного дня недели (dow 0-6, Пн=0) внутри недели цикла. */
+function dayOfWeekIso(week: number, dow: number, referenceIso?: string): string {
+  const ref = referenceIso ? new Date(referenceIso) : new Date();
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + (week - 1) * 7 + dow);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Календарь .ics: кардио-события по дням недели (тип, минуты, фаза). */
 export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): string {
   const lines: string[] = [
     'BEGIN:VCALENDAR',
@@ -862,15 +869,15 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
   ];
   for (const w of cycle.weeks) {
     const day = dayStartIso(w.week, referenceIso);
-    const start = toIcsDate(day);
     for (const s of w.sessions) {
       if (s.weeklyFrequency <= 0) continue;
+      const start = toIcsDate(s.dayOfWeek != null ? dayOfWeekIso(w.week, s.dayOfWeek, referenceIso) : day);
       const summary = `Кардио ${s.type.toUpperCase()} ${s.durationMin} мин · нед ${w.week}`;
-      const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`;
+      const desc = `Фаза: ${CARDIO_PHASE_LABELS[w.phase]} · ${s.purpose}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`;
       lines.push('BEGIN:VEVENT');
       lines.push(`UID:${cycle.id}-w${w.week}-${s.type}@bbh`);
       lines.push(`DTSTART:${start}`);
-      lines.push(`DTEND:${toIcsDate(day)}`);
+      lines.push(`DTEND:${start}`);
       lines.push(`SUMMARY:${escIcs(summary)}`);
       lines.push(`DESCRIPTION:${escIcs(desc)}`);
       lines.push('END:VEVENT');
@@ -878,6 +885,32 @@ export function buildCardioIcs(cycle: CardioCycle, referenceIso?: string): strin
   }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
+}
+
+// ─── Следующая сессия ───
+
+export interface CardioNextSession {
+  date: string;
+  week: number;
+  session: CardioSession;
+}
+
+/** Ближайшая запланированная сессия от даты (с учётом дня недели сессии). */
+export function cardioNextSession(cycle: CardioCycle, dateIso: string, referenceIso?: string): CardioNextSession | null {
+  const parseLocal = (v: string) => new Date(v.length === 10 ? v + 'T00:00:00' : v);
+  const start = parseLocal(dateIso);
+  if (!Number.isFinite(start.getTime())) return null;
+  const maxDays = Math.min(cycle.totalWeeks * 7, 365);
+  for (let i = 0; i < maxDays; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const week = cardioWeekForDate(cycle, iso, referenceIso);
+    if (!week) continue;
+    const dow = (d.getDay() + 6) % 7;
+    const s = week.sessions.find(x => x.dayOfWeek === dow);
+    if (s) return { date: iso, week: week.week, session: s };
+  }
+  return null;
 }
 
 // ─── Текстовая сводка (копирование в буфер) ───

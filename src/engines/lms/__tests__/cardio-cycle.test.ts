@@ -14,7 +14,7 @@ import {
   buildCardioSummaryText,
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
-  cardioWeightAdvice,
+  cardioWeightAdvice, buildCardioIcs, cardioNextSession,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -879,5 +879,45 @@ describe('cardioWeightAdvice', () => {
     const c = buildCardioCycle({ goal: 'mass', totalWeeks: 8 });
     const a = cardioWeightAdvice([{ date: '2026-08-01', weight: 80 }, { date: '2026-08-15', weight: 80 }], c, REF);
     expect(a.action).toBe('keep');
+  });
+});
+
+// ─── .ics по дням недели и следующая сессия ───
+
+describe('buildCardioIcs — дни недели', () => {
+  it('события привязаны к конкретным дням (dayOfWeek)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 1, daysAvailable: 7, id: 'ics-days' });
+    const ics = buildCardioIcs(c, '2026-01-05');
+    const s0 = c.weeks[0].sessions[0];
+    expect(s0.dayOfWeek).not.toBeUndefined();
+    const expected = dayStartPlus(s0.dayOfWeek!, 0);
+    expect(ics).toContain(`DTSTART:${expected}`);
+  });
+
+  it('DESCRIPTION содержит оборудование при персонализации', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 1, equipment: ['cycling'], id: 'ics-eq' });
+    const ics = buildCardioIcs(c, '2026-01-05');
+    expect(ics).toContain('Вело');
+  });
+});
+
+function dayStartPlus(dow: number, week: number): string {
+  const ref = new Date(2026, 0, 5 + week * 7 + dow);
+  return `${ref.getFullYear()}${String(ref.getMonth() + 1).padStart(2, '0')}${String(ref.getDate()).padStart(2, '0')}Z`;
+}
+
+describe('cardioNextSession', () => {
+  it('возвращает ближайшую сессию с её днём', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, daysAvailable: 7 });
+    const next = cardioNextSession(c, '2026-01-05', '2026-01-05');
+    expect(next).not.toBeNull();
+    expect(next!.week).toBe(1);
+    expect(next!.session.type).toBe('zone2');
+    expect(next!.date >= '2026-01-05').toBe(true);
+  });
+
+  it('null вне цикла', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, daysAvailable: 7 });
+    expect(cardioNextSession(c, '2026-03-01', '2026-01-05')).toBeNull();
   });
 });
