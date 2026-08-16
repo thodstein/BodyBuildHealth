@@ -6,6 +6,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { MEET_STRATEGY_PCT_LABEL, MEET_STRATEGY_LABEL } from '../../../engines/lms/competition-attempts';
+import { coachPLPeakPlan } from '../../../engines/lms/lms-taper-coach.engine';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { diaryCard, diaryLabel, ACCENT, DIM } from './diary-tokens';
 
@@ -112,6 +113,14 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
                   <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 9, background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>📉 тапер ×{rec.taperWeeks}</span>
                   {rec.mockMeet && <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 9, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>🎯 mock meet</span>}
                   {rec.meetWeek && <span style={{ padding: '2px 8px', borderRadius: 8, fontSize: 9, background: 'rgba(234,179,8,0.14)', color: '#eab308' }}>🏁 соревнования</span>}
+                  {(() => {
+                    try {
+                      const verdict = coachPLPeakPlan(rec.plan);
+                      const c = verdict.score >= 85 ? '#22c55e' : verdict.score >= 65 ? '#eab308' : verdict.score >= 40 ? '#f97316' : '#ef4444';
+                      const top = verdict.notes.find(n => n.severity === 'danger' || n.severity === 'warn')?.text ?? verdict.label;
+                      return <span title={`🧠 ${verdict.label}. ${top}`} style={{ padding: '2px 8px', borderRadius: 8, fontSize: 9, fontWeight: 800, background: c + '18', border: `1px solid ${c}44`, color: c }}>🧠 {verdict.score}/100</span>;
+                    } catch { return null; }
+                  })()}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>

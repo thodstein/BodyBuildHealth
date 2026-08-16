@@ -69,6 +69,23 @@ describe('CompetitionPlansView — подвкладка «Соревновани
     expect(screen.getByText(/mock meet/)).toBeTruthy();
   });
 
+  it('тренерский score: бейдж 🧠 N/100 у сохранённого плана', () => {
+    saveCompetitionPlan(makeRecord());
+    render(<CompetitionPlansView />);
+    const badge = screen.getByText(/🧠 \d+\/100/);
+    expect(badge).toBeTruthy();
+  });
+
+  it('тренерский score: план без тапера получает низкий вердикт (danger)', () => {
+    const plain = makePlan(10);
+    plain.weeks = plain.weeks.map(w => ({ ...w, taperWeek: false, meetWeek: false, meetAttempts: undefined }));
+    saveCompetitionPlan(makeRecord({ plan: plain }));
+    render(<CompetitionPlansView />);
+    const badge = screen.getByText(/🧠 \d+\/100/);
+    const score = Number(badge.textContent?.match(/(\d+)\/100/)?.[1] ?? '0');
+    expect(score).toBeLessThan(85);
+  });
+
   it('разворот «Прикиды»: подходы из карточек (опенер/вторая/третья, ×1 сингл)', () => {
     saveCompetitionPlan(makeRecord());
     render(<CompetitionPlansView />);
