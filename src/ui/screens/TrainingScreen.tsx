@@ -678,13 +678,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           return (<>
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
             {tab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
-            {tab === 'load_management' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub /></InfoErrorBoundary>}
+            {tab === 'load_management' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} /></InfoErrorBoundary>}
             {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
             {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
             {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
-            {tab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub /></InfoErrorBoundary>}
+            {tab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
             {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
             {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}

@@ -19,6 +19,8 @@ import { CheckinMetricsCard } from './CheckinMetricsCard';
 import { WhatIfCard } from './WhatIfCard';
 import { PriRepPatternCard } from './PriRepPatternCard';
 import { DeloadSchedulerTab } from './DeloadSchedulerTab';
+import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
+import type { WorkoutLog } from '../../../core/types';
 
 type SectionId = 'safety' | 'load' | 'volume' | 'autoreg' | 'recovery' | 'cardio' | 'deload';
 
@@ -32,8 +34,8 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: string; desc: string
   { id: 'deload', label: 'Разгрузка', icon: '🧘', desc: 'Планировщик разгрузочных недель' },
 ];
 
-export const TrainingSafetyHub: React.FC = () => {
-  const [section, setSection] = useState<SectionId>('safety');
+export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?: WorkoutLog[] }> = ({ initialSection = 'safety', sessions = [] }) => {
+  const [section, setSection] = useState<SectionId>(initialSection);
 
   return (
     <div style={{ color: '#fff', padding: 4 }}>
@@ -79,6 +81,8 @@ export const TrainingSafetyHub: React.FC = () => {
           <MRVEstimatorTab />
           <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '10px 0' }} />
           <VolumeOptimizerTab />
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '10px 0' }} />
+          <VolumeRecoveryCorrelationCard sessions={sessions} />
         </>
       )}
       {section === 'autoreg' && (
