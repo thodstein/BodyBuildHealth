@@ -8,6 +8,9 @@ import { loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog } from '../../../engines/warmup.engine';
 import { loadCooldownLog } from '../../../engines/cooldown.engine';
+import { loadStretchLog } from '../../../engines/stretch-session.engine';
+import { loadCheckins } from '../../../engines/mindset-protocol.engine';
+import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { diaryStyles as style, ACCENT, DIM } from './diary-tokens';
@@ -419,6 +422,105 @@ export const WarmupRampCard: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+/* ─── HabitWeekCard — недельный пульс привычек (матрица 6 привычек × 7 дней) ─── */
+
+export const HABIT_ROWS: { id: string; label: string; icon: string }[] = [
+  { id: 'workout', label: 'Тренировка', icon: '🏋️' },
+  { id: 'warmup', label: 'Разминка', icon: '🔥' },
+  { id: 'cooldown', label: 'Заминка', icon: '❄️' },
+  { id: 'stretch', label: 'Растяжка', icon: '🧘' },
+  { id: 'mobility', label: 'Мобильность', icon: '🤸' },
+  { id: 'mindset', label: 'Психо-чек-ин', icon: '🧠' },
+];
+
+function localIso(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Матрица выполнения привычек за текущую неделю (Пн-начало). */
+export function buildHabitWeek(historyWorkouts: WorkoutLog[]): { days: string[]; marks: Record<string, boolean[]> } {
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7; // 0 = Пн
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - dow);
+  const days: string[] = [];
+  const marks: Record<string, boolean[]> = { workout: [], warmup: [], cooldown: [], stretch: [], mobility: [], mindset: [] };
+  const warmupDone = new Set(loadWarmupLog().filter(e => e.done).map(e => e.date));
+  const cooldownDone = new Set(loadCooldownLog().filter(e => e.done).map(e => e.date));
+  const stretchDone = new Set(loadStretchLog().filter(e => e.done).map(e => e.date));
+  const mobilityDone = new Set(loadMobilityCheckins().filter(c => c.done).map(c => c.date));
+  const mindDates = new Set(loadCheckins().map(c => c.date));
+  const workoutDates = new Set((historyWorkouts || []).map(w => (w.date || '').slice(0, 10)));
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const iso = localIso(d);
+    days.push(iso);
+    marks.workout.push(workoutDates.has(iso));
+    marks.warmup.push(warmupDone.has(iso));
+    marks.cooldown.push(cooldownDone.has(iso));
+    marks.stretch.push(stretchDone.has(iso));
+    marks.mobility.push(mobilityDone.has(iso));
+    marks.mindset.push(mindDates.has(iso));
+  }
+  return { days, marks };
+}
+
+export const HabitWeekCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
+  const { days, marks } = buildHabitWeek(historyWorkouts);
+  const today = new Date();
+  const todayIdx = (today.getDay() + 6) % 7;
+  const todayDone = HABIT_ROWS.filter(r => marks[r.id][todayIdx]).length;
+  const weekTotals = HABIT_ROWS.map(r => ({ ...r, count: marks[r.id].filter(Boolean).length }));
+  return (
+    <div style={style.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div style={style.label}>📋 Недельный пульс привычек</div>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>сегодня: {todayDone}/{HABIT_ROWS.length}</span>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+        Тренировки и восстановление за эту неделю — из дневников.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {weekTotals.map(row => (
+          <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+            <span style={{ minWidth: 118, color: 'rgba(255,255,255,0.75)', fontWeight: 600 }}>
+              {row.icon} {row.label}
+            </span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {days.map((d, di) => {
+                const done = marks[row.id][di];
+                const isToday = di === todayIdx;
+                return (
+                  <span key={d} title={`${d}: ${done ? 'выполнено' : '—'}`}
+                    style={{
+                      flex: 1, textAlign: 'center', fontSize: 9, padding: '2px 0', borderRadius: 5,
+                      border: isToday ? '1px solid rgba(0,230,138,0.5)' : '1px solid transparent',
+                      background: done ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.03)',
+                      color: done ? '#22c55e' : 'rgba(255,255,255,0.25)',
+                      fontWeight: done ? 700 : 400,
+                    }}>
+                    {done ? '✓' : '·'}
+                  </span>
+                );
+              })}
+            </div>
+            <span style={{ minWidth: 24, textAlign: 'right', color: row.count >= 3 ? '#22c55e' : row.count > 0 ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
+              {row.count}/7
+            </span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 9, color: 'var(--text-faint)', marginTop: 6 }}>
+        Пн Вт Ср Чт Пт Сб Вс · сегодня подсвечено. Полные карточки — в разделах «Разминка/Заминка/Мобильность/Психология».
+      </div>
     </div>
   );
 };

@@ -45,7 +45,7 @@ import type { ProgressionAlert } from '../../../engines/strength-diary.engine';
 import { ACCENT, DIM, GRP_RU, GROUP_COLORS, diaryCard, diaryLabel, diaryInput, diaryBtn, diaryStyles } from './diary-tokens';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { SessionEditorModal } from './SessionEditorModal';
-import { WorkoutWeekCard, ProgressChartsCard, WorkoutComparisonCard, ExerciseSubstitutionCard, WarmupRampCard, SectionHeader, DiaryEmptyState } from './diary-cards';
+import { WorkoutWeekCard, ProgressChartsCard, WorkoutComparisonCard, ExerciseSubstitutionCard, WarmupRampCard, SectionHeader, DiaryEmptyState, HabitWeekCard } from './diary-cards';
 import { DiaryAnalyticsView } from './DiaryAnalyticsView';
 import { DiaryProgressView } from './DiaryProgressView';
 import { DiaryHistoryView } from './DiaryHistoryView';
@@ -742,6 +742,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             );
           })()}</>
           </InfoErrorBoundary>
+          <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
           <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === new Date().toISOString().slice(0, 10))} /></InfoErrorBoundary>
           <InfoErrorBoundary label="Форма записи"><RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}

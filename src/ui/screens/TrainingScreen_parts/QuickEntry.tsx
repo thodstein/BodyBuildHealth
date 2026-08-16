@@ -185,6 +185,25 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     setCurrentSetIdx(currentEx.sets.length);
   }, [currentEx, currentExIdx, exercises, pushUndo]);
 
+  const addSets = useCallback((count: number) => {
+    if (!currentEx || count < 2) return;
+    pushUndo(exercises);
+    const lastSet = currentEx.sets[currentEx.sets.length - 1];
+    const newSets: SetRecord[] = Array.from({ length: count }, () => ({
+      weight: lastSet?.weight || 0,
+      reps: lastSet?.reps || 10,
+      rpe: 0,
+      rir: lastSet?.rir || 2,
+      completed: false,
+    }));
+    setExercises(prev => {
+      const updated = [...prev];
+      updated[currentExIdx] = { ...updated[currentExIdx], sets: [...updated[currentExIdx].sets, ...newSets] };
+      return updated;
+    });
+    setCurrentSetIdx(currentEx.sets.length);
+  }, [currentEx, currentExIdx, exercises, pushUndo]);
+
   const completeSet = useCallback((weight: number, reps: number, rpe: number, rir: number) => {
     if (!currentEx) return;
     setExercises(prev => {
@@ -531,6 +550,18 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                       color: ACCENT, cursor: 'pointer', fontSize: 11, minHeight: 36,
                     }}
                   >+ Добавить</button>
+                  {[2, 3].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => addSets(n)}
+                      title={`Добавить ${n} одинаковых подхода`}
+                      style={{
+                        padding: '8px 10px', borderRadius: 8,
+                        border: '1px dashed rgba(0,230,138,0.2)', background: 'transparent',
+                        color: 'rgba(0,230,138,0.8)', cursor: 'pointer', fontSize: 11, minHeight: 36,
+                      }}
+                    >+{n}×</button>
+                  ))}
                   {ex.sets.length >= 2 && (
                     <button
                       onClick={() => {
