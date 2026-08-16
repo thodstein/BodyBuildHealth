@@ -472,6 +472,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
+            {/* 🏁 Активный contest prep — сводная карточка на главном экране тренировок */}
+            <div style={{ marginBottom: 8 }}>
+              <BBContestPrepActiveCard onOpen={() => { hapticImpact('light'); setPage('tabs'); switchPlanningTrack('bb'); setZone('planner'); }} />
+            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
@@ -596,8 +600,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {zone === 'planner' && (
         <InfoErrorBoundary label="Планировщик">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {/* 🏁 Активный contest prep — сводная карточка (только в планировщике, не мешает выполнению) */}
-            <BBContestPrepActiveCard onOpen={() => { hapticImpact('light'); switchPlanningTrack('bb'); setZone('planner'); }} />
             <div style={{ display:'flex', gap:4, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
               {PLANNER_MODES.map(m => (
                 <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:'0 0 auto', minWidth:104, padding:'8px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? '#ffffff' : 'var(--text-dim)', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'nowrap', boxShadow: planningTrack === m.id ? '0 0 0 1px rgba(0,230,138,0.4), 0 2px 10px rgba(0,0,0,0.25)' : 'none' }}>
