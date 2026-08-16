@@ -85,7 +85,6 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
-import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
@@ -353,7 +352,6 @@ export const BbAutoConstructor: React.FC = () => {
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
-  const [showTools, setShowTools] = useState(false);
   // 🔄 «Начать заново»: подтверждение сброса сборки.
   const [resetAsk, setResetAsk] = useState(false);
   // PRO: cross-mesocycle continuity — auto-load последнего сохранённого плана
@@ -4542,64 +4540,10 @@ export const BbAutoConstructor: React.FC = () => {
         <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>💪 ББ-авто</span>
         <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
       </div>
-      {/* Шаги конструктора + инструменты — ряд с переносом, помещается на экране без прокрутки */}
+      {/* Шаги конструктора — ряд с переносом, помещается на экране без прокрутки */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         {renderStepNav()}
-        <button
-          onClick={() => setShowTools(true)}
-          title="Библиотека инструментов"
-          style={{ padding:'9px 12px', borderRadius:12, fontSize:16, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.8)', minWidth:38, minHeight:38, flexShrink:0 }}
-        >⚙️</button>
       </div>
-      {showTools && (
-        <div className="bb-tools-modal-backdrop" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: 8 }} onClick={() => setShowTools(false)}>
-          <div
-            className="bb-tools-modal-dialog"
-            role="dialog"
-            aria-label="Библиотека инструментов"
-            onClick={e => e.stopPropagation()}
-            style={{
-               width: '100%', maxWidth: 560,
-               maxHeight: '92vh',
-              display: 'flex', flexDirection: 'column',
-              borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.1)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-                 overflow: 'hidden',
-                 minHeight: 0,
-            }}
-          >
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-              flexShrink: 0, background: 'rgba(24,24,27,0.95)', position: 'sticky', top: 0, zIndex: 1,
-            }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>📚 Библиотека инструментов</div>
-              <button
-                onClick={() => setShowTools(false)}
-                aria-label="Закрыть"
-                style={{
-                  padding: '6px 12px', borderRadius: 8, fontSize: 14, cursor: 'pointer',
-                  border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
-                  color: 'var(--text-dim)', minHeight: 32, minWidth: 32, lineHeight: 1,
-                }}
-              >✕</button>
-            </div>
-            <div
-              style={{
-                flex: '1 1 auto',
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                WebkitOverflowScrolling: 'touch',
-                overscrollBehavior: 'contain',
-                padding: '12px 12px 24px 12px',
-                minHeight: 0,
-              }}
-            >
-              <PlannerToolsPanel mode="bb" />
-            </div>
-          </div>
-        </div>
-      )}
       {step === 'annual' && (
         <div className="bb-annual-planner-page">
           <div className="bb-annual-planner-page__header">
