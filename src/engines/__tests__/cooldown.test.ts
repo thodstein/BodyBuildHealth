@@ -9,7 +9,7 @@ import {
   generateCooldown, upsertCooldownLog, loadCooldownLog, latestCooldownLog, cooldownLogForDate,
   cooldownAdherence, cooldownQualityTrend, cooldownStreak, buildCooldownInsights,
   exportCooldownCheckinsCSV, COOLDOWN_LABELS, cooldownLabel, sanitizeCooldownLog,
-  COOLDOWN_DIARY_KEY, COOLDOWN_SKIP_REASONS,
+  COOLDOWN_DIARY_KEY, COOLDOWN_SKIP_REASONS, correlateCooldownWithReadiness,
 } from '../cooldown.engine';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -71,6 +71,25 @@ describe('generateCooldown с targetGroups', () => {
     const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.8, riskFlags: {}, sessionDuration: 3600, targetGroups: ['chest'] });
     expect(blocks[0].type).toBe('breathing');
     expect(blocks.some(b => b.type === 'mobility')).toBe(true);
+  });
+
+  it('длинная сессия (> 60 мин) → лёгкое кардио-заминка', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 4200, targetGroups: ['chest'] });
+    expect(blocks.some(b => b.type === 'cardio')).toBe(true);
+    const cardio = blocks.find(b => b.type === 'cardio')!;
+    expect(cardio.exercises[0].exerciseId).toBe('light_cardio');
+  });
+
+  it('короткая сессия → без кардио-заминки', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['chest'] });
+    expect(blocks.some(b => b.type === 'cardio')).toBe(false);
+  });
+
+  it('длительность растяжки = сумма упражнений (не фиксированная 240)', () => {
+    const blocks = generateCooldown({ muscleGroupsUsed: [], fatigueScore: 0.3, riskFlags: {}, sessionDuration: 1800, targetGroups: ['quads', 'hamstrings', 'glutes'] });
+    const stretch = blocks.find(b => b.type === 'stretch')!;
+    const sum = stretch.exercises.reduce((s, e) => s + e.durationSec, 0);
+    expect(stretch.durationSec).toBe(sum);
   });
 
   it('без targetGroups — прежняя эвристика по muscleGroupsUsed', () => {
@@ -146,5 +165,46 @@ describe('Дневник заминки', () => {
     expect(COOLDOWN_LABELS['chest_stretch']).toBeTruthy();
     expect(cooldownLabel('неизвестный_id')).toBe('неизвестный_id');
     expect(COOLDOWN_SKIP_REASONS.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('Связь заминки с готовностью', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('без данных → n 0 и null', () => {
+    upsertCooldownLog({ date: '2026-01-01', done: true, quality: 5 });
+    const link = correlateCooldownWithReadiness([]);
+    expect(link.n).toBe(0);
+    expect(link.pearson).toBeNull();
+  });
+
+  it('качество заминки растёт с готовностью на следующий день → положительный r и корзины', () => {
+    upsertCooldownLog({ date: '2026-01-01', done: true, quality: 2 });
+    upsertCooldownLog({ date: '2026-01-02', done: true, quality: 3 });
+    upsertCooldownLog({ date: '2026-01-03', done: true, quality: 5 });
+    const readiness = [
+      { date: '2026-01-02', recovery: 60 },
+      { date: '2026-01-03', recovery: 70 },
+      { date: '2026-01-04', recovery: 85 },
+    ];
+    const link = correlateCooldownWithReadiness(readiness);
+    expect(link.n).toBe(3);
+    expect(link.pearson).not.toBeNull();
+    expect(link.pearson as number).toBeGreaterThan(0);
+    const high = link.buckets.find(b => b.level === 'high')!;
+    expect(high.avgRecovery).toBe(85);
+  });
+
+  it('buildCooldownInsights с readiness: инсайт про связь при |r| ≥ 0.3', () => {
+    upsertCooldownLog({ date: '2026-01-01', done: true, quality: 2 });
+    upsertCooldownLog({ date: '2026-01-02', done: true, quality: 3 });
+    upsertCooldownLog({ date: '2026-01-03', done: true, quality: 5 });
+    const readiness = [
+      { date: '2026-01-02', recovery: 60 },
+      { date: '2026-01-03', recovery: 70 },
+      { date: '2026-01-04', recovery: 85 },
+    ];
+    const out = buildCooldownInsights(readiness);
+    expect(out.some(s => s.includes('Связь качества заминки с готовностью'))).toBe(true);
   });
 });

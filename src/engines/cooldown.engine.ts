@@ -50,6 +50,16 @@ export function generateCooldown(input: CooldownInput): CooldownBlock[] {
     ],
   });
 
+  // Лёгкое кардио-заминка после длинных сессий: плавное снижение пульса
+  if (input.sessionDuration > 3600) {
+    blocks.push({
+      type: 'cardio',
+      durationSec: 180,
+      exercises: [{ exerciseId: 'light_cardio', durationSec: 180 }],
+      notes: 'Медленный темп: пульс плавно к покою',
+    });
+  }
+
   // Упор на целевые группы дня (если переданы), иначе — фокус-эвристика
   const targetGroups = (input.targetGroups || []).filter(Boolean);
   const groupStretch = targetGroups.length > 0 ? collectGroupCooldown(targetGroups) : null;
@@ -60,9 +70,11 @@ export function generateCooldown(input: CooldownInput): CooldownBlock[] {
     stretchExs.push({ exerciseId: 'nerve_flossing', durationSec: 45 });
   }
   if (stretchExs.length > 0) {
+    const totalStretch = stretchExs.reduce((s, e) => s + e.durationSec, 0);
     blocks.push({
       type: 'stretch',
-      durationSec: 240,
+      // Длительность по факту: сумма упражнений, но не меньше 120с и не больше 360с
+      durationSec: Math.max(120, Math.min(360, totalStretch)),
       exercises: stretchExs,
       notes: groupStretch ? `Растяжка рабочих зон: ${prepGroupLabelsCooldown(targetGroups)}` : undefined,
     });
@@ -232,6 +244,12 @@ export const COOLDOWN_SKIP_REASONS = ['не было времени', 'уста�
 
 function isoOf(d: Date): string { return d.toISOString().slice(0, 10); }
 
+function isoAddDays(date: string, days: number): string {
+  const [y, m, d] = date.slice(0, 10).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return dt.toISOString().slice(0, 10);
+}
+
 /** Серия: сколько дней подряд заминка выполнялась (с сегодня или вчера). */
 export function cooldownStreak(): number {
   const log = loadCooldownLog();
@@ -251,7 +269,56 @@ export function cooldownStreak(): number {
   return streak;
 }
 
-export function buildCooldownInsights(): string[] {
+export interface CooldownReadinessLink {
+  /** Корреляция Пирсона качества заминки ↔ готовность (recovery) на следующий день. */
+  pearson: number | null;
+  /** Средняя готовность на следующий день по корзинам качества. */
+  buckets: { level: 'low' | 'mid' | 'high'; range: string; avgRecovery: number; n: number }[];
+  n: number;
+}
+
+function cooldownPearson(xs: number[], ys: number[]): number | null {
+  if (xs.length < 3 || xs.length !== ys.length) return null;
+  const n = xs.length;
+  const mx = xs.reduce((s, v) => s + v, 0) / n;
+  const my = ys.reduce((s, v) => s + v, 0) / n;
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - mx) * (ys[i] - my);
+    dx += (xs[i] - mx) ** 2;
+    dy += (ys[i] - my) ** 2;
+  }
+  if (dx === 0 || dy === 0) return null;
+  return Math.round(num / Math.sqrt(dx * dy) * 100) / 100;
+}
+
+/** Связь качества заминки дня с готовностью (recovery 0-100) на следующий день. */
+export function correlateCooldownWithReadiness(readiness: { date: string; recovery: number }[]): CooldownReadinessLink {
+  const recoveryByDate = new Map((readiness || []).map(r => [r.date, r.recovery]));
+  const pairs: { q: number; recovery: number }[] = [];
+  for (const e of loadCooldownLog()) {
+    if (e.quality === null) continue;
+    const rec = recoveryByDate.get(isoAddDays(e.date, 1));
+    if (rec !== undefined && rec > 0) pairs.push({ q: e.quality, recovery: rec });
+  }
+  const r = cooldownPearson(pairs.map(p => p.q), pairs.map(p => p.recovery));
+  const bucket = (level: 'low' | 'mid' | 'high', filter: (q: number) => boolean, range: string) => {
+    const items = pairs.filter(p => filter(p.q));
+    const avg = items.length > 0 ? Math.round(items.reduce((s, p) => s + p.recovery, 0) / items.length) : 0;
+    return { level, range, avgRecovery: avg, n: items.length };
+  };
+  return {
+    pearson: r,
+    buckets: [
+      bucket('low', q => q <= 2, 'качество 1-2'),
+      bucket('mid', q => q === 3, 'качество 3'),
+      bucket('high', q => q >= 4, 'качество 4-5'),
+    ],
+    n: pairs.length,
+  };
+}
+
+export function buildCooldownInsights(readiness?: { date: string; recovery: number }[]): string[] {
   const out: string[] = [];
   const adh = cooldownAdherence(30);
   if (adh.total >= 3) {
@@ -272,6 +339,12 @@ export function buildCooldownInsights(): string[] {
   }
   const streak = cooldownStreak();
   if (streak >= 3) out.push(`Серия: заминка выполнена ${streak} дней подряд — отличный ритм восстановления.`);
+  if (Array.isArray(readiness) && readiness.length >= 3) {
+    const link = correlateCooldownWithReadiness(readiness);
+    if (link.n >= 3 && link.pearson !== null && Math.abs(link.pearson) >= 0.3) {
+      out.push(`Связь качества заминки с готовностью на следующий день: r = ${link.pearson} (n=${link.n}). ${link.pearson > 0 ? 'Качественная заминка окупается — готовность завтра выше.' : 'Обратная связь — проверьте сон/питание.'}`);
+    }
+  }
   if (out.length === 0) out.push('Пока мало данных: отмечайте заминку после тренировок — появятся приверженность и тренд качества.');
   return out;
 }

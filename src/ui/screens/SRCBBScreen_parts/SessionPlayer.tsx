@@ -10,8 +10,8 @@ import {
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
   compareWithPrevious, getCachedProgressForExercise,
 } from '../../../engines/workout-logger.engine';
-import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, type WarmupInput } from '../../../engines/warmup.engine';
-import { generateCooldown, upsertCooldownLog, cooldownLabel, type CooldownInput } from '../../../engines/cooldown.engine';
+import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, WARMUP_SKIP_REASONS, type WarmupInput } from '../../../engines/warmup.engine';
+import { generateCooldown, upsertCooldownLog, cooldownLabel, COOLDOWN_SKIP_REASONS, type CooldownInput } from '../../../engines/cooldown.engine';
 import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
@@ -51,6 +51,30 @@ function formatPlates(targetW: number): string {
 }
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 14, minHeight: 44 };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: `1px solid ${ACCENT}` };
+
+/** ⏭ Пропустить разминку/заминку с указанием причины (пишется в дневник). */
+const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; label: string }> = ({ reasons, onSkip, label }) => {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState(reasons[0] || 'другое');
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button type="button" style={{ ...BTN_GHOST, width: '100%', color: 'var(--text-dim)', borderColor: 'var(--border)' }} onClick={() => setOpen(v => !v)}>
+        ⏭ Пропустить {label} {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={reason} onChange={e => setReason(e.target.value)} aria-label={`Причина пропуска ${label}`}
+            style={{ ...IN, flex: 1, minWidth: 160, minHeight: 40 }}>
+            {reasons.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <button type="button" style={{ ...BTN, flex: 1, minWidth: 120 }} onClick={() => { onSkip(reason); setOpen(false); }}>
+            Пропустить
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 const IN: React.CSSProperties = { background: 'var(--input-bg)', color: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const LABEL: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
@@ -97,7 +121,10 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
    const [exDone, setExDone] = useState<Record<string, boolean>>({});
    const [interExTimerSec, setInterExTimerSec] = useState<number>(0);
    const [interExTimerRunning, setInterExTimerRunning] = useState<boolean>(false);
-   const interExTimerRef = useRef<number | null>(null);
+    const interExTimerRef = useRef<number | null>(null);
+    // Причина пропуска разминки/заминки (устанавливается кнопкой «⏭ Пропустить»)
+    const skipWarmupReasonRef = useRef<string | null>(null);
+    const skipCooldownReasonRef = useRef<string | null>(null);
    const [supersetMode, setSupersetMode] = useState<boolean>(false);
    const [circuitMode, setCircuitMode] = useState<boolean>(false);
     const [supersetExercises, setSupersetExercises] = useState<number[]>([]);
@@ -344,8 +371,16 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
       });
     }
     const techniqueIssues: string[] = profile.weakPoints?.length
-      ? profile.weakPoints.map(w => w === 'back' || w === 'core' ? 'rounding_back' : w === 'knees' ? 'knee_valgus' : '')
-        .filter(Boolean)
+      ? profile.weakPoints.map(w => {
+          const wp = String(w).toLowerCase();
+          if (wp.includes('back') || wp.includes('поясн') || wp === 'core') return 'rounding_back';
+          if (wp.includes('knee') || wp.includes('колен')) return 'knee_valgus';
+          if (wp.includes('shoulder') || wp.includes('плеч')) return 'tight_shoulders';
+          if (wp.includes('hip') || wp.includes('бёдр') || wp.includes('таз')) return 'tight_hips';
+          if (wp.includes('ankle') || wp.includes('голеност')) return 'tight_ankles';
+          if (wp.includes('chest') || wp.includes('груд')) return 'tight_chest';
+          return '';
+        }).filter(Boolean)
       : [];
     const warmupInput: WarmupInput = {
       sessionFocus: focus,
@@ -368,14 +403,16 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
        const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
        const doneCnt = Object.values(warmupDone).filter(Boolean).length;
        const pct = total > 0 ? doneCnt / total : 0;
+       const skipped = skipWarmupReasonRef.current;
        upsertWarmupLog({
          date: new Date().toISOString().slice(0, 10),
-         done: doneCnt > 0,
-         quality: doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
+         done: skipped ? false : doneCnt > 0,
+         quality: skipped ? null : doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
          totalItems: total,
          doneItems: doneCnt,
-         skippedReason: doneCnt === 0 ? 'не отметил ни одного пункта' : undefined,
+         skippedReason: skipped || (doneCnt === 0 ? 'не отметил ни одного пункта' : undefined),
        });
+       skipWarmupReasonRef.current = null;
      } catch { /* дневник разминки недоступен — не блокируем переход */ }
      let s = startSession(focus || day.label, weekNumber);
      day.exercises.forEach(ex => {
@@ -489,14 +526,16 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
         const total = cooldownBlocks.reduce((s, b) => s + b.exercises.length, 0);
         const doneCnt = Object.values(cooldownDone).filter(Boolean).length;
         const pct = total > 0 ? doneCnt / total : 0;
+        const skipped = skipCooldownReasonRef.current;
         upsertCooldownLog({
           date: new Date().toISOString().slice(0, 10),
-          done: doneCnt > 0,
-          quality: doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
+          done: skipped ? false : doneCnt > 0,
+          quality: skipped ? null : doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
           totalItems: total,
           doneItems: doneCnt,
-          skippedReason: doneCnt === 0 ? 'не отметил ни одного пункта' : undefined,
+          skippedReason: skipped || (doneCnt === 0 ? 'не отметил ни одного пункта' : undefined),
         });
+        skipCooldownReasonRef.current = null;
       } catch { /* дневник заминки недоступен — не блокируем выход */ }
     }
     setPhase('done');
@@ -900,6 +939,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             </div>
           ))}
           <button style={{ ...BTN, width: '100%', marginTop: 12 }} onClick={startMain}>🚀 Перейти к основной тренировке</button>
+          <SkipBar reasons={WARMUP_SKIP_REASONS} label="разминку" onSkip={reason => { skipWarmupReasonRef.current = reason; startMain(); }} />
         </div>
       )}
 
@@ -1260,7 +1300,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
           {cooldownBlocks.map((b, i) => (
             <div key={i} style={{ ...CARD, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
-                {b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
+                {b.type === 'cardio' ? 'Лёгкое кардио' : b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
                 <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{b.durationSec}с</span>
               </div>
               {b.notes && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{b.notes}</div>}
@@ -1279,6 +1319,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             </div>
           ))}
           <button style={{ ...BTN, width: '100%', marginTop: 12 }} onClick={exitSession}>✓ Завершить и выйти</button>
+          <SkipBar reasons={COOLDOWN_SKIP_REASONS} label="заминку" onSkip={reason => { skipCooldownReasonRef.current = reason; exitSession(); }} />
         </div>
       )}
 

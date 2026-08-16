@@ -63,6 +63,7 @@ import { CooldownDiaryView } from './CooldownDiaryView';
 import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins, detectDayType } from '../../../engines/mindset-protocol.engine';
 import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog, upsertWarmupLog, warmupLogForDate } from '../../../engines/warmup.engine';
+import { loadCooldownLog, upsertCooldownLog, cooldownLogForDate } from '../../../engines/cooldown.engine';
 import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 
 /* ─── RecordModeSelector — sub-mode toggle for record (quick vs full) ─── */
@@ -509,11 +510,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     const mobPct = mobDaily.length > 0 ? Math.round(mobDaily.filter(i => mobDone.includes(i.id)).length / mobDaily.length * 100) : null;
                     const warmToday = warmupLogForDate(today);
                     const warmPct = warmToday ? (warmToday.done ? 100 : 0) : (trainedToday ? 0 : null);
+                    const coolToday = cooldownLogForDate(today);
+                    const coolPct = coolToday ? (coolToday.done ? 100 : 0) : (trainedToday ? 0 : null);
                     const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
                       { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: () => {} },
                       { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => setMode('mindset') },
                       { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => setMode('mobility') },
                       { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => setMode('warmup') },
+                      { label: 'Заминка', pct: coolPct, color: '#38bdf8', onClick: () => setMode('cooldown') },
                     ];
                     const hasAny = rings.some(r => r.pct !== null);
                     if (!hasAny) return null;
@@ -644,6 +648,30 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         </button>
                         <button onClick={() => setMode('warmup')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           К разминке →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  // Заминка: сегодня была тренировка, но заминка не отмечена
+                  const today = new Date().toISOString().slice(0, 10);
+                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
+                  if (!trainedToday) return null;
+                  if (cooldownLogForDate(today)) return null;
+                  const markCooldownDone = () => {
+                    upsertCooldownLog({ date: today, done: true, quality: 4 });
+                    forceHub(h => h + 1);
+                  };
+                  return (
+                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', color: '#38bdf8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span>❄️ Заминка сегодня не отмечена</span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={markCooldownDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          ✓ Заминка выполнена
+                        </button>
+                        <button onClick={() => setMode('cooldown')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          К заминке →
                         </button>
                       </div>
                     </div>

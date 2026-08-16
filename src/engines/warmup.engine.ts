@@ -112,7 +112,8 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   if (mobilityExs.length > 0) {
     blocks.push({
       type: 'mobility',
-      durationSec: 180,
+      // Длительность по факту: ~30с на упражнение, 90-240с
+      durationSec: Math.max(90, Math.min(240, mobilityExs.length * 30)),
       exercises: mobilityExs,
       notes: groupPrep ? `Суставная подготовка: ${jointPrepLabels(targetGroups)} · зоны: ${prepGroupLabels(targetGroups)}` : 'Суставная подготовка',
     });
@@ -132,7 +133,8 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   if (activationExs.length > 0) {
     blocks.push({
       type: 'activation',
-      durationSec: 180,
+      // Длительность по факту: ~35с на упражнение, 90-240с
+      durationSec: Math.max(90, Math.min(240, activationExs.length * 35)),
       exercises: activationExs,
       notes: groupPrep ? `Активация: ${prepGroupLabels(targetGroups)}` : 'Активация мышц',
     });
@@ -183,18 +185,27 @@ function getActivationExercises(
   hasBand: boolean,
 ): { exerciseId: string; sets: number; reps: number }[] {
   const exs: { exerciseId: string; sets: number; reps: number }[] = [];
+  const add = (id: string, sets: number, reps: number) => {
+    if (!exs.some(e => e.exerciseId === id)) exs.push({ exerciseId: id, sets, reps });
+  };
   if (riskFlags['knee'] === 'high' || techniqueIssues.includes('knee_valgus')) {
-    exs.push(hasBand
-      ? { exerciseId: 'banded_clam', sets: 2, reps: 15 }
-      : { exerciseId: 'side_lying_abduction', sets: 2, reps: 15 });
+    add(hasBand ? 'banded_clam' : 'side_lying_abduction', 2, 15);
   }
-  if (riskFlags['shoulder'] === 'high') {
-    exs.push(hasBand
-      ? { exerciseId: 'external_rotation', sets: 2, reps: 12 }
-      : { exerciseId: 'wall_slide', sets: 2, reps: 10 });
+  if (riskFlags['shoulder'] === 'high' || techniqueIssues.includes('tight_shoulders')) {
+    add(hasBand ? 'external_rotation' : 'wall_slide', 2, 12);
   }
   if (techniqueIssues.includes('rounding_back')) {
-    exs.push({ exerciseId: 'bird_dog', sets: 2, reps: 10 }, { exerciseId: 'dead_bug', sets: 1, reps: 10 });
+    add('bird_dog', 2, 10);
+    add('dead_bug', 1, 10);
+  }
+  if (techniqueIssues.includes('tight_hips')) {
+    add('glute_bridge', 2, 12);
+  }
+  if (techniqueIssues.includes('tight_ankles')) {
+    add('air_squat', 2, 8);
+  }
+  if (techniqueIssues.includes('tight_chest')) {
+    add('pushup_light', 1, 8);
   }
   return exs;
 }

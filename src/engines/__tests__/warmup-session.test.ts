@@ -60,6 +60,23 @@ describe('generateWarmup', () => {
     expect(act.exercises.some(e => e.exerciseId === 'external_rotation')).toBe(false);
   });
 
+  it('слабые точки: плечи/бёдра/голеностоп/грудь → активация', () => {
+    const blocks = generateWarmup({ ...baseInput, techniqueIssues: ['tight_shoulders', 'tight_hips', 'tight_ankles', 'tight_chest'] });
+    const act = blocks.find(b => b.type === 'activation')!;
+    const ids = act.exercises.map(e => e.exerciseId);
+    expect(ids).toContain('wall_slide'); // tight_shoulders без ленты
+    expect(ids).toContain('glute_bridge'); // tight_hips
+    expect(ids).toContain('air_squat'); // tight_ankles
+    expect(ids).toContain('pushup_light'); // tight_chest
+  });
+
+  it('длительность мобильности/активации масштабируется по объёму (≥ 90с)', () => {
+    const blocks = generateWarmup({ ...baseInput, targetGroups: ['chest'] });
+    const mob = blocks.find(b => b.type === 'mobility')!;
+    expect(mob.durationSec).toBeGreaterThanOrEqual(90);
+    expect(mob.durationSec).toBeLessThanOrEqual(240);
+  });
+
   it('с лентой: ленточная активация', () => {
     const withBand: WarmupInput = { ...baseInput, riskFlags: { knee: 'high' }, equipmentAvailable: ['barbell', 'resistance_band'] };
     const act = generateWarmup(withBand).find(b => b.type === 'activation')!;

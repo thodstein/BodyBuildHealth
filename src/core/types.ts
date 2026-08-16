@@ -1318,7 +1318,7 @@ export interface WarmupBlock {
 }
 
 export interface CooldownBlock {
-  type: 'stretch' | 'breathing' | 'mobility';
+  type: 'stretch' | 'breathing' | 'mobility' | 'cardio';
   durationSec: number;
   exercises: { exerciseId: string; durationSec: number }[];
   /** Пояснение блока (например, «Растяжка рабочих зон: грудь, спина»). */
