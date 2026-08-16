@@ -23,7 +23,8 @@ import {
   deserializeMacro, serializeMacro, deserializeBbMacro, serializeBbMacro,
   attachCardioToMacro, detachCardioFromMacro,
 } from '../../../engines/lms/macrocycle.engine';
-import { getProfile } from '../../../core/profile-manager';
+import { getProfile, updateSection } from '../../../core/profile-manager';
+import { CardioUserCard } from './CardioUserCard';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { CardioParamsStep, type PhaseSplitState } from './CardioParamsStep';
@@ -364,6 +365,19 @@ export const CardioConstructor: React.FC = () => {
     flashMsg('📋 Параметры пользователя загружены из профиля');
   };
 
+  const saveToProfile = () => {
+    try {
+      updateSection('personal', {
+        weight: Math.max(30, Math.min(300, Number(bodyWeight) || 80)),
+        age: Math.max(12, Math.min(90, Number(age) || 30)),
+        sex,
+      });
+      const r = Number(restingHr) > 0 ? Number(restingHr) : 0;
+      updateSection('lifestyle', { restingHR: r });
+      flashMsg('💾 Параметры сохранены в профиль');
+    } catch { flashMsg('⚠ Не удалось сохранить в профиль'); }
+  };
+
   const autoModeOn = useMemo(() => {
     try { return localStorage.getItem('he_cardio_auto_tune') === '1'; } catch { return false; }
   }, [flash, cycle]);
@@ -414,6 +428,9 @@ export const CardioConstructor: React.FC = () => {
         </div>
       </div>
 
+      {/* Графа пользователя */}
+      <CardioUserCard age={age} sex={sex} weight={bodyWeight} restingHr={restingHr} level={level} onFromProfile={fromProfile} onSaveProfile={saveToProfile} />
+
       {/* Степпер */}
       <div style={{ display: 'flex', gap: 4, padding: 6, borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {STEPS.map((s, i) => {
@@ -457,7 +474,6 @@ export const CardioConstructor: React.FC = () => {
           age={age} setAge={setAge}
           sex={sex} setSex={setSex}
           restingHr={restingHr} setRestingHr={setRestingHr}
-          onFromProfile={fromProfile}
           onReset={resetParams}
         />
       )}

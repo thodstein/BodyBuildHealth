@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { describe, expect, it, beforeEach } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioConstructor } from '../CardioConstructor';
 import { loadCardioCycles } from '../../../../engines/lms/cardio.engine';
@@ -84,5 +85,41 @@ describe('CardioConstructor — сценарий пользователя', () =
     expect(screen.getByRole('button', { name: /Пол: мужской/ })).toBeTruthy();
     expect(screen.getByLabelText('Вес')).toHaveValue(88);
     expect(screen.getByLabelText('Возраст')).toHaveValue(41);
+  });
+
+  it('графа пользователя: карточка с параметрами и кнопками синхронизации', () => {
+    seedProfile({ 'settings.personal.sex': 'female', 'settings.personal.weight': 66, 'settings.personal.age': 29, 'settings.lifestyle.restingHR': 58 });
+    const html = renderToStaticMarkup(<CardioConstructor />);
+    expect(html).toContain('Возраст');
+    expect(html).toContain('Вес');
+    expect(html).toContain('ЧСС покоя');
+    expect(html).toContain('Из профиля');
+    expect(html).toContain('В профиль');
+  });
+
+  it('«💾 В профиль» сохраняет изменённые параметры в he_profile_v2', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.change(screen.getByLabelText('Возраст'), { target: { value: '44' } });
+    fireEvent.change(screen.getByLabelText('ЧСС покоя'), { target: { value: '55' } });
+    fireEvent.click(screen.getByRole('button', { name: /В профиль/ }));
+    expect(screen.getByText(/сохранены в профиль/)).toBeTruthy();
+    const saved = JSON.parse(localStorage.getItem(PROFILE_KEY) ?? '{}');
+    expect(saved.settings.personal.age).toBe(44);
+    expect(saved.settings.lifestyle.restingHR).toBe(55);
+  });
+
+  it('предпросмотр: «План по фазам» и «Taper-план» видны после сборки со стартом', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.change(screen.getByLabelText('Неделя старта'), { target: { value: '10' } });
+    fireEvent.change(screen.getByPlaceholderText('Название (например, Шоу)'), { target: { value: 'Шоу' } });
+    fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    expect(screen.getByText(/План по фазам/)).toBeTruthy();
+    expect(screen.getByText(/Taper-план перед стартом/)).toBeTruthy();
+    expect(screen.getAllByText(/без HIIT/).length).toBeGreaterThan(0);
   });
 });

@@ -39,6 +39,44 @@ export const CardioPreviewStep: React.FC<{
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
   const quality = useMemo(() => (cycle ? cardioQualityReport(cycle, daysAvailable) : null), [cycle, daysAvailable]);
 
+  const phasesPlan = useMemo(() => {
+    if (!cycle) return [];
+    const order: { phase: string; label: string }[] = [
+      { phase: 'base', label: '🌱 База' },
+      { phase: 'build', label: '📈 Наращивание' },
+      { phase: 'maintenance', label: '🧘 Поддержание' },
+      { phase: 'contest_prep', label: '🏋️ Prep' },
+      { phase: 'taper', label: '📉 Taper' },
+      { phase: 'peak', label: '🎭 Пик' },
+      { phase: 'transition', label: '🌤 Переход' },
+    ];
+    return order
+      .map(o => {
+        const weeks = cycle.weeks.filter(w => w.phase === o.phase);
+        if (weeks.length === 0) return null;
+        const minutes = weeks.reduce((s, w) => s + w.totalMinutes, 0);
+        return {
+          ...o,
+          weeks: weeks.length,
+          first: weeks[0].week,
+          last: weeks[weeks.length - 1].week,
+          avgMin: Math.round(minutes / weeks.length),
+        };
+      })
+      .filter(Boolean) as { phase: string; label: string; weeks: number; first: number; last: number; avgMin: number }[];
+  }, [cycle]);
+
+  const taperPlan = useMemo(() => {
+    if (!cycle) return [];
+    return cycle.weeks.filter(w => w.phase === 'taper' || w.phase === 'peak').map(w => ({
+      week: w.week,
+      phase: w.phase,
+      minutes: w.totalMinutes,
+      hiit: w.sessions.some(s => s.type === 'hiit'),
+      sessions: w.sessions.length,
+    }));
+  }, [cycle]);
+
   if (!cycle || !summary) {
     return (
       <div style={CARD}>
@@ -103,6 +141,38 @@ export const CardioPreviewStep: React.FC<{
             <input value={nameDraft || cycle.name} onChange={e => setNameDraft(e.target.value)} style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Название цикла" />
             <button style={BTN_PRIMARY} onClick={() => { if (nameDraft.trim()) { onRename(nameDraft.trim()); setNameDraft(''); } }}>💾 Переименовать</button>
           </div>
+        </div>
+      )}
+
+      {/* План по фазам */}
+      <div style={CARD}>
+        <div style={LABEL}>🗂 План по фазам</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {phasesPlan.map(p => (
+            <div key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+              <span style={{ width: 130, fontWeight: 700, color: PHASE_COLOR[p.phase] ?? '#888' }}>{p.label}</span>
+              <span style={{ width: 110, color: 'rgba(255,255,255,0.55)' }}>нед {p.first}–{p.last}</span>
+              <span style={{ color: 'rgba(255,255,255,0.55)' }}>{p.weeks} нед</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ color: 'rgba(255,255,255,0.55)' }}>~{p.avgMin} мин/нед</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Taper-план */}
+      {taperPlan.length > 0 && (
+        <div style={{ ...CARD, borderColor: 'rgba(234,179,8,0.3)' }}>
+          <div style={LABEL}>📉 Taper-план перед стартом</div>
+          {taperPlan.map(w => (
+            <div key={w.week} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+              <span style={{ width: 44, fontWeight: 800, color: PHASE_COLOR[w.phase] }}>нед {w.week}</span>
+              <span style={{ width: 90, color: 'rgba(255,255,255,0.6)' }}>{CARDIO_PHASE_LABELS[w.phase]}</span>
+              <span style={{ color: 'rgba(255,255,255,0.55)' }}>{w.minutes} мин · {w.sessions} сессий</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ color: w.hiit ? '#f87171' : '#4ade80', fontWeight: 700 }}>{w.hiit ? 'есть HIIT' : 'без HIIT'}</span>
+            </div>
+          ))}
         </div>
       )}
 

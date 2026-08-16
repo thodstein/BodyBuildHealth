@@ -72,9 +72,8 @@ export const CardioParamsStep: React.FC<{
   setSex: (s: 'male' | 'female') => void;
   restingHr: string;
   setRestingHr: (v: string) => void;
-  onFromProfile: () => void;
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, onFromProfile, onReset }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -212,9 +211,9 @@ export const CardioParamsStep: React.FC<{
 
       {/* Персонализация: уровень, оборудование, суставы, возраст */}
       <div style={CARD}>
-        <div style={ROW}>
-          <span style={LABEL}>👤 Параметры пользователя</span>
-          <button style={{ ...BTN, minHeight: 32, padding: '5px 12px' }} onClick={onFromProfile} aria-label="Из профиля">📋 Из профиля</button>
+        <div style={LABEL}>👤 Параметры пользователя</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Возраст/пол/вес/ЧСС покоя — в карточке «👤» над мастером (кнопки «📋 Из профиля» / «💾 В профиль»).
         </div>
         <div style={ROW}>
           <span style={LABEL}>Пол</span>
