@@ -8,15 +8,9 @@ import {
   cardioWeekForDate, cardioNextSession, cardioEquipmentLabel, DAY_LABELS_RU, CARDIO_PHASE_LABELS, type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
+import { CARD, ROW, LABEL } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
-
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
-};
-const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
 
 function todayIso(): string {
   const d = new Date();

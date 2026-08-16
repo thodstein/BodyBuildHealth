@@ -1,27 +1,10 @@
 /**
  * CardioCompsStep.tsx — шаг 2 мастера кардио: соревнования/старты.
- * Для каждого старта строится taper (2 нед) и пик-неделя.
+ * Для каждого старта строится taper (объём ↓, HIIT убран) и пик-неделя.
  */
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
-
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-};
-const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
-const BTN: React.CSSProperties = {
-  padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
-};
-const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'rgba(0,230,138,0.16)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' };
-const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' };
-const INPUT: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12, minWidth: 90,
-};
+import { SectionCard, GroupHeading, ROW, LABEL, HINT, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, INPUT, ChipToggle, InfoBanner } from './CardioUI';
 
 export interface CompDraft { name: string; week: string }
 
@@ -45,9 +28,9 @@ export const CardioCompsStep: React.FC<{
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={CARD}>
-        <div style={LABEL}>🏁 Соревнования и старты</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+      <GroupHeading icon="🏁" text="Соревнования и старты" desc="Для каждого старта строится taper и пик-неделя." />
+      <SectionCard title="Старты">
+        <div style={HINT}>
           Для каждого старта цикл строит taper (объём снижается, HIIT убирается) и пик-неделю
           (только лёгкое восстановительное кардио). Можно не указывать — тогда последняя неделя будет переходной.
         </div>
@@ -64,28 +47,22 @@ export const CardioCompsStep: React.FC<{
           <input value={draft.week} onChange={e => setDraft({ ...draft, week: e.target.value })} placeholder="Неделя" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Неделя старта" />
           <button style={BTN_PRIMARY} onClick={add}>+ Добавить старт</button>
         </div>
-      </div>
+        {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper будет построен автоматически.</InfoBanner>}
+      </SectionCard>
 
-      {/* Конструирование taper */}
-      <div style={CARD}>
-        <div style={LABEL}>📉 Taper перед стартом</div>
+      <GroupHeading icon="📉" text="Taper перед стартом" desc="Объём снижается (×0.6-0.7), HIIT убирается (Bosquet 2005)." />
+      <SectionCard title="📉 Taper перед стартом">
         <div style={ROW}>
           <span style={LABEL}>Недель taper</span>
-          <button style={BTN} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
+          <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{taperWeeks}</span>
-          <button style={BTN} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
-          <button
-            style={peakWeek ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-            onClick={() => setPeakWeek(!peakWeek)}
-          >
+          <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
+          <ChipToggle active={peakWeek} onClick={() => setPeakWeek(!peakWeek)}>
             {peakWeek ? '🏔 Пик-неделя: вкл' : 'Пик-неделя: выкл'}
-          </button>
+          </ChipToggle>
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Taper: объём снижается (×0.6-0.7), HIIT убирается (Bosquet 2005). Пик-неделя — только лёгкое recovery
-          кардио в день старта.
-        </div>
-      </div>
+        <div style={HINT}>Taper: объём снижается (×0.6-0.7), HIIT убирается (Bosquet 2005). Пик-неделя — только лёгкое recovery кардио в день старта.</div>
+      </SectionCard>
     </div>
   );
 };

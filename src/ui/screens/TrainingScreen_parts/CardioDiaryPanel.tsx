@@ -11,28 +11,7 @@ import {
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeightAdvice, cardioWeekForDate, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-
-const BTN: React.CSSProperties = {
-  padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
-};
-const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'rgba(0,230,138,0.16)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' };
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
-};
-const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 };
-const INPUT: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12, minWidth: 60,
-};
-const CHIP: React.CSSProperties = {
-  padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', fontWeight: 600,
-};
-const CHIP_ACTIVE: React.CSSProperties = { ...CHIP, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.15)', color: '#fff' };
+import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, INPUT, CHIP, CHIP_ACTIVE } from './CardioUI';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };

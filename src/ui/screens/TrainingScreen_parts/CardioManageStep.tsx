@@ -1,6 +1,7 @@
 /**
  * CardioManageStep.tsx — шаг 4 мастера кардио: интеграции (ПЛ/ББ/ручной,
- * годовой план), экспорт (.ics/печать), библиотека с карточками, редактор недели.
+ * годовой план), экспорт (.ics/.tcx/печать/питание), редактор недели,
+ * библиотека с карточками и сценарии. Структура: секции с навигацией.
  */
 import React, { useState } from 'react';
 import {
@@ -13,20 +14,7 @@ import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
-
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-};
-const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
-const BTN: React.CSSProperties = {
-  padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
-};
-const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'rgba(0,230,138,0.16)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' };
-const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' };
+import { SectionCard, GroupHeading, SectionNav, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, InfoBanner } from './CardioUI';
 
 export const CardioManageStep: React.FC<{
   cycle: CardioCycle | null;
@@ -116,11 +104,21 @@ export const CardioManageStep: React.FC<{
     } catch { /* ignore */ }
   };
 
+  const NAV = [
+    { id: 'sec-integrations', label: '🔗 Интеграции' },
+    { id: 'sec-export', label: '📤 Экспорт' },
+    { id: 'sec-week', label: '🛠 Неделя' },
+    { id: 'sec-library', label: '📚 Библиотека' },
+    { id: 'sec-scenarios', label: '📸 Сценарии' },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Интеграция с силовым планом */}
-      <div style={CARD}>
-        <div style={LABEL}>🔗 Силовой план (ссылка, не копия)</div>
+      <SectionNav items={NAV} />
+
+      {/* ── Интеграции ── */}
+      <GroupHeading icon="🔗" text="Интеграции" desc="Подключите кардио-цикл к силовому плану ссылкой (без копии) или к годовому плану." />
+      <SectionCard id="sec-integrations" title="Силовой план (ссылка, не копия)">
         {cycle && (
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
             Активный цикл: <b style={{ color: '#4ade80' }}>{cycle.name}</b> — будет подключаться к конструкторам.
@@ -138,11 +136,9 @@ export const CardioManageStep: React.FC<{
             <button style={BTN} onClick={() => onLinkTo('manual')}>✋ К ручному</button>
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      {/* Годовой план */}
-      <div style={CARD}>
-        <div style={LABEL}>🗓 Годовой план (macrocycle.cardioCycleId)</div>
+      <SectionCard title="Годовой план (macrocycle.cardioCycleId)">
         {macroLink?.cycleId ? (
           <div style={ROW}>
             <span style={{ fontSize: 12, color: '#4ade80' }}>Привязано к годовому плану {macroLink.kind === 'pl' ? 'ПЛ' : 'ББ'}</span>
@@ -154,12 +150,12 @@ export const CardioManageStep: React.FC<{
             <button style={BTN} onClick={() => onAttachMacro('bb')}>💪 К плану ББ</button>
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      {/* Экспорт */}
+      {/* ── Экспорт ── */}
+      <GroupHeading icon="📤" text="Экспорт" desc="Календарь, тренировочный файл, печать, сводка и передача расхода в питание." />
       {cycle && (
-        <div style={CARD}>
-          <div style={LABEL}>📤 Экспорт</div>
+        <SectionCard id="sec-export" title="Экспорт">
           <div style={ROW}>
             <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
             <button style={BTN} onClick={downloadTcx} title="Экспорт сессий в .tcx (Garmin Training Center)">📤 .tcx</button>
@@ -174,15 +170,18 @@ export const CardioManageStep: React.FC<{
               {nutriFlash ? '✅ Расход передан' : '🍽 В питание'}
             </button>
           </div>
-        </div>
+        </SectionCard>
       )}
 
-      {/* Ручная настройка недели */}
-      <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
+      {/* ── Ручная настройка недели ── */}
+      <GroupHeading icon="🛠" text="Конструктор недели" desc="Раскладка по дням, ±10% минут и редактор сессий конкретной недели." />
+      <div id="sec-week">
+        <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
+      </div>
 
-      {/* Библиотека */}
-      <div style={CARD}>
-        <div style={LABEL}>📚 Библиотека ({library.length})</div>
+      {/* ── Библиотека ── */}
+      <GroupHeading icon="📚" text="Библиотека циклов" desc="Сохранённые циклы: активировать, копировать, сравнить, экспортировать." />
+      <SectionCard id="sec-library" title={`Библиотека (${library.length})`}>
         {library.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Пока пусто — соберите первый цикл на шаге «Предпросмотр».</div>}
         {library.map(c => {
           const s = cardioCycleSummary(c);
@@ -206,19 +205,15 @@ export const CardioManageStep: React.FC<{
           );
         })}
         {comparison && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: 8 }} role="status">
-            {comparison}
-          </div>
+          <InfoBanner tone="info">{comparison}</InfoBanner>
         )}
-      </div>
+      </SectionCard>
 
-      {/* Сценарии */}
-      <div style={CARD}>
-        <div style={ROW}>
-          <span style={LABEL}>📸 Сценарии ({scenarios.length}/6)</span>
-          <span style={{ flex: 1 }} />
-          <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
-        </div>
+      {/* ── Сценарии ── */}
+      <GroupHeading icon="📸" text="Сценарии" desc="Снапшоты циклов для сравнения вариантов (до 6)." />
+      <SectionCard id="sec-scenarios" title={`Сценарии (${scenarios.length}/6)`} right={
+        <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
+      }>
         {scenarios.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Сценариев нет — сохраните текущий цикл для сравнения вариантов.</div>}
         {scenarios.map(sc => {
           const s = cardioCycleSummary(sc.cycle);
@@ -235,7 +230,7 @@ export const CardioManageStep: React.FC<{
             </div>
           );
         })}
-      </div>
+      </SectionCard>
     </div>
   );
 };

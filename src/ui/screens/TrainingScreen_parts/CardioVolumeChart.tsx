@@ -6,20 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { cardioVolumeSeries, CARDIO_PHASE_LABELS, cardioWeekForDate, type CardioCycle } from '../../../engines/lms/cardio.engine';
 import { cardioWeekFact, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
-
-const BTN: React.CSSProperties = {
-  padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-  color: '#fff', minHeight: 36, whiteSpace: 'nowrap',
-};
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
-};
-
-const PHASE_COLOR: Record<string, string> = {
-  base: '#22c55e', build: '#3b82f6', maintenance: '#8b5cf6', contest_prep: '#f59e0b', taper: '#eab308', peak: '#ef4444', transition: '#71717a',
-};
+import { CARD, BTN, PHASE_COLOR } from './CardioUI';
 
 function todayIso(): string {
   const d = new Date();

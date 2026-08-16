@@ -7,17 +7,7 @@ import React, { useMemo } from 'react';
 import { cardioEquipmentLabel, loadActiveCardioCycle, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
 import { cardioDayLoad, loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
-
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
-};
-const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-const BTN: React.CSSProperties = {
-  padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(0,230,138,0.4)', background: 'rgba(0,230,138,0.12)',
-  color: '#00e68a', minHeight: 32, whiteSpace: 'nowrap',
-};
+import { CARD, ROW, BTN_PRIMARY } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
 
@@ -39,7 +29,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       <div style={ROW}>
         <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)' }}>📅 Кардио и нагрузка дня</span>
         <button
-          style={BTN}
+          style={{ ...BTN_PRIMARY, minHeight: 30, padding: '4px 10px', fontSize: 10 }}
           onClick={() => { if (onOpen) onOpen(); else { try { localStorage.setItem('he_training_planning_track', 'cardio'); } catch { /* ignore */ } window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'cardio' })); } }}
           aria-label="Открыть кардио-дневник"
         >

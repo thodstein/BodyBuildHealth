@@ -1,6 +1,8 @@
 /**
- * CardioParamsStep.tsx — шаг 1 мастера кардио: цель, горизонт, восстановление,
- * быстрые старты (пресеты), ручная структура фаз и живой предпросмотр.
+ * CardioParamsStep.tsx — шаг 1 мастера кардио: быстрый старт (пресеты),
+ * цель и горизонт, персонализация (уровень/оборудование/пол/возраст),
+ * дни ног, факторы восстановления, структура фаз и живой предпросмотр.
+ * Структура: секции с якорной навигацией и единый стиль (CardioUI).
  */
 import React, { useMemo } from 'react';
 import {
@@ -9,28 +11,21 @@ import {
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
+import {
+  ROW, LABEL, HINT, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE,
+  SectionCard, StatTile, GroupHeading, SectionNav, InfoBanner,
+} from './CardioUI';
 
-const CARD: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-};
-const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
-const BTN: React.CSSProperties = {
-  padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)',
-  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
-};
-const PRESET: React.CSSProperties = {
-  flex: '1 1 130px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
-};
 const GOAL_CARD: React.CSSProperties = {
   flex: '1 1 140px', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
+  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
 };
 const GOAL_CARD_ACTIVE: React.CSSProperties = {
   ...GOAL_CARD, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff',
+};
+const PRESET: React.CSSProperties = {
+  flex: '1 1 130px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
 };
 
 const GOAL_DESC: Record<CardioGoal, string> = {
@@ -128,11 +123,25 @@ export const CardioParamsStep: React.FC<{
     else if (equipment.length < 3) setEquipment([...equipment, e]);
   };
 
+  const NAV = [
+    { id: 'sec-start', label: '⚡ Старт' },
+    { id: 'sec-goal', label: '🎯 Цель' },
+    { id: 'sec-personal', label: '👤 Параметры' },
+    { id: 'sec-nog', label: '🦵 Дни ног' },
+    { id: 'sec-factors', label: '📊 Факторы' },
+    { id: 'sec-phases', label: '🧩 Фазы' },
+    { id: 'sec-preview', label: '👁 Итог' },
+  ];
+
+  const numInput = (w: number): React.CSSProperties => ({ ...INPUT, width: w });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Быстрые старты */}
-      <div style={CARD}>
-        <div style={LABEL}>⚡ Быстрые старты</div>
+      <SectionNav items={NAV} />
+
+      {/* ── I. Быстрые старты ── */}
+      <GroupHeading icon="⚡" text="Быстрые старты" desc="Выберите готовый шаблон — остальные настройки подстроятся под него." />
+      <SectionCard id="sec-start" title="Готовые пресеты">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {CARDIO_PRESETS.map(p => (
             <div key={p.id} style={PRESET} onClick={() => applyPreset(p.id)} role="button" aria-label={`Пресет: ${p.name}`}>
@@ -141,10 +150,11 @@ export const CardioParamsStep: React.FC<{
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      <div style={CARD}>
-        <div style={LABEL}>🎯 Цель цикла</div>
+      {/* ── II. Цель и горизонт ── */}
+      <GroupHeading icon="🎯" text="Цель и горизонт" desc="Определяют профиль объёма и длительность цикла." />
+      <SectionCard id="sec-goal" title="🎯 Цель цикла">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {(Object.keys(CARDIO_GOAL_LABELS) as CardioGoal[]).map(g => (
             <div key={g} style={goal === g ? GOAL_CARD_ACTIVE : GOAL_CARD} onClick={() => setGoal(g)} role="button" aria-label={`Цель: ${CARDIO_GOAL_LABELS[g]}`}>
@@ -153,159 +163,41 @@ export const CardioParamsStep: React.FC<{
             </div>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      <div style={CARD}>
-        <div style={LABEL}>⏱ Горизонт</div>
+      <SectionCard id="sec-horizon" title="⏱ Горизонт">
         <div style={ROW}>
           <span style={LABEL}>Недель</span>
-          <button style={BTN} onClick={() => setTotalWeeks(Math.max(1, totalWeeks - 1))} aria-label="Меньше недель">−</button>
+          <button style={BTN_SMALL} onClick={() => setTotalWeeks(Math.max(1, totalWeeks - 1))} aria-label="Меньше недель">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 34, textAlign: 'center' }}>{totalWeeks}</span>
-          <button style={BTN} onClick={() => setTotalWeeks(Math.min(52, totalWeeks + 1))} aria-label="Больше недель">+</button>
+          <button style={BTN_SMALL} onClick={() => setTotalWeeks(Math.min(52, totalWeeks + 1))} aria-label="Больше недель">+</button>
           <span style={{ ...LABEL, marginLeft: 12 }}>Дней в неделю</span>
-          <button style={BTN} onClick={() => setDaysAvailable(Math.max(0, daysAvailable - 1))} aria-label="Меньше дней">−</button>
+          <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.max(0, daysAvailable - 1))} aria-label="Меньше дней">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{daysAvailable}</span>
-          <button style={BTN} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>
+          <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>
           <span style={{ ...LABEL, marginLeft: 12 }}>Вес (кг)</span>
-          <input type="number" value={bodyWeight} onChange={e => setBodyWeight(Math.max(30, Math.min(300, Number(e.target.value) || 80)))} inputMode="numeric" style={{ width: 70, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Вес" />
+          <input type="number" value={bodyWeight} onChange={e => setBodyWeight(Math.max(30, Math.min(300, Number(e.target.value) || 80)))} inputMode="numeric" style={numInput(70)} aria-label="Вес" />
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Вес влияет на оценку расхода калорий кардио-сессий.
-        </div>
-      </div>
+        <div style={HINT}>Вес влияет на оценку расхода калорий кардио-сессий.</div>
+      </SectionCard>
 
-      {/* Структура фаз */}
-      <div style={CARD}>
-        <div style={LABEL}>🧩 Структура фаз</div>
-        <div style={ROW}>
-          <button
-            style={phaseSplit.auto ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-            onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}
-          >Авто (по долям)</button>
-          <button
-            style={!phaseSplit.auto ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-            onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}
-          >Вручную</button>
-        </div>
-        {!phaseSplit.auto && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(['base', 'build', 'maintenance'] as const).map(k => (
-              <div key={k} style={ROW}>
-                <span style={{ ...LABEL, minWidth: 120 }}>{k === 'base' ? '🌱 База' : k === 'build' ? '📈 Наращивание' : '🧘 Поддержание'}</span>
-                <button style={BTN} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.max(0, phaseSplit[k] - 1) })} aria-label={`Меньше ${k}`}>−</button>
-                <span style={{ fontSize: 14, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{phaseSplit[k]}</span>
-                <button style={BTN} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.min(Math.max(1, totalWeeks - 2), phaseSplit[k] + 1) })} aria-label={`Больше ${k}`}>+</button>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нед</span>
-              </div>
-            ))}
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-              Итого распределено: {phaseSplit.base + phaseSplit.build + phaseSplit.maintenance} нед (сверх — поддерживающие; taper/пик задаются стартами).
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div style={CARD}>
-        <div style={LABEL}>🏋️ Дни тяжёлых ног (кардио не ставится в эти дни)</div>
-        <div style={ROW}>
-          {DAY_LABELS_RU.map((d, i) => (
-            <button
-              key={d}
-              style={legDays.includes(i) ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-              onClick={() => setLegDays(legDays.includes(i) ? legDays.filter(x => x !== i) : [...legDays, i])}
-              aria-label={`Ноги: ${d}`}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Zone 2 / MISS / HIIT не попадут на эти дни; recovery — в любой день.
-        </div>
-      </div>
-
-      {/* Факторы восстановления/курса из профиля */}
-      <div style={CARD}>
-        <div style={LABEL}>📊 Факторы (восстановление и курс)</div>
-        <div style={ROW}>
-          <button style={factorsOn.sleep ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
-          <button style={factorsOn.stress ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
-          <button style={factorsOn.hrv ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('hrv')} aria-label="Фактор: HRV">📉 HRV</button>
-          <button style={factorsOn.ped ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('ped')} aria-label="Фактор: PED-курс">💉 PED</button>
-          <button style={factorsOn.joints ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('joints')} aria-label="Фактор: суставы">🦴 Суставы</button>
-        </div>
-        {factorsSummary.length > 0 && (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-            {factorsSummary.map((s, i) => <div key={i}>• {s}</div>)}
-          </div>
-        )}
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Влияют на объём и HIIT: сон {'<'}6 ч → ×0.9; стресс ≥7 → HIIT убран, ×0.95; низкий HRV → ×0.9;
-          PED-курс → ×1.05; суставы → низкоударный режим.
-        </div>
-      </div>
-
-      <div style={CARD}>
-        <div style={LABEL}>🧘 Восстановление</div>
-        <button
-          style={recoveryLow ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-          onClick={() => setRecoveryLow(!recoveryLow)}
-        >
-          {recoveryLow ? '🧘 Низкое восстановление (HIIT убран)' : '🟢 Восстановление в норме'}
-        </button>
-      </div>
-
-      {/* Персонализация: уровень, оборудование, суставы, возраст */}
-      <div style={CARD}>
-        <div style={LABEL}>👤 Параметры пользователя</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Возраст/пол/вес/ЧСС покоя — в карточке «👤» над мастером (кнопки «📋 Из профиля» / «💾 В профиль»).
-        </div>
-        <div style={ROW}>
-          <span style={LABEL}>Пол</span>
-          <button
-            style={sex === 'male' ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-            onClick={() => setSex('male')}
-            aria-label="Пол: мужской"
-          >♂ Мужской</button>
-          <button
-            style={sex === 'female' ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-            onClick={() => setSex('female')}
-            aria-label="Пол: женский"
-          >♀ Женский</button>
-          <span style={{ ...LABEL, marginLeft: 10 }}>ЧСС покоя</span>
-          <input type="number" value={restingHr} onChange={e => setRestingHr(e.target.value)} inputMode="numeric" style={{ width: 70, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="ЧСС покоя" />
-        </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст.
-        </div>
-      </div>
-
-      <div style={CARD}>
-        <div style={LABEL}>🎚 Уровень подготовки</div>
+      {/* ── III. Параметры пользователя ── */}
+      <GroupHeading icon="👤" text="Параметры пользователя" desc="Уровень, оборудование, пол, возраст и восстановление — уточняют объём и пульс-зоны." />
+      <SectionCard title="🎚 Уровень подготовки">
         <div style={ROW}>
           {(Object.keys(CARDIO_LEVEL_LABELS) as CardioLevel[]).map(l => (
-            <button
-              key={l}
-              style={level === l ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-              onClick={() => setLevel(l)}
-            >
-              {CARDIO_LEVEL_LABELS[l]}
-            </button>
+            <button key={l} style={level === l ? CHIP_ACTIVE : CHIP} onClick={() => setLevel(l)}>{CARDIO_LEVEL_LABELS[l]}</button>
           ))}
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
-          Новичок — объём ×0.8, продвинутый — ×1.15.
-        </div>
-      </div>
+        <div style={HINT}>Новичок — объём ×0.8, продвинутый — ×1.15.</div>
+      </SectionCard>
 
-      <div style={CARD}>
-        <div style={LABEL}>🏃 Оборудование (до 3)</div>
+      <SectionCard title="🏃 Оборудование (до 3)">
         <div style={ROW}>
           {CARDIO_EQUIPMENT_OPTIONS.map(e => (
             <button
               key={e.id}
-              style={equipment.includes(e.id) ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : { ...BTN, opacity: lowImpact && e.impact === 'high' ? 0.4 : 1 }}
+              style={equipment.includes(e.id) ? CHIP_ACTIVE : { ...CHIP, opacity: lowImpact && e.impact === 'high' ? 0.4 : 1 }}
               onClick={() => toggleEquipment(e.id)}
               disabled={lowImpact && e.impact === 'high'}
               aria-label={`Оборудование: ${e.label}`}
@@ -314,52 +206,109 @@ export const CardioParamsStep: React.FC<{
             </button>
           ))}
         </div>
-        <button
-          style={lowImpact ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN}
-          onClick={() => setLowImpact(!lowImpact)}
-        >
+        <button style={lowImpact ? CHIP_ACTIVE : CHIP} onClick={() => setLowImpact(!lowImpact)}>
           {lowImpact ? '🦴 Щадить суставы: вкл' : 'Щадить суставы: выкл'}
         </button>
         <div style={ROW}>
           <span style={LABEL}>Возраст (пульс-зоны)</span>
-          <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={{ width: 70, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }} aria-label="Возраст" />
+          <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="Возраст" />
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Живой предпросмотр */}
-      <div style={{ ...CARD, borderColor: 'rgba(0,230,138,0.25)' }}>
+      <SectionCard title="🧘 Восстановление">
         <div style={ROW}>
-          <span style={LABEL}>👁 Предпросмотр цикла</span>
-          <button style={{ ...BTN, minHeight: 30, padding: '4px 10px' }} onClick={onReset} aria-label="Сбросить параметры">⟲ Сбросить</button>
+          <button style={recoveryLow ? CHIP_ACTIVE : CHIP} onClick={() => setRecoveryLow(!recoveryLow)}>
+            {recoveryLow ? '🧘 Низкое восстановление (HIIT убран)' : '🟢 Восстановление в норме'}
+          </button>
         </div>
+        <div style={ROW}>
+          <span style={LABEL}>Пол</span>
+          <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
+          <button style={sex === 'female' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('female')} aria-label="Пол: женский">♀ Женский</button>
+          <span style={{ ...LABEL, marginLeft: 10 }}>ЧСС покоя</span>
+          <input type="number" value={restingHr} onChange={e => setRestingHr(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="ЧСС покоя" />
+        </div>
+        <div style={HINT}>Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст. Возраст/пол/вес/ЧСС покоя можно загрузить из профиля в карточке «👤» над мастером.</div>
+      </SectionCard>
+
+      {/* ── IV. Дни ног ── */}
+      <GroupHeading icon="🦵" text="Дни тяжёлых ног" desc="Интенсивное кардио не ставится на силовые дни ног." />
+      <SectionCard id="sec-nog" title="Дни тяжёлых ног">
+        <div style={ROW}>
+          {DAY_LABELS_RU.map((d, i) => (
+            <button
+              key={d}
+              style={legDays.includes(i) ? CHIP_ACTIVE : CHIP}
+              onClick={() => setLegDays(legDays.includes(i) ? legDays.filter(x => x !== i) : [...legDays, i])}
+              aria-label={`Ноги: ${d}`}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        <div style={HINT}>Zone 2 / MISS / HIIT не попадут на эти дни; recovery — в любой день.</div>
+      </SectionCard>
+
+      {/* ── V. Факторы ── */}
+      <GroupHeading icon="📊" text="Факторы восстановления и курса" desc="Из профиля: сон, стресс, HRV, PED, суставы." />
+      <SectionCard id="sec-factors" title="Факторы (восстановление и курс)">
+        <div style={ROW}>
+          <button style={factorsOn.sleep ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
+          <button style={factorsOn.stress ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
+          <button style={factorsOn.hrv ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('hrv')} aria-label="Фактор: HRV">📉 HRV</button>
+          <button style={factorsOn.ped ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('ped')} aria-label="Фактор: PED-курс">💉 PED</button>
+          <button style={factorsOn.joints ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('joints')} aria-label="Фактор: суставы">🦴 Суставы</button>
+        </div>
+        {factorsSummary.length > 0 && (
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+            {factorsSummary.map((s, i) => <div key={i}>• {s}</div>)}
+          </div>
+        )}
+        <div style={HINT}>Влияют на объём и HIIT: сон {'<'}6 ч → ×0.9; стресс ≥7 → HIIT убран, ×0.95; низкий HRV → ×0.9; PED-курс → ×1.05; суставы → низкоударный режим.</div>
+      </SectionCard>
+
+      {/* ── VI. Структура фаз ── */}
+      <GroupHeading icon="🧩" text="Структура фаз" desc="Доли фаз в цикле: авто или вручную." />
+      <SectionCard id="sec-phases" title="🧩 Структура фаз">
+        <div style={ROW}>
+          <button style={phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}>Авто (по долям)</button>
+          <button style={!phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}>Вручную</button>
+        </div>
+        {!phaseSplit.auto && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(['base', 'build', 'maintenance'] as const).map(k => (
+              <div key={k} style={ROW}>
+                <span style={{ ...LABEL, minWidth: 120 }}>{k === 'base' ? '🌱 База' : k === 'build' ? '📈 Наращивание' : '🧘 Поддержание'}</span>
+                <button style={BTN_SMALL} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.max(0, phaseSplit[k] - 1) })} aria-label={`Меньше ${k}`}>−</button>
+                <span style={{ fontSize: 14, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{phaseSplit[k]}</span>
+                <button style={BTN_SMALL} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.min(Math.max(1, totalWeeks - 2), phaseSplit[k] + 1) })} aria-label={`Больше ${k}`}>+</button>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нед</span>
+              </div>
+            ))}
+            <div style={HINT}>Итого распределено: {phaseSplit.base + phaseSplit.build + phaseSplit.maintenance} нед (сверх — поддерживающие; taper/пик задаются стартами).</div>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── VII. Предпросмотр ── */}
+      <GroupHeading icon="👁" text="Итог" desc="Мгновенный расчёт цикла по текущим параметрам." />
+      <SectionCard id="sec-preview" accent title="👁 Предпросмотр цикла" right={
+        <button style={BTN_SMALL} onClick={onReset} aria-label="Сбросить параметры">⟲ Сбросить</button>
+      }>
         {s && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>НЕДЕЛЬ</div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>{totalWeeks}</div>
-            </div>
-            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>МИН/НЕД</div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#3b82f6' }}>{s.avgMinutesPerWeek}</div>
-            </div>
-            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>ККАЛ/НЕД</div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b' }}>{s.avgKcalPerWeek}</div>
-            </div>
-            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>HIIT-НЕД</div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#a78bfa' }}>{s.hiitWeeks}</div>
-            </div>
-            <div style={{ flex: '1 1 80px', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>ЦЕЛЬ</div>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#94a3b8' }}>{CARDIO_GOAL_LABELS[goal]}</div>
-            </div>
+            <StatTile label="НЕДЕЛЬ" value={String(totalWeeks)} color="#22c55e" />
+            <StatTile label="МИН/НЕД" value={String(s.avgMinutesPerWeek)} color="#3b82f6" />
+            <StatTile label="ККАЛ/НЕД" value={String(s.avgKcalPerWeek)} color="#f59e0b" />
+            <StatTile label="HIIT-НЕД" value={String(s.hiitWeeks)} color="#a78bfa" />
+            <StatTile label="ЦЕЛЬ" value={CARDIO_GOAL_LABELS[goal]} color="#94a3b8" />
           </div>
         )}
         {preview.warnings.map((w, i) => (
-          <div key={i} style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '5px 8px' }} role="alert">⚠ {w}</div>
+          <InfoBanner key={i} tone="warn">⚠ {w}</InfoBanner>
         ))}
-      </div>
+        {s && <InfoBanner tone="ok">Собранный цикл готов — «Далее» перейдёт к стартам, затем к предпросмотру.</InfoBanner>}
+      </SectionCard>
     </div>
   );
 };
