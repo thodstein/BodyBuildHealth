@@ -1621,6 +1621,7 @@ export const BbAutoConstructor: React.FC = () => {
               esc(ex.executionProfile?.peak || ''),
               esc(ex.executionProfile?.mistakes.join('; ') || ''),
               esc(ex.comment || ''),
+              esc(feat),
             ].join(','));
           }
         }
