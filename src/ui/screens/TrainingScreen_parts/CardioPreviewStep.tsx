@@ -34,7 +34,7 @@ export const CardioPreviewStep: React.FC<{
   onRename: (name: string) => void;
   daysAvailable: number;
 }> = ({ cycle, onBuild, onRename, daysAvailable }) => {
-  const [showWeeks, setShowWeeks] = useState(false);
+  const [showWeeks, setShowWeeks] = useState(true);
   const [nameDraft, setNameDraft] = useState('');
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
   const quality = useMemo(() => (cycle ? cardioQualityReport(cycle, daysAvailable) : null), [cycle, daysAvailable]);

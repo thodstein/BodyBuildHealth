@@ -77,7 +77,12 @@ interface WizardState {
 function loadWizard(): Partial<WizardState> {
   try {
     const v = JSON.parse(localStorage.getItem(WIZARD_KEY) ?? 'null');
-    return v && typeof v === 'object' ? v as Partial<WizardState> : {};
+    if (!v || typeof v !== 'object') return {};
+    // v2: параметры пользователя (возраст/пол/ЧСС покоя) теперь приоритетнее
+    // устаревших дефолтов из старых wizard-сохранений — при старом формате
+    // возвращаем пусто, чтобы значения подтянулись из профиля.
+    if ((v as { version?: number }).version !== 2) return {};
+    return v as Partial<WizardState>;
   } catch { return {}; }
 }
 
@@ -314,7 +319,7 @@ export const CardioConstructor: React.FC = () => {
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0,
       };
-      localStorage.setItem(WIZARD_KEY, JSON.stringify(s));
+      localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
   }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr]);
 

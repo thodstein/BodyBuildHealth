@@ -173,7 +173,7 @@ describe('CardioConstructor — CSR', () => {
   });
 
   it('параметры мастера восстанавливаются из localStorage', () => {
-    localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ goal: 'mass', totalWeeks: 10, daysAvailable: 2, recoveryLow: true, bodyWeight: 90, taperWeeks: 3, peakWeek: false, phaseAuto: false, phaseBase: 2, phaseBuild: 3, phaseMaint: 3 }));
+    localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ version: 2, goal: 'mass', totalWeeks: 10, daysAvailable: 2, recoveryLow: true, bodyWeight: 90, taperWeeks: 3, peakWeek: false, phaseAuto: false, phaseBase: 2, phaseBuild: 3, phaseMaint: 3, level: 'beginner', equipment: ['cycling'], lowImpact: true, age: 40, sex: 'female', restingHr: 60 }));
     const { unmount } = render(<CardioConstructor />);
     expect(screen.getByRole('button', { name: /Цель: Массонабор/ })).toBeTruthy();
     unmount();
