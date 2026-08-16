@@ -11,16 +11,22 @@ import { CardioWeekEditor } from '../CardioWeekEditor';
 import { CardioVolumeChart } from '../CardioVolumeChart';
 import { CardioSessionTimer } from '../CardioSessionTimer';
 import { CardioProgressCard } from '../CardioProgressCard';
+import { CardioDiaryPanel } from '../CardioDiaryPanel';
+import { CardioDayCard } from '../CardioDayCard';
+import { CardioDiaryStep } from '../CardioDiaryStep';
 import { buildCardioCycle, loadCardioCycles } from '../../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog } from '../../../../engines/lms/cardio-diary.engine';
+import { saveSRPESession } from '../../../../engines/pro/srpe-store';
 
 const CYCLES_KEY = 'he_cardio_cycles';
 const LOG_KEY = 'he_cardio_sessions';
+const SRPE_KEY = 'he_srpe_sessions';
 
 beforeEach(() => {
   try {
     localStorage.removeItem(CYCLES_KEY);
     localStorage.removeItem(LOG_KEY);
+    localStorage.removeItem(SRPE_KEY);
     localStorage.removeItem(CARDIO_AUTO_TUNE_KEY);
   } catch { /* ignore */ }
 });
@@ -183,6 +189,50 @@ describe('CardioVolumeChart', () => {
   });
 });
 
+describe('CardioVolumeChart — план vs факт', () => {
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const plusDays = (base: string, days: number) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + days);
+    return iso(d);
+  };
+
+  it('без журнала: факт-сводка не показывается', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'vc-1' });
+    const html = renderToStaticMarkup(<CardioVolumeChart cycle={c} />);
+    expect(html).not.toContain('план vs факт');
+  });
+
+  it('с журналом: сводка план vs факт и выполнение прошедших недель', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 8);
+    const start = iso(d);
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'vc-2', startDate: start });
+    const log = [
+      { id: 'f1', date: start, type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true, calories: 180 },
+      { id: 'f2', date: plusDays(start, 1), type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true, calories: 180 },
+    ];
+    render(<CardioVolumeChart cycle={c} log={log} />);
+    fireEvent.click(screen.getByRole('button', { name: /Показать/ }));
+    expect(screen.getByText(/план vs факт/)).toBeTruthy();
+    expect(screen.getByText(/Выполнение прошедших недель/)).toBeTruthy();
+    expect(screen.getByText(/факт \(дневник\)/)).toBeTruthy();
+  });
+
+  it('будущие недели не штрафуют выполнение (только прошедшие)', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 8);
+    const start = iso(d);
+    // 8 недель: неделя 1 прошедшая, недели 2+ будущие.
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 8, id: 'vc-3', startDate: start });
+    const log = [{ id: 'f1', date: start, type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true }];
+    render(<CardioVolumeChart cycle={c} log={log} />);
+    fireEvent.click(screen.getByRole('button', { name: /Показать/ }));
+    // 1 из 3 сессий недели 1 → ~33% (не 33% от всего цикла).
+    expect(screen.getAllByText(/33%/).length).toBeGreaterThan(0);
+  });
+});
+
 describe('CardioSessionTimer', () => {
   it('SSR: показывает быстрый старт', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-1' });
@@ -222,6 +272,17 @@ describe('CardioSessionTimer', () => {
     expect(log[0].notes).toBe('пропущена');
     unmount();
   });
+
+  it('«↗ Перенести» переносит сессию и отдаёт новый цикл наружу', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-4', daysAvailable: 2 });
+    let next: unknown = null;
+    const { unmount } = render(<CardioSessionTimer cycle={c} onReschedule={(n) => { next = n; }} />);
+    const btn = screen.getByRole('button', { name: /Перенести на другой день/ });
+    fireEvent.click(btn);
+    expect(screen.getByText(/перенесена/)).toBeTruthy();
+    expect(next).not.toBeNull();
+    unmount();
+  });
 });
 
 describe('CardioProgressCard', () => {
@@ -230,5 +291,66 @@ describe('CardioProgressCard', () => {
     const html = renderToStaticMarkup(<CardioProgressCard cycle={c} />);
     expect(html).toContain('Прогресс цикла');
     expect(html).toContain('из 12');
+  });
+});
+
+describe('CardioDiaryPanel — adherence текущей недели', () => {
+  it('свежий цикл (startDate=сегодня) → неделя 1', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-1' });
+    render(<CardioDiaryPanel cycle={c} />);
+    expect(screen.getByText(/Неделя 1: выполнено/)).toBeTruthy();
+  });
+
+  it('цикл, начатый 8 дней назад → неделя 2 (не последняя)', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 8);
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-2', startDate: start });
+    render(<CardioDiaryPanel cycle={c} />);
+    expect(screen.getByText(/Неделя 2: выполнено/)).toBeTruthy();
+  });
+});
+
+describe('CardioDayCard — кардио-слой дня', () => {
+  it('SSR: заголовок и кнопка дневника', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const html = renderToStaticMarkup(<CardioDayCard cycle={c} />);
+    expect(html).toContain('Кардио и нагрузка дня');
+    expect(html).toContain('Дневник');
+  });
+
+  it('CSR: план/факт и нагрузка дня (сила+кардио)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'day-1' });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    saveCardioLogEntry({ id: 'd1', date: iso, type: 'zone2', durationMin: 30, rpe: 6, completed: true, calories: 210 });
+    saveSRPESession({ date: iso, sRPE: 8, durationMin: 60 });
+    render(<CardioDayCard cycle={c} />);
+    expect(screen.getByText(/Факт:/)).toBeTruthy();
+    expect(screen.getByText(/Нагрузка дня/)).toBeTruthy();
+  });
+
+  it('CSR: без факта — «не записано»', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'day-2' });
+    render(<CardioDayCard cycle={c} />);
+    expect(screen.getByText(/не записано/)).toBeTruthy();
+  });
+});
+
+describe('CardioDiaryStep — старт-контроль (5C)', () => {
+  it('с соревнованием впереди: строка «🏁 Старт через N нед»', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 8);
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, startDate: start, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    const html = renderToStaticMarkup(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
+    expect(html).toContain('Старт через');
+    expect(html).toContain('HIIT уже убран');
+  });
+
+  it('без стартов: строка не показывается', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const html = renderToStaticMarkup(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
+    expect(html).not.toContain('Старт через');
   });
 });

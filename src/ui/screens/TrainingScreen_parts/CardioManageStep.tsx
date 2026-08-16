@@ -5,8 +5,11 @@
 import React, { useState } from 'react';
 import {
   cardioCycleSummary, buildCardioSummaryText, cardioCycleToUserProgram, CARDIO_GOAL_LABELS,
+  cardioToNutritionPayload, buildCardioTcx,
   type CardioCycle, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
+import { CARDIO_KCAL_NOTE_KEY } from './planner-bridge-handlers';
+import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
@@ -48,6 +51,7 @@ export const CardioManageStep: React.FC<{
   onChanged: () => void;
 }> = ({ cycle, library, scenarios, link, macroLink, comparison, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario }) => {
   const [copyFlash, setCopyFlash] = useState(false);
+  const [nutriFlash, setNutriFlash] = useState(false);
 
   const copySummary = () => {
     if (!cycle) return;
@@ -57,6 +61,20 @@ export const CardioManageStep: React.FC<{
     } catch { fallbackCopy(text); }
     if (!navigator.clipboard) fallbackCopy(text);
     window.setTimeout(() => setCopyFlash(false), 2500);
+  };
+
+  /** «🍽 В питание»: расход кардио → заметка для планировщика питания + буфер. */
+  const sendToNutrition = () => {
+    if (!cycle) return;
+    const p = cardioToNutritionPayload(cycle, loadCardioLog());
+    try {
+      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
+    } catch { /* ignore */ }
+    try {
+      navigator.clipboard.writeText(p.text).then(() => setNutriFlash(true)).catch(() => fallbackCopy(p.text));
+    } catch { fallbackCopy(p.text); }
+    if (!navigator.clipboard) fallbackCopy(p.text);
+    window.setTimeout(() => setNutriFlash(false), 2500);
   };
 
   const fallbackCopy = (text: string) => {
@@ -76,6 +94,23 @@ export const CardioManageStep: React.FC<{
     try {
       const prog = cardioCycleToUserProgram(cycle);
       applyToPlanner({ kind: 'program', label: cycle.name, data: { program: prog } });
+      setCopyFlash(true);
+      window.setTimeout(() => setCopyFlash(false), 2500);
+    } catch { /* ignore */ }
+  };
+
+  const downloadTcx = () => {
+    if (!cycle) return;
+    try {
+      const blob = new Blob([buildCardioTcx(cycle)], { type: 'application/xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${cycle.id}.tcx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       setCopyFlash(true);
       window.setTimeout(() => setCopyFlash(false), 2500);
     } catch { /* ignore */ }
@@ -127,12 +162,16 @@ export const CardioManageStep: React.FC<{
           <div style={LABEL}>📤 Экспорт</div>
           <div style={ROW}>
             <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
+            <button style={BTN} onClick={downloadTcx} title="Экспорт сессий в .tcx (Garmin Training Center)">📤 .tcx</button>
             <button style={BTN} onClick={() => onPrint(cycle)}>🖨 Печать / PDF</button>
             <button style={BTN} onClick={copySummary} aria-label="Скопировать сводку">
               {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
             </button>
             <button style={{ ...BTN, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToProgram} title="Открыть кардио-цикл как отдельную программу в ручном конструкторе (выполнение как обычная программа)">
               {copyFlash ? '✅ Отправлено' : '📦 Как отдельную программу'}
+            </button>
+            <button style={{ ...BTN, borderColor: 'rgba(250,204,21,0.4)', color: '#facc15' }} onClick={sendToNutrition} title="Передать расход кардио (ккал/нед + сегодня) в планировщик питания — заметка + буфер">
+              {nutriFlash ? '✅ Расход передан' : '🍽 В питание'}
             </button>
           </div>
         </div>

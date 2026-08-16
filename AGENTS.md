@@ -1,5 +1,49 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Кардио-конструктор: полное выполнение плана до «хорошего уровня» (Aug 16 2026, uncommitted)
+
+Полный цикл доработки по `docs/CARDIO-GOOD-LEVEL-PLAN.md` (анализ + 6 этапов). **282 теста в области зелёные, tsc 0 по моим файлам** (в проекте 6 чужих ошибок: bb-technique-display/BbAutoConstructor — параллельный агент). Файлы других агентов не тронуты (TrainingDiaryHub, IndividualPlanContext, SRCBBScreen, MacrocyclePanel, annual-training — чужой WIP).
+
+### Этап 1 — P1-баги (данные не врут)
+- `CardioLinkCard` «Сегодня» теперь передаёт `c.startDate` (раньше неделя съезжала для старых циклов).
+- `CardioDiaryPanel` adherence к ТЕКУЩЕЙ неделе через `cardioWeekForDate` (раньше всегда последняя неделя цикла).
+- **`recalcSessionKcal`** — единая точка пересчёта ккал: `adaptCardioToStrength`/`autoTuneCardioCycle`/`applyPL/BBCardioTaper`/`bumpCardioZone2Volume` при изменении durationMin теперь пересчитывают kcalPerSession (минуты и ккал не расходятся); `cycleBodyWeight` — вес цикла из config (bump больше не хардкодит 80).
+- **`assignSessionDays` + referenceIso** — стартовый день раскладки от `startDate` цикла (было от дня сборки).
+
+### Этап 2 — ядро исполнения
+- **План vs факт**: `cardioWeekFact`/`cardioCycleCompliance` (движок) + `CardioVolumeChart` — факт-бары из журнала, «план vs факт: N% · сессий», выполнение прошедших недель (будущее не штрафуется); график подключён в `CardioDiaryStep` с живым журналом.
+- **Reschedule**: `rescheduleCardioSession(cycle, dateIso)` — перенос плановой сессии на ближайший свободный день недели (no-op без сессии/свободного дня); кнопка «↗» в `CardioSessionTimer`; `CardioDiaryStep` держит локальную копию цикла + undo-версию.
+- **CardioDayCard** (NEW) — кардио-слой дня: план на сегодня, факт из журнала, **нагрузка дня (сила + кардио)** через `cardioDayLoad` (кардио мин×RPE/10 + sRPE×мин силы); рендерится в DiaryStep и доступен из конструктора.
+- **`CardioLinkCard`**: «⏭ Следующая сессия» + «▶ Старт» (открывает дневник) + «🔥 Нагрузка дня».
+
+### Этап 3 — питание
+- **`cardioToNutritionPayload(cycle, log, today?)`** — расход ккал/нед + факт за сегодня (чистая функция).
+- **Handler `'cardio'` в planner-bridge-handlers** (kind был объявлен, но мёртв): пишет `he_cardio_kcal_note` ({cycleId, avgKcalPerWeek, …}) + копирует текст в буфер + toast; кнопка «🍽 В питание» в `CardioManageStep` (экспорт-блок).
+
+### Этап 4 — наука тренировки
+- **MISS (Z3) в build-фазах** cut/recomp/health: чередование с HIIT по чётности недели (alt-записи в RampProfile); делод убирает и HIIT, и MISS; mass/maintenance без изменений.
+- **`cardioHrCompliance(cycle, log, {days})`** — факт-ЧСС vs целевые зоны плана (в/над/под зоной, % попадания, среднее отклонение, совет); блок «🎯 Пульс по факту» в `CardioAutoTunePanel`.
+- **Недельная авто-прогрессия** в `autoTuneCardioCycle`: 2 последние прошедшие недели «лёгкие» (pct≥1, RPE<6) → будущим рабочим +10%; 2 «тяжёлые» (RPE≥8 или <50%) → −10%; прошлое не меняется. **База окон недель — `cycle.startDate`** (была referenceIso — UI передавал startDate, из-за чего «текущая неделя» была всегда 1); UI больше не передаёт referenceIso (по умолчанию — сегодня).
+
+### Этап 5 — персонализация и интеграции
+- **Авто-факторы профиля** в конструкторе: сон/стресс/HRV/PED/суставы включаются по умолчанию при обнаружении в профиле (сохранённый выбор мастера приоритетнее).
+- **Авто-legDays**: `legDaysFromBBPlan(plan)` — дни недели 1 с мышцами ног из сохранённого ББ-плана; LinkCard «Пересчитать под ACWR» передаёт их в `adaptCardioToStrength` (flash «дней ног: N»); бейдж «🦵 Дней ног в ББ-плане: N» в шапке конструктора.
+- **Старт-контроль**: строка «🏁 Старт через N нед (taper снижает объём — HIIT уже убран; вес…)» в `CardioDiaryStep` (ближайший taper/peak + последний вес из журнала).
+- Подпись «🗓 Привязан к годовому плану» в печатной сводке цикла (annual-training блоки не трогал — чужой WIP).
+
+### Этап 6 — pro
+- **`lthrZones(lthr)`** (Friel 2017) + поле «LTHR (тест 30′)» в AutoTunePanel (зоны по LTHR приоритетнее Karvonen).
+- **`runningVdot(testKm, testMin)`** (Daniels 2013) — VDOT + 5 целевых темпов мин/км; блок «🏃 VDOT» в AutoTunePanel.
+- **`buildCardioTcx(cycle, reference?)`** — экспорт .tcx (Garmin TC) по дням; кнопка «📤 .tcx» в ManageStep.
+
+### Тесты (+37: 245 → 282)
+- `cardio-cycle.test.ts` 145 (было 122): ккал-консистентность (7), reschedule (4), assignSessionDays startDate (3), MISS (3), недельная прогрессия (2), payload (2), legDays (2), tcx/LTHR/vdot (4), обновлены autoTune-тесты (startDate-база) и «сушка» (MISS).
+- `cardio-diary.test.ts` 23 (было 15): план vs факт (3), день/нагрузка (3), hr-compliance (2).
+- `cardio-pro-panels.test.tsx` 30 (было 19): план vs факт график (3), reschedule кнопка (1), DiaryPanel неделя (2), DayCard (3), старт-контроль (2).
+- `cardio-link-card.test.tsx` 10 (было 7): startDate «Сегодня», следующая сессия + «▶ Старт», факт/нагрузка.
+- `planner-bridge-handlers.test.ts` 23 (было 17): cardio handler (3).
+- Проверено: 282/282 в cardio-области, tsc 0 по моим файлам. Чужой параллельный WIP (bb-technique-display, BbAutoConstructor, annual-training, MacrocyclePanel, ExerciseLab) не тронут.
+
 ## Диагностика движения: раунд 4 — MRV-кап починён, асимметрия, VBT-ввод, e1RM-тренд (Aug 16 2026, uncommitted)
 
 Поверх раунда 3 (74195a58b). **Ни один пункт не перестраивает исходный цикл** — все изменения аддитивные/отображение:

@@ -17,6 +17,9 @@ import {
   cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
   bumpCardioZone2Volume, cardioSafetyReport, configFromCycle,
   cardioProfileFactors, cardioNutritionNotes,
+  cycleBodyWeight, recalcSessionKcal, rescheduleCardioSession,
+  cardioToNutritionPayload, legDaysFromBBPlan, buildCardioTcx,
+  lthrZones, runningVdot,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -50,13 +53,15 @@ describe('buildCardioCycle — структура', () => {
     expect(c.source).toBe('auto');
   });
 
-  it('сушка: zone2 появляется в базе, HIIT в build/maintenance, делод каждые 4 нед', () => {
+  it('сушка: zone2 появляется в базе, MISS/HIIT чередуются в build, делод каждые 4 нед', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 12 });
     const w1 = c.weeks[0];
     expect(w1.sessions.some(s => s.type === 'zone2')).toBe(true);
     expect(w1.sessions.some(s => s.type === 'hiit')).toBe(false);
     const w5 = c.weeks[4];
-    expect(w5.sessions.some(s => s.type === 'hiit')).toBe(true);
+    expect(w5.sessions.some(s => s.type === 'miss')).toBe(true);
+    const w6 = c.weeks[5];
+    expect(w6.sessions.some(s => s.type === 'hiit')).toBe(true);
     const w4 = c.weeks[3];
     expect(w4.deload).toBe(true);
     expect(w4.sessions.some(s => s.type === 'hiit')).toBe(false);
@@ -380,7 +385,7 @@ describe('autoTuneCardioCycle', () => {
   const REF = '2026-01-05';
 
   it('ACWR опасный → HIIT убран на рабочих неделях', () => {
-    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, startDate: REF });
     const r = autoTuneCardioCycle(c, [], { acwr: 1.6, referenceIso: REF });
     expect(r.changes.length).toBeGreaterThan(0);
     const tunedWeeks = r.cycle.weeks.filter(w => !w.deload && !w.taper);
@@ -388,7 +393,7 @@ describe('autoTuneCardioCycle', () => {
   });
 
   it('выполнено <60% сессий → частота zone2 −1', () => {
-    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: REF });
     const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     const log = [{ date: '2026-01-05', durationMin: 30, completed: true }];
     const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
@@ -397,7 +402,7 @@ describe('autoTuneCardioCycle', () => {
   });
 
   it('RPE ≥8 → минуты −10%', () => {
-    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, startDate: REF });
     const before = c.weeks[0].totalMinutes;
     const log = [{ date: '2026-01-05', durationMin: 45, rpe: 9, completed: true }, { date: '2026-01-06', durationMin: 45, rpe: 8, completed: true }];
     const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
@@ -405,7 +410,7 @@ describe('autoTuneCardioCycle', () => {
   });
 
   it('соответствие плану → изменений нет', () => {
-    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: REF });
     const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     const log = Array.from({ length: planned }, (_, i) => ({ date: `2026-01-${5 + i}`, durationMin: 30, rpe: 5, completed: true }));
     const r = autoTuneCardioCycle(c, log, { referenceIso: REF });
@@ -1120,7 +1125,7 @@ describe('аудит: окно недели autoTune (баг +7)', () => {
   const REF = '2026-01-05';
 
   it('сессии в середине/конце недели учитыются (не только первый день)', () => {
-    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: REF });
     const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     // Все сессии недели 1 выполнены (даты с ведущими нулями 05..07).
     const log = Array.from({ length: planned }, (_, i) => ({ date: `2026-01-${String(5 + i).padStart(2, '0')}`, durationMin: 30, rpe: 5, completed: true }));
@@ -1130,7 +1135,7 @@ describe('аудит: окно недели autoTune (баг +7)', () => {
   });
 
   it('выполнена только половина недели → частота −1 (корректный подсчёт)', () => {
-    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: REF });
     const planned = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     // Выполнена 1 из 3 сессий (только первый день) → pct < 60% → частота −1.
     const log = [{ date: '2026-01-05', durationMin: 30, rpe: 5, completed: true }];
@@ -1182,5 +1187,315 @@ describe('аудит: экспорт в программу сохраняет ч
     const w1 = p.bb!.weeks[0];
     const freq = c.weeks[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     expect(w1.sessions.length).toBe(freq);
+  });
+});
+
+// ─── Аудит: консистентность ккал после адаптаций (P1-3) ───
+
+describe('аудит: ккал консистентны после адаптаций', () => {
+  const expectKcalConsistent = (c: CardioCycle) => {
+    const bw = cycleBodyWeight(c);
+    for (const w of c.weeks) {
+      const sum = w.sessions.reduce((s, x) => s + x.kcalPerSession * x.weeklyFrequency, 0);
+      expect(w.totalKcal).toBe(sum);
+      for (const s of w.sessions) {
+        expect(s.kcalPerSession).toBe(kcalForCardio(s.type, s.durationMin, bw, s.equipment));
+      }
+    }
+  };
+
+  it('recalcSessionKcal: пересчёт по длительности/весу/оборудованию', () => {
+    const s = recalcSessionKcal({ type: 'zone2', durationMin: 45, weeklyFrequency: 2, intensity: 'moderate', kcalPerSession: 100, purpose: 'x', equipment: 'cycling' }, 100);
+    expect(s.kcalPerSession).toBe(kcalForCardio('zone2', 45, 100, 'cycling'));
+  });
+
+  it('adaptCardioToStrength (осторожный ACWR) пересчитывает ккал под новые минуты', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, bodyWeight: 90 });
+    const adapted = adaptCardioToStrength(c, { acwr: 1.4 });
+    expect(adapted.weeks[0].totalMinutes).toBeLessThan(c.weeks[0].totalMinutes);
+    expectKcalConsistent(adapted);
+  });
+
+  it('adaptCardioToStrength (опасный ACWR) — ккал только оставшихся сессий', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const adapted = adaptCardioToStrength(c, { acwr: 1.6 });
+    for (const w of adapted.weeks) {
+      for (const s of w.sessions) expect(['recovery', 'zone2']).toContain(s.type);
+    }
+    expectKcalConsistent(adapted);
+  });
+
+  it('autoTuneCardioCycle (RPE ≥8 → минуты −10%) пересчитывает ккал', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, startDate: '2026-01-05' });
+    const log = [
+      { date: '2026-01-05', durationMin: 30, rpe: 9, completed: true },
+      { date: '2026-01-07', durationMin: 30, rpe: 9, completed: true },
+    ];
+    const r = autoTuneCardioCycle(c, log, { referenceIso: '2026-01-05' });
+    expect(r.changes.some(ch => ch.label.includes('RPE'))).toBe(true);
+    expectKcalConsistent(r.cycle);
+  });
+
+  it('applyPLCardioTaper пересчитывает ккал taper-недель (вес 100)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, bodyWeight: 100 });
+    const t = applyPLCardioTaper(c, { competitionWeek: 6 });
+    expect(t.weeks.find(w => w.week === 5)!.phase).toBe('taper');
+    expectKcalConsistent(t);
+  });
+
+  it('applyBBCardioTaper пересчитывает ккал taper-недель и пик-недели', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const t = applyBBCardioTaper(c, { showWeek: 6, peakWeek: true });
+    expect(t.weeks[5].phase).toBe('peak');
+    expectKcalConsistent(t);
+  });
+
+  it('bumpCardioZone2Volume использует вес цикла (не 80)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, bodyWeight: 100 });
+    const bumped = bumpCardioZone2Volume(c, 15);
+    const s = bumped.weeks[0].sessions.find(x => x.type === 'zone2')!;
+    expect(s.kcalPerSession).toBe(kcalForCardio('zone2', s.durationMin, 100, s.equipment));
+    expectKcalConsistent(bumped);
+  });
+});
+
+// ─── Перенос сессии (reschedule, A3) ───
+
+describe('rescheduleCardioSession', () => {
+  const REF = '2026-01-05';
+  const weekDateIso = (week: number, dow: number) => {
+    const d = new Date(REF);
+    d.setDate(d.getDate() + (week - 1) * 7 + dow);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  it('переносит сессию дня на ближайший свободный день недели', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, daysAvailable: 3, startDate: REF });
+    const w1 = c.weeks[0];
+    const oldDow = w1.sessions[0].dayOfWeek!;
+    const r = rescheduleCardioSession(c, weekDateIso(1, oldDow), { referenceIso: REF });
+    expect(r.changes).toHaveLength(1);
+    expect(r.changes[0].week).toBe(1);
+    const after = r.cycle.weeks[0].sessions;
+    expect(after.some(s => s.dayOfWeek === oldDow)).toBe(false);
+    const dows = after.map(s => s.dayOfWeek);
+    expect(new Set(dows).size).toBe(dows.length);
+  });
+
+  it('без сессии на дату — цикл не меняется', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, daysAvailable: 1, startDate: REF });
+    const busy = new Set(c.weeks[0].sessions.map(s => s.dayOfWeek));
+    let free = -1;
+    for (let d = 0; d < 7; d++) if (!busy.has(d)) { free = d; break; }
+    const before = JSON.stringify(c);
+    const r = rescheduleCardioSession(c, weekDateIso(1, free), { referenceIso: REF });
+    expect(r.changes).toEqual([]);
+    expect(JSON.stringify(r.cycle)).toBe(before);
+  });
+
+  it('нет свободного дня (все заняты) — no-op', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 1 });
+    const full: CardioCycle = {
+      ...c,
+      weeks: [{
+        ...c.weeks[0],
+        sessions: [0, 1, 2, 3, 4, 5, 6].map(d => ({ type: 'zone2' as const, durationMin: 30, weeklyFrequency: 1, intensity: 'moderate' as const, kcalPerSession: 210, purpose: 'x', dayOfWeek: d })),
+      }],
+    };
+    const r = rescheduleCardioSession(full, weekDateIso(1, 0), { referenceIso: REF });
+    expect(r.changes).toEqual([]);
+  });
+
+  it('дата вне цикла — no-op', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 2 });
+    const before = JSON.stringify(c);
+    const r = rescheduleCardioSession(c, '2026-02-01', { referenceIso: REF });
+    expect(r.changes).toEqual([]);
+    expect(JSON.stringify(r.cycle)).toBe(before);
+  });
+});
+
+describe('assignSessionDays — стартовый день от startDate (баг №6)', () => {
+  it('цикл со startDate в понедельник: первая сессия недели 1 на понедельник', () => {
+    // 2026-01-05 — понедельник.
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: '2026-01-05' });
+    const w1 = c.weeks[0];
+    expect(w1.sessions[0].dayOfWeek).toBe(0);
+  });
+
+  it('цикл со startDate в среду: первая сессия недели 1 на среду (не день сборки)', () => {
+    // 2026-01-07 — среда (dow 2).
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: '2026-01-07' });
+    expect(c.weeks[0].sessions[0].dayOfWeek).toBe(2);
+  });
+
+  it('assignSessionDays без reference — от сегодня (поведение по умолчанию)', () => {
+    const s = assignSessionDays([{ type: 'zone2' as const, durationMin: 30, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 210, purpose: 'x' }]);
+    expect(s[0].dayOfWeek).toBe((new Date().getDay() + 6) % 7);
+  });
+});
+
+// ─── MISS (Z3) в build-фазах (C1) ───
+
+describe('MISS в build-фазе (чередование с HIIT)', () => {
+  it('cut: нечётные build-недели получают MISS, чётные — HIIT', () => {
+    // 12 нед: base 1-4, build 5-8, maintenance 9-11, transition 12.
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 12, daysAvailable: 7 });
+    const w5 = c.weeks.find(w => w.week === 5)!;
+    const w6 = c.weeks.find(w => w.week === 6)!;
+    expect(w5.sessions.some(s => s.type === 'miss')).toBe(true);
+    expect(w5.sessions.some(s => s.type === 'hiit')).toBe(false);
+    expect(w6.sessions.some(s => s.type === 'hiit')).toBe(true);
+    expect(w6.sessions.some(s => s.type === 'miss')).toBe(false);
+  });
+
+  it('health: build-фаза чередует MISS (без HIIT в профиле)', () => {
+    // 8 нед: base 1-3, build 4-6.
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 8, daysAvailable: 7 });
+    const w4 = c.weeks.find(w => w.week === 4)!;
+    const w5 = c.weeks.find(w => w.week === 5)!;
+    expect(w5.sessions.some(s => s.type === 'miss')).toBe(true);
+    expect(w4.sessions.some(s => s.type === 'miss')).toBe(false);
+    expect(c.weeks.every(w => w.sessions.every(s => s.type !== 'hiit'))).toBe(true);
+  });
+
+  it('mass: MISS нигде не появляется', () => {
+    const c = buildCardioCycle({ goal: 'mass', totalWeeks: 8 });
+    expect(c.weeks.every(w => w.sessions.every(s => s.type !== 'miss' && s.type !== 'hiit'))).toBe(true);
+  });
+});
+
+// ─── Недельная авто-прогрессия (4D) ───
+
+describe('autoTuneCardioCycle — недельная прогрессия', () => {
+  it('2 лёгкие недели подряд → будущим рабочим неделям +10%', () => {
+    // 6 нед (base 1-2, build 3-4, maint 5, transition 6): ref=19.01 → текущая неделя 3.
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, startDate: '2026-01-05' });
+    const log = [
+      { date: '2026-01-05', durationMin: 25, rpe: 5, completed: true },
+      { date: '2026-01-06', durationMin: 25, rpe: 5, completed: true },
+      { date: '2026-01-07', durationMin: 25, rpe: 5, completed: true },
+      { date: '2026-01-12', durationMin: 25, rpe: 5, completed: true },
+      { date: '2026-01-13', durationMin: 25, rpe: 5, completed: true },
+      { date: '2026-01-14', durationMin: 25, rpe: 5, completed: true },
+    ];
+    const r = autoTuneCardioCycle(c, log, { referenceIso: '2026-01-19' });
+    expect(r.changes.some(ch => ch.label.includes('лёгкие'))).toBe(true);
+    // Будущая рабочая неделя 5 (maint) увеличена; прошедшие 1-2 не тронуты.
+    expect(r.cycle.weeks[4].totalMinutes).toBeGreaterThan(c.weeks[4].totalMinutes);
+    expect(r.cycle.weeks[0].totalMinutes).toBe(c.weeks[0].totalMinutes);
+    expect(r.cycle.weeks[1].totalMinutes).toBe(c.weeks[1].totalMinutes);
+  });
+
+  it('2 тяжёлые недели подряд → будущим рабочим неделям −10%', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, startDate: '2026-01-05' });
+    const log = [
+      { date: '2026-01-05', durationMin: 25, rpe: 9, completed: true },
+      { date: '2026-01-07', durationMin: 25, rpe: 9, completed: true },
+      { date: '2026-01-08', durationMin: 25, rpe: 9, completed: true },
+      { date: '2026-01-12', durationMin: 25, rpe: 9, completed: true },
+      { date: '2026-01-13', durationMin: 25, rpe: 9, completed: true },
+      { date: '2026-01-14', durationMin: 25, rpe: 9, completed: true },
+    ];
+    const r = autoTuneCardioCycle(c, log, { referenceIso: '2026-01-19' });
+    expect(r.changes.some(ch => ch.label.includes('тяжёлые'))).toBe(true);
+    expect(r.cycle.weeks[4].totalMinutes).toBeLessThan(c.weeks[4].totalMinutes);
+  });
+});
+
+// ─── Мост в питание (cardioToNutritionPayload, B1) ───
+
+describe('cardioToNutritionPayload — мост ккал в питание', () => {
+  it('средний расход ккал/нед и факт за сегодня', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, id: 'nut-1', name: 'Сушка' });
+    const log = [
+      { date: '2026-01-05', durationMin: 40, calories: 280, completed: true },
+      { date: '2026-01-05', durationMin: 15, type: 'hiit' as const, calories: 210, completed: true },
+      { date: '2026-01-06', durationMin: 60, calories: 420, completed: true },
+    ];
+    const p = cardioToNutritionPayload(c, log, '2026-01-05');
+    expect(p.avgKcalPerWeek).toBeGreaterThan(0);
+    expect(p.text).toContain('ккал/нед');
+    expect(p.todayMinutes).toBe(55);
+    expect(p.todayKcal).toBe(490);
+    expect(p.text).toContain('Сегодня: 55 мин · 490 ккал');
+  });
+
+  it('без факта за день — строка «не записано»', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const p = cardioToNutritionPayload(c, [], '2026-01-05');
+    expect(p.todayMinutes).toBe(0);
+    expect(p.text).toContain('не записано');
+    expect(p.text).toContain('0.5-1%/нед');
+  });
+});
+
+// ─── Авто-учёт дней ног из ББ-плана (5B) ───
+
+describe('legDaysFromBBPlan', () => {
+  it('считает дни недели 1 с мышцами ног', () => {
+    const plan = {
+      weeks: [{
+        sessions: [
+          { blocks: [{ muscle: 'chest' }, { muscle: 'triceps' }] },
+          { blocks: [{ muscle: 'quads' }, { muscle: 'glutes' }] },
+          { blocks: [{ muscle: 'hamstrings' }] },
+          { blocks: [{ muscle: 'back' }] },
+        ],
+      }],
+    };
+    expect(legDaysFromBBPlan(plan as never)).toBe(2);
+  });
+
+  it('пустой/без плана → 0', () => {
+    expect(legDaysFromBBPlan(null)).toBe(0);
+    expect(legDaysFromBBPlan({ weeks: [] })).toBe(0);
+    expect(legDaysFromBBPlan({ weeks: [{ sessions: [] }] })).toBe(0);
+  });
+});
+
+// ─── Pro: .tcx, LTHR-зоны, VDOT (Этап 6) ───
+
+describe('buildCardioTcx', () => {
+  it('строит XML с сессиями по дням недели', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, id: 'tcx-1', daysAvailable: 3, startDate: '2026-01-05' });
+    const tcx = buildCardioTcx(c, '2026-01-05');
+    expect(tcx).toContain('<?xml version="1.0"');
+    expect(tcx).toContain('TrainingCenterDatabase');
+    expect(tcx).toContain('<Activities>');
+    expect(tcx).toContain('<Id>2026-01-05T');
+    expect(tcx).toContain('Кардио ZONE2');
+    expect(tcx).toContain('2026-01-0');
+  });
+});
+
+describe('lthrZones', () => {
+  it('5 зон, монотонно возрастающие, Z2 по центру LTHR', () => {
+    const zones = lthrZones(160);
+    expect(zones).toHaveLength(5);
+    for (let i = 1; i < 5; i++) {
+      expect(zones[i].bpmMin).toBeGreaterThanOrEqual(zones[i - 1].bpmMax);
+    }
+    expect(zones[1].label).toContain('Z2');
+    // Z2 = 82-88% от 160 → 131-141.
+    expect(zones[1].bpmMin).toBe(131);
+    expect(zones[1].bpmMax).toBe(141);
+  });
+});
+
+describe('runningVdot', () => {
+  it('тест 5 км за 25 мин → VDOT и темпы (лёгкий медленнее порога)', () => {
+    const r = runningVdot(5, 25);
+    expect(r).not.toBeNull();
+    expect(r!.vdot).toBeGreaterThan(0);
+    expect(r!.pacesKm).toHaveLength(5);
+    const easy = r!.pacesKm[0];
+    const threshold = r!.pacesKm[2];
+    expect(easy.minPerKm).toBeGreaterThan(threshold.minPerKm);
+  });
+
+  it('некорректный ввод → null', () => {
+    expect(runningVdot(0, 25)).toBeNull();
+    expect(runningVdot(5, 0)).toBeNull();
   });
 });

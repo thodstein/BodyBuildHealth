@@ -32,6 +32,8 @@ import { getLatestBp } from '../../../core/bp-hr-data';
 import { CardioUserCard } from './CardioUserCard';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
+import { loadSavedBBPlans } from './bb-plans-store';
+import { legDaysFromBBPlan } from '../../../engines/lms/cardio.engine';
 import { CardioParamsStep, type PhaseSplitState } from './CardioParamsStep';
 import { CardioCompsStep, type CompDraft } from './CardioCompsStep';
 import { CardioPreviewStep } from './CardioPreviewStep';
@@ -202,12 +204,23 @@ export const CardioConstructor: React.FC = () => {
   const pf = useMemo(() => {
     try { return cardioProfileFactors(getProfile()?.settings ?? {}); } catch { return {}; }
   }, []);
-  const [factorsOn, setFactorsOn] = useState<{ sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean }>({
-    sleep: wizard.factorSleep ?? false,
-    stress: wizard.factorStress ?? false,
-    hrv: wizard.factorHrv ?? false,
-    ped: wizard.factorPed ?? false,
-    joints: wizard.factorJoints ?? false,
+  // Авто-детекция факторов (5A): найденные в профиле проблемы включены по
+  // умолчанию (сохранённый выбор мастера приоритетнее).
+  const [factorsOn, setFactorsOn] = useState<{ sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean }>(() => {
+    const auto = {
+      sleep: !!(pf.sleepHours && pf.sleepHours < 6),
+      stress: !!(pf.stressLevel && pf.stressLevel >= 7),
+      hrv: !!(pf.hrvMs && pf.hrvMs > 0 && pf.hrvMs < 25),
+      ped: !!pf.enhanced,
+      joints: !!pf.jointIssues,
+    };
+    return {
+      sleep: wizard.factorSleep ?? auto.sleep,
+      stress: wizard.factorStress ?? auto.stress,
+      hrv: wizard.factorHrv ?? auto.hrv,
+      ped: wizard.factorPed ?? auto.ped,
+      joints: wizard.factorJoints ?? auto.joints,
+    };
   });
   const factorsSummary = useMemo(() => {
     const out: string[] = [];
@@ -426,6 +439,14 @@ export const CardioConstructor: React.FC = () => {
       const srpe = loadSRPESessions();
       return srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)).ratio : null;
     } catch { return null; }
+  }, []);
+
+  // Авто-учёт дней ног из последнего сохранённого ББ-плана (5B).
+  const autoLegDays = useMemo(() => {
+    try {
+      const saved = loadSavedBBPlans();
+      return saved.length > 0 ? legDaysFromBBPlan(saved[0].plan) : 0;
+    } catch { return 0; }
   }, []);
 
   // Сохранение параметров мастера

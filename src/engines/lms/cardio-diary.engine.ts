@@ -3,7 +3,8 @@
  * Запись выполненных сессий, adherence против CardioCycle, статистика 7/28 дней
  * и объяснимые рекомендации (снизить/сохранить/увеличить) на основе факта.
  */
-import type { CardioCycle, CardioType } from './cardio.engine';
+import type { CardioCycle, CardioSession, CardioType } from './cardio.engine';
+import { cardioSessionsForDate, cardioWeekForDate } from './cardio.engine';
 
 export const CARDIO_LOG_KEY = 'he_cardio_sessions';
 export const CARDIO_LOG_CAP = 500;
@@ -179,4 +180,177 @@ export function computeCardioAdvice(
     return { action: 'reduce', reason: `Средний RPE ${stats.avgRpe} — кардио перегружает: снизить интенсивность/минуты.` };
   }
   return { action: 'keep', reason: 'Нагрузка соответствует плану — продолжайте.' };
+}
+
+// ─── План vs факт по неделям (график/сводка) ───
+
+export interface CardioWeekFact extends CardioAdherence {
+  /** Фактически сожжённые ккал (поле calories журнала) за неделю. */
+  factKcal: number;
+}
+
+/** Факт недели цикла: план/выполнено/минуты/ккал (0 если calories не записывались). */
+export function cardioWeekFact(cycle: CardioCycle, week: number, log: CardioLogEntry[], referenceIso?: string): CardioWeekFact {
+  const a = cardioWeekAdherence(cycle, week, log, referenceIso);
+  const start = weekStartIso(week, referenceIso);
+  const end = weekStartIso(week + 1, referenceIso);
+  const done = log.filter(e => e.completed && e.date >= start && e.date < end);
+  const factKcal = done.reduce((s, e) => s + (e.calories ?? 0), 0);
+  return { ...a, factKcal };
+}
+
+export interface CardioCycleCompliance {
+  weeks: CardioWeekFact[];
+  /** Выполнение по минутам за переданный диапазон недель (0-100). */
+  overallPctMinutes: number;
+  totalDoneSessions: number;
+  totalPlannedSessions: number;
+}
+
+/** Сводная compliance по неделям цикла (диапазон задаёт вызывающий код). */
+export function cardioCycleCompliance(cycle: CardioCycle, log: CardioLogEntry[], weekFilter?: (w: number) => boolean, referenceIso?: string): CardioCycleCompliance {
+  const weeks = cycle.weeks.filter(w => !weekFilter || weekFilter(w.week)).map(w => cardioWeekFact(cycle, w.week, log, referenceIso));
+  const plannedMinutes = weeks.reduce((s, w) => s + w.plannedMinutes, 0);
+  const doneMinutes = weeks.reduce((s, w) => s + w.doneMinutes, 0);
+  const plannedSessions = weeks.reduce((s, w) => s + w.plannedSessions, 0);
+  const doneSessions = weeks.reduce((s, w) => s + w.doneSessions, 0);
+  return {
+    weeks,
+    overallPctMinutes: plannedMinutes > 0 ? Math.round((doneMinutes / plannedMinutes) * 100) : 0,
+    totalDoneSessions: doneSessions,
+    totalPlannedSessions: plannedSessions,
+  };
+}
+
+// ─── День: план, факт и суммарная нагрузка (сила + кардио) ───
+
+export interface CardioDayFact {
+  done: CardioLogEntry[];
+  minutes: number;
+  kcal: number;
+  avgRpe: number | null;
+}
+
+/** Факт дня из кардио-журнала (выполненные сессии за дату). */
+export function cardioDayFact(log: CardioLogEntry[], dateIso: string): CardioDayFact {
+  const done = log.filter(e => e.completed && e.date === dateIso);
+  const minutes = done.reduce((s, e) => s + e.durationMin, 0);
+  const kcal = done.reduce((s, e) => s + (e.calories ?? 0), 0);
+  const rpes = done.filter(e => typeof e.rpe === 'number' && e.rpe > 0);
+  return {
+    done,
+    minutes,
+    kcal,
+    avgRpe: rpes.length > 0 ? Math.round((rpes.reduce((s, e) => s + (e.rpe ?? 0), 0) / rpes.length) * 10) / 10 : null,
+  };
+}
+
+export interface CardioDayLoad {
+  planned: CardioSession[];
+  done: CardioLogEntry[];
+  cardioMinutes: number;
+  /** Нагрузка кардио: минуты × RPE/10 (RPE по умолчанию 5). */
+  cardioLoad: number;
+  strengthSessions: number;
+  /** Нагрузка силы: Σ sRPE × минуты (как в training-load). */
+  strengthLoad: number;
+  totalLoad: number;
+}
+
+/**
+ * Суммарная нагрузка дня: план кардио (из цикла), факт (журнал кардио)
+ * и силовая нагрузка (sRPE-сессии). Единая строка «сила + кардио».
+ */
+export function cardioDayLoad(
+  cycle: CardioCycle | null,
+  log: CardioLogEntry[],
+  srpe: { date: string; sRPE: number; durationMin: number }[],
+  dateIso: string,
+  referenceIso?: string,
+): CardioDayLoad {
+  const planned = cycle ? (cardioSessionsForDate(cycle, dateIso, referenceIso ?? cycle.startDate)?.sessions ?? []) : [];
+  const fact = cardioDayFact(log, dateIso);
+  const cardioLoad = fact.done.reduce((s, e) => s + e.durationMin * ((e.rpe ?? 5) / 10), 0);
+  const strength = srpe.filter(s => s.date === dateIso);
+  const strengthLoad = strength.reduce((s, x) => s + x.sRPE * x.durationMin, 0);
+  return {
+    planned,
+    done: fact.done,
+    cardioMinutes: fact.minutes,
+    cardioLoad: Math.round(cardioLoad),
+    strengthSessions: strength.length,
+    strengthLoad: Math.round(strengthLoad),
+    totalLoad: Math.round(cardioLoad + strengthLoad),
+  };
+}
+
+// ─── Пульс по факту: факт-ЧСС vs целевые зоны плана (C2) ───
+
+export interface CardioHrCheck {
+  date: string;
+  type: CardioType;
+  avgHr: number;
+  targetMin?: number;
+  targetMax?: number;
+  inZone: boolean;
+  above: boolean;
+  below: boolean;
+}
+
+export interface CardioHrComplianceResult {
+  checks: CardioHrCheck[];
+  /** % сессий с avgHr внутри целевой зоны (null — нет данных с ЧСС). */
+  inZonePct: number | null;
+  /** Среднее отклонение факт-ЧСС от середины зоны (уд; null — нет данных). */
+  avgDelta: number | null;
+  advice: string | null;
+}
+
+/**
+ * Анализ фактического пульса против целевых зон плана за окно дней.
+ * Сессия журнала (avgHr) сопоставляется с целевой зоной сессии цикла
+ * того же типа в неделе даты. Возвращает точность попадания и совет.
+ */
+export function cardioHrCompliance(
+  cycle: CardioCycle,
+  log: CardioLogEntry[],
+  opts: { days?: number; referenceIso?: string } = {},
+): CardioHrComplianceResult {
+  const days = Math.max(1, Math.round(opts.days ?? 28));
+  const from = dateDaysAgo(days, opts.referenceIso);
+  const rows = log.filter(e => e.completed && typeof e.avgHr === 'number' && e.avgHr > 0 && e.date >= from);
+  const checks: CardioHrCheck[] = [];
+  for (const e of rows) {
+    const week = cardioWeekForDate(cycle, e.date, cycle.startDate);
+    if (!week) continue;
+    const plan = week.sessions.find(s => s.type === e.type) ?? week.sessions[0];
+    const t = plan?.targetHr;
+    if (!t || t.min == null || t.max == null) continue;
+    const hr = e.avgHr as number;
+    checks.push({
+      date: e.date,
+      type: e.type,
+      avgHr: hr,
+      targetMin: t.min,
+      targetMax: t.max,
+      inZone: hr >= t.min && hr <= t.max,
+      above: hr > t.max,
+      below: hr < t.min,
+    });
+  }
+  if (checks.length === 0) return { checks, inZonePct: null, avgDelta: null, advice: null };
+  const inZone = checks.filter(c => c.inZone).length;
+  const inZonePct = Math.round((inZone / checks.length) * 100);
+  const avgDelta = Math.round(checks.reduce((s, c) => s + (c.avgHr - ((c.targetMin ?? 0) + (c.targetMax ?? 0)) / 2), 0) / checks.length);
+  let advice: string;
+  if (inZonePct >= 70) {
+    advice = `Попадание в пульс-зону ${inZonePct}% (${checks.length} сессий) — точность хорошая, среднее отклонение ${avgDelta > 0 ? '+' : ''}${avgDelta} уд.`;
+  } else if (avgDelta > 5) {
+    advice = `ЧСС выше целевой зоны в среднем на ${avgDelta} уд — снизьте темп, держитесь в зоне сессии (Z2/Z3).`;
+  } else if (avgDelta < -5) {
+    advice = `ЧСС ниже целевой зоны в среднем на ${-avgDelta} уд — сессии проходят слишком легко, добавьте темп.`;
+  } else {
+    advice = `Попадание в зону ${inZonePct}% — пульс плавает; чаще сверяйтесь с зоной по ходу сессии.`;
+  }
+  return { checks, inZonePct, avgDelta, advice };
 }

@@ -5,7 +5,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  cardioSessionsForDate, cardioSessionProtocol,
+  cardioSessionsForDate, cardioSessionProtocol, rescheduleCardioSession,
   type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
@@ -48,7 +48,7 @@ interface ActiveSession {
   paused: boolean;
 }
 
-export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?: () => void }> = ({ cycle, onSaved }) => {
+export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?: () => void; onReschedule?: (next: CardioCycle) => void }> = ({ cycle, onSaved, onReschedule }) => {
   const [todaySessions, setTodaySessions] = useState<{ type: CardioType; durationMin: number }[]>(() => {
     if (!cycle) return [];
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
@@ -132,6 +132,14 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
     flashMsg('⏭ Сессия отмечена пропущенной (учитывается в рекомендациях)');
   };
 
+  const reschedule = () => {
+    if (!cycle) return;
+    const r = rescheduleCardioSession(cycle, todayIso(), { referenceIso: cycle.startDate });
+    if (r.changes.length === 0) { flashMsg('⚠ Сессию некуда перенести (нет свободного дня недели)'); return; }
+    onReschedule?.(r.cycle);
+    flashMsg(`↗ Сессия перенесена на ${r.changes[0].to} (нед ${r.changes[0].week})`);
+  };
+
   return (
     <div style={CARD}>
       <div style={LABEL}>⚡ Быстрый старт сессии</div>
@@ -187,6 +195,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <div key={i} style={ROW}>
               <span style={{ fontSize: 12, flex: 1 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин</span>
               <button style={BTN_PRIMARY} onClick={() => start(s.type, s.durationMin)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+              <button style={BTN} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
               <button style={BTN} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
             </div>
           ))}

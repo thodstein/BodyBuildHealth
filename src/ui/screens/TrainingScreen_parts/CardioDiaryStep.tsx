@@ -1,13 +1,27 @@
 /**
  * CardioDiaryStep.tsx — шаг 5 мастера кардио: быстрый старт сессии (таймер),
- * прогресс цикла, авто-режим (подстройка по дневнику), дневник выполнения.
+ * прогресс цикла, старт-контроль, авто-режим (подстройка по дневнику),
+ * дневник выполнения, график план vs факт.
  */
-import React from 'react';
-import type { CardioCycle } from '../../../engines/lms/cardio.engine';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  saveCardioCycleVersion, saveCardioCycle, setActiveCardioCycle,
+  cardioWeekForDate, CARDIO_PHASE_LABELS,
+  type CardioCycle,
+} from '../../../engines/lms/cardio.engine';
+import { loadCardioLog, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { getWeightLog } from '../../../engines/profile-store';
 import { CardioDiaryPanel } from './CardioDiaryPanel';
 import { CardioAutoTunePanel } from './CardioAutoTunePanel';
 import { CardioSessionTimer } from './CardioSessionTimer';
 import { CardioProgressCard } from './CardioProgressCard';
+import { CardioVolumeChart } from './CardioVolumeChart';
+import { CardioDayCard } from './CardioDayCard';
+
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export const CardioDiaryStep: React.FC<{
   cycle: CardioCycle | null;
@@ -16,12 +30,51 @@ export const CardioDiaryStep: React.FC<{
   onChanged: () => void;
   onApplyWeightAdjust?: () => void;
 }> = ({ cycle, acwr, recoveryLow, onChanged, onApplyWeightAdjust }) => {
+  // Локальная копия цикла: перенос сессии (↗) меняет план здесь же, без пересборки.
+  const [localCycle, setLocalCycle] = useState<CardioCycle | null>(cycle);
+  useEffect(() => { setLocalCycle(cycle); }, [cycle]);
+  const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
+  const reloadLog = useCallback(() => { setLog(loadCardioLog()); onChanged(); }, [onChanged]);
+
+  const handleReschedule = useCallback((next: CardioCycle) => {
+    saveCardioCycleVersion(localCycle ?? next, '↗ перенос сессии');
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setLocalCycle(next);
+    reloadLog();
+  }, [localCycle, reloadLog]);
+
+  // Старт-контроль (5C): ближайший taper/peak впереди + последний вес.
+  const startInfo = useMemo(() => {
+    if (!localCycle) return null;
+    const w = cardioWeekForDate(localCycle, todayIso(), localCycle.startDate);
+    const current = w?.week ?? 1;
+    const start = localCycle.weeks.find(x => x.week >= current && (x.phase === 'taper' || x.phase === 'peak'));
+    if (!start) return null;
+    let lastWeight: number | null = null;
+    try {
+      const weights = getWeightLog();
+      const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
+      if (sorted.length > 0) lastWeight = sorted[0].weight;
+    } catch { /* ignore */ }
+    return { week: start.week, left: Math.max(0, start.week - current), phase: start.phase, lastWeight };
+  }, [localCycle]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <CardioProgressCard cycle={cycle} />
-      <CardioSessionTimer cycle={cycle} onSaved={onChanged} />
-      <CardioAutoTunePanel cycle={cycle} acwr={acwr} onChanged={onChanged} />
-      <CardioDiaryPanel cycle={cycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} />
+      <CardioDayCard cycle={localCycle} />
+      <CardioProgressCard cycle={localCycle} />
+      {startInfo && (
+        <div style={{ fontSize: 11, color: startInfo.left === 0 ? '#f87171' : '#fbbf24', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '8px 10px' }}>
+          {startInfo.left === 0
+            ? `🏁 Эта неделя — старт (${CARDIO_PHASE_LABELS[startInfo.phase]}): только лёгкое кардио (recovery), без HIIT.`
+            : `🏁 Старт через ${startInfo.left} нед (нед ${startInfo.week}, ${CARDIO_PHASE_LABELS[startInfo.phase]}): taper снижает объём — HIIT уже убран; контролируйте вес (темп 0.5-1%/нед) и сон.${startInfo.lastWeight != null ? ` Последний вес: ${startInfo.lastWeight} кг.` : ''}`}
+        </div>
+      )}
+      <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
+      <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
+      <CardioVolumeChart cycle={localCycle} log={log} />
+      <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} />
     </div>
   );
 };

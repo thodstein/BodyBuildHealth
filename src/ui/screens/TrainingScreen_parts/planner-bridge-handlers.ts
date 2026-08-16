@@ -25,6 +25,10 @@ import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual
 import {
   loadAnnualTrainingPlan, saveAnnualTrainingPlan,
 } from '../../../engines/annual-training/annual-training-storage';
+import {
+  loadCardioCycles, loadActiveCardioCycle, cardioToNutritionPayload,
+} from '../../../engines/lms/cardio.engine';
+import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -484,6 +488,32 @@ const annualBlockHandler: Handler = (payload, { onChange, showToast }) => {
   } catch (e) { showToast('⚠ Не удалось открыть блок: ' + (e as Error)?.message); }
 };
 
+/** Ключ заметки «кардио → питание» (читается планировщиком питания/другими UI). */
+export const CARDIO_KCAL_NOTE_KEY = 'he_cardio_kcal_note';
+
+/**
+ * handler kind='cardio': передаёт расход кардио в питание —
+ * считает среднее ккал/нед цикла + факт за сегодня, пишет заметку
+ * в localStorage (he_cardio_kcal_note) и копирует текст в буфер.
+ */
+const cardioHandler: Handler = (payload, { showToast }) => {
+  const cycleId = typeof payload.data?.cycleId === 'string' ? payload.data.cycleId : undefined;
+  try {
+    const cycle = cycleId
+      ? loadCardioCycles().find(c => c.id === cycleId)
+      : loadActiveCardioCycle();
+    if (!cycle) { showToast('⚠ Кардио-цикл не найден — соберите его в кардио-конструкторе'); return; }
+    const p = cardioToNutritionPayload(cycle, loadCardioLog());
+    try {
+      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
+    } catch { /* ignore */ }
+    try { navigator.clipboard?.writeText(p.text) } catch { /* ignore */ }
+    showToast(`🍽 Расход кардио передан в питание: ~${p.avgKcalPerWeek} ккал/нед · сегодня ${p.todayMinutes} мин${p.todayKcal > 0 ? ' · ' + p.todayKcal + ' ккал' : ''} (в буфер)`);
+  } catch (e) {
+    showToast('⚠ Ошибка передачи в питание: ' + (e as Error)?.message);
+  }
+};
+
 /** P0-3: Dispatch table — maps PlannerApplyKind to handler function. */
 export const BRIDGE_HANDLERS: Record<string, Handler> = {
   split: splitHandler,
@@ -501,6 +531,7 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   design: designHandler,
   macrocycle: macrocycleHandler,
   annual_block: annualBlockHandler,
+  cardio: cardioHandler,
 };
 
 /** Apply a bridge payload using the dispatch table. Returns true if a handler matched.

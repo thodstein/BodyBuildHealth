@@ -8,9 +8,10 @@ import {
   autoTuneCardioCycle, cardioHeartZones, cardioSessionsForDate, cardioCycleSummary,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
+  lthrZones, runningVdot,
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
-import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
 
 const BTN: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
@@ -53,14 +54,32 @@ export const CardioAutoTunePanel: React.FC<{
   const [flash, setFlash] = useState<string | null>(null);
   const [age, setAge] = useState('30');
   const [restHr, setRestHr] = useState('');
+  const [lthr, setLthr] = useState('');
+  const [vdotKm, setVdotKm] = useState('');
+  const [vdotMin, setVdotMin] = useState('');
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
   const zones = useMemo(() => {
+    const l = Number(lthr);
+    if (l > 0) return lthrZones(l);
     const a = Math.max(12, Math.min(90, Number(age) || 30));
     const r = Number(restHr) > 0 ? Number(restHr) : undefined;
     return cardioHeartZones(a, r);
-  }, [age, restHr]);
+  }, [age, restHr, lthr]);
+
+  const vdot = useMemo(() => {
+    const km = Number(vdotKm);
+    const min = Number(vdotMin);
+    if (!(km > 0) || !(min > 0)) return null;
+    return runningVdot(km, min);
+  }, [vdotKm, vdotMin]);
+
+  // Факт-ЧСС против целевых зон плана (28 дней).
+  const hrCheck = useMemo(() => {
+    if (!cycle) return null;
+    try { return cardioHrCompliance(cycle, loadCardioLog(), { days: 28 }); } catch { return null; }
+  }, [cycle]);
 
   const today = useMemo(() => {
     if (!cycle) return null;
@@ -82,7 +101,7 @@ export const CardioAutoTunePanel: React.FC<{
 
   const applyTune = () => {
     if (!cycle) return;
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr, referenceIso: cycle.startDate });
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
     if (r.changes.length === 0) return;
     saveCardioCycleVersion(cycle, 'авто-подстройка');
     saveCardioCycle(r.cycle);
@@ -94,7 +113,7 @@ export const CardioAutoTunePanel: React.FC<{
 
   const previewTune = () => {
     if (!cycle) { flashMsg('⚠ Сначала соберите кардио-цикл'); return; }
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr, referenceIso: cycle.startDate });
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
     if (r.changes.length === 0) { flashMsg('✅ Дневник соответствует плану — изменений нет'); return; }
     setPending({ changes: r.changes, reason: r.advice.reason });
   };
@@ -173,11 +192,18 @@ export const CardioAutoTunePanel: React.FC<{
         </div>
       )}
 
+      {hrCheck && hrCheck.advice && (
+        <div style={{ fontSize: 11, color: hrCheck.inZonePct != null && hrCheck.inZonePct >= 70 ? '#4ade80' : '#fbbf24', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+          🎯 Пульс по факту (28д): попадание в зону {hrCheck.inZonePct}% · отклонение {hrCheck.avgDelta != null && hrCheck.avgDelta > 0 ? '+' : ''}{hrCheck.avgDelta} уд — {hrCheck.advice}
+        </div>
+      )}
+
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={ROW}>
-          <span style={LABEL}>🎯 Пульс-зоны (Karvonen)</span>
+          <span style={LABEL}>🎯 Пульс-зоны {lthr ? '(LTHR)' : '(Karvonen)'}</span>
           <input value={age} onChange={e => setAge(e.target.value)} placeholder="Возраст" inputMode="numeric" style={INPUT} aria-label="Возраст" />
           <input value={restHr} onChange={e => setRestHr(e.target.value)} placeholder="ЧСС покоя" inputMode="numeric" style={INPUT} aria-label="ЧСС покоя" />
+          <input value={lthr} onChange={e => setLthr(e.target.value)} placeholder="LTHR (тест 30′)" inputMode="numeric" style={INPUT} aria-label="LTHR" title="Пороговый пульс из 30-минутного теста — зоны по Friel 2017" />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {zones.map(z => (
@@ -186,6 +212,19 @@ export const CardioAutoTunePanel: React.FC<{
             </div>
           ))}
         </div>
+      </div>
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={ROW}>
+          <span style={LABEL}>🏃 VDOT (тест: км за минуты)</span>
+          <input value={vdotKm} onChange={e => setVdotKm(e.target.value)} placeholder="Км" inputMode="decimal" style={INPUT} aria-label="Дистанция теста км" />
+          <input value={vdotMin} onChange={e => setVdotMin(e.target.value)} placeholder="Мин" inputMode="numeric" style={INPUT} aria-label="Время теста мин" />
+        </div>
+        {vdot && (
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+            VDOT {vdot.vdot} · темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm} мин/км`).join(' · ')}
+          </div>
+        )}
       </div>
     </div>
   );

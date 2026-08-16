@@ -9,7 +9,7 @@ import {
   type CardioLogEntry,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
-import { cardioWeightAdvice, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
+import { cardioWeightAdvice, cardioWeekForDate, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 
 const BTN: React.CSSProperties = {
@@ -63,7 +63,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const advice = useMemo(() => computeCardioAdvice(cycle ?? { totalWeeks: 0, totalKcal: 0, weeks: [], rationale: [], goal: 'health', id: '', name: '', source: 'auto', version: 1, createdAt: '', linkedCompetitionIds: [] } as CardioCycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
   const adherence = useMemo(() => {
     if (!cycle) return null;
-    const currentWeek = cycle.weeks.reduce((acc, w) => (w.totalMinutes > 0 ? w.week : acc), 1);
+    // Текущая неделя по дате (неделя 1 = cycle.startDate); фоллбек — неделя 1.
+    const weekForDate = cardioWeekForDate(cycle, todayIso(), cycle.startDate);
+    const currentWeek = weekForDate ? weekForDate.week : 1;
     return cardioWeekAdherence(cycle, Math.min(currentWeek, cycle.totalWeeks), log, cycle.startDate);
   }, [log, cycle]);
 

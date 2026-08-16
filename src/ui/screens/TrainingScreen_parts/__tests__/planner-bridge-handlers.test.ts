@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createBlank } from '../../../../engines/user-program/program-store';
 import {
   applyBridgePayloadDispatch,
-  completeAnnualBlockImport, getPendingAnnualBlock, ANNUAL_BLOCK_PENDING_KEY,
+  completeAnnualBlockImport, getPendingAnnualBlock, ANNUAL_BLOCK_PENDING_KEY, CARDIO_KCAL_NOTE_KEY,
   type BridgeCtx,
 } from '../planner-bridge-handlers';
 import type { PlannerApply } from '../planner-bridge';
@@ -10,6 +10,7 @@ import { annualPlanFromMacro, buildAnnualBlock } from '../../../../engines/annua
 import { saveAnnualTrainingPlan, loadAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
 import type { Macrocycle } from '../../../../engines/lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
+import { buildCardioCycle, saveCardioCycle, setActiveCardioCycle } from '../../../../engines/lms/cardio.engine';
 
 function payload(kind: PlannerApply['kind'], data: Record<string, unknown>): PlannerApply {
   return { kind, label: 'test', data, ts: 1 };
@@ -290,5 +291,46 @@ describe('annual_block bridge (блок года → редактор → обр
     saveAnnualTrainingPlan({ ...plan, blocks: [built] });
     expect(completeAnnualBlockImport(createBlank('bb'))).toBe(false);
     expect(loadAnnualTrainingPlan()!.blocks[0].result!.program?.meta.title).not.toBe('x');
+  });
+});
+
+describe('planner bridge � cardio handler (���� ���� � �������)', () => {
+  const CYCLE_KEY = 'he_cardio_cycles';
+  const ACTIVE_KEY = 'he_active_cardio_cycle';
+
+  beforeEach(() => {
+    try {
+      localStorage.removeItem(CYCLE_KEY);
+      localStorage.removeItem(ACTIVE_KEY);
+      localStorage.removeItem(CARDIO_KCAL_NOTE_KEY);
+    } catch { /* ignore */ }
+  });
+
+  it('cardio: активный цикл → заметка в localStorage + toast с ккал/нед', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, id: 'cc-nut' });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    const ctx = context('bb');
+    expect(applyBridgePayloadDispatch(payload('cardio', {}), ctx)).toBe(true);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('ккал/нед'));
+    const note = JSON.parse(localStorage.getItem(CARDIO_KCAL_NOTE_KEY) ?? 'null');
+    expect(note?.cycleId).toBe('cc-nut');
+    expect(note?.avgKcalPerWeek).toBeGreaterThan(0);
+  });
+
+  it('cardio: по cycleId из payload', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cc-nut2' });
+    saveCardioCycle(c);
+    const ctx = context('bb');
+    applyBridgePayloadDispatch(payload('cardio', { cycleId: 'cc-nut2' }), ctx);
+    const note = JSON.parse(localStorage.getItem(CARDIO_KCAL_NOTE_KEY) ?? 'null');
+    expect(note?.cycleId).toBe('cc-nut2');
+  });
+
+  it('cardio: без цикла → предупреждение, заметка не пишется', () => {
+    const ctx = context('bb');
+    expect(applyBridgePayloadDispatch(payload('cardio', {}), ctx)).toBe(true);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('не найден'));
+    expect(localStorage.getItem(CARDIO_KCAL_NOTE_KEY)).toBeNull();
   });
 });

@@ -4,6 +4,8 @@ import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, clearCardioLog,
   cardioLogStats, dateDaysAgo, weekStartIso,
   cardioWeekAdherence, cardioAdherenceSummary, computeCardioAdvice,
+  cardioWeekFact, cardioCycleCompliance,
+  cardioDayFact, cardioDayLoad, cardioHrCompliance,
   type CardioLogEntry,
 } from '../cardio-diary.engine';
 
@@ -143,5 +145,104 @@ describe('computeCardioAdvice', () => {
     ];
     const a = computeCardioAdvice(c, log, { referenceIso: REF });
     expect(a.action).toBe('keep');
+  });
+});
+
+describe('план vs факт (cardioWeekFact / cardioCycleCompliance)', () => {
+  it('cardioWeekFact: минуты/сессии/ккал факта в окне недели', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const log = [
+      entry({ date: '2026-01-05', durationMin: 30, calories: 210, completed: true }),
+      entry({ date: '2026-01-08', durationMin: 25, calories: 175, completed: true }),
+      entry({ date: '2026-01-12', durationMin: 60, calories: 500, completed: true }), // неделя 2
+      entry({ date: '2026-01-09', durationMin: 20, completed: false }),
+    ];
+    const f = cardioWeekFact(c, 1, log, REF);
+    expect(f.doneSessions).toBe(2);
+    expect(f.doneMinutes).toBe(55);
+    expect(f.factKcal).toBe(385);
+    expect(f.plannedSessions).toBeGreaterThan(0);
+  });
+
+  it('cardioCycleCompliance: overall % по фильтру недель', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, daysAvailable: 3 });
+    const log = [entry({ date: '2026-01-05', durationMin: 30, completed: true })];
+    const all = cardioCycleCompliance(c, log, undefined, REF);
+    expect(all.weeks).toHaveLength(4);
+    expect(all.totalDoneSessions).toBe(1);
+    // Только неделя 1: 30 мин из 75 (health base 3×25) → 40%.
+    const w1 = cardioCycleCompliance(c, log, w => w === 1, REF);
+    expect(w1.overallPctMinutes).toBe(40);
+  });
+
+  it('пустой журнал → 0% без ошибок', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const r = cardioCycleCompliance(c, [], w => w === 1, REF);
+    expect(r.overallPctMinutes).toBe(0);
+    expect(r.totalDoneSessions).toBe(0);
+  });
+});
+
+describe('день: план, факт, нагрузка (кардио-слой дневника)', () => {
+  it('cardioDayFact: выполненные сессии за дату', () => {
+    const log = [
+      entry({ date: '2026-01-05', durationMin: 30, rpe: 6, calories: 210, completed: true }),
+      entry({ date: '2026-01-05', durationMin: 15, type: 'hiit', rpe: 9, calories: 220, completed: true }),
+      entry({ date: '2026-01-06', durationMin: 60, completed: true }),
+      entry({ date: '2026-01-05', durationMin: 20, completed: false }),
+    ];
+    const f = cardioDayFact(log, '2026-01-05');
+    expect(f.done).toHaveLength(2);
+    expect(f.minutes).toBe(45);
+    expect(f.kcal).toBe(430);
+    expect(f.avgRpe).toBe(7.5);
+  });
+
+  it('cardioDayLoad: план из цикла + факт + силовая нагрузка', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: '2026-01-05' });
+    const log = [entry({ date: '2026-01-05', durationMin: 30, rpe: 6, completed: true })];
+    const srpe = [{ date: '2026-01-05', sRPE: 8, durationMin: 60 }];
+    const l = cardioDayLoad(c, log, srpe, '2026-01-05', '2026-01-05');
+    expect(l.planned.length).toBeGreaterThan(0);
+    expect(l.cardioMinutes).toBe(30);
+    expect(l.cardioLoad).toBe(18); // 30 × 0.6
+    expect(l.strengthSessions).toBe(1);
+    expect(l.strengthLoad).toBe(480);
+    expect(l.totalLoad).toBe(498);
+  });
+
+  it('cardioDayLoad без RPE: дефолт 5 → cardioLoad = 0.5 × минуты', () => {
+    const log = [entry({ date: '2026-01-05', durationMin: 20, completed: true })];
+    const l = cardioDayLoad(null, log, [], '2026-01-05', REF);
+    expect(l.cardioLoad).toBe(10);
+    expect(l.strengthSessions).toBe(0);
+    expect(l.totalLoad).toBe(10);
+  });
+});
+
+describe('cardioHrCompliance — факт-ЧСС vs целевые зоны', () => {
+  it('сессии в зоне/выше/ниже классифицируются корректно', () => {
+    // health, 30 лет: zone2 (зона 2) ≈ 114-133, зона 3 ≈ 133-152 (по % от ЧССмакс 190).
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: '2026-01-05', age: 30 });
+    const log = [
+      entry({ date: '2026-01-05', durationMin: 25, avgHr: 120, completed: true }), // в зоне
+      entry({ date: '2026-01-06', durationMin: 25, avgHr: 160, completed: true }), // выше
+      entry({ date: '2026-01-07', durationMin: 25, avgHr: 100, completed: true }), // ниже
+      entry({ date: '2026-01-08', durationMin: 25, completed: true }),             // без ЧСС — пропуск
+    ];
+    const r = cardioHrCompliance(c, log, { days: 28, referenceIso: '2026-01-05' });
+    expect(r.checks).toHaveLength(3);
+    expect(r.checks[0].inZone).toBe(true);
+    expect(r.checks[1].above).toBe(true);
+    expect(r.checks[2].below).toBe(true);
+    expect(r.inZonePct).toBe(33);
+    expect(r.advice).not.toBeNull();
+  });
+
+  it('без данных с ЧСС → null-результат', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: '2026-01-05' });
+    const r = cardioHrCompliance(c, [], { days: 28, referenceIso: '2026-01-05' });
+    expect(r.inZonePct).toBeNull();
+    expect(r.advice).toBeNull();
   });
 });
