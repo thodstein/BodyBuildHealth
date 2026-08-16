@@ -12,8 +12,22 @@ describe('lift-diagnostics', () => {
     expect(result!.corrections.length).toBeGreaterThan(0);
     expect(result!.assistance.length).toBeGreaterThan(0);
   });
-  it('returns no detailed diagnosis for unsupported phase', () => {
+  it('returns diagnosis for all 7 lifts (A3: углы для ohp/row/pulldown/incline)', () => {
+    expect(diagnoseLift('ohp', 'ohp_mid')).not.toBeNull();
+    expect(diagnoseLift('row', 'row_start')).not.toBeNull();
+    expect(diagnoseLift('pulldown', 'pd_squeeze')).not.toBeNull();
+    expect(diagnoseLift('incline_press', 'inc_lockout')).not.toBeNull();
     expect(diagnoseLift('ohp', 'mid')).toBeNull();
+  });
+  it('sumo-тяга: отдельные фазы с углами (сумо-старт и замыкание)', () => {
+    const start = diagnoseLift('deadlift', 'sumo_start');
+    expect(start).not.toBeNull();
+    expect(start!.angleRangeDeg).toEqual([0, 20]);
+    expect(start!.weakMuscles.join(' ')).toContain('Приводящие');
+    const lockout = diagnoseLift('deadlift', 'sumo_lockout');
+    expect(lockout).not.toBeNull();
+    expect(lockout!.keyJoint).toContain('таз');
+    expect(lockout!.corrections.length).toBeGreaterThan(0);
   });
   it('lists phases and maps bar path issues', () => {
     expect(stickingPhases('squat')).toContain('bottom');

@@ -15,6 +15,7 @@ import {
 import { analyzePhaseAssistance, analyzeBarPathAssistance, analyzeStickingCorrections, protocolFromCycle, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
 import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { detectWeakMusclesByE1rm } from '../../../engines/pro/weak-muscle-detection.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
@@ -89,6 +90,7 @@ const ISSUE_RU: Record<BarPathIssue, string> = {
 const PHASE_RU: Record<string, string> = {
   off_chest: 'Сход со груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт',
   bottom: 'Низ (выход из ямы)',
+  sumo_start: 'Сумо: старт (срыв)', sumo_lockout: 'Сумо: дожим (замыкание)',
   ohp_start: 'Старт с плеч', ohp_mid: 'Середина', ohp_lockout: 'Дожим вверх',
   row_start: 'Старт (съём)', row_mid: 'Середина', row_squeeze: 'Сведение лопаток',
   pd_top: 'Верх (старт)', pd_mid: 'Середина', pd_squeeze: 'Сведение к груди',
@@ -98,7 +100,7 @@ const PHASE_RU: Record<string, string> = {
 const LIFT_PHASES: Record<Lift, WeakPoint[]> = {
   bench: ['off_chest', 'mid', 'lockout', 'start'],
   squat: ['bottom', 'mid', 'lockout'],
-  deadlift: ['start', 'mid', 'lockout'],
+  deadlift: ['start', 'mid', 'lockout', 'sumo_start', 'sumo_lockout'],
   ohp: ['ohp_start', 'ohp_mid', 'ohp_lockout'],
   row: ['row_start', 'row_mid', 'row_squeeze'],
   pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
@@ -305,6 +307,9 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
     return out;
   }, [template, weakMuscleSubs, lift]);
 
+  // 📊 Авто-детекция слабых мышц по e1RM-тренду дневника (подсказка, не авто-выбор).
+  const weakMuscleHints = useMemo(() => detectWeakMusclesByE1rm(sessions), [sessions]);
+
   // Авто-пресет из дневника: частые тяжёлые подходы (RPE≥8) в фазе движения — подсказка (не авто-выбор).
   const diaryHint = useMemo(() => {
     if (!sessions.length) return null;
@@ -438,6 +443,21 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             return <button key={d.id} onClick={() => toggleWeakMuscle(d.id)} style={{ minHeight: 32, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', border: on ? '1px solid #4ade80' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(74,222,128,0.15)' : 'transparent', color: on ? '#4ade80' : DIM, fontWeight: 700, fontSize: 10 }}>{d.label}{on ? ' ✓' : ''}</button>;
           })}
         </div>
+        {weakMuscleHints.length > 0 && (
+          <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>📊 Дневник: e1RM-тренд (28 дней) — подсказка слабых мышц</div>
+            {weakMuscleHints.map(signal => (
+              <div key={signal.group} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 3 }}>
+                <span style={{ fontSize: 10, color: DIM }}>
+                  {signal.status === 'weak' ? '📉' : '🟡'} {signal.label}: {signal.currentE1rm}{signal.priorE1rm > 0 ? ` кг (было ${signal.priorE1rm}, ${signal.deltaPct > 0 ? '+' : ''}${signal.deltaPct}%)` : ' кг'} · {signal.sessions} сесс.
+                </span>
+                <button onClick={() => { if (!weakMuscleGroups.includes(signal.group)) toggleWeakMuscle(signal.group); }} style={{ padding: '2px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 9, border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.1)', color: '#fbbf24', fontWeight: 700, minHeight: 26 }}>
+                  ➕ в слабые мышцы
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {!template && (
           <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>
         )}
@@ -539,7 +559,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         ) : (
           <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
-              📐 Угловая диагностика мёртвых точек есть для приседа, жима лёжа и становой тяги. Для {LIFT_RU[lift]} используйте слабые точки (раздел 1) и движение штанги (раздел 3).
+              📐 Угловая диагностика недоступна для этой фазы — используйте слабые точки (раздел 2) и движение штанги (раздел 4).
             </div>
           </div>
         )}

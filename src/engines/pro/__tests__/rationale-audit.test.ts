@@ -25,7 +25,7 @@ describe('lift-assistance: пулы разделены (слабые мышцы 
     }
   });
 
-  it('мёртвые точки: коррекции углов (source=sticking) только для 3 классических', () => {
+  it('мёртвые точки: коррекции углов (source=sticking) для ВСЕХ 7 движений', () => {
     for (const wp of WEAK.bench) {
       const r = analyzeStickingCorrections('bench', wp as any);
       expect(r.items.length, `bench/${wp}`).toBeGreaterThanOrEqual(2);
@@ -39,10 +39,12 @@ describe('lift-assistance: пулы разделены (слабые мышцы 
     for (const wp of WEAK.deadlift) {
       expect(analyzeStickingCorrections('deadlift', wp as any).items.length).toBeGreaterThanOrEqual(2);
     }
-    // Для движений без угловой диагностики — мёртвых точек нет
+    // A3: ohp/row/pulldown/incline тоже имеют угловую диагностику (коррекции не пустые)
     for (const l of ['ohp', 'row', 'pulldown', 'incline_press']) {
       for (const wp of WEAK[l]) {
-        expect(analyzeStickingCorrections(l as any, wp as any).items, `${l}/${wp}`).toEqual([]);
+        const r = analyzeStickingCorrections(l as any, wp as any);
+        expect(r.items.length, `${l}/${wp}: пусто`).toBeGreaterThanOrEqual(1);
+        expect(r.items.every(i => i.source === 'sticking'), `${l}/${wp}`).toBe(true);
       }
     }
   });

@@ -1,5 +1,22 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Диагностика движения: раунд 2 — A3/sumo/лимит/parity/e1RM-детекция (Aug 16 2026, uncommitted)
+
+Поверх раунда A–E (d080442b):
+
+- **A3 — углы для всех 7 движений**: `STICKING_POINTS` в lift-diagnostics пополнен ohp/row/pulldown/incline_press (углы локтя/плеча/лопатки, слабые мышцы, коррекции из weakpoint-pl). `diagnoseLift` больше не возвращает null для 4 движений; `analyzeStickingCorrections` даёт непустые коррекции везде; fallback-текст карточки обновлён.
+- **Sumo-тяга**: `WeakPoint` += `sumo_start` (0-20°, срыв: ягодицы/приводящие) и `sumo_lockout` (70-180°, замыкание бёдер) — weakpoint-pl (DIAGNOSIS + WEAK_POINTS_BY_LIFT.deadlift = 5 фаз), STICKING_POINTS, лейблы в карточке (PHASE_RU/LIFT_PHASES) и SRCBBScreen (PL_WEAKPOINT_LABELS — 2 строки).
+- **Лимит сессии**: `injectDiagnosticExercises` — day cap 10 упражнений (паритет со слабыми группами, тест 4.25).
+- **Parity протокола**: `diagnosticGroupForExercise` приведён к ТОЧНОМУ резолву карточки (PL-группы каталога → LMS_EXERCISES, БЕЗ общего каталога) и паттерн spec резолвится pool-exact — `diagnosticProtocolFromCycle` экспортирован; NEW `diagnostic-protocol-parity.test.ts` (3 теста) гарантирует «показанный протокол = вписанный» для всех фаз/отклонений.
+- **NEW `weak-muscle-detection.engine.ts`**: `detectWeakMusclesByE1rm(sessions)` — per-group тренд e1RM (Epley) за два 28-дневных окна: −5% → `weak`, рост ≤1% при ≥2 сессиях → `plateau`; `groupOfExerciseName` (алиасы, arms перед chest — «французский жим» не уходит в грудь). UI карточки: блок «📊 Дневник: e1RM-тренд» с кнопкой «➕ в слабые мышцы» (подсказка, не авто-выбор).
+
+### Тесты (раунд 2)
+- NEW `weak-muscle-detection.test.ts` (11), NEW `diagnostic-protocol-parity.test.ts` (3).
+- Обновлены: `lift-diagnostics.test.ts` (16: 7 движений + сумо), `weakpoint-pl.test.ts` (12: deadlift 5 фаз), `rationale-audit.test.ts` (все 7 движений со sticking-коррекциями), `pl-diagnostics-full-audit.test.ts` (то же), `pl-deadpoints-barpath-card.test.tsx` (жим стоя с углами), `pl-auto-key-tests-coverage.test.ts` (25: +4.25 day cap).
+- Проверено: tsc 0; затронутые области **816/816**; полный прогон **5712/5715** — 3 падения пред-существующие/не мои (bb-macrocycle v7 чужого агента, bb-training-recommendations каталог-рантайм, cardio-user-flow clipboard-флейк параллельного прогона — изолированно 17/17).
+
+---
+
 ## Диагностика движения: полный раунд A–E (Aug 16 2026, uncommitted)
 
 Полный анализ «слабые мышцы → слабые точки → мёртвые точки → движение штанги» + доработки по плану A–E. Слои: `weakpoint-pl.ts` (24 диагноза 7 движений) → `lift-diagnostics.engine.ts` (углы/биомеханика для bench/squat/deadlift + bar-path 5 отклонений) → `lift-assistance.engine.ts` (пулы muscle/weak/sticking/bar, топ-1 ⭐, `protocolFromCycle`) → инъекция в план (`injectPLWeakPoints`/`injectDiagnosticExercises` в lms-builder) → UI (`PlDeadpointsBarPathCard` — единый калькулятор; `StickingPointAnalysisCard` — по дневнику).

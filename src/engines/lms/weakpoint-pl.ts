@@ -27,6 +27,7 @@ function findExerciseByLabel(label: string): Exercise | undefined {
 
 export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press';
 export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom'
+  | 'sumo_start' | 'sumo_lockout'
   | 'ohp_start' | 'ohp_mid' | 'ohp_lockout'
   | 'row_start' | 'row_mid' | 'row_squeeze'
   | 'pd_top' | 'pd_mid' | 'pd_squeeze'
@@ -58,6 +59,8 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
     start: { weakPoint: 'start', label: 'Старт (с пола)', description: 'Не отрывает от пола — слабые ноги/спина в стартовой позиции.', assistanceFromCatalog: ['Становая тяга из ямы', 'Становая тяга с плинтов', 'Присед'], intensityPct: 0.7, rationale: 'Тяга из ямы (ниже обычного старта) + присед для силы ног в старте.' },
     mid: { weakPoint: 'mid', label: 'Середина (колени)', description: 'Зависание на коленях — слабая спина/переход.', assistanceFromCatalog: ['Становая тяга с остановками', 'Румынская тяга', 'Становая тяга с паузой ниже колен'], intensityPct: 0.7, rationale: 'Остановки/пауза тренируют удержание позиции; РДЛ — бицепс бедра/разгибатели.' },
     lockout: { weakPoint: 'lockout', label: 'Дожим (локдаун)', description: 'Не дожимает — слабые ягодицы/верх спины.', assistanceFromCatalog: ['Тяга с плинтов (rack pull)', 'Румынская тяга', 'Шраги'], intensityPct: 0.75, rationale: 'Тяга с плинтов (выше колен) — изолированный дожим; шраги — жёсткость верха.' },
+    sumo_start: { weakPoint: 'sumo_start', label: 'Сумо: старт (срыв)', description: 'Срыв с пола в сумо — слабые ягодицы/приводящие бедра.', assistanceFromCatalog: ['Присед в широкой постановке', 'Становая тяга из ямы', 'Тяга с плинтов (rack pull)'], intensityPct: 0.7, rationale: 'Широкая постановка и тяга из ямы перегружают ягодицы/приводящие в стартовом положении сумо.' },
+    sumo_lockout: { weakPoint: 'sumo_lockout', label: 'Сумо: дожим (замыкание)', description: 'Не замыкает бёдра вверху — слабые ягодицы/разгибатели спины.', assistanceFromCatalog: ['Тяга с плинтов (rack pull)', 'Присед в широкой постановке', 'Румынская тяга'], intensityPct: 0.75, rationale: 'Тяга с плинтов выше колен + широкая постановка — изоляция финальной фазы сумо.' },
   },
   ohp: {
     ohp_start: { weakPoint: 'ohp_start', label: 'Старт с плеч', description: 'Не хватает стартовой силы — слабые передние дельты в нижней точке.', assistanceFromCatalog: ['Армейский жим', 'Жим гантелей', 'Махи гантелями в стороны'], intensityPct: 0.65, rationale: 'Армейский жим + жим гантелей для силы дельт в старте.' },
@@ -107,7 +110,7 @@ export function diagnoseWeakPoint(lift: Lift, weakPoint: WeakPoint): WeakPointDi
 export const WEAK_POINTS_BY_LIFT: Record<Lift, WeakPoint[]> = {
   bench: ['off_chest', 'mid', 'lockout', 'start'],
   squat: ['bottom', 'mid', 'lockout'],
-  deadlift: ['start', 'mid', 'lockout'],
+  deadlift: ['start', 'mid', 'lockout', 'sumo_start', 'sumo_lockout'],
   ohp: ['ohp_start', 'ohp_mid', 'ohp_lockout'],
   row: ['row_start', 'row_mid', 'row_squeeze'],
   pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],

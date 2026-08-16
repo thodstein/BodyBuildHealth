@@ -287,4 +287,15 @@ describe('PL-auto key coverage 4.1-4.15', () => {
       expect(injected!.workSets[0].sets).toBe(Math.max(1, first.sets));
       expect(injected!.workSets[0].rir).toBe(first.rir ?? 2);
     });
+
+    it('4.25 diagnostic assistant: day cap — не более 10 упражнений на день', () => {
+      const many = Array.from({ length: 12 }, (_, i) => `Ассистент ${i + 1}`);
+      const p = buildLMSPlan({ template: CYCLE_01, pmMap, weeksOverride: 4, mode: 'natural',
+        diagnosticExerciseMap: { 'bench|barpath|forward_drift': many },
+        currentReadiness: 100 });
+      const dayLengths = p.weeks[0].days.map(day => day.exercises.length);
+      expect(dayLengths.every(len => len <= 10)).toBe(true);
+      const injectedCount = p.weeks[0].days.reduce((sum, day) => sum + day.exercises.filter(e => e.name.startsWith('Ассистент')).length, 0);
+      expect(injectedCount).toBeGreaterThan(0);
+    });
   });

@@ -682,14 +682,27 @@ function injectPLWeakPoints(
   }
 }
 
-/** Группа ПЛ-пула, в которую входит упражнение (для подбора протокола аксессуара). */
+/** Группа ПЛ-пула, в которую входит упражнение (для подбора протокола аксессуара).
+ *  Резолв ИДЕНТИЧЕН карточке диагностики (lift-assistance): каталог-группы ПЛ-пула
+ *  (точное имя) → СРЦ-пул LMS_EXERCISES (группы «Жим»/«Тяга»/«Присед» → общая группа).
+ *  Общий каталог намеренно НЕ участвует — у карточки такой ветки нет, иначе протоколы разойдутся.
+ */
 function diagnosticGroupForExercise(name: string): string | null {
   const n = norm(name);
   for (const group of Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS)) {
     if (getExercisesByGroup(group).some(e => norm(e.name) === n)) return group;
   }
-  const ex = findCatalogExerciseByLabel(name);
-  if (ex) return (trueMuscleOf(ex) ?? (ex.group as string)) ?? null;
+  const lms = LMS_EXERCISES.find(l => norm(l.name) === n);
+  if (lms) {
+    const g = (lms.groups ?? []).join(' ').toLowerCase();
+    if (/тяга|становая|гипер|наклон|шраги/.test(g)) return 'back';
+    if (/жим стоя|стоя|плеч|махи|дельт/.test(g)) return 'shoulders';
+    if (/жим/.test(g)) return 'chest';
+    if (/присед|выпад|разгибание ног|жим ногами/.test(g)) return 'legs';
+    if (/бицепс|сгибан|разгибание|подъем|подъём/.test(g)) return 'arms';
+    if (/пресс|скруч|кор/.test(g)) return 'core';
+    return 'accessory';
+  }
   return null;
 }
 
@@ -698,8 +711,9 @@ function diagnosticGroupForExercise(name: string): string | null {
  * раскладки цикла ТЕМ ЖЕ алгоритмом, что protocolFromCycle в карточке
  * диагностики (lift-assistance.engine): set-блоки аксессуара цикла на целевую
  * группу. Показанный в UI протокол и вписанный в план совпадают по построению.
+ * Экспортирован для parity-теста (diagnostic-protocol-parity.test.ts).
  */
-function diagnosticProtocolFromCycle(template: SRCycleTemplate | undefined, exerciseName: string): { pct: number; reps: number; sets: number; rir: number } {
+export function diagnosticProtocolFromCycle(template: SRCycleTemplate | undefined, exerciseName: string): { pct: number; reps: number; sets: number; rir: number } {
   const fallback = { pct: 0.6, reps: 10, sets: 3, rir: 2 };
   if (!template) return fallback;
   const layouts = template.weeks && template.weeks.length > 0 ? template.weeks : [template.week1];
@@ -708,7 +722,14 @@ function diagnosticProtocolFromCycle(template: SRCycleTemplate | undefined, exer
   if (accSpecs.length === 0) return fallback;
   const group = diagnosticGroupForExercise(exerciseName);
   const allowed = group ? (PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? []) : [];
-  const match = accSpecs.find(spec => allowed.includes(sourcePattern(spec)));
+  // Паттерн spec резолвится ТЕМ ЖЕ способом, что в карточке (protocolFromCycle):
+  // точное имя в ПЛ-группах каталога → movementPattern/derivePattern; иначе ''.
+  const pool = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
+  const pattern = (spec: SRExerciseSpec): string => {
+    const ex = pool.find(e => norm(e.name) === norm(spec.name));
+    return ex ? catalogPattern(ex) : '';
+  };
+  const match = accSpecs.find(spec => allowed.includes(pattern(spec)));
   const spec = match ?? accSpecs[0];
   const first = spec?.sets?.[0];
   if (!first) return fallback;
@@ -777,6 +798,8 @@ function injectDiagnosticExercises(
       const day = days[dayIndex];
       if (!day) continue;
       if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
+      // Day cap (паритет со слабыми группами): упражнений ≤ 10 на сессию.
+      if (day.exercises.length >= 10) continue;
       const pm = pmRow[name] ?? fallbackPm;
       const protocol = diagnosticProtocolFromCycle(template, name);
       day.exercises.push({

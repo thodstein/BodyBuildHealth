@@ -42,16 +42,12 @@ describe('ПЛ-диагностика: полный тренерский ауд�
     expect(empty, `пустых фаз: ${empty}`).toBe(0);
   });
 
-  it('мёртвые точки: 3 классических — коррекции с углами; 4 остальных — пусто (пояснение в UI)', () => {
+  it('мёртвые точки: все 7 движений — коррекции с углами (A3)', () => {
     for (const [lift, phases] of Object.entries(WEAK)) {
       for (const wp of phases) {
         const r = analyzeStickingCorrections(lift as any, wp as any, CYCLE_01);
-        if (['bench', 'squat', 'deadlift'].includes(lift)) {
-          expect(r.items.length, `${lift}/${wp}: нет коррекций`).toBeGreaterThanOrEqual(2);
-          expect(r.items[0].rationale).toContain('Коррекция мёртвой точки');
-        } else {
-          expect(r.items, `${lift}/${wp}: у 4 движений мёртвых точек нет`).toEqual([]);
-        }
+        expect(r.items.length, `${lift}/${wp}: нет коррекций`).toBeGreaterThanOrEqual(1);
+        expect(r.items[0].rationale).toContain('Коррекция мёртвой точки');
       }
     }
   });

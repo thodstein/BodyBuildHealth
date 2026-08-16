@@ -68,4 +68,14 @@ describe('WEAK_POINTS_BY_LIFT', () => {
   it('squat имеет 3 слабых точки', () => {
     expect(WEAK_POINTS_BY_LIFT.squat).toHaveLength(3);
   });
+
+  it('deadlift имеет 5 слабых точек (классика + сумо-старт/дожим)', () => {
+    expect(WEAK_POINTS_BY_LIFT.deadlift).toHaveLength(5);
+    expect(WEAK_POINTS_BY_LIFT.deadlift).toContain('sumo_start');
+    expect(WEAK_POINTS_BY_LIFT.deadlift).toContain('sumo_lockout');
+    const sumoStart = diagnoseWeakPoint('deadlift', 'sumo_start');
+    expect(sumoStart.assistance.some(a => /широк|ямы/i.test(a))).toBe(true);
+    const sumoLockout = diagnoseWeakPoint('deadlift', 'sumo_lockout');
+    expect(sumoLockout.assistance.some(a => /плинт/i.test(a))).toBe(true);
+  });
 });

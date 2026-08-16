@@ -119,11 +119,12 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
     expect(screen.getByText(/Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
   });
 
-  it('для движений БЕЗ угловой диагностики (жим стоя) — пояснение, выбор в слабых точках и bar-path', () => {
+  it('жим стоя (A3): угловая диагностика есть — угол/сустав и коррекции', () => {
     render(<PlDeadpointsBarPathCard dayCount={3} template={CYCLE_01} />);
     fireEvent.click(screen.getByText('Жим стоя'));
-    // Пояснение про углы (мёртвых точек нет у 4 движений)
-    expect(screen.getByText(/Угловая диагностика мёртвых точек есть для приседа, жима лёжа и становой тяги/)).toBeTruthy();
+    // Углы и слабые мышцы показываются для жима стоя
+    expect(screen.getByText(/Угол: \d+°–\d+°/)).toBeTruthy();
+    expect(screen.getByText(/Упражнения-коррекции \(выберите и добавьте в план\)/)).toBeTruthy();
     // Выбор упражнений есть: слабые точки (секция 2) и bar-path (секция 4)
     expect(screen.getByText(/Упражнения \(из раскладки цикла/)).toBeTruthy();
     expect(screen.getByText('4 · Движение штанги (bar-path) · Жим стоя')).toBeTruthy();
