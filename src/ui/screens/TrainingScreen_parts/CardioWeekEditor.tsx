@@ -8,6 +8,7 @@ import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
+  cardioWeekForDate, cardioSafetyReport,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 
@@ -96,6 +97,16 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const hasVersion = cycle ? latestCardioCycleVersion(cycle.id) != null : false;
 
+  const goCurrentWeek = () => {
+    if (!cycle) return;
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const w = cardioWeekForDate(cycle, iso, cycle.startDate);
+    setWeekNo(Math.min(cycle.totalWeeks, Math.max(1, w?.week ?? 1)));
+  };
+
+  const safety = useMemo(() => (week ? cardioSafetyReport({ ...cycle!, weeks: [week] }).warnings : []), [week, cycle]);
+
   const scaleMinutes = (mult: number) => saveWeek(w => ({
     ...w,
     sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult))) })),
@@ -122,16 +133,21 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   return (
     <div style={CARD}>
+      <style>{`@media (max-width:480px){.cardio-day-grid{display:grid!important;grid-template-columns:repeat(4,1fr)}.cardio-day-grid>div{min-width:0!important}}`}</style>
       <div style={ROW}>
         <span style={LABEL}>🛠 Конструктор недели</span>
         <button style={BTN} onClick={() => setWeekNo(Math.max(1, weekNo - 1))} aria-label="Предыдущая неделя">−</button>
         <span style={{ fontSize: 13, fontWeight: 800, minWidth: 30, textAlign: 'center' }}>{week.week}</span>
         <button style={BTN} onClick={() => setWeekNo(Math.min(cycle.totalWeeks, weekNo + 1))} aria-label="Следующая неделя">+</button>
+        <button style={BTN} onClick={goCurrentWeek} title="Перейти к текущей неделе цикла" aria-label="К текущей неделе">📍</button>
         <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{CARDIO_PHASE_LABELS[week.phase]}{week.deload ? ' · делод' : ''}{week.taper ? ' · taper' : ''} · {week.totalMinutes} мин</span>
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
+      {safety.length > 0 && safety.map((s, i) => (
+        <div key={i} style={{ fontSize: 10, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '5px 8px' }} role="alert">⚠ {s}</div>
+      ))}
 
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      <div className="cardio-day-grid" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {DAY_LABELS_RU.map((d, i) => {
           const sess = days.filter(s => s.dayOfWeek === i);
           return (

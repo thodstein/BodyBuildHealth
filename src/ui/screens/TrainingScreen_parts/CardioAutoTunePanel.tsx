@@ -64,7 +64,7 @@ export const CardioAutoTunePanel: React.FC<{
 
   const today = useMemo(() => {
     if (!cycle) return null;
-    return cardioSessionsForDate(cycle, todayIso());
+    return cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
   }, [cycle]);
 
   const toggleAuto = (v: boolean) => {
@@ -82,7 +82,7 @@ export const CardioAutoTunePanel: React.FC<{
 
   const applyTune = () => {
     if (!cycle) return;
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr, referenceIso: cycle.startDate });
     if (r.changes.length === 0) return;
     saveCardioCycleVersion(cycle, 'авто-подстройка');
     saveCardioCycle(r.cycle);
@@ -94,7 +94,7 @@ export const CardioAutoTunePanel: React.FC<{
 
   const previewTune = () => {
     if (!cycle) { flashMsg('⚠ Сначала соберите кардио-цикл'); return; }
-    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr });
+    const r = autoTuneCardioCycle(cycle, loadCardioLog(), { acwr, referenceIso: cycle.startDate });
     if (r.changes.length === 0) { flashMsg('✅ Дневник соответствует плану — изменений нет'); return; }
     setPending({ changes: r.changes, reason: r.advice.reason });
   };

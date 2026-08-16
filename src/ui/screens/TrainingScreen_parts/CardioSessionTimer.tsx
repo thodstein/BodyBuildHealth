@@ -51,7 +51,7 @@ interface ActiveSession {
 export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?: () => void }> = ({ cycle, onSaved }) => {
   const [todaySessions, setTodaySessions] = useState<{ type: CardioType; durationMin: number }[]>(() => {
     if (!cycle) return [];
-    const t = cardioSessionsForDate(cycle, todayIso());
+    const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
     return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin })) : [];
   });
   const [active, setActive] = useState<ActiveSession | null>(null);
@@ -63,7 +63,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
   useEffect(() => {
     if (!cycle) { setTodaySessions([]); return; }
-    const t = cardioSessionsForDate(cycle, todayIso());
+    const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
     setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin })) : []);
   }, [cycle]);
 

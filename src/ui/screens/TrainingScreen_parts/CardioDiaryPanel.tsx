@@ -64,7 +64,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const adherence = useMemo(() => {
     if (!cycle) return null;
     const currentWeek = cycle.weeks.reduce((acc, w) => (w.totalMinutes > 0 ? w.week : acc), 1);
-    return cardioWeekAdherence(cycle, Math.min(currentWeek, cycle.totalWeeks), log);
+    return cardioWeekAdherence(cycle, Math.min(currentWeek, cycle.totalWeeks), log, cycle.startDate);
   }, [log, cycle]);
 
   const add = () => {

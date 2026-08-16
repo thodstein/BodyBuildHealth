@@ -15,7 +15,7 @@ import {
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
-  bumpCardioZone2Volume,
+  bumpCardioZone2Volume, cardioSafetyReport, configFromCycle,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -904,6 +904,75 @@ describe('bumpCardioZone2Volume', () => {
     const before = JSON.stringify(c);
     bumpCardioZone2Volume(c, 15);
     expect(JSON.stringify(c)).toBe(before);
+  });
+});
+
+// ─── startDate / config / safety (этапы G-I) ───
+
+describe('startDate', () => {
+  it('неделя 1 = startDate: цикл, собранный неделю назад → неделя 2', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, startDate: '2026-08-09' });
+    expect(c.startDate).toBe('2026-08-09');
+    expect(cardioWeekForDate(c, '2026-08-16', c.startDate)?.week).toBe(2);
+  });
+
+  it('по умолчанию startDate = сегодня', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(c.startDate).toBe(iso);
+  });
+});
+
+describe('config-снапшот', () => {
+  it('buildCardioCycle сохраняет параметры сборки в config', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 4, level: 'advanced', equipment: ['cycling'], legDays: [0, 3] });
+    expect(c.config).toBeTruthy();
+    expect(c.config!.goal).toBe('cut');
+    expect(c.config!.totalWeeks).toBe(8);
+    expect(c.config!.daysAvailable).toBe(4);
+    expect(c.config!.level).toBe('advanced');
+    expect(c.config!.equipment).toEqual(['cycling']);
+    expect(c.config!.legDays).toEqual([0, 3]);
+    expect(configFromCycle(c)?.goal).toBe('cut');
+  });
+});
+
+describe('cardioSafetyReport', () => {
+  it('нормальный цикл без предупреждений', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6 });
+    expect(cardioSafetyReport(c).warnings).toEqual([]);
+  });
+
+  it('перегруз: сессия > лимита и неделя > 600 мин → warn', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 1, daysAvailable: 7 });
+    const heavy: CardioCycle = {
+      ...c,
+      weeks: c.weeks.map(w => ({
+        ...w,
+        sessions: [
+          { type: 'zone2' as const, durationMin: 120, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 840, purpose: 'x' },
+          { type: 'hiit' as const, durationMin: 40, weeklyFrequency: 4, intensity: 'high' as const, kcalPerSession: 560, purpose: 'y' },
+        ],
+        totalMinutes: 400,
+        totalKcal: 3000,
+      })),
+    };
+    const r = cardioSafetyReport(heavy);
+    expect(r.warnings.length).toBeGreaterThan(0);
+    expect(r.warnings.some(x => x.includes('ZONE2 120 мин'))).toBe(true);
+    expect(r.warnings.some(x => x.includes('HIIT ×4'))).toBe(true);
+  });
+
+  it('safety встроен в качество (штраф)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 1, daysAvailable: 7 });
+    const heavy: CardioCycle = {
+      ...c,
+      weeks: c.weeks.map(w => ({ ...w, sessions: [{ type: 'zone2' as const, durationMin: 150, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 1050, purpose: 'x' }], totalMinutes: 300, totalKcal: 2100 })),
+    };
+    const q = cardioQualityReport(heavy, 7);
+    expect(q.findings.some(f => f.level === 'warn' && f.text.includes('ZONE2 150 мин'))).toBe(true);
+    expect(q.score).toBeLessThan(100);
   });
 });
 

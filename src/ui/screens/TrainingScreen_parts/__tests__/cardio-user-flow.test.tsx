@@ -228,4 +228,36 @@ describe('CardioConstructor — сценарий пользователя', () =
     expect(screen.getByText(/Протокол:/)).toBeTruthy();
     expect(screen.getByText(/Разминка/)).toBeTruthy();
   });
+
+  it('«📍 К текущей неделе» в предпросмотре не ломает навигацию', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /К текущей неделе/ }));
+    expect(screen.getAllByText(/из 12/).length).toBeGreaterThan(0);
+  });
+
+  it('«🔥 Ккал в буфер» копирует расход', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Скопировать ккал/ }));
+    expect(screen.getByText(/Ккал в буфере/)).toBeTruthy();
+  });
+
+  it('пагинация: 52-недельный цикл показывает «Показать все (52)»', () => {
+    seedProfile({});
+    localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ version: 2, goal: 'health', totalWeeks: 52, daysAvailable: 4, recoveryLow: false, bodyWeight: 80, taperWeeks: 2, peakWeek: true, phaseAuto: true, phaseBase: 0, phaseBuild: 0, phaseMaint: 0, level: 'intermediate', equipment: [], lowImpact: false, age: 30, sex: 'male', restingHr: 0 }));
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    expect(screen.getByRole('button', { name: /Показать все недели/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Показать все недели/ }));
+    expect(screen.queryByRole('button', { name: /Показать все недели/ })).toBeNull();
+  });
 });

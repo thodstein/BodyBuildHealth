@@ -26,11 +26,12 @@ function todayIso(): string {
 export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cycle }) => {
   const data = useMemo(() => {
     if (!cycle) return null;
-    const week = cardioWeekForDate(cycle, todayIso());
+    const ref = cycle.startDate;
+    const week = cardioWeekForDate(cycle, todayIso(), ref);
     const current = week?.week ?? 0;
     const pct = cycle.totalWeeks > 0 ? Math.round((Math.min(current, cycle.totalWeeks) / cycle.totalWeeks) * 100) : 0;
     const log = loadCardioLog();
-    const done = cycle.weeks.filter(w => w.week < current).map(w => cardioWeekAdherence(cycle, w.week, log));
+    const done = cycle.weeks.filter(w => w.week < current).map(w => cardioWeekAdherence(cycle, w.week, log, ref));
     const planned = done.reduce((s, a) => s + a.plannedSessions, 0);
     const actual = done.reduce((s, a) => s + a.doneSessions, 0);
     const adherence = planned > 0 ? Math.round((actual / planned) * 100) : null;
@@ -42,7 +43,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
       left: Math.max(0, cycle.totalWeeks - current),
       currentPhase: week?.phase ?? null,
       nextStart,
-      nextSession: cardioNextSession(cycle, todayIso()),
+      nextSession: cardioNextSession(cycle, todayIso(), cycle.startDate),
       totalWeeks: cycle.totalWeeks,
     };
   }, [cycle]);

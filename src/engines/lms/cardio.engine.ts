@@ -99,6 +99,12 @@ export interface CardioCycle {
   version: 1;
   createdAt: string;
   rationale: string[];
+  /** Дата начала цикла (локальная YYYY-MM-DD) — неделя 1 = startDate.
+   *  Все date-функции (неделя/прогресс/adherence/«Сегодня») должны
+   *  использовать его как reference, иначе прогресс «съезжает». */
+  startDate?: string;
+  /** Снапшот параметров сборки — для «⚙️ Изменить параметры» в мастере. */
+  config?: CardioCycleInput;
 }
 
 export interface CardioCycleInput {
@@ -130,6 +136,10 @@ export interface CardioCycleInput {
   sex?: 'male' | 'female';
   /** Дни тяжёлых ног (0-6, Пн=0): zone2/miss/hiit не ставятся в эти дни. */
   legDays?: number[];
+  /** Дата начала цикла (локальная YYYY-MM-DD); по умолчанию — сегодня. */
+  startDate?: string;
+  /** Снапшот параметров сборки (для «⚙️ Изменить параметры»). Заполняется в buildCardioCycle. */
+  config?: CardioCycleInput;
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
@@ -463,6 +473,8 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     weeks.push({ week: w, phase, sessions, totalMinutes: weekMinutes, totalKcal: weekKcal, deload, taper: phase === 'taper' || phase === 'peak', rationale });
   }
 
+  const now = new Date();
+  const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const cycle: CardioCycle = {
     id: input.id ?? `cardio-${Date.now()}`,
     name: input.name ?? `Кардио ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()} ${totalWeeks} нед`,
@@ -475,8 +487,30 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     source: input.source ?? 'auto',
     version: 1,
     createdAt: input.createdAt ?? new Date().toISOString(),
+    startDate: input.startDate ?? todayLocal,
+    config: input.config ?? undefined,
     rationale: [],
   };
+  if (!cycle.config) {
+    cycle.config = {
+      goal: input.goal,
+      totalWeeks: input.totalWeeks,
+      bodyWeight: input.bodyWeight,
+      daysAvailable: input.daysAvailable,
+      recoveryLow: input.recoveryLow,
+      competitions: input.competitions ? input.competitions.map(c => ({ ...c })) : undefined,
+      phaseSplit: input.phaseSplit ? { ...input.phaseSplit } : undefined,
+      taperWeeks: input.taperWeeks,
+      peakWeek: input.peakWeek,
+      level: input.level,
+      equipment: input.equipment ? [...input.equipment] : undefined,
+      lowImpact: input.lowImpact,
+      age: input.age,
+      restingHr: input.restingHr,
+      sex: input.sex,
+      legDays: input.legDays ? [...input.legDays] : undefined,
+    };
+  }
   cycle.rationale.push(`Цель: ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()}, ${totalWeeks} нед, ${daysAvailable} дн/нед.`);
   if (input.level && input.level !== 'intermediate') cycle.rationale.push(`Уровень: ${CARDIO_LEVEL_LABELS[input.level].toLowerCase()} (объём ×${levelMult}).`);
   if (equipmentPool.length > 0) cycle.rationale.push(`Оборудование: ${equipmentPool.map(e => cardioEquipmentLabel(e)).join(', ')}${lowImpact ? ' (низкоударное)' : ''}.`);
@@ -687,6 +721,8 @@ export function cardioPlanToCycle(plan: CardioPlan, goal: CardioGoal = 'maintena
     taper: false,
     rationale: plan.rationale,
   };
+  const now = new Date();
+  const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   return {
     id: `cardio-migrated-${Date.now()}`,
     name: `Кардио ${CARDIO_GOAL_LABELS[goal].toLowerCase()} (миграция)`,
@@ -697,6 +733,7 @@ export function cardioPlanToCycle(plan: CardioPlan, goal: CardioGoal = 'maintena
     source: 'imported',
     version: 1,
     createdAt: new Date().toISOString(),
+    startDate: todayLocal,
     rationale: plan.rationale,
   };
 }
@@ -1365,12 +1402,43 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
   // 6. Пустые недели и перегруз дней
   const emptyWeeks = cycle.weeks.filter(w => weekMaxFreq(w) === 0).length;
   if (emptyWeeks > 0) add('warn', `${emptyWeeks} недель без сессий.`, 10);
+
+  // 7. Safety: перегруз (мин/сессия, мин/нед, HIIT-частота)
+  for (const s of cardioSafetyReport(cycle).warnings) add('warn', s, 10);
+
   const maxFreq = Math.max(1, ...cycle.weeks.map(weekMaxFreq));
   if (daysAvailable > 0 && daysAvailable < 7 && maxFreq > daysAvailable) {
     add('info', `Максимальная частота недели (${maxFreq}) больше доступных дней (${daysAvailable}) — часть сессий сгруппируется.`, 0);
   }
 
   return { score: Math.max(0, Math.min(100, 100 - penalty)), findings };
+}
+
+// ─── Safety-валидация правок (перегруз) ───
+
+/** Предупреждения безопасности: сессии/недели за пределами разумных объёмов. */
+export function cardioSafetyReport(cycle: CardioCycle): { warnings: string[] } {
+  const warnings: string[] = [];
+  for (const w of cycle.weeks) {
+    for (const s of w.sessions) {
+      const limit = s.type === 'hiit' ? 30 : s.type === 'zone2' ? 90 : s.type === 'miss' ? 90 : 120;
+      if (s.durationMin > limit) {
+        warnings.push(`Нед ${w.week}: ${s.type.toUpperCase()} ${s.durationMin} мин — больше ${limit} мин (перегруз).`);
+      }
+      if (s.type === 'hiit' && s.weeklyFrequency > 3) {
+        warnings.push(`Нед ${w.week}: HIIT ×${s.weeklyFrequency} — больше 3×/нед (риск перетренированности).`);
+      }
+    }
+    if (w.totalMinutes > 600) {
+      warnings.push(`Нед ${w.week}: ${w.totalMinutes} мин — больше 600 мин/нед (высокий риск перегрузки).`);
+    }
+  }
+  return { warnings };
+}
+
+/** Обратный снапшот параметров сборки для «⚙️ Изменить параметры». */
+export function configFromCycle(cycle: CardioCycle): CardioCycleInput | null {
+  return cycle.config ? { ...cycle.config } : null;
 }
 
 // ─── Варианты плана и объяснение выбора (P0) ───

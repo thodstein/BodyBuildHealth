@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import {
   cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel,
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
-  spreadSessionsAcrossDays, DAY_LABELS_RU,
+  spreadSessionsAcrossDays, DAY_LABELS_RU, cardioWeekForDate,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
@@ -48,6 +48,7 @@ export const CardioPreviewStep: React.FC<{
   cycle: CardioCycle | null;
   onBuild: () => void;
   onRename: (name: string) => void;
+  onEditConfig: () => void;
   daysAvailable: number;
   recoveryLow: boolean;
   variant: CardioVariant;
@@ -55,12 +56,14 @@ export const CardioPreviewStep: React.FC<{
   variants: ReturnType<typeof cardioPlanVariants>;
   explanation: string[];
   onImproved: (cycle: CardioCycle) => void;
-}> = ({ cycle, onBuild, onRename, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, onImproved }) => {
+}> = ({ cycle, onBuild, onRename, onEditConfig, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, onImproved }) => {
   const [showWeeks, setShowWeeks] = useState(true);
+  const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [weekNo, setWeekNo] = useState(1);
   const [improve, setImprove] = useState<{ changes: CardioTuneChange[]; cycle: CardioCycle } | null>(null);
   const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfWeek: number } | null>(null);
+  const [kcalFlash, setKcalFlash] = useState(false);
 
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
   const quality = useMemo(() => (cycle ? cardioQualityReport(cycle, daysAvailable) : null), [cycle, daysAvailable]);
@@ -100,6 +103,38 @@ export const CardioPreviewStep: React.FC<{
     return w ? spreadSessionsAcrossDays(w) : [];
   }, [cycle, weekNo]);
 
+  const goCurrentWeek = () => {
+    if (!cycle) return;
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const w = cardioWeekForDate(cycle, iso, cycle.startDate);
+    setWeekNo(Math.min(cycle.totalWeeks, Math.max(1, w?.week ?? 1)));
+  };
+
+  const copyKcal = () => {
+    if (!cycle || !summary) return;
+    const text = `Кардио «${cycle.name}»: ${summary.avgKcalPerWeek} ккал/нед (в среднем)`;
+    try {
+      navigator.clipboard.writeText(text).then(() => setKcalFlash(true)).catch(() => fallbackCopy(text));
+    } catch { fallbackCopy(text); }
+    if (!navigator.clipboard) fallbackCopy(text);
+    window.setTimeout(() => setKcalFlash(false), 2000);
+  };
+
+  const fallbackCopy = (text: string) => {
+    setKcalFlash(true);
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch { /* ignore */ }
+  };
+
+  const visibleWeeks = showAllWeeks || (cycle?.totalWeeks ?? 0) <= 16 ? (cycle?.weeks ?? []) : (cycle?.weeks ?? []).slice(0, 12);
+
   const previewImprove = () => {
     if (!cycle) return;
     const r = improveCardioCycle(cycle, { daysAvailable, recoveryLow });
@@ -134,6 +169,7 @@ export const CardioPreviewStep: React.FC<{
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <style>{`@media (max-width:480px){.cardio-day-grid{display:grid!important;grid-template-columns:repeat(4,1fr)}.cardio-day-grid>div{min-width:0!important}}`}</style>
       <div style={CARD}>
         <div style={ROW}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>{cycle.name}</span>
@@ -147,7 +183,13 @@ export const CardioPreviewStep: React.FC<{
             </div>
           ))}
         </div>
-        <button style={BTN_PRIMARY} onClick={onBuild}>🔄 Пересобрать цикл</button>
+        <div style={ROW}>
+          <button style={BTN_PRIMARY} onClick={onBuild}>🔄 Пересобрать цикл</button>
+          <button style={BTN} onClick={onEditConfig} title="Загрузить параметры, из которых собран этот цикл, для редактирования">⚙️ Изменить параметры</button>
+          <button style={BTN} onClick={copyKcal} aria-label="Скопировать ккал">
+            {kcalFlash ? '✅ Ккал в буфере' : '🔥 Ккал в буфер'}
+          </button>
+        </div>
       </div>
 
       {/* Варианты нагрузки */}
@@ -259,9 +301,10 @@ export const CardioPreviewStep: React.FC<{
           <button style={BTN} onClick={() => setWeekNo(Math.max(1, weekNo - 1))} aria-label="Предыдущая неделя">−</button>
           <span style={{ fontSize: 13, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{Math.min(cycle.totalWeeks, Math.max(1, weekNo))}</span>
           <button style={BTN} onClick={() => setWeekNo(Math.min(cycle.totalWeeks, weekNo + 1))} aria-label="Следующая неделя">+</button>
+          <button style={BTN} onClick={goCurrentWeek} title="Перейти к текущей неделе цикла" aria-label="К текущей неделе">📍</button>
           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>из {cycle.totalWeeks}</span>
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div className="cardio-day-grid" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {DAY_LABELS_RU.map((d, i) => {
             const sess = weekDays.filter(s => s.dayOfWeek === i);
             return (
@@ -311,7 +354,7 @@ export const CardioPreviewStep: React.FC<{
         </div>
         {showWeeks && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {cycle.weeks.map(w => (
+            {visibleWeeks.map(w => (
               <div key={w.week} style={ROW}>
                 <span style={{ width: 26, fontSize: 11, fontWeight: 800, color: PHASE_COLOR[w.phase] ?? '#888' }}>{w.week}</span>
                 <span style={{ width: 92, fontSize: 11, color: 'var(--text-dim)' }}>
@@ -323,6 +366,11 @@ export const CardioPreviewStep: React.FC<{
                 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', minWidth: 74, textAlign: 'right' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
               </div>
             ))}
+            {!showAllWeeks && (cycle.totalWeeks ?? 0) > 16 && (
+              <button style={{ ...BTN, minHeight: 32, padding: '6px 12px', alignSelf: 'flex-start' }} onClick={() => setShowAllWeeks(true)} aria-label="Показать все недели">
+                Показать все ({cycle.totalWeeks})
+              </button>
+            )}
           </div>
         )}
       </div>

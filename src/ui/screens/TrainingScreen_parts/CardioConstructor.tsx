@@ -16,7 +16,7 @@ import {
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
-  type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
+  type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
@@ -222,12 +222,7 @@ export const CardioConstructor: React.FC = () => {
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
 
   const build = () => {
-    const vOpts = variant === 'gentle'
-      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
-      : variant === 'intense'
-        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
-        : { level, recoveryLow };
-    const c = buildCardioCycle({
+    const base: CardioCycleInput = {
       goal,
       totalWeeks,
       daysAvailable,
@@ -235,7 +230,8 @@ export const CardioConstructor: React.FC = () => {
       competitions: comps,
       taperWeeks,
       peakWeek,
-      ...vOpts,
+      level,
+      recoveryLow,
       equipment,
       lowImpact,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
@@ -243,12 +239,41 @@ export const CardioConstructor: React.FC = () => {
       sex,
       legDays,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
-    });
+    };
+    const vOpts = variant === 'gentle'
+      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
+      : variant === 'intense'
+        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
+        : { level, recoveryLow };
+    const c = buildCardioCycle({ ...base, ...vOpts, config: base });
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
     reload();
     flashMsg('✅ Кардио-цикл собран и сохранён в библиотеку');
+  };
+
+  const editConfig = () => {
+    if (!cycle?.config) { flashMsg('⚠ Параметры сборки недоступны — пересоберите цикл'); return; }
+    const cfg = cycle.config;
+    setGoal(cfg.goal);
+    setTotalWeeks(cfg.totalWeeks ?? totalWeeks);
+    setDaysAvailable(cfg.daysAvailable ?? daysAvailable);
+    setRecoveryLow(cfg.recoveryLow ?? recoveryLow);
+    if (cfg.bodyWeight != null) setBodyWeight(cfg.bodyWeight);
+    setComps(cfg.competitions ? cfg.competitions.map(c => ({ ...c })) : []);
+    setTaperWeeks(cfg.taperWeeks ?? taperWeeks);
+    setPeakWeek(cfg.peakWeek ?? peakWeek);
+    setLevel(cfg.level ?? level);
+    setEquipment(cfg.equipment ? [...cfg.equipment] : []);
+    setLowImpact(cfg.lowImpact ?? lowImpact);
+    if (cfg.age != null) setAge(String(cfg.age));
+    if (cfg.restingHr != null && cfg.restingHr > 0) setRestingHr(String(cfg.restingHr));
+    if (cfg.sex) setSex(cfg.sex);
+    setLegDays(cfg.legDays ? [...cfg.legDays] : []);
+    setPhaseSplit(cfg.phaseSplit ? { auto: false, base: cfg.phaseSplit.base ?? 0, build: cfg.phaseSplit.build ?? 0, maintenance: cfg.phaseSplit.maintenance ?? 0 } : { auto: true, base: 0, build: 0, maintenance: 0 });
+    setStep('params');
+    flashMsg('⚙️ Параметры загружены из цикла — измените и пересоберите');
   };
 
   const migrateFromPlan = () => {
@@ -473,11 +498,11 @@ export const CardioConstructor: React.FC = () => {
     try { return localStorage.getItem('he_cardio_auto_tune') === '1'; } catch { return false; }
   }, [flash, cycle]);
 
-  const todayCardio = useMemo(() => (cycle ? cardioSessionsForDate(cycle, todayIso()) : null), [cycle]);
+  const todayCardio = useMemo(() => (cycle ? cardioSessionsForDate(cycle, todayIso(), cycle.startDate) : null), [cycle]);
 
   const nextStartInfo = useMemo(() => {
     if (!cycle) return null;
-    const w = cardioWeekForDate(cycle, todayIso());
+    const w = cardioWeekForDate(cycle, todayIso(), cycle.startDate);
     const current = w?.week ?? 1;
     const start = cycle.weeks.find(x => x.week >= current && (x.phase === 'taper' || x.phase === 'peak'));
     return start ? { week: start.week, left: Math.max(0, start.week - current) } : null;
@@ -576,7 +601,7 @@ export const CardioConstructor: React.FC = () => {
       {step === 'preview' && (
         <>
           <CardioPreviewStep
-            cycle={cycle} onBuild={build} onRename={renameCycle}
+            cycle={cycle} onBuild={build} onRename={renameCycle} onEditConfig={editConfig}
             daysAvailable={daysAvailable} recoveryLow={recoveryLow}
             variant={variant} onVariant={setVariant}
             variants={planVariants} explanation={planExplanation}
