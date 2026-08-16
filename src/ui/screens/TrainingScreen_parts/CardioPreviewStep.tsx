@@ -60,6 +60,7 @@ export const CardioPreviewStep: React.FC<{
   const [nameDraft, setNameDraft] = useState('');
   const [weekNo, setWeekNo] = useState(1);
   const [improve, setImprove] = useState<{ changes: CardioTuneChange[]; cycle: CardioCycle } | null>(null);
+  const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfWeek: number } | null>(null);
 
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
   const quality = useMemo(() => (cycle ? cardioQualityReport(cycle, daysAvailable) : null), [cycle, daysAvailable]);
@@ -267,14 +268,37 @@ export const CardioPreviewStep: React.FC<{
               <div key={d} style={DAY_CELL}>
                 <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 3 }}>{d}</div>
                 {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
-                  <div key={j} style={{ color: '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap' }}>
+                  <button
+                    key={j}
+                    onClick={() => setSelectedSession({ week: Math.min(cycle.totalWeeks, Math.max(1, weekNo)), dayOfWeek: i })}
+                    title="Показать протокол сессии"
+                    style={{ color: '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 10 }}
+                    aria-label={`Протокол: ${TYPE_LABEL[s.type]} ${d}`}
+                  >
                     {TYPE_LABEL[s.type]} {s.durationMin}м{s.equipment ? ` ${cardioEquipmentLabel(s.equipment)}` : ''}
-                  </div>
+                  </button>
                 ))}
               </div>
             );
           })}
         </div>
+        {selectedSession && (() => {
+          const w = cycle.weeks.find(x => x.week === selectedSession.week);
+          const s = w?.sessions.find(x => x.dayOfWeek === selectedSession.dayOfWeek);
+          if (!s) return null;
+          const protocol = cardioSessionProtocol(s);
+          return (
+            <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }} role="status">
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>📋 Протокол: {TYPE_LABEL[s.type]} {s.durationMin} мин · нед {selectedSession.week}</div>
+              {protocol.map(p => (
+                <div key={p.name} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  <b>{p.name}</b> {p.minutes} мин — {p.note}{p.hrZone?.max ? ` · ЧСС ${p.hrZone.min}-${p.hrZone.max}` : ''}
+                </div>
+              ))}
+              <button style={{ ...BTN, minHeight: 30, padding: '4px 10px', alignSelf: 'flex-start' }} onClick={() => setSelectedSession(null)}>✕ Закрыть</button>
+            </div>
+          );
+        })()}
       </div>
 
       <CardioProgressCard cycle={cycle} />

@@ -611,6 +611,20 @@ export function cardioWeightAdvice(
   return { action: 'keep', reason: `Темп снижения веса ${Math.abs(weekly).toFixed(2)} кг/нед — в норме, кардио менять не нужно.` };
 }
 
+/** Одно-кликовое применение рекомендации по весу: +N мин Zone 2 на рабочие недели. */
+export function bumpCardioZone2Volume(cycle: CardioCycle, addMin = 15): CardioCycle {
+  const weeks = cycle.weeks.map(w => {
+    if (w.deload || w.taper || w.phase === 'peak' || w.phase === 'transition') return w;
+    const sessions = w.sessions.map(s => {
+      if (s.type !== 'zone2') return s;
+      const durationMin = s.durationMin + addMin;
+      return { ...s, durationMin, kcalPerSession: kcalForCardio('zone2', durationMin, 80) };
+    });
+    return rebuildWeek(w, sessions, ['⚖️ Zone 2 +' + addMin + ' мин (коррекция по весу)']);
+  });
+  return { ...cycle, weeks, source: cycle.source };
+}
+
 // ─── История версий цикла (undo авто-подстройки/правок) ───
 
 export const CARDIO_HISTORY_KEY = 'he_cardio_cycle_history';

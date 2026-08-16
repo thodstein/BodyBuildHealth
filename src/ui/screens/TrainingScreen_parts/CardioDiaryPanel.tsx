@@ -47,7 +47,7 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: number | null; recoveryLow?: boolean }> = ({ cycle, acwr, recoveryLow }) => {
+export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: number | null; recoveryLow?: boolean; onApplyWeightAdjust?: () => void }> = ({ cycle, acwr, recoveryLow, onApplyWeightAdjust }) => {
   const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
   const [date, setDate] = useState(todayIso());
   const [type, setType] = useState<CardioType>('zone2');
@@ -118,8 +118,13 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
           const wa = cardioWeightAdvice(w, cycle);
           if (wa.action !== 'increase') return null;
           return (
-            <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '6px 8px' }} role="status">
-              ⚖️ {wa.reason}
+            <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 6 }} role="status">
+              <div>⚖️ {wa.reason}</div>
+              {onApplyWeightAdjust && (
+                <button style={{ ...BTN, minHeight: 32, padding: '5px 10px', alignSelf: 'flex-start' }} onClick={onApplyWeightAdjust} aria-label="Применить +15 мин Zone 2">
+                  ⚖️ Применить (+15 мин Zone 2)
+                </button>
+              )}
             </div>
           );
         } catch { return null; }

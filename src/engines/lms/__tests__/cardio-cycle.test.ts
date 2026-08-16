@@ -15,6 +15,7 @@ import {
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
+  bumpCardioZone2Volume,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -879,6 +880,30 @@ describe('cardioWeightAdvice', () => {
     const c = buildCardioCycle({ goal: 'mass', totalWeeks: 8 });
     const a = cardioWeightAdvice([{ date: '2026-08-01', weight: 80 }, { date: '2026-08-15', weight: 80 }], c, REF);
     expect(a.action).toBe('keep');
+  });
+});
+
+describe('bumpCardioZone2Volume', () => {
+  it('+15 мин Zone 2 на рабочих неделях, taper/делод не трогаются', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const bumped = bumpCardioZone2Volume(c, 15);
+    const z2Before = c.weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
+    const z2After = bumped.weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
+    expect(z2After).toBe(z2Before + 15);
+    expect(bumped.weeks[0].totalMinutes).toBeGreaterThan(c.weeks[0].totalMinutes);
+    const deloadIdx = c.weeks.findIndex(w => w.deload);
+    if (deloadIdx >= 0) {
+      const wb = c.weeks[deloadIdx];
+      const wa = bumped.weeks[deloadIdx];
+      expect(wa.sessions.map(s => s.durationMin)).toEqual(wb.sessions.map(s => s.durationMin));
+    }
+  });
+
+  it('исходный цикл не мутируется', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6 });
+    const before = JSON.stringify(c);
+    bumpCardioZone2Volume(c, 15);
+    expect(JSON.stringify(c)).toBe(before);
   });
 });
 

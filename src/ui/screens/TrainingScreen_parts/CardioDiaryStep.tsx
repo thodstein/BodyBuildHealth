@@ -14,13 +14,14 @@ export const CardioDiaryStep: React.FC<{
   acwr?: number | null;
   recoveryLow: boolean;
   onChanged: () => void;
-}> = ({ cycle, acwr, recoveryLow, onChanged }) => {
+  onApplyWeightAdjust?: () => void;
+}> = ({ cycle, acwr, recoveryLow, onChanged, onApplyWeightAdjust }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <CardioProgressCard cycle={cycle} />
       <CardioSessionTimer cycle={cycle} onSaved={onChanged} />
       <CardioAutoTunePanel cycle={cycle} acwr={acwr} onChanged={onChanged} />
-      <CardioDiaryPanel cycle={cycle} acwr={acwr} recoveryLow={recoveryLow} />
+      <CardioDiaryPanel cycle={cycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} />
     </div>
   );
 };

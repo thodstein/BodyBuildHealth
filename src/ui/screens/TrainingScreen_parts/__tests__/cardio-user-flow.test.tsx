@@ -191,4 +191,41 @@ describe('CardioConstructor — сценарий пользователя', () =
     expect(screen.getByText(/Сценарии \(1\/6\)/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /Загрузить/ })).toBeTruthy();
   });
+
+  it('⚖️ плато веса: совет и применение +15 мин Zone 2', () => {
+    seedProfile({});
+    localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ version: 2, goal: 'cut', totalWeeks: 8, daysAvailable: 5, recoveryLow: false, bodyWeight: 80, taperWeeks: 2, peakWeek: true, phaseAuto: true, phaseBase: 0, phaseBuild: 0, phaseMaint: 0, level: 'intermediate', equipment: [], lowImpact: false, age: 30, sex: 'male', restingHr: 0 }));
+    const today = new Date();
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const d = (n: number) => { const x = new Date(today); x.setDate(x.getDate() - n); return iso(x); };
+    localStorage.setItem('he_weight_log', JSON.stringify([
+      { date: d(12), weight: 80.0 },
+      { date: d(8), weight: 79.95 },
+      { date: d(4), weight: 79.9 },
+      { date: d(1), weight: 79.9 },
+    ]));
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Вес стоит/)).toBeTruthy();
+    const z2Before = loadCardioCycles()[0].weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
+    fireEvent.click(screen.getByRole('button', { name: /Применить \+15 мин Zone 2/ }));
+    const z2After = loadCardioCycles()[0].weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
+    expect(z2After).toBe(z2Before + 15);
+  });
+
+  it('протокол сессии открывается по клику на сессию в «Неделе по дням»', () => {
+    seedProfile({});
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const sessionBtn = screen.getAllByRole('button', { name: /Протокол: Zone 2/ })[0];
+    fireEvent.click(sessionBtn);
+    expect(screen.getByText(/Протокол:/)).toBeTruthy();
+    expect(screen.getByText(/Разминка/)).toBeTruthy();
+  });
 });

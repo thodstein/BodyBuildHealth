@@ -15,6 +15,7 @@ import {
   cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel,
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
+  bumpCardioZone2Volume,
   type CardioCycle, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import {
@@ -375,6 +376,17 @@ export const CardioConstructor: React.FC = () => {
     flashMsg('✨ Улучшения применены');
   };
 
+  const applyWeightAdjust = () => {
+    if (!cycle) return;
+    saveCardioCycleVersion(cycle, '⚖️ коррекция по весу');
+    const next = bumpCardioZone2Volume(cycle, 15);
+    saveCardioCycle(next);
+    setActiveCardioCycle(next);
+    setCycle(next);
+    reload();
+    flashMsg('⚖️ Zone 2 +15 мин применено (отмена — «↩ Вернуть версию»)');
+  };
+
   const planVariants = useMemo(() => {
     try {
       return cardioPlanVariants({
@@ -585,7 +597,7 @@ export const CardioConstructor: React.FC = () => {
         />
       )}
       {step === 'diary' && (
-        <CardioDiaryStep cycle={cycle} acwr={acwrValue} recoveryLow={recoveryLow} onChanged={refreshActive} />
+        <CardioDiaryStep cycle={cycle} acwr={acwrValue} recoveryLow={recoveryLow} onChanged={refreshActive} onApplyWeightAdjust={applyWeightAdjust} />
       )}
 
       {/* Навигация */}
