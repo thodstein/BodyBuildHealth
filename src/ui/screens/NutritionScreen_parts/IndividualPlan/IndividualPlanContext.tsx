@@ -31,6 +31,9 @@ import { getYesterdaySummary, computeCompensation, computeRollingCompensation, t
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
 import { getBBCategory, type BBCategory, getPeakWeekDay, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
 import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
+import { annualPlanPhaseForDate } from "../../../../engines/annual-training/block-builders.engine";
+import { loadAnnualTrainingPlan } from "../../../../engines/annual-training/annual-training-storage";
+import type { AnnualTrainingPlan } from "../../../../engines/annual-training/annual-training.types";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -426,6 +429,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     window.addEventListener('he-bb-contest-prep-updated', onPrepUpdated);
     return () => window.removeEventListener('he-bb-contest-prep-updated', onPrepUpdated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 🗓 Годовой план (событие he-annual-training-plan-updated): живьё перечитываем
+  // разметку блоков — для подсказки «неделя года = contest prep» при питании.
+  const [annualPlan, setAnnualPlan] = useState<AnnualTrainingPlan | null>(null);
+  useEffect(() => {
+    const onAnnualUpdated = () => {
+      try { setAnnualPlan(loadAnnualTrainingPlan()); } catch { /* ignore */ }
+    };
+    try { setAnnualPlan(loadAnnualTrainingPlan()); } catch { /* ignore */ }
+    window.addEventListener('he-annual-training-plan-updated', onAnnualUpdated);
+    return () => window.removeEventListener('he-annual-training-plan-updated', onAnnualUpdated);
   }, []);
   const applyBBPeakToPlan = (cfg: BBContestPrepConfig | null) => {
     setBBPrepConfig(cfg);
@@ -1677,6 +1691,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // → legacy конфиг (goals.bbPeakConfig, только пик-неделя).
         const _prepDate = isoAddDays(isoToday(), offset);
         const _inPrepWindow = bbPrepPlan ? prepPhaseForDate(bbPrepPlan, _prepDate) !== null : false;
+        // 🗓 Годовой план: активный блок на дату (для подсказки про contest prep).
+        const _annualPhase = annualPlan ? annualPlanPhaseForDate(annualPlan, _prepDate) : null;
         const _peakTargets = bbPrepPlan && _inPrepWindow
           ? nutritionTargetsForPrepDate(_prepDate, bbPrepPlan, {
               kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
@@ -1698,6 +1714,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             : null;
         if (_peakTargets?.phase) _peakNote = _peakTargets.note;
         else if (bbPrepPlan && _peakTargets?.note) _peakNote = _peakTargets.note;
+        else if (_annualPhase && _annualPhase.block.ref.kind === 'BB' && _annualPhase.block.ref.phase === 'contest_prep' && !bbPrepPlan && !bbPrepConfig && !_peakNote) {
+          _peakNote = '🏁 Годовой план: эта неделя — contest prep, но prep-план не собран. Соберите «🏁 Contest prep» в ББ-авто (или включите «🎭 Пик-неделю» у блока в Годовом плане) — иначе цели подготовки не применяются.';
+        }
         const _applyPrepTargets = !!(_peakTargets && (_peakTargets.phase || _inPrepWindow));
         const input: MealPlanInput = {
           weightKg: weight, lbmKg, bodyFatPct: bfPct, sex,

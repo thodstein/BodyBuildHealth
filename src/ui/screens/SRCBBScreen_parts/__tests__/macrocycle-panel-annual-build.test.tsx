@@ -181,6 +181,12 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const saved = JSON.parse(localStorage.getItem('he_bb_plan_saved') || 'null');
     expect(saved).toBeTruthy();
     expect(saved.plan?.weeks?.length).toBe(6);
+    // Контекст передачи блока: ББ-авто предзаполняет шаг «🏁 Contest prep».
+    const ctx = JSON.parse(localStorage.getItem('he_bb_plan_saved_ctx') || 'null');
+    expect(ctx).toBeTruthy();
+    expect(ctx.blockKey).toBeTruthy();
+    expect(ctx.phase).toBe('strength');
+    expect(ctx.peakWeek).toBe(false);
   });
 
   it('живое обновление: событие he-annual-training-plan-updated перечитывает план', async () => {

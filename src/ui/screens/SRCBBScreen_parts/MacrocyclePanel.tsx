@@ -2082,8 +2082,17 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           <button type="button" onClick={() => {
                             try {
                               localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: b.result!.bbPlan, date: new Date().toISOString() }));
+                              // Контекст передачи блока: ББ-авто предзаполняет шаг «🏁 Contest prep».
+                              localStorage.setItem('he_bb_plan_saved_ctx', JSON.stringify({
+                                blockKey: b.ref.blockKey,
+                                phase: b.ref.phase,
+                                weeks: b.ref.weeks,
+                                peakWeek: !!b.config.peakWeek,
+                                peakConfig: b.config.peakConfig ?? null,
+                                taper: b.config.taper ?? null,
+                              }));
                               window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
-                              setAnnualStatusNote('🚀 Блок передан в ББ-авто — откройте шаг «План» в ББ-авто');
+                              setAnnualStatusNote('🚀 Блок передан в ББ-авто — откройте шаг «План»' + (b.config.peakWeek ? ' (пик-неделя предзаполнена в «🏁 Contest prep»)' : ''));
                             } catch { setAnnualStatusNote('⚠ Не удалось передать блок в ББ-авто'); }
                           }}
                             style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
@@ -2163,7 +2172,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 {blocks.map((b, i) => (
                   <div key={i} style={{ marginBottom: 4, padding: b.isActive ? '4px 6px' : 0, borderRadius: 6, background: b.isActive ? b.color + '14' : 'transparent', border: b.isActive ? `1px solid ${b.color}40` : '1px solid transparent' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6, fontSize: 10 }}>
-                      <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: b.isActive ? 800 : 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: b.isActive ? 800 : 600, flex: 1, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                         {b.isActive ? '📍 ' : ''}{b.icon} {b.label}{b.cycleTitle ? ` — ${b.cycleTitle}` : ''}
                       </span>
                       <span style={{ color: 'rgba(255,255,255,0.45)', flexShrink: 0 }}>нед {b.weekOffset}–{b.weekOffset + b.weeks - 1} · {b.weeks}н · {b.pct}%</span>
@@ -2189,7 +2198,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                       return (
                         <div key={c.id} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                           <span>{v.icon}</span><span style={{ fontWeight: 700, color: v.color }}>[{c.priority}]</span>
-                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{c.name}</span>
                           <span style={{ color: 'rgba(255,255,255,0.4)' }}>нед {c.week}{c.date ? ` (${c.date})` : ''}</span>
                           <span title={taperOk ? 'Тапер-окно ≥2 нед перед стартом — разгрузка выполнена' : taperWeeks === 1 ? 'Тапер-окно 1 нед — разгрузка короткая, увеличьте peak-блок' : 'Нет тапер-окна перед стартом — добавьте peak-блок ≥2 нед'} style={{ padding: '1px 6px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: rdColor + '16', border: `1px solid ${rdColor}44`, color: rdColor }}>
                             🧠 готовность {taperOk ? '100%' : taperWeeks === 1 ? '75%' : '50%'} · тапер {taperWeeks} нед

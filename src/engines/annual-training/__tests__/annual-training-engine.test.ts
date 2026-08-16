@@ -12,7 +12,7 @@ import {
   directionFromKinds, planStatusFromBlocks, defaultConfigForRef,
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
   importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
-  recommendKindForPhase, cloneBlockConfigFrom,
+  recommendKindForPhase, cloneBlockConfigFrom, annualWeekForDate, annualPlanPhaseForDate,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -424,6 +424,30 @@ describe('валидация разметки года', () => {
     expect(activeBlockForWeek(plan, 99)).toBeNull();
     expect(activeBlockForWeek(plan, 0)).toBeNull();
     expect(activeBlockForWeek(plan, NaN)).toBeNull();
+  });
+
+  it('annualWeekForDate: неделя 1 = reference; +7д → 2; -7д → 2; некорректно → null', () => {
+    const ref = '2026-01-01';
+    expect(annualWeekForDate('2026-01-01', ref)).toBe(1);
+    expect(annualWeekForDate('2026-01-08', ref)).toBe(2);
+    expect(annualWeekForDate('2026-01-02', ref)).toBe(1);
+    expect(annualWeekForDate('2025-12-25', ref)).toBe(2);
+    expect(annualWeekForDate('не дата', ref)).toBeNull();
+    expect(annualWeekForDate('', ref)).toBeNull();
+  });
+
+  it('annualPlanPhaseForDate: блок года на дату + неделя', () => {
+    const plan = annualPlanFromMacro(makePLMacro());
+    const ref = '2026-01-01'; // нед 1 = endurance (1-8)
+    const inBlock = annualPlanPhaseForDate(plan, '2026-01-15', ref); // нед 3
+    expect(inBlock).toBeTruthy();
+    expect(inBlock!.week).toBe(3);
+    expect(inBlock!.block.ref.phase).toBe('endurance');
+    const inStrength = annualPlanPhaseForDate(plan, '2026-03-05', ref); // нед 10
+    expect(inStrength!.block.ref.phase).toBe('strength');
+    const out = annualPlanPhaseForDate(plan, '2027-01-01', ref);
+    expect(out).toBeNull();
+    expect(annualPlanPhaseForDate(plan, 'не дата', ref)).toBeNull();
   });
 
   it('recommendKindForPhase: BB-макро → BB; PL-фазы → PL, BB-фазы → BB', () => {

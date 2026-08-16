@@ -621,6 +621,30 @@ export function activeBlockForWeek(plan: AnnualTrainingPlan, week: number): Annu
   return plan.blocks.find(b => week >= b.ref.startWeek && week < b.ref.startWeek + b.ref.weeks) ?? null;
 }
 
+/** Неделя года (1-индекс) для ISO-даты: неделя 1 = reference (по умолчанию сегодня).
+ *  Будущее: нед 1 = сегодня; прошлое: нед 2 = 7-13 дней назад и т.д. */
+export function annualWeekForDate(isoDate: string, reference?: Date | string): number | null {
+  const d = new Date(isoDate).getTime();
+  const ref = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
+  if (!Number.isFinite(d) || !Number.isFinite(ref)) return null;
+  const diffDays = (d - ref) / 86400000;
+  const week = diffDays >= 0 ? Math.floor(diffDays / 7) + 1 : 1 + Math.floor(-diffDays / 7);
+  return Math.max(1, week);
+}
+
+/** Фаза/блок годового плана на дату (для питания, дневника и других экранов). */
+export function annualPlanPhaseForDate(
+  plan: AnnualTrainingPlan,
+  isoDate: string,
+  reference?: Date | string,
+): { week: number; block: AnnualBlockState } | null {
+  const week = annualWeekForDate(isoDate, reference);
+  if (week == null) return null;
+  const block = activeBlockForWeek(plan, week);
+  if (!block) return null;
+  return { week, block };
+}
+
 /** Рекомендуемый конструктор блока по фазе макро (подсказка, не авто-выбор). */
 export function recommendKindForPhase(phase: string, source: 'pl' | 'bb'): AnnualBlockKind {
   if (source === 'bb') return 'BB';
