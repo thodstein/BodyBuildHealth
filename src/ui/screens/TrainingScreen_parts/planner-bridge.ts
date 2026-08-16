@@ -18,11 +18,13 @@
  *  - design    : { design: MacrocycleDesign, fillExercises?, daysPerWeek?, level?, goal? } — применить дизайн периодизации к новой/текущей программе
  *  - macrocycle: { macro: Macrocycle, level?, goal?, daysPerWeek? } — применить макроцикл ПЛ-авто как ББ-программу
  *  - cardio    : { cycleId?, cycle? } — подключить CardioCycle к силовому плану (ссылка, не копия)
+ *  - annual_block: { blockKey, program? } — блок годового плана: загрузить в редактор;
+ *                  при сохранении программы изменения возвращаются в блок (he_annual_block_pending)
  */
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -39,8 +41,9 @@ export interface ProgramPayload { cycleId?: string; [key: string]: unknown }
 export interface DesignPayload { design: unknown; fillExercises?: boolean; daysPerWeek?: number; level?: string; goal?: string }
 export interface MacrocyclePayload { macro: unknown; level?: string; goal?: string; daysPerWeek?: number }
 export interface CardioPayload { cycleId?: string; cycle?: unknown }
+export interface AnnualBlockPayload { blockKey: string; program?: unknown }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload;
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -60,6 +63,7 @@ export interface PlannerApplyDataByKind {
   design: DesignPayload;
   macrocycle: MacrocyclePayload;
   cardio: CardioPayload;
+  annual_block: AnnualBlockPayload;
 }
 
 export interface PlannerApply {

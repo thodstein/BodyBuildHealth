@@ -10,9 +10,12 @@ import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, applyBlockTaperToWeeks,
   directionFromKinds, planStatusFromBlocks, defaultConfigForRef,
+  setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
+  importProgramIntoAnnualBlock,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
+import { createBlank } from '../../user-program/program-store';
 
 const CYCLE_ID = LMS_CYCLES[0]?.meta.id ?? 'cycle_unknown';
 
@@ -293,6 +296,74 @@ describe('сборка года', () => {
     const built = buildAnnualBlock(state, plan, macro, {});
     expect(built.status).toBe('error');
     expect(built.error).toContain('Неизвестный тип конструктора');
+  });
+});
+
+describe('правки блоков (конфиг/ручной roundtrip)', () => {
+  it('setAnnualBlockConfig: собранный блок → stale, результат сохраняется', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    const withResult = { ...plan, blocks: [built, ...plan.blocks.slice(1)] };
+    const next = setAnnualBlockConfig(withResult, built.ref.blockKey, { taper: { enabled: true } });
+    expect(next.blocks[0].status).toBe('stale');
+    expect(next.blocks[0].config.taper?.enabled).toBe(true);
+    expect(next.blocks[0].result).toEqual(built.result);
+    expect(next.status).toBe('stale');
+  });
+
+  it('setAnnualBlockConfig: unbuilt остаётся unbuilt', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const next = setAnnualBlockConfig(plan, plan.blocks[0].ref.blockKey, { daysPerWeek: 5 });
+    expect(next.blocks[0].status).toBe('unbuilt');
+    expect(next.blocks[0].config.daysPerWeek).toBe(5);
+  });
+
+  it('setAnnualBlockKind: смена конструктора → stale + пересчёт direction', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS); // BB → MANUAL
+    const withResult = { ...plan, blocks: [plan.blocks[0], built, ...plan.blocks.slice(2)] };
+    const next = setAnnualBlockKind(withResult, built.ref.blockKey, 'MANUAL');
+    expect(next.blocks[1].ref.kind).toBe('MANUAL');
+    expect(next.blocks[1].status).toBe('stale');
+    expect(next.direction).toBe('mixed');
+  });
+
+  it('updateAnnualBlockWeeks: ручной roundtrip → built, configHash синхронизирован (нет stale)', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    const withResult = { ...plan, blocks: [built, ...plan.blocks.slice(1)] };
+    const editedWeeks = built.result!.weeks.map(w => ({
+      ...w,
+      sessions: w.sessions.map(s => ({ ...s, blocks: s.blocks.slice(0, Math.max(0, s.blocks.length - 1)) })),
+    }));
+    const next = updateAnnualBlockWeeks(withResult, built.ref.blockKey, editedWeeks, null, ['ручная правка']);
+    expect(next.blocks[0].status).toBe('built');
+    expect(next.blocks[0].result!.weeks).toHaveLength(8);
+    expect(next.blocks[0].result!.warnings).toContain('ручная правка');
+    // Синхронизация с макро не помечает блок устаревшим (configHash совпадает).
+    const synced = syncAnnualPlan(next, macro);
+    expect(synced.blocks[0].status).toBe('built');
+    expect(synced.blocks[0].result!.weeks[0].sessions[0].blocks.length).toBe(
+      next.blocks[0].result!.weeks[0].sessions[0].blocks.length,
+    );
+  });
+
+  it('importProgramIntoAnnualBlock: принимает bb-программу из редактора', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS);
+    const withResult = { ...plan, blocks: [plan.blocks[0], built, ...plan.blocks.slice(2)] };
+    const prog = createBlank('bb');
+    prog.meta.title = 'Отредактировано вручную';
+    prog.bb!.weeks = built.result!.weeks;
+    const next = importProgramIntoAnnualBlock(withResult, built.ref.blockKey, prog);
+    expect(next.blocks[1].status).toBe('built');
+    expect(next.blocks[1].result!.program?.meta.title).toBe('Отредактировано вручную');
+    expect(next.blocks[1].result!.warnings.some(w => w.includes('Импортировано'))).toBe(true);
   });
 });
 

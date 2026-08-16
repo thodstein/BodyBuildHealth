@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createBlank } from '../../../../engines/user-program/program-store';
 import {
   applyBridgePayloadDispatch,
+  completeAnnualBlockImport, getPendingAnnualBlock, ANNUAL_BLOCK_PENDING_KEY,
   type BridgeCtx,
 } from '../planner-bridge-handlers';
 import type { PlannerApply } from '../planner-bridge';
+import { annualPlanFromMacro, buildAnnualBlock } from '../../../../engines/annual-training/block-builders.engine';
+import { saveAnnualTrainingPlan, loadAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
+import type { Macrocycle } from '../../../../engines/lms/macrocycle.engine';
+import { LMS_CYCLES } from '../../../../data/lms-cycles/lms-cycle-index';
 
 function payload(kind: PlannerApply['kind'], data: Record<string, unknown>): PlannerApply {
   return { kind, label: 'test', data, ts: 1 };
@@ -187,5 +192,58 @@ describe('planner bridge handlers', () => {
     const ok = applyBridgePayloadDispatch(payload('program', { id: 'cycle-01' }), ctx);
     expect(ok).toBe(true);
     expect(ctx.onChange).toHaveBeenCalled();
+  });
+});
+
+describe('annual_block bridge (блок года → редактор → обратно)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
+
+  const CYCLE_ID = LMS_CYCLES[0]?.meta.id ?? 'cycle-01';
+  const macro: Macrocycle = {
+    blocks: [{ phase: 'endurance', weeks: 6, weekOffset: 1, kind: 'SRC', cycleId: CYCLE_ID, description: 'Тест' }],
+    totalWeeks: 6, rationale: [],
+  };
+
+  it('annual_block с программой: загружает в редактор и ставит pending-ссылку', () => {
+    const ctx = context('bb');
+    const prog = createBlank('bb');
+    prog.meta.title = 'Блок для правки';
+    const ok = applyBridgePayloadDispatch(payload('annual_block', { blockKey: 'blk-1', program: prog }), ctx);
+    expect(ok).toBe(true);
+    expect(ctx.onChange).toHaveBeenCalledWith(prog);
+    expect(getPendingAnnualBlock()?.blockKey).toBe('blk-1');
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('вернутся в блок'));
+  });
+
+  it('annual_block без программы: предупреждение, pending не ставится', () => {
+    const ctx = context('bb');
+    const ok = applyBridgePayloadDispatch(payload('annual_block', { blockKey: 'blk-1' }), ctx);
+    expect(ok).toBe(true);
+    expect(ctx.onChange).not.toHaveBeenCalled();
+    expect(getPendingAnnualBlock()).toBeNull();
+  });
+
+  it('completeAnnualBlockImport: сохранение программы возвращает её в блок года', () => {
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, { daysPerWeek: 4 });
+    saveAnnualTrainingPlan({ ...plan, blocks: [built] });
+    localStorage.setItem(ANNUAL_BLOCK_PENDING_KEY, JSON.stringify({ blockKey: built.ref.blockKey, ts: 1 }));
+    const prog = createBlank('bb');
+    prog.meta.title = 'Отредактировано в редакторе';
+    prog.bb!.weeks = built.result!.weeks;
+    const done = completeAnnualBlockImport(prog);
+    expect(done).toBe(true);
+    expect(getPendingAnnualBlock()).toBeNull();
+    const stored = loadAnnualTrainingPlan();
+    expect(stored!.blocks[0].status).toBe('built');
+    expect(stored!.blocks[0].result!.program?.meta.title).toBe('Отредактировано в редакторе');
+  });
+
+  it('completeAnnualBlockImport без pending → false, план не трогается', () => {
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, { daysPerWeek: 4 });
+    saveAnnualTrainingPlan({ ...plan, blocks: [built] });
+    expect(completeAnnualBlockImport(createBlank('bb'))).toBe(false);
+    expect(loadAnnualTrainingPlan()!.blocks[0].result!.program?.meta.title).not.toBe('x');
   });
 });

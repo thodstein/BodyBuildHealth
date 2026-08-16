@@ -17,6 +17,13 @@ import type { MacrocycleDesign } from '../../../engines/periodization-designer.e
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 import { clampRir } from '../../../engines/bb/bb-utils';
+import {
+  importProgramIntoAnnualBlock,
+} from '../../../engines/annual-training/block-builders.engine';
+import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
+import {
+  loadAnnualTrainingPlan, saveAnnualTrainingPlan,
+} from '../../../engines/annual-training/annual-training-storage';
 
 export interface BridgeCtx {
   program: UserProgram;
@@ -332,6 +339,61 @@ const macrocycleHandler: Handler = (payload, { program: p, onChange, showToast, 
   } catch (e) { showToast('⚠ Не удалось применить макроцикл: ' + (e as Error)?.message); }
 };
 
+/* ─── Годовой план: блок → ручной редактор (и обратно при сохранении) ─────── */
+
+export const ANNUAL_BLOCK_PENDING_KEY = 'he_annual_block_pending';
+
+/** Открытая ссылка «блок годового плана ↔ редактируемая программа». */
+export function getPendingAnnualBlock(): { blockKey: string; ts: number } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(ANNUAL_BLOCK_PENDING_KEY) || 'null');
+    return v && typeof v.blockKey === 'string' ? v : null;
+  } catch { return null; }
+}
+
+export function clearPendingAnnualBlock(): void {
+  try { localStorage.removeItem(ANNUAL_BLOCK_PENDING_KEY); } catch { /* ignore */ }
+}
+
+/**
+ * Завершить импорт: отредактированная программа возвращается в блок годового
+ * плана (updateAnnualBlockWeeks — блок 'built', не stale). Вызывается при
+ * сохранении программы в ручном конструкторе.
+ */
+export function completeAnnualBlockImport(program: UserProgram): boolean {
+  const pending = getPendingAnnualBlock();
+  if (!pending) return false;
+  try {
+    const plan: AnnualTrainingPlan | null = loadAnnualTrainingPlan();
+    if (plan) {
+      const next = importProgramIntoAnnualBlock(plan, pending.blockKey, program);
+      saveAnnualTrainingPlan(next);
+      window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated', {
+        detail: { planId: next.id, blockKey: pending.blockKey, status: next.status },
+      }));
+    }
+  } finally {
+    clearPendingAnnualBlock();
+  }
+  return true;
+}
+
+const annualBlockHandler: Handler = (payload, { onChange, showToast }) => {
+  if (!payload.data?.blockKey) return;
+  try {
+    const prog = payload.data.program as UserProgram | undefined;
+    if (prog && (prog.bb || prog.pl || prog.hybrid)) {
+      onChange(prog);
+      try {
+        localStorage.setItem(ANNUAL_BLOCK_PENDING_KEY, JSON.stringify({ blockKey: payload.data.blockKey, ts: Date.now() }));
+      } catch { /* ignore */ }
+      showToast('🔗 Блок годового плана открыт в редакторе — после правок сохраните программу, изменения вернутся в блок');
+      return;
+    }
+    showToast('⚠ Блок не собран — сначала соберите его в годовой панели («⚙️ Собрать блок»)');
+  } catch (e) { showToast('⚠ Не удалось открыть блок: ' + (e as Error)?.message); }
+};
+
 /** P0-3: Dispatch table — maps PlannerApplyKind to handler function. */
 export const BRIDGE_HANDLERS: Record<string, Handler> = {
   split: splitHandler,
@@ -348,6 +410,7 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   program: programHandler,
   design: designHandler,
   macrocycle: macrocycleHandler,
+  annual_block: annualBlockHandler,
 };
 
 /** Apply a bridge payload using the dispatch table. Returns true if a handler matched.

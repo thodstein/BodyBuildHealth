@@ -21,6 +21,7 @@ import { createBlank, createFromBuild } from '../user-program/program-store';
 import type {
   AnnualBlockState, AnnualBlockRef, AnnualTrainingPlan, AnnualBlockKind,
   AnnualBuildOptions, AnnualBuildOutcome, AnnualBlockConfig, AnnualBlockBuildResult,
+  MacroBlockBuildStatus,
 } from './annual-training.types';
 import {
   type Macrocycle, type MacroBlock, type BBMacrocycle, type BBMacroBlock,
@@ -593,6 +594,105 @@ export function buildAnnualPlan(
     plan: { ...synced, blocks, status: planStatusFromBlocks(blocks), updatedAt: nowIso() },
     built, skipped, failed, errors,
   };
+}
+
+/* ─────────────────────── Правки блоков (конфиг/ручной roundtrip) ─────────── */
+
+function findBlockIndex(plan: AnnualTrainingPlan, blockKey: string): number {
+  return plan.blocks.findIndex(b => b.ref.blockKey === blockKey);
+}
+
+/**
+ * Изменить конфиг блока (цикл/сплит/taper/peak и т.д.).
+ * Собранный блок помечается 'stale' — результат сохраняется, пользователь
+ * решает, пересобирать ли. Возвращает НОВЫЙ план.
+ */
+export function setAnnualBlockConfig(
+  plan: AnnualTrainingPlan,
+  blockKey: string,
+  patch: Partial<AnnualBlockConfig>,
+): AnnualTrainingPlan {
+  const idx = findBlockIndex(plan, blockKey);
+  if (idx < 0) return plan;
+  const blocks = [...plan.blocks];
+  const block = blocks[idx];
+  const config = { ...block.config, ...patch };
+  const status: MacroBlockBuildStatus = block.status === 'unbuilt' ? 'unbuilt' : 'stale';
+  blocks[idx] = { ...block, config, status };
+  return { ...plan, blocks, status: planStatusFromBlocks(blocks), updatedAt: nowIso() };
+}
+
+/**
+ * Сменить тип конструктора блока (ПЛ/ББ/ручной). Собранный результат
+ * сохраняется, блок помечается 'stale' (пересборка новым конструктором).
+ */
+export function setAnnualBlockKind(
+  plan: AnnualTrainingPlan,
+  blockKey: string,
+  kind: AnnualBlockKind,
+): AnnualTrainingPlan {
+  const idx = findBlockIndex(plan, blockKey);
+  if (idx < 0) return plan;
+  const blocks = [...plan.blocks];
+  const block = blocks[idx];
+  const ref = { ...block.ref, kind };
+  const status: MacroBlockBuildStatus = block.status === 'unbuilt' ? 'unbuilt' : 'stale';
+  blocks[idx] = { ...block, ref, status };
+  return {
+    ...plan,
+    blocks,
+    direction: directionFromKinds(blocks.map(b => b.ref.kind)),
+    status: planStatusFromBlocks(blocks),
+    updatedAt: nowIso(),
+  };
+}
+
+/**
+ * Ручной roundtrip: принять ОТРЕДАКТИРОВАННЫЕ недели блока (из ручного
+ * конструктора). Статус → 'built', configHash синхронизируется с текущим
+ * конфигом — блок не считается устаревшим и не пересобирается автоматически.
+ */
+export function updateAnnualBlockWeeks(
+  plan: AnnualTrainingPlan,
+  blockKey: string,
+  weeks: UserWeek[],
+  program?: UserProgram | null,
+  warnings?: string[],
+): AnnualTrainingPlan {
+  const idx = findBlockIndex(plan, blockKey);
+  if (idx < 0) return plan;
+  const blocks = [...plan.blocks];
+  const block = blocks[idx];
+  const result: AnnualBlockBuildResult = {
+    blockKey,
+    kind: block.ref.kind,
+    weeks: loopWeeksToLength(weeks, block.ref.weeks),
+    program: program ?? block.result?.program ?? null,
+    bbPlan: block.result?.bbPlan ?? null,
+    warnings: warnings ?? block.result?.warnings ?? [],
+    taperApplied: block.result?.taperApplied ?? false,
+    peakApplied: block.result?.peakApplied ?? false,
+    configHash: configHashOf(block.config, block.ref),
+  };
+  blocks[idx] = { ...block, status: 'built', result, builtAt: nowIso(), error: undefined };
+  return { ...plan, blocks, status: planStatusFromBlocks(blocks), updatedAt: nowIso() };
+}
+
+/**
+ * Импортировать UserProgram в блок годового плана (ручной roundtrip).
+ * Берёт недели из bb.weeks / hybrid.bbWeeks; для PL-программ — скелет не
+ * заменяется, обновляется только program (веса/цикл остаются ссылочными).
+ */
+export function importProgramIntoAnnualBlock(
+  plan: AnnualTrainingPlan,
+  blockKey: string,
+  program: UserProgram,
+): AnnualTrainingPlan {
+  const idx = findBlockIndex(plan, blockKey);
+  if (idx < 0) return plan;
+  const block = plan.blocks[idx];
+  const weeks = program.bb?.weeks ?? program.hybrid?.bbWeeks ?? block.result?.weeks ?? [];
+  return updateAnnualBlockWeeks(plan, blockKey, weeks, program, ['Импортировано из ручного конструктора.']);
 }
 
 /* ─────────────────────────── Композиция года ────────────────────────────── */

@@ -12,14 +12,18 @@
 
 ### UI (MacrocyclePanel.tsx)
 - Карточка **«🧩 Сборка года по конструкторам»** (после действий года, перед «Итог года»): кнопки «📦 Собрать весь год» / «⚙️ Собрать блок» (по `selectedBlockIdx`) / «📥 В ручной режим» (composeAnnualProgram → `applyToPlanner kind 'program'`); список блоков с иконками ✅/⚠/❌, kind (ПЛ/ББ/✍), «изменился: пересоберите» для stale; клик по строке выбирает блок на таймлайне.
+- **⚙️ Настройки блока** (по клику в списке): чипы конструктора (ПЛ СРЦ/ББ-авто/✍ ручной → `setAnnualBlockKind`, блок → stale, результат сохраняется); ПЛ — селектор СРЦ-цикла; ББ — сплит/цель/«🎭 Пик-неделя»; ручной — шаблон из собранных блоков; общий — «📉 Taper внутри блока (2 нед)»; «✍ В редактор» — мост `annual_block`.
+- **Пик-неделя по умолчанию**: `withDefaultPeakConfigs` — BB-блоку с `peakWeek` без явного конфига подставляется `defaultPrepConfigForBlock` (профиль вес/пол/категория + `goals.bbPeakConfig`, дата шоу из соревнования блока) перед сборкой.
+- **Ручной roundtrip**: мост `annual_block` (planner-bridge) — «✍ В редактор» загружает программу блока и ставит `he_annual_block_pending`; `completeAnnualBlockImport` в `ProgramManagerPanel.commit` возвращает сохранённую программу в блок (`importProgramIntoAnnualBlock` → статус 'built', configHash синхронизирован — блок не stale и не пересобирается).
 - Авто-синхронизация (useEffect на macro/bbMacro): правка макро сразу подсвечивает stale-блоки, результат не теряется.
-- `runAnnualBuild('all'|'block'|'export')` — статус-флеши «📦 Годовой план: собрано +N · готовых пропущено M · ошибок K».
+- `runAnnualBuild('all'|'block'|'export'|'editor')` — статус-флеши «📦 Годовой план: собрано +N · готовых пропущено M · ошибок K».
 
-### Тесты (45 новых)
-- `annual-training-engine.test.ts` (27): хэши/ключи, план из PL/BB макро, sync (layout без изменений / изменён→stale с сохранением результата / конфиг изменён→stale), сборка PL (цикл→недели+program.pl), PL без цикла (скелет+warning), taper-идемпотентность, BB-блок 8 нед/20 нед (зацикливание), пик-неделя contest_prep (peakApplied, фаза peaking), MANUAL скелет+шаблон, сборка года (только missing / rebuild all / частичная при ошибке), композиция (bb/hybrid/pl/notes/null).
+### Тесты (60 новых)
+- `annual-training-engine.test.ts` (32): хэши/ключи, план из PL/BB макро, sync (layout без изменений / изменён→stale с сохранением результата / конфиг изменён→stale), сборка PL (цикл→недели+program.pl), PL без цикла (скелет+warning), taper-идемпотентность, BB-блок 8 нед/20 нед (зацикливание), пик-неделя contest_prep (peakApplied, фаза peaking), MANUAL скелет+шаблон, сборка года (только missing / rebuild all / частичная при ошибке), правки блоков (setAnnualBlockConfig/kind→stale с сохранением результата, updateAnnualBlockWeeks→built без stale, importProgramIntoAnnualBlock), композиция (bb/hybrid/pl/notes/null).
 - `annual-training-storage.test.ts` (11): roundtrip, битый JSON/форма, remove, миграция (BB-приоритет, стабильный id, существующий план не перезаписывается).
-- `macrocycle-panel-annual-build.test.tsx` (7): карточка после сборки макро, «Собрать весь год» (все built, PL-блоки с sourceCycleId), «Собрать блок» (только выбранный), экспорт без блоков (предупреждение), экспорт после сборки (мост he_planner_apply, kind program), stale после смены недели соревнования, десериализация макро с cycleId.
-- Проверено: tsc 0 по моим файлам (ошибки в чужом WIP: cardio.engine.ts битый импорт, BbAutoConstructor PrepAdjustment — файлы других агентов не трогаю); annual-training 38/38, panel-annual-build 7/7, смежные macrocycle/bridge 143/143.
+- `macrocycle-panel-annual-build.test.tsx` (12): карточка после сборки макро, «Собрать весь год» (все built, PL-блоки с sourceCycleId), «Собрать блок» (только выбранный), экспорт без блоков (предупреждение), экспорт после сборки (мост he_planner_apply, kind program), stale после смены недели соревнования, десериализация макро с cycleId, панель настроек блока, смена конструктора→stale (результат не потерян), «✍ В редактор» (без сборки→предупреждение / после сборки→мост annual_block с blockKey), BB-блок с «🎭 Пик-неделя» (peakApplied + конфиг из профиля).
+- `planner-bridge-handlers.test.ts` (+4): annual_block с программой (onChange + pending), без программы (предупреждение), completeAnnualBlockImport (программа → блок, pending очищен), без pending → false.
+- Проверено: tsc 0 по моим файлам (ошибки в чужом WIP: cardio.engine.ts битый импорт, BbAutoConstructor PrepAdjustment — файлы других агентов не трогаю); annual-training 43/43, panel-annual-build 12/12, planner-bridge-handlers 17/17, смежные macrocycle/bridge 143/143.
 
 ---
 

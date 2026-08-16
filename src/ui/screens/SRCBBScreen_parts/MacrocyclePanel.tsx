@@ -33,9 +33,9 @@ import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines
 import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardio.engine';
 import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
-  composeAnnualProgram, planStatusFromBlocks,
+  composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
 } from '../../../engines/annual-training/block-builders.engine';
-import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
+import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 
 /** Кардио-фазы (кардио-слой в «Итог года»). */
@@ -792,10 +792,91 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setAnnualPlan(plan);
     } catch { /* ignore */ }
   }, [macro, bbMacro, isBB]);
-  const runAnnualBuild = (mode: 'all' | 'block' | 'export') => {
+
+  /** Пик-неделя по умолчанию для BB-блока: профиль (вес/пол/категория) +
+   *  сохранённый bbPeakConfig; дата шоу из соревнования блока или оценка. */
+  const defaultPrepConfigForBlock = (startWeek: number, weeks: number, competitionId?: string): Record<string, unknown> => {
+    const pk = profilePeakDefaults();
+    const category = normalizeContestCategory(pk.category, pk.sex);
+    const src = currentMacroSource();
+    const comp = (src?.competitions ?? []).find(c => c.id === competitionId);
+    const lastWeek = startWeek + weeks - 1;
+    const showDate = comp?.date ?? isoAddDays(isoToday(), Math.max(0, lastWeek - 1) * 7);
+    const goals = (getProfile()?.settings as any)?.goals;
+    const storedCfg = goals?.bbPeakConfig ? deserializeBBPrepConfig(goals.bbPeakConfig) : null;
+    return {
+      sex: pk.sex,
+      category,
+      weightKg: Math.max(40, Math.min(200, pk.weight)),
+      experienceLevel: storedCfg?.experienceLevel ?? 'intermediate',
+      enhanced: storedCfg?.enhanced ?? false,
+      prepCount: storedCfg?.prepCount ?? 0,
+      showDate,
+      weeksOut: Math.min(storedCfg?.weeksOut ?? 3, Math.max(1, weeks)),
+      trainingProtocol: storedCfg?.trainingProtocol ?? 'bb',
+      carbLoadStrategy: storedCfg?.carbLoadStrategy ?? 'moderate',
+      waterStrategy: storedCfg?.waterStrategy ?? 'minimal',
+      sodiumStrategy: storedCfg?.sodiumStrategy ?? 'constant',
+    };
+  };
+
+  /** Перед сборкой: BB-блокам с включённым пиком без явного конфига подставить
+   *  дефолтный из профиля (единая система bb-contest-prep). */
+  const withDefaultPeakConfigs = (plan: AnnualTrainingPlan): AnnualTrainingPlan => ({
+    ...plan,
+    blocks: plan.blocks.map(b => {
+      if (b.ref.kind === 'BB' && b.config.peakWeek && !b.config.peakConfig) {
+        return {
+          ...b,
+          config: {
+            ...b.config,
+            peakConfig: defaultPrepConfigForBlock(b.ref.startWeek, b.ref.weeks, b.ref.competitionId),
+          },
+        };
+      }
+      return b;
+    }),
+  });
+
+  const applyAnnualConfig = (blockKey: string, patch: Partial<AnnualBlockConfig>) => {
+    const plan = annualPlan;
+    if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
+    const next = saveAnnualTrainingPlan(setAnnualBlockConfig(plan, blockKey, patch));
+    setAnnualPlan(next);
+    setAnnualStatusNote('⚙️ Настройки блока сохранены — блок помечен устаревшим: пересоберите («⚙️ Собрать блок»)');
+  };
+
+  const applyAnnualKind = (blockKey: string, kind: AnnualBlockKind) => {
+    const plan = annualPlan;
+    if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
+    const next = saveAnnualTrainingPlan(setAnnualBlockKind(plan, blockKey, kind));
+    setAnnualPlan(next);
+    setAnnualStatusNote(`⚙️ Конструктор блока изменён на ${kind === 'PL' ? 'ПЛ' : kind === 'BB' ? 'ББ' : 'ручной'} — пересоберите блок`);
+  };
+
+  const runAnnualBuild = (mode: 'all' | 'block' | 'export' | 'editor') => {
     const src = currentMacroSource();
     if (!src) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
     try {
+      if (mode === 'editor') {
+        const plan = annualPlan;
+        if (!plan || selectedBlockIdx < 0 || selectedBlockIdx >= plan.blocks.length) {
+          setAnnualStatusNote('⚠ Выберите собранный блок (клик по строке в списке)');
+          return;
+        }
+        const block = plan.blocks[selectedBlockIdx];
+        if (block.status !== 'built' || !block.result?.program) {
+          setAnnualStatusNote('⚠ Блок не собран — сначала «⚙️ Собрать блок»');
+          return;
+        }
+        applyToPlanner({
+          kind: 'annual_block',
+          label: `Блок года: ${block.ref.description ?? block.ref.phase} (${block.ref.kind})`,
+          data: { blockKey: block.ref.blockKey, program: block.result.program },
+        });
+        setAnnualStatusNote('✍ Блок открыт в ручном конструкторе — сохраните программу, изменения вернутся в блок');
+        return;
+      }
       if (mode === 'export') {
         const plan = loadAnnualTrainingPlan();
         if (!plan || !plan.blocks.some(b => b.status === 'built' && b.result)) {
@@ -808,7 +889,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         setAnnualStatusNote(`✅ «${prog.meta.title}» передана в ручной конструктор — подтвердите в баннере «Калькулятор рекомендует»`);
         return;
       }
-      let plan = loadAnnualTrainingPlan() ?? annualPlanFromMacro(src);
+      let plan = withDefaultPeakConfigs(loadAnnualTrainingPlan() ?? annualPlanFromMacro(src));
       if (mode === 'block') {
         plan = syncAnnualPlan(plan, src);
         if (selectedBlockIdx < 0 || selectedBlockIdx >= plan.blocks.length) {
@@ -1779,6 +1860,91 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   })}
                 </div>
               )}
+              {/* ⚙️ Настройки выбранного блока (конструктор/цикл/сплит/taper/пик) */}
+              {annualPlan && selectedBlockIdx >= 0 && selectedBlockIdx < annualPlan.blocks.length && (() => {
+                const b = annualPlan.blocks[selectedBlockIdx];
+                const kindOptions: { id: AnnualBlockKind; label: string }[] = [
+                  { id: 'PL', label: 'ПЛ (СРЦ-цикл)' },
+                  { id: 'BB', label: 'ББ (ББ-авто)' },
+                  { id: 'MANUAL', label: '✍ Ручной' },
+                ];
+                const templateBlocks = annualPlan.blocks.filter(x => x.ref.blockKey !== b.ref.blockKey && x.status === 'built' && x.result?.weeks?.length);
+                return (
+                  <div style={{ marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.18)' }} className="macrocycle-annual-block-config">
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>
+                      ⚙️ Блок: нед {b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1} · {b.ref.phase}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                      {kindOptions.map(k => (
+                        <button key={k.id} type="button" onClick={() => applyAnnualKind(b.ref.blockKey, k.id)}
+                          style={{ padding: '4px 8px', borderRadius: 8, fontSize: 10, fontWeight: 700, minHeight: 32, cursor: 'pointer',
+                            border: b.ref.kind === k.id ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.1)',
+                            background: b.ref.kind === k.id ? 'rgba(139,92,246,0.25)' : 'transparent',
+                            color: b.ref.kind === k.id ? '#c084fc' : 'rgba(255,255,255,0.55)' }}>
+                          {k.label}
+                        </button>
+                      ))}
+                    </div>
+                    {b.ref.kind === 'PL' && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                        <select aria-label="СРЦ-цикл блока" value={b.config.cycleId ?? b.ref.cycleId ?? ''}
+                          onChange={e => applyAnnualConfig(b.ref.blockKey, { cycleId: e.target.value || undefined })}
+                          style={{ ...SEL, flex: 1, minWidth: 180, fontSize: 10 }}>
+                          <option value="">— авто-цикл по фазе —</option>
+                          {LMS_CYCLES.map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {b.ref.kind === 'BB' && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                        <select aria-label="Сплит блока" value={b.config.splitPattern ?? ''}
+                          onChange={e => applyAnnualConfig(b.ref.blockKey, { splitPattern: e.target.value || undefined })}
+                          style={{ ...SEL, flex: 1, minWidth: 150, fontSize: 10 }}>
+                          <option value="">— авто-сплит —</option>
+                          {SPLIT_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        <select aria-label="Цель блока" value={b.config.goal ?? ''}
+                          onChange={e => applyAnnualConfig(b.ref.blockKey, { goal: e.target.value || undefined })}
+                          style={{ ...SEL, minWidth: 110, fontSize: 10 }}>
+                          <option value="">— цель по фазе —</option>
+                          {['hypertrophy', 'mass', 'strength', 'strength_mass', 'cut', 'recomp'].map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', minHeight: 32 }}>
+                          <input type="checkbox" checked={!!b.config.peakWeek} style={{ width: 16, height: 16, accentColor: '#f59e0b' }}
+                            onChange={e => applyAnnualConfig(b.ref.blockKey, { peakWeek: e.target.checked, peakConfig: e.target.checked ? b.config.peakConfig : undefined })} />
+                          🎭 Пик-неделя
+                        </label>
+                      </div>
+                    )}
+                    {b.ref.kind === 'MANUAL' && (
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                        <select aria-label="Шаблон ручного блока" value={b.config.templateFromBlockKey ?? ''}
+                          onChange={e => applyAnnualConfig(b.ref.blockKey, { templateFromBlockKey: e.target.value || undefined })}
+                          style={{ ...SEL, flex: 1, minWidth: 170, fontSize: 10 }}>
+                          <option value="">— пустой скелет —</option>
+                          {templateBlocks.map(t => (
+                            <option key={t.ref.blockKey} value={t.ref.blockKey}>
+                              нед {t.ref.startWeek}–{t.ref.startWeek + t.ref.weeks - 1} · {t.ref.phase}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', minHeight: 32 }}>
+                        <input type="checkbox" checked={!!b.config.taper?.enabled} style={{ width: 16, height: 16, accentColor: '#f59e0b' }}
+                          onChange={e => applyAnnualConfig(b.ref.blockKey, { taper: { enabled: e.target.checked, weeks: 2 } })} />
+                        📉 Taper внутри блока (2 нед)
+                      </label>
+                      <button type="button" onClick={() => runAnnualBuild('editor')}
+                        style={{ ...BTN_GHOST, marginLeft: 'auto', fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                        title="Открыть собранный блок в ручном конструкторе; после сохранения изменения вернутся в блок">
+                        ✍ В редактор
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
               {annualStatusNote && (
                 <div role="status" style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, fontSize: 11, lineHeight: 1.5,
                   background: annualStatusNote.startsWith('⚠') ? 'rgba(245,158,11,0.08)' : 'rgba(0,230,138,0.08)',

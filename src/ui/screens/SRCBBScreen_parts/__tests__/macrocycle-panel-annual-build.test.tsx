@@ -99,6 +99,72 @@ describe('MacrocyclePanel — сборка года по конструктор�
     const plan = loadAnnualTrainingPlan();
     expect(plan!.blocks.filter(b => b.ref.kind === 'PL').every(b => b.result?.program?.pl?.sourceCycleId)).toBe(true);
   });
+
+  it('выбор блока открывает панель настроек (конструктор/цикл/taper)', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText(/^· нед 1–/));
+    await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
+    expect(screen.getByText('ПЛ (СРЦ-цикл)')).toBeTruthy();
+    expect(screen.getByText('ББ (ББ-авто)')).toBeTruthy();
+    expect(screen.getByText('✍ Ручной')).toBeTruthy();
+    expect(screen.getByText('📉 Taper внутри блока (2 нед)')).toBeTruthy();
+  });
+
+  it('смена конструктора блока → блок помечается устаревшим', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText(/^· нед 1–/));
+    await waitFor(() => expect(screen.getByText('✍ Ручной')).toBeTruthy());
+    fireEvent.click(screen.getByText('⚙️ Собрать блок'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[0].status).toBe('built'), { timeout: 30000 });
+    fireEvent.click(screen.getByText('✍ Ручной'));
+    await waitFor(() => expect(screen.getByText(/Конструктор блока изменён/)).toBeTruthy());
+    const plan = loadAnnualTrainingPlan();
+    expect(plan!.blocks[0].ref.kind).toBe('MANUAL');
+    expect(plan!.blocks[0].status).toBe('stale');
+    expect(plan!.blocks[0].result).toBeTruthy(); // результат не потерян
+  });
+
+  it('✍ В редактор без собранного блока → предупреждение', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText(/^· нед 1–/));
+    await waitFor(() => expect(screen.getByText('✍ В редактор')).toBeTruthy());
+    fireEvent.click(screen.getByText('✍ В редактор'));
+    await waitFor(() => expect(screen.getByText(/⚠ Блок не собран/)).toBeTruthy());
+  });
+
+  it('✍ В редактор после сборки → мост annual_block с blockKey', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText('📦 Собрать весь год'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.status).toBe('built'), { timeout: 30000 });
+    fireEvent.click(screen.getByText(/^✅ нед 1–/));
+    await waitFor(() => expect(screen.getByText('✍ В редактор')).toBeTruthy());
+    fireEvent.click(screen.getByText('✍ В редактор'));
+    await waitFor(() => expect(screen.getByText(/✍ Блок открыт в ручном конструкторе/)).toBeTruthy());
+    const payload = JSON.parse(localStorage.getItem('he_planner_apply') || 'null');
+    expect(payload.kind).toBe('annual_block');
+    expect(payload.data.blockKey).toBeTruthy();
+    expect(payload.data.program?.meta).toBeTruthy();
+  });
+
+  it('BB-блок с «🎭 Пик-неделя»: сборка применяет пик с конфигом из профиля', async () => {
+    const macro = buildPlMacroFixture();
+    localStorage.setItem('he_pl_macro', serializeMacro(macro));
+    render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
+    await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
+    // Выбрать BB-блок (strength, индекс 1) в списке сборки.
+    fireEvent.click(screen.getByText(/strength · ББ/));
+    await waitFor(() => expect(screen.getByLabelText(/Пик-неделя/)).toBeTruthy());
+    fireEvent.click(screen.getByLabelText(/Пик-неделя/));
+    await waitFor(() => expect(screen.getByText(/Настройки блока сохранены/)).toBeTruthy());
+    fireEvent.click(screen.getByText('⚙️ Собрать блок'));
+    await waitFor(() => expect(screen.getByText(/✅ Блок «/)).toBeTruthy(), { timeout: 30000 });
+    const plan = loadAnnualTrainingPlan();
+    const bb = plan!.blocks.find(b => b.ref.phase === 'strength')!;
+    expect(bb.status).toBe('built');
+    expect(bb.result!.peakApplied).toBe(true);
+    expect(bb.config.peakConfig).toBeTruthy();
+    expect((bb.config.peakConfig as any).category).toBe('mens_physique');
+  });
 });
 
 /** ПЛ-макроцикл с 3 блоками (два SRC + один BB). */

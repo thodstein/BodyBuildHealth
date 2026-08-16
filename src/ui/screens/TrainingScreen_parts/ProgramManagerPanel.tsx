@@ -61,6 +61,7 @@ import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { loadTrainingProfile } from './training-profile';
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
+import { completeAnnualBlockImport } from './planner-bridge-handlers';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
@@ -334,7 +335,13 @@ export const ProgramManagerPanel: React.FC = () => {
     }
     saveUserProgram(editing, note);
     refresh();
-    flash('✅ Сохранено');
+    // Годовой план: если программа открыта из блока (he_annual_block_pending) —
+    // вернуть изменения в блок годового плана.
+    if (completeAnnualBlockImport(editing)) {
+      flash('✅ Сохранено · ↩ Блок годового плана обновлён');
+    } else {
+      flash('✅ Сохранено');
+    }
     return true;
   };
 
