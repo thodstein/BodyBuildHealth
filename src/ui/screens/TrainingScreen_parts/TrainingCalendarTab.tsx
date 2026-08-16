@@ -197,6 +197,13 @@ export const TrainingCalendarTab: React.FC = () => {
       return new Set((Array.isArray(list) ? list : []).filter((e: any) => typeof e?.date === 'string' && e.done).map((e: any) => e.date.slice(0, 10)));
     } catch { return new Set<string>(); }
   }, [monthKey]);
+  // Даты с выполненной заминкой (бейдж ❄️ на ячейках календаря)
+  const coolDates = useMemo(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('he_cooldown_diary') || '[]');
+      return new Set((Array.isArray(list) ? list : []).filter((e: any) => typeof e?.date === 'string' && e.done).map((e: any) => e.date.slice(0, 10)));
+    } catch { return new Set<string>(); }
+  }, [monthKey]);
 
   const weekSummaries = cal.weekSummaries || [];
 
@@ -340,7 +347,7 @@ export const TrainingCalendarTab: React.FC = () => {
             <div key={wi} style={{ display: 'grid', gridTemplateColumns: '32px repeat(7, 1fr)', gap: 2, marginBottom: 2 }}>
               <div style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>Н{wi + 1}</div>
               {week.map((day, di) => (
-                <CalendarCell key={di} day={day} today={today} mindDates={mindDates} mobDates={mobDates} warmDates={warmDates} onClick={() => { setView('week'); setSelectedWeek(wi + 1); }} />
+                <CalendarCell key={di} day={day} today={today} mindDates={mindDates} mobDates={mobDates} warmDates={warmDates} coolDates={coolDates} onClick={() => { setView('week'); setSelectedWeek(wi + 1); }} />
               ))}
             </div>
           ))}
@@ -581,7 +588,7 @@ export const TrainingCalendarTab: React.FC = () => {
 };
 
 /** Calendar cell for month grid */
-const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<string>; mobDates?: Set<string>; warmDates?: Set<string>; onClick: () => void }> = ({ day, today, mindDates, mobDates, warmDates, onClick }) => {
+const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<string>; mobDates?: Set<string>; warmDates?: Set<string>; coolDates?: Set<string>; onClick: () => void }> = ({ day, today, mindDates, mobDates, warmDates, coolDates, onClick }) => {
   if (!day.date) {
     return <div style={{ aspectRatio: '1', borderRadius: 8 }} />;
   }
@@ -594,6 +601,7 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
   const hasMind = !!mindDates && mindDates.has(day.date);
   const hasMob = !!mobDates && mobDates.has(day.date);
   const hasWarm = !!warmDates && warmDates.has(day.date);
+  const hasCool = !!coolDates && coolDates.has(day.date);
 
   return (
     <div onClick={onClick} title={[
@@ -601,6 +609,7 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
       hasMind ? '🧠 психо-чек-ин' : '',
       hasMob ? '🧘 мобильность выполнена' : '',
       hasWarm ? '🔥 разминка выполнена' : '',
+      hasCool ? '❄️ заминка выполнена' : '',
     ].filter(Boolean).join(' · ') || ''} style={{
       aspectRatio: '1',
       borderRadius: 8,
@@ -618,11 +627,12 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
       <div style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? ACCENT : 'var(--text)' }}>
         {day.date.slice(8)}
       </div>
-      {(hasMind || hasMob || hasWarm) && (
+      {(hasMind || hasMob || hasWarm || hasCool) && (
         <div style={{ position: 'absolute', top: 1, right: 2, display: 'flex', gap: 1, fontSize: 7 }}>
           {hasMind && <span title="Психо-чек-ин">🧠</span>}
           {hasMob && <span title="Мобильность">🧘</span>}
           {hasWarm && <span title="Разминка">🔥</span>}
+          {hasCool && <span title="Заминка">❄️</span>}
         </div>
       )}
       {day.isTrainingDay && (

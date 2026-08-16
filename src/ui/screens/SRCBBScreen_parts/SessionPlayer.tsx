@@ -11,7 +11,7 @@ import {
   compareWithPrevious, getCachedProgressForExercise,
 } from '../../../engines/workout-logger.engine';
 import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, type WarmupInput } from '../../../engines/warmup.engine';
-import { generateCooldown, type CooldownInput } from '../../../engines/cooldown.engine';
+import { generateCooldown, upsertCooldownLog, cooldownLabel, type CooldownInput } from '../../../engines/cooldown.engine';
 import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
@@ -40,16 +40,6 @@ import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
       to { transform: translateY(0); opacity: 1; }
     }
   `;
-
-const COOLDOWN_LABELS: Record<string, string> = {
-  deep_breathing: 'Глубокое дыхание (диафрагмальное)', box_breathing: 'Квадратное дыхание (4-4-4-4)',
-  chest_stretch: 'Растяжка груди', shoulder_stretch: 'Растяжка плеч',
-  lat_stretch: 'Растяжка широчайших', hamstring_stretch: 'Растяжка задней поверхности бедра',
-  quad_stretch: 'Растяжка квадрицепса', glute_stretch: 'Растяжка ягодиц',
-  child_pose: 'Поза ребёнка', cat_camel: 'Кошка-верблюд',
-  nerve_flossing: 'Нейро-мобилизация',
-};
-function cLabel(exId: string) { return COOLDOWN_LABELS[exId] || exId; }
 
 function formatPlates(targetW: number): string {
   if (targetW <= 0) return '';
@@ -446,6 +436,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
       fatigueScore: profile.fatigue / 10,
       riskFlags: finishRiskFlags,
       sessionDuration: (Math.max(finished.durationMin || 0, sessionDur)) * 60,
+      targetGroups: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup || '').filter(Boolean))),
     };
     setCooldownBlocks(generateCooldown(cooldownInput));
     setPhase('cooldown');
@@ -491,6 +482,22 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
     if (session && session.exercises.some(e => (e.sets || []).length > 0) && !savedRef.current) {
       finish();
       return;
+    }
+    // Фиксируем факт заминки в дневник (he_cooldown_diary, одна запись на дату)
+    if (cooldownBlocks.length > 0) {
+      try {
+        const total = cooldownBlocks.reduce((s, b) => s + b.exercises.length, 0);
+        const doneCnt = Object.values(cooldownDone).filter(Boolean).length;
+        const pct = total > 0 ? doneCnt / total : 0;
+        upsertCooldownLog({
+          date: new Date().toISOString().slice(0, 10),
+          done: doneCnt > 0,
+          quality: doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
+          totalItems: total,
+          doneItems: doneCnt,
+          skippedReason: doneCnt === 0 ? 'не отметил ни одного пункта' : undefined,
+        });
+      } catch { /* дневник заминки недоступен — не блокируем выход */ }
     }
     setPhase('done');
   };
@@ -1232,7 +1239,12 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               const total = cooldownBlocks.reduce((s, b) => s + b.exercises.length, 0);
               const done = Object.values(cooldownDone).filter(Boolean).length;
               const pct = total > 0 ? Math.round(done / total * 100) : 0;
-              return <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>{done}/{total} · {pct}%</span>;
+              const totalSec = cooldownBlocks.reduce((s, b) => s + (b.durationSec || 0), 0);
+              return (
+                <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>
+                  {done}/{total} · {pct}%{totalSec > 0 ? ` · ~${Math.round(totalSec / 60 * 10) / 10} мин` : ''}
+                </span>
+              );
             })()}
           </div>
           {(() => {
@@ -1251,13 +1263,14 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 {b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
                 <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{b.durationSec}с</span>
               </div>
+              {b.notes && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{b.notes}</div>}
               <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
                 {b.exercises.map((ex, j) => {
                   const isDone = cooldownDone[`c_${i}_${j}`];
                   return (
                     <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleCooldown(i, j)} />
-                      {cLabel(ex.exerciseId)}
+                      {cooldownLabel(ex.exerciseId)}
                       <span style={{ color: 'var(--text-dim)', fontSize: 10 }}> · {ex.durationSec}с</span>
                     </li>
                   );

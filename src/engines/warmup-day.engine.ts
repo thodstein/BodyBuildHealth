@@ -204,6 +204,11 @@ function canonicalize(g: string): CanonGroup[] {
   return [];
 }
 
+/** Нормализация группы дня → канонические группы (общая для warmup/cooldown). */
+export function canonicalizeGroups(g: string): CanonGroup[] {
+  return canonicalize(g);
+}
+
 /** Разминка для набора групп дня: мерж с дедупликацией, приоритетом и фильтром ленты. */
 export function collectGroupPrep(groups: string[], hasBand = true): WarmupGroupPrep {
   const seenMob = new Set<string>();

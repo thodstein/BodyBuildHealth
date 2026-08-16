@@ -12,15 +12,18 @@
 import { loadCheckins, upsertCheckin } from './mindset-protocol.engine';
 import { loadMobilityCheckins, upsertMobilityCheckin } from './mobility-protocol.engine';
 import { loadWarmupLog, upsertWarmupLog, warmupLogForDate } from './warmup.engine';
+import { loadCooldownLog, upsertCooldownLog, cooldownLogForDate } from './cooldown.engine';
 
 export interface DiaryBackupExtras {
   warmupDiary?: unknown[];
+  cooldownDiary?: unknown[];
   mindsetChecks?: unknown[];
   mobilityChecks?: unknown[];
 }
 
 export interface RestoreCounts {
   warmup: number;
+  cooldown: number;
   mind: number;
   mob: number;
 }
@@ -29,7 +32,7 @@ const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 
 export function restoreDiaryExtras(data: DiaryBackupExtras): RestoreCounts {
-  let warmup = 0, mind = 0, mob = 0;
+  let warmup = 0, cooldown = 0, mind = 0, mob = 0;
 
   if (Array.isArray(data.warmupDiary)) {
     for (const raw of data.warmupDiary) {
@@ -46,6 +49,24 @@ export function restoreDiaryExtras(data: DiaryBackupExtras): RestoreCounts {
         note: str(e.note),
       });
       warmup++;
+    }
+  }
+
+  if (Array.isArray(data.cooldownDiary)) {
+    for (const raw of data.cooldownDiary) {
+      const e = raw as any;
+      if (!e || typeof e !== 'object' || typeof e.date !== 'string' || !DATE_RE.test(e.date)) continue;
+      if (cooldownLogForDate(e.date)) continue;
+      upsertCooldownLog({
+        date: e.date,
+        done: !!e.done,
+        quality: typeof e.quality === 'number' ? e.quality : null,
+        totalItems: typeof e.totalItems === 'number' ? e.totalItems : undefined,
+        doneItems: typeof e.doneItems === 'number' ? e.doneItems : undefined,
+        skippedReason: str(e.skippedReason),
+        note: str(e.note),
+      });
+      cooldown++;
     }
   }
 
@@ -89,5 +110,5 @@ export function restoreDiaryExtras(data: DiaryBackupExtras): RestoreCounts {
     }
   }
 
-  return { warmup, mind, mob };
+  return { warmup, cooldown, mind, mob };
 }

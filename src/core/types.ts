@@ -1321,6 +1321,8 @@ export interface CooldownBlock {
   type: 'stretch' | 'breathing' | 'mobility';
   durationSec: number;
   exercises: { exerciseId: string; durationSec: number }[];
+  /** Пояснение блока (например, «Растяжка рабочих зон: грудь, спина»). */
+  notes?: string;
 }
 
 export interface ExerciseOrderItem {

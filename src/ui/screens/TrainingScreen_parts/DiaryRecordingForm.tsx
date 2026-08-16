@@ -8,6 +8,7 @@ import { MMCSetPanel } from './MMCSetPanel';
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
+import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
 import { getPreviousWorkoutData } from './diary-shared';
 import type { StrengthLogEntry, WorkoutLog } from '../../../core/types';
 
@@ -796,6 +797,11 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {/* Чек-ин разминки (опционально): выполнена + качество */}
       {exercises.length > 0 && (
         <WarmupCheckinInline date={logDate} sessionId={savedWid || undefined} />
+      )}
+
+      {/* Чек-ин заминки (опционально): выполнена + качество */}
+      {exercises.length > 0 && (
+        <CooldownCheckinInline date={logDate} sessionId={savedWid || undefined} />
       )}
 
       {/* Save */}

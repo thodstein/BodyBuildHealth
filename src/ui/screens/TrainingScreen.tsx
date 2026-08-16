@@ -207,7 +207,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     } catch {}
   }, []);
   useEffect(() => {
-    const diaryTabs = new Set<TrainingTab>(['diary', 'history', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'mindset', 'mobility', 'warmup', 'reports']);
+    const diaryTabs = new Set<TrainingTab>(['diary', 'history', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'mindset', 'mobility', 'warmup', 'cooldown', 'reports']);
     if (initialSubTab === 'reports') {
       setZone('diary'); setPage('tabs'); setTab('reports');
     } else if (initialSubTab === 'analytics') {
@@ -654,7 +654,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
             {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {/* ═══════════ Дневник и аналитика (зона) ═══════════ */}
-      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'mindset' || tab === 'mobility' || tab === 'warmup' || tab === 'reports' || tab === 'mytraining') && (
+      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'mindset' || tab === 'mobility' || tab === 'warmup' || tab === 'cooldown' || tab === 'reports' || tab === 'mytraining') && (
         <DiaryAnalyticsZone
           tab={tab}
           initialDiaryMode={initialSubTab === 'diary' ? 'diary' : undefined}

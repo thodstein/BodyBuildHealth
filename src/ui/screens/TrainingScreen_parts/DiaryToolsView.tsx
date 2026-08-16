@@ -13,6 +13,7 @@ import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { exportMobilityCheckinsCSV, loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
+import { exportCooldownCheckinsCSV, loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../../engines/cooldown.engine';
 import { restoreDiaryExtras } from '../../../engines/diary-backup.engine';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
@@ -111,6 +112,23 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               🔥 Скачать дневник разминки CSV
             </button>
           </div>
+          {/* Cooldown diary CSV export */}
+          <div style={style.card}>
+            <div style={style.label}>❄️ Заминка CSV</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {loadCooldownLog().length} записей</div>
+            <button onClick={() => {
+              const csv = exportCooldownCheckinsCSV();
+              const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `cooldown_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }} style={{ width: '100%', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: 'rgba(56,189,248,0.12)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.3)', cursor: 'pointer' }}>
+              ❄️ Скачать дневник заминки CSV
+            </button>
+          </div>
           {/* Workout templates from history */}
           {historyWorkouts.length > 0 && (() => {
             const recent = historyWorkouts.slice(-5).reverse();
@@ -179,10 +197,13 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const mind30 = loadCheckins().filter(c => c.date >= cutoffStr);
               const mob30 = loadMobilityCheckins().filter(c => c.date >= cutoffStr);
               const warm30 = loadWarmupLog().filter(e => e.date >= cutoffStr);
+              const cool30 = loadCooldownLog().filter(e => e.date >= cutoffStr);
               const confAvg = mind30.length > 0 ? (mind30.reduce((s, c) => s + c.confidence, 0) / mind30.length).toFixed(1) : null;
               const mobDone30 = mob30.filter(c => c.done).length;
               const warmDone30 = warm30.filter(e => e.done).length;
               const warmQ = warmupQualityTrend(30);
+              const coolDone30 = cool30.filter(e => e.done).length;
+              const coolQ = cooldownQualityTrend(30);
               const romAvg = (() => { const scored = mob30.filter(c => c.romScore !== null); return scored.length > 0 ? (scored.reduce((s, c) => s + (c.romScore || 0), 0) / scored.length).toFixed(1) : null; })();
               const rows = month.map(w => `
                 <tr>
@@ -197,12 +218,13 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 .stats{display:flex;gap:24px;font-size:13px;margin:8px 0}</style></head><body>
                 <h1>📊 Тренировочный дневник — 30 дней</h1>
                 <div class="stats"><span>Тренировок: <b>${month.length}</b></span><span>Подходов: <b>${sets}</b></span><span>Тоннаж: <b>${(vol / 1000).toFixed(1)} т</b></span></div>
-                ${mind30.length > 0 || mob30.length > 0 || warm30.length > 0 ? `
-                  <h2>🧠 Психология, мобильность и разминка</h2>
+                ${mind30.length > 0 || mob30.length > 0 || warm30.length > 0 || cool30.length > 0 ? `
+                  <h2>🧠 Психология, мобильность, разминка и заминка</h2>
                   <div class="stats">
                     ${mind30.length > 0 ? `<span>Психо-чек-инов: <b>${mind30.length}</b></span><span>Ср. уверенность: <b>${confAvg}/5</b></span>` : ''}
                     ${mob30.length > 0 ? `<span>Мобильность: <b>${mobDone30}/${mob30.length}</b> дней</span><span>Ср. ROM: <b>${romAvg !== null ? romAvg + '/5' : '—'}</b></span>` : ''}
                     ${warm30.length > 0 ? `<span>Разминка: <b>${warmDone30}/${warm30.length}</b> дней</span><span>Ср. качество: <b>${warmQ.count > 0 ? warmQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
+                    ${cool30.length > 0 ? `<span>Заминка: <b>${coolDone30}/${cool30.length}</b> дней</span><span>Ср. качество: <b>${coolQ.count > 0 ? coolQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
                   </div>` : ''}
                 ${prs.length > 0 ? `<h2>🏆 PR за период</h2><ul>${prs.slice(0, 10).map(p => `<li>${esc(p.ex)} — ${esc(p.w)}</li>`).join('')}</ul>` : ''}
                 <h2>📋 Сессии</h2>
@@ -360,6 +382,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   rirCalibration: (() => { try { return JSON.parse(localStorage.getItem('he_rir_calibration') || 'null'); } catch { return null; } })(),
                   mmc: (() => { try { return JSON.parse(localStorage.getItem('he_mmc_data') || '[]'); } catch { return []; } })(),
                   warmupDiary: loadWarmupLog(),
+                  cooldownDiary: loadCooldownLog(),
                   mindsetChecks: loadCheckins(),
                   mobilityChecks: loadMobilityCheckins(),
                 };
@@ -402,7 +425,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const extras = restoreDiaryExtras(data);
                         const totalAdded = newWorkouts.length + addedMeasurements + extras.warmup + extras.mind + extras.mob;
                         if (totalAdded === 0) { alert('Все данные уже есть в дневнике'); return; }
-                        alert(`Импортировано: ${newWorkouts.length} тренировок, ${addedMeasurements} замеров, ${extras.warmup} записей разминки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
+                        alert(`Импортировано: ${newWorkouts.length} тренировок, ${addedMeasurements} замеров, ${extras.warmup} записей разминки, ${extras.cooldown} записей заминки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
                         onRefresh();
                       } catch { alert('Ошибка чтения файла'); }
                     })();

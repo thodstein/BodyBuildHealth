@@ -20,6 +20,7 @@ import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-
 import { MindsetCheckinInline } from '../SRCBBScreen_parts/MindsetSessionPanels';
 import { MobilityCheckinInline } from '../SRCBBScreen_parts/MobilitySessionPanel';
 import { WarmupCheckinInline } from '../SRCBBScreen_parts/WarmupSessionPanel';
+import { CooldownCheckinInline } from '../SRCBBScreen_parts/CooldownSessionPanel';
 
 const ACCENT = '#00e68a';
 
@@ -630,6 +631,8 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         <MobilityCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
         {/* Чек-ин разминки (опционально): выполнена + качество */}
         <WarmupCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
+        {/* Чек-ин заминки (опционально): выполнена + качество */}
+        <CooldownCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
         </>
       )}
     </div>

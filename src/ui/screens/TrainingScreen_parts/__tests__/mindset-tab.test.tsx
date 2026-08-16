@@ -9,6 +9,7 @@ import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MindsetTab } from '../MindsetTab';
 import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard, MindsetCheckinInline } from '../../SRCBBScreen_parts/MindsetSessionPanels';
 import { WarmupCheckinInline } from '../../SRCBBScreen_parts/WarmupSessionPanel';
+import { CooldownCheckinInline } from '../../SRCBBScreen_parts/CooldownSessionPanel';
 import { tabToHubMode } from '../DiaryAnalyticsZone';
 import { buildPresetProtocol, createProtocol, upsertProtocol, setActiveProtocol, loadCheckins, loadProtocols, loadActiveProtocol, itemsForDay, MINDSET_PROTOCOLS_KEY, MINDSET_ACTIVE_KEY, MINDSET_CHECKS_KEY } from '../../../../engines/mindset-protocol.engine';
 import type { DiaryHubCtx } from '../diary-hub-context';
@@ -23,7 +24,9 @@ import { TrainingCalendarTab } from '../TrainingCalendarTab';
 import { buildPresetMobility, upsertMobilityProtocol, setActiveMobility, itemsForSlot, loadMobilityProtocols, loadActiveMobility } from '../../../../engines/mobility-protocol.engine';
 import { saveAssessment } from '../../../../engines/mobility-assessment.engine';
 import { loadWarmupLog, upsertWarmupLog, WARMUP_DIARY_KEY } from '../../../../engines/warmup.engine';
+import { loadCooldownLog, upsertCooldownLog, COOLDOWN_DIARY_KEY } from '../../../../engines/cooldown.engine';
 import { WarmupDiaryView } from '../WarmupDiaryView';
+import { CooldownDiaryView } from '../CooldownDiaryView';
 
 const mkHub = (historyWorkouts: any[] = []): DiaryHubCtx => ({ historyWorkouts } as any as DiaryHubCtx);
 
@@ -325,6 +328,60 @@ describe('Разминка в блоке «Сегодня»', () => {
     expect(html).toContain('Сводка · 30 дней');
     expect(html).toContain('Персональные инсайты');
     expect(html).toContain('Разминочная рампа');
+  });
+});
+
+describe('Заминка (чек-ин, бейджи, вкладка)', () => {
+  beforeEach(() => localStorage.clear());
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  it('CooldownCheckinInline: «✓ да» + сохранить → запись в дневнике заминки', () => {
+    render(<CooldownCheckinInline date="2026-08-14" sessionId="w1" />);
+    fireEvent.click(screen.getByText('✓ да'));
+    fireEvent.click(screen.getByLabelText('Сохранить чек-ин заминки'));
+    const log = loadCooldownLog();
+    expect(log.length).toBe(1);
+    expect(log[0].done).toBe(true);
+    expect(log[0].sessionId).toBe('w1');
+  });
+
+  it('CooldownCheckinInline: «✕ нет» фиксирует причину пропуска', () => {
+    render(<CooldownCheckinInline date="2026-08-14" />);
+    fireEvent.click(screen.getByText('✕ нет'));
+    fireEvent.click(screen.getByLabelText('Сохранить чек-ин заминки'));
+    const log = loadCooldownLog();
+    expect(log[0].done).toBe(false);
+    expect(log[0].skippedReason).toBeTruthy();
+  });
+
+  it('WorkoutWeekCard: выполненная заминка → бейдж ❄️', () => {
+    upsertCooldownLog({ date: today, done: true, quality: 4, sessionId: 'w_cool1' });
+    const workout = {
+      id: 'w_cool1', date: today, exercises: [{ id: 'e1', date: today, exerciseId: 'bench_press', exerciseName: 'Жим', sets: [{ weight: 80, reps: 8 }], totalVolume: 640, estimated1RM: 101 } as any],
+    } as WorkoutLog;
+    const html = renderToStaticMarkup(<WorkoutWeekCard weekLabel="Неделя 1" workouts={[workout]} expanded onToggle={() => {}} />);
+    expect(html).toContain('❄️ ✓ 4/5');
+  });
+
+  it('CooldownDiaryView (SSR): сводка, инсайты и пустое состояние', () => {
+    const html = renderToStaticMarkup(<CooldownDiaryView />);
+    expect(html).toContain('❄️ Заминка');
+    expect(html).toContain('Сводка · 30 дней');
+    expect(html).toContain('Пока нет записей');
+    expect(html).toContain('Персональные инсайты');
+  });
+
+  it('TrainingDiaryHub с mode cooldown рендерит вкладку заминки', () => {
+    upsertCooldownLog({ date: today, done: true, quality: 4 });
+    const html = renderToStaticMarkup(<TrainingDiaryHub
+      diary={{} as any} diaryStats={[]} diaryProgress={[]} historyWorkouts={[]} macrocycle={null} selectedWeek={1}
+      level="intermediate" onRefresh={() => {}} trainingOutput={null} goal="bulk" daysPerWeek={4} splitType="auto"
+      periodizationType="auto" mesoLength={12} tprofile={{} as any} linked={{}} initialMode="cooldown"
+    />);
+    expect(html).toContain('❄️ Заминка');
+    expect(html).toContain('Приверженность');
+    expect(html).toContain('CSV');
   });
 });
 
@@ -826,6 +883,15 @@ describe('Визуальные улучшения (степпер, кольца,
 
   it('tabToHubMode маппит вкладку warmup', () => {
     expect(tabToHubMode('warmup')).toBe('warmup');
+  });
+
+  it('tabToHubMode маппит вкладку cooldown', () => {
+    expect(tabToHubMode('cooldown')).toBe('cooldown');
+  });
+
+  it('nav: зона diary включает cooldown', () => {
+    const all = ZONES.diary.categories!.flatMap(c => c.tabs);
+    expect(all).toContain('cooldown');
   });
 
   it('WarmupDiaryView (SSR): рендерит сводку, инсайты и пустое состояние', () => {

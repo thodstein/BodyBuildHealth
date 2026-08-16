@@ -45,7 +45,7 @@ export type TrainingTab =
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
-  | 'training_mix_hub' | 'mix_presets' | 'warmup';
+  | 'training_mix_hub' | 'mix_presets' | 'warmup' | 'cooldown';
 export type TrainingPage = 'hero' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
@@ -83,6 +83,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   mindset: '🧠 Психология',
   mobility: '🧘 Мобильность',
   warmup: '🔥 Разминка',
+  cooldown: '❄️ Заминка',
   checkin: '📋 Чек-ин метрик',
   strength: '💪 Аналитика силы',
   bb_tools: '💪 ББ-инструменты',

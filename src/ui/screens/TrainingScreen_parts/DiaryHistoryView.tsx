@@ -9,6 +9,7 @@ import { clearStorageTrimWarning } from '../../../engines/workout-logger.engine'
 import { loadCheckins, protocolAdherence, mindsetTrends } from '../../../engines/mindset-protocol.engine';
 import { loadMobilityCheckins, mobilityAdherence, mobilityTrends } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
+import { loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../../engines/cooldown.engine';
 import { Sparkline } from './Sparkline';
 import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
@@ -144,6 +145,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             // Разминка за неделю
             const warmWeek = loadWarmupLog().filter(e => e.date >= weekAgoStr);
             const warmDoneWeek = warmWeek.filter(e => e.done).length;
+            // Заминка за неделю
+            const coolWeek = loadCooldownLog().filter(e => e.date >= weekAgoStr);
+            const coolDoneWeek = coolWeek.filter(e => e.done).length;
             const summary = [
               `📅 Неделя: ${lastWeek[0].date.slice(8, 10)}.${lastWeek[0].date.slice(5, 7)} — ${lastWeek[lastWeek.length - 1].date.slice(8, 10)}.${lastWeek[lastWeek.length - 1].date.slice(5, 7)}`,
               `🏋️ Тренировок: ${lastWeek.length} (${prevWeek.length ? `прошлая: ${prevWeek.length}` : 'прошлая: —'})`,
@@ -152,6 +156,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               mindWeek.length > 0 ? `🧠 Психо: ${mindWeek.length} чек-ин(а) · уверенность ${confAvg}/5` : '',
               mobWeek.length > 0 ? `🧘 Мобильность: ${mobDoneWeek}/${mobWeek.length} дней выполнено` : '',
               warmWeek.length > 0 ? `🔥 Разминка: ${warmDoneWeek}/${warmWeek.length} дней` : '',
+              coolWeek.length > 0 ? `❄️ Заминка: ${coolDoneWeek}/${coolWeek.length} дней` : '',
               lastWeek[0].notes ? `📝 ${lastWeek[0].notes}` : '',
             ].filter(Boolean).join('\n');
             return (
@@ -787,6 +792,40 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
                     <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wadh.done}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Заминка: сводка (дневник заминки) */}
+          {loadCooldownLog().length > 0 && (() => {
+            const cadh = cooldownAdherence(30);
+            const cq = cooldownQualityTrend(30);
+            const clast = loadCooldownLog()[loadCooldownLog().length - 1];
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label}>❄️ Заминка</div>
+                  <span style={{ fontSize: 9, color: 'rgba(56,189,248,0.8)' }}>
+                    последний: {clast.date.slice(5).replace('-', '.')} · {clast.done ? `выполнена${clast.quality !== null ? `, качество ${clast.quality}/5` : ''}` : 'пропущена'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Записей · 30д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#38bdf8' }}>{cadh.total}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: cadh.pct >= 80 ? '#22c55e' : cadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{cadh.total > 0 ? `${cadh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Ср. качество</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{cq.count > 0 ? cq.avg.toFixed(1) : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{cadh.done}</div>
                   </div>
                 </div>
               </div>

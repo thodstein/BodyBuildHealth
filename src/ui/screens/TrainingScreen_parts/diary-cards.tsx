@@ -7,6 +7,7 @@ import { getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logge
 import { loadCheckins } from '../../../engines/mindset-protocol.engine';
 import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog } from '../../../engines/warmup.engine';
+import { loadCooldownLog } from '../../../engines/cooldown.engine';
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { diaryStyles as style, ACCENT, DIM } from './diary-tokens';
@@ -43,6 +44,9 @@ export const WorkoutWeekCard: React.FC<{
   // Бейдж разминки (одна запись на дату; ключ — дата или sessionId записи)
   const warmBadge = new Map<string, { done: boolean; quality: number | null }>();
   loadWarmupLog().forEach(e => { warmBadge.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
+  // Бейдж заминки (одна запись на дату; ключ — дата или sessionId записи)
+  const coolBadge = new Map<string, { done: boolean; quality: number | null }>();
+  loadCooldownLog().forEach(e => { coolBadge.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
   return (
     <div style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
       <div onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
@@ -71,12 +75,14 @@ export const WorkoutWeekCard: React.FC<{
                 const m = mindBadge.get(key);
                 const mb = mobBadge.has(key);
                 const wu = warmBadge.get(key);
-                if (!m && !mb && !wu) return null;
+                const cd = coolBadge.get(key);
+                if (!m && !mb && !wu && !cd) return null;
                 return (
                   <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, verticalAlign: 'middle' }}>
                     {m && <span title={`Психо-чек-ин: уверенность ${m}/5`} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', fontWeight: 700 }}>🧠 {m}/5</span>}
                     {mb && <span title="Мобильность: рутина/сессия выполнена" style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', fontWeight: 700 }}>🧘 ✓</span>}
                     {wu && <span title={wu.done ? `Разминка выполнена${wu.quality !== null ? `, качество ${wu.quality}/5` : ''}` : 'Разминка пропущена'} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: wu.done ? 'rgba(249,115,22,0.15)' : 'rgba(239,68,68,0.15)', color: wu.done ? '#f97316' : '#ef4444', fontWeight: 700 }}>🔥 {wu.done ? `✓${wu.quality !== null ? ` ${wu.quality}/5` : ''}` : '✕'}</span>}
+                    {cd && <span title={cd.done ? `Заминка выполнена${cd.quality !== null ? `, качество ${cd.quality}/5` : ''}` : 'Заминка пропущена'} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 8, background: cd.done ? 'rgba(56,189,248,0.15)' : 'rgba(239,68,68,0.15)', color: cd.done ? '#38bdf8' : '#ef4444', fontWeight: 700 }}>❄️ {cd.done ? `✓${cd.quality !== null ? ` ${cd.quality}/5` : ''}` : '✕'}</span>}
                   </span>
                 );
               })()}
