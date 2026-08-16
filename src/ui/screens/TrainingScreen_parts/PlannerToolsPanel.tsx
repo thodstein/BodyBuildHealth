@@ -4,7 +4,6 @@
 import React, { useState } from 'react';
 
 // Общие (сила/нагрузка/периодизация)
-import { PeriodizationDesignerTab } from './PeriodizationDesignerTab';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { loadTrainingProfile } from './training-profile';
 import { DiagnosticsHub } from './DiagnosticsHub';
@@ -36,7 +35,6 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
     { id: 'intelligence-strength', title: 'Анализ силы', icon: '🏋️', short: 'Интеллектуальный анализ силы: 1RM, VBT, относительная сила, нормативы и аналитика.', render: () => <StrengthAnalysisHub /> },
     { id: 'safety', title: 'Безопасность и нагрузка', icon: '🛡', short: 'Единый инструмент: безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио, разгрузка.', render: () => <TrainingSafetyHub /> },
     { id: 'meso', title: 'Прогрессия мезо', icon: '📈', short: 'Кривые V/I/RIR по неделям → стартовый объём планировщику.', render: () => <MesocycleProgressionCard weeks={12} startVolumeSets={18} startIntensityPct={0.75} startRIR={3} goal="hypertrophy" fatigueTrajectory={[]} /> },
-    { id: 'period', title: 'Дизайнер периодизации', icon: '🔄', short: 'Блочный макроцикл: drag-and-drop фаз на таймлайн.', render: () => <PeriodizationDesignerTab /> },
   ],
 
   // ═══ ББ-АВТО ═══
