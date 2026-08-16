@@ -1,6 +1,6 @@
 /**
  * TaperPlannerTab.tsx — ЕДИНЫЙ ПОЛНЫЙ ТАПЕР-КАЛЬКУЛЯТОР.
- * Объединяет: PL-taper (taper.engine), BB show-peak (peaking-engine),
+ * Объединяет: PL-taper (pro/taper.engine), BB show-peak (bb-contest-prep.engine),
  * весовую категорию, таймлайн дня, протоколы восстановления, ментальные рутины.
  * Ранее: TaperPlannerTab + PeakingPanel(PL) + ProPlToolsTab(taper) — теперь всё здесь.
  */
@@ -9,7 +9,6 @@ import {
   taperPlan, warmupSequence, taperWeeksForFatigue,
   type AttemptStrategy, type Lift, type TaperPlan,
 } from '../../../engines/pro/taper.engine';
-import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
 import { buildBBContestPrep, isoToday, isoAddDays, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
 import {
   selectWeightClass, generateCompetitionTimeline,
@@ -31,6 +30,9 @@ const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 1
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: 'rgba(255,255,255,0.8)' };
 const LIFT_RU: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Тяга' };
 const LIFT_COLOR: Record<Lift, string> = { squat: '#ef4444', bench: '#3b82f6', deadlift: '#f59e0b' };
+
+type BBShowPeakWeekRow = { day: number; training: string; carbs: string; water: string; sodium: string; posing: string };
+type BBShowPeakOutput = { weekPlan: BBShowPeakWeekRow[]; recommendations: string[] };
 
 const fatigueOpts = [
   { id: 'low', label: 'Низкая (8-9)', desc: 'Лёгкий taper 1 неделя' },
@@ -92,7 +94,7 @@ export const TaperPlannerTab: React.FC = () => {
   const warmup = plan ? warmupSequence(plan.attempts.squat.opener) : [];
 
   // ── Расчёты BB (canonical engine: bb-contest-prep.engine.ts) ──
-  const bb: BBPeakingOutput | null = useMemo(() => {
+  const bb: BBShowPeakOutput | null = useMemo(() => {
     if (kind !== 'bb') return null;
     try {
       const cfg: BBContestPrepConfig = {

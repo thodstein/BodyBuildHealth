@@ -41,10 +41,11 @@ export const PeakingProtocolsTab: React.FC = () => {
 
   const applyProtocol = useCallback((type: PeakingProtocol) => {
     const p = getPeakingProtocol(type);
+    const fw = p.weeks[p.weeks.length - 1];
     applyToPlanner({
       kind: 'peak',
       label: `Пик-протокол: ${p.name}`,
-      data: { protocol: type, weeks: p.weeks },
+      data: { protocol: type, weeks: p.weeks, volumeMult: fw.volumePct, rirTarget: fw.rirMin },
     });
     setAppliedProtocol(type);
     setTimeout(() => setAppliedProtocol(null), 2000);
