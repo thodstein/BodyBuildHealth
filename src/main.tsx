@@ -7,7 +7,7 @@ import { renderAuthModule } from './ui/auth-module';
 import { db } from './core/db';
 import { registry } from './core/data/registry';
 import { initPWA } from './core/pwa-manager';
-import { onViewportChanged, hapticImpact } from './core/telegram';
+import { onViewportChanged, hapticImpact, onKeyboardClose } from './core/telegram';
 import { initCloudSync } from './core/cloud-sync';
 import { processQueue } from './core/sync-queue';
 import { initEncryption } from './core/db-encryption';
@@ -76,6 +76,9 @@ function fixMobileViewport() {
     document.documentElement.style.setProperty('--vh', `${height * 0.01}px`);
     document.documentElement.style.setProperty('--app-height', `${height}px`);
   });
+  // AGENTS.md: после закрытия клавиатуры Android-WebView не возвращает полную высоту —
+  // нижняя зона экрана мертва для тапов; пере-расширяем по focusout/resize.
+  try { onKeyboardClose(() => {}); } catch (e) { console.warn('onKeyboardClose failed:', e); }
 }
 
 function showBootstrapError(msg: string) {

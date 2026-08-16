@@ -1,11 +1,9 @@
 /** diary-cards.tsx — самодостаточные карточки дневника (вынесены из TrainingDiaryHub). */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { WorkoutLog } from '../../../core/types';
 import { epley1RM } from '../../../engines/e1rm';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { getISOWeekNumber, getISOWeekYear } from '../../../engines/workout-logger.engine';
-import { loadCheckins } from '../../../engines/mindset-protocol.engine';
-import { loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog } from '../../../engines/warmup.engine';
 import { loadCooldownLog } from '../../../engines/cooldown.engine';
 import { loadStretchLog } from '../../../engines/stretch-session.engine';
@@ -40,16 +38,19 @@ export const WorkoutWeekCard: React.FC<{
   const prevVol = (prevWorkouts || []).reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
   const isDeload = prevVol > 0 && totalVol > 0 && totalVol / prevVol < 0.55;
   // Бейджи психо-чек-инов и мобильности (ключ: sessionId (id записи) или дата)
-  const mindBadge = new Map<string, number>();
-  loadCheckins().forEach(c => { if (c.confidence > 0) mindBadge.set(c.sessionId || c.date, c.confidence); });
-  const mobBadge = new Set<string>();
-  loadMobilityCheckins().forEach(c => { if (c.done) mobBadge.add(c.sessionId || c.date); });
-  // Бейдж разминки (одна запись на дату; ключ — дата или sessionId записи)
-  const warmBadge = new Map<string, { done: boolean; quality: number | null }>();
-  loadWarmupLog().forEach(e => { warmBadge.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
-  // Бейдж заминки (одна запись на дату; ключ — дата или sessionId записи)
-  const coolBadge = new Map<string, { done: boolean; quality: number | null }>();
-  loadCooldownLog().forEach(e => { coolBadge.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
+  // Мемоизировано: localStorage-чтения на каждый рендер вешали UI при большой истории.
+  const badges = useMemo(() => {
+    const mind = new Map<string, number>();
+    loadCheckins().forEach(c => { if (c.confidence > 0) mind.set(c.sessionId || c.date, c.confidence); });
+    const mob = new Set<string>();
+    loadMobilityCheckins().forEach(c => { if (c.done) mob.add(c.sessionId || c.date); });
+    const warm = new Map<string, { done: boolean; quality: number | null }>();
+    loadWarmupLog().forEach(e => { warm.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
+    const cool = new Map<string, { done: boolean; quality: number | null }>();
+    loadCooldownLog().forEach(e => { cool.set(e.sessionId || e.date, { done: e.done, quality: e.quality }); });
+    return { mindBadge: mind, mobBadge: mob, warmBadge: warm, coolBadge: cool };
+  }, [workouts]);
+  const { mindBadge, mobBadge, warmBadge, coolBadge } = badges;
   return (
     <div style={{ ...style.card, borderLeft: isDeload ? '3px solid #f59e0b' : undefined }}>
       <div onClick={onToggle} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: expanded ? 6 : 0, cursor: 'pointer', padding: '2px 0' }}>
@@ -474,7 +475,7 @@ export function buildHabitWeek(historyWorkouts: WorkoutLog[]): { days: string[];
 }
 
 export const HabitWeekCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ historyWorkouts }) => {
-  const { days, marks } = buildHabitWeek(historyWorkouts);
+  const { days, marks } = useMemo(() => buildHabitWeek(historyWorkouts || []), [historyWorkouts]);
   const today = new Date();
   const todayIdx = (today.getDay() + 6) % 7;
   const todayDone = HABIT_ROWS.filter(r => marks[r.id][todayIdx]).length;
