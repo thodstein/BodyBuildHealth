@@ -1,8 +1,8 @@
 /**
- * CardioParamsStep.tsx — шаг 1 мастера кардио: быстрый старт (пресеты),
- * цель и горизонт, персонализация (уровень/оборудование/пол/возраст),
- * дни ног, факторы восстановления, структура фаз и живой предпросмотр.
- * Структура: секции с якорной навигацией и единый стиль (CardioUI).
+ * CardioParamsStep.tsx — шаг 1 мастера кардио. Логичный порядок секций:
+ * 1) параметры пользователя, 2) выбор цели и быстрые старты, 3) горизонт,
+ * 4) оборудование, 5) дни ног, 6) факторы, 7) структура фаз, 8) итог.
+ * Вертикальные секции с заголовками, единый стиль (CardioUI), навигация.
  */
 import React, { useMemo } from 'react';
 import {
@@ -124,9 +124,11 @@ export const CardioParamsStep: React.FC<{
   };
 
   const NAV = [
-    { id: 'sec-start', label: '⚡ Старт' },
-    { id: 'sec-goal', label: '🎯 Цель' },
-    { id: 'sec-personal', label: '👤 Параметры' },
+    { id: 'sec-user', label: '👤 Пользователь' },
+    { id: 'sec-goal', label: '🎯 Выбор цели' },
+    { id: 'sec-start', label: '⚡ Старты' },
+    { id: 'sec-horizon', label: '⏱ Горизонт' },
+    { id: 'sec-equip', label: '🏃 Оборудование' },
     { id: 'sec-nog', label: '🦵 Дни ног' },
     { id: 'sec-factors', label: '📊 Факторы' },
     { id: 'sec-phases', label: '🧩 Фазы' },
@@ -139,21 +141,37 @@ export const CardioParamsStep: React.FC<{
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <SectionNav items={NAV} />
 
-      {/* ── I. Быстрые старты ── */}
-      <GroupHeading icon="⚡" text="Быстрые старты" desc="Выберите готовый шаблон — остальные настройки подстроятся под него." />
-      <SectionCard id="sec-start" title="Готовые пресеты">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {CARDIO_PRESETS.map(p => (
-            <div key={p.id} style={PRESET} onClick={() => applyPreset(p.id)} role="button" aria-label={`Пресет: ${p.name}`}>
-              <div style={{ fontSize: 11, fontWeight: 800 }}>{p.icon} {p.name}</div>
-              <div style={{ fontSize: 10, marginTop: 2, opacity: 0.7 }}>{p.desc}</div>
-            </div>
+      {/* ── 1. Параметры пользователя ── */}
+      <GroupHeading icon="👤" text="Параметры пользователя" desc="Возраст, пол, вес, ЧСС покоя, уровень и восстановление — основа для пульс-зон и объёма." />
+      <SectionCard id="sec-user" title="👤 Параметры пользователя">
+        <div style={ROW}>
+          <span style={LABEL}>Возраст</span>
+          <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="Возраст" />
+          <span style={{ ...LABEL, marginLeft: 12 }}>Вес (кг)</span>
+          <input type="number" value={bodyWeight} onChange={e => setBodyWeight(Math.max(30, Math.min(300, Number(e.target.value) || 80)))} inputMode="numeric" style={numInput(70)} aria-label="Вес" />
+          <span style={{ ...LABEL, marginLeft: 12 }}>ЧСС покоя</span>
+          <input type="number" value={restingHr} onChange={e => setRestingHr(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="ЧСС покоя" />
+        </div>
+        <div style={ROW}>
+          <span style={LABEL}>Пол</span>
+          <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
+          <button style={sex === 'female' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('female')} aria-label="Пол: женский">♀ Женский</button>
+          <span style={{ ...LABEL, marginLeft: 12 }}>Уровень</span>
+          {(Object.keys(CARDIO_LEVEL_LABELS) as CardioLevel[]).map(l => (
+            <button key={l} style={level === l ? CHIP_ACTIVE : CHIP} onClick={() => setLevel(l)}>{CARDIO_LEVEL_LABELS[l]}</button>
           ))}
         </div>
+        <div style={ROW}>
+          <span style={LABEL}>Восстановление</span>
+          <button style={recoveryLow ? CHIP_ACTIVE : CHIP} onClick={() => setRecoveryLow(!recoveryLow)}>
+            {recoveryLow ? '🧘 Низкое (HIIT убран)' : '🟢 В норме'}
+          </button>
+        </div>
+        <div style={HINT}>Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст. Уровень: новичок ×0.8, продвинутый ×1.15. Можно загрузить из профиля в карточке «👤» над мастером.</div>
       </SectionCard>
 
-      {/* ── II. Цель и горизонт ── */}
-      <GroupHeading icon="🎯" text="Цель и горизонт" desc="Определяют профиль объёма и длительность цикла." />
+      {/* ── 2. Выбор цели ── */}
+      <GroupHeading icon="🎯" text="Выбор цели" desc="Определяет профиль объёма (Zone 2 / HIIT / восстановление)." />
       <SectionCard id="sec-goal" title="🎯 Цель цикла">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {(Object.keys(CARDIO_GOAL_LABELS) as CardioGoal[]).map(g => (
@@ -165,6 +183,21 @@ export const CardioParamsStep: React.FC<{
         </div>
       </SectionCard>
 
+      {/* ── 3. Быстрые старты ── */}
+      <GroupHeading icon="⚡" text="Быстрые старты" desc="Готовые шаблоны — подстроят цель, горизонт и восстановление." />
+      <SectionCard id="sec-start" title="Готовые пресеты">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {CARDIO_PRESETS.map(p => (
+            <div key={p.id} style={PRESET} onClick={() => applyPreset(p.id)} role="button" aria-label={`Пресет: ${p.name}`}>
+              <div style={{ fontSize: 11, fontWeight: 800 }}>{p.icon} {p.name}</div>
+              <div style={{ fontSize: 10, marginTop: 2, opacity: 0.7 }}>{p.desc}</div>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* ── 4. Горизонт ── */}
+      <GroupHeading icon="⏱" text="Горизонт" desc="Длительность цикла и доступные дни в неделю." />
       <SectionCard id="sec-horizon" title="⏱ Горизонт">
         <div style={ROW}>
           <span style={LABEL}>Недель</span>
@@ -175,24 +208,13 @@ export const CardioParamsStep: React.FC<{
           <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.max(0, daysAvailable - 1))} aria-label="Меньше дней">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{daysAvailable}</span>
           <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>
-          <span style={{ ...LABEL, marginLeft: 12 }}>Вес (кг)</span>
-          <input type="number" value={bodyWeight} onChange={e => setBodyWeight(Math.max(30, Math.min(300, Number(e.target.value) || 80)))} inputMode="numeric" style={numInput(70)} aria-label="Вес" />
         </div>
-        <div style={HINT}>Вес влияет на оценку расхода калорий кардио-сессий.</div>
+        <div style={HINT}>Вес влияет на оценку расхода калорий кардио-сессий (задается в параметрах пользователя).</div>
       </SectionCard>
 
-      {/* ── III. Параметры пользователя ── */}
-      <GroupHeading icon="👤" text="Параметры пользователя" desc="Уровень, оборудование, пол, возраст и восстановление — уточняют объём и пульс-зоны." />
-      <SectionCard title="🎚 Уровень подготовки">
-        <div style={ROW}>
-          {(Object.keys(CARDIO_LEVEL_LABELS) as CardioLevel[]).map(l => (
-            <button key={l} style={level === l ? CHIP_ACTIVE : CHIP} onClick={() => setLevel(l)}>{CARDIO_LEVEL_LABELS[l]}</button>
-          ))}
-        </div>
-        <div style={HINT}>Новичок — объём ×0.8, продвинутый — ×1.15.</div>
-      </SectionCard>
-
-      <SectionCard title="🏃 Оборудование (до 3)">
+      {/* ── 5. Оборудование ── */}
+      <GroupHeading icon="🏃" text="Оборудование" desc="Виды кардио и режим «щадить суставы» (низкоударные)." />
+      <SectionCard id="sec-equip" title="🏃 Оборудование (до 3)">
         <div style={ROW}>
           {CARDIO_EQUIPMENT_OPTIONS.map(e => (
             <button
@@ -209,29 +231,10 @@ export const CardioParamsStep: React.FC<{
         <button style={lowImpact ? CHIP_ACTIVE : CHIP} onClick={() => setLowImpact(!lowImpact)}>
           {lowImpact ? '🦴 Щадить суставы: вкл' : 'Щадить суставы: выкл'}
         </button>
-        <div style={ROW}>
-          <span style={LABEL}>Возраст (пульс-зоны)</span>
-          <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="Возраст" />
-        </div>
+        <div style={HINT}>При «щадить суставы» высокоударный бег недоступен и заменяется низкоуударным видом.</div>
       </SectionCard>
 
-      <SectionCard title="🧘 Восстановление">
-        <div style={ROW}>
-          <button style={recoveryLow ? CHIP_ACTIVE : CHIP} onClick={() => setRecoveryLow(!recoveryLow)}>
-            {recoveryLow ? '🧘 Низкое восстановление (HIIT убран)' : '🟢 Восстановление в норме'}
-          </button>
-        </div>
-        <div style={ROW}>
-          <span style={LABEL}>Пол</span>
-          <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
-          <button style={sex === 'female' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('female')} aria-label="Пол: женский">♀ Женский</button>
-          <span style={{ ...LABEL, marginLeft: 10 }}>ЧСС покоя</span>
-          <input type="number" value={restingHr} onChange={e => setRestingHr(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="ЧСС покоя" />
-        </div>
-        <div style={HINT}>Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст. Возраст/пол/вес/ЧСС покоя можно загрузить из профиля в карточке «👤» над мастером.</div>
-      </SectionCard>
-
-      {/* ── IV. Дни ног ── */}
+      {/* ── 6. Дни ног ── */}
       <GroupHeading icon="🦵" text="Дни тяжёлых ног" desc="Интенсивное кардио не ставится на силовые дни ног." />
       <SectionCard id="sec-nog" title="Дни тяжёлых ног">
         <div style={ROW}>
@@ -249,9 +252,9 @@ export const CardioParamsStep: React.FC<{
         <div style={HINT}>Zone 2 / MISS / HIIT не попадут на эти дни; recovery — в любой день.</div>
       </SectionCard>
 
-      {/* ── V. Факторы ── */}
+      {/* ── 7. Факторы ── */}
       <GroupHeading icon="📊" text="Факторы восстановления и курса" desc="Из профиля: сон, стресс, HRV, PED, суставы." />
-      <SectionCard id="sec-factors" title="Факторы (восстановление и курс)">
+      <SectionCard id="sec-factors" title="📊 Факторы (восстановление и курс)">
         <div style={ROW}>
           <button style={factorsOn.sleep ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
           <button style={factorsOn.stress ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
@@ -264,10 +267,10 @@ export const CardioParamsStep: React.FC<{
             {factorsSummary.map((s, i) => <div key={i}>• {s}</div>)}
           </div>
         )}
-        <div style={HINT}>Влияют на объём и HIIT: сон {'<'}6 ч → ×0.9; стресс ≥7 → HIIT убран, ×0.95; низкий HRV → ×0.9; PED-курс → ×1.05; суставы → низкоударный режим.</div>
+        <div style={HINT}>Сон {'<'}6 ч → ×0.9; стресс ≥7 → HIIT убран, ×0.95; низкий HRV → ×0.9; PED → ×1.05; суставы → низкоударный.</div>
       </SectionCard>
 
-      {/* ── VI. Структура фаз ── */}
+      {/* ── 8. Структура фаз ── */}
       <GroupHeading icon="🧩" text="Структура фаз" desc="Доли фаз в цикле: авто или вручную." />
       <SectionCard id="sec-phases" title="🧩 Структура фаз">
         <div style={ROW}>
@@ -290,7 +293,7 @@ export const CardioParamsStep: React.FC<{
         )}
       </SectionCard>
 
-      {/* ── VII. Предпросмотр ── */}
+      {/* ── 9. Предпросмотр ── */}
       <GroupHeading icon="👁" text="Итог" desc="Мгновенный расчёт цикла по текущим параметрам." />
       <SectionCard id="sec-preview" accent title="👁 Предпросмотр цикла" right={
         <button style={BTN_SMALL} onClick={onReset} aria-label="Сбросить параметры">⟲ Сбросить</button>
