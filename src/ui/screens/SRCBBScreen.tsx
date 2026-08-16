@@ -23,6 +23,7 @@ import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCour
 
 import { AutoregPanel } from './SRCBBScreen_parts/AutoregPanel';
 import { PeakingPanel } from './SRCBBScreen_parts/PeakingPanel';
+import { TaperCoachCard } from './SRCBBScreen_parts/TaperCoachCard';
 import { RecoveryPanel } from './SRCBBScreen_parts/RecoveryPanel';
 import { ExerciseSafetyPanel } from './SRCBBScreen_parts/ExerciseSafetyPanel';
 import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
@@ -1600,110 +1601,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                     title="Сохранить цикл с тапером как соревновательный — появится в дневнике тренировок (подвкладка «🏁 Соревнования») с прикидами и составом мезоцикла"
                   >🏆 Сохранить как соревновательный</button>
                 </div>
-                {/* 🧠 ТРЕНЕР: авто-подбор схемы + вердикт по готовности к старту */}
-                <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>🧠 Тренерская работа</div>
-                    <button
-                      onClick={() => { try { applyTaperRecommendation(recommendTaperConfig(buildCoachCtx())); } catch (error) { setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`); } }}
-                      style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
-                      title="Автоматически подобрать схему тапера, длительность, весовую цель, mock meet и пост-старт под ваши усталость/ACWR/вес/план ПМ"
-                    >🤖 Подобрать тапер автоматически</button>
-                  </div>
-                  {builtSrc && taperNote && (() => {
-                    try {
-                      const verdict = coachPLPeakPlan(builtSrc, buildCoachCtx());
-                      const scoreColor = verdict.score >= 85 ? '#22c55e' : verdict.score >= 65 ? '#eab308' : verdict.score >= 40 ? '#f97316' : '#ef4444';
-                      const feas = pmFeasibility(buildCoachCtx());
-                      const projected = builtSrc.weeks[builtSrc.weeks.length - 1]?.pmRow
-                        ? projectPmToMeet(builtSrc.weeks[builtSrc.weeks.length - 1].pmRow, builtSrc.template?.meta?.correctionPct ?? 0.005, weeksToMeet) : null;
-                      return (
-                        <div>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
-                            <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor }}>{verdict.score}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{verdict.label}</span>
-                            {projected && (() => {
-                              const sq = projected['Присед'] ?? projected['Приседания со штангой'];
-                              if (!sq) return null;
-                              return <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>· прогноз к старту: присед ≈ {sq} кг</span>;
-                            })()}
-                          </div>
-                          {verdict.notes.slice(0, 6).map((n, i) => (
-                            <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : 'rgba(255,255,255,0.7)', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
-                          ))}
-                          {feas.status !== 'realistic' && feas.lifts.length > 0 && (
-                            <div style={{ fontSize: 10, color: feas.status === 'unrealistic' ? '#f87171' : '#fbbf24', marginTop: 3 }}>🎯 {feas.summary}</div>
-                          )}
-                          <button
-                            onClick={() => { try { applyTaperRecommendation(verdict.actions ?? recommendTaperConfig(buildCoachCtx())); } catch (error) { setMethodNote(`⚠ Ошибка: ${(error as Error).message}`); } }}
-                            style={{ ...BTN_GHOST, marginTop: 6, minHeight: 36, fontSize: 10, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', background: 'rgba(0,230,138,0.06)' }}
-                            title="Применить рекомендуемые настройки тапера (схема/длительность/весовая цель/mock/пост-старт) — затем нажмите «📉 Добавить тапер к плану»"
-                          >✅ Применить рекомендации тренера</button>
-                          <button
-                            onClick={() => {
-                              try {
-                                const lines = [
-                                  `🧠 Тренерский вердикт: ${verdict.score}/100 — ${verdict.label}`,
-                                  ...verdict.notes.map(n => `${n.icon} ${n.text}`),
-                                  feas.summary && feas.lifts.length > 0 ? `🎯 ${feas.summary}` : '',
-                                  projected && projected['Присед'] ? `🔮 Прогноз к старту: присед ≈ ${projected['Присед']} кг` : '',
-                                ].filter(Boolean);
-                                const text = lines.join('\n');
-                                const done = () => setMethodNote('📋 Вердикт тренера скопирован в буфер');
-                                if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(text).then(done).catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { /* ignore */ } document.body.removeChild(ta); }); }
-                                else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { /* ignore */ } document.body.removeChild(ta); }
-                              } catch (error) { setMethodNote(`⚠ Не удалось скопировать: ${(error as Error).message}`); }
-                            }}
-                            style={{ ...BTN_GHOST, marginTop: 6, minHeight: 36, fontSize: 10, marginLeft: 6, border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.03)' }}
-                            title="Скопировать полную сводку вердикта тренера (score, заметки, достижимость ПМ, прогноз)"
-                          >📋 Копировать вердикт</button>
-                          {/* 🔀 Сравнение сценариев тапера */}
-                          <div style={{ marginTop: 8, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>🔀 Сравнение сценариев («что если…»)</div>
-                            {(() => {
-                              const cmp = compareTaperScenarios(buildCoachCtx());
-                              return (
-                                <>
-                                  {cmp.results.slice(0, 5).map((r) => (
-                                    <div key={r.scenario.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, padding: '2px 0' }}>
-                                      <span style={{ minWidth: 26, fontWeight: 800, color: r.scenario.id === cmp.best.scenario.id ? '#00e68a' : 'rgba(255,255,255,0.5)' }}>{r.score}</span>
-                                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.8)' }}>{r.summary}</span>
-                                      {r.scenario.id === cmp.best.scenario.id && <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 700 }}>лучший</span>}
-                                    </div>
-                                  ))}
-                                  <button
-                                    onClick={() => { applyTaperRecommendation({ mode: cmp.best.scenario.mode, taperWeeks: cmp.best.scenario.taperWeeks, weightGoal: taperWeightGoal, mockMeet: mockMeetOn, postMeet: postMeetOn, strategy: attemptStrategy, rationale: [`🔀 Лучший сценарий: ${cmp.best.summary}`] }); }}
-                                    style={{ ...BTN_GHOST, marginTop: 4, minHeight: 32, fontSize: 10, border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa', background: 'rgba(139,92,246,0.08)' }}
-                                    title="Применить лучший сценарий (схема + длительность) — затем «📉 Добавить тапер к плану»"
-                                  >🎯 Применить лучший сценарий</button>
-                                </>
-                              );
-                            })()}
-                          </div>
-                          {/* 🩺 Оценка прикидов из дневника */}
-                          {(() => {
-                            const attempts = [...builtSrc.weeks].reverse().find(w => w.meetAttempts)?.meetAttempts;
-                            if (!attempts) return null;
-                            const evalRes = evaluateMeetAttemptsFromDiary(attempts, diarySessions as any);
-                            if (!evalRes) return null;
-                            return (
-                              <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.14)' }}>
-                                <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>🩺 Оценка прикидов по дневнику</div>
-                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{evalRes.summary}</div>
-                                {evalRes.nextStrategy !== attemptStrategy && (
-                                  <button
-                                    onClick={() => { setAttemptStrategy(evalRes.nextStrategy); setMethodNote(`🏁 Стратегия прикидов обновлена по факту дневника: ${MEET_STRATEGY_PCT_LABEL[evalRes.nextStrategy]} — нажмите «🔄 Обновить прикиды».`); }}
-                                    style={{ ...BTN_GHOST, marginTop: 4, minHeight: 32, fontSize: 10, border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd', background: 'rgba(96,165,250,0.08)' }}
-                                  >📌 Применить стратегию «{MEET_STRATEGY_PCT_LABEL[evalRes.nextStrategy]}»</button>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      );
-                    } catch { return null; }
-                  })()}
-                </div>
+                {/* 🧠 ТРЕНЕР: авто-подбор схемы + вердикт по готовности к старту (вынесено в TaperCoachCard) */}
+                <TaperCoachCard
+                  builtSrc={builtSrc}
+                  hasTaper={!!taperNote}
+                  buildCtx={buildCoachCtx}
+                  applyRecommendation={applyTaperRecommendation}
+                  attemptStrategy={attemptStrategy}
+                  onStrategyChange={s => setAttemptStrategy(s)}
+                  diarySessions={diarySessions}
+                  onNote={setMethodNote}
+                />
                 {/* 📋 ТАПЕР-ПЛАН: отдельная свёрнутая карточка (не встраивается в weeks цикла) */}
                 <ExpandableCard
                   title={`📋 Тапер-план${taperPlan ? ` · ${peakMode === 'pl' ? '🏁 ПЛ-пик' : '📉 классика'} · ${taperPlan.weeks.length} нед${Object.values(taperActualPm).some(v => v > 0) ? ' · по факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · план федерации' : ''}` : ''}`}
