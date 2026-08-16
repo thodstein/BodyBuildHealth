@@ -34,6 +34,7 @@ import {
   prepWeightAdvice,
   buildPostShowPlan,
   buildContestPrepPrintHtml,
+  buildPeakWeek,
   type BBContestPrepConfig,
   type BBContestPrepPlan,
   type BBPlanWithPrep,
@@ -962,6 +963,64 @@ describe('Post-show — контроль восстановления после
     const post = buildPostShowPlan(plan);
     const text = [...post.notes, ...post.training, post.weightCheck].join(' ').toLowerCase();
     expect(text).not.toMatch(/диуретик|0\.5 ?л|0\.25 ?л/);
+  });
+});
+
+describe('Женская подготовка — грамотность питания', () => {
+  const base = { kcal: 2000, proteinG: 130, fatG: 55, carbsG: 240, waterMl: 3000, sodiumMg: 2800 };
+
+  it('калорийный пол 1400 ккал (RED-S), жиры ≥ 0.8 г/кг, женские примечания в подготовке', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ sex: 'female', category: 'bikini', weightKg: 55 }), { prepWeeks: 8, taperWeeks: 2 });
+    // Дефолтный женский темп осторожнее.
+    expect(plan.preparation.targetRatePctPerWeek).toBe(0.4);
+    const t = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, base);
+    expect(t.kcal).toBeGreaterThanOrEqual(1400);
+    expect(t.fatG).toBeGreaterThanOrEqual(Math.round(55 * 0.8));
+    expect(t.note).toMatch(/RED-S|энергетической доступности/i);
+    expect(t.note).toMatch(/Железо/i);
+    expect(t.note).toMatch(/Кальций/i);
+    expect(t.note).toMatch(/лютеиновую/i);
+  });
+
+  it('пик-неделя женщины: натрий ≥ 800 мг, вода в день шоу ≥ 0.5 л, женские mealNotes (железо/кальций/цикл)', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ sex: 'female', category: 'bikini', weightKg: 55 }), { prepWeeks: 8, taperWeeks: 2 });
+    const peak = buildPeakWeek(configFromPlan(plan));
+    expect(peak.length).toBe(7);
+    for (const d of peak) expect(d.sodiumMg).toBeGreaterThanOrEqual(800);
+    expect(peak[6].waterLiters).toBeGreaterThanOrEqual(0.5);
+    const allNotes = peak.flatMap(d => d.mealNotes).join(' ');
+    expect(allNotes).toMatch(/железо/i);
+    expect(allNotes).toMatch(/кальций/i);
+    expect(allNotes).toMatch(/лютеиновую/i);
+    // Карб-загрузка женской лёгкой категории ниже мужской тяжёлой.
+    const male = buildBBContestPrepPlan(baseConfig({ sex: 'male', category: 'mens_bb', weightKg: 90 }), { prepWeeks: 8, taperWeeks: 2 });
+    const malePeak = buildPeakWeek(configFromPlan(male));
+    const femaleLoad = peak.find(d => d.phase.startsWith('load'))!;
+    const maleLoad = malePeak.find(d => d.phase.startsWith('load'))!;
+    expect(femaleLoad.carbsG).toBeLessThan(maleLoad.carbsG);
+  });
+
+  it('мужская подготовка: калорийный пол 1200, жиры ≥ 0.6 г/кг, без женских нот', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ sex: 'male', category: 'mens_physique', weightKg: 80 }), { prepWeeks: 8, taperWeeks: 2 });
+    expect(plan.preparation.targetRatePctPerWeek).toBe(0.5);
+    const t = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, { ...base, kcal: 1100 });
+    expect(t.kcal).toBeGreaterThanOrEqual(1200);
+    expect(t.fatG).toBeGreaterThanOrEqual(Math.round(80 * 0.6));
+    expect(t.note).not.toMatch(/лютеиновую/i);
+  });
+
+  it('адаптация по весу: женская too_fast-рекомендация учитывает фазу цикла', () => {
+    const plan = buildBBContestPrepPlan(baseConfig({ sex: 'female', category: 'bikini', weightKg: 55, showDate: addDaysIso(todayIso(), 60) }), { prepWeeks: 6, taperWeeks: 2 });
+    const ref = todayIso();
+    const wl = (startIso: string, weights: number[]): Array<{ date: string; weight: number }> =>
+      weights.map((weight, i) => ({ date: addDaysIso(startIso, i * 1), weight }));
+    const log = [
+      ...wl(addDaysIso(ref, -13), [58, 58, 57.9]),
+      ...wl(addDaysIso(ref, -6), [56.5, 56.4, 56.3]),
+    ];
+    const advice = prepWeightAdvice(log, plan, { referenceDate: ref });
+    expect(advice.status).toBe('too_fast');
+    expect(advice.recommendation).toMatch(/цикла/i);
   });
 });
 

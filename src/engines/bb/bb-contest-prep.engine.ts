@@ -685,6 +685,14 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
       mealNotes.push('Далее карбс малыми порциями каждые 1.5–2 ч. Вода глотками.');
     }
     if (cfg.allergens?.length) mealNotes.push(`Исключить аллергены: ${cfg.allergens.join(', ')}.`);
+    // Женская грамотность пик-недели (лёгкие категории bikini/wellness/figure):
+    // железо при деплеции, кальций, цикл-задержка воды, мягче протокол.
+    if (isFemale) {
+      if (phase.startsWith('deplete')) mealNotes.push('Женщины: железо — красное мясо/печень/шпинат (дефицит типичен для сушки).');
+      if (phase.startsWith('load') || phase === 'peak') mealNotes.push('Женщины: кальций 1000–1200 мг/день (молочные/обогащённые) — защита костей при низком % жира.');
+      if (phase !== 'show') mealNotes.push('Женщины: в лютеиновую фазу цикла возможна задержка воды +0.5–1 кг — это норма, не усиливайте дефицит.');
+      if (day === 7) mealNotes.push('Женщины: вода не ниже 0.5 л в день шоу; натрий не ниже 800 мг — риск гипонатриемии выше.');
+    }
 
     const supplementNotes: string[] = [];
     supplementNotes.push(`Магний 300–400 мг/день (анти-судороги), калий ${potassiumMg} мг — не снижать.`);
@@ -1729,7 +1737,9 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
 
   const now = new Date().toISOString();
   const startDate = phases[0]?.dateStart ?? isoAddDays(showDate, -(7 * (prepWeeks + taperWeeks)));
-  const targetRate = clamp(Number(opts.targetRatePctPerWeek) || 0.5, 0.25, 0.75);
+  // Женский темп осторожнее по умолчанию (0.4%/нед vs 0.5%): меньше жировой ткани,
+  // выше риск RED-S и потери массы при агрессивном дефиците (Helms 2022).
+  const targetRate = clamp(Number(opts.targetRatePctPerWeek) || (cfg.sex === 'female' ? 0.4 : 0.5), 0.25, 0.75);
 
   const plan: BBContestPrepPlan = {
     id: opts.id ?? `bbprep_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
@@ -1978,18 +1988,30 @@ export function nutritionTargetsForPrepDate(
   }
   const profile = CATEGORY_PROFILES[plan.category];
   const w = plan.preparation.startingWeightKg;
+  const isFemale = plan.sex === 'female';
   const proteinG = Math.round(w * clamp(profile?.proteinGPerKg ?? 2.2, 1.8, 2.8));
   const fatFloor = prepFatFloorGPerKg(plan.sex);
-  const fatG = Math.max(30, Math.round(w * fatFloor));
+  const fatG = Math.max(isFemale ? 40 : 30, Math.round(w * fatFloor));
   // Ступенчатая коррекция калорий по фазе: финальная подготовка −2-3%, тапер — поддержание.
   const phaseMult = phase.key === 'final_preparation' ? 0.97 : phase.key === 'taper' ? 1.0 : 1.0;
-  const kcal = Math.max(1400, Math.round(plan.preparation.currentCalories * phaseMult));
+  // Женский калорийный пол выше (RED-S / энергетическая доступность): минимум 1400 ккал.
+  const kcal = Math.max(isFemale ? 1400 : 1200, Math.round(plan.preparation.currentCalories * phaseMult));
   const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
-  const phaseNote = phase.key === 'taper'
+  const basePhaseNote = phase.key === 'taper'
     ? 'Объём снижается, калории стабильны — усталость падает, катаболизм не нужен.'
     : phase.key === 'final_preparation'
       ? 'Финал подготовки: лёгкий дефицит сохраняется, белок и жиры не режутся.'
       : 'Подготовка: дефицит 0.25–0.75%/нед по среднему весу за 7 дней, вода и натрий стабильны.';
+  // Женская грамотность: RED-S, железо, кальций, цикл (задержка воды в лютеиновую фазу).
+  const femaleNotes = isFemale
+    ? [
+        'Женщины: минимум 1400 ккал/день — при энергетической доступности <30 ккал/кг FFM риск RED-S/аменореи.',
+        'Железо: красное мясо/печень/шпинат 2–3 раза в неделю — дефицит железа типичен для женской сушки.',
+        'Кальций 1000–1200 мг/день (молочные/обогащённые) — защита костей при низком % жира.',
+        'Цикл: в лютеиновую фазу возможна задержка воды +0.5–1 кг — не паникуйте, анализируйте среднее за 7 дней.',
+      ].join(' ')
+    : '';
+  const phaseNote = `${basePhaseNote}${femaleNotes ? ' ' + femaleNotes : ''}`;
   return {
     kcal,
     proteinG,
@@ -2251,7 +2273,10 @@ export function prepWeightAdvice(
   if (lossPerWeek < fastBound) {
     // Слишком быстро (или наоборот — набор на сушке).
     base.status = 'too_fast';
-    base.recommendation = `Темп ${(Math.abs(lossPerWeek)).toFixed(2)}%/нед — быстрее цели (${targetRate}%/нед). Задержка воды, стресс, сон? ${steps} Шаг: +150 ккал ИЛИ −20 мин кардио/нед (одна переменная).`;
+    const femaleCycleNote = plan.sex === 'female'
+      ? ' Учтите фазу цикла: задержка воды в лютеиновую фазу может маскировать реальную потерю — проверьте среднее за 14 дней, не усиливайте дефицит. '
+      : ' Задержка воды, стресс, сон? ';
+    base.recommendation = `Темп ${(Math.abs(lossPerWeek)).toFixed(2)}%/нед — быстрее цели (${targetRate}%/нед).${femaleCycleNote}${steps} Шаг: +150 ккал ИЛИ −20 мин кардио/нед (одна переменная).`;
     base.adjustCalories = 150;
     base.adjustCardioMin = -20;
     return base;
