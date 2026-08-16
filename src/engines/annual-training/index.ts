@@ -8,3 +8,4 @@
 export * from './annual-training.types';
 export * from './block-builders.engine';
 export * from './annual-training-storage';
+export * from './annual-training-print';

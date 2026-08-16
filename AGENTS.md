@@ -62,15 +62,17 @@
 - **Живая синхронизация**: панель слушает `he-annual-training-plan-updated` (dispatch в saveAnnualTrainingPlan и completeAnnualBlockImport) — возврат блока из ручного конструктора виден без перемонтажа.
 - **Валидация разметки**: `validateAnnualPlan(plan)` (gaps/overlaps/totalMismatch/outOfRange + warnings) — красная строка «⚠ Разметка года: пропуск нед X–Y…» в карточке сборки.
 - **📍 Текущая неделя**: `activeBlockForWeek(plan, week)` — строка активного блока в карточке сборки (неделя/фаза/kind/статус), клик выбирает блок в списке.
+- **🖨 Сводка года (PDF)**: `buildAnnualPrintHtml(plan)` (annual-training-print.ts) — HTML-сводка (таблица блоков: недели/фаза/конструктор/цикл/сплит/taper/пик/статус, превью недели 1 для собранных блоков, предупреждения валидации), XSS-экранирование; кнопка «🖨 Сводка (PDF)» в карточке сборки (window.open → print).
 - Авто-синхронизация (useEffect на macro/bbMacro): правка макро сразу подсвечивает stale-блоки, результат не теряется.
 - `runAnnualBuild('all'|'block'|'export'|'editor')` — статус-флеши «📦 Годовой план: собрано +N · готовых пропущено M · ошибок K».
 
-### Тесты (72 новых)
+### Тесты (78 новых)
 - `annual-training-engine.test.ts` (38): хэши/ключи, план из PL/BB макро, sync (layout без изменений / изменён→stale с сохранением результата / конфиг изменён→stale), сборка PL (цикл→недели+program.pl), PL без цикла (скелет+warning), taper-идемпотентность, BB-блок 8 нед/20 нед (зацикливание), пик-неделя contest_prep (peakApplied, фаза peaking), MANUAL скелет+шаблон, сборка года (только missing / rebuild all / частичная при ошибке), правки блоков (setAnnualBlockConfig/kind→stale с сохранением результата, updateAnnualBlockWeeks→built без stale, importProgramIntoAnnualBlock), композиция (bb/hybrid/pl/notes/null), валидация разметки (целостная/gap/overlap/totalMismatch), activeBlockForWeek, E2E 52 недели (сборка смешанного года → hybrid 52 нед без разрывов).
 - `annual-training-storage.test.ts` (11): roundtrip, битый JSON/форма, remove, миграция (BB-приоритет, стабильный id, существующий план не перезаписывается).
+- `annual-training-print.test.ts` (6): содержимое (недели/фазы/конструкторы/статусы), настройки (цикл/сплит/taper/пик), превью сессий, XSS (description/error), предупреждения валидации, сводка статусов.
 - `macrocycle-panel-annual-build.test.tsx` (15): карточка после сборки макро, «Собрать весь год» (все built, PL-блоки с sourceCycleId), «Собрать блок» (только выбранный), экспорт без блоков (предупреждение), экспорт после сборки (мост he_planner_apply, kind program), stale после смены недели соревнования, десериализация макро с cycleId, панель настроек блока, смена конструктора→stale (результат не потерян), «✍ В редактор» (без сборки→предупреждение / после сборки→мост annual_block с blockKey), BB-блок с «🎭 Пик-неделя» (peakApplied + конфиг из профиля), «🚀 В ББ-авто» (he_bb_plan_saved с bbPlan блока), живое обновление по событию he-annual-training-plan-updated, «📍 Текущая неделя» (строка + клик выбирает блок).
 - `planner-bridge-handlers.test.ts` (+4): annual_block с программой (onChange + pending), без программы (предупреждение), completeAnnualBlockImport (программа → блок, pending очищен), без pending → false.
-- Проверено: tsc 0 по моим файлам (ошибки в чужом WIP: BbAutoConstructor→TrainingSafetyHub переезд, CooldownDiaryView дубль — файлы других агентов не трогаю); annual-training 49/49, panel-annual-build 15/15, planner-bridge-handlers 17/17; **полный прогон 5682/5684** — падают только 2 теста и 5 suite-load в чужом WIP (training-safety переименования, bb-macrocycle v8, EXERCISE_CATALOG-рантайм) — мои области без регрессий.
+- Проверено: tsc 0 по моим файлам (ошибки в чужом WIP: cardio.engine.ts дубль `recoveryLow` блокирует трансформацию панельных тестов — транзиентно, файл другого агента не трогаю); annual-training 55/55 (38+11+6), planner-bridge-handlers 17/17; полный прогон ранее 5682/5684 — падения только в чужом WIP.
 
 ---
 

@@ -36,6 +36,7 @@ import {
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
   validateAnnualPlan, activeBlockForWeek,
 } from '../../../engines/annual-training/block-builders.engine';
+import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-training-print';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 
@@ -863,6 +864,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const next = saveAnnualTrainingPlan(setAnnualBlockKind(plan, blockKey, kind));
     setAnnualPlan(next);
     setAnnualStatusNote(`⚙️ Конструктор блока изменён на ${kind === 'PL' ? 'ПЛ' : kind === 'BB' ? 'ББ' : 'ручной'} — пересоберите блок`);
+  };
+
+  // 🖨 Печать сводки годового плана по блокам (окно печати → PDF).
+  const printAnnualPlan = () => {
+    const plan = annualPlan;
+    if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
+    const win = window.open('', '_blank', 'width=820,height=920');
+    if (!win) { setAnnualStatusNote('⚠ Блокировка всплывающих окон — разрешите окна для печати'); return; }
+    win.document.write(buildAnnualPrintHtml(plan));
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   const runAnnualBuild = (mode: 'all' | 'block' | 'export' | 'editor') => {
@@ -1849,6 +1862,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 <button type="button" onClick={() => runAnnualBuild('export')} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
                   title="Объединить собранные блоки в одну программу и передать в ручной конструктор">
                   📥 В ручной режим
+                </button>
+                <button type="button" onClick={printAnnualPlan} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                  title="Открыть сводку года по блокам в окне печати (PDF)">
+                  🖨 Сводка (PDF)
                 </button>
               </div>
               {annualPlan && (() => {
