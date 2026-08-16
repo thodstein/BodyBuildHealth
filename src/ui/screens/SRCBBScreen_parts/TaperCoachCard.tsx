@@ -7,7 +7,7 @@ import React from 'react';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import {
   recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet,
-  compareTaperScenarios, evaluateMeetAttemptsFromDiary,
+  compareTaperScenarios, evaluateMeetAttemptsFromDiary, buildTaperCoachPrintHtml,
   type TaperCoachCtx, type TaperConfigRecommendation,
 } from '../../../engines/lms/lms-taper-coach.engine';
 import { MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
@@ -107,6 +107,17 @@ export const TaperCoachCard: React.FC<TaperCoachCardProps> = ({ builtSrc, hasTap
                 style={{ ...BTN_GHOST, marginTop: 6, marginLeft: 6, border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.03)' }}
                 title="Скопировать полную сводку вердикта тренера (score, заметки, достижимость ПМ, прогноз)"
               >📋 Копировать вердикт</button>
+              <button
+                onClick={() => {
+                  try {
+                    const w = window.open('', '_blank', 'width=900,height=700');
+                    if (w) { w.document.write(buildTaperCoachPrintHtml(verdict, buildCtx())); w.document.close(); w.print(); }
+                    else onNote('⚠ Браузер заблокировал всплывающее окно — разрешите попапы для печати.');
+                  } catch (error) { onNote(`⚠ Не удалось открыть печать: ${(error as Error).message}`); }
+                }}
+                style={{ ...BTN_GHOST, marginTop: 6, marginLeft: 6, border: '1px solid rgba(96,165,250,0.4)', color: '#93c5fd', background: 'rgba(96,165,250,0.08)' }}
+                title="Печать полной тренерской сводки (score, заметки, достижимость ПМ, сценарии) — PDF через диалог печати"
+              >🖨 Печать сводки (PDF)</button>
 
               {/* 🔀 Сравнение сценариев тапера */}
               <div style={{ marginTop: 8, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>

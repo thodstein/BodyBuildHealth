@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PLCompetitionTab, type PLCompetitionTabApi } from '../PLCompetitionTab';
+import { PLTaperProvider } from '../taper-state';
 
 const api = (): PLCompetitionTabApi => ({
   builtSrc: null,
@@ -32,5 +33,16 @@ describe('PLCompetitionTab', () => {
     expect(screen.getByText(/Подобрать тапер автоматически/)).toBeTruthy();
     expect(screen.getAllByText(/Сгенерировать тапер-план/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Добавить тапер к плану/)).toBeTruthy();
+  });
+
+  it('бейдж готовности старта в сезоне (weeksToStart=8 → 🧠 75%)', () => {
+    render(<PLCompetitionTab api={api()} />);
+    expect(screen.getByText(/🧠 75%/)).toBeTruthy();
+  });
+
+  it('бейдж готовности: старт через 1 нед → 🧠 92% (тапер-окно)', () => {
+    const saved = { plMeetList: [{ id: 'm1', name: 'Старт', weeksToStart: 1, fed: 'ipf', plannedPm: {}, strategy: 'balanced' }], plMainMeetId: 'm1' };
+    render(<PLTaperProvider saved={saved}><PLCompetitionTab api={api()} /></PLTaperProvider>);
+    expect(screen.getByText(/🧠 92%/)).toBeTruthy();
   });
 });

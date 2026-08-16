@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   pmFeasibility, recommendTaperConfig, coachPLPeakPlan, projectPmToMeet, liftKeyOf,
   sRPEAdjustment, scoreTaperScenario, compareTaperScenarios, evaluateMeetAttemptsFromDiary,
+  buildTaperCoachPrintHtml,
 } from '../lms-taper-coach.engine';
 import type { LMSBuildOutput, LMSPlanWeek } from '../lms-builder.engine';
 import type { MeetAttemptsInfo } from '../competition-attempts';
@@ -236,6 +237,29 @@ describe('вспомогательные', () => {
     expect(liftKeyOf('Жим ногами')).toBeNull();
     expect(liftKeyOf('Становая тяга')).toBe('deadlift');
     expect(liftKeyOf('Тяга к поясу')).toBeNull();
+  });
+});
+
+// ═══════════ Печать тренерской сводки (PDF) ═══════════
+describe('buildTaperCoachPrintHtml', () => {
+  it('содержит score, заметки, рекомендации и достижимость ПМ', () => {
+    const v = coachPLPeakPlan(balancedPlan(), baseCtx());
+    const html = buildTaperCoachPrintHtml(v, { ...baseCtx(), plannedPm: { 'Присед': 210, 'Жим лежа': 145, 'Становая тяга': 245 } });
+    expect(html).toContain('Тренерская сводка');
+    expect(html).toContain(`${v.score}/100`);
+    expect(html).toContain('Заметки');
+    expect(html).toContain('Рекомендации тренера');
+    expect(html).toContain('Достижимость плана ПМ');
+    expect(html).toContain('Сравнение сценариев');
+  });
+
+  it('XSS-экранирование пользовательских строк', () => {
+    const v = coachPLPeakPlan(balancedPlan(), baseCtx());
+    // Подмешиваем опасные строки в заметки и рекомендации
+    const evil = '<script>alert(1)</script>';
+    const html = buildTaperCoachPrintHtml({ ...v, label: evil, notes: [{ severity: 'warn', icon: '⚠', text: evil }], actions: { ...v.actions!, rationale: [evil] } }, baseCtx());
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
   });
 });
 

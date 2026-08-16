@@ -90,6 +90,16 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         </div>
         {meetList.map(m => {
           const isMain = m.id === mainMeetId;
+          // 🧠 Готовность старта по срокам: 0 нед — старт, ≤2 — тапер, ≤4 — пик, >4 — база.
+          const wl = Math.max(0, m.weeksToStart);
+          const readiness = wl === 0
+            ? { score: 100, label: '🏁 старт' }
+            : wl <= 2
+              ? { score: 92, label: '📉 тапер' }
+              : wl <= 4
+                ? { score: 85, label: '🎯 пик' }
+                : { score: 75, label: '✅ база' };
+          const rdColor = readiness.score >= 90 ? '#22c55e' : readiness.score >= 80 ? '#eab308' : '#93c5fd';
           return (
             <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: 6, borderRadius: 8, marginTop: 4, background: isMain ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
               <button
@@ -126,6 +136,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               >
                 <option value="ipf">IPF</option><option value="fpr">FPR</option><option value="wpc">WPC</option><option value="other">Другая</option>
               </select>
+              <span title={`Готовность старта «${m.name}» через ${m.weeksToStart} нед: ${readiness.label}`} style={{ padding: '2px 7px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: rdColor + '16', border: `1px solid ${rdColor}44`, color: rdColor }}>
+                🧠 {readiness.score}%
+              </span>
               <button
                 onClick={() => removeMeet(m.id)}
                 disabled={meetList.length <= 1}

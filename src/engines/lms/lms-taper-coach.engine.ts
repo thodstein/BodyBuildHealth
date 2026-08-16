@@ -538,4 +538,62 @@ export function evaluateMeetAttemptsFromDiary(attempts: MeetAttemptsInfo | null 
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Печать тренерской сводки (PDF через window.print)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const escHtml = (s: string): string => s
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const SEVERITY_COLOR: Record<CoachNoteSeverity, string> = {
+  ok: '#22c55e', info: '#93c5fd', warn: '#f59e0b', danger: '#ef4444',
+};
+
+/**
+ * Полная HTML-сводка тренерского вердикта для печати (XSS-экранирование
+ * пользовательских строк: заметки, рекомендации, summary).
+ */
+export function buildTaperCoachPrintHtml(verdict: TaperCoachVerdict, ctx?: TaperCoachCtx): string {
+  const feas = ctx ? pmFeasibility(ctx) : null;
+  const cmp = ctx ? compareTaperScenarios(ctx) : null;
+  const lines: string[] = [];
+  lines.push('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Тренерская сводка тапера</title>');
+  lines.push('<style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;max-width:800px;margin:0 auto;padding:20px}h1{font-size:18px;color:#0a7d45}.score{font-size:34px;font-weight:800;color:#0a7d45}.note{padding:6px 10px;border-left:4px solid #ccc;margin:4px 0;background:#f7f7f7}table{border-collapse:collapse;width:100%;margin-top:8px}td,th{border:1px solid #ddd;padding:5px 8px;text-align:left;font-size:11px}th{background:#f0f0f0}</style></head><body>');
+  lines.push(`<h1>🧠 Тренерская сводка тапера/пика (ПЛ)</h1>`);
+  lines.push(`<div class="score">${verdict.score}/100</div>`);
+  lines.push(`<div style="font-weight:700;margin-bottom:8px">${escHtml(verdict.label)}</div>`);
+  if (verdict.notes.length > 0) {
+    lines.push('<h3>Заметки</h3>');
+    for (const n of verdict.notes) {
+      lines.push(`<div class="note" style="border-left-color:${SEVERITY_COLOR[n.severity]}">${escHtml(n.icon + ' ' + n.text)}</div>`);
+    }
+  }
+  if (verdict.actions) {
+    lines.push('<h3>Рекомендации тренера (авто-подбор)</h3>');
+    lines.push(`<div style="font-size:11px">Схема: <b>${escHtml(verdict.actions.mode)}</b> · ${verdict.actions.taperWeeks} нед · весовая цель: ${escHtml(verdict.actions.weightGoal)} · mock meet: ${verdict.actions.mockMeet ? 'да' : 'нет'} · пост-старт: ${verdict.actions.postMeet ? 'да' : 'нет'} · стратегия: ${escHtml(verdict.actions.strategy)}</div>`);
+    if (verdict.actions.rationale.length > 0) {
+      lines.push('<ul style="font-size:11px">' + verdict.actions.rationale.map(r => `<li>${escHtml(r)}</li>`).join('') + '</ul>');
+    }
+  }
+  if (feas && feas.lifts.length > 0) {
+    lines.push('<h3>Достижимость плана ПМ к старту</h3>');
+    lines.push(`<div style="font-size:11px;margin-bottom:4px">${escHtml(feas.summary)}</div>`);
+    lines.push('<table><tr><th>Движение</th><th>Прогноз</th><th>План</th><th>Разрыв, кг</th><th>Нужно нед</th><th>Достижимо</th></tr>');
+    for (const l of feas.lifts) {
+      lines.push(`<tr><td>${escHtml(l.name)}</td><td>${l.forecast}</td><td>${l.planned}</td><td>${l.gapKg}</td><td>${l.weeksNeeded}</td><td>${l.feasible ? '✅' : '❌'}</td></tr>`);
+    }
+    lines.push('</table>');
+  }
+  if (cmp) {
+    lines.push('<h3>Сравнение сценариев тапера</h3>');
+    lines.push('<table><tr><th>Сценарий</th><th>Score</th><th>Сводка</th></tr>');
+    for (const r of cmp.results.slice(0, 6)) {
+      lines.push(`<tr><td><b>${escHtml(r.summary.split(':')[0] ?? r.scenario.id)}</b>${r.scenario.id === cmp.best.scenario.id ? ' ⭐ лучший' : ''}</td><td>${r.score}</td><td>${escHtml(r.summary)}</td></tr>`);
+    }
+    lines.push('</table>');
+  }
+  lines.push('</body></html>');
+  return lines.join('\n');
+}
+
 export { buildPLTaperCurve };
