@@ -14,6 +14,7 @@ import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset
 import { exportMobilityCheckinsCSV, loadMobilityCheckins } from '../../../engines/mobility-protocol.engine';
 import { exportWarmupCheckinsCSV, loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
 import { exportCooldownCheckinsCSV, loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../../engines/cooldown.engine';
+import { loadStretchLog, stretchStats } from '../../../engines/stretch-session.engine';
 import { restoreDiaryExtras } from '../../../engines/diary-backup.engine';
 
 export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
@@ -204,6 +205,8 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const warmQ = warmupQualityTrend(30);
               const coolDone30 = cool30.filter(e => e.done).length;
               const coolQ = cooldownQualityTrend(30);
+              const stretch30 = loadStretchLog().filter(e => e.date >= cutoffStr && e.done);
+              const stretchMin30 = stretch30.reduce((s, e) => s + e.durationMin, 0);
               const romAvg = (() => { const scored = mob30.filter(c => c.romScore !== null); return scored.length > 0 ? (scored.reduce((s, c) => s + (c.romScore || 0), 0) / scored.length).toFixed(1) : null; })();
               const rows = month.map(w => `
                 <tr>
@@ -218,13 +221,14 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 .stats{display:flex;gap:24px;font-size:13px;margin:8px 0}</style></head><body>
                 <h1>📊 Тренировочный дневник — 30 дней</h1>
                 <div class="stats"><span>Тренировок: <b>${month.length}</b></span><span>Подходов: <b>${sets}</b></span><span>Тоннаж: <b>${(vol / 1000).toFixed(1)} т</b></span></div>
-                ${mind30.length > 0 || mob30.length > 0 || warm30.length > 0 || cool30.length > 0 ? `
+                ${mind30.length > 0 || mob30.length > 0 || warm30.length > 0 || cool30.length > 0 || stretch30.length > 0 ? `
                   <h2>🧠 Психология, мобильность, разминка и заминка</h2>
                   <div class="stats">
                     ${mind30.length > 0 ? `<span>Психо-чек-инов: <b>${mind30.length}</b></span><span>Ср. уверенность: <b>${confAvg}/5</b></span>` : ''}
                     ${mob30.length > 0 ? `<span>Мобильность: <b>${mobDone30}/${mob30.length}</b> дней</span><span>Ср. ROM: <b>${romAvg !== null ? romAvg + '/5' : '—'}</b></span>` : ''}
                     ${warm30.length > 0 ? `<span>Разминка: <b>${warmDone30}/${warm30.length}</b> дней</span><span>Ср. качество: <b>${warmQ.count > 0 ? warmQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
                     ${cool30.length > 0 ? `<span>Заминка: <b>${coolDone30}/${cool30.length}</b> дней</span><span>Ср. качество: <b>${coolQ.count > 0 ? coolQ.avg.toFixed(1) + '/5' : '—'}</b></span>` : ''}
+                    ${stretch30.length > 0 ? `<span>Растяжка: <b>${stretchMin30} мин</b> (${stretch30.length} сессий)</span>` : ''}
                   </div>` : ''}
                 ${prs.length > 0 ? `<h2>🏆 PR за период</h2><ul>${prs.slice(0, 10).map(p => `<li>${esc(p.ex)} — ${esc(p.w)}</li>`).join('')}</ul>` : ''}
                 <h2>📋 Сессии</h2>
@@ -383,6 +387,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   mmc: (() => { try { return JSON.parse(localStorage.getItem('he_mmc_data') || '[]'); } catch { return []; } })(),
                   warmupDiary: loadWarmupLog(),
                   cooldownDiary: loadCooldownLog(),
+                  stretchSessions: loadStretchLog(),
                   mindsetChecks: loadCheckins(),
                   mobilityChecks: loadMobilityCheckins(),
                 };
@@ -425,7 +430,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const extras = restoreDiaryExtras(data);
                         const totalAdded = newWorkouts.length + addedMeasurements + extras.warmup + extras.mind + extras.mob;
                         if (totalAdded === 0) { alert('Все данные уже есть в дневнике'); return; }
-                        alert(`Импортировано: ${newWorkouts.length} тренировок, ${addedMeasurements} замеров, ${extras.warmup} записей разминки, ${extras.cooldown} записей заминки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
+                        alert(`Импортировано: ${newWorkouts.length} тренировок, ${addedMeasurements} замеров, ${extras.warmup} записей разминки, ${extras.cooldown} записей заминки, ${extras.stretch} сессий растяжки, ${extras.mind} психо-чек-инов, ${extras.mob} чек-инов мобильности`);
                         onRefresh();
                       } catch { alert('Ошибка чтения файла'); }
                     })();

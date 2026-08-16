@@ -10,6 +10,7 @@ import { loadCheckins, protocolAdherence, mindsetTrends } from '../../../engines
 import { loadMobilityCheckins, mobilityAdherence, mobilityTrends } from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog, warmupAdherence, warmupQualityTrend } from '../../../engines/warmup.engine';
 import { loadCooldownLog, cooldownAdherence, cooldownQualityTrend } from '../../../engines/cooldown.engine';
+import { loadStretchLog } from '../../../engines/stretch-session.engine';
 import { Sparkline } from './Sparkline';
 import { MiniBarChart } from './DiaryChart';
 import { WorkoutWeekCard, DiaryEmptyState } from './diary-cards';
@@ -148,6 +149,9 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             // Заминка за неделю
             const coolWeek = loadCooldownLog().filter(e => e.date >= weekAgoStr);
             const coolDoneWeek = coolWeek.filter(e => e.done).length;
+            // Сессии растяжки за неделю (минуты)
+            const stretchWeek = loadStretchLog().filter(e => e.date >= weekAgoStr && e.done);
+            const stretchMinWeek = stretchWeek.reduce((s, e) => s + e.durationMin, 0);
             const summary = [
               `📅 Неделя: ${lastWeek[0].date.slice(8, 10)}.${lastWeek[0].date.slice(5, 7)} — ${lastWeek[lastWeek.length - 1].date.slice(8, 10)}.${lastWeek[lastWeek.length - 1].date.slice(5, 7)}`,
               `🏋️ Тренировок: ${lastWeek.length} (${prevWeek.length ? `прошлая: ${prevWeek.length}` : 'прошлая: —'})`,
@@ -157,6 +161,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               mobWeek.length > 0 ? `🧘 Мобильность: ${mobDoneWeek}/${mobWeek.length} дней выполнено` : '',
               warmWeek.length > 0 ? `🔥 Разминка: ${warmDoneWeek}/${warmWeek.length} дней` : '',
               coolWeek.length > 0 ? `❄️ Заминка: ${coolDoneWeek}/${coolWeek.length} дней` : '',
+              stretchWeek.length > 0 ? `🧘 Растяжка: ${stretchMinWeek} мин` : '',
               lastWeek[0].notes ? `📝 ${lastWeek[0].notes}` : '',
             ].filter(Boolean).join('\n');
             return (

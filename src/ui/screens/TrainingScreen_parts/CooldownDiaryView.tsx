@@ -222,6 +222,9 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
               ▶ Собрать и начать
             </button>
           )}
+          <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 6, lineHeight: 1.4 }}>
+            Правила: мягкое натяжение 6/10, выдох в растяжение, пауза 20-40с, без боли и рывков. Статика — только после тренировки или в день отдыха.
+          </div>
         </div>
         {stretchPlan && (
           <div style={{ marginTop: 8 }}>
