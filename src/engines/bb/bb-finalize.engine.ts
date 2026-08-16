@@ -1772,6 +1772,17 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : ex);
   }
   syncBBPlanSetShape(next);
+  // 🏁 Contest prep guard: план сконфигурирован каноническим prep-движком
+  // (contestPhase/peakWeek/prepProtocol) — его недели уже сформированы:
+  // подготовка (режим RIR 1–3/объём), финальная (×0.9), taper (кривая),
+  // пик-неделя (памп). Повторная финализация (revalidate после ручных правок
+  // в «Коррекции») НЕ должна перестраивать состав/объём — только форма.
+  // Ручные правки пользователя применяются ДО revalidate (exerciseEdits →
+  // applyEditsToPlan), поэтому ранний return их не теряет.
+  if (next.weeks.some((w: any) => w.peakWeek === true || w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || typeof w.prepProtocol === 'string')) {
+    syncBBPlanSetShape(next);
+    return next;
+  }
   // 🏁 Contest prep guard: недели, управляемые каноническим prep-движком
   // (taper/пик-неделя с prepProtocol/contestPhase), НЕ должны получать объём
   // от финализатора при повторной финализации (revalidate после ручных правок):
@@ -1847,6 +1858,11 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     }
   }
 for (const week of next.weeks) {
+    // 🏁 Prep guard: недели, управляемые contest prep, не проходят MEV-guard/
+    // tidy/fit/repair/back-баланс — повторная финализация (revalidate после ручных
+    // правок) НЕ должна менять их упражнения/объём (пользовательские правки и
+    // prep-кривая сохраняются).
+    if (isPrepControlled(week)) continue;
     // MEV-guard карта недели: бюджет не режет сеты ниже ceil(MEV/частота) —
     // иначе natural-планы получают deficit, а fill не может добавить (сессии
     // на лимите). Только для генераторных планов (pattern.id): произвольные/
@@ -1948,6 +1964,8 @@ for (const week of next.weeks) {
       }
     }
     for (const week of next.weeks) {
+      // 🏁 Prep guard: MEV-repair/back-баланс не трогает недели contest prep.
+      if (isPrepControlled(week)) continue;
       const w: any = week;
       if (w.phase === 'deload' || week.sessions.some(s => s.exercises.some(e => /разгруз|deload/i.test(e.comment || '')))) continue;
       const weekVolume = aggregateBBVolume(week.sessions);

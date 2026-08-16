@@ -1572,6 +1572,8 @@ export interface BBContestPrepPlan {
 
   /** Число завершённых недель от старта — не пересчитываются без подтверждения. */
   frozenWeeks?: number;
+  /** История корректировок (ступени калорий/кардио) — причина каждой правки. */
+  adjustments?: PrepAdjustment[];
 }
 
 export const PREP_PLAN_VERSION = 1;
@@ -2405,7 +2407,98 @@ ${timeline.map(t => `<tr><td>${t.time}</td><td><b>${escHtml(t.action)}</b></td><
 
 ${plan.safety.warnings.length > 0 ? `<h2>⚠️ Предупреждения</h2><ul>${rows(plan.safety.warnings)}</ul>` : ''}
 ${plan.safety.requiresReview ? `<div class="warn">🩺 Требуется профессиональное сопровождение: ${escHtml(plan.safety.contraindications.join(', '))}. Агрессивные режимы отключены.</div>` : ''}
+${(plan.adjustments?.length ?? 0) > 0 ? `<h2>📝 История корректировок</h2><table><tr><th>Дата</th><th>Причина</th><th>Ккал</th><th>Кардио</th><th>Источник</th></tr>${(plan.adjustments ?? []).map(a => `<tr><td>${escHtml(a.date)}</td><td>${escHtml(a.reason)}</td><td>${a.caloriesDelta > 0 ? '+' : ''}${a.caloriesDelta}</td><td>${a.cardioDelta > 0 ? '+' : ''}${a.cardioDelta}</td><td>${escHtml(a.source)}</td></tr>`).join('')}</table>` : ''}
 <div class="muted" style="margin-top:16px">Расчёт не заменяет работу с врачом и тренером. Диуретики и фармакология не назначаются.</div>
 </body></html>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// История корректировок (P2): каждая ступень калорий/кардио фиксируется
+// с датой, причиной и источником — видно «почему» (раздел 8 плана).
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepAdjustment {
+  date: string;            // ISO yyyy-mm-dd
+  reason: string;
+  caloriesDelta: number;   // ккал (0 если не менялись)
+  cardioDelta: number;     // мин/нед (0 если не менялись)
+  weightStatus: string;    // статус адаптации (on_track/too_fast/too_slow/...)
+  source: 'user' | 'auto';
+}
+
+/** Добавить запись в историю корректировок плана (не мутирует входной объект). */
+export function recordPrepAdjustment(
+  plan: BBContestPrepPlan,
+  adjustment: Omit<PrepAdjustment, 'date'> & { date?: string },
+): BBContestPrepPlan {
+  const entry: PrepAdjustment = {
+    date: adjustment.date ?? isoToday(),
+    reason: adjustment.reason,
+    caloriesDelta: adjustment.caloriesDelta,
+    cardioDelta: adjustment.cardioDelta,
+    weightStatus: adjustment.weightStatus,
+    source: adjustment.source,
+  };
+  return {
+    ...plan,
+    updatedAt: new Date().toISOString(),
+    adjustments: [...(plan.adjustments ?? []), entry].slice(-20),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Экспорт для тренера: ICS-календарь фаз и JSON-снапшот (P3)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function icsEscape(s: string): string {
+  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+/** Фазы contest prep → .ics (события на каждый день фазы; show day — отдельно). */
+export function buildPrepIcs(plan: BBContestPrepPlan): string {
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BodyBuildHealth//ContestPrep//RU',
+    'CALSCALE:GREGORIAN',
+  ];
+  for (const p of plan.phases) {
+    if (p.key === 'show_day') continue; // отдельным событием ниже
+    const start = p.dateStart.replace(/-/g, '');
+    const end = isoAddDays(p.dateEnd, 1).replace(/-/g, '');
+    lines.push('BEGIN:VEVENT');
+    lines.push(`DTSTART;VALUE=DATE:${start}`);
+    lines.push(`DTEND;VALUE=DATE:${end}`);
+    lines.push(`SUMMARY:${icsEscape(`🏁 ${p.label} (contest prep)`)}`);
+    lines.push(`DESCRIPTION:${icsEscape(p.note)}`);
+    lines.push('END:VEVENT');
+  }
+  // Show day — однособытие.
+  lines.push('BEGIN:VEVENT');
+  lines.push(`DTSTART;VALUE=DATE:${plan.showDate.replace(/-/g, '')}`);
+  lines.push(`DTEND;VALUE=DATE:${isoAddDays(plan.showDate, 1).replace(/-/g, '')}`);
+  lines.push('SUMMARY:🎬 Show day');
+  lines.push(`DESCRIPTION:${icsEscape(`${CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category} — выход на сцену`)}`);
+  lines.push('END:VEVENT');
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+/** JSON-снапшот плана для тренера (компактный, без лишних полей). */
+export function buildPrepCoachJson(plan: BBContestPrepPlan): string {
+  return JSON.stringify({
+    id: plan.id,
+    showDate: plan.showDate,
+    category: plan.category,
+    sex: plan.sex,
+    status: plan.status,
+    preparation: plan.preparation,
+    taper: plan.taper,
+    peakWeek: plan.peakWeek,
+    phases: plan.phases.map(p => ({ key: p.key, label: p.label, weekStart: p.weekStart, weekEnd: p.weekEnd, dateStart: p.dateStart, dateEnd: p.dateEnd })),
+    adjustments: plan.adjustments ?? [],
+    safety: plan.safety,
+    updatedAt: plan.updatedAt,
+  }, null, 2);
 }
 
