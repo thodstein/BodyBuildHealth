@@ -16,6 +16,7 @@ import {
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
+  cardioProfileFactors, cardioNutritionNotes,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import {
@@ -78,6 +79,11 @@ interface WizardState {
   sex: 'male' | 'female';
   restingHr: number;
   legDays: number[];
+  factorSleep: boolean;
+  factorStress: boolean;
+  factorHrv: boolean;
+  factorPed: boolean;
+  factorJoints: boolean;
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -126,6 +132,17 @@ function profileRestingHr(): number | undefined {
     const hr = p?.settings?.health?.heartRate;
     return typeof hr === 'number' && hr > 0 ? hr : undefined;
   } catch { return undefined; }
+}
+
+/** Профиль для кардио-питания: вес/пол и калорийность (manualTargets.kcal). */
+function profileSettingsForNutrition(): { personal?: { weight?: number; sex?: 'male' | 'female' }; nutrition?: { manualTargets?: { kcal?: number } } } {
+  try {
+    const s = getProfile()?.settings;
+    return {
+      personal: s?.personal ? { weight: s.personal.weight, sex: s.personal.sex } : undefined,
+      nutrition: s?.nutrition?.manualTargets ? { manualTargets: { kcal: s.nutrition.manualTargets.kcal } } : undefined,
+    };
+  } catch { return {}; }
 }
 
 function todayIso(): string {
@@ -182,6 +199,34 @@ export const CardioConstructor: React.FC = () => {
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
   const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
+  const pf = useMemo(() => {
+    try { return cardioProfileFactors(getProfile()?.settings ?? {}); } catch { return {}; }
+  }, []);
+  const [factorsOn, setFactorsOn] = useState<{ sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean }>({
+    sleep: wizard.factorSleep ?? false,
+    stress: wizard.factorStress ?? false,
+    hrv: wizard.factorHrv ?? false,
+    ped: wizard.factorPed ?? false,
+    joints: wizard.factorJoints ?? false,
+  });
+  const factorsSummary = useMemo(() => {
+    const out: string[] = [];
+    if (factorsOn.sleep) out.push(`Сон: ${pf.sleepHours ?? '—'} ч ${pf.sleepHours && pf.sleepHours < 6 ? '(низкий → объём ×0.9)' : ''}`);
+    if (factorsOn.stress) out.push(`Стресс: ${pf.stressLevel ?? '—'}/10 ${pf.stressLevel && pf.stressLevel >= 7 ? '(высокий → HIIT убран, ×0.95)' : ''}`);
+    if (factorsOn.hrv) out.push(`HRV: ${pf.hrvMs ? pf.hrvMs + ' мс' : '—'} ${pf.hrvMs && pf.hrvMs < 25 ? '(низкий → ×0.9)' : ''}`);
+    if (factorsOn.ped) out.push(`PED-курс: ${pf.enhanced ? 'есть (→ ×1.05)' : 'не обнаружен'}`);
+    if (factorsOn.joints) out.push(`Суставы: ${pf.jointIssues ? 'есть проблемы → низкоударный' : 'проблем не найдено'}`);
+    return out;
+  }, [factorsOn, pf]);
+  const onToggleFactor = useCallback((key: keyof typeof factorsOn) => {
+    setFactorsOn(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...loadWizard(), version: 2, factorSleep: next.sleep, factorStress: next.stress, factorHrv: next.hrv, factorPed: next.ped, factorJoints: next.joints }));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   // Результат и библиотека
   const [cycle, setCycle] = useState<CardioCycle | null>(null);
@@ -238,6 +283,12 @@ export const CardioConstructor: React.FC = () => {
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex,
       legDays,
+      sleepHours: factorsOn.sleep ? pf.sleepHours : undefined,
+      stressLevel: factorsOn.stress ? pf.stressLevel : undefined,
+      hrvMs: factorsOn.hrv ? pf.hrvMs : undefined,
+      enhanced: factorsOn.ped ? pf.enhanced : undefined,
+      autoLowImpact: factorsOn.joints ? true : undefined,
+      jointIssues: factorsOn.joints ? pf.jointIssues : undefined,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     };
     const vOpts = variant === 'gentle'
@@ -271,6 +322,13 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.restingHr != null && cfg.restingHr > 0) setRestingHr(String(cfg.restingHr));
     if (cfg.sex) setSex(cfg.sex);
     setLegDays(cfg.legDays ? [...cfg.legDays] : []);
+    setFactorsOn({
+      sleep: cfg.sleepHours != null && cfg.sleepHours < 6,
+      stress: cfg.stressLevel != null && cfg.stressLevel >= 7,
+      hrv: cfg.hrvMs != null && cfg.hrvMs > 0 && cfg.hrvMs < 25,
+      ped: cfg.enhanced === true,
+      joints: cfg.autoLowImpact === true,
+    });
     setPhaseSplit(cfg.phaseSplit ? { auto: false, base: cfg.phaseSplit.base ?? 0, build: cfg.phaseSplit.build ?? 0, maintenance: cfg.phaseSplit.maintenance ?? 0 } : { auto: true, base: 0, build: 0, maintenance: 0 });
     setStep('params');
     flashMsg('⚙️ Параметры загружены из цикла — измените и пересоберите');
@@ -377,10 +435,11 @@ export const CardioConstructor: React.FC = () => {
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek,
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
+        factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -591,6 +650,8 @@ export const CardioConstructor: React.FC = () => {
           sex={sex} setSex={setSex}
           restingHr={restingHr} setRestingHr={setRestingHr}
           legDays={legDays} setLegDays={setLegDays}
+          factorsOn={factorsOn} onToggleFactor={onToggleFactor}
+          factorsSummary={factorsSummary}
           onReset={resetParams}
         />
       )}
@@ -606,6 +667,8 @@ export const CardioConstructor: React.FC = () => {
             variant={variant} onVariant={setVariant}
             variants={planVariants} explanation={planExplanation}
             onImproved={applyImproved}
+            factorsSummary={factorsSummary}
+            nutritionNotes={cycle ? cardioNutritionNotes(cycle, profileSettingsForNutrition()) : []}
           />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button style={NAV_BTN} onClick={migrateFromPlan}>📦 Мигрировать недельный план</button>

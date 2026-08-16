@@ -16,6 +16,7 @@ import {
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
   bumpCardioZone2Volume, cardioSafetyReport, configFromCycle,
+  cardioProfileFactors, cardioNutritionNotes,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -1040,5 +1041,75 @@ describe('cardioCycleToUserProgram', () => {
     const last = p.bb!.weeks[p.bb!.weeks.length - 1];
     expect(last.phase).toBe('peaking');
     expect(p.bb!.weeks[4].phase).toBe('deload');
+  });
+});
+
+// ─── Профиль-факторы и питание ───
+
+describe('cardioProfileFactors', () => {
+  it('сон/стресс/HRV/PED/суставы распознаются из профиля', () => {
+    const f = cardioProfileFactors({
+      lifestyle: { sleepHours: 5.5, stressLevel: 8, morningHRV: 20 },
+      pharma: { currentSubstances: [{ substanceId: 'test_e' }] },
+      health: { chronicConditions: ['Артроз коленей'] },
+    });
+    expect(f.sleepHours).toBe(5.5);
+    expect(f.stressLevel).toBe(8);
+    expect(f.hrvMs).toBe(20);
+    expect(f.enhanced).toBe(true);
+    expect(f.jointIssues).toBe(true);
+  });
+
+  it('пустой профиль → пустые факторы', () => {
+    expect(cardioProfileFactors({})).toEqual({});
+  });
+});
+
+describe('факторы в buildCardioCycle', () => {
+  it('низкий сон + стресс + низкий HRV снижают объём, стресс убирает HIIT', () => {
+    const base = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 5 });
+    const tired = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 5, sleepHours: 5, stressLevel: 8, hrvMs: 20 });
+    expect(tired.weeks[0].totalMinutes).toBeLessThan(base.weeks[0].totalMinutes);
+    expect(tired.weeks.some(w => w.sessions.some(s => s.type === 'hiit'))).toBe(false);
+    expect(tired.rationale.some(r => r.includes('Сон <6'))).toBe(true);
+    expect(tired.rationale.some(r => r.includes('Стресс ≥7'))).toBe(true);
+  });
+
+  it('PED-курс повышает объём', () => {
+    const base = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 5 });
+    const enh = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 5, enhanced: true });
+    expect(enh.weeks[0].totalMinutes).toBeGreaterThan(base.weeks[0].totalMinutes);
+  });
+
+  it('autoLowImpact + jointIssues → низкоударное оборудование', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, equipment: ['running'], autoLowImpact: true, jointIssues: true });
+    for (const w of c.weeks) {
+      for (const s of w.sessions) expect(s.equipment).not.toBe('running');
+    }
+    expect(c.rationale.some(r => r.includes('суставов из профиля'))).toBe(true);
+  });
+});
+
+describe('cardioNutritionNotes', () => {
+  it('сушка: расход, белок ≥2.2 г/кг, углеводы при HIIT, калорийность', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const notes = cardioNutritionNotes(c, { personal: { weight: 80 }, nutrition: { manualTargets: { kcal: 2400 } } });
+    const text = notes.join('\n');
+    expect(text).toContain('Расход кардио');
+    expect(text).toContain('2.2 г/кг = 176 г/сут');
+    expect(text).toContain('ккал/сут');
+  });
+
+  it('без ручной калорийности — рекомендации без неё, но с расходом', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+    const notes = cardioNutritionNotes(c, { personal: { weight: 80 } });
+    expect(notes.join('\n')).toContain('Расход кардио');
+    expect(notes.join('\n')).not.toContain('ккал/сут — расход');
+  });
+
+  it('массонабор: белок 1.8-2.0 г/кг', () => {
+    const c = buildCardioCycle({ goal: 'mass', totalWeeks: 6 });
+    const notes = cardioNutritionNotes(c, { personal: { weight: 90 } });
+    expect(notes.join('\n')).toContain('1.8-2.0 г/кг = 171 г/сут');
   });
 });

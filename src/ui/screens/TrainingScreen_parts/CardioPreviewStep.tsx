@@ -56,7 +56,9 @@ export const CardioPreviewStep: React.FC<{
   variants: ReturnType<typeof cardioPlanVariants>;
   explanation: string[];
   onImproved: (cycle: CardioCycle) => void;
-}> = ({ cycle, onBuild, onRename, onEditConfig, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, onImproved }) => {
+  factorsSummary: string[];
+  nutritionNotes: string[];
+}> = ({ cycle, onBuild, onRename, onEditConfig, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, onImproved, factorsSummary, nutritionNotes }) => {
   const [showWeeks, setShowWeeks] = useState(true);
   const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -213,6 +215,26 @@ export const CardioPreviewStep: React.FC<{
           <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {e}</div>
         ))}
       </div>
+
+      {/* Факторы восстановления/курса */}
+      {factorsSummary.length > 0 && (
+        <div style={CARD}>
+          <div style={LABEL}>📊 Учтённые факторы</div>
+          {factorsSummary.map((f, i) => (
+            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {f}</div>
+          ))}
+        </div>
+      )}
+
+      {/* Питание для кардио */}
+      {nutritionNotes.length > 0 && (
+        <div style={CARD}>
+          <div style={LABEL}>🍽 Питание для кардио</div>
+          {nutritionNotes.map((n, i) => (
+            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {n}</div>
+          ))}
+        </div>
+      )}
 
       {/* Качество + улучшить */}
       {quality && (

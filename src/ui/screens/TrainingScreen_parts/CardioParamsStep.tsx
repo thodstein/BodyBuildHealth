@@ -74,8 +74,11 @@ export const CardioParamsStep: React.FC<{
   setRestingHr: (v: string) => void;
   legDays: number[];
   setLegDays: (d: number[]) => void;
+  factorsOn: { sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean };
+  onToggleFactor: (key: keyof { sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean }) => void;
+  factorsSummary: string[];
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, onReset }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -218,6 +221,27 @@ export const CardioParamsStep: React.FC<{
         </div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
           Zone 2 / MISS / HIIT не попадут на эти дни; recovery — в любой день.
+        </div>
+      </div>
+
+      {/* Факторы восстановления/курса из профиля */}
+      <div style={CARD}>
+        <div style={LABEL}>📊 Факторы (восстановление и курс)</div>
+        <div style={ROW}>
+          <button style={factorsOn.sleep ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
+          <button style={factorsOn.stress ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
+          <button style={factorsOn.hrv ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('hrv')} aria-label="Фактор: HRV">📉 HRV</button>
+          <button style={factorsOn.ped ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('ped')} aria-label="Фактор: PED-курс">💉 PED</button>
+          <button style={factorsOn.joints ? { ...BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff' } : BTN} onClick={() => onToggleFactor('joints')} aria-label="Фактор: суставы">🦴 Суставы</button>
+        </div>
+        {factorsSummary.length > 0 && (
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+            {factorsSummary.map((s, i) => <div key={i}>• {s}</div>)}
+          </div>
+        )}
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          Влияют на объём и HIIT: сон {'<'}6 ч → ×0.9; стресс ≥7 → HIIT убран, ×0.95; низкий HRV → ×0.9;
+          PED-курс → ×1.05; суставы → низкоударный режим.
         </div>
       </div>
 

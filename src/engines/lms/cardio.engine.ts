@@ -136,14 +136,86 @@ export interface CardioCycleInput {
   sex?: 'male' | 'female';
   /** Дни тяжёлых ног (0-6, Пн=0): zone2/miss/hiit не ставятся в эти дни. */
   legDays?: number[];
+  /** Проблемы суставов из профиля (для autoLowImpact). */
+  jointIssues?: boolean;
   /** Дата начала цикла (локальная YYYY-MM-DD); по умолчанию — сегодня. */
   startDate?: string;
+  /** Сон (часы/ночь): <6 → объём ×0.9. */
+  sleepHours?: number;
+  /** Стресс (1-10): ≥7 → HIIT убран, объём ×0.95. */
+  stressLevel?: number;
+  /** HRV (мс, утренний): <25 при >0 → объём ×0.9. */
+  hrvMs?: number;
+  /** PED-курс: повышенное восстановление → объём ×1.05. */
+  enhanced?: boolean;
+  /** Авто-учёт суставов из профиля (chronicConditions) → lowImpact. */
+  autoLowImpact?: boolean;
   /** Снапшот параметров сборки (для «⚙️ Изменить параметры»). Заполняется в buildCardioCycle. */
   config?: CardioCycleInput;
   id?: string;
   name?: string;
   source?: CardioCycle['source'];
   createdAt?: string;
+}
+
+// ─── Факторы профиля (сон/стресс/HRV/PED/суставы) и питание ───
+
+export interface CardioProfileFactors {
+  sleepHours?: number;
+  stressLevel?: number;
+  hrvMs?: number;
+  enhanced?: boolean;
+  jointIssues?: boolean;
+}
+
+/** Прочитать факторы восстановления/курса/суставов из профиля (чистая функция). */
+export function cardioProfileFactors(profile: {
+  personal?: { age?: number; sex?: 'male' | 'female'; weight?: number };
+  lifestyle?: { sleepHours?: number; stressLevel?: number; morningHRV?: number };
+  pharma?: { currentSubstances?: unknown[] };
+  health?: { chronicConditions?: string[] };
+}): CardioProfileFactors {
+  const f: CardioProfileFactors = {};
+  const lf = profile.lifestyle ?? {};
+  if (typeof lf.sleepHours === 'number' && lf.sleepHours > 0) f.sleepHours = lf.sleepHours;
+  if (typeof lf.stressLevel === 'number' && lf.stressLevel > 0) f.stressLevel = lf.stressLevel;
+  if (typeof lf.morningHRV === 'number' && lf.morningHRV > 0) f.hrvMs = lf.morningHRV;
+  const subs = profile.pharma?.currentSubstances;
+  if (Array.isArray(subs) && subs.length > 0) f.enhanced = true;
+  const conds = profile.health?.chronicConditions;
+  if (Array.isArray(conds)) {
+    const joint = /сустав|колен|артрит|остеохондроз|травм/i;
+    if (conds.some(c => joint.test(String(c).toLowerCase()))) f.jointIssues = true;
+  }
+  return f;
+}
+
+/** Питание для кардио: расход, белок, углеводы, гидратация (чистая функция). */
+export function cardioNutritionNotes(
+  cycle: CardioCycle,
+  profile: { personal?: { weight?: number; sex?: 'male' | 'female' }; nutrition?: { manualTargets?: { kcal?: number } } },
+): string[] {
+  const notes: string[] = [];
+  const bw = profile.personal?.weight ?? 80;
+  const s = cardioCycleSummary(cycle);
+  notes.push(`🔥 Расход кардио: ${s.avgKcalPerWeek} ккал/нед (~${Math.max(1, Math.round(s.avgKcalPerWeek / 9))} г жира/нед при дефиците).`);
+  if (cycle.goal === 'cut' || cycle.goal === 'recomp') {
+    notes.push(`🥩 Белок при сушке: ≥2.2 г/кг = ${Math.round(bw * 2.2)} г/сут — сохранит мышцы на фоне дефицита + кардио.`);
+  } else if (cycle.goal === 'mass') {
+    notes.push(`🥩 Белок при массонаборе: 1.8-2.0 г/кг = ${Math.round(bw * 1.9)} г/сут.`);
+  } else {
+    notes.push(`🥩 Белок: 1.6-2.0 г/кг = ${Math.round(bw * 1.8)} г/сут.`);
+  }
+  const hasHiit = s.hiitWeeks > 0;
+  const longZ2 = cycle.weeks.some(w => w.sessions.some(x => x.type === 'zone2' && x.durationMin >= 60));
+  if (hasHiit) notes.push('🍚 Перед HIIT: 30-60 г углеводов за 1-2 ч; после — 30-60 г + белок (гликоген).');
+  if (longZ2) notes.push('💧 Zone 2 ≥60 мин: 500-750 мл/час, при >90 мин — электролиты (Na/K/Mg).');
+  notes.push('⏰ Z2 можно натощак (жиросжигание); HIIT — только не натощак.');
+  const kcal = profile.nutrition?.manualTargets?.kcal;
+  if (typeof kcal === 'number' && kcal > 0) {
+    notes.push(`📊 Калорийность цели: ${kcal} ккал/сут — расход кардио усиливает дефицит, следите за темпом (0.5-1%/нед).`);
+  }
+  return notes;
 }
 
 // ─── Пресеты-шаблоны (быстрые старты) ───
@@ -420,7 +492,6 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const totalWeeks = clamp(Math.round(input.totalWeeks ?? 12), 1, MAX_CYCLE_WEEKS);
   const bw = clamp(input.bodyWeight ?? 80, 30, 300);
   const daysAvailable = clamp(Math.round(input.daysAvailable ?? 7), 0, 7);
-  const recoveryLow = !!input.recoveryLow;
   const competitions = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= totalWeeks);
   const taperWeeks = clamp(Math.round(input.taperWeeks ?? 2), 1, 4);
   const peakWeek = input.peakWeek !== false;
@@ -432,7 +503,18 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       }
     : undefined;
   const levelMult = CARDIO_LEVEL_MULT[input.level ?? 'intermediate'];
-  const lowImpact = !!input.lowImpact;
+  const lowImpact = !!input.lowImpact || (!!input.autoLowImpact && !!input.jointIssues);
+  const stressHigh = (input.stressLevel ?? 0) >= 7;
+  const sleepLow = (input.sleepHours ?? 7) < 6;
+  const hrvLow = (input.hrvMs ?? 0) > 0 && (input.hrvMs ?? 0) < 25;
+  const enhanced = !!input.enhanced;
+  let factorMult = levelMult;
+  const factorNotes: string[] = [];
+  if (sleepLow) { factorMult *= 0.9; factorNotes.push('Сон <6 ч → объём ×0.9.'); }
+  if (stressHigh) { factorMult *= 0.95; factorNotes.push('Стресс ≥7 → объём ×0.95, HIIT убран.'); }
+  if (hrvLow) { factorMult *= 0.9; factorNotes.push('Низкий HRV → объём ×0.9.'); }
+  if (enhanced) { factorMult *= 1.05; factorNotes.push('PED-курс: восстановление выше → объём ×1.05.'); }
+  const recoveryLow = !!input.recoveryLow || stressHigh;
   const equipmentPool = (input.equipment ?? []).filter(e => !lowImpact || CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.impact === 'low');
   const fallbackEquipment: CardioEquipment = lowImpact ? 'walking' : equipmentPool[0] ?? 'running';
   const zones = input.age != null ? cardioHeartZones(input.age, input.restingHr, undefined, input.sex) : undefined;
@@ -453,7 +535,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
     }
     // Персонализация: уровень (объём), оборудование, целевые пульс-зоны
     sessions = sessions.map(s => {
-      const dur = Math.max(10, Math.round(s.durationMin * levelMult));
+      const dur = Math.max(10, Math.round(s.durationMin * factorMult));
       const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
       const zone = s.type === 'hiit' ? zones?.[3] : s.type === 'miss' ? zones?.[2] : zones?.[1];
       return {
@@ -509,10 +591,18 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
       restingHr: input.restingHr,
       sex: input.sex,
       legDays: input.legDays ? [...input.legDays] : undefined,
+      sleepHours: input.sleepHours,
+      stressLevel: input.stressLevel,
+      hrvMs: input.hrvMs,
+      enhanced: input.enhanced,
+      autoLowImpact: input.autoLowImpact,
+      jointIssues: input.jointIssues,
     };
   }
   cycle.rationale.push(`Цель: ${CARDIO_GOAL_LABELS[input.goal].toLowerCase()}, ${totalWeeks} нед, ${daysAvailable} дн/нед.`);
   if (input.level && input.level !== 'intermediate') cycle.rationale.push(`Уровень: ${CARDIO_LEVEL_LABELS[input.level].toLowerCase()} (объём ×${levelMult}).`);
+  for (const n of factorNotes) cycle.rationale.push(n);
+  if (lowImpact && input.autoLowImpact) cycle.rationale.push('Учтены проблемы суставов из профиля — низкоударный режим.');
   if (equipmentPool.length > 0) cycle.rationale.push(`Оборудование: ${equipmentPool.map(e => cardioEquipmentLabel(e)).join(', ')}${lowImpact ? ' (низкоударное)' : ''}.`);
   else if (lowImpact) cycle.rationale.push('Оборудование: низкоударное (ходьба/вело/эллипс по умолчанию).');
   if (input.age != null) cycle.rationale.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''} — целевые пульс-зоны сессий заданы${input.restingHr != null && input.restingHr > 0 ? ` (ЧСС покоя ${input.restingHr})` : ''}.`);
