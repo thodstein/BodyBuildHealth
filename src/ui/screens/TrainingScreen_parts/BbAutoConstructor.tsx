@@ -87,6 +87,8 @@ import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
+import { TrainingSafetyHub } from './TrainingSafetyHub';
+import type { TrainingSafetyInput } from '../../../engines/training-safety.types';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
@@ -1990,6 +1992,17 @@ export const BbAutoConstructor: React.FC = () => {
           onChange={setInjuries}
         />
       </div>
+      <TrainingSafetyHub input={useMemo<TrainingSafetyInput>(() => ({
+        source: 'bb_auto',
+        profile: {
+          injuries,
+          techniqueIssues: mobilityRestrictions,
+          avoidAxialLoad: (prof as any).avoidAxialLoad,
+          trainingYears: bbTrainingYears,
+          level: bbLevel,
+        },
+        workload: { acwrRatio: calculateACWR() },
+      }), [injuries, mobilityRestrictions, prof, bbTrainingYears, bbLevel])} compact />
       {/* PRO: Mobility restrictions — biomechanics-based exercise filtering */}
       <div style={{ marginTop:8 }}>
         <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6 }}>🦴 Ограничения мобильности (биомеханика)</div>
@@ -3876,6 +3889,57 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:3 }}>
                     Объём снижается, веса сохраняются, RIR 2–4, без отказа и новых упражнений. Изменения настроек ниже пересобирают эти недели.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 🏋️ Недели подготовки (режим подготовки) */}
+            {prepApplied && builtPlan && (() => {
+              const prepWeeksList = builtPlan.weeks
+                .filter((w: any) => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation')
+                .map((w: any) => {
+                  const totalSets = w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+                  const rir = Math.min(...w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.rir ?? 3)));
+                  return { w, totalSets, rir };
+                });
+              if (prepWeeksList.length === 0) return null;
+              const shown = prepWeeksList.slice(0, 4);
+              const rest = prepWeeksList.length - shown.length;
+              return (
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>🏋️ Недели подготовки (режим подготовки)</div>
+                  <div style={{ overflowX:'auto' }}>
+                    <table style={{ width:'100%', fontSize:10, borderCollapse:'collapse', minWidth:420 }}>
+                      <thead>
+                        <tr style={{ color:'rgba(255,255,255,0.5)', textAlign:'left' }}>
+                          <th style={{ padding:'4px 6px' }}>Нед</th>
+                          <th style={{ padding:'4px 6px' }}>Фаза</th>
+                          <th style={{ padding:'4px 6px', textAlign:'right' }}>Сетов</th>
+                          <th style={{ padding:'4px 6px', textAlign:'right' }}>RIR</th>
+                          <th style={{ padding:'4px 6px' }}>Режим</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shown.map(({ w, totalSets, rir }) => (
+                          <tr key={(w as any).week} style={{ borderTop:'1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding:'4px 6px', fontWeight:700 }}>{(w as any).week}</td>
+                            <td style={{ padding:'4px 6px', color: PREP_PHASE_COLORS[(w as any).contestPhase as PrepPhaseKey] ?? '#60a5fa', fontWeight:700 }}>
+                              {(w as any).contestPhase === 'final_preparation' ? 'Финальная' : 'Подготовка'}
+                            </td>
+                            <td style={{ padding:'4px 6px', textAlign:'right' }}>{totalSets}</td>
+                            <td style={{ padding:'4px 6px', textAlign:'right' }}>{rir}</td>
+                            <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.55)', fontSize:9 }}>
+                              {String((w as any).prepProtocol || '').startsWith('Подготовка') ? 'RIR 1–3, без отказа' : String((w as any).prepProtocol || '').startsWith('Финальная') ? '×0.9, RIR 2–3' : 'как в плане'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.4)', marginTop:3 }}>
+                    {rest > 0 ? `и ещё ${rest} недель подготовки с тем же режимом. ` : ''}
+                    Объём подготовки не переделывает цикл: меняются только RIR/техники (+объём при выборе ×0.85), веса сохраняются.
                   </div>
                 </div>
               );
