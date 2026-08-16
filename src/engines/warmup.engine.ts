@@ -1,4 +1,5 @@
 import type { WarmupBlock } from '../core/types';
+import { collectGroupPrep, prepGroupLabels } from './warmup-day.engine';
 export type { WarmupBlock };
 
 export interface WarmupInput {
@@ -8,6 +9,8 @@ export interface WarmupInput {
   techniqueIssues: string[];
   fatigueLevel: number;
   equipmentAvailable: string[];
+  /** Целевые группы тренировочного дня (muscleGroup упражнений плана) — упор разминки. */
+  targetGroups?: string[];
 }
 
 /** Канонические русские названия разминочных упражнений (единый словарь). */
@@ -28,6 +31,24 @@ export const WARMUP_LABELS: Record<string, string> = {
   dead_bug: 'Мёртвый жук (Dead bug)',
   side_lying_abduction: 'Отведение ноги лёжа на боку',
   wall_slide: 'Скольжение по стене (Wall slide)',
+  wall_pec_stretch: 'Растяжка груди у стены',
+  pushup_light: 'Лёгкие отжимания',
+  scapular_pull: 'Подтягивание лопаток',
+  band_pull_apart: 'Разведение ленты перед собой',
+  air_squat: 'Приседания без веса',
+  lateral_band_walk: 'Боковые шаги с лентой',
+  hip_hinge_prep: 'Разминочный наклон таза',
+  glute_bridge: 'Ягодичный мост',
+  rdl_light: 'Лёгкая румынская тяга',
+  '90_90_switch': 'Переход бёдер 90/90',
+  ytw: 'Y-T-W разведения',
+  band_curl_light: 'Сгибания с резинкой (лёгкие)',
+  band_pushdown_light: 'Разгибания с резинкой (лёгкие)',
+  calf_raise: 'Подъёмы на носки',
+  calf_stretch: 'Растяжка икр у стены',
+  wrist_circles: 'Круги запястьями',
+  neck_cars: 'CARs шеи',
+  wrist_flex_ext: 'Сгибание-разгибание кисти',
   squat: 'Разминочные подходы — присед',
   bench: 'Разминочные подходы — жим',
   bench_press: 'Разминочные подходы — жим',
@@ -67,23 +88,46 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
     });
   }
 
-  const mobilityExs = getMobilityExercises(input.sessionFocus, input.riskFlags);
+  // Упор на целевые группы дня (если переданы) — суставная подготовка + активация
+  const targetGroups = (input.targetGroups || []).filter(Boolean);
+  const groupPrep = targetGroups.length > 0 ? collectGroupPrep(targetGroups, hasBand) : null;
+  const toBlockEx = (e: { id: string; sets: number; reps: number }) => ({ exerciseId: e.id, sets: e.sets, reps: e.reps });
+
+  const mobilityExs: { exerciseId: string; sets: number; reps: number }[] = groupPrep
+    ? groupPrep.mobility.map(toBlockEx)
+    : getMobilityExercises(input.sessionFocus, input.riskFlags);
+  if (Object.values(input.riskFlags).includes('high') && !mobilityExs.some(e => e.exerciseId === 'cat_camel')) {
+    mobilityExs.push({ exerciseId: 'cat_camel', sets: 1, reps: 8 });
+  }
+  if (Object.values(input.riskFlags).includes('high') && !mobilityExs.some(e => e.exerciseId === 'worlds_greatest')) {
+    mobilityExs.push({ exerciseId: 'worlds_greatest', sets: 1, reps: 6 });
+  }
   if (mobilityExs.length > 0) {
     blocks.push({
       type: 'mobility',
       durationSec: 180,
       exercises: mobilityExs,
-      notes: 'Суставная подготовка',
+      notes: groupPrep ? `Суставная подготовка: ${prepGroupLabels(targetGroups)}` : 'Суставная подготовка',
     });
   }
 
-  const activationExs = getActivationExercises(input.riskFlags, input.techniqueIssues, hasBand);
+  const activationExs: { exerciseId: string; sets: number; reps: number }[] = groupPrep
+    ? groupPrep.activation.map(toBlockEx)
+    : getActivationExercises(input.riskFlags, input.techniqueIssues, hasBand);
+  if (input.techniqueIssues.includes('knee_valgus') && !activationExs.some(e => e.exerciseId === 'banded_clam' || e.exerciseId === 'side_lying_abduction')) {
+    activationExs.push(hasBand
+      ? { exerciseId: 'banded_clam', sets: 2, reps: 15 }
+      : { exerciseId: 'side_lying_abduction', sets: 2, reps: 15 });
+  }
+  if (input.techniqueIssues.includes('rounding_back') && !activationExs.some(e => e.exerciseId === 'bird_dog')) {
+    activationExs.push({ exerciseId: 'bird_dog', sets: 2, reps: 10 });
+  }
   if (activationExs.length > 0) {
     blocks.push({
       type: 'activation',
       durationSec: 180,
       exercises: activationExs,
-      notes: 'Активация мышц',
+      notes: groupPrep ? `Активация: ${prepGroupLabels(targetGroups)}` : 'Активация мышц',
     });
   }
 

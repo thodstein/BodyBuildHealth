@@ -364,6 +364,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
       techniqueIssues,
       fatigueLevel: profile.fatigue / 10,
       equipmentAvailable: profile.equipment,
+      targetGroups: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup || '').filter(Boolean))),
     };
     setWarmupBlocks(generateWarmup(warmupInput));
     setPhase('warmup');
