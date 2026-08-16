@@ -4,7 +4,6 @@
 import React, { useState } from 'react';
 
 // Общие (сила/нагрузка/периодизация)
-import { loadTrainingProfile } from './training-profile';
 import { StrengthAnalysisHub } from './StrengthAnalysisHub';
 import { TrainingSafetyHub } from './TrainingSafetyHub';
 
@@ -18,18 +17,9 @@ interface ToolDef { id: string; title: string; icon: string; short: string; rend
 const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
   // ═══ ПЛ-АВТО ═══
   pl: [
-    { id: 'intelligence-diagnostics', title: 'Диагностика', icon: '🔬', short: 'Единый калькулятор движения (мёртвые точки → слабые точки → bar-path), срывы, RIR, коррекция мезо.', render: () => (
-      <DiagnosticsHub
-        sessions={[]}
-        tprofile={loadTrainingProfile()}
-        readinessRecovery={loadTrainingProfile().recovery * 10}
-        readinessFatigue={loadTrainingProfile().fatigue * 10}
-        mesoWeeks={12}
-        missedSessions={0}
-        currentVolume={18}
-        currentRir={2}
-      />
-    ) },
+    // «🔬 Диагностика» убрана — полный калькулятор движения (PlDeadpointsBarPathCard)
+    // живёт во вкладке «📋 План цикла» (с template + сессиями дневника); анализ срывов
+    // по дневнику — в аналитике дневника (StickingPointAnalysisCard с реальными данными).
     { id: 'intelligence-strength', title: 'Анализ силы', icon: '🏋️', short: 'Интеллектуальный анализ силы: 1RM, VBT, относительная сила, нормативы и аналитика.', render: () => <StrengthAnalysisHub /> },
     { id: 'safety', title: 'Безопасность и нагрузка', icon: '🛡', short: 'Единый инструмент: безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио, разгрузка.', render: () => <TrainingSafetyHub /> },
   ],
