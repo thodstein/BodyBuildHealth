@@ -232,13 +232,22 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
 
     // Тяжёлые рабочие сеты (≥85%, ≥2 сетов) в финале — только для разгрузочных режимов;
     // соревновательная неделя ПЛ-протокола (разминка 50/70/90) — норма.
-    const heavySets = finalTaper.days.flatMap(d => d.exercises.filter(e => isMain(e)).flatMap(e => e.workSets))
+    const heavySets = finalTaper.days.flatMap(d => d.exercises.filter(e => isMain(e)).flatMap(e => e.workSets ?? []))
       .filter(ws => (ws.pct ?? 0) >= 0.85 && (ws.sets ?? 0) >= 2);
     if (heavySets.length > 0) {
       score -= 25;
       notes.push({ severity: 'danger', icon: '🚨', text: `В финальную тапер-неделю ${finalTaper.week} остались тяжёлые рабочие сеты (${heavySets.length} шт ≥85%) — перегруз ЦНС перед стартом. Последние тяжёлые: присед за ${LAST_HEAVY_DAYS.squat} дн, жим за ${LAST_HEAVY_DAYS.bench} дн, тяга за ${LAST_HEAVY_DAYS.deadlift} дн до старта.` });
     } else {
       notes.push({ severity: 'ok', icon: '✅', text: 'Тяжёлых рабочих сетов в финальной неделе нет — ЦНС успеет восстановиться к старту.' });
+    }
+
+    // Рабочие сеты выше 100% ПМ (multi-rep) — арифметическая ошибка планирования:
+    // выше ПМ допустимы ТОЛЬКО прикиды-синглы дня соревнований (reps=1, sets=1).
+    const overPm = finalTaper.days.flatMap(d => d.exercises.flatMap(e => e.workSets ?? []))
+      .filter(ws => (ws.pct ?? 0) > 1.0 && (ws.reps ?? 1) > 1 && (ws.sets ?? 0) >= 1);
+    if (overPm.length > 0) {
+      score -= 20;
+      notes.push({ severity: 'danger', icon: '⚖️', text: `В финальной неделе ${overPm.length} рабочих сетов выше 100% ПМ (${overPm.map(ws => Math.round((ws.pct ?? 0) * 100)).join('/')}%) — выше ПМ допустимы только прикиды-синглы дня соревнований.` });
     }
   }
 

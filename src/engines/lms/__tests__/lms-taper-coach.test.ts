@@ -193,6 +193,15 @@ describe('coachPLPeakPlan', () => {
     expect(v.score).toBeLessThan(80);
   });
 
+  it('рабочие сеты >100% ПМ в финальной неделе → danger', () => {
+    const plan = balancedPlan();
+    // Финальная тапер-неделя (нед 8): multi-rep рабочие сеты на 105%
+    plan.weeks[7] = { ...plan.weeks[7], days: [{ exercises: [{ name: 'Присед', group: 'ПР', coef: 1, mnosz: 1, pm: 200, rir: 1, load: 'main', workSets: [{ pct: 1.05, reps: 3, sets: 3, weight: 210, rir: 1 }] }], metrics: {} as any }] };
+    const v = coachPLPeakPlan(plan, baseCtx());
+    expect(v.notes.some(n => n.severity === 'danger' && n.text.includes('выше 100% ПМ'))).toBe(true);
+    expect(v.score).toBeLessThan(85);
+  });
+
   it('старый план без workSets у упражнений — вердикт не падает', () => {
     const stale: LMSBuildOutput = {
       template: {} as any,

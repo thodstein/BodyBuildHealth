@@ -14,6 +14,7 @@ import {
   type Macrocycle, type MacroBlock, type MacroPhase, type MacroInput, type BBMacrocycle, type BBMacroBlock, type BBMacroPhase, type CompetitionEvent,
 } from '../../../engines/lms/macrocycle.engine';
 import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
+import { buildPLTaperCurve, type TaperMode } from '../../../engines/lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
@@ -408,9 +409,12 @@ interface Props {
   onGoalChange?: (goal: 'powerlifting' | 'bodybuilding' | 'general') => void;
   /** MC-4: Storage key для изоляции storage контекстов (по умолчанию he_pl_macro / he_bb_macro). */
   storageKey?: string;
+  /** 🏁 Схема тапера, выбранная в ПЛ-авто (канон lms-taper.engine) — карточка
+   *  «Тапер к старту» показывает реальные цифры схемы. */
+  taperMode?: TaperMode;
 }
 
-export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange, storageKey }) => {
+export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange, storageKey, taperMode }) => {
   // Локальные редактируемые значения (если onLevelChange/onGoalChange не переданы — селекторы disabled)
   const [localLevel, setLocalLevel] = useState<string>(level);
   const [localGoal, setLocalGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(goal);
@@ -1414,14 +1418,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               {!isBB && 'cycleId' in activeBlock && activeBlock.cycleId && (() => {
                 const cyc = getCycleById(activeBlock.cycleId);
                 if (!cyc) return null;
-                const taper = taperWeeksForBlock(activeBlock as MacroBlock);
+                // Канон (lms-taper.engine): реальные цифры выбранной схемы тапера.
+                const taper = buildPLTaperCurve({ taperWeeks: 2, mode: taperMode ?? 'classic' });
                 const weeksToStart = Math.max(0, activeBlock.weekOffset + activeBlock.weeks - 1 - currentWeekIdx + 1);
                 const pmMult = projectPmGrowthMultiplier(cyc, weeksToStart);
                 return (
                   <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-                    {taper.length > 0 && (
-                      <div>🏁 Тапер к старту: {taper.map(t => `нед ${t.week} — ${t.label}, объём ×${t.volumeMult}, RIR +${t.rirShift}`).join(' · ')}</div>
-                    )}
+                    <div>🏁 Тапер к старту ({(taperMode ?? 'classic') === 'pl' ? 'ПЛ-пик-протокол' : (taperMode ?? 'classic') === 'pro' ? 'про-тапер' : (taperMode ?? 'classic') === 'wf' ? 'Classic WF' : 'классика Bosquet'}): {taper.map(t => `нед ${t.week} — ${t.label.toLowerCase()}, объём ×${t.volumePct}, RIR ${t.rirTarget != null ? `→${t.rirTarget}` : `+${t.rirShift}`}`).join(' · ')}</div>
                     <div>📈 Прогрессия цикла {Math.round((cyc.meta.correctionPct ?? 0.005) * 1000) / 10}%/нед → к старту ПМ ×{pmMult.toFixed(2)}</div>
                   </div>
                 );

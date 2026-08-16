@@ -1639,6 +1639,24 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
                             style={{ ...BTN_GHOST, marginTop: 6, minHeight: 36, fontSize: 10, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', background: 'rgba(0,230,138,0.06)' }}
                             title="Применить рекомендуемые настройки тапера (схема/длительность/весовая цель/mock/пост-старт) — затем нажмите «📉 Добавить тапер к плану»"
                           >✅ Применить рекомендации тренера</button>
+                          <button
+                            onClick={() => {
+                              try {
+                                const lines = [
+                                  `🧠 Тренерский вердикт: ${verdict.score}/100 — ${verdict.label}`,
+                                  ...verdict.notes.map(n => `${n.icon} ${n.text}`),
+                                  feas.summary && feas.lifts.length > 0 ? `🎯 ${feas.summary}` : '',
+                                  projected && projected['Присед'] ? `🔮 Прогноз к старту: присед ≈ ${projected['Присед']} кг` : '',
+                                ].filter(Boolean);
+                                const text = lines.join('\n');
+                                const done = () => setMethodNote('📋 Вердикт тренера скопирован в буфер');
+                                if (navigator.clipboard?.writeText) { navigator.clipboard.writeText(text).then(done).catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { /* ignore */ } document.body.removeChild(ta); }); }
+                                else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch { /* ignore */ } document.body.removeChild(ta); }
+                              } catch (error) { setMethodNote(`⚠ Не удалось скопировать: ${(error as Error).message}`); }
+                            }}
+                            style={{ ...BTN_GHOST, marginTop: 6, minHeight: 36, fontSize: 10, marginLeft: 6, border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.03)' }}
+                            title="Скопировать полную сводку вердикта тренера (score, заметки, достижимость ПМ, прогноз)"
+                          >📋 Копировать вердикт</button>
                           {/* 🔀 Сравнение сценариев тапера */}
                           <div style={{ marginTop: 8, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>🔀 Сравнение сценариев («что если…»)</div>
@@ -3172,7 +3190,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track 
           </div>
         </div>
       )}
-      {subView === 'macro' && <MacrocyclePanel level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro) => {
+      {subView === 'macro' && <MacrocyclePanel taperMode={macroTaperMode} level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro) => {
         try {
           if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle);
           else applyBBMacrocycle(macro as Macrocycle | BBMacrocycle);
