@@ -20,6 +20,8 @@ import AllExercisesTrendCard from './AllExercisesTrendCard';
 import StandardForecastCard from './StandardForecastCard';
 import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
+import { ReadinessForecastCard } from './ReadinessForecastCard';
+import { TrainingScoreCard } from '../../components/TrainingScoreCard';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { WeeklyTargetsCard, SectionHeader, DiaryEmptyState } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
@@ -703,6 +705,9 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   </div>
                 );
               })()}
+              {/* Готовность и риск (перенесены из Инструментов ПЛ-авто) */}
+              <ReadinessForecastCard />
+              <TrainingScoreCard workoutsPerWeek={tprofile.daysPerWeek ?? 3} avgMinutes={75} intensity="moderate" goal={(tprofile.goal === 'strength' ? 'strength' : (tprofile.goal === 'mass' || tprofile.goal === 'hypertrophy') ? 'hypertrophy' : tprofile.goal === 'endurance' ? 'endurance' : 'recomposition') as 'strength' | 'hypertrophy' | 'endurance' | 'recomposition'} experience={(tprofile.level === 'novice' ? 'beginner' : tprofile.level === 'intermediate' ? 'intermediate' : 'advanced') as 'beginner' | 'intermediate' | 'advanced'} sleepHours={tprofile.sleepHours ?? 7} stressLevel={Math.round(tprofile.stressLevel ?? 3)} jointPain={[]} deloadWeeksAgo={99} weight={tprofile.bodyWeight || 80} age={30} sex={'male'} />
               {/* Training consistency */}
               <SectionHeader icon="📅" title="Регулярность и привычки" hint="серии · частота · плотность" />
               {historyWorkouts.length >= 4 && (() => {

@@ -39,8 +39,6 @@ import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
-import { TrainingScoreCard } from '../components/TrainingScoreCard';
-import { ReadinessForecastCard } from './TrainingScreen_parts/ReadinessForecastCard';
 import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
@@ -1305,14 +1303,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       )}
 
       {mainTab === 'pl' && subView === 'tools' && (
-        <>
-          <PlannerToolsPanel mode="pl" />
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', margin: '10px 0 6px' }}>🧮 Training Score Engine</div>
-            <TrainingScoreCard workoutsPerWeek={days} avgMinutes={75} intensity={autoRegResult.deload ? 'low' : 'moderate'} goal="strength" experience={(level === 'novice' ? 'beginner' : level === 'intermediate' ? 'intermediate' : 'advanced') as 'beginner' | 'intermediate' | 'advanced'} sleepHours={(linked.readiness?.sleep ?? 7) as number} stressLevel={Math.round((linked.readiness?.stress ?? 3) as number)} jointPain={[]} deloadWeeksAgo={autoRegResult.deload ? 0 : 99} weight={bw} age={30} sex={'male'} />
-          </div>
-          <ReadinessForecastCard />
-        </>
+        <PlannerToolsPanel mode="pl" />
       )}
 
       {mainTab === 'bb' && subView === 'plan' && (
