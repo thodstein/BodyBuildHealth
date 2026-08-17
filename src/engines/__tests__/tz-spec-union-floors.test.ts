@@ -1,8 +1,8 @@
-/** tz-spec-union-floors.test.ts — субаддитивная агрегация (union) + якорные floors.
+/** tz-spec-union-floors.test.ts — субаддитивная агрегация (RSS) + якорные floors.
  *  Сценарная валидация: клинические кейсы с ожидаемым ответом,
  *  чтобы формула не «плавала». */
 import { describe, expect, it } from 'vitest';
-import { calculateTzSpecRisk, unionPct, applyMechanismSynergies, clinicalFloorsForLabs } from '../risk-engine-tz-spec';
+import { calculateTzSpecRisk, rssPct, applyMechanismSynergies, clinicalFloorsForLabs } from '../risk-engine-tz-spec';
 
 function input(overrides: Partial<Parameters<typeof calculateTzSpecRisk>[0]> = {}) {
   return {
@@ -20,25 +20,26 @@ function input(overrides: Partial<Parameters<typeof calculateTzSpecRisk>[0]> = {
   };
 }
 
-describe('unionPct — субаддитивная агрегация', () => {
-  it('7+7+7 → 19.6, а не 21', () => {
-    expect(unionPct([7, 7, 7])).toBeCloseTo(19.6, 1);
+describe('rssPct — субаддитивная агрегация (евклидова норма)', () => {
+  it('7+7+7 → 12.1, а не 21', () => {
+    expect(rssPct([7, 7, 7])).toBeCloseTo(12.1, 1);
   });
-  it('50+50 → 75, а не 100', () => {
-    expect(unionPct([50, 50])).toBe(75);
+  it('50+50 → 70.7, а не 100', () => {
+    expect(rssPct([50, 50])).toBeCloseTo(70.7, 1);
   });
-  it('30+30+30 → 65.7, а не 90', () => {
-    expect(unionPct([30, 30, 30])).toBeCloseTo(65.7, 1);
+  it('30+30+30 → 52, а не 90', () => {
+    expect(rssPct([30, 30, 30])).toBeCloseTo(52, 1);
   });
-  it('один механизм → его процент', () => {
-    expect(unionPct([42])).toBe(42);
+  it('один механизм → его процент (доминанта сохраняется)', () => {
+    expect(rssPct([42])).toBe(42);
+    expect(rssPct([60])).toBe(60);
   });
   it('пусто/нули → 0', () => {
-    expect(unionPct([])).toBe(0);
-    expect(unionPct([0, 0])).toBe(0);
+    expect(rssPct([])).toBe(0);
+    expect(rssPct([0, 0])).toBe(0);
   });
   it('кап 100', () => {
-    expect(unionPct([90, 90, 90])).toBeLessThanOrEqual(100);
+    expect(rssPct([90, 90, 90])).toBeLessThanOrEqual(100);
   });
 });
 
@@ -162,12 +163,10 @@ describe('сценарная валидация — клинические ке�
     }
   });
 
-  it('общий риск = худшая система (триаж), не union по органам', () => {
+  it('общий риск = среднее по системам (не max, не union по органам)', () => {
     const r = calculateTzSpecRisk(input({ combinations: 3 }));
-    const max = r.organs.reduce((s, o) => Math.max(s, o.rawPercent), 0);
-    expect(r.overallRaw).toBe(max);
-    // union по органам переоценил бы: проверим, что общий заметно ниже union
-    expect(r.overallRaw).toBeLessThan(unionPct(r.organs.map(o => o.rawPercent)));
+    const mean = Math.round(r.organs.reduce((s, o) => s + o.rawPercent, 0) / r.organs.length);
+    expect(r.overallRaw).toBe(mean);
   });
 });
 

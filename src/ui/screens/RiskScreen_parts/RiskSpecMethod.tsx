@@ -5,6 +5,7 @@ import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, 
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
 import { PHARMA_DB } from '../../../core/pharma-database';
+import { resolvePedAlias } from '../../../data/ped-alias-map';
 import { TZRisk3DModel } from './TZRisk3DModel';
 
 const ACCENT = '#00e68a';
@@ -91,10 +92,25 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   const [showInputs, setShowInputs] = useState(false);
 
   useEffect(() => {
-    try {
-      const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
-      if (sr && Array.isArray(sr.subs)) setSupportIds(sr.subs.map((id: string) => id.toLowerCase()));
-    } catch {}
+    const loadSupport = () => {
+      try {
+        const sr = JSON.parse(localStorage.getItem('he_support_risk') || 'null');
+        if (sr && Array.isArray(sr.subs)) {
+          const subs = sr.subs.map((id: string) => id.toLowerCase());
+          const procs = Array.isArray(sr.procedures) ? sr.procedures.map((id: string) => id.toLowerCase()) : [];
+          setSupportIds([...subs, ...procs]);
+        }
+      } catch {}
+    };
+    loadSupport();
+    // Живое обновление: калькулятор может пересчитать поддержку ПОСЛЕ монтирования
+    // вкладки — слушаем storage-события и возврат фокуса на окно.
+    window.addEventListener('storage', loadSupport);
+    window.addEventListener('focus', loadSupport);
+    return () => {
+      window.removeEventListener('storage', loadSupport);
+      window.removeEventListener('focus', loadSupport);
+    };
   }, []);
 
   const courseSummary = useMemo(() => {
@@ -147,7 +163,7 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
       const isAAS = !id.includes('gh') && !id.includes('growth') && !id.includes('insulin') && !id.includes('igf');
       return {
         drugClass: isAAS ? 'aas' as const : id.includes('insulin') ? 'insulin' as const : 'gh' as const,
-        drugName: id || 'unknown',
+        drugName: resolvePedAlias(id) || id || 'unknown',
         dose: c.doseValue || 250,
         form: (id.includes('oxand') || id.includes('stan') || id.includes('meth') ? 'oral' : 'inject') as 'inject' | 'oral',
         startWeek: c.startWeek,
@@ -278,6 +294,11 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
           {calcSnapshot && (
             <div style={{ marginTop: 6, fontSize: 8, color: '#22c55e', fontWeight: 600 }}>
               ⚡ Цифры идентичны калькулятору поддержки (единый вход: поддержка, фаза, анализы, питание)
+            </div>
+          )}
+          {!calcSnapshot && supportIds.length === 0 && (
+            <div style={{ marginTop: 6, fontSize: 8, color: '#fbbf24', fontWeight: 600 }}>
+              ⚠ Поддержка не выбрана — «с поддержкой» = «без поддержки». Откройте калькулятор поддержки, чтобы учесть план.
             </div>
           )}
         </div>

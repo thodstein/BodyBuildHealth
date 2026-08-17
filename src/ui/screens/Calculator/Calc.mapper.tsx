@@ -891,6 +891,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         localStorage.setItem('he_calc_tz_input', JSON.stringify({ input: inp, ts: Date.now() }));
         localStorage.setItem('he_support_risk', JSON.stringify({
           subs: finalRec.subs.map(s => s.substanceId),
+          procedures: procedureIds,
           riskBeforeSupport: result.overallRaw,
           riskAfterSupport: result.overallAfter,
           timestamp: Date.now(),

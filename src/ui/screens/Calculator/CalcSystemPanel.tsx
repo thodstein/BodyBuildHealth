@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 import type { TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
-import { unionPct } from '../../../engines/risk-engine-tz-spec';
+import { rssPct } from '../../../engines/risk-engine-tz-spec';
 
 // ════════════════════════════════════════════════════════════════════
 //  CalcSystemPanel — панель «Риск системы + под-риски + мониторинг»
@@ -59,8 +59,8 @@ export const CalcSystemPanel: React.FC<{
   contra?: Array<{ substanceId?: string; label?: string; severity?: string; message?: string }>;
 }> = ({ risk, panel, groups, note, contra }) => {
   const riskColor = (p: number) => (p >= 75 ? '#f87171' : p >= 50 ? '#f97316' : p >= 25 ? '#f59e0b' : '#22c55e');
-  const sumPct = (mechs: string[]) => (risk ? unionPct(mechs.map(m => risk.mechanisms.find(x => x.id === m)?.rawPercent ?? 0)) : 0);
-  const sumAfter = (mechs: string[]) => (risk ? unionPct(mechs.map(m => risk.mechanisms.find(x => x.id === m)?.afterPercent ?? 0)) : 0);
+  const sumPct = (mechs: string[]) => (risk ? rssPct(mechs.map(m => risk.mechanisms.find(x => x.id === m)?.rawPercent ?? 0)) : 0);
+  const sumAfter = (mechs: string[]) => (risk ? rssPct(mechs.map(m => risk.mechanisms.find(x => x.id === m)?.afterPercent ?? 0)) : 0);
   const showSub = groups && groups.length > 0 && !!risk;
   const contraList = (contra || []).filter(c => c?.label || c?.message);
   return (

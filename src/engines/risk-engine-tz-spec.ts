@@ -135,16 +135,20 @@ function getFormFactor(form:string,organId:string):number{if(form==='inject')ret
 function getCombinationFactor(count:number):number{if(count<=1)return 1.0;if(count===2)return 1.2;return 1.5}
 function getPenaltyFactor(d_cov:number):number{return 1+0.25*(1-d_cov)}
 
-// ── Субаддитивная агрегация (competing risks) ──
-// Механизмы одного органа — конкурирующие пути повреждения: система = union,
-// а не сумма. 7%+7%+7% → 19.6%, 50%+50% → 75%. Каноническая формула
-// competing-risks (эпидемиология/токсикология): S = 1 − Π(1 − pᵢ).
-export function unionPct(pcts:number[]):number{
+// ── Субаддитивная агрегация: евклидова норма (RSS) ──
+// Проценты механизмов — баллы тяжести (mechRaw/maxRaw), НЕ вероятности,
+// и механизмы коррелированы (один препарат). Вероятностная арифметика
+// (union = 1−Π(1−pᵢ)) к ним неприменима. Клинические шкалы (Framingham,
+// SCORE2, FIB-4, MELD) агрегируют факторы суммой с насыщением, но их
+// факторы откалиброваны под суммирование; наши — per-механизм против
+// maxRaw. Медицински корректная субаддитивная форма, сохраняющая
+// доминирующий механизм: система = √(Σpᵢ²) — длина вектора повреждения.
+// 7+7+7 → 12.1 (не 21), 60 → 60 (доминанта), 50+50 → 70.7, 30+30+30 → 52.
+export function rssPct(pcts:number[]):number{
   const valid=pcts.filter(p=>Number.isFinite(p)&&p>0);
   if(valid.length===0)return 0;
-  let product=1;
-  for(const p of valid)product*=Math.max(0,1-Math.min(100,p)/100);
-  return Math.min(100,Math.round((1-product)*1000)/10);
+  const sumSq=valid.reduce((s,p)=>s+Math.min(100,p)*Math.min(100,p),0);
+  return Math.min(100,Math.round(Math.sqrt(sumSq)*10)/10);
 }
 
 // ── Документированные парные синергии механизмов ──
@@ -613,10 +617,10 @@ export function calculateTzSpecRiskTimeline(input: TzSpecInput, totalWeeks?: num
     }
 
     const overallRaw = Object.keys(organPercents).length > 0
-      ? Math.max(...Object.values(organPercents))
+      ? Math.round(Object.values(organPercents).reduce((a, b) => a + b, 0) / Object.keys(organPercents).length)
       : 0;
     const overallAfter = Object.keys(organAfterPercents).length > 0
-      ? Math.max(...Object.values(organAfterPercents))
+      ? Math.round(Object.values(organAfterPercents).reduce((a, b) => a + b, 0) / Object.keys(organAfterPercents).length)
       : 0;
 
     results.push({
@@ -765,12 +769,12 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
       });
     }
 
-    // ── Агрегация системы: union (competing risks), НЕ сумма ──
-    // Механизмы — конкурирующие пути повреждения одного органа.
-    // 7%+7%+7% → 19.6%, а не 21%; 50%+50% → 75%, а не 100%.
+    // ── Агрегация системы: евклидова норма (RSS), НЕ сумма ──
+    // Механизмы — компоненты повреждения одного органа (баллы тяжести,
+    // не вероятности). 7%+7%+7% → 12.1%, а не 21%; 50%+50% → 70.7%.
     applyMechanismSynergies(mechResults);
-    const rawPercent=unionPct(mechResults.map(m=>m.rawPercent));
-    const afterPercent=unionPct(mechResults.map(m=>m.afterPercent));
+    const rawPercent=rssPct(mechResults.map(m=>m.rawPercent));
+    const afterPercent=rssPct(mechResults.map(m=>m.afterPercent));
     const k_protect=rawPercent>0?Math.round(((rawPercent-afterPercent)/rawPercent)*100):0;
 
     // Per-system верификация: доля механизмов с релевантными маркерами
@@ -807,12 +811,13 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     organ.k_protect=organ.rawPercent>0?Math.round(((organ.rawPercent-organ.afterPercent)/organ.rawPercent)*100):0;
   }
 
-  // ── Общий индекс = худшая система (клинический принцип) ──
-  // Органы коррелированы (один препарат бьёт по всем системам), поэтому
-  // union по органам переоценивает: 6 систем по 25% дали бы 82% «очень
-  // высокий» для обычного курса. Триаж идёт по худшей системе.
-  const overallRaw=organResults.length>0?Math.max(...organResults.map(o=>o.rawPercent)):0;
-  const overallAfter=organResults.length>0?Math.max(...organResults.map(o=>o.afterPercent)):0;
+  // ── Общий индекс = среднее по системам ──
+  // Внутри системы — RSS механизмов (баллы тяжести, не вероятности);
+  // между системами — усреднение (как было изначально). Max/union по органам
+  // не используются: органы коррелированы одним препаратом.
+  const n=organResults.length||1;
+  const overallRaw=Math.round(organResults.reduce((s,o)=>s+o.rawPercent,0)/n);
+  const overallAfter=Math.round(organResults.reduce((s,o)=>s+o.afterPercent,0)/n);
   const overallK=overallRaw>0?Math.round(((overallRaw-overallAfter)/overallRaw)*100):0;
   const overallVerification=organResults.length>0
     ? organResults.reduce((s,o)=>s+o.verification,0)/organResults.length
@@ -825,7 +830,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     'Модель: механизм-ориентированный интегральный индекс риска (ТЗ).',
     `Курс: ${drugNames}, ${duration} нед.`,
     'Формула: R = Σ(w × m × E × U × Π(1−k*)), суммирование по препаратам.',
-    'Агрегация: union (competing risks) — механизмы и системы комбинируются нелинейно.',
+    'Агрегация: RSS (евклидова норма) — механизмы комбинируются нелинейно, системы усредняются.',
     suppIDs.length>0?`Поддержка (${suppIDs.length}): ${suppIDs.join(', ')}.`:'Поддержка не выбрана.',
     highOrgans.length>0?`Наибольший риск: ${highOrgans.map(o=>`${o.icon} ${o.name} (${o.afterPercent}%)`).join(', ')}.`:'Все системы в норме.',
     floors.length>0?`Якорные пороги анализов: ${floors.map(f=>f.label).join('; ')}.`:'',
