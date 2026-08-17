@@ -291,7 +291,17 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       document.addEventListener('scroll', measure, { capture: true, passive: true });
       window.addEventListener('scroll', measure, { passive: true });
       window.addEventListener('resize', measure);
+      // Гарантированный пин даже там, где scroll-события не шлются во время
+      // прокрутки (iOS WebView / Telegram) — периодическая проверка позиции.
+      const timer = window.setInterval(measure, 250);
       measure();
+      return () => {
+        ro?.disconnect();
+        document.removeEventListener('scroll', measure, { capture: true } as EventListenerOptions);
+        window.removeEventListener('scroll', measure);
+        window.removeEventListener('resize', measure);
+        window.clearInterval(timer);
+      };
     } catch { /* jsdom: getBoundingClientRect/ResizeObserver могут отсутствовать */ }
     return () => {
       ro?.disconnect();
@@ -645,110 +655,69 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
 return (
       <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: headerPinned ? headerPad : undefined }}>
-       {/* Липкая навигация: шапка + пилюли внутренних шагов всегда наверху
-           (position:fixed с замером, когда sticky-скролл-контекст недоступен) */}
+       {/* Липкая панель действий — компактная, всегда наверху */}
         <div ref={editorHeaderRef} style={headerPinned && headerRect
           ? { position: 'fixed', top: 0, left: headerRect.left, width: headerRect.width, zIndex: 60, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }
           : { position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
-        <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {/* Ряд 1: информация о программе */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
-        <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
-        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>
-          🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
-        </span>
-        {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
-        </div>
-
-      {/* P5.2 — Inline-валидация: компактная строка, подробности — в карточке валидации ниже */}
-      {(() => {
-        const issues = validateProgram(program);
-        const errs = issues.filter((i) => i.level === 'error');
-        const warns = issues.filter((i) => i.level === 'warning');
-        if (errs.length === 0 && warns.length === 0) return null;
-        const color = errs.length > 0 ? '#ef4444' : '#f59e0b';
-        return (
-          <div role="alert" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 6, background: color + '14', borderRadius: 8, padding: '5px 10px', border: '1px solid ' + color + '44', fontSize: 11, fontWeight: 700, color, flexWrap: 'wrap' }}>
-            {errs.length > 0 ? `🚫 ${errs.length} ошибк${errs.length === 1 ? 'а' : 'и'} валидации` : `⚠ ${warns.length} предупреждени${warns.length === 1 ? 'е' : 'я'}`}
-            <span style={{ fontWeight: 400, color: DIM }}>— подробности в карточке ниже</span>
-          </div>
-        );
-      })()}
-
-        {/* Ряд 2: действия — навигация слева, основные справа */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
-            {(dir === 'bb' || dir === 'pl') && (
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
-                Нед
-                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 50, minHeight: 44, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя выполнения" inputMode="numeric" />
-              </label>
-            )}
-            {dir === 'bb' && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
-            )}
-            {dir === 'pl' && program.pl && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
-            )}
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={undo} title="Отменить последнее изменение (Ctrl+Z)">↩</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={redo} title="Повторить отменённое изменение (Ctrl+Shift+Z)">↪</button>
-          </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
-              {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
-            </button>
-            {estepIdx > 0 && (
-              <button style={{ ...BTN_GHOST, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep}>
-                ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
-              </button>
-            )}
+        <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 40 }} onClick={safeBack}>← К списку</button>
+          <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+          <span style={{ fontSize: 10, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
+          </span>
+          {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
             {onNext && (
-              <button style={{ ...BTN, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goNextStep}>
+              <button style={{ ...BTN, padding: '10px 16px', fontSize: 12, minHeight: 40 }} onClick={goNextStep}>
                 Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
               </button>
             )}
-            {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
+            <button style={{ ...BTN, padding: '8px 14px', fontSize: 11, minHeight: 40 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
+              {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
+            </button>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 40 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
           </div>
         </div>
         {showMore && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
-            {isPro && (
-              <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
+            {estepIdx > 0 && (
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40 }} onClick={goPrevStep}>
+                ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
+              </button>
             )}
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
-              onClick={() => {
-                if (dir === 'bb') setEditorLibOpen('bb');
-                else if (dir === 'pl') setEditorLibOpen('pl');
-              }}
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
+            {(dir === 'bb' || dir === 'pl') && (
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, minHeight: 40 }}>
+                Нед
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 50, minHeight: 40, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя выполнения" inputMode="numeric" />
+              </label>
+            )}
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40 }} onClick={undo} title="Отменить последнее изменение (Ctrl+Z)">↩</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40 }} onClick={redo} title="Повторить отменённое изменение (Ctrl+Shift+Z)">↪</button>
+            {dir === 'bb' && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>}
+            {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>}
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
+            {isPro && (
+              <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
+            )}
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
+              onClick={() => { if (dir === 'bb') setEditorLibOpen('bb'); else if (dir === 'pl') setEditorLibOpen('pl'); }}
               title="Загрузить программу или цикл из библиотеки для редактирования"
             >📥 Загрузить</button>
             {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
-                onClick={() => {
-                  const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) };
-                  update({ bb: updated });
-                  showToast('📈 Фазовая периодизация применена: RIR/фазы/повторения по неделям');
-                }}
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+                onClick={() => { const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) }; update({ bb: updated }); showToast('📈 Фазовая периодизация применена: RIR/фазы/повторения по неделям'); }}
                 title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
               >📈 Применить фазы</button>
             )}
-            {/* 🗓 Годовой план — MacrocyclePanel (для всех направлений: BB/PL/Hybrid) */}
             {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }}
-                onClick={() => {
-                  setMacroLevel(program.meta.level);
-                  setMacroGoal(mapGoalToMacro(program.meta.goal));
-                  setEditorLibOpen('macro');
-                }}
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }}
+                onClick={() => { setMacroLevel(program.meta.level); setMacroGoal(mapGoalToMacro(program.meta.goal)); setEditorLibOpen('macro'); }}
                 title="Годовое планирование: построить макроцикл (5 фаз) и применить к программе"
               >🗓 Годовой план</button>
             )}
             {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
                 onClick={() => setEditorLibOpen('methods')}
                 title="Справочник тренировочных методик"
               >📚 Методики</button>
@@ -756,9 +725,9 @@ return (
             <CardioLinkCard />
           </div>
         )}
-      </div>
+        </div>
 
-      {/* Внутренние шаги редактора: содержимое показывается по одному шагу */}
+      {/* Пилюли шагов + заголовок активного шага — обычный контент (не липкие) */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {editorSteps.map((s, si) => (
           <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined} title={EDITOR_STEP_INFO[s].hint}>
@@ -767,14 +736,12 @@ return (
         ))}
         <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 'auto' }}>шаг {estepIdx + 1} из {editorSteps.length}</span>
       </div>
-      {/* Заголовок и описание активного шага + прогресс */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>{EDITOR_STEP_INFO[estep].title}</span>
         <span style={{ fontSize: 11, color: DIM, lineHeight: 1.3 }}>{EDITOR_STEP_INFO[estep].hint}</span>
       </div>
       <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
         <div style={{ height: '100%', borderRadius: 2, background: 'linear-gradient(90deg,#00e68a,#00c8a0)', width: `${Math.round(((estepIdx + 1) / editorSteps.length) * 100)}%`, transition: 'width .3s ease' }} />
-      </div>
       </div>
 
       {/* P2-1/F5: подсказка при пустой программе — прямая CTA авто-черновика (шаг «🎛 Параметры») */}

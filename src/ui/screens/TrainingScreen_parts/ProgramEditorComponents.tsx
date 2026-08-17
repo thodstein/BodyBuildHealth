@@ -37,6 +37,37 @@ import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
 
+/** Быстрые шаблоны тренировочных дней — день с готовыми упражнениями из каталога. */
+const DAY_TEMPLATES: Array<{
+  label: string; icon: string; name: string; focus: string;
+  blocks: Array<{ exerciseName: string; muscle: string; type: UserBlock['type']; sets: Array<{ reps: number; rir: number; restSec: number }> }>;
+}> = [
+  {
+    label: 'Грудь / Трицепс', icon: '💪', name: 'Грудь / Трицепс', focus: 'грудь, трицепс',
+    blocks: [
+      { exerciseName: 'Жим штанги лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 120 }, { reps: 8, rir: 2, restSec: 120 }, { reps: 6, rir: 1, restSec: 120 }] },
+      { exerciseName: 'Жим гантелей лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }, { reps: 10, rir: 2, restSec: 90 }, { reps: 8, rir: 1, restSec: 90 }] },
+    ],
+  },
+  {
+    label: 'Спина / Бицепс', icon: '🏋️', name: 'Спина / Бицепс', focus: 'спина, бицепс',
+    blocks: [
+      { exerciseName: 'Тяга верхнего блока (прямой)', muscle: 'back', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }, { reps: 10, rir: 2, restSec: 90 }, { reps: 8, rir: 1, restSec: 90 }] },
+      { exerciseName: 'Тяга штанги в наклоне (прямой хват)', muscle: 'back', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 120 }, { reps: 8, rir: 2, restSec: 120 }, { reps: 6, rir: 1, restSec: 120 }] },
+      { exerciseName: 'Подъём штанги на бицепс стоя', muscle: 'arms', type: 'isolation', sets: [{ reps: 10, rir: 2, restSec: 60 }, { reps: 10, rir: 2, restSec: 60 }, { reps: 8, rir: 1, restSec: 60 }] },
+    ],
+  },
+  {
+    label: 'Ноги / Плечи', icon: '🦵', name: 'Ноги / Плечи', focus: 'ноги, плечи',
+    blocks: [
+      { exerciseName: 'Приседания со штангой', muscle: 'legs', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 150 }, { reps: 8, rir: 2, restSec: 150 }, { reps: 6, rir: 1, restSec: 150 }] },
+      { exerciseName: 'Жим ногами', muscle: 'legs', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 120 }, { reps: 10, rir: 2, restSec: 120 }, { reps: 8, rir: 1, restSec: 120 }] },
+      { exerciseName: 'Сгибания ног в тренажёре лёжа', muscle: 'legs', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }, { reps: 12, rir: 2, restSec: 60 }, { reps: 10, rir: 1, restSec: 60 }] },
+      { exerciseName: 'Жим гантелей сидя', muscle: 'shoulders', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }, { reps: 10, rir: 2, restSec: 90 }, { reps: 8, rir: 1, restSec: 90 }] },
+    ],
+  },
+];
+
 export function isUserBlockClipboardShape(value: unknown): value is UserBlock {
   if (!value || typeof value !== 'object') return false;
   const block = value as Partial<UserBlock>;
@@ -362,6 +393,23 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
 const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
   const { confirm } = useConfirmDialog();
   const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfWeek: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
+  // Быстрый день из шаблона — с готовыми упражнениями из каталога
+  const addSessionFromTemplate = (tmpl: typeof DAY_TEMPLATES[0]) => {
+    onChange([...sessions, {
+      id: newId('ses'),
+      name: tmpl.name,
+      dayOfWeek: firstFreeTrainingDay(sessions),
+      focus: tmpl.focus,
+      blocks: tmpl.blocks.map(b => ({
+        id: newId('blk'),
+        type: b.type,
+        exerciseName: b.exerciseName,
+        muscle: b.muscle,
+        role: b.type === 'compound' ? 'primary' : 'accessory',
+        sets: b.sets.map(s => ({ ...s })),
+      })),
+    }]);
+  };
   const updateSession = (si: number, patch: Partial<UserSession>) => onChange(sessions.map((s, i) => i === si ? { ...s, ...patch } : s));
   // U4/F4: confirm-диалог при удалении сессии — ConfirmDialog
   const removeSession = async (si: number) => {
@@ -426,7 +474,16 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
         </div>
         );
       })}
-       <button className="editor-add-session" style={{ ...BTN, padding: '10px 16px', fontSize: 12, minHeight: 48, width: '100%' }} onClick={addSession}>+ Добавить тренировочный день</button>
+       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+         <button className="editor-add-session" style={{ ...BTN, padding: '10px 16px', fontSize: 12, minHeight: 48, flex: 1, minWidth: 200 }} onClick={addSession}>+ Добавить тренировочный день</button>
+         <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>или шаблон:</span>
+         {DAY_TEMPLATES.map(t => (
+           <button key={t.label} onClick={() => addSessionFromTemplate(t)} title={`Добавить день «${t.name}» с упражнениями из каталога`}
+             style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 44, flex: '0 0 auto' }}>
+             {t.icon} {t.label}
+           </button>
+         ))}
+       </div>
     </div>
   );
 };
