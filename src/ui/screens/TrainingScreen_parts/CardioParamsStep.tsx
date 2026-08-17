@@ -96,8 +96,11 @@ export const CardioParamsStep: React.FC<{
   factorsOn: { sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean };
   onToggleFactor: (key: keyof { sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean }) => void;
   factorsSummary: string[];
+  onFromProfile: () => void;
+  onSaveProfile: () => void;
+  onFromDiaryHr: () => void;
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onReset }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -169,7 +172,13 @@ export const CardioParamsStep: React.FC<{
 
       {/* ── 1. Параметры пользователя ── */}
       <GroupHeading icon="👤" text="Параметры пользователя" desc="Возраст, пол, вес, ЧСС покоя, уровень и восстановление — основа для пульс-зон и объёма." />
-      <SectionCard id="sec-user" title="👤 Параметры пользователя">
+      <SectionCard id="sec-user" title="👤 Параметры пользователя" right={
+        <div style={ROW}>
+          <button style={BTN_SMALL} onClick={onFromProfile} title="Загрузить возраст/вес/пол/ЧСС покоя из профиля" aria-label="Из профиля">📋 Из профиля</button>
+          <button style={BTN_SMALL} onClick={onFromDiaryHr} title="ЧСС покоя из последней записи дневника АД" aria-label="Из дневника АД">❤️ Из дневника АД</button>
+          <button style={{ ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.5)', color: '#00e68a' }} onClick={onSaveProfile} title="Сохранить возраст/вес/пол/ЧСС покоя в профиль" aria-label="В профиль">💾 В профиль</button>
+        </div>
+      }>
         <div style={ROW}>
           <span style={LABEL}>Возраст</span>
           <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="Возраст" />
@@ -193,7 +202,7 @@ export const CardioParamsStep: React.FC<{
             {recoveryLow ? '🧘 Низкое (HIIT убран)' : '🟢 В норме'}
           </button>
         </div>
-        <div style={HINT}>Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст. Уровень: новичок ×0.8, продвинутый ×1.15. Можно загрузить из профиля в карточке «👤» над мастером.</div>
+        <div style={HINT}>Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст. Уровень: новичок ×0.8, продвинутый ×1.15.</div>
       </SectionCard>
 
       {/* ── 2. Выбор цели ── */}

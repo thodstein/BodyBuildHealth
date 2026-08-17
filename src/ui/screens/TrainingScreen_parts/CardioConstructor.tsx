@@ -29,7 +29,6 @@ import {
 } from '../../../engines/lms/macrocycle.engine';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 import { getLatestBp } from '../../../core/bp-hr-data';
-import { CardioUserCard } from './CardioUserCard';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadSavedBBPlans } from './bb-plans-store';
@@ -633,9 +632,7 @@ export const CardioConstructor: React.FC = () => {
         </div>
       </div>
 
-      {/* Графа пользователя */}
-      <CardioUserCard age={age} sex={sex} weight={bodyWeight} restingHr={restingHr} level={level} onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr} />
-
+      {/* Графа пользователя — внутри шага 1, не над степпером */}
       {/* Степпер */}
       <div style={{ display: 'flex', gap: 4, padding: 6, borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {STEPS.map((s, i) => {
@@ -683,6 +680,7 @@ export const CardioConstructor: React.FC = () => {
           legDays={legDays} setLegDays={setLegDays}
           factorsOn={factorsOn} onToggleFactor={onToggleFactor}
           factorsSummary={factorsSummary}
+          onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr}
           onReset={resetParams}
         />
       )}
