@@ -31,7 +31,7 @@ import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
-import { canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
+import { canonicalMuscle, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -159,15 +159,6 @@ function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
   return weakPoints.includes(PARENT[muscle] ?? '');
 }
 
-/** Гранулярные зоны (подгруппы) — их можно сочетать внутри одного региона:
- *  delt_mid + delt_rear = две зоны плеч. Канонические мышцы с зонами
- *  НЕ сочетаются: shoulders + delt_mid = перекрытие одной зоны. */
-const GRANULAR_ZONES = new Set(['chest_upper', 'chest_lower', 'back_width', 'back_thickness', 'delt_front', 'delt_mid', 'delt_rear']);
-function isRegionConflict(a: string, b: string): boolean {
-  if (!a || !b || a === b) return false;
-  if (canonicalMuscle(a) !== canonicalMuscle(b)) return false;
-  return !(GRANULAR_ZONES.has(a) && GRANULAR_ZONES.has(b));
-}
 
 /** Метка подгруппы спины (backSubgroup) для UI-бейджа. */
 export function backSubgroupLabel(sub: string): string {
@@ -294,7 +285,7 @@ export const BbAutoConstructor: React.FC = () => {
   // Единая модель акцентов: 1-2 отстающие мышцы (специализация). focusGroup и
   // отдельный режим специализации больше не выбираются в UI — движок получает
   // specialization: true + weakPoints: targets (без стэкинга 1.2×1.3).
-  const [specTargets, setSpecTargets] = useState<string[]>((prof.weakPoints || []).slice(0, 2));
+  const [specTargets, setSpecTargets] = useState<string[]>(() => normalizeSpecializationTargets((prof.weakPoints || []).slice(0, 2)));
   // 📅 Планирование блоков специализации (для планов > 10 нед): блок 1 →
   // баланс / те же мышцы / другие мышцы. Методика: блок 6-10 нед.
   const [specBlockWeeks, setSpecBlockWeeks] = useState<number>(10);
@@ -936,14 +927,22 @@ export const BbAutoConstructor: React.FC = () => {
     if (specTargets.length === 0) return '';
     const RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', quads: 'Квадры', hamstrings: 'Бицепс бедра', shoulders: 'Плечи', biceps: 'Бицепс', triceps: 'Трицепс', calves: 'Икры', glutes: 'Ягодицы', abs: 'Пресс', traps: 'Трапеции', forearms: 'Предплечья' };
     const parts: string[] = [];
+    const byRegion = new Map<string, string[]>();
     for (const t of specTargets) {
       const c = canonicalMuscle(t);
+      const zones = byRegion.get(c) || [];
+      zones.push(t);
+      byRegion.set(c, zones);
+    }
+    for (const [c, zones] of byRegion) {
       const lm = (allLandmarks as Record<string, { mav: number }>)[c];
       if (!lm) continue;
-      const heads = specTargets.filter(x => canonicalMuscle(x) === c).length;
-      const mult = Math.min(1.3, 1.0 + 0.1 * heads);
-      const label = WEAK_GROUPS.find(([id]) => id === t)?.[1] || RU[c] || t;
-      parts.push(`${label} ≈${Math.round(lm.mav * mult)} сетов/нед${heads > 1 && GRANULAR_ZONES.has(t) ? ` (${heads} зоны)` : ''}`);
+      const mult = Math.min(1.3, 1.0 + 0.1 * zones.length);
+      const label = RU[c] || c;
+      const zoneText = zones.length > 1
+        ? ` (${zones.length} зоны: ${zones.map(t => WEAK_GROUPS.find(([id]) => id === t)?.[1] || t).join(' + ')})`
+        : '';
+      parts.push(`${label} ≈${Math.round(lm.mav * mult)} сетов/нед${zoneText}`);
     }
     return parts.join(' · ');
   }, [specTargets, allLandmarks]);
@@ -1564,7 +1563,7 @@ export const BbAutoConstructor: React.FC = () => {
       if (b2) {
         const same = JSON.stringify(b2.targets || []) === JSON.stringify(b1?.targets || []);
         if (same) setSpecNextMode('same');
-        else if ((b2.targets || []).length > 0) { setSpecNextMode('new'); setSpecNextTargets(b2.targets.slice(0, 2)); }
+        else if ((b2.targets || []).length > 0) { setSpecNextMode('new'); setSpecNextTargets(normalizeSpecializationTargets(b2.targets.slice(0, 2))); }
         else setSpecNextMode('balance');
       } else {
         setSpecNextMode('balance');
@@ -1815,7 +1814,7 @@ export const BbAutoConstructor: React.FC = () => {
               {WEAK_GROUPS.map(([id, l]) => {
                 const on = specNextTargets.includes(id);
                 const disabled = !on && (specNextTargets.length >= 2 || specNextTargets.some(t => isRegionConflict(t, id)));
-                return <button key={id} disabled={disabled} onClick={() => setSpecNextTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
+                return <button key={id} disabled={disabled} onClick={() => setSpecNextTargets(t => normalizeSpecializationTargets(on ? t.filter(x => x !== id) : [...t, id]))}
                   style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:32,
                     background: on ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
                     border: on ? '1px solid rgba(236,72,153,0.4)' : '1px solid rgba(255,255,255,0.08)',
@@ -1829,6 +1828,35 @@ export const BbAutoConstructor: React.FC = () => {
       </div>
     );
   };
+
+  /** Единственная точка выбора специализации. Она живёт на шаге 1 независимо
+   *  от источника программы; в шаге 2 выбор повторно не показывается. */
+  const renderSpecializationSelection = () => (
+    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.18)' }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+        {WEAK_GROUPS.map(([id, l]) => {
+          const on = specTargets.includes(id);
+          const disabled = specChipDisabled(id, on);
+          return (
+            <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => normalizeSpecializationTargets(on ? t.filter(x => x !== id) : [...t, id]))}
+              style={{ padding:'5px 10px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:38,
+                background:on?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.04)',
+                border:on?'1px solid rgba(245,158,11,0.4)':'1px solid rgba(255,255,255,0.06)',
+                color:on?'#fbbf24':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.75)', opacity:disabled?0.5:1 }}>
+              {on ? '✓ ' : ''}{l}
+            </button>
+          );
+        })}
+      </div>
+      {specTargets.length > 0 && (
+        <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.5 }}>
+          Базовый ориентир: {specVolumeSummary}. Фактический план дополнительно учитывает уровень, стаж, цель, PED, восстановление, питание, лабораторную коррекцию и фазу; выбранные зоны получают приоритет и частоту 2-4×/нед.
+        </div>
+      )}
+      {renderSpecPlanner()}
+    </div>
+  );
 
   const renderParams = () => (
     <div>
@@ -1851,7 +1879,9 @@ export const BbAutoConstructor: React.FC = () => {
             color: planMode === 'bb_cycle' ? '#00e68a' : 'rgba(255,255,255,0.6)',
           }}>📋 ПРОФ-цикл (12 готовых программ)</button>
         </div>
-      </div>
+       </div>
+
+      {renderSpecializationSelection()}
 
       {planMode === 'bb_cycle' && (
         <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
@@ -2060,31 +2090,6 @@ export const BbAutoConstructor: React.FC = () => {
                     {autoDeload ? '✅ Авто-делод при перегрузке' : '⬜ Авто-делод при перегрузке'} (ACWR&gt;1.3)
                   </button>
 
-                  {/* Отстающие мышцы (специализация, 1-2) */}
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                    {WEAK_GROUPS.map(([id, l]) => {
-                      const on = specTargets.includes(id);
-                      const disabled = specChipDisabled(id, on);
-                      return (
-                        <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
-                          style={{
-                            padding: '5px 10px', borderRadius: 999, cursor: disabled ? 'default' : 'pointer', fontSize: 10, fontWeight: 700, minHeight: 38,
-                            background: on ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
-                            border: on ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                            color: on ? '#fbbf24' : disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
-                            opacity: disabled ? 0.5 : 1,
-                          }}
-                        >{on ? '✓ ' : ''}{l}</button>
-                      );
-                    })}
-                  </div>
-                  {specTargets.length > 0 && (
-                    <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                      Специализация: {specTargets.join(', ')} — {specVolumeSummary}. Первыми в тренировке, RIR 0-1 на изоляциях. Остальные мышцы — поддерживающий объём (MEV).
-                    </div>
-                  )}
-                  {renderSpecPlanner()}
                 </div>
               )}
             </>
@@ -2191,33 +2196,6 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
           Любимые получают приоритет при отборе упражнений. Не любимые полностью исключаются из генерации плана. Синхронизируется с профилем (🧬 Профиль тренированности).
-        </div>
-        {/* Отстающие мышцы (специализация, 1-2) — единый блок акцентов */}
-        <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-            {WEAK_GROUPS.map(([id, l]) => {
-              const on = specTargets.includes(id);
-              const disabled = specChipDisabled(id, on);
-              return (
-                <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
-                  style={{
-                    padding: '5px 10px', borderRadius: 999, cursor: disabled ? 'default' : 'pointer', fontSize: 10, fontWeight: 700, minHeight: 38,
-                    background: on ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
-                    border: on ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                    color: on ? '#fbbf24' : disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
-                    opacity: disabled ? 0.5 : 1,
-                  }}
-                >{on ? '✓ ' : ''}{l}</button>
-              );
-            })}
-          </div>
-          {specTargets.length > 0 && (
-            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-              Специализация: {specTargets.join(', ')} — {specVolumeSummary}. Первыми в тренировке, RIR 0-1 на изоляциях. Остальные мышцы — поддерживающий объём (MEV).
-            </div>
-          )}
-          {renderSpecPlanner()}
         </div>
       </div>
       )}
@@ -2380,21 +2358,6 @@ export const BbAutoConstructor: React.FC = () => {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
         {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={500} suffix=' кг' onChange={v => setBbWorkMax(p => ({ ...p, [k]: v }))} />)}
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:ACCENT }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
-      </div>
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
-        {WEAK_GROUPS.map(([id,l]) => {
-          const on = specTargets.includes(id);
-          const disabled = specChipDisabled(id, on);
-          return <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
-            style={{ padding:'5px 10px', borderRadius:14, fontSize:11, fontWeight:700, cursor:disabled?'default':'pointer', border:on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.02)', color:on?'#00e68a':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.6)', opacity:disabled?0.5:1 }}>{l}{on?' ✓':''}</button>;
-        })}
-      </div>
-      <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>
-        💡 Специализация: {specTargets.length > 0 ? `${specVolumeSummary}. ` : ''}Выбранные зоны — первыми в тренировке, RIR 0-1 на изоляциях. Остальные — поддерживающий объём (MEV).
-      </div>
-      {renderSpecPlanner()}
       <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'bb_cycle' ? buildBb() : setStep('split')}>
         {planMode === 'bb_cycle' ? '⚡ Собрать план по циклу →' : 'Далее: выбрать сплит →'}
       </button>

@@ -51,6 +51,33 @@ export function dedupeExactMuscles(muscles: string[]): string[] {
   return out;
 }
 
+/** Гранулярные зоны, которые можно сочетать внутри одного региона:
+ *  delt_mid+delt_rear, chest_upper+chest_lower и т.п. */
+const GRANULAR_SPECIALIZATION_ZONES = new Set([
+  'chest_upper', 'chest_lower', 'back_width', 'back_thickness',
+  'delt_front', 'delt_mid', 'delt_rear',
+]);
+
+/** Проверка конфликтующего выбора parent + zone: shoulders+delt_mid нельзя,
+ *  но две разные зоны (delt_mid+delt_rear) допустимы. */
+export function isSpecializationTargetConflict(a: string, b: string): boolean {
+  if (!a || !b || a === b) return false;
+  if (canonicalMuscle(a) !== canonicalMuscle(b)) return false;
+  return !(GRANULAR_SPECIALIZATION_ZONES.has(a) && GRANULAR_SPECIALIZATION_ZONES.has(b));
+}
+
+/** Нормализовать две цели блока: точный дедуп, parent/zone-конфликты,
+ *  максимум 2 цели. Канонизация здесь НЕ выполняется, чтобы сохранить зоны. */
+export function normalizeSpecializationTargets(targets: string[]): string[] {
+  const out: string[] = [];
+  for (const target of dedupeExactMuscles(targets)) {
+    if (out.length >= 2) break;
+    if (out.some(existing => isSpecializationTargetConflict(existing, target))) continue;
+    out.push(target);
+  }
+  return out;
+}
+
 export interface SpecializationResolution {
   /** Цели специализации (топ-2 из слабых, порядок ввода). ГРАНУЛЯРНЫЕ:
    *  delt_mid/delt_rear/chest_upper — разные зоны одной мышцы. */
@@ -76,7 +103,7 @@ export function resolveSpecialization(
   const focus = focusGroup ? canonicalMuscle(focusGroup) : '';
   const weak = dedupeExactMuscles(weakPoints || []);
   const active = !!specialization && weak.length > 0;
-  const targets = active ? weak.slice(0, 2) : [];
+  const targets = active ? normalizeSpecializationTargets(weak) : [];
   return { targets, focus, weak, active };
 }
 
@@ -172,14 +199,14 @@ export const SPECIALIZATION_BLOCK_WEEKS = 10;
 export const SPECIALIZATION_MIN_BLOCK_WEEKS = 6;
 
 /** Один блок плана: недели [weekStart..weekEnd] с целями специализации.
- *  targets: 1-2 канонические мышцы; пустой массив = сбалансированный блок
- *  (возврат к MAV для всех). */
+ *  targets: 1-2 цели (гранулярные зоны сохраняются); пустой массив =
+ *  сбалансированный блок (возврат к MAV для всех). */
 export interface SpecializationBlock {
   /** Первая неделя блока (1-индекс, включительно). */
   weekStart: number;
   /** Последняя неделя блока (1-индекс, включительно). */
   weekEnd: number;
-  /** Цели блока (1-2 канонические мышцы); [] = баланс. */
+  /** Цели блока (1-2 гранулярные или обычные цели); [] = баланс. */
   targets: string[];
 }
 
@@ -207,32 +234,36 @@ export function buildSpecializationSchedule(
 ): SpecializationSchedule {
   const base = resolveSpecialization(focusGroup, weakPoints, specialization);
   const focus = base.focus;
+  const safeTotalWeeks = Math.max(1, Math.round(totalWeeks || 1));
   let blocks: SpecializationBlock[] = [];
   if (explicit && explicit.length > 0) {
     blocks = explicit
       .map(b => ({
-        weekStart: Math.max(1, Math.min(totalWeeks, Math.round(b.weekStart || 1))),
-        weekEnd: Math.max(1, Math.min(totalWeeks, Math.round(b.weekEnd || totalWeeks))),
-        targets: dedupeExactMuscles(b.targets || []).slice(0, 2),
+        weekStart: Math.max(1, Math.min(safeTotalWeeks, Math.round(b.weekStart || 1))),
+        weekEnd: Math.max(1, Math.min(safeTotalWeeks, Math.round(b.weekEnd || safeTotalWeeks))),
+        targets: normalizeSpecializationTargets(b.targets || []),
       }))
       .filter(b => b.weekStart <= b.weekEnd)
       .sort((a, b) => a.weekStart - b.weekStart);
   } else if (base.active) {
-    const end = Math.min(SPECIALIZATION_BLOCK_WEEKS, totalWeeks);
+    const end = Math.min(SPECIALIZATION_BLOCK_WEEKS, safeTotalWeeks);
     blocks = [{ weekStart: 1, weekEnd: end, targets: base.targets }];
   }
-  // Заполняем пропуски сбалансированными блоками и хвост.
+  // Заполняем пропуски балансом и обрезаем пересечения: следующий блок
+  // начинается после фактического конца предыдущего, а не поверх него.
   const filled: SpecializationBlock[] = [];
   let cursor = 1;
   for (const b of blocks) {
-    if (b.weekStart > cursor) filled.push({ weekStart: cursor, weekEnd: b.weekStart - 1, targets: [] });
-    filled.push(b);
-    cursor = Math.max(cursor, b.weekEnd + 1);
+    const start = Math.max(cursor, b.weekStart);
+    if (start > b.weekEnd) continue;
+    if (start > cursor) filled.push({ weekStart: cursor, weekEnd: start - 1, targets: [] });
+    filled.push({ ...b, weekStart: start });
+    cursor = start > cursor ? b.weekEnd + 1 : Math.max(cursor, b.weekEnd + 1);
   }
-  if (cursor <= totalWeeks) filled.push({ weekStart: cursor, weekEnd: totalWeeks, targets: [] });
+  if (cursor <= safeTotalWeeks) filled.push({ weekStart: cursor, weekEnd: safeTotalWeeks, targets: [] });
   const primary = filled.find(b => b.targets.length > 0);
   return {
-    blocks: filled.length > 0 ? filled : [{ weekStart: 1, weekEnd: totalWeeks, targets: [] }],
+    blocks: filled.length > 0 ? filled : [{ weekStart: 1, weekEnd: safeTotalWeeks, targets: [] }],
     active: filled.some(b => b.targets.length > 0),
     primaryTargets: primary ? primary.targets : [],
     focus,

@@ -18,6 +18,9 @@ describe('BB-auto UI smoke', () => {
     expect(html).toContain('Цель');
     expect(html).toContain('PED');
     expect(html).toContain('Сплит');
+    expect((html.match(/Отстающие мышцы \(специализация, 1-2\)/g) || [])).toHaveLength(1);
+    expect(html).not.toContain('Режим специализации');
+    expect(html).not.toContain('Фокус-группа');
   });
 
   it('renders twice consistently (deterministic SSR)', () => {

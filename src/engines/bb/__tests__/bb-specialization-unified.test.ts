@@ -7,6 +7,8 @@ import {
   isSpecializationWeak,
   isSpecializationFocus,
   canonicalizeMuscles,
+  isSpecializationTargetConflict,
+  normalizeSpecializationTargets,
   buildSpecializationSchedule,
   specResForWeekSchedule,
   specializationScheduleText,
@@ -88,6 +90,13 @@ describe('resolveSpecialization (резолвер)', () => {
 
   it('canonicalizeMuscles: пустые отбрасываются, неизвестные сохраняются', () => {
     expect(canonicalizeMuscles(['', 'unknown_muscle', 'chest'])).toEqual(['unknown_muscle', 'chest']);
+  });
+
+  it('выбор зон: parent+zone конфликтует, две разные зоны допустимы', () => {
+    expect(isSpecializationTargetConflict('shoulders', 'delt_mid')).toBe(true);
+    expect(isSpecializationTargetConflict('delt_mid', 'delt_rear')).toBe(false);
+    expect(normalizeSpecializationTargets(['shoulders', 'delt_mid'])).toEqual(['shoulders']);
+    expect(normalizeSpecializationTargets(['delt_mid', 'delt_rear'])).toEqual(['delt_mid', 'delt_rear']);
   });
 });
 
@@ -264,6 +273,17 @@ describe('расписание блоков специализации (6-10 н�
       { weekStart: 3, weekEnd: 6, targets: ['chest_upper', 'biceps'] },
       { weekStart: 7, weekEnd: 8, targets: [] },
       { weekStart: 9, weekEnd: 12, targets: ['back_width'] },
+    ]);
+  });
+
+  it('явные пересекающиеся блоки обрезаются, а не перекрывают календарь', () => {
+    const s = buildSpecializationSchedule(undefined, ['chest'], true, 12, [
+      { weekStart: 1, weekEnd: 8, targets: ['chest'] },
+      { weekStart: 5, weekEnd: 12, targets: ['back'] },
+    ]);
+    expect(s.blocks).toEqual([
+      { weekStart: 1, weekEnd: 8, targets: ['chest'] },
+      { weekStart: 9, weekEnd: 12, targets: ['back'] },
     ]);
   });
 

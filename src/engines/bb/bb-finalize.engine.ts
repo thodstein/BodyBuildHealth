@@ -1304,16 +1304,19 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue;
     // Цели НЕДЕЛИ: по активному расписанию блоков специализации или весь
-    // priorityMuscles (legacy/неактивное расписание). Фокус-мышца
-    // спец-частоты — последняя цель.
+    // priorityMuscles (legacy/неактивное расписание).
     const weekTargets = (schedule && schedule.active)
       ? specResForWeekSchedule(schedule, week.week).targets
       : priority.map(collapse);
     if (!weekTargets.length) continue;
-    const targetMuscles = new Set(weekTargets);
-    const focusMuscle = weekTargets[weekTargets.length - 1];
-    // Спец-частота ≥2×/нед: целевая мышца получает изоляции во второй сессии.
-    if (focusMuscle && focusMuscle !== '') {
+    // Движок хранит упражнения по канонической мышце, а выбор пользователя
+    // может быть гранулярным (delt_mid/delt_rear). Схлопываем только для
+    // поиска упражнений, сохраняя сами зоны в priority/рационале.
+    const targetMuscles = new Set(weekTargets.map(collapse));
+    // Спец-частота ≥2×/нед: КАЖДАЯ целевая каноническая мышца получает
+    // изоляцию во второй сессии. Раньше обрабатывалась только последняя
+    // цель массива (для chest+back грудь могла остаться 1×/нед).
+    for (const focusMuscle of targetMuscles) {
       const freq = week.sessions.filter(s => s.exercises.some((e: any) => e.muscle === focusMuscle && !(e as any).warmupActivator)).length;
       if (freq < 2) {
         const tags = SPEC_FREQ_TAGS[focusMuscle];
@@ -1891,7 +1894,13 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     // Специализация/малые группы — только для генераторных планов (pattern.id):
     // произвольные/faithful входы сохраняют исходный набор упражнений.
     if ((next as any).pattern?.id) {
-      ensureWeakPatternCoverage(session, options);
+      const weekOptions = options.specializationSchedule?.active
+        ? {
+            ...options,
+            priorityMuscles: specResForWeekSchedule(options.specializationSchedule, week.week).targets,
+          }
+        : options;
+      ensureWeakPatternCoverage(session, weekOptions);
       ensureSmallMuscleQuality(session, week, options);
     }
     }
@@ -2341,7 +2350,7 @@ for (const week of next.weeks) {
   // Проф-тренер назначает: cable fly → dropset, leg extension → myo_rep,
   // curl → rest_pause. Без этого 0% планов имеют intensity techniques.
   if (!options.preserveSource) {
-    autoAssignIntensityTechniques(next, options.level || 'intermediate', options.priorityMuscles);
+    autoAssignIntensityTechniques(next, options.level || 'intermediate', options.priorityMuscles, options.specializationSchedule);
   }
   const rotation = analyzeBBRotation(next);
   next.rotationReport = rotation;
@@ -2581,11 +2590,14 @@ for (const week of next.weeks) {
  * Только для level >= intermediate. Только для accessory/памп упражнений.
  * Не более 1 техники на упражнение, не более 2-3 на сессию.
  */
-function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[]): void {
+function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule): void {
   if (level === 'beginner') return; // новички не используют intensity techniques
-  const bicepsPriority = (priorityMuscles || []).some(m => (WEAK_TO_MUSCLE[m] || m) === 'biceps');
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue; // deload — без intensity techniques
+    const weekPriority = schedule?.active
+      ? specResForWeekSchedule(schedule, week.week).targets
+      : (priorityMuscles || []);
+    const bicepsPriority = weekPriority.some(m => (WEAK_TO_MUSCLE[m] || m) === 'biceps');
     for (const session of week.sessions) {
       let techniquesInSession = 0;
       const maxPerSession = level === 'enhanced' ? 3 : level === 'advanced' ? 3 : 2;
