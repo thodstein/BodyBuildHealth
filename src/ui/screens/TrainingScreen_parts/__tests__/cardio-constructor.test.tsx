@@ -69,6 +69,12 @@ describe('CardioConstructor — SSR', () => {
     expect(html).toContain('Прогноз адаптации');
     expect(html).toMatch(/\+\d+(\.\d+)?%/);
   });
+
+  it('шаг 1: при малом числе дней предупреждение об урезании сессий', () => {
+    localStorage.setItem('he_cardio_wizard_state', JSON.stringify({ version: 2, goal: 'cut', totalWeeks: 8, daysAvailable: 1, recoveryLow: false, bodyWeight: 80, taperWeeks: 2, peakWeek: true, phaseAuto: true, phaseBase: 0, phaseBuild: 0, phaseMaint: 0, level: 'intermediate', equipment: [], lowImpact: false, age: 30, sex: 'male', restingHr: 0, legDays: [] }));
+    const html = renderToStaticMarkup(<CardioConstructor />);
+    expect(html).toContain('сессии урезаны');
+  });
 });
 
 describe('CardioConstructor — CSR', () => {

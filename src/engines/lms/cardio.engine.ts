@@ -633,7 +633,11 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
         targetHr,
       };
     });
+    const requestedFreq = sessions.reduce((s, x) => s + x.weeklyFrequency, 0);
     if (daysAvailable < 7) sessions = capSessionsToDays(sessions, daysAvailable);
+    if (daysAvailable < 7 && requestedFreq > daysAvailable) {
+      rationale.push(`Дней в неделю ${daysAvailable} < запрошенной частоты ${requestedFreq} — сессии урезаны под доступные дни.`);
+    }
     sessions = assignSessionDays(sessions, input.legDays, input.startDate);
     const weekMinutes = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
     const weekKcal = sessions.reduce((s, x) => s + x.kcalPerSession * x.weeklyFrequency, 0);

@@ -134,6 +134,12 @@ export const CardioParamsStep: React.FC<{
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         source: 'auto',
       });
+      if (daysAvailable > 0 && daysAvailable < 7) {
+        const cutWeeks = cycle.weeks.filter(w => w.rationale.some(r => r.includes('сессии урезаны')));
+        if (cutWeeks.length > 0) {
+          warnings.push(`Дней в неделю (${daysAvailable}) меньше запрошенной частоты — сессии урезаны на ${cutWeeks.length} нед.`);
+        }
+      }
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
   }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays]);

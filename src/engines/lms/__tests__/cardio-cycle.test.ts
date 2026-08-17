@@ -1676,3 +1676,19 @@ describe('cardioFitnessForecast / cardioCoachHints', () => {
     expect(text).toContain('Контрольные замеры');
   });
 });
+
+// ─── Урезание сессий при малом числе дней ───
+
+describe('buildCardioCycle — урезание сессий при daysAvailable < частоты', () => {
+  it('при 1 дне в неделю rationale недель сообщает об урезании', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 1 });
+    const cut = c.weeks.filter(w => w.rationale.some(r => r.includes('сессии урезаны')));
+    expect(cut.length).toBeGreaterThan(0);
+    expect(cut[0].sessions.reduce((s, x) => s + x.weeklyFrequency, 0)).toBeLessThanOrEqual(1);
+  });
+
+  it('при 7 днях урезания нет', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, daysAvailable: 7 });
+    expect(c.weeks.every(w => !w.rationale.some(r => r.includes('сессии урезаны')))).toBe(true);
+  });
+});
