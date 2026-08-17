@@ -288,6 +288,7 @@ export const DIARY_META: Record<
   weight: { title: 'Вес и замеры', unit: 'кг / см', icon: '⚖️', color: '#22c55e' },
   injection: { title: 'Инъекции', unit: '', icon: '💉', color: '#f59e0b', storageKey: 'he_injection_diary' },
   health: { title: 'Здоровье', unit: '', icon: '🩺', color: '#ec4899', storageKey: 'he_health_diary' },
+  cardio: { title: 'Кардио', unit: 'мин', icon: '❤️', color: '#4ade80', storageKey: 'he_cardio_sessions' },
 };
 
 export const painZoneColor = (v: number) => (v <= 2 ? '#22c55e' : v <= 4 ? '#f59e0b' : v <= 7 ? '#f97316' : '#ef4444');

@@ -240,7 +240,9 @@ export const CardioParamsStep: React.FC<{
           <button style={BTN_SMALL} onClick={() => setTotalWeeks(Math.max(1, totalWeeks - 1))} aria-label="Меньше недель">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 34, textAlign: 'center' }}>{totalWeeks}</span>
           <button style={BTN_SMALL} onClick={() => setTotalWeeks(Math.min(52, totalWeeks + 1))} aria-label="Больше недель">+</button>
-          <span style={{ ...LABEL, marginLeft: 12 }}>Дней в неделю</span>
+        </div>
+        <div style={ROW}>
+          <span style={LABEL}>Дней в неделю</span>
           <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.max(0, daysAvailable - 1))} aria-label="Меньше дней">−</button>
           <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{daysAvailable}</span>
           <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>

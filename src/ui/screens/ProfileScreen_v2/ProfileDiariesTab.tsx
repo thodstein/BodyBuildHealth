@@ -20,6 +20,7 @@ import { BPDiary } from './diaries/BPDiary/BPDiary';
 import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
 import { InjectionDiary } from './diaries/InjectionDiary/InjectionDiary';
 import { HealthDiary } from './diaries/HealthDiary/HealthDiary';
+import { CardioDiary } from './diaries/CardioDiary/CardioDiary';
 import {
   AddSleepModal,
   AddBPModal,
@@ -55,6 +56,7 @@ import {
   generateEntryId,
   type BPEntry as CoreBPEntry,
 } from '../../../core/bp-hr-data';
+import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -653,6 +655,7 @@ export const ProfileDiariesTab: React.FC<{
   const [hematoEntries, setHematoEntries] = useState<HematoEntry[]>([]);
   const [healthEntries, setHealthEntries] = useState<UnifiedHealthEntry[]>([]);
   const [weights, setWeights] = useState<ReturnType<typeof getWeightLog>>([]);
+  const [cardioLog, setCardioLog] = useState<ReturnType<typeof loadCardioLog>>([]);
 
   const [addSleepOpen, setAddSleepOpen] = useState(false);
   const [addBPOpen, setAddBPOpen] = useState(false);
@@ -798,6 +801,7 @@ export const ProfileDiariesTab: React.FC<{
       setWeights(getWeightLog());
     } catch {}
     setHealthEntries(getUnifiedHealthEntries());
+    setCardioLog(loadCardioLog());
   };
 
   useEffect(() => {
@@ -894,6 +898,10 @@ export const ProfileDiariesTab: React.FC<{
       if (e.date === today)
         overview.push({ label: 'Гемат', value: `${e.totalScore}/8`, color: e.totalScore >= 2 ? '#ef4444' : '#22c55e' });
     }
+    if (cardioLog.length) {
+      const e = cardioLog[0];
+      if (e.date === today) overview.push({ label: 'Кардио', value: `${e.durationMin} мин`, color: '#4ade80' });
+    }
     return overview;
   };
   const todayOverview = buildTodayOverview();
@@ -910,6 +918,7 @@ export const ProfileDiariesTab: React.FC<{
     { key: 'weight', count: weights.length, last: lastDate(weights) },
     { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
     { key: 'health', count: healthEntries.length, last: healthEntries.length ? healthEntries[0].date : '' },
+    { key: 'cardio', count: cardioLog.length, last: cardioLog.length ? cardioLog[0].date : '' },
   ];
 
   const exportAllDiaries = () => {
@@ -928,6 +937,7 @@ export const ProfileDiariesTab: React.FC<{
         [ACNE_DIARY_KEY]: acneEntries,
         [HEMATO_DIARY_KEY]: hematoEntries,
         [WEIGHT_LOG_KEY]: weights,
+        he_cardio_sessions: cardioLog,
       },
     };
     const json = JSON.stringify(payload, null, 2);
@@ -973,6 +983,16 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
     e.neuro && e.neuro.totalScore > 0 ? `${e.neuro.totalScore}/10` : '',
     e.acne && e.acne.totalScore > 0 ? `${e.acne.totalScore}/12` : '',
     e.hemato && e.hemato.totalScore > 0 ? `${e.hemato.totalScore}/8` : '',
+    e.notes || '',
+  ]))}
+${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 'RPE', 'Статус', 'Заметки'],
+  sortedDesc(cardioLog).map((e) => [
+    e.date,
+    String(e.type).toUpperCase(),
+    String(e.durationMin),
+    e.avgHr != null ? String(e.avgHr) : '',
+    e.rpe != null ? String(e.rpe) : '',
+    e.completed ? 'выполнена' : 'пропущена',
     e.notes || '',
   ]))}
 </body></html>`;
@@ -1798,6 +1818,7 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                     [HEMATO_DIARY_KEY]: [...hematoEntries] as any[],
                     [HEALTH_DIARY_KEY]: [...healthEntries] as any[],
                     [WEIGHT_LOG_KEY]: [...weights] as any[],
+                    he_cardio_sessions: [...cardioLog] as any[],
                   };
                   const total = Object.values(snap).reduce((s, a) => s + a.length, 0);
                   [
@@ -1811,6 +1832,7 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                     HEMATO_DIARY_KEY,
                     HEALTH_DIARY_KEY,
                     WEIGHT_LOG_KEY,
+                    'he_cardio_sessions',
                   ].forEach((k) => saveDiary(k, []));
                   setSleepEntries([]);
                   setBpEntries([]);
@@ -1822,6 +1844,7 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                   setHematoEntries([]);
                   setHealthEntries([]);
                   setWeights([]);
+                  setCardioLog([]);
                   pushUndo(`🧹 Очищены все встроенные дневники (${total})`, () => {
                     setSleepEntries(snap[SLEEP_DIARY_KEY] as SleepEntry[]);
                     setBpEntries(snap[BP_DIARY_KEY] as BPEntry[]);
@@ -1833,6 +1856,7 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
                     setHematoEntries(snap[HEMATO_DIARY_KEY] as HematoEntry[]);
                     setHealthEntries(snap[HEALTH_DIARY_KEY] as UnifiedHealthEntry[]);
                     setWeights(snap[WEIGHT_LOG_KEY] as ReturnType<typeof getWeightLog>);
+                    setCardioLog(snap['he_cardio_sessions'] as ReturnType<typeof loadCardioLog>);
                     Object.entries(snap).forEach(([k, v]) => saveDiary(k, v as any[]));
                   });
                 }}
@@ -1878,6 +1902,9 @@ ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', '�
           )}
             {activeDiary === 'health' && (
               <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="health" onDataChange={refresh} onNavigate={onNavigate} />
+            )}
+            {activeDiary === 'cardio' && (
+              <CardioDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="cardio" onDataChange={refresh} onNavigate={onNavigate} />
             )}
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
