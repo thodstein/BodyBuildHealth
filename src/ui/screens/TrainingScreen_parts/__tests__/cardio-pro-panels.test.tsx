@@ -251,6 +251,13 @@ describe('CardioSessionTimer', () => {
     expect(html).toContain('Быстрый старт сессии');
   });
 
+  it('CSR: сессия дня с возрастом показывает целевую ЧСС-зону', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-5', age: 40 });
+    const { unmount } = render(<CardioSessionTimer cycle={c} />);
+    expect(screen.getByText(/🎯 ЧСС/)).toBeTruthy();
+    unmount();
+  });
+
   it('CSR: старт → завершить → сохранить записывает сессию в дневник', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-2' });
     const { unmount } = render(<CardioSessionTimer cycle={c} />);

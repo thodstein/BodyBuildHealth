@@ -6,7 +6,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   cardioSessionsForDate, cardioSessionProtocol, rescheduleCardioSession,
-  type CardioCycle, type CardioType,
+  cardioEquipmentLabel,
+  type CardioCycle, type CardioType, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
@@ -36,11 +37,18 @@ interface ActiveSession {
   paused: boolean;
 }
 
+interface TodaySession {
+  type: CardioType;
+  durationMin: number;
+  targetHr?: { min?: number; max?: number };
+  equipment?: CardioEquipment;
+}
+
 export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?: () => void; onReschedule?: (next: CardioCycle) => void }> = ({ cycle, onSaved, onReschedule }) => {
-  const [todaySessions, setTodaySessions] = useState<{ type: CardioType; durationMin: number }[]>(() => {
+  const [todaySessions, setTodaySessions] = useState<TodaySession[]>(() => {
     if (!cycle) return [];
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
-    return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin })) : [];
+    return t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment })) : [];
   });
   const [active, setActive] = useState<ActiveSession | null>(null);
   const [finished, setFinished] = useState<{ type: CardioType; durationMin: number } | null>(null);
@@ -52,7 +60,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   useEffect(() => {
     if (!cycle) { setTodaySessions([]); return; }
     const t = cardioSessionsForDate(cycle, todayIso(), cycle.startDate);
-    setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin })) : []);
+    setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment })) : []);
   }, [cycle]);
 
   useEffect(() => {
@@ -181,7 +189,12 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
           {todaySessions.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>По плану на сегодня кардио нет.</div>}
           {todaySessions.map((s, i) => (
             <div key={i} style={ROW}>
-              <span style={{ fontSize: 12, flex: 1 }}>{TYPE_LABEL[s.type]} · {s.durationMin} мин</span>
+              <span style={{ fontSize: 12, flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span>{TYPE_LABEL[s.type]} · {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment as CardioEquipment)}` : ''}</span>
+                {s.targetHr?.max && (
+                  <span style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
+                )}
+              </span>
               <button style={BTN_PRIMARY} onClick={() => start(s.type, s.durationMin)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
               <button style={BTN} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
               <button style={BTN} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
