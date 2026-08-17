@@ -198,6 +198,17 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (isLastEditorStep) onNext?.();
     else setEstep(editorSteps[estepIdx + 1]);
   }, [onNext, editorSteps, estepIdx, isLastEditorStep]);
+  // При переключении внутреннего шага — скролл контента наверх (липкая шапка остаётся сверху)
+  const editorRootRef = useRef<HTMLDivElement | null>(null);
+  const scrollEditorTop = useCallback(() => {
+    const root = editorRootRef.current;
+    if (!root) return;
+    try {
+      const scroller = root.closest('.screen.training-screen') as HTMLElement | null;
+      if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
+      else if (typeof root.scrollIntoView === 'function') root.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    } catch { /* jsdom и т.п. — scroll API может отсутствовать */ }
+  }, []);
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
