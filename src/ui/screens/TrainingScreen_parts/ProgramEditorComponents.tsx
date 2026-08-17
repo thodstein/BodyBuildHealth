@@ -924,27 +924,27 @@ const PLSetEditor: React.FC<{ sets: PLSet[]; lift: PLExercise['lift']; workMax: 
       {sets.map((s, i) => {
         const w = calcW(s.pct);
         return (
-          <div key={i} style={{ background: 'rgba(167,139,250,0.10)', borderRadius: 6, padding: '5px 6px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: DIM }}>%1RM</span>
-              <input aria-label="Процент от 1ПМ" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 54, minHeight: 44 }}
+          <div key={i} style={{ background: 'rgba(167,139,250,0.10)', borderRadius: 8, padding: '6px 8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, color: DIM, fontWeight: 700 }}>%1RM</span>
+              <input aria-label="Процент от 1ПМ" type="number" style={{ ...IN, padding: '5px 7px', fontSize: 11, width: 56, minHeight: 44 }}
                 value={Math.round(s.pct * 100)} min={30} max={110} onChange={e => {
                   const value = Number(e.target.value);
                   if (Number.isFinite(value)) updSet(i, { pct: Math.max(0.3, Math.min(1.1, value / 100)) });
                 }} />
               {w != null && <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700 }}>→ {w}кг</span>}
               <span style={{ fontSize: 10, color: DIM }}>×</span>
-              <input aria-label="Повторения" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 42, minHeight: 44 }}
-                value={s.reps} min={1} max={20} onChange={e => updSet(i, { reps: Math.max(1, Number(e.target.value) || 1) })} title="повт" />
+              <input aria-label="Повторения" type="number" style={{ ...IN, padding: '5px 7px', fontSize: 11, width: 46, minHeight: 44 }}
+                value={s.reps} min={1} max={20} onChange={e => updSet(i, { reps: Math.max(1, Number(e.target.value) || 1) })} placeholder="повт" />
               <span style={{ fontSize: 10, color: DIM }}>повт</span>
-              <input aria-label="Количество подходов" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 44 }}
-                value={s.sets} min={1} max={12} onChange={e => updSet(i, { sets: Math.max(1, Number(e.target.value) || 1) })} title="подходов" />
+              <input aria-label="Количество подходов" type="number" style={{ ...IN, padding: '5px 7px', fontSize: 11, width: 48, minHeight: 44 }}
+                value={s.sets} min={1} max={12} onChange={e => updSet(i, { sets: Math.max(1, Number(e.target.value) || 1) })} placeholder="сетов" />
               <span style={{ fontSize: 10, color: DIM }}>сетов</span>
-              <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 2 }}>
-                RIR <input aria-label="RIR" type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44 }}
+              <label style={{ fontSize: 10, color: DIM, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 2 }}>
+                RIR <input aria-label="RIR" type="number" style={{ ...IN, padding: '5px 7px', fontSize: 11, width: 42, minHeight: 44 }}
                   value={s.rir ?? 2} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) updSet(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} inputMode="numeric" />
               </label>
-              <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 6px', minHeight: 44 }} onClick={() => removeSet(i)}>✕</button>
+              <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 44, marginLeft: 'auto' }} onClick={() => removeSet(i)}>✕</button>
             </div>
           </div>
         );
@@ -1217,8 +1217,9 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                       <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
                     </div>
                     {d.exercises.map((ex, ei) => (
-                      <div key={ei} style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.12)' }}>
+                      <div key={ei} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.14)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: DIM }}>Упр {ei + 1}</span>
                           <ExerciseLabPicker
                             value={ex.name}
                             muscle={ex.muscle ?? ''}
@@ -1228,10 +1229,10 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                             {LIFT_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                           </select>
                           <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 90px', minHeight: 44 }} value={ex.muscle ?? ''} onChange={e => updateExercise(wi, di, ei, { muscle: e.target.value })} placeholder="мышца" list="muscle-list" />
-                          <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '1 1 100px', minHeight: 44 }} value={ex.note ?? ''} onChange={e => updateExercise(wi, di, ei, { note: e.target.value })} placeholder="заметка" />
-                          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
+                          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
                         </div>
                         <PLSetEditor sets={ex.sets} lift={ex.lift} workMax={body.workMax} onChange={(sets) => updateExercise(wi, di, ei, { sets })} />
+                        <input style={{ ...IN, padding: '5px 8px', fontSize: 11, width: '100%', minHeight: 44, marginTop: 4 }} value={ex.note ?? ''} onChange={e => updateExercise(wi, di, ei, { note: e.target.value })} placeholder="💬 Комментарий к упражнению (техника, цель, примечания)" />
                       </div>
                     ))}
                     <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => addExercise(wi, di)}>+ Добавить упражнение</button>

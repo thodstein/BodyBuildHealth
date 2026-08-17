@@ -100,6 +100,11 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const btn: React.CSSProperties = { ...BTN, flex: 1, minWidth: 0 };
 const ghostBtn: React.CSSProperties = { ...BTN_GHOST, flex: 1, minWidth: 0 };
+/** Цветной бейдж-метрика для сводки на шаге «Итог». */
+const finalBadge = (bg: string, bd: string, fg: string): React.CSSProperties => ({
+  padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+  background: bg, border: `1px solid ${bd}`, color: fg, whiteSpace: 'nowrap',
+});
 
 /** Последовательные шаги ручного конструктора (как в BB-авто):
  * 1 «Выбор» — создать/клонировать/открыть программу (ББ/ПЛ/БВ);
@@ -452,7 +457,7 @@ export const ProgramManagerPanel: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{p.meta.title}</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: DIR_COLOR[dir] }}>
-              {DIR_LABEL[dir]} · {SOURCE_LABEL[p.meta.source] ?? p.meta.source}
+              {dir === 'bb' ? '💪 ' : dir === 'pl' ? '🏆 ' : '⚡ '}{DIR_LABEL[dir]} · {SOURCE_LABEL[p.meta.source] ?? p.meta.source}
             </span>
           </div>
           <div style={{ fontSize: 11, color: DIM, marginTop: 4, lineHeight: 1.5 }}>
@@ -461,14 +466,14 @@ export const ProgramManagerPanel: React.FC = () => {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
             {dir === 'bb' && bbMetrics && (
               <>
-                <span style={{ fontSize: 10, color: DIM_STRONG }}>📦 Сетов: <b style={{ color: '#fff' }}>{bbMetrics.totalSets}</b></span>
-                <span style={{ fontSize: 10, color: DIM_STRONG }}>🏋️ Тяж {Math.round(bbMetrics.тяжPct * 100)}% · 💧 Памп {Math.round(bbMetrics.пампPct * 100)}%</span>
-                <span style={{ fontSize: 10, color: DIM_STRONG }}>RIR {bbMetrics.avgRir.toFixed(1)}</span>
-                {overMrv > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>⚠ {overMrv} групп выше MRV</span>}
-                {belowMev > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{belowMev} групп ниже MEV</span>}
+                <span style={finalBadge('rgba(0,230,138,0.12)', 'rgba(0,230,138,0.3)', '#00e68a')}>📦 Сетов: {bbMetrics.totalSets}</span>
+                <span style={finalBadge('rgba(96,165,250,0.12)', 'rgba(96,165,250,0.3)', '#93c5fd')}>🏋️ Тяж {Math.round(bbMetrics.тяжPct * 100)}% · 💧 Памп {Math.round(bbMetrics.пампPct * 100)}%</span>
+                <span style={finalBadge('rgba(167,139,250,0.12)', 'rgba(167,139,250,0.3)', '#c4b5fd')}>RIR {bbMetrics.avgRir.toFixed(1)}</span>
+                {overMrv > 0 && <span style={finalBadge('rgba(239,68,68,0.12)', 'rgba(239,68,68,0.35)', '#ef4444')}>⚠ {overMrv} выше MRV</span>}
+                {belowMev > 0 && <span style={finalBadge('rgba(59,130,246,0.12)', 'rgba(59,130,246,0.35)', '#60a5fa')}>{belowMev} ниже MEV</span>}
               </>
             )}
-            <span style={{ fontSize: 10, color: DIM_STRONG }}>📝 Упражнений: <b style={{ color: '#fff' }}>{totalExercises}</b></span>
+            <span style={finalBadge('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.85)')}>📝 Упражнений: {totalExercises}</span>
           </div>
         </div>
 
@@ -845,6 +850,34 @@ export const ProgramManagerPanel: React.FC = () => {
                   <span style={chip}>🗓 {p.meta.daysPerWeek}д × {p.meta.weeks}н</span>
                   {p.meta.updatedAt && <span style={chip}>📅 {new Date(p.meta.updatedAt).toLocaleDateString('ru-RU')}</span>}
                 </div>
+                {(() => {
+                  let total = 0, filled = 0;
+                  if (p.bb?.weeks?.length) {
+                    total = p.bb.weeks.reduce((s, w) => s + w.sessions.length, 0);
+                    filled = p.bb.weeks.reduce((s, w) => s + w.sessions.filter(se => (se.blocks ?? []).some(b => b.exerciseName)).length, 0);
+                  } else if (p.pl?.customWeeks?.length) {
+                    total = p.pl.customWeeks.reduce((s, w) => s + w.days.length, 0);
+                    filled = p.pl.customWeeks.reduce((s, w) => s + w.days.filter(d => (d.exercises ?? []).some(e => e.name)).length, 0);
+                  } else if (p.hybrid?.bbWeeks?.length) {
+                    total = p.hybrid.bbWeeks.reduce((s, w) => s + (w.sessions ?? []).length, 0);
+                    filled = p.hybrid.bbWeeks.reduce((s, w) => s + (w.sessions ?? []).filter(se => (se.blocks ?? []).some(b => b.exerciseName)).length, 0);
+                  }
+                  if (total <= 0) return null;
+                  const pct = Math.round((filled / total) * 100);
+                  const full = filled >= total;
+                  const color = full ? '#00e68a' : filled > 0 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginBottom: 3 }}>
+                        <span>Заполнено: {filled} из {total} дн.</span>
+                        <span style={{ color, fontWeight: 700 }}>{full ? '✓ готово' : pct + '%'}</span>
+                      </div>
+                      <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 2, background: color, width: pct + '%' }} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, alignItems: 'flex-end' }}>
                 <button style={{ ...BTN, padding: '6px 16px', fontSize: 12, minHeight: 40 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>

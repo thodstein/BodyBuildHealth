@@ -121,7 +121,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   // P4: Undo/Redo — snapshot перед каждым onChange, чтобы Ctrl+Z работал из редактора
-  const { pushSnapshot } = useProgramUndo(program, (p) => { if (p) onChange(p); });
+  const { pushSnapshot, undo, redo } = useProgramUndo(program, (p) => { if (p) onChange(p); });
   const onChangeWithUndo = useCallback((p: UserProgram) => {
     pushSnapshot(p);
     onChange(p);
@@ -710,6 +710,8 @@ return (
           {dir === 'pl' && program.pl && (
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={undo} title="Отменить последнее изменение (Ctrl+Z)">↩</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={redo} title="Повторить отменённое изменение (Ctrl+Shift+Z)">↪</button>
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
             {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
           </button>
@@ -1178,20 +1180,36 @@ return (
       </div>
       )}
       {estep === 'weeks' && dir === 'bb' && (
+        <>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📊 Статистика плана</span>
+          <span style={{ fontSize: 10, color: DIM }}>Объём, RIR и нагрузка по неделям</span>
+        </div>
         <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />
+        </>
       )}
 
 
       {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера, шаг «🗓 Недели») */}
       {/* P2-3: extracted to BulkApplyCard with week-range selector */}
       {estep === 'weeks' && isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
+        <>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>🛠 Методики для всей программы</span>
+          <span style={{ fontSize: 10, color: DIM }}>Интенсивные техники и схемы объёма — на диапазон недель</span>
+        </div>
         <BulkApplyCard program={program} onChange={onChange} showToast={showToast} />
+        </>
       )}
 
 
       {/* Шаг «🎛 Параметры»: название/цель/уровень/дни/недели + заметки + авто-периодизация (pro) */}
       {estep === 'params' && (
       <>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>🎛 Основное</span>
+        <span style={{ fontSize: 10, color: DIM }}>Название, цель, уровень и формат недели</span>
+      </div>
       {/* Meta */}
       <div className="constructor-surface editor-meta-card" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
          <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
@@ -1252,9 +1270,18 @@ return (
       </div>
 
       {/* F2.5: тренерские заметки (отображаются в PDF) */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📝 Заметки тренера</span>
+        <span style={{ fontSize: 10, color: DIM }}>Видно в PDF и при отправке к выполнению</span>
+      </div>
       <ProgramNotes program={program} onChange={onChange} />
 
       {isPro && (
+        <>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📈 Авто-периодизация</span>
+          <span style={{ fontSize: 10, color: DIM }}>Распределить фазы по неделям в один клик</span>
+        </div>
         <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
           onApply={(phases) => {
             if (dir !== 'bb' || !program.bb) return;
@@ -1266,6 +1293,7 @@ return (
             showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
           }}
         />
+        </>
       )}
       </>
       )}
@@ -1329,6 +1357,12 @@ return (
         />
       )}
 
+      {estep === 'weeks' && !showTableView && (dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>✏️ Редактор недель и дней</span>
+          <span style={{ fontSize: 10, color: DIM }}>Добавляйте дни, упражнения и настраивайте подходы</span>
+        </div>
+      )}
       {estep === 'weeks' && !showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
       {estep === 'weeks' && !showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
       {estep === 'weeks' && !showTableView && dir === 'hybrid' && program.hybrid && (
