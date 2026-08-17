@@ -8,7 +8,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { SET_TEMPLATES, GROUP_RU } from './program-types';
-import { ACCENT, ACCENT_LINE, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
+import { ACCENT, ACCENT_LINE, BTN, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
 import { createBlank, getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
 import type {
@@ -35,6 +35,7 @@ import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../.
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
+const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
 
 export function isUserBlockClipboardShape(value: unknown): value is UserBlock {
   if (!value || typeof value !== 'object') return false;
@@ -395,28 +396,36 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
           <div style={{ fontSize: 10, color: DIM, marginTop: 3 }}>Нажмите кнопку ниже, чтобы создать первый день, например «Пн · Грудь / Трицепс».</div>
         </div>
       )}
-      {sessions.map((s, si) => (
-        <div key={s.id} className="editor-session-card" style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="editor-session-heading">
-            <div>
-              <div className="editor-kicker">ТРЕНИРОВОЧНЫЙ ДЕНЬ {si + 1}</div>
-              <div className="editor-session-day">{TRAINING_DAY_NAMES[sessionDayOfWeek(s, si)]} · {s.blocks.length} упражн.</div>
+      {sessions.map((s, si) => {
+        const dow = sessionDayOfWeek(s, si);
+        const dc = DAY_COLORS[dow % 7] ?? '#f59e0b';
+        return (
+        <div key={s.id} className="editor-session-card" style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="editor-session-heading" style={{ alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: dc + '1c', color: dc, border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{TRAINING_DAY_NAMES[dow]}</span>
+              <div style={{ minWidth: 0 }}>
+                <div className="editor-kicker">ТРЕНИРОВОЧНЫЙ ДЕНЬ {si + 1}</div>
+                <div className="editor-session-day" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name || 'Без названия'} · {s.blocks.length} упражн.</div>
+              </div>
             </div>
-            <div className="editor-session-hint">Сначала выберите день и фокус, затем добавьте упражнения</div>
+            <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
+              <button aria-label={`Клонировать тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать тренировку">⧉</button>
+              <button aria-label={`Удалить тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня" aria-label={`Название тренировки ${si + 1}`} />
-            <select style={{ ...IN, padding: '6px 8px', fontSize: 11, flex: '0 0 74px', minHeight: 44 }} value={sessionDayOfWeek(s, si)} onChange={e => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), trainingDayForIndex(si)) })} aria-label={`День недели тренировки ${si + 1}`}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6, marginTop: 6 }}>
+            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня (например: Грудь / Трицепс)" aria-label={`Название тренировки ${si + 1}`} />
+            <select style={{ ...IN, padding: '6px 8px', fontSize: 11, flex: '0 0 74px', minHeight: 44 }} value={dow} onChange={e => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), trainingDayForIndex(si)) })} aria-label={`День недели тренировки ${si + 1}`}>
               {TRAINING_DAY_NAMES.map((day, di) => <option key={di} value={di} disabled={sessions.some((other, oi) => oi !== si && sessionDayOfWeek(other, oi) === di)}>{day}{sessions.some((other, oi) => oi !== si && sessionDayOfWeek(other, oi) === di) ? ' · занято' : ''}</option>)}
             </select>
             <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
-            <button aria-label={`Клонировать тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать тренировку">⧉</button>
-            <button aria-label={`Удалить тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
           </div>
           <BlockList blocks={s.blocks} phase={phase} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
-      ))}
-       <button className="editor-add-session" style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={addSession}>+ Добавить тренировочный день</button>
+        );
+      })}
+       <button className="editor-add-session" style={{ ...BTN, padding: '10px 16px', fontSize: 12, minHeight: 48, width: '100%' }} onClick={addSession}>+ Добавить тренировочный день</button>
     </div>
   );
 };
