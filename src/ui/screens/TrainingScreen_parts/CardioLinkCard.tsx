@@ -52,7 +52,7 @@ export const CardioLinkCard: React.FC = () => {
       const iso = todayIso();
       const t = cardioSessionsForDate(c, iso, c.startDate);
       setTodayText(t && t.sessions.length > 0
-        ? t.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}`).join(' · ')
+        ? t.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')
         : null);
       const n = cardioNextSession(c, iso, c.startDate);
       setNextText(n ? `нед ${n.week} · ${TYPE_LABEL[n.session.type]} ${n.session.durationMin} мин` : null);

@@ -61,6 +61,14 @@ describe('CardioLinkCard — CSR', () => {
     expect(screen.getByText(/Сегодня:/)).toBeTruthy();
   });
 
+  it('«Сегодня» показывает целевую ЧСС-зону сессии (цикл с возрастом)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cc-zone', age: 40 });
+    saveCardioCycle(c);
+    setCardioLink({ cycleId: 'cc-zone', sport: 'bb', linkedAt: 'x' });
+    render(<CardioLinkCard />);
+    expect(screen.getByText(/ЧСС \d+-\d+/)).toBeTruthy();
+  });
+
   it('«Открыть кардио-конструктор» пишет track=cardio и шлёт событие', () => {
     let detail: string | null = null;
     window.addEventListener('planning-track-open', (e) => { detail = (e as CustomEvent).detail as string; });
