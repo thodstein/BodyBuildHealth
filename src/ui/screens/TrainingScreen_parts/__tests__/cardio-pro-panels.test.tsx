@@ -107,6 +107,17 @@ describe('CardioAutoTunePanel — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Включён|Выключен/ }));
     expect(localStorage.getItem(CARDIO_AUTO_TUNE_KEY)).toBe('1');
   });
+
+  it('возраст/ЧСС покоя подставляются из параметров цикла (config) в пульс-зоны', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, age: 50, restingHr: 55 });
+    render(<CardioAutoTunePanel cycle={c} />);
+    const ageInput = screen.getByLabelText('Возраст') as HTMLInputElement;
+    const hrInput = screen.getByLabelText('ЧСС покоя') as HTMLInputElement;
+    expect(ageInput.value).toBe('50');
+    expect(hrInput.value).toBe('55');
+    // Z2 по Karvonen для возраста 50 и ЧСС покоя 55: 55 + 0.6*(170-55)=124.
+    expect(screen.getByText(/Z2 Zone 2: 124–/)).toBeTruthy();
+  });
 });
 
 describe('CardioWeekEditor', () => {

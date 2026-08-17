@@ -5,7 +5,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
-  cardioLogStats, cardioAdherenceSummary, computeCardioAdvice,
+  cardioLogStats, computeCardioAdvice, cardioWeekFact,
   type CardioLogEntry,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
@@ -47,6 +47,24 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     const currentWeek = weekForDate ? weekForDate.week : 1;
     return cardioWeekAdherence(cycle, Math.min(currentWeek, cycle.totalWeeks), log, cycle.startDate);
   }, [log, cycle]);
+  // Выполнение цикла в целом: прошедшие недели (сессии/минуты), до текущей.
+  const cycleStats = useMemo(() => {
+    if (!cycle) return null;
+    const weekForDate = cardioWeekForDate(cycle, todayIso(), cycle.startDate);
+    const currentWeek = Math.min(weekForDate ? weekForDate.week : 1, cycle.totalWeeks);
+    const pastWeeks = cycle.weeks.filter(w => w.week < currentWeek);
+    if (pastWeeks.length === 0) return null;
+    const planned = pastWeeks.reduce((s, w) => s + w.sessions.reduce((a, x) => a + x.weeklyFrequency, 0), 0);
+    const plannedMin = pastWeeks.reduce((s, w) => s + w.totalMinutes, 0);
+    const doneSessions = pastWeeks.reduce((s, w) => s + cardioWeekAdherence(cycle, w.week, log, cycle.startDate).doneSessions, 0);
+    const doneMin = pastWeeks.reduce((s, w) => s + cardioWeekFact(cycle, w.week, log, cycle.startDate).doneMinutes, 0);
+    return {
+      planned, plannedMin, doneSessions, doneMin,
+      pctSessions: planned > 0 ? Math.round((doneSessions / planned) * 100) : null,
+      pctMinutes: plannedMin > 0 ? Math.round((doneMin / plannedMin) * 100) : null,
+      weeksDone: pastWeeks.length,
+    };
+  }, [cycle, log]);
 
   const add = () => {
     const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
@@ -81,6 +99,11 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       {adherence && (
         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
           Неделя {adherence.week}: выполнено {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин ({adherence.pctMinutes}%)
+        </div>
+      )}
+      {cycleStats && (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+          📊 Цикл: {cycleStats.weeksDone} пройденных нед · сессий {cycleStats.doneSessions}/{cycleStats.planned} ({cycleStats.pctSessions ?? 0}%) · минут {cycleStats.doneMin}/{cycleStats.plannedMin} ({cycleStats.pctMinutes ?? 0}%)
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>

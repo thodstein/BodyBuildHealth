@@ -1,10 +1,11 @@
 /**
  * CardioCompsStep.tsx — шаг 2 мастера кардио: соревнования/старты.
- * Для каждого старта строится taper (объём ↓, HIIT убран) и пик-неделя.
+ * Taper/пик-неделя настраиваются на шаге 1 (Структура фаз) — здесь только
+ * список стартов и статус выбранного режима.
  */
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
-import { SectionCard, GroupHeading, ROW, LABEL, HINT, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, INPUT, ChipToggle, InfoBanner } from './CardioUI';
+import { SectionCard, GroupHeading, ROW, LABEL, HINT, BTN_PRIMARY, BTN_DANGER, INPUT, InfoBanner } from './CardioUI';
 
 export interface CompDraft { name: string; week: string }
 
@@ -15,32 +16,40 @@ export const CardioCompsStep: React.FC<{
   setDraft: (d: CompDraft) => void;
   totalWeeks: number;
   taperWeeks: number;
-  setTaperWeeks: (n: number) => void;
   taperEnabled: boolean;
-  setTaperEnabled: (v: boolean) => void;
   peakWeek: boolean;
-  setPeakWeek: (v: boolean) => void;
-}> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek }) => {
+}> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, taperEnabled, peakWeek }) => {
   const add = () => {
-    const week = Math.min(Math.max(1, Math.round(Number(draft.week) || 0)), totalWeeks);
-    if (!draft.name.trim() || week < 1) return;
+    const wNum = Number(draft.week);
+    if (!draft.name.trim() || !Number.isFinite(wNum) || wNum < 1) return;
+    const week = Math.min(Math.max(1, Math.round(wNum)), totalWeeks);
     setComps([...comps, { id: `comp-${Date.now()}`, name: draft.name.trim(), week }]);
     setDraft({ name: '', week: '' });
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <GroupHeading icon="🏁" text="Соревнования и старты" desc="Для каждого старта строится taper и пик-неделя." />
+      <GroupHeading icon="🏁" text="Соревнования и старты" desc="Даты, к которым цикл строит taper и пик-неделю." />
       <SectionCard title="Старты">
         <div style={HINT}>
           Для каждого старта цикл строит taper (объём снижается, HIIT убирается) и пик-неделю
           (только лёгкое восстановительное кардио). Можно не указывать — тогда последняя неделя будет переходной.
         </div>
+        <div style={HINT}>
+          Режим: {taperEnabled
+            ? `📉 taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}`
+            : 'без taper — перед стартом наращивание (contest_prep)'}
+          {' '}— настраивается на шаге «Параметры» (Структура фаз).
+        </div>
         {comps.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Старты не добавлены.</div>}
         {comps.map(c => (
           <div key={c.id} style={ROW}>
             <span style={{ fontSize: 12, flex: 1 }}>{c.name}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>нед {c.week} · taper с нед {Math.max(1, c.week - taperWeeks)}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              {taperEnabled
+                ? `нед ${c.week} · taper с нед ${Math.max(1, c.week - taperWeeks)}`
+                : `нед ${c.week}${peakWeek ? ' · пик-неделя' : ''}`}
+            </span>
             <button style={BTN_DANGER} onClick={() => setComps(comps.filter(x => x.id !== c.id))} aria-label={`Удалить ${c.name}`}>✕</button>
           </div>
         ))}
@@ -49,32 +58,7 @@ export const CardioCompsStep: React.FC<{
           <input value={draft.week} onChange={e => setDraft({ ...draft, week: e.target.value })} placeholder="Неделя" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Неделя старта" />
           <button style={BTN_PRIMARY} onClick={add}>+ Добавить старт</button>
         </div>
-        {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper будет построен автоматически.</InfoBanner>}
-      </SectionCard>
-
-      <GroupHeading icon="📉" text="Taper перед стартом" desc="Плавное снижение объёма к старту (Bosquet 2005) — можно отключить." />
-      <SectionCard title="📉 Taper перед стартом">
-        <div style={ROW}>
-          <ChipToggle active={taperEnabled} onClick={() => setTaperEnabled(!taperEnabled)}>
-            {taperEnabled ? '📉 Taper: вкл' : 'Taper: выкл'}
-          </ChipToggle>
-          {taperEnabled && (
-            <>
-              <span style={LABEL}>Недель taper</span>
-              <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
-              <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{taperWeeks}</span>
-              <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
-            </>
-          )}
-          <ChipToggle active={peakWeek} onClick={() => setPeakWeek(!peakWeek)}>
-            {peakWeek ? '🏔 Пик-неделя: вкл' : 'Пик-неделя: выкл'}
-          </ChipToggle>
-        </div>
-        <div style={HINT}>
-          {taperEnabled
-            ? 'Taper: объём снижается плавно (×0.85→×0.4), HIIT убирается (Bosquet 2005). Пик-неделя — только лёгкое recovery в день старта.'
-            : 'Taper выключен: перед стартом цикл продолжает наращивание (contest_prep), без снижения объёма.'}
-        </div>
+        {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}
       </SectionCard>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel,
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
   spreadSessionsAcrossDays, DAY_LABELS_RU, cardioWeekForDate,
+  cardioFitnessForecast, cardioCoachHints,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
@@ -40,10 +41,11 @@ export const CardioPreviewStep: React.FC<{
   onVariant: (v: CardioVariant) => void;
   variants: ReturnType<typeof cardioPlanVariants>;
   explanation: string[];
+  paramsDirty?: boolean;
   onImproved: (cycle: CardioCycle) => void;
   factorsSummary: string[];
   nutritionNotes: string[];
-}> = ({ cycle, onBuild, onRename, onEditConfig, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, onImproved, factorsSummary, nutritionNotes }) => {
+}> = ({ cycle, onBuild, onRename, onEditConfig, daysAvailable, recoveryLow, variant, onVariant, variants, explanation, paramsDirty, onImproved, factorsSummary, nutritionNotes }) => {
   const [showWeeks, setShowWeeks] = useState(true);
   const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -192,6 +194,11 @@ export const CardioPreviewStep: React.FC<{
             {kcalFlash ? '✅ Ккал в буфере' : '🔥 Ккал в буфер'}
           </button>
         </div>
+        {paramsDirty && (
+          <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '8px 10px' }} role="status">
+            ⚠ Параметры в мастере изменены — показан последний собранный цикл. Нажмите «🔄 Пересобрать цикл», чтобы применить изменения.
+          </div>
+        )}
       </div>
 
       {/* Якорная навигация по секциям */}
@@ -282,6 +289,32 @@ export const CardioPreviewStep: React.FC<{
         </div>
       )}
 
+      {/* Адаптация и контроль (проф) */}
+      {(() => {
+        const forecast = cardioFitnessForecast(cycle);
+        const hints = cardioCoachHints(cycle);
+        const tests = hints.filter(h => h.kind === 'test');
+        return (
+          <div style={{ ...CARD, borderColor: 'rgba(96,165,250,0.3)' }}>
+            <div style={LABEL}>📈 Адаптация и контроль</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+              Прогноз адаптации: <b style={{ color: '#60a5fa' }}>+{forecast.vo2GainPct}% VO2max</b> за цикл ({forecast.effectiveWeeks} рабочих нед)
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{forecast.note}</div>
+            {tests.length > 0 && (
+              <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+                🔬 Контрольные замеры: недели {tests.map(t => t.week).join(', ')} — 30 мин на комфортном темпе, сравните пульс/ощущения с прошлым замером.
+              </div>
+            )}
+            {hints.filter(h => h.kind !== 'work').slice(0, 4).map(h => (
+              <div key={h.week} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
+                • Нед {h.week} ({CARDIO_PHASE_LABELS[h.phase]}): {h.text}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Переименование */}
       <div style={CARD}>
         <div style={LABEL}>✏️ Название цикла</div>
@@ -294,6 +327,11 @@ export const CardioPreviewStep: React.FC<{
       {/* План по фазам */}
       <div style={CARD} id="sec-phases">
         <div style={LABEL}>🗂 План по фазам</div>
+        <div style={{ display: 'flex', gap: 2, height: 14, borderRadius: 3, overflow: 'hidden' }}>
+          {phasesPlan.map(p => (
+            <div key={p.phase} title={`${p.label}: ${p.weeks} нед`} style={{ flex: p.weeks, background: PHASE_COLOR[p.phase] ?? '#888' }} />
+          ))}
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {phasesPlan.map(p => (
             <div key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
@@ -383,18 +421,28 @@ export const CardioPreviewStep: React.FC<{
         </div>
         {showWeeks && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {visibleWeeks.map(w => (
-              <div key={w.week} style={ROW}>
-                <span style={{ width: 26, fontSize: 11, fontWeight: 800, color: PHASE_COLOR[w.phase] ?? '#888' }}>{w.week}</span>
-                <span style={{ width: 92, fontSize: 11, color: 'var(--text-dim)' }}>
-                  {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
-                </span>
-                <span style={{ flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {w.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}×${s.weeklyFrequency}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join('  |  ')}
-                </span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', minWidth: 74, textAlign: 'right' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
-              </div>
-            ))}
+            {visibleWeeks.map(w => {
+              const hint = cardioCoachHints(cycle).find(h => h.week === w.week);
+              return (
+                <div key={w.week} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <div style={ROW}>
+                    <span style={{ width: 26, fontSize: 11, fontWeight: 800, color: PHASE_COLOR[w.phase] ?? '#888' }}>{w.week}</span>
+                    <span style={{ width: 92, fontSize: 11, color: 'var(--text-dim)' }}>
+                      {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
+                    </span>
+                    <span style={{ flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {w.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}×${s.weeklyFrequency}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join('  |  ')}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', minWidth: 74, textAlign: 'right' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
+                  </div>
+                  {hint && hint.kind !== 'work' && (
+                    <div style={{ fontSize: 9, color: hint.kind === 'test' ? '#4ade80' : hint.kind === 'deload' ? '#fbbf24' : hint.kind === 'taper' ? '#eab308' : '#f87171', paddingLeft: 26, lineHeight: 1.4 }}>
+                      {hint.kind === 'test' ? '🔬 ' : hint.kind === 'deload' ? '🧘 ' : hint.kind === 'taper' ? '📉 ' : '🎭 '}{hint.text}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             {!showAllWeeks && (cycle.totalWeeks ?? 0) > 16 && (
               <button style={{ ...BTN, minHeight: 32, padding: '6px 12px', alignSelf: 'flex-start' }} onClick={() => setShowAllWeeks(true)} aria-label="Показать все недели">
                 Показать все ({cycle.totalWeeks})

@@ -62,6 +62,13 @@ describe('CardioConstructor — SSR', () => {
     expect(html).toContain('База');
     expect(html).toContain('Поддержание');
   });
+
+  it('шаг 1: предпросмотр показывает прогноз адаптации VO2max', () => {
+    const html = renderToStaticMarkup(<CardioConstructor />);
+    expect(html).toContain('+VO2MAX');
+    expect(html).toContain('Прогноз адаптации');
+    expect(html).toMatch(/\+\d+(\.\d+)?%/);
+  });
 });
 
 describe('CardioConstructor — CSR', () => {
@@ -74,16 +81,13 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByRole('button', { name: /Собрать и сохранить цикл/ })).toBeTruthy();
   });
 
-  it('шаг «Старты»: конструирование taper (недель + пик-неделя) влияет на сборку', () => {
+  it('шаг «Старты»: taper-режим настраивается на шаге «Параметры» (статус виден в стартах)', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    expect(screen.getByText(/Недель taper/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Больше taper/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Пик-неделя: вкл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Пик-неделя старта/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    const saved = loadCardioCycles()[0];
-    expect(saved.weeks.some(w => w.phase === 'peak')).toBe(false);
+    expect(screen.getByText(/Соревнования и старты/)).toBeTruthy();
+    expect(screen.getByText(/taper 3 нед/)).toBeTruthy();
   });
 
   it('шаг 1: выключение taper напрямую в параметрах — сборка без taper-кривой', () => {
@@ -212,5 +216,50 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     const saved = loadCardioCycles()[0];
     expect(saved.weeks[0].sessions[0].equipment).toBe('cycling');
+  });
+
+  it('«⚙️ Изменить параметры» сбрасывает вариант нагрузки в «Базовый»', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    // Выбрать интенсивный вариант на предпросмотре.
+    fireEvent.click(screen.getByRole('button', { name: /Вариант: Интенсивный/ }));
+    // Вернуться к параметрам через «⚙️ Изменить параметры» — вариант сбрасывается в базовый.
+    fireEvent.click(screen.getByRole('button', { name: /Изменить параметры/ }));
+    expect(screen.getByRole('button', { name: /Taper перед стартом/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    const btn = screen.getByRole('button', { name: /Вариант: Базовый/ });
+    expect(btn).toBeTruthy();
+  });
+
+  it('изменение параметров после сборки → предупреждение «параметры изменены» на предпросмотре', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    // Назад на шаг 1 и меняем цель.
+    fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Цель: Здоровье/ }));
+    // Снова к предпросмотру — цикл не пересобран, параметры расходятся.
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Параметры в мастере изменены/)).toBeTruthy();
+  });
+
+  it('добавление старта после сборки → предупреждение «параметры изменены»', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    // Назад на шаг 2 и добавляем старт.
+    fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
+    fireEvent.change(screen.getByPlaceholderText(/Название/), { target: { value: 'Старт' } });
+    fireEvent.change(screen.getByPlaceholderText(/Неделя/), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getByText(/Параметры в мастере изменены/)).toBeTruthy();
   });
 });

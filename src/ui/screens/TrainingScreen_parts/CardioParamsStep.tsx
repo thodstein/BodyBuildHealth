@@ -8,6 +8,7 @@ import React, { useMemo } from 'react';
 import {
   buildCardioCycle, cardioCycleSummary, CARDIO_GOAL_LABELS, CARDIO_PRESETS,
   CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS, DAY_LABELS_RU,
+  cardioFitnessForecast,
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
@@ -356,6 +357,9 @@ export const CardioParamsStep: React.FC<{
             <StatTile label="ККАЛ/НЕД" value={String(s.avgKcalPerWeek)} color="#f59e0b" />
             <StatTile label="HIIT-НЕД" value={String(s.hiitWeeks)} color="#a78bfa" />
             <StatTile label="ЦЕЛЬ" value={CARDIO_GOAL_LABELS[goal]} color="#94a3b8" />
+            {preview.cycle && (
+              <StatTile label="+VO2MAX" value={`+${cardioFitnessForecast(preview.cycle).vo2GainPct}%`} color="#60a5fa" />
+            )}
           </div>
         )}
         {preview.cycle && (
@@ -379,6 +383,9 @@ export const CardioParamsStep: React.FC<{
                   {p.label} · {s?.phaseWeeks[p.phase]}
                 </span>
               ))}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(96,165,250,0.8)', lineHeight: 1.4 }}>
+              📈 Прогноз адаптации: +{cardioFitnessForecast(preview.cycle).vo2GainPct}% VO2max за цикл ({cardioFitnessForecast(preview.cycle).effectiveWeeks} рабочих нед) — ориентир, зависит от выполнения.
             </div>
           </div>
         )}

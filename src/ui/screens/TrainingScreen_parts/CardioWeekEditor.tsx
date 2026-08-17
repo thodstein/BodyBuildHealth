@@ -8,7 +8,7 @@ import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  cardioWeekForDate, cardioSafetyReport,
+  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
@@ -95,9 +95,11 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const safety = useMemo(() => (week ? cardioSafetyReport({ ...cycle!, weeks: [week] }).warnings : []), [week, cycle]);
 
+  const bw = cycle ? cycleBodyWeight(cycle) : 80;
+
   const scaleMinutes = (mult: number) => saveWeek(w => ({
     ...w,
-    sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult)), 80, s.equipment) })),
+    sessions: w.sessions.map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * mult)), kcalPerSession: kcalForCardio(s.type, Math.max(10, Math.round(s.durationMin * mult)), bw, s.equipment) })),
   }));
 
   const updateSession = (idx: number, patch: Partial<CardioSession>) => saveWeek(w => ({
@@ -105,7 +107,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
     sessions: w.sessions.map((s, i) => {
       if (i !== idx) return s;
       const next = { ...s, ...patch };
-      next.kcalPerSession = kcalForCardio(next.type, next.durationMin, 80, next.equipment);
+      next.kcalPerSession = kcalForCardio(next.type, next.durationMin, bw, next.equipment);
       return next;
     }),
   }));
@@ -114,7 +116,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const addSession = () => saveWeek(w => ({
     ...w,
-    sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, 80, undefined), purpose: 'Ручная сессия' }],
+    sessions: [...w.sessions, { type: newType, durationMin: 30, weeklyFrequency: 1, intensity: newType === 'hiit' ? 'high' : newType === 'recovery' ? 'low' : 'moderate', kcalPerSession: kcalForCardio(newType, 30, bw, undefined), purpose: 'Ручная сессия' }],
   }));
 
   if (!cycle || !week) return null;

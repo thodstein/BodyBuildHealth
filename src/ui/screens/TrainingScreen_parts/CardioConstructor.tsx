@@ -351,6 +351,7 @@ export const CardioConstructor: React.FC = () => {
       joints: cfg.autoLowImpact === true,
     });
     setPhaseSplit(cfg.phaseSplit ? { auto: false, base: cfg.phaseSplit.base ?? 0, build: cfg.phaseSplit.build ?? 0, maintenance: cfg.phaseSplit.maintenance ?? 0 } : { auto: true, base: 0, build: 0, maintenance: 0 });
+    setVariant('base');
     setStep('params');
     flashMsg('⚙️ Параметры загружены из цикла — измените и пересоберите');
   };
@@ -525,6 +526,36 @@ export const CardioConstructor: React.FC = () => {
     }, cycle);
   }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
 
+  // Цикл устарел относительно текущих параметров мастера (для предпросмотра).
+  const paramsDirty = useMemo(() => {
+    if (!cycle?.config) return false;
+    const cfg = cycle.config;
+    const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    if (cfg.goal !== goal) return true;
+    if (cfg.totalWeeks != null && cfg.totalWeeks !== totalWeeks) return true;
+    if (cfg.daysAvailable != null && cfg.daysAvailable !== daysAvailable) return true;
+    if (!!cfg.recoveryLow !== recoveryLow) return true;
+    if (cfg.bodyWeight != null && cfg.bodyWeight !== bodyWeight) return true;
+    if (cfg.taperWeeks != null && cfg.taperWeeks !== taperWeeks) return true;
+    if (!!cfg.taper !== taperEnabled) return true;
+    if (!!cfg.peakWeek !== peakWeek) return true;
+    if (cfg.level != null && cfg.level !== level) return true;
+    if (!same(cfg.equipment, equipment)) return true;
+    if (!!cfg.lowImpact !== lowImpact) return true;
+    if (cfg.age != null && cfg.age !== Math.max(12, Math.min(90, Number(age) || 30))) return true;
+    if (!same(cfg.legDays, legDays)) return true;
+    if (cfg.sex !== sex) return true;
+    if (!same(cfg.restingHr, Number(restingHr) > 0 ? Number(restingHr) : undefined)) return true;
+    if (!same(cfg.competitions, comps)) return true;
+    if (!same(cfg.phaseSplit, phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance })) return true;
+    if (cfg.enhanced !== previewFactors.enhanced) return true;
+    if (cfg.autoLowImpact !== previewFactors.autoLowImpact) return true;
+    if (cfg.sleepHours !== previewFactors.sleepHours) return true;
+    if (cfg.stressLevel !== previewFactors.stressLevel) return true;
+    if (cfg.hrvMs !== previewFactors.hrvMs) return true;
+    return false;
+  }, [cycle, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors]);
+
   const resetParams = () => {
     setGoal('cut');
     setTotalWeeks(12);
@@ -533,7 +564,9 @@ export const CardioConstructor: React.FC = () => {
     setBodyWeight(profileWeight() ?? 80);
     setPhaseSplit({ auto: true, base: 0, build: 0, maintenance: 0 });
     setTaperWeeks(2);
+    setTaperEnabled(true);
     setPeakWeek(true);
+    setVariant('base');
     setLevel('intermediate');
     setEquipment([]);
     setLowImpact(false);
@@ -686,7 +719,7 @@ export const CardioConstructor: React.FC = () => {
       )}
       {step === 'comps' && (
         <CardioCompsStep comps={comps} setComps={setComps} draft={compDraft} setDraft={setCompDraft} totalWeeks={totalWeeks}
-          taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} taperEnabled={taperEnabled} setTaperEnabled={setTaperEnabled} peakWeek={peakWeek} setPeakWeek={setPeakWeek} />
+          taperWeeks={taperWeeks} taperEnabled={taperEnabled} peakWeek={peakWeek} />
       )}
       {step === 'preview' && (
         <>
@@ -695,6 +728,7 @@ export const CardioConstructor: React.FC = () => {
             daysAvailable={daysAvailable} recoveryLow={recoveryLow}
             variant={variant} onVariant={setVariant}
             variants={planVariants} explanation={planExplanation}
+            paramsDirty={paramsDirty}
             onImproved={applyImproved}
             factorsSummary={factorsSummary}
             nutritionNotes={cycle ? cardioNutritionNotes(cycle, profileSettingsForNutrition()) : []}

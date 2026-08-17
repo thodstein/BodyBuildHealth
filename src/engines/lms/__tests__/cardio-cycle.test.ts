@@ -20,6 +20,8 @@ import {
   cycleBodyWeight, recalcSessionKcal, rescheduleCardioSession,
   cardioToNutritionPayload, legDaysFromBBPlan, buildCardioTcx,
   lthrZones, runningVdot, cardioYearPlan, buildCardioYearText,
+  cardioFitnessForecast, cardioCoachHints, cardioCoachSummary,
+  buildCardioPrintHtml,
   CARDIO_PRESETS,
   type CardioCycle,
 } from '../cardio.engine';
@@ -1606,5 +1608,71 @@ describe('рационал buildCardioCycle — текст для taper:false', 
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
     const text = c.rationale.join('\n');
     expect(text).toContain('taper 2 нед');
+  });
+});
+
+// ─── Интенсивностная периодизация Z2 (проф) ───
+
+describe('buildCardioCycle — периодизация зоны Z2', () => {
+  it('Z2 начинается с нижней границы и сдвигается вверх к концу цикла', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 8, age: 40 });
+    const first = c.weeks[0].sessions.find(s => s.type === 'zone2')!;
+    const last = c.weeks.find(w => w.week === 7)!.sessions.find(s => s.type === 'zone2')!;
+    expect(first.targetHr?.min).toBe(Math.round(180 * 0.6));
+    expect(last.targetHr!.min!).toBeGreaterThan(first.targetHr!.min!);
+  });
+
+  it('taper-неделя получает Z2 в нижней части зоны (свежесть к старту)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, age: 30, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    const taper = c.weeks.find(w => w.phase === 'taper')!;
+    const z2 = taper.sessions.find(s => s.type === 'zone2')!;
+    expect(z2.targetHr?.min).toBe(Math.round(190 * 0.6));
+  });
+});
+
+// ─── Прогноз адаптации и подсказки (проф) ───
+
+describe('cardioFitnessForecast / cardioCoachHints', () => {
+  it('новичок получает больший прогноз прироста, чем продвинутый', () => {
+    const nov = buildCardioCycle({ goal: 'health', totalWeeks: 12, level: 'beginner', age: 30 });
+    const adv = buildCardioCycle({ goal: 'health', totalWeeks: 12, level: 'advanced', age: 30 });
+    const fn = cardioFitnessForecast(nov);
+    const fa = cardioFitnessForecast(adv);
+    expect(fn.vo2GainPct).toBeGreaterThan(fa.vo2GainPct);
+    expect(fn.effectiveWeeks).toBeGreaterThan(0);
+    expect(fa.note).toContain('рабочих нед');
+  });
+
+  it('mass-цикл не обещает большой адаптации', () => {
+    const c = buildCardioCycle({ goal: 'mass', totalWeeks: 8, level: 'beginner', age: 30 });
+    const f = cardioFitnessForecast(c);
+    expect(f.vo2GainPct).toBeLessThan(3);
+  });
+
+  it('подсказки: контрольный замер на 4-й рабочей неделе, делод и taper помечены', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    const hints = cardioCoachHints(c);
+    // Неделя 4 в этом цикле — делод (каждые 4 нед), замер попадает на следующую рабочую (5).
+    expect(hints.some(h => h.kind === 'test' && h.week === 5)).toBe(true);
+    expect(hints.some(h => h.kind === 'deload')).toBe(true);
+    expect(hints.some(h => h.kind === 'taper')).toBe(true);
+    expect(hints.some(h => h.kind === 'peak')).toBe(true);
+  });
+
+  it('cardioCoachSummary содержит прогноз и недели замеров', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 10, age: 30 });
+    const lines = cardioCoachSummary(c);
+    expect(lines.some(l => l.includes('Прогноз адаптации'))).toBe(true);
+    expect(lines.some(l => l.includes('Контрольные замеры'))).toBe(true);
+  });
+
+  it('печатная сводка и текстовая содержат прогноз адаптации и ключевые недели', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 10, age: 30, competitions: [{ id: 'c', name: 'Шоу', week: 10 }] });
+    const html = buildCardioPrintHtml(c);
+    expect(html).toContain('Прогноз адаптации');
+    expect(html).toContain('Ключевые недели');
+    const text = buildCardioSummaryText(c);
+    expect(text).toContain('Прогноз адаптации');
+    expect(text).toContain('Контрольные замеры');
   });
 });

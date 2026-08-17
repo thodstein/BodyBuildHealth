@@ -606,17 +606,31 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
         .map(s => ({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * profile.deloadMult)), weeklyFrequency: Math.max(1, Math.round(s.weeklyFrequency * profile.deloadMult)) }));
       rationale.push('Делод: объём кардио снижен, HIIT/MISS убраны.');
     }
-    // Персонализация: уровень (объём), оборудование, целевые пульс-зоны
+    // Персонализация: уровень (объём), оборудование, целевые пульс-зоны.
+    // Интенсивностная периодизация: Z2 сдвигается внутри своей зоны по ходу
+    // цикла (нижняя часть в базе → верхняя в пике объёма, ниже в taper),
+    // HIIT/MISS — фиксированные зоны 3/4.
     sessions = sessions.map(s => {
       const dur = Math.max(10, Math.round(s.durationMin * factorMult));
       const equip = (s.type === 'hiit' || s.type === 'miss') ? (equipmentPool[1] ?? fallbackEquipment) : (equipmentPool[0] ?? fallbackEquipment);
       const zone = s.type === 'hiit' ? zones?.[3] : s.type === 'miss' ? zones?.[2] : zones?.[1];
+      let targetHr = zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr;
+      if (s.type === 'zone2' && zones && targetHr) {
+        // Позиция внутри Z2: 0 = нижняя граница, 1 = верхняя.
+        const prog = phase === 'taper' || phase === 'peak' || phase === 'transition'
+          ? 0
+          : deload
+            ? 0.3
+            : Math.min(1, (w - 1) / Math.max(1, totalWeeks - 1));
+        const mid = Math.round(zone!.bpmMin + (zone!.bpmMax - zone!.bpmMin) * prog);
+        targetHr = { min: mid, max: zone!.bpmMax };
+      }
       return {
         ...s,
         durationMin: dur,
         kcalPerSession: kcalForCardio(s.type, dur, bw, equip),
         equipment: equip,
-        targetHr: zone ? { min: zone.bpmMin, max: zone.bpmMax } : s.targetHr,
+        targetHr,
       };
     });
     if (daysAvailable < 7) sessions = capSessionsToDays(sessions, daysAvailable);
@@ -1339,6 +1353,10 @@ export function buildCardioSummaryText(cycle: CardioCycle): string {
     const marks = [w.deload ? 'делод' : null, w.taper ? 'taper' : null].filter(Boolean).join('+');
     lines.push(`Нед ${w.week} · ${CARDIO_PHASE_LABELS[w.phase]}${marks ? ' · ' + marks : ''}: ${sessions} — ${w.totalMinutes} мин, ${w.totalKcal} ккал`);
   }
+  const forecast = cardioFitnessForecast(cycle);
+  lines.push(`📈 Прогноз адаптации: +${forecast.vo2GainPct}% VO2max за цикл (${forecast.effectiveWeeks} рабочих нед).`);
+  const tests = cardioCoachHints(cycle).filter(h => h.kind === 'test');
+  if (tests.length > 0) lines.push(`🔬 Контрольные замеры: недели ${tests.map(t => t.week).join(', ')}.`);
   if (cycle.rationale.length > 0) {
     lines.push('── Обоснование ──');
     lines.push(...cycle.rationale);
@@ -1410,15 +1428,22 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
     }).join('');
     return `<tr><td style="font-weight:700;font-size:11px">Нед ${w.week}<br>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td>${cells}</tr>`;
   }).join('');
+  const forecast = cardioFitnessForecast(cycle);
+  const hintRows = cardioCoachHints(cycle)
+    .filter(h => h.kind !== 'work')
+    .map(h => `<tr><td>${h.week}</td><td>${escHtml(CARDIO_PHASE_LABELS[h.phase])}</td><td>${escHtml(h.text)}</td></tr>`)
+    .join('');
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${escHtml(cycle.name)}</title>
 <style>body{font-family:system-ui,sans-serif;padding:24px;color:#111}table{border-collapse:collapse;width:100%;margin-top:12px}
 th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px;text-align:left}th{background:#f0f0f0}h2{font-size:18px}</style></head>
 <body><h2>❤️ ${escHtml(cycle.name)}</h2>
 <p>Цель: ${escHtml(CARDIO_GOAL_LABELS[cycle.goal])} · ${cycle.totalWeeks} нед · в среднем ${summary.avgMinutesPerWeek} мин/нед · ${summary.avgKcalPerWeek} ккал/нед</p>
+<p style="font-size:12px;color:#555">📈 Прогноз адаптации: +${forecast.vo2GainPct}% VO2max за цикл (${forecast.effectiveWeeks} рабочих нед). ${escHtml(forecast.note)}</p>
 ${cycle.linkedMacrocycleId ? '<p style="font-size:12px;color:#555">🗓 Привязан к годовому плану (cardioCycleId).</p>' : ''}
 ${cycle.rationale.map(r => `<p style="font-size:12px;color:#555">${escHtml(r)}</p>`).join('')}
 <h3>Фазы</h3><table><tr><th>Фаза</th><th>Недель</th></tr>${phaseRows}</table>
 <h3>Недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Сессии</th><th>Мин</th><th>Ккал</th><th>Метки</th></tr>${weekRows}</table>
+${hintRows ? `<h3>💡 Ключевые недели</h3><table><tr><th>Нед</th><th>Фаза</th><th>Что делать</th></tr>${hintRows}</table>` : ''}
 <h3>🗓 Недели по дням (Пн-Вс)</h3><table><tr><th>Неделя</th><th>Пн</th><th>Вт</th><th>Ср</th><th>Чт</th><th>Пт</th><th>Сб</th><th>Вс</th></tr>${dayRows}</table>
 </body></html>`;
 }
@@ -1929,6 +1954,10 @@ export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle)
   }
   const s = cardioCycleSummary(cycle);
   lines.push(`Итог: ${cycle.totalWeeks} нед, ${s.avgMinutesPerWeek} мин/нед, ${s.avgKcalPerWeek} ккал/нед, ${s.hiitWeeks} HIIT-недель.`);
+  if (input.age != null) {
+    const f = cardioFitnessForecast(cycle);
+    lines.push(`Прогноз адаптации: +${f.vo2GainPct}% VO2max за цикл (${f.effectiveWeeks} рабочих нед).`);
+  }
   return lines;
 }
 
@@ -2067,4 +2096,84 @@ export function buildCardioYearText(plan: CardioYearPlan): string {
   }
   lines.push(`Итого: ${plan.totalWeeks} нед · в среднем ${plan.avgMinutesPerWeek} мин/нед · ${plan.avgKcalPerWeek} ккал/нед`);
   return lines.join('\n');
+}
+
+// ─── Проф-инструменты: прогноз адаптации и подсказки недель ───
+
+export interface CardioFitnessForecast {
+  /** Ожидаемый прирост VO2max за цикл, % (модель адаптации: чем больше
+   *  эффективных минут и выше стартовый уровень, тем медленнее рост). */
+  vo2GainPct: number;
+  /** Эффективные (рабочие) недели — без делодов/taper/пика/перехода. */
+  effectiveWeeks: number;
+  /** Краткое объяснение модели. */
+  note: string;
+}
+
+/**
+ * Прогноз кардиоадаптации по циклу (VO2max-прирост).
+ * Модель: новичок 2.5%/нед эффективной работы, средний 1.5%, продвинутый 1%,
+ * с насыщением от объёма (норма 150-300 мин/нед) и возрастом. mass/recovery —
+ * минимальная адаптация (цикл не для прогресса). Возвращает чистую оценку —
+ * рекомендательный характер.
+ */
+export function cardioFitnessForecast(cycle: CardioCycle): CardioFitnessForecast {
+  const level = cycle.config?.level ?? 'intermediate';
+  const ratePerWeek = level === 'beginner' ? 0.025 : level === 'advanced' ? 0.01 : 0.015;
+  const effectiveWeeks = cycle.weeks.filter(w => !w.deload && !w.taper && w.phase !== 'peak' && w.phase !== 'transition').length;
+  const s = cardioCycleSummary(cycle);
+  const minutes = s.avgMinutesPerWeek;
+  const volumeFactor = minutes > 0 ? Math.min(1, Math.max(0.4, minutes / 250)) : 0.5;
+  const age = cycle.config?.age;
+  const ageFactor = age != null && age > 45 ? 0.85 : 1;
+  const intensityFactor = s.hiitWeeks > 0 ? 1.05 : 1;
+  const goalFactor = cycle.goal === 'mass' || cycle.goal === 'recovery' ? 0.15 : 1;
+  const gain = ratePerWeek * effectiveWeeks * volumeFactor * ageFactor * intensityFactor * goalFactor;
+  const vo2GainPct = Math.round(gain * 1000) / 10;
+  const note = cycle.goal === 'mass' || cycle.goal === 'recovery'
+    ? 'Цикл не направлен на рост аэробной формы (масса/восстановление) — адаптация минимальна.'
+    : `Модель: ${effectiveWeeks} рабочих нед · ${Math.round(minutes)} мин/нед · уровень ${CARDIO_LEVEL_LABELS[level].toLowerCase()}${cycle.config?.age != null && cycle.config.age > 45 ? ' · возраст >45 (адаптация ×0.85)' : ''}${s.hiitWeeks > 0 ? ' · с HIIT (×1.05)' : ''}.`;
+  return { vo2GainPct, effectiveWeeks, note };
+}
+
+export interface CardioCoachHint {
+  week: number;
+  phase: CardioPhase;
+  text: string;
+  /** Чем отмечена неделя: deload/taper/peak/тест. */
+  kind: 'work' | 'deload' | 'taper' | 'peak' | 'test';
+}
+
+/**
+ * Тренерские подсказки на каждую неделю: контрольный тест (каждые ~4 рабочих
+ * недели и в конце базы), делод, taper/пик, зоны. Чистая функция для UI.
+ */
+export function cardioCoachHints(cycle: CardioCycle): CardioCoachHint[] {
+  const hints: CardioCoachHint[] = [];
+  let workCounter = 0;
+  for (const w of cycle.weeks) {
+    if (w.deload) { hints.push({ week: w.week, phase: w.phase, kind: 'deload', text: 'Делод: объём снижен, только лёгкая активность — восстановление и сон в приоритете.' }); continue; }
+    if (w.phase === 'peak') { hints.push({ week: w.week, phase: w.phase, kind: 'peak', text: 'Пик-неделя: только лёгкое recovery, без HIIT — свежесть к старту.' }); continue; }
+    if (w.phase === 'taper') { hints.push({ week: w.week, phase: w.phase, kind: 'taper', text: 'Taper: объём снижается плавно, HIIT убран — интенсивность сохранена (Bosquet 2005).' }); continue; }
+    if (w.phase === 'transition') { hints.push({ week: w.week, phase: w.phase, kind: 'deload', text: 'Переход: лёгкая активность для восстановления.' }); continue; }
+    workCounter++;
+    if (workCounter % 4 === 0 || (w.phase === 'base' && cycle.weeks.some(x => x.phase !== 'base' && x.week > w.week))) {
+      hints.push({ week: w.week, phase: w.phase, kind: 'test', text: 'Контрольный замер: 30 мин на комфортном темпе, ЧСС/пульс, ощущения (RPE) — сверьте с прошлой неделей.' });
+    } else {
+      const z2 = w.sessions.find(s => s.type === 'zone2');
+      const zoneText = z2?.targetHr?.max ? ` Зона Z2: ${z2.targetHr.min}-${z2.targetHr.max} уд/мин.` : '';
+      hints.push({ week: w.week, phase: w.phase, kind: 'work', text: `Рабочая неделя: ${Math.round(w.totalMinutes)} мин.${zoneText}` });
+    }
+  }
+  return hints;
+}
+
+/** Сводная строка прогноза + подсказок для UI (короткая). */
+export function cardioCoachSummary(cycle: CardioCycle): string[] {
+  const f = cardioFitnessForecast(cycle);
+  const lines: string[] = [];
+  lines.push(`📈 Прогноз адаптации: +${f.vo2GainPct}% VO2max за цикл (${f.effectiveWeeks} рабочих нед). ${f.note}`);
+  const tests = cardioCoachHints(cycle).filter(h => h.kind === 'test');
+  if (tests.length > 0) lines.push(`🔬 Контрольные замеры: недели ${tests.map(t => t.week).join(', ')} — сравните пульс/темп/ощущения с предыдущим замером.`);
+  return lines;
 }

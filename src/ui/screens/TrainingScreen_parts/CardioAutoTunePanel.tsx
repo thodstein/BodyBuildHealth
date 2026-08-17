@@ -40,8 +40,10 @@ export const CardioAutoTunePanel: React.FC<{
   });
   const [pending, setPending] = useState<{ changes: CardioTuneChange[]; reason: string } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
-  const [age, setAge] = useState('30');
-  const [restHr, setRestHr] = useState('');
+  // Возраст/ЧСС покоя предзаполняются из параметров цикла (config) — зоны
+  // считаются для реального пользователя, а не для дефолтных 30 лет.
+  const [age, setAge] = useState(() => String(cycle?.config?.age ?? 30));
+  const [restHr, setRestHr] = useState(() => (cycle?.config?.restingHr != null && cycle.config.restingHr > 0 ? String(cycle.config.restingHr) : ''));
   const [lthr, setLthr] = useState('');
   const [vdotKm, setVdotKm] = useState('');
   const [vdotMin, setVdotMin] = useState('');
