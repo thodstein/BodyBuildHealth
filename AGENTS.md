@@ -1,5 +1,37 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Ручной конструктор: внутренние шаги редактора + липкая шапка (Aug 17 2026, pushed 9e6563ff6 + 4ab04abc1)
+
+Пошаговая структура внутри шага «2 Редактор» (поверх флоу Выбор → Редактор → Итог):
+- **Липкая шапка** редактора («⋯ Ещё» / «💾 Сохранить» / «Далее») — `position: sticky; top: 0; z-index: 40`
+  (inline + `.manual-constructor--editor .editor-topbar` в styles.css; скролл-контейнер `.screen.training-screen`
+  с overflow auto — sticky работает). Класс `.manual-constructor__sticky-header` НЕ используется (background
+  `var(--bg) !important` перекрыл бы inline-стекло).
+- **Внутренние шаги** (`EditorStep` + `STANDARD_EDITOR_STEPS`/`PRO_EDITOR_STEPS` + пилюли `STEP_PILL`
+  с `aria-current`, эксклюзивный рендеринг по `estep === ...`):
+  - standard: `🎛 Параметры → 🗓 Недели`;
+  - pro: `👤 Профиль → 🎛 Параметры → 🗓 Недели → 📊 Анализ → 🔄 Обратная связь → 🔧 Инструменты`;
+  - кнопка «Далее: {следующий шаг} →» (`EDITOR_STEP_BTN_LABELS` без эмодзи), на последнем шаге — «Далее: Итог →» → родительский `onNext` (mstep 'final').
+- **Распределение контента**: CTA авто-черновика + meta (название/цель/уровень/дни/недели) + заметки +
+  `AutoPeriodizationPanel`(pro) → Параметры; расписание недели + `PlanSummaryTable`(showTableView) +
+  `BBEditor`/`PLEditor`/`HybridPlanPanel` + `BulkApplyCard`(pro) + `PlanStatsPanel` → Недели;
+  `TrainingProfileCard` + `BBConstraintsPanel` → Профиль (pro); `BbContextPanel`/`MesoHeatmap`/лаб-коррекция/
+  dashboard (`RirWaveChart`+`ProgramTimeline`+`QualityScorePanel`) + анализ-панели → Анализ (pro);
+  `StrengthDiaryPanel` → Обратная связь (pro); PL-блок (`PlannerToolsPanel`+`PlDeadpointsBarPathCard`) +
+  техника/инструменты-секции + «📜 История правок» → Инструменты (pro). Dashboard из standard-режима убран (был план).
+- Удалены: мёртвый `estep?: 'meta' | 'weeks'` из `ProgramEditorProps` (ни один вызывающий не передавал),
+  `showProTools`-тоггл «▼ Открыть PRO-анализ» (заменён пилюлями) и его CSS-правила
+  `.manual-constructor__pro-tools-toggle` (десктоп + мобильный media query).
+- **Скролл наверх при смене шага**: `scrollEditorTop` (`.screen.training-screen` → scrollTo top 0, fallback
+  scrollIntoView; try/catch + guard на отсутствие scroll API в jsdom).
+- Тесты `manual-constructor-steps.test.tsx` — 5 (обновлены standard-флоу «Далее: Недели →» → «Далее: Итог →»;
+  новый pro-тест: 6 пилюль + «Далее» по всем шагам до «Итог»).
+- Проверено: tsc 0; TrainingScreen_parts/__tests__ **393/393** (37 файлов); manual-constructor-steps 5/5;
+  pl-plan-view 3/3, manual-constructor.engine 7/7. `vite build` блокируется чужим WIP
+  (`PLPlanView.tsx:973` unterminated string literal — файл другого агента, не трогается).
+- Файлы других агентов не тронуты; запушены только свои: `ProgramEditorView.tsx`, `styles.css`,
+  `manual-constructor-steps.test.tsx`.
+
 ## Кардио-конструктор: структуризация вкладок + единый UI-слой (Aug 17 2026, pushed c7f0ab8aa)
 
 Структуризация всех вкладок кардио-конструктора: чёткая навигация по секциям, групповые
