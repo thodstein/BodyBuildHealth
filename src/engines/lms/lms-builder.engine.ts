@@ -8,6 +8,7 @@
 
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec } from '../../data/lms-cycles/lms-types';
 import { pmProgression, pmForWeek, workWeight, progressionRationale, levelPmFloor, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
+import { autoWeeklyPercent, type PMAutoRegMode } from './pm-autoreg.engine';
 import { calcSessionMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { type Exercise } from '../../core/types';
@@ -63,6 +64,9 @@ export interface LMSBuildInput {
   acwr?: { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous' };
   /** Авторегуляция: topSetPctMultiplier/volumeMultiplier/rirShift (если передана — применяется к весам). */
   autoReg?: { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number; deload: boolean };
+  /** Авторегуляция ПРОГРЕССИИ ПМ (только ПМ, без объёма). off — фикс. % цикла; auto — % по авторасчётам
+   *  (PED/курс/уровень); diary — множитель ПМ по e1RM из дневника (diaryMultiplier: name → ×1.05/×1/×0.95). */
+  pmAutoReg?: { mode: PMAutoRegMode; diaryMultiplier?: Record<string, number> };
   /** PED-адаптация (dose-aware): если передана — заменяет хардкод pedMrvMult. */
   peds?: PED[];
   pedDoses?: Record<string, number>;
@@ -967,9 +971,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     pm0: rationalePm0, weeks: totalWeeks, mode,
     weeklyPercent: input.weeklyPercent, courseIntensity: input.courseIntensity,
   };
-  const rationale = hasExplicitWeeks
+  const rationale = (hasExplicitWeeks && input.progressionEnabled === false)
     ? 'Программа задана дословно по источнику (явная раскладка всех недель, без авто-прогрессии PM).'
-     : progressionRationale(progInput);
+    : progressionRationale(progInput);
   const weakNotes: string[] = [];
 
   const goalKey = rirGoalKey(template.meta.period);
@@ -1033,6 +1037,26 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const arVolMult = Math.min(ar?.volumeMultiplier ?? 1, ar?.deload ? 0.6 : 1);
   const arRirShift = ar?.rirShift ?? 0;
 
+  // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ). pmK — недельный % роста ПМ (loop-invariant).
+  const pmAuto = input.pmAutoReg;
+  let pmK: number;
+  if (pmAuto?.mode === 'auto') {
+    // АВТО: % по авторасчётам (PED/курс/уров), а не из фикс. correctionPct цикла.
+    pmK = autoWeeklyPercent({ mode, courseIntensity: input.courseIntensity, level: vrLevel, weeklyPercent: input.weeklyPercent });
+  } else {
+    // off / diary: фикс. % из цикла (с levelK-флором для натурала).
+    const rawK = (input.weeklyPercent != null ? input.weeklyPercent
+      : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
+      : mode === 'pct' ? -0.005 : template.meta.correctionPct);
+    const levelK = (mode === 'natural' || mode === 'custom') ? levelPmFloor(vrLevel) : null;
+    pmK = (levelK != null && rawK < levelK) ? levelK : rawK;
+  }
+  const pmAutoNote = pmAuto?.mode === 'auto'
+    ? ` ⚡ Авторегуляция ПМ: темп ${(pmK * 100).toFixed(1)}%/нед рассчитан автоматически (PED/курс/уровень).`
+    : pmAuto?.mode === 'diary'
+      ? ` 📒 Авторегуляция ПМ: по дневнику (e1RM vs плановый ПМ, множитель ×1.05/×1/×0.95).`
+      : '';
+
   const weeks: LMSPlanWeek[] = [];
   const sourceLayouts = template.weeks && template.weeks.length > 0
     ? template.weeks
@@ -1054,13 +1078,14 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         // Уровень спортсмена влияет на темп прогрессии ПМ для натурала:
         // k = max(коррекция цикла, levelK) — новичок растёт быстрее (Rhea 2003).
         // На курсе — курсовая кривая, на ПКТ — нисходящая (levelK не применяется).
-        const rawK = (input.weeklyPercent != null ? input.weeklyPercent
-          : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
-          : mode === 'pct' ? -0.005 : template.meta.correctionPct);
-        const levelK = (mode === 'natural' || mode === 'custom') ? levelPmFloor(vrLevel) : null;
-        const k = (levelK != null && rawK < levelK) ? levelK : rawK;
-        const progInput: PMProgressionInput = { pm0: pm0Map[name], weeks: totalWeeks, mode, weeklyPercent: k, courseIntensity: input.courseIntensity };
-        const progressedPm = pmForWeek(progInput, weekNumber);
+        // k уже рассчитан выше (pmK): off/diary — фикс. % цикла, auto — по авторасчётам.
+        const progInput: PMProgressionInput = { pm0: pm0Map[name], weeks: totalWeeks, mode, weeklyPercent: pmK, courseIntensity: input.courseIntensity };
+        let progressedPm = pmForWeek(progInput, weekNumber);
+        // ДНЕВНИК: множитель ПМ по e1RM из дневника (обгон → ×1.05, отставание → ×0.95).
+        if (pmAuto?.mode === 'diary') {
+          const mult = pmAuto.diaryMultiplier?.[name] ?? 1;
+          progressedPm = progressedPm * mult;
+        }
         pmRow[name] = progressedPm * (faithful ? 1 : arTopMult);
       }
     }
@@ -1365,6 +1390,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
     input.acwr ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.` : '',
     input.autoReg ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.` : '',
+    pmAutoNote,
     ...weakNotes,
   ].filter(Boolean).join(' ');
 

@@ -51,6 +51,7 @@ import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycl
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
+import { pmDiaryMultiplier, type PMAutoRegMode } from '../../engines/lms/pm-autoreg.engine';
 import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../engines/lms/competition-attempts';
 import { recommendWeightCut } from '../../engines/gym-competition.engine';
 import { updateSection, getProfile } from '../../core/profile-manager';
@@ -261,10 +262,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
-  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string }>>({});
+  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number }>>({});
   const setKey = (w: number, di: number, ei: number, si: number) => `${w}_${di}_${ei}_${si}`;
   const effSet = (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number }) => {
     const ed = srcEdits[setKey(w, di, ei, si)];
+    if (ed?.pct != null && ed.pct > 0 && ws.pct > 0) {
+      // % правка: вес пересчитывается из PM недели (ws.weight / ws.pct = PM_нед).
+      return { sets: ed?.sets ?? ws.sets, reps: ed?.reps ?? ws.reps, weight: Math.round((ws.weight / ws.pct) * ed.pct * 10) / 10, pct: ed.pct };
+    }
     return { sets: ed?.sets ?? ws.sets, reps: ed?.reps ?? ws.reps, weight: ed?.weight ?? ws.weight, pct: ws.pct };
   };
 
@@ -357,6 +362,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
       autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+      pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
       // Original SRC cycles are self-calculating: preserve their source layout
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
@@ -403,7 +409,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           pedDoses,
           nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-           autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+            pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
            faithful: true,
            ...rec,
         });
@@ -612,6 +619,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   // P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary)
   const [autoRegMode, setAutoRegMode] = useState<AutoRegMode>('off');
   const autoRegOn = autoRegMode !== 'off';
+  // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ) — независимый переключатель от авторегуляции весов/объёма/RIR.
+  const [pmAutoRegMode, setPmAutoRegMode] = useState<PMAutoRegMode>('off');
   const acwrData = useMemo(() => {
     const srpe = loadSRPESessions();
     if (srpe.length < 2) return { ratio: 1.0, zone: 'optimal' as const };
@@ -648,6 +657,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     }));
     return buildDiaryAutoreg({ historyWorkouts, plannedExercises: planned });
   }, [autoRegMode, builtSrc, srcWeek, historyWorkouts]);
+
+  // Авторегуляция ПМ по дневнику: множитель кривой ПМ по e1RM vs плановый ПМ0.
+  const pmDiary = useMemo(() => {
+    if (pmAutoRegMode !== 'diary') return null;
+    const pm0Map: Record<string, number> = { ...exercisePMs };
+    if (!pm0Map['Присед']) pm0Map['Присед'] = pmSquat;
+    if (!pm0Map['Жим лежа']) pm0Map['Жим лежа'] = pmBench;
+    if (!pm0Map['Становая тяга']) pm0Map['Становая тяга'] = pmDead;
+    return pmDiaryMultiplier({ historyWorkouts, pm0Map });
+  }, [pmAutoRegMode, exercisePMs, pmSquat, pmBench, pmDead, historyWorkouts]);
 
   // ── TRAINING INTEGRATION: мост план→сессия ──
   const [bridgeSessions, setBridgeSessions] = useState<BridgeSession[]>([]);
@@ -1293,6 +1312,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             buildSrc: () => buildSrc(),
             selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
             autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead,
+            pmAutoRegMode, setPmAutoRegMode, pmDiary,
             best: ranked[0] as never,
             plWeakPoints,
             linked, runFocus, diaryAutoreg, calibratePmFromDiary,

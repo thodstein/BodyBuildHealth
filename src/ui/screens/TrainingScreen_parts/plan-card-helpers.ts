@@ -37,9 +37,10 @@ export function parseProgressionRationale(text: string): ProgressionInfo {
     if (pctMatch) info.weeklyPct = pctMatch[1].replace(',', '.');
     const pm0Match = t.match(/ПМ0=(\d+(?:[.,]\d+)?)/);
     if (pm0Match) info.pm0 = parseFloat(pm0Match[1].replace(',', '.'));
-    const finalMatch = t.match(/к\s+\d+\s+нед[^:]*:?\s*(\d+(?:[.,]\d+)?)\s*кг/);
+    // Реальный формат движка: «ПМ0=100 кг → за 12 нед: 106.7 кг» (и legacy «к 12 нед»).
+    const finalMatch = t.match(/(?:за|к)\s+\d+\s+нед[^:]*?:?\s*(\d+(?:[.,]\d+)?)\s*кг/);
     if (finalMatch) info.pmFinal = parseFloat(finalMatch[1].replace(',', '.'));
-    const weeksMatch = t.match(/к\s+(\d+)\s+нед/);
+    const weeksMatch = t.match(/(?:за|к)\s+(\d+)\s+нед/);
     if (weeksMatch) info.weeks = parseInt(weeksMatch[1], 10);
   }
   // Заметки: предложения после основного (первого) — отдельными пунктами.

@@ -92,7 +92,7 @@ interface FactEntry {
 }
 
 /** Найти последнюю (по дате) StrengthLogEntry по имени упражнения во всех WorkoutLog. */
-function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string): FactEntry | null {
+export function findLastFact(historyWorkouts: WorkoutLog[], exerciseName: string): FactEntry | null {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
   const cutoffStr = cutoff.toISOString().slice(0, 10);

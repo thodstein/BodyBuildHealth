@@ -31,6 +31,7 @@ import { usePLTaper } from './taper-state';
 import type { BridgeSession } from '../../../engines/training-integration.engine';
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
+import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
 const ACCENT = '#00e68a';
@@ -53,8 +54,8 @@ export interface PLPlanViewApi {
   setBuiltSrc: (p: LMSBuildOutput) => void;
   srcWeek: number;
   setSrcWeek: (n: number) => void;
-  srcEdits: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string }>;
-  setSrcEdits: React.Dispatch<React.SetStateAction<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string }>>>;
+  srcEdits: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number }>;
+  setSrcEdits: React.Dispatch<React.SetStateAction<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number }>>>;
   srcAdditions: Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>;
   setSrcAdditions: React.Dispatch<React.SetStateAction<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>>;
   editMode: boolean;
@@ -91,6 +92,9 @@ export interface PLPlanViewApi {
   autoRegMode: 'off' | 'auto' | 'diary';
   setAutoRegMode: (m: 'off' | 'auto' | 'diary') => void;
   autoRegResult: AutoRegOutput;
+  pmAutoRegMode: PMAutoRegMode;
+  setPmAutoRegMode: (m: PMAutoRegMode) => void;
+  pmDiary: { multiplier: Record<string, number>; decisions: string[]; adjusted: number; noData: number } | null;
   bridgeRir: number;
   pmSquat: number; pmBench: number; pmDead: number;
   best: any;
@@ -120,6 +124,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     bridgeSessions, setBridgeWeek, bridgeWeek, onNote, buildSrc,
     selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
     autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead, best,
+    pmAutoRegMode, setPmAutoRegMode, pmDiary,
     plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary,
     e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
     tempoStr, getTempo, methodHints,
@@ -211,6 +216,15 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   const info = parseProgressionRationale(builtSrc.progressionRationale || '');
                   const tiles = progressionTiles(info);
                   if (tiles.length === 0) return null;
+                  // Только значимые заметки сборки. Отфильтровываем шум, который
+                  // не относится к действующему циклу и/или дублируется в других карточках:
+                  // слабые группы/диагностика (показаны в «🎯 Слабые точки СРЦ»), S-MRV-бюджет,
+                  // дефолтный объём аксессуаров.
+                  const RELEVANT = (n: string) =>
+                    !/Слабая группа|Диагностика|не добавлен/.test(n) &&
+                    !/S-MRV|объём сессий автоматически/.test(n) &&
+                    !/Объём аксессуаров/.test(n);
+                  const notes = info.notes.filter(RELEVANT);
                   return (
                     <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(56,189,248,0.05)', border:'1px solid rgba(56,189,248,0.16)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
@@ -225,9 +239,9 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           </div>
                         ))}
                       </div>
-                      {info.notes.length > 0 && (
+                      {notes.length > 0 && (
                         <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
-                          {info.notes.map((n, i) => (
+                          {notes.map((n, i) => (
                             <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.6)', padding:'5px 8px', borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.12)', lineHeight:1.4 }}>
                               {n}
                             </div>
@@ -352,6 +366,39 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       {diaryAutoreg.plateauWarnings.map((w, i) => <div key={'pw'+i} style={{ marginTop:2, color:'#ef4444' }}>🔴 {w}</div>)}
                     </div>}
                     {autoRegMode === 'diary' && !diaryAutoreg && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план и выберите неделю — дневниковая авторегуляция применится к весам.</div>}
+                  </div>
+                );
+              })()}
+              {/* Авторегуляция ПРОГРЕССИИ ПМ (только ПМ, без объёма) — независимый переключатель */}
+              {(() => {
+                const pmColor = pmAutoRegMode === 'auto' ? '#a78bfa' : pmAutoRegMode === 'diary' ? '#22c55e' : '#71717a';
+                const pmSegBtn = (m: PMAutoRegMode, label: string) => (
+                  <button onClick={() => setPmAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: pmAutoRegMode === m ? pmColor : 'rgba(255,255,255,0.08)', color: pmAutoRegMode === m ? '#000' : 'rgba(255,255,255,0.6)' }}>{label}</button>
+                );
+                return (
+                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.06)', border: '1px solid ' + (pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.25)') }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                      <div>
+                        <span style={{ fontSize:11, fontWeight:700, color: pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.4)' : pmColor }}>
+                          {pmAutoRegMode === 'off' ? 'Прогрессия ПМ: по данным цикла' : pmAutoRegMode === 'auto' ? '⚡ ПМ по авторасчётам' : '📒 ПМ по дневнику'}
+                        </span>
+                        <span style={{ marginLeft:6, fontSize:10, color:'rgba(255,255,255,0.4)' }}>только ПМ · без объёма</span>
+                      </div>
+                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                        <span style={{ fontSize:10, fontWeight:700, color: pmColor, marginRight: 4 }}>Авторег. ПМ:</span>
+                        {pmSegBtn('off', 'ВЫКЛ')}
+                        {pmSegBtn('auto', 'АВТО')}
+                        {pmSegBtn('diary', 'ДНЕВНИК')}
+                      </div>
+                    </div>
+                    {pmAutoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                      <div>Темп ПМ рассчитывается автоматически (PED/курс/уровень), коррекция цикла игнорируется.</div>
+                    </div>}
+                    {pmAutoRegMode === 'diary' && pmDiary && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                      <div style={{ fontWeight:700, color: '#22c55e' }}>✓ {pmDiary.adjusted} скорректировано · {pmDiary.noData} без данных</div>
+                      {pmDiary.decisions.slice(0,4).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                    </div>}
+                    {pmAutoRegMode === 'diary' && !pmDiary && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план — дневниковая авторегуляция ПМ применится к кривой ПМ.</div>}
                   </div>
                 );
               })()}
@@ -703,10 +750,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                     const es = effSet(wk.week, di, ei, setIdx, ws);
                                     return (
                                       <div key={setIdx} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
-                                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(ws.pct*100)}%</span></div>
-                                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                                          <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], weight: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
+                                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span></div>
+                                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                                          <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), weight: +ev.target.value } }; delete next[k].pct; return next; })} style={{ ...INM, width:'100%' }} /></div>
                                           <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
+                                          <div><div style={IN_LBL}>% ПМ</div><input type='number' value={Math.round(es.pct*100)} min={0} max={110} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), pct: (+ev.target.value) / 100 } }; delete next[k].weight; return next; })} style={{ ...INM, width:'100%' }} title='% от ПМ недели — вес пересчитается автоматически' /></div>
                                         </div>
                                       </div>
                                     );
