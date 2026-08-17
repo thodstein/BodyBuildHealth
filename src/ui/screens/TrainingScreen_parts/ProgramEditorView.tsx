@@ -190,8 +190,30 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const [showTableView, setShowTableView] = useState(false);
   // Внутренний шаг редактора: standard = [Параметры, Недели], pro = [Профиль, Параметры, Недели, Анализ, Обратная связь, Инструменты]
   const editorSteps = isPro ? PRO_EDITOR_STEPS : STANDARD_EDITOR_STEPS;
-  const [estep, setEstep] = useState<EditorStep>('params');
-  useEffect(() => { setEstep(isPro ? 'profile' : 'params'); }, [program.meta.id, isPro]);
+  // Шаг восстанавливается из sessionStorage (he_editor_step) — возврат из «Итога» не сбрасывает позицию
+  const [estep, setEstep] = useState<EditorStep>(() => {
+    try {
+      const raw = sessionStorage.getItem('he_editor_step');
+      if (raw) {
+        const stored = JSON.parse(raw) as { id?: string; step?: EditorStep };
+        // Валидируем шаг по ТЕКУЩЕМУ режиму (pro/standard) — иначе пилюля не подсветится и контент не отрисуется
+        if (stored.id === program.meta.id && stored.step && editorSteps.includes(stored.step)) {
+          return stored.step;
+        }
+      }
+    } catch { /* ignore */ }
+    return isPro ? 'profile' : 'params';
+  });
+  const estepResetFirst = useRef(true);
+  useEffect(() => {
+    // Первый рендер пропускаем (инициализатор уже восстановил/выбрал шаг),
+    // дальше — сброс к первому шагу при смене программы или режима.
+    if (estepResetFirst.current) { estepResetFirst.current = false; return; }
+    setEstep(isPro ? 'profile' : 'params');
+  }, [program.meta.id, isPro]);
+  useEffect(() => {
+    try { sessionStorage.setItem('he_editor_step', JSON.stringify({ id: program.meta.id, step: estep })); } catch { /* ignore */ }
+  }, [estep, program.meta.id]);
   const estepIdx = editorSteps.indexOf(estep);
   const isLastEditorStep = estepIdx >= editorSteps.length - 1;
   const goNextStep = useCallback(() => {
@@ -554,8 +576,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
 return (
       <div className="manual-constructor manual-constructor--editor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-       {/* Шапка липкая — остаётся сверху при скролле контента (внутренние шаги ниже) */}
-        <div className="manual-constructor__header editor-topbar" style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
+       {/* Липкая навигация: шапка + пилюли внутренних шагов всегда наверху */}
+        <div style={{ position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
+        <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
@@ -613,6 +636,11 @@ return (
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+          {estepIdx > 0 && (
+            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => setEstep(editorSteps[estepIdx - 1])}>
+              ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
+            </button>
+          )}
           {onNext && (
             <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={goNextStep}>
               Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
@@ -667,12 +695,14 @@ return (
       </div>
 
       {/* Внутренние шаги редактора: содержимое показывается по одному шагу */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {editorSteps.map(s => (
           <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined}>
             {EDITOR_STEP_LABELS[s]}
           </button>
         ))}
+        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 'auto' }}>шаг {estepIdx + 1} из {editorSteps.length}</span>
+      </div>
       </div>
 
       {/* P2-1/F5: подсказка при пустой программе — прямая CTA авто-черновика (шаг «🎛 Параметры») */}

@@ -106,9 +106,6 @@
 .manual-constructor--editor .editor-topbar {
   gap: 8px;
   padding: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 40;
 }
 .manual-constructor--editor .editor-meta-card {
   border-top: 2px solid var(--accent-line);

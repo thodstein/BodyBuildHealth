@@ -12,6 +12,7 @@ import { ProgramManagerPanelWithProvider } from '../ProgramManagerPanel';
 describe('Ручной конструктор — последовательные шаги', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('шаг 1 «Выбор»: навигационные пилюли видны', () => {
@@ -22,16 +23,24 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('🆕 Создать новую')).toBeTruthy();
   });
 
-  it('standard: создание → «Далее: Недели →» (первый шаг Параметры), затем «Далее: Итог →»', async () => {
+  it('standard: создание → «Далее: Недели →» (первый шаг Параметры), затем «Далее: Итог →» + «← Назад»', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);
     await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
-    // Пилюля «2 Редактор» активна, внутренние пилюли standard видны
+    // Пилюля «2 Редактор» активна, внутренние пилюли standard видны, счётчик шага
     expect(screen.getByText('2 Редактор')).toBeTruthy();
     expect(screen.getByText('🎛 Параметры')).toBeTruthy();
     expect(screen.getByText('🗓 Недели')).toBeTruthy();
+    expect(screen.getByText('шаг 1 из 2')).toBeTruthy();
+    // На первом шаге кнопки «← Назад» нет
+    expect(screen.queryByText('← Назад: Параметры')).toBeNull();
     fireEvent.click(screen.getByText('Далее: Недели →'));
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
+    expect(screen.getByText('шаг 2 из 2')).toBeTruthy();
+    // На втором шаге появляется «← Назад: Параметры» — возврат на первый шаг
+    expect(screen.getByText('← Назад: Параметры')).toBeTruthy();
+    fireEvent.click(screen.getByText('← Назад: Параметры'));
+    expect(screen.getByText('Далее: Недели →')).toBeTruthy();
   });
 
   it('standard: «Далее: Недели →» → «Далее: Итог →» открывает шаг «Итог»', async () => {
@@ -45,21 +54,29 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('📋 В буфер')).toBeTruthy();
   });
 
-  it('pro: внутренние шаги редактора (Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты → Итог)', async () => {
+  it('pro: внутренние шаги редактора (Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты → Итог) с «← Назад»', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getByText('Профессиональный'));
     fireEvent.click(screen.getAllByText('ББ')[0]);
     await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
-    // Все 6 внутренних пилюль видны
+    // Все 6 внутренних пилюль видны + счётчик
     expect(screen.getByText('👤 Профиль')).toBeTruthy();
     expect(screen.getByText('🎛 Параметры')).toBeTruthy();
     expect(screen.getByText('🗓 Недели')).toBeTruthy();
     expect(screen.getByText('📊 Анализ')).toBeTruthy();
     expect(screen.getByText('🔄 Обратная связь')).toBeTruthy();
     expect(screen.getByText('🔧 Инструменты')).toBeTruthy();
+    expect(screen.getByText('шаг 1 из 6')).toBeTruthy();
     // «Далее» ведёт по шагам pro
     fireEvent.click(screen.getByText('Далее: Параметры →'));
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
+    expect(screen.getByText('шаг 2 из 6')).toBeTruthy();
+    // «← Назад: Профиль» возвращает на первый шаг
+    expect(screen.getByText('← Назад: Профиль')).toBeTruthy();
+    fireEvent.click(screen.getByText('← Назад: Профиль'));
+    expect(screen.getByText('Далее: Параметры →')).toBeTruthy();
+    // Проходим до конца
+    fireEvent.click(screen.getByText('Далее: Параметры →'));
     fireEvent.click(screen.getByText('Далее: Недели →'));
     expect(screen.getByText('Далее: Анализ →')).toBeTruthy();
     fireEvent.click(screen.getByText('Далее: Анализ →'));
@@ -68,6 +85,7 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('Далее: Инструменты →')).toBeTruthy();
     fireEvent.click(screen.getByText('Далее: Инструменты →'));
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
+    expect(screen.getByText('шаг 6 из 6')).toBeTruthy();
   });
 
   it('пилюли «Редактор»/«Итог» не переводят без выбранной программы', () => {
