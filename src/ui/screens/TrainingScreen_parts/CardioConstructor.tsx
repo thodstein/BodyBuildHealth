@@ -243,6 +243,16 @@ export const CardioConstructor: React.FC = () => {
     });
   }, []);
 
+  // Факторы профиля, применённые к сборке и предпросмотру шага 1 (единый источник).
+  const previewFactors = useMemo(() => ({
+    sleepHours: factorsOn.sleep ? pf.sleepHours : undefined,
+    stressLevel: factorsOn.stress ? pf.stressLevel : undefined,
+    hrvMs: factorsOn.hrv ? pf.hrvMs : undefined,
+    enhanced: factorsOn.ped ? pf.enhanced : undefined,
+    autoLowImpact: factorsOn.joints ? true : undefined,
+    jointIssues: factorsOn.joints ? pf.jointIssues : undefined,
+  }), [factorsOn, pf]);
+
   // Результат и библиотека
   const [cycle, setCycle] = useState<CardioCycle | null>(null);
   const [library, setLibrary] = useState<CardioCycle[]>([]);
@@ -299,12 +309,7 @@ export const CardioConstructor: React.FC = () => {
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex,
       legDays,
-      sleepHours: factorsOn.sleep ? pf.sleepHours : undefined,
-      stressLevel: factorsOn.stress ? pf.stressLevel : undefined,
-      hrvMs: factorsOn.hrv ? pf.hrvMs : undefined,
-      enhanced: factorsOn.ped ? pf.enhanced : undefined,
-      autoLowImpact: factorsOn.joints ? true : undefined,
-      jointIssues: factorsOn.joints ? pf.jointIssues : undefined,
+      ...previewFactors,
       phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
     };
     const vOpts = variant === 'gentle'
@@ -501,25 +506,25 @@ export const CardioConstructor: React.FC = () => {
     try {
       return cardioPlanVariants({
         goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
-        competitions: comps, taperWeeks, peakWeek, level, equipment, lowImpact,
+        competitions: comps, taperWeeks, taper: taperEnabled, peakWeek, level, equipment, lowImpact,
         age: Math.max(12, Math.min(90, Number(age) || 30)),
         restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
         sex,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
       });
     } catch { return []; }
-  }, [step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit]);
+  }, [step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex, phaseSplit]);
 
   const planExplanation = useMemo(() => {
     if (!cycle || step !== 'preview') return [];
     return explainCardioChoice({
       goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight,
-      competitions: comps, taperWeeks, peakWeek, level, equipment, lowImpact,
+      competitions: comps, taperWeeks, taper: taperEnabled, peakWeek, level, equipment, lowImpact,
       age: Math.max(12, Math.min(90, Number(age) || 30)),
       restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
       sex,
     }, cycle);
-  }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
+  }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
 
   const resetParams = () => {
     setGoal('cut');
@@ -667,7 +672,8 @@ export const CardioConstructor: React.FC = () => {
           phaseSplit={phaseSplit} setPhaseSplit={setPhaseSplit}
           comps={comps}
           bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
-          taperWeeks={taperWeeks} peakWeek={peakWeek}
+          taperWeeks={taperWeeks} setTaperWeeks={setTaperWeeks} taperEnabled={taperEnabled} setTaperEnabled={setTaperEnabled} peakWeek={peakWeek} setPeakWeek={setPeakWeek}
+          previewFactors={previewFactors}
           level={level} setLevel={setLevel}
           equipment={equipment} setEquipment={setEquipment}
           lowImpact={lowImpact} setLowImpact={setLowImpact}

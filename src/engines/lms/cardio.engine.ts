@@ -1800,11 +1800,14 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
     else add('ok', `HIIT на ${s.hiitWeeks} неделях — метаболический стимул есть.`, 0);
   }
 
-  // 5. Taper у стартов
+  // 5. Taper у стартов (не штрафуем циклы, где taper выключен явно)
   if ((cycle.linkedCompetitionIds?.length ?? 0) > 0) {
+    const taperOff = cycle.config?.taper === false;
     const taperWeeksCount = cycle.weeks.filter(w => w.phase === 'taper').length;
-    if (taperWeeksCount === 0) add('warn', 'Есть старты, но нет ни одной taper-недели.', 10);
-    else add('ok', `Taper построен (${taperWeeksCount} нед).`, 0);
+    if (taperWeeksCount === 0) {
+      if (taperOff) add('info', 'Taper отключён в параметрах — перед стартом наращивание (contest_prep), без снижения объёма.', 0);
+      else add('warn', 'Есть старты, но нет ни одной taper-недели.', 10);
+    } else add('ok', `Taper построен (${taperWeeksCount} нед).`, 0);
     const peak = cycle.weeks.find(w => w.phase === 'peak');
     if (peak && peak.sessions.some(s => s.type === 'hiit')) add('warn', 'Пик-неделя содержит HIIT.', 10);
   }
@@ -1912,8 +1915,12 @@ export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle)
   }
   const comps = (input.competitions ?? []).filter(c => c.week >= 1 && c.week <= (input.totalWeeks ?? 12));
   if (comps.length > 0) {
-    const tw = Math.max(1, Math.min(4, Math.round(input.taperWeeks ?? 2)));
-    lines.push(`Старты: ${comps.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${tw} нед${input.peakWeek !== false ? ' + пик-неделя' : ''} (без HIIT, объём ×0.6-0.7).`);
+    if (input.taper === false) {
+      lines.push(`Старты: ${comps.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper отключён: перед стартом наращивание (contest_prep), неделя старта${input.peakWeek !== false ? ' — пик (только лёгкое recovery)' : ' — обычная'}, без taper-кривой.`);
+    } else {
+      const tw = Math.max(1, Math.min(4, Math.round(input.taperWeeks ?? 2)));
+      lines.push(`Старты: ${comps.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${tw} нед${input.peakWeek !== false ? ' + пик-неделя' : ''} (без HIIT, объём ×0.85→×0.4).`);
+    }
   }
   const s = cardioCycleSummary(cycle);
   lines.push(`Итог: ${cycle.totalWeeks} нед, ${s.avgMinutesPerWeek} мин/нед, ${s.avgKcalPerWeek} ккал/нед, ${s.hiitWeeks} HIIT-недель.`);

@@ -10,9 +10,9 @@ import {
   CARDIO_LEVEL_LABELS, CARDIO_EQUIPMENT_OPTIONS, DAY_LABELS_RU,
   type CardioCycle, type CardioGoal, type CardioLevel, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
-import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
+import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
-  ROW, LABEL, HINT, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE,
+  ROW, LABEL, HINT, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR,
   SectionCard, StatTile, GroupHeading, SectionNav, InfoBanner,
 } from './CardioUI';
 
@@ -39,6 +39,25 @@ const GOAL_DESC: Record<CardioGoal, string> = {
 
 export interface PhaseSplitState { auto: boolean; base: number; build: number; maintenance: number }
 
+export interface CardioPreviewFactors {
+  sleepHours?: number;
+  stressLevel?: number;
+  hrvMs?: number;
+  enhanced?: boolean;
+  autoLowImpact?: boolean;
+  jointIssues?: boolean;
+}
+
+const PHASE_ORDER: { phase: CardioPhase; label: string }[] = [
+  { phase: 'base', label: 'База' },
+  { phase: 'build', label: 'Наращивание' },
+  { phase: 'contest_prep', label: 'Prep' },
+  { phase: 'maintenance', label: 'Поддержание' },
+  { phase: 'taper', label: 'Taper' },
+  { phase: 'peak', label: 'Пик' },
+  { phase: 'transition', label: 'Переход' },
+];
+
 export const CardioParamsStep: React.FC<{
   goal: CardioGoal;
   setGoal: (g: CardioGoal) => void;
@@ -54,7 +73,12 @@ export const CardioParamsStep: React.FC<{
   bodyWeight: number;
   setBodyWeight: (n: number) => void;
   taperWeeks: number;
+  setTaperWeeks: (n: number) => void;
+  taperEnabled: boolean;
+  setTaperEnabled: (v: boolean) => void;
   peakWeek: boolean;
+  setPeakWeek: (v: boolean) => void;
+  previewFactors?: CardioPreviewFactors;
   level: CardioLevel;
   setLevel: (l: CardioLevel) => void;
   equipment: CardioEquipment[];
@@ -73,12 +97,12 @@ export const CardioParamsStep: React.FC<{
   onToggleFactor: (key: keyof { sleep: boolean; stress: boolean; hrv: boolean; ped: boolean; joints: boolean }) => void;
   factorsSummary: string[];
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, peakWeek, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onReset }) => {
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onReset }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
     for (const c of comps) {
-      if (c.week < taperWeeks + 1) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper (${taperWeeks} нед) не влезает.`);
+      if (taperEnabled && c.week < taperWeeks + 1) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper (${taperWeeks} нед) не влезает.`);
     }
     if (lowImpact && equipment.includes('running')) {
       warnings.push('«Щадить суставы» включено, но выбран бег — бег заменяется низкоударным видом.');
@@ -93,6 +117,7 @@ export const CardioParamsStep: React.FC<{
         bodyWeight,
         competitions: comps,
         taperWeeks,
+        taper: taperEnabled,
         peakWeek,
         level,
         equipment,
@@ -101,12 +126,13 @@ export const CardioParamsStep: React.FC<{
         restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
         sex,
         legDays,
+        ...previewFactors,
         phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
         source: 'auto',
       });
       return { cycle, warnings };
     } catch { return { cycle: null, warnings }; }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, peakWeek, level, equipment, lowImpact, age, restingHr, sex, legDays]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, comps, phaseSplit, bodyWeight, taperWeeks, taperEnabled, peakWeek, previewFactors, level, equipment, lowImpact, age, restingHr, sex, legDays]);
 
   const s = preview.cycle ? cardioCycleSummary(preview.cycle) : null;
   const applyPreset = (id: string) => {
@@ -276,7 +302,23 @@ export const CardioParamsStep: React.FC<{
         <div style={ROW}>
           <button style={phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}>Авто (по долям)</button>
           <button style={!phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}>Вручную</button>
+          <span style={{ flex: 1 }} />
+          <button style={taperEnabled ? CHIP_ACTIVE : CHIP} onClick={() => setTaperEnabled(!taperEnabled)} aria-label="Taper перед стартом">
+            {taperEnabled ? '📉 Taper: вкл' : 'Taper: выкл'}
+          </button>
+          <button style={peakWeek ? CHIP_ACTIVE : CHIP} onClick={() => setPeakWeek(!peakWeek)} aria-label="Пик-неделя старта">
+            {peakWeek ? '🏔 Пик-неделя: вкл' : 'Пик-неделя: выкл'}
+          </button>
         </div>
+        {taperEnabled && (
+          <div style={ROW}>
+            <span style={LABEL}>Недель taper</span>
+            <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
+            <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{taperWeeks}</span>
+            <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нед</span>
+          </div>
+        )}
         {!phaseSplit.auto && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(['base', 'build', 'maintenance'] as const).map(k => (
@@ -305,6 +347,30 @@ export const CardioParamsStep: React.FC<{
             <StatTile label="ККАЛ/НЕД" value={String(s.avgKcalPerWeek)} color="#f59e0b" />
             <StatTile label="HIIT-НЕД" value={String(s.hiitWeeks)} color="#a78bfa" />
             <StatTile label="ЦЕЛЬ" value={CARDIO_GOAL_LABELS[goal]} color="#94a3b8" />
+          </div>
+        )}
+        {preview.cycle && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={ROW}>
+              <span style={LABEL}>🗺 Фазы по неделям</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 10, color: taperEnabled ? '#eab308' : 'rgba(255,255,255,0.6)', fontWeight: 800 }}>
+                {taperEnabled ? `📉 taper ${taperWeeks} нед${peakWeek ? ' + пик' : ''}` : 'без taper'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 2, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {preview.cycle.weeks.map(w => (
+                <div key={w.week} style={{ flex: '1 0 10px', minWidth: 8, height: 18, borderRadius: 3, background: PHASE_COLOR[w.phase] ?? '#888', opacity: w.deload ? 0.55 : 1 }} title={`Нед ${w.week} · ${w.phase}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {PHASE_ORDER.filter(p => (s?.phaseWeeks[p.phase] ?? 0) > 0).map(p => (
+                <span key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 2, background: PHASE_COLOR[p.phase] }} />
+                  {p.label} · {s?.phaseWeeks[p.phase]}
+                </span>
+              ))}
+            </div>
           </div>
         )}
         {preview.warnings.map((w, i) => (

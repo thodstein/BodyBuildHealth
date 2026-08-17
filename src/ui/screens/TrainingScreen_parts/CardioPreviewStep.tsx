@@ -307,10 +307,10 @@ export const CardioPreviewStep: React.FC<{
         </div>
       </div>
 
-      {/* Taper-план */}
+      {/* Taper-план (или пик-недели при taper:false) */}
       {taperPlan.length > 0 && (
         <div style={{ ...CARD, borderColor: 'rgba(234,179,8,0.3)' }}>
-          <div style={LABEL}>📉 Taper-план перед стартом</div>
+          <div style={LABEL}>{cycle.config?.taper === false ? '🏔 Пик-неделя перед стартом (без taper)' : '📉 Taper-план перед стартом'}</div>
           {taperPlan.map(w => (
             <div key={w.week} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
               <span style={{ width: 44, fontWeight: 800, color: PHASE_COLOR[w.phase] }}>нед {w.week}</span>

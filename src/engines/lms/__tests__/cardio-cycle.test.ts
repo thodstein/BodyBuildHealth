@@ -1555,3 +1555,40 @@ describe('buildCardioCycle — taper: false (цикл без taper-кривой)
     expect(c.weeks.some(w => w.phase === 'taper')).toBe(true);
   });
 });
+
+// ─── Качество и объяснение при taper: false ───
+
+describe('cardioQualityReport — taper:false не штрафуется, taper:true без taper-недель штрафуется', () => {
+  it('цикл со стартом и taper:false — НЕ предупреждает «нет taper-недель»', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, taper: false, competitions: [{ id: 'c', name: 'Шоу', week: 6 }] });
+    const r = cardioQualityReport(c, 5);
+    expect(c.weeks.some(w => w.phase === 'taper')).toBe(false);
+    expect(r.findings.some(f => f.text.includes('нет ни одной taper-недели'))).toBe(false);
+    expect(r.findings.some(f => f.text.includes('отключён'))).toBe(true);
+  });
+
+  it('цикл со стартом на 1-й неделе и taper включён (нет места под taper) — предупреждение остаётся', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, taper: true, competitions: [{ id: 'c', name: 'Старт', week: 1 }] });
+    const r = cardioQualityReport(c, 5);
+    expect(c.weeks.some(w => w.phase === 'taper')).toBe(false);
+    expect(r.findings.some(f => f.level === 'warn' && f.text.includes('нет ни одной taper-недели'))).toBe(true);
+  });
+});
+
+describe('explainCardioChoice — текст для taper:false', () => {
+  it('при taper:false объяснение сообщает «taper отключён» вместо «taper N нед»', () => {
+    const input = { goal: 'cut' as const, totalWeeks: 8, taper: false, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] };
+    const cycle = buildCardioCycle({ ...input });
+    const text = explainCardioChoice({ ...input }, cycle).join('\n');
+    expect(text).toContain('taper отключён');
+    expect(text).not.toContain('taper 2 нед');
+    expect(text).toContain('наращивание');
+  });
+
+  it('при taper:true объяснение сообщает число недель taper', () => {
+    const input = { goal: 'cut' as const, totalWeeks: 8, taper: true, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] };
+    const cycle = buildCardioCycle({ ...input });
+    const text = explainCardioChoice({ ...input }, cycle).join('\n');
+    expect(text).toContain('taper 2 нед');
+  });
+});

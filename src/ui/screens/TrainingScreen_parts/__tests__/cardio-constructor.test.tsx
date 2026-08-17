@@ -52,6 +52,16 @@ describe('CardioConstructor — SSR', () => {
     expect(html).toContain('Из профиля');
     expect(html).toContain('ЧСС покоя');
   });
+
+  it('шаг 1: taper вкл по умолчанию + визуальная карта фаз в предпросмотре', () => {
+    const html = renderToStaticMarkup(<CardioConstructor />);
+    expect(html).toContain('Taper: вкл');
+    expect(html).toContain('Пик-неделя: вкл');
+    expect(html).toContain('Фазы по неделям');
+    expect(html).toContain('taper 2 нед');
+    expect(html).toContain('База');
+    expect(html).toContain('Поддержание');
+  });
 });
 
 describe('CardioConstructor — CSR', () => {
@@ -74,6 +84,20 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     const saved = loadCardioCycles()[0];
     expect(saved.weeks.some(w => w.phase === 'peak')).toBe(false);
+  });
+
+  it('шаг 1: выключение taper напрямую в параметрах — сборка без taper-кривой', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Taper перед стартом/ }));
+    expect(screen.getByText(/Taper: выкл/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.change(screen.getByPlaceholderText(/Название/), { target: { value: 'Старт' } });
+    fireEvent.change(screen.getByPlaceholderText(/Неделя/), { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    const saved = loadCardioCycles()[0];
+    expect(saved.weeks.some(w => w.phase === 'taper')).toBe(false);
   });
 
   it('сборка на предпросмотре сохраняет цикл в библиотеку и показывает метрики', () => {
