@@ -18,7 +18,7 @@ import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, Progre
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { ProPanelSection, ProPanelsGroup, ThemeToggle } from './ProPanelSection';
 import { MesoHeatmap } from './MesoHeatmap';
-import { ProgramNotes, ProgramMetricsCSV, RecoveryBadge, ProgramStrengthScore } from './ProgramExtras';
+import { ProgramNotes, ProgramStrengthScore } from './ProgramExtras';
 import { ProgramRevisionsDiff } from './ProgramRevisions';
 import { StrengthDiaryPanel } from './StrengthDiaryPanel';
 import { CardioLinkCard } from './CardioLinkCard';
@@ -257,13 +257,12 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   // Детерминированная фиксация шапки: sticky может не сработать из-за
   // overflow:hidden на main/внутренней обёртке и transform-анимаций предков,
   // поэтому при уходе верха редактора за экран переключаем шапку в position:fixed
-  // с замером левого края/ширины (window + ближайший скроллер + ResizeObserver).
+  // с замером левого края/ширины (document-capture scroll + window + ResizeObserver).
   const editorHeaderRef = useRef<HTMLDivElement | null>(null);
   const [headerPinned, setHeaderPinned] = useState(false);
   const [headerPad, setHeaderPad] = useState(0);
   const [headerRect, setHeaderRect] = useState<{ left: number; width: number } | null>(null);
   useEffect(() => {
-    let scroller: HTMLElement | null = null;
     let ro: ResizeObserver | null = null;
     const measure = () => {
       const root = editorRootRef.current;
@@ -287,15 +286,16 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         ro = new ResizeObserver(() => measure());
         ro.observe(root);
       }
-      scroller = root.closest('.screen.training-screen, main') as HTMLElement | null;
-      scroller?.addEventListener('scroll', measure, { passive: true });
+      // Перехват scroll в capture-фазе на document ловит скролл ЛЮБОГО контейнера
+      // (в приложении реальный скроллер может быть не .training-screen и не main).
+      document.addEventListener('scroll', measure, { capture: true, passive: true });
       window.addEventListener('scroll', measure, { passive: true });
       window.addEventListener('resize', measure);
       measure();
     } catch { /* jsdom: getBoundingClientRect/ResizeObserver могут отсутствовать */ }
     return () => {
       ro?.disconnect();
-      scroller?.removeEventListener('scroll', measure);
+      document.removeEventListener('scroll', measure, { capture: true } as EventListenerOptions);
       window.removeEventListener('scroll', measure);
       window.removeEventListener('resize', measure);
     };
@@ -650,88 +650,72 @@ return (
         <div ref={editorHeaderRef} style={headerPinned && headerRect
           ? { position: 'fixed', top: 0, left: headerRect.left, width: headerRect.width, zIndex: 60, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }
           : { position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
-        <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Ряд 1: информация о программе */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: isPro ? 'rgba(167,139,250,0.12)' : 'rgba(0,230,138,0.10)', border: isPro ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(0,230,138,0.25)', color: isPro ? '#c4b5fd' : '#00e68a', whiteSpace: 'nowrap' }}>{isPro ? '🎓 PRO' : '✋ Стандарт'}</span>
         <span style={{ fontSize: 10, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>
           🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
         </span>
-        {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
-        <span className="editor-topbar-hide-mobile"><ProgramMetricsCSV program={program} dir={dir} onToast={showToast} /></span>
-        {program.meta.updatedAt && (
-          <span className="editor-topbar-hide-mobile" style={{ fontSize: 11, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
-            · {(() => {
-              const diff = Date.now() - new Date(program.meta.updatedAt).getTime();
-              if (diff < 0 || diff < 60000) return 'только что';
-              const min = Math.floor(diff / 60000);
-              if (min < 60) return `${min} мин назад`;
-              const hr = Math.floor(min / 60);
-              if (hr < 24) return `${hr} ч назад`;
-              const day = Math.floor(hr / 24);
-              if (day < 30) return `${day} дн назад`;
-              return `${Math.floor(day / 30)} мес назад`;
-            })()}
-          </span>
-        )}
         {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
+        </div>
 
-      {/* P5.2 — Inline-валидация: критические ошибки сразу бросаются в глаза. */}
+      {/* P5.2 — Inline-валидация: компактная строка, подробности — в карточке валидации ниже */}
       {(() => {
         const issues = validateProgram(program);
         const errs = issues.filter((i) => i.level === 'error');
         const warns = issues.filter((i) => i.level === 'warning');
         if (errs.length === 0 && warns.length === 0) return null;
+        const color = errs.length > 0 ? '#ef4444' : '#f59e0b';
         return (
-           <div role="alert" aria-live="polite" style={{ background: errs.length > 0 ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)', borderRadius: 8, padding: '8px 10px', borderLeft: '3px solid ' + (errs.length > 0 ? '#ef4444' : '#f59e0b') }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: errs.length > 0 ? '#ef4444' : '#f59e0b', marginBottom: 4 }}>
-              {errs.length > 0 ? `🚫 ${errs.length} ошибк${errs.length === 1 ? 'а' : 'и'} валидации` : `⚠ ${warns.length} предупреждений`}
-            </div>
-            <div style={{ fontSize: 10, lineHeight: 1.45, color: 'rgba(255,255,255,0.85)' }}>
-              {errs.slice(0, 4).map((i, ix) => <div key={'e' + ix}>• <b>{i.code}</b>: {i.message}</div>)}
-              {warns.slice(0, 3).map((i, ix) => <div key={'w' + ix}>• <b>{i.code}</b>: {i.message}</div>)}
-              {(errs.length + warns.length) > 7 && <div style={{ color: DIM, marginTop: 4 }}>…и ещё {(errs.length + warns.length) - 7}</div>}
-            </div>
+          <div role="alert" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 6, background: color + '14', borderRadius: 8, padding: '5px 10px', border: '1px solid ' + color + '44', fontSize: 11, fontWeight: 700, color, flexWrap: 'wrap' }}>
+            {errs.length > 0 ? `🚫 ${errs.length} ошибк${errs.length === 1 ? 'а' : 'и'} валидации` : `⚠ ${warns.length} предупреждени${warns.length === 1 ? 'е' : 'я'}`}
+            <span style={{ fontWeight: 400, color: DIM }}>— подробности в карточке ниже</span>
           </div>
         );
       })()}
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {/* P2-5: основной ряд (всегда виден) */}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
-          {(dir === 'bb' || dir === 'pl') && (
-            <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
-              Нед
-              <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 50, minHeight: 44, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя выполнения" inputMode="numeric" />
-            </label>
-          )}
-          {dir === 'bb' && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
-          )}
-          {dir === 'pl' && program.pl && (
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
-          )}
-          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={undo} title="Отменить последнее изменение (Ctrl+Z)">↩</button>
-          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={redo} title="Повторить отменённое изменение (Ctrl+Shift+Z)">↪</button>
-          <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
-            {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
-          </button>
-          {estepIdx > 0 && (
-            <button style={{ ...BTN_GHOST, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep}>
-              ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
+        {/* Ряд 2: действия — навигация слева, основные справа */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
+            {(dir === 'bb' || dir === 'pl') && (
+              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, marginRight: 4 }}>
+                Нед
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 50, minHeight: 44, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя выполнения" inputMode="numeric" />
+              </label>
+            )}
+            {dir === 'bb' && (
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+            )}
+            {dir === 'pl' && program.pl && (
+              <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
+            )}
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={undo} title="Отменить последнее изменение (Ctrl+Z)">↩</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 13, minHeight: 44, minWidth: 44 }} onClick={redo} title="Повторить отменённое изменение (Ctrl+Shift+Z)">↪</button>
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
+              {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
             </button>
-          )}
-          {onNext && (
-            <button style={{ ...BTN, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goNextStep}>
-              Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
-            </button>
-          )}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
-          {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
-          <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
+            {estepIdx > 0 && (
+              <button style={{ ...BTN_GHOST, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep}>
+                ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
+              </button>
+            )}
+            {onNext && (
+              <button style={{ ...BTN, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goNextStep}>
+                Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
+              </button>
+            )}
+            {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
+          </div>
         </div>
         {showMore && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
             {isPro && (
               <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
             )}

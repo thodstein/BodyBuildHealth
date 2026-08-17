@@ -891,6 +891,17 @@ export const ProgramManagerPanel: React.FC = () => {
                   <span style={chip}>📶 {levelLabel}</span>
                   <span style={chip}>🗓 {p.meta.daysPerWeek}д × {p.meta.weeks}н</span>
                   {p.meta.updatedAt && <span style={chip}>📅 {new Date(p.meta.updatedAt).toLocaleDateString('ru-RU')}</span>}
+                  {(() => {
+                    const issues = validateProgram(p);
+                    const errs = issues.filter(i => i.level === 'error').length;
+                    const warns = issues.filter(i => i.level === 'warning').length;
+                    if (errs === 0 && warns === 0) return null;
+                    return (
+                      <span style={{ ...chip, color: errs > 0 ? '#ef4444' : '#f59e0b', borderColor: errs > 0 ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)', background: errs > 0 ? 'rgba(239,68,68,0.14)' : 'rgba(245,158,11,0.14)' }} title={issues.filter(i => i.level === 'error' || i.level === 'warning').slice(0, 5).map(i => i.message).join('\n')}>
+                        {errs > 0 ? `🚫 ${errs} ошиб.` : `⚠ ${warns} предупр.`}
+                      </span>
+                    );
+                  })()}
                 </div>
                 {(() => {
                   let total = 0, filled = 0;
