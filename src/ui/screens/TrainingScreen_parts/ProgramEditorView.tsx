@@ -35,7 +35,7 @@ import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import { deserializeMacro, deserializeBbMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
-import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, UI_METRICS } from './training-ui';
+import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -72,6 +72,23 @@ const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
 
+/** Внутренние шаги редактора (внутри шага «2 Редактор» родителя).
+ *  Standard: Параметры → Недели. Pro: Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты. */
+type EditorStep = 'profile' | 'params' | 'weeks' | 'analysis' | 'feedback' | 'tools';
+const STANDARD_EDITOR_STEPS: EditorStep[] = ['params', 'weeks'];
+const PRO_EDITOR_STEPS: EditorStep[] = ['profile', 'params', 'weeks', 'analysis', 'feedback', 'tools'];
+const EDITOR_STEP_LABELS: Record<EditorStep, string> = {
+  profile: '👤 Профиль',
+  params: '🎛 Параметры',
+  weeks: '🗓 Недели',
+  analysis: '📊 Анализ',
+  feedback: '🔄 Обратная связь',
+  tools: '🔧 Инструменты',
+};
+const EDITOR_STEP_BTN_LABELS: Record<EditorStep, string> = {
+  profile: 'Профиль', params: 'Параметры', weeks: 'Недели', analysis: 'Анализ', feedback: 'Обратная связь', tools: 'Инструменты',
+};
+
 export function escapeHtml(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -87,13 +104,12 @@ export interface ProgramEditorProps {
   onSave: (note?: string) => boolean | void;
   onBack: () => void;
   onNext?: () => void;
-  estep?: 'meta' | 'weeks';
   mode: ManualMode;
   onMode: (m: ManualMode) => void;
   autoFillOnMount?: boolean;
 }
 
-export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, onNext, estep = 'weeks', mode, onMode, autoFillOnMount = false }) => {
+export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, onNext, mode, onMode, autoFillOnMount = false }) => {
   const dir = program.meta.direction;
   const isPro = mode === 'pro';
   // P4: Undo/Redo — snapshot перед каждым onChange, чтобы Ctrl+Z работал из редактора
@@ -172,7 +188,16 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   };
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
-  const [showProTools, setShowProTools] = useState(false);
+  // Внутренний шаг редактора: standard = [Параметры, Недели], pro = [Профиль, Параметры, Недели, Анализ, Обратная связь, Инструменты]
+  const editorSteps = isPro ? PRO_EDITOR_STEPS : STANDARD_EDITOR_STEPS;
+  const [estep, setEstep] = useState<EditorStep>('params');
+  useEffect(() => { setEstep(isPro ? 'profile' : 'params'); }, [program.meta.id, isPro]);
+  const estepIdx = editorSteps.indexOf(estep);
+  const isLastEditorStep = estepIdx >= editorSteps.length - 1;
+  const goNextStep = useCallback(() => {
+    if (isLastEditorStep) onNext?.();
+    else setEstep(editorSteps[estepIdx + 1]);
+  }, [onNext, editorSteps, estepIdx, isLastEditorStep]);
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
@@ -518,8 +543,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
 return (
       <div className="manual-constructor manual-constructor--editor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-       {/* Шапка не липкая — скроллится вместе с контентом */}
-        <div className="manual-constructor__header editor-topbar" style={{ background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)' }}>
+       {/* Шапка липкая — остаётся сверху при скролле контента (внутренние шаги ниже) */}
+        <div className="manual-constructor__header editor-topbar" style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
@@ -578,7 +603,9 @@ return (
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
           {onNext && (
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={onNext}>Далее: {estep === 'meta' ? 'Недели' : 'Итог'} →</button>
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={goNextStep}>
+              Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
+            </button>
           )}
           <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
           {/* P2-5: secondary ряд (сворачиваемый «⋯ Ещё») */}
@@ -628,8 +655,17 @@ return (
         )}
       </div>
 
-      {/* P2-1/F5: подсказка при пустой программе в standard-режиме — прямая CTA авто-черновика */}
-      {program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
+      {/* Внутренние шаги редактора: содержимое показывается по одному шагу */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {editorSteps.map(s => (
+          <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined}>
+            {EDITOR_STEP_LABELS[s]}
+          </button>
+        ))}
+      </div>
+
+      {/* P2-1/F5: подсказка при пустой программе — прямая CTA авто-черновика (шаг «🎛 Параметры») */}
+      {estep === 'params' && program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
         <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 14, borderLeft: '3px solid #00e68a' }}>
           <div style={{ fontSize: 12, color: DIM_STRONG, lineHeight: 1.5, marginBottom: 8 }}>
             💡 Пустая программа. Заполните автоматически на основе вашего профиля или возьмите готовую из библиотеки.
@@ -654,37 +690,17 @@ return (
         </div>
       )}
 
-      {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: контекстные панели, профиль, лаб-коррекция, диагностика, объём, периодизация, рекомендации, тренер ═════════ */}
-      {isPro && (
+      {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: пошаговые секции (профиль / анализ / обратная связь / инструменты) ═════════ */}
+      {isPro && estep === 'profile' && (
       <>
-      <div className="manual-constructor__pro-tools-toggle">
-        <button type="button" onClick={() => setShowProTools(value => !value)} aria-expanded={showProTools}>
-          {showProTools ? '▲ Скрыть PRO-анализ' : '▼ Открыть PRO-анализ и инструменты'}
-        </button>
-        <span>Основной редактор программы находится ниже</span>
-      </div>
-      {showProTools && <>
-      {dir === 'pl' && (
-        <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', marginBottom: 3 }}>
-            🏆 ПЛ PRO: диагностика, мёртвые точки и инструменты
-          </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
-            Анализ применяется только как рекомендация и добавление ассистентов. Исходные упражнения и процентовки ПЛ-цикла не изменяются.
-          </div>
-          <PlannerToolsPanel mode="pl" />
-          <div style={{ marginTop: 10, borderTop: '1px solid rgba(167,139,250,0.2)', paddingTop: 8 }}>
-            <PlDeadpointsBarPathCard />
-          </div>
-        </div>
+      <TrainingProfileCard profile={tprofile} update={updateTProfile} compact />
+      </>
       )}
+      {isPro && estep === 'analysis' && (
+      <>
       {/* P4 — контекстная панель ББ (ПЛ дубль PLEditor удалён — F4.5) */}
       {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
       {dir === 'bb' && program.bb && <MesoHeatmap program={program} dir={dir} onToast={showToast} />}
-
-      {/* Единый профиль тренированности: ПМ, workMax, weakPoints, оборудование, курс —
-          авто-черновик и SMART-рекомендации читают эти данные. */}
-      <TrainingProfileCard profile={tprofile} update={updateTProfile} compact />
 
       {/* Лабораторная коррекция плана: MRV× + предупреждения по анализам */}
       {labAdjust.mrvMultiplier < 1 && (() => {
@@ -722,21 +738,16 @@ return (
             <ProgramStrengthScore program={program} dir={dir} />
             <PlanDiagnosticsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
             <InteractiveVolumePanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-            <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
-              onApply={(phases) => {
-                if (dir !== 'bb' || !program.bb) return;
-                const weeks = program.bb.weeks.map((w) => {
-                  const phase = phases.find(p => Array.isArray(p.weeks) && p.weeks.includes(w.week));
-                  return { ...w, phase: (phase?.phase || w.phase) as any, deload: phase?.phase === 'deload' ? true : w.deload };
-                });
-                update({ bb: { ...program.bb!, weeks } });
-                showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
-              }}
-            />
             <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
             <TonnageEstimatePanel program={program} dir={dir} />
           </>,
         },
+      ]} />
+      </>
+      )}
+      {isPro && estep === 'feedback' && (
+      <>
+      <ProPanelsGroup sections={[
         {
           id: 'feedback',
           title: '🔄 Обратная связь (sRPE / RIR / чек-ин)',
@@ -749,19 +760,39 @@ return (
             <ReadinessForecastPanel program={program} dir={dir} />
             <CheckinGuardPanel program={program} dir={dir} />
             <WhatIfGuardPanel program={program} dir={dir} />
+            <StrengthDiaryPanel program={program} dir={dir} />
           </>,
         },
+      ]} />
+      </>
+      )}
+      {isPro && estep === 'tools' && (
+      <>
+      {dir === 'pl' && (
+        <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', marginBottom: 3 }}>
+            🏆 ПЛ PRO: диагностика, мёртвые точки и инструменты
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
+            Анализ применяется только как рекомендация и добавление ассистентов. Исходные упражнения и процентовки ПЛ-цикла не изменяются.
+          </div>
+          <PlannerToolsPanel mode="pl" />
+          <div style={{ marginTop: 10, borderTop: '1px solid rgba(167,139,250,0.2)', paddingTop: 8 }}>
+            <PlDeadpointsBarPathCard />
+          </div>
+        </div>
+      )}
+      <ProPanelsGroup sections={[
         {
           id: 'technique',
           title: '🦴 Техника и биомеханика',
-          hint: 'Срывы, bar-path, блины, инфо об упражнениях, прогресс из дневника',
+          hint: 'Срывы, bar-path, блины, инфо об упражнениях',
           color: '#06b6d4',
           content: <>
             <StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
             <BiomechanicsPanel program={program} dir={dir} />
             <PlateAutoPanel program={program} dir={dir} />
             <ExerciseInfoPanel program={program} dir={dir} />
-            <StrengthDiaryPanel program={program} dir={dir} />
           </>,
         },
         {
@@ -776,7 +807,6 @@ return (
           </>,
         },
       ]} />
-      </>}
       </>
       )}
 
@@ -891,6 +921,9 @@ return (
         </TrainingModal>
       )}
 
+      {/* Шаг «🗓 Недели»: расписание, таблица плана, редактор недель/сессий, статистика */}
+      {estep === 'weeks' && (
+      <>
       {showTableView && dir === 'bb' && program.bb && (
         <PlanSummaryTable program={program} showWeek={execWeek} onShowWeekChange={setExecWeek} />
       )}
@@ -969,25 +1002,33 @@ return (
       })()}
 
       </> )}
+      </> )}
 
-      {/* V3: compact dashboard keeps the key signals together and tied to execWeek. */}
+      {/* V3: compact dashboard — сигналы плана, привязаны к execWeek (шаг «📊 Анализ» в pro-режиме) */}
+      {isPro && estep === 'analysis' && (
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
         <RirWaveChart program={program} />
         {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
           <ProgramTimeline program={program} selectedWeek={execWeek - 1} onSelectWeek={(wi) => setExecWeek(wi + 1)} />
         )}
-        {isPro && <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />}
-        {dir === 'bb' && <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />}
+        <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
       </div>
+      )}
+      {estep === 'weeks' && dir === 'bb' && (
+        <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />
+      )}
 
 
-      {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера) */}
+      {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера, шаг «🗓 Недели») */}
       {/* P2-3: extracted to BulkApplyCard with week-range selector */}
-      {isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
+      {estep === 'weeks' && isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
         <BulkApplyCard program={program} onChange={onChange} showToast={showToast} />
       )}
 
 
+      {/* Шаг «🎛 Параметры»: название/цель/уровень/дни/недели + заметки + авто-периодизация (pro) */}
+      {estep === 'params' && (
+      <>
       {/* Meta */}
       <div className="constructor-surface editor-meta-card" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
          <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
@@ -1050,6 +1091,22 @@ return (
       {/* F2.5: тренерские заметки (отображаются в PDF) */}
       <ProgramNotes program={program} onChange={onChange} />
 
+      {isPro && (
+        <AutoPeriodizationPanel weeks={program.meta.weeks} goal={program.meta.goal} level={program.meta.level}
+          onApply={(phases) => {
+            if (dir !== 'bb' || !program.bb) return;
+            const weeks = program.bb.weeks.map((w) => {
+              const phase = phases.find(p => Array.isArray(p.weeks) && p.weeks.includes(w.week));
+              return { ...w, phase: (phase?.phase || w.phase) as any, deload: phase?.phase === 'deload' ? true : w.deload };
+            });
+            update({ bb: { ...program.bb!, weeks } });
+            showToast('📈 Периодизация применена: ' + phases.map(p => p.phase).join(' → '));
+          }}
+        />
+      )}
+      </>
+      )}
+
       {/* Локальный toast для сообщений внутри редактора (авто-черновик, к выполнению и т.п.) */}
       {ToastNode}
 
@@ -1099,8 +1156,8 @@ return (
         </TrainingModal>
       )}
 
-      {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only */}
-      {isPro && !showTableView && dir === 'bb' && program.bb && (
+      {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only, шаг «👤 Профиль» */}
+      {isPro && estep === 'profile' && dir === 'bb' && program.bb && (
         <BBConstraintsPanel
           constraints={program.bb.constraints ?? { equipment: [] }}
           progression={program.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
@@ -1109,9 +1166,9 @@ return (
         />
       )}
 
-      {!showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
-      {!showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
-      {!showTableView && dir === 'hybrid' && program.hybrid && (
+      {estep === 'weeks' && !showTableView && dir === 'bb' && program.bb && <BBEditor body={program.bb} level={program.meta.level} onChange={(bb) => update({ bb })} />}
+      {estep === 'weeks' && !showTableView && dir === 'pl' && program.pl && <PLEditor body={program.pl} onChange={(pl) => update({ pl })} />}
+      {estep === 'weeks' && !showTableView && dir === 'hybrid' && program.hybrid && (
         <>
            <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
@@ -1149,8 +1206,8 @@ return (
         );
       })()}
 
-      {/* История правок (revisions): дешёвая версия — без полных снапшотов, только timestamp+note */}
-      {revisions.length > 0 && (
+      {/* История правок (revisions): дешёвая версия — без полных снапшотов, только timestamp+note (шаг «🔧 Инструменты») */}
+      {isPro && estep === 'tools' && revisions.length > 0 && (
         <div style={{ ...CARD, padding: 10, marginTop: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📜 История правок</span>
