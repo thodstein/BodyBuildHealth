@@ -243,7 +243,11 @@ export const SliderInput: React.FC<{
   color?: string;
   /** Куда направлена шкала: 'good' = выше лучше (↑ хорошо), 'bad' = выше хуже (↓ плохо). */
   direction?: 'good' | 'bad';
-}> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color, direction }) => {
+  /** Подпись минимального значения шкалы (например, «спокоен» для стресса 1-10). */
+  minLabel?: string;
+  /** Подпись максимального значения шкалы (например, «пик стресса» для стресса 1-10). */
+  maxLabel?: string;
+}> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color, direction, minLabel, maxLabel }) => {
   const c = color || colors.primary;
   const value = (rawValue !== undefined && rawValue !== null && !isNaN(rawValue)) ? rawValue : min;
   const pct = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
@@ -302,6 +306,12 @@ export const SliderInput: React.FC<{
           transition: 'left 0.1s',
         }} />
       </div>
+      {(minLabel || maxLabel) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
+          <span>{minLabel ? `${min} = ${minLabel}` : ''}</span>
+          <span>{maxLabel ? `${max} = ${maxLabel}` : ''}</span>
+        </div>
+      )}
     </div>
   );
 };

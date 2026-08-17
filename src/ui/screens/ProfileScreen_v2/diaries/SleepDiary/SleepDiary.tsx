@@ -371,6 +371,8 @@ const SleepForm: React.FC<{
               step={1}
               label="Стресс за день"
               color="#f59e0b"
+              minLabel="спокоен"
+              maxLabel="пик стресса"
             />
           </div>
         </div>

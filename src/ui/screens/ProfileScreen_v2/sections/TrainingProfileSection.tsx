@@ -105,6 +105,8 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
             onChange={v => updateTraining({ recovery: v })}
             min={1} max={10}
             color={colors.green}
+            minLabel="разбит"
+            maxLabel="полностью восстановлен"
           />
         </div>
         <div>
@@ -114,6 +116,8 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
             onChange={v => updateTraining({ motivation: v })}
             min={1} max={10}
             color={colors.purple}
+            minLabel="нет желания"
+            maxLabel="максимум"
           />
         </div>
         <div>
@@ -123,6 +127,8 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
             onChange={v => updateTraining({ doms: v })}
             min={1} max={10}
             color={colors.warning}
+            minLabel="нет боли"
+            maxLabel="сильная крепатура"
           />
         </div>
       </FieldRow>

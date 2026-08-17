@@ -81,9 +81,9 @@ export const UserLifestyleSection: React.FC = React.memo(function UserLifestyleS
       <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
 
       <FieldRow cols={2}>
-        <SliderInput label="Стресс (1-10)" value={lifestyle.stressLevel} onChange={v => updateLifestyle({ stressLevel: v })} min={1} max={10} color={colors.danger} direction="bad" />
-        <SliderInput label="Усталость (1-10)" value={lifestyle.fatigueLevel} onChange={v => updateLifestyle({ fatigueLevel: v })} min={1} max={10} color={colors.warning} direction="bad" />
-        <SliderInput label="Активность (1-10)" value={lifestyle.activityLevel} onChange={v => updateLifestyle({ activityLevel: v })} min={1} max={10} color={colors.primary} direction="good" />
+        <SliderInput label="Стресс (1-10)" value={lifestyle.stressLevel} onChange={v => updateLifestyle({ stressLevel: v })} min={1} max={10} color={colors.danger} direction="bad" minLabel="спокоен" maxLabel="пик стресса" />
+        <SliderInput label="Усталость (1-10)" value={lifestyle.fatigueLevel} onChange={v => updateLifestyle({ fatigueLevel: v })} min={1} max={10} color={colors.warning} direction="bad" minLabel="бодр" maxLabel="истощён" />
+        <SliderInput label="Активность (1-10)" value={lifestyle.activityLevel} onChange={v => updateLifestyle({ activityLevel: v })} min={1} max={10} color={colors.primary} direction="good" minLabel="сидячий образ" maxLabel="спортсмен" />
         <PopupValueEditor
           label="Базовый HRV (коэф.)"
           value={lifestyle.baselineHrvRatio}
