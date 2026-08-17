@@ -1592,3 +1592,19 @@ describe('explainCardioChoice — текст для taper:false', () => {
     expect(text).toContain('taper 2 нед');
   });
 });
+
+describe('рационал buildCardioCycle — текст для taper:false', () => {
+  it('при taper:false рационал сообщает «taper отключён» и не упоминает taper-кривую', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, taper: false, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    const text = c.rationale.join('\n');
+    expect(text).toContain('taper отключён');
+    expect(text).toContain('наращивание (contest_prep)');
+    expect(text).not.toContain('taper 2 нед');
+  });
+
+  it('при taper:true рационал сообщает число недель taper', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    const text = c.rationale.join('\n');
+    expect(text).toContain('taper 2 нед');
+  });
+});

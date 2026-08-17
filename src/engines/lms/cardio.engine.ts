@@ -682,7 +682,12 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   if (input.age != null) cycle.rationale.push(`Возраст ${input.age}${input.sex === 'female' ? ' (жен.)' : ''} — целевые пульс-зоны сессий заданы${input.restingHr != null && input.restingHr > 0 ? ` (ЧСС покоя ${input.restingHr})` : ''}.`);
   if (recoveryLow) cycle.rationale.push('Низкое восстановление: HIIT исключён.');
   if (competitions.length > 0) {
-    cycle.rationale.push(`Соревнования: ${competitions.map(c => `${c.name} (нед ${c.week})`).join(', ')} — taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}.`);
+    const starts = competitions.map(c => `${c.name} (нед ${c.week})`).join(', ');
+    if (taperEnabled) {
+      cycle.rationale.push(`Соревнования: ${starts} — taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}.`);
+    } else {
+      cycle.rationale.push(`Соревнования: ${starts} — taper отключён: до старта наращивание (contest_prep), неделя старта${peakWeek ? ' — пик (только лёгкое recovery)' : ' — обычная'}.`);
+    }
   }
   return cycle;
 }
