@@ -30,14 +30,27 @@ const WM = {
 };
 
 describe('resolveSpecialization (резолвер)', () => {
-  it('канонизирует слабые группы с сохранением порядка и без дублей', () => {
+  it('слабые группы сохраняют гранулярность (только точный дедуп)', () => {
     const res = resolveSpecialization(undefined, ['shoulders', 'delt_mid', 'chest_upper', 'chest'], false);
-    expect(res.weak).toEqual(['shoulders', 'chest']);
+    expect(res.weak).toEqual(['shoulders', 'delt_mid', 'chest_upper', 'chest']);
   });
 
-  it('top-2 специализации — канонические (shoulders не занимает 2 слота)', () => {
-    const res = resolveSpecialization(undefined, ['shoulders', 'chest'], true);
-    expect(res.targets).toEqual(['shoulders', 'chest']);
+  it('top-2 специализации: 2 зоны одной мышцы — 2 цели (delt_mid+delt_rear не схлопываются)', () => {
+    const res = resolveSpecialization(undefined, ['delt_mid', 'delt_rear'], true);
+    expect(res.targets).toEqual(['delt_mid', 'delt_rear']);
+    // Плечи получают множитель 2 зон: ×1.2 (не ×1.1 как одна зона).
+    expect(specializationVolumeFactor('shoulders', res)).toBe(1.2);
+  });
+
+  it('1 зона = ×1.1, 2 зоны одной мышцы = ×1.2 — выборы РАЗЛИЧАЮТСЯ', () => {
+    const one = resolveSpecialization(undefined, ['shoulders'], true);
+    const two = resolveSpecialization(undefined, ['delt_mid', 'delt_rear'], true);
+    expect(specializationVolumeFactor('shoulders', one)).toBe(1.1);
+    expect(specializationVolumeFactor('shoulders', two)).toBe(1.2);
+    // В двухзонном выборе грудь — не цель (MEV), в плечи+грудь — цель.
+    const mix = resolveSpecialization(undefined, ['shoulders', 'chest'], true);
+    expect(specializationVolumeFactor('chest', two)).toBe(0.7);
+    expect(specializationVolumeFactor('chest', mix)).toBe(1.1);
   });
 
   it('specialization без слабых групп — no-op', () => {
@@ -128,6 +141,25 @@ describe('generic buildBBPlan: единая модель', () => {
       .filter(e => !(e as any).warmupActivator).reduce((a, e) => a + e.sets, 0);
     expect(sumSets(spec)).toBe(sumSets(plain));
   });
+
+  it('2 зоны (delt_mid+delt_rear) дают плечам БОЛЬШЕ, чем 1 зона (shoulders)', () => {
+    const twoZones = buildBBPlan({
+      patternId: 'ppl_6', level: 'intermediate', trainingYears: 3,
+      goal: 'mass', weeks: 1, workMax: WM,
+      weakPoints: ['delt_mid', 'delt_rear'], specialization: true,
+    });
+    const oneZone = buildBBPlan({
+      patternId: 'ppl_6', level: 'intermediate', trainingYears: 3,
+      goal: 'mass', weeks: 1, workMax: WM,
+      weakPoints: ['shoulders'], specialization: true,
+    });
+    // Целевой объём плеч: ×1.2 (2 зоны) > ×1.1 (1 зона).
+    expect(twoZones.rotationMuscleVolume['shoulders']).toBeGreaterThan(oneZone.rotationMuscleVolume['shoulders']);
+    // Не-цели не меняются от выбора зон — объёмная модель стабильна.
+    expect(twoZones.rotationMuscleVolume['quads']).toBe(oneZone.rotationMuscleVolume['quads']);
+    expect(twoZones.rotationMuscleVolume['back']).toBe(oneZone.rotationMuscleVolume['back']);
+    expect(twoZones.rotationMuscleVolume['chest']).toBe(oneZone.rotationMuscleVolume['chest']);
+  }, 30000);
 
   it('уровень/стаж/PED-множители не сломаны: enhanced 6 лет получает back ≥18 в Upper', () => {
     const plan = buildBBPlan({
@@ -222,16 +254,16 @@ describe('расписание блоков специализации (6-10 н�
     ]);
   });
 
-  it('явные блоки: пропуски заполняются балансом, концы клампятся, канонизация целей', () => {
+  it('явные блоки: пропуски заполняются балансом, концы клампятся, точный дедуп целей', () => {
     const s = buildSpecializationSchedule(undefined, ['chest'], true, 12, [
       { weekStart: 3, weekEnd: 6, targets: ['chest_upper', 'biceps', 'biceps'] },
       { weekStart: 9, weekEnd: 99, targets: ['back_width'] },
     ]);
     expect(s.blocks).toEqual([
       { weekStart: 1, weekEnd: 2, targets: [] },
-      { weekStart: 3, weekEnd: 6, targets: ['chest', 'biceps'] },
+      { weekStart: 3, weekEnd: 6, targets: ['chest_upper', 'biceps'] },
       { weekStart: 7, weekEnd: 8, targets: [] },
-      { weekStart: 9, weekEnd: 12, targets: ['back'] },
+      { weekStart: 9, weekEnd: 12, targets: ['back_width'] },
     ]);
   });
 

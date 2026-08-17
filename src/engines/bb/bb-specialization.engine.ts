@@ -38,12 +38,26 @@ export function canonicalizeMuscles(muscles: string[]): string[] {
   return out;
 }
 
+/** Дедуп ТОЛЬКО точных дублей (без канонизации): delt_mid и delt_rear —
+ *  РАЗНЫЕ цели специализации (две зоны одной мышцы = больше объёма). */
+export function dedupeExactMuscles(muscles: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of muscles) {
+    if (!m || seen.has(m)) continue;
+    seen.add(m);
+    out.push(m);
+  }
+  return out;
+}
+
 export interface SpecializationResolution {
-  /** Канонические мышцы специализации (топ-2 из слабых, порядок ввода). */
+  /** Цели специализации (топ-2 из слабых, порядок ввода). ГРАНУЛЯРНЫЕ:
+   *  delt_mid/delt_rear/chest_upper — разные зоны одной мышцы. */
   targets: string[];
   /** Каноническая фокус-мышца (если задана). */
   focus: string;
-  /** Все канонические слабые мышцы (для weak-логики: feeders/приоритет). */
+  /** Все слабые мышцы (гранулярные; для weak-логики: feeders/приоритет). */
   weak: string[];
   /** Специализация активна (только при наличии слабых групп). */
   active: boolean;
@@ -60,15 +74,33 @@ export function resolveSpecialization(
   specialization: boolean | undefined,
 ): SpecializationResolution {
   const focus = focusGroup ? canonicalMuscle(focusGroup) : '';
-  const weak = canonicalizeMuscles(weakPoints || []);
+  const weak = dedupeExactMuscles(weakPoints || []);
   const active = !!specialization && weak.length > 0;
   const targets = active ? weak.slice(0, 2) : [];
   return { targets, focus, weak, active };
 }
 
+/** Сколько целей специализации попадают в каноническую мышцу m
+ *  (delt_mid + delt_rear → shoulders = 2 зоны). */
+export function targetHeadsFor(
+  muscle: string,
+  res: SpecializationResolution,
+): number {
+  const m = canonicalMuscle(muscle);
+  return res.targets.filter(t => canonicalMuscle(t) === m).length;
+}
+
+/** Мышца входит в список (с учётом гранулярных зон: delt_mid ∈ shoulders). */
+function listHasMuscle(muscle: string, list: string[]): boolean {
+  const m = canonicalMuscle(muscle);
+  return list.some(t => canonicalMuscle(t) === m);
+}
+
 /**
  * Множитель объёма мышцы (per-session и целевой расчёт).
- * Приоритет: focus (×1.3) > specialization target (×1.1) > weak (×1.2) > 1.
+ * Приоритет: focus (×1.3) > specialization target (×1.1 за зону, до ×1.3)
+ * > weak (×1.2) > 1. Две зоны одной мышцы (delt_mid+delt_rear) = ×1.2 —
+ *  специализация на 2 головки даёт БОЛЬШЕ объёма, чем одна.
  * Специализация: не-целевые мышцы — поддерживающий объём (×0.7).
  * Фокус-мышца при специализации НЕ режется (защита от 0.7 × 1.3 = 0.91).
  */
@@ -79,10 +111,11 @@ export function specializationVolumeFactor(
   const m = canonicalMuscle(muscle);
   if (res.focus && m === res.focus) return 1.3;
   if (res.active) {
-    if (res.targets.includes(m)) return 1.1;
+    const heads = targetHeadsFor(m, res);
+    if (heads > 0) return Math.min(1.3, 1.0 + 0.1 * heads);
     return 0.7;
   }
-  if (res.weak.includes(m)) return 1.2;
+  if (listHasMuscle(m, res.weak)) return 1.2;
   return 1.0;
 }
 
@@ -98,7 +131,7 @@ export function specializationEmphasisFactor(
 ): number {
   const m = canonicalMuscle(muscle);
   if (res.focus && m === res.focus) return 1.3;
-  if (res.weak.includes(m)) return 1.2;
+  if (listHasMuscle(m, res.weak)) return 1.2;
   return 1.0;
 }
 
@@ -113,7 +146,7 @@ export function specializationMrvFactor(
 ): number {
   const m = canonicalMuscle(muscle);
   if (res.focus && m === res.focus) return 1.3;
-  if (res.weak.includes(m)) return 1.2;
+  if (listHasMuscle(m, res.weak)) return 1.2;
   return 1.0;
 }
 
@@ -122,7 +155,7 @@ export function isSpecializationWeak(
   muscle: string,
   res: SpecializationResolution,
 ): boolean {
-  return res.weak.includes(canonicalMuscle(muscle));
+  return listHasMuscle(muscle, res.weak);
 }
 
 /** Мышца — фокус (для primary-гарантии и бейджей). */
@@ -180,7 +213,7 @@ export function buildSpecializationSchedule(
       .map(b => ({
         weekStart: Math.max(1, Math.min(totalWeeks, Math.round(b.weekStart || 1))),
         weekEnd: Math.max(1, Math.min(totalWeeks, Math.round(b.weekEnd || totalWeeks))),
-        targets: canonicalizeMuscles(b.targets || []).slice(0, 2),
+        targets: dedupeExactMuscles(b.targets || []).slice(0, 2),
       }))
       .filter(b => b.weekStart <= b.weekEnd)
       .sort((a, b) => a.weekStart - b.weekStart);

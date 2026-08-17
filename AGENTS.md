@@ -1,5 +1,35 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## BB-авто: гранулярные зоны специализации + проверка выбора (Aug 18 2026, uncommitted)
+
+Жалоба: «выбор средняя+задняя дельта даёт то же значение, что и просто плечи» — зоны
+канонизировались в одну мышцу (delt_mid+delt_rear → shoulders = 1 цель), подбор упражнений
+терял гранулярные зоны. **Объёмная модель (MEV/MAV/MRV, уровень/стаж/PED/цель) НЕ менялась**
+— ключевое правило; изменён только учёт ЗОН в специализации.
+
+- **`bb-specialization.engine.ts`**: `resolveSpecialization` сохраняет гранулярные цели
+  (`dedupeExactMuscles` — только точный дедуп, без канонизации); `targetHeadsFor` — сколько
+  целей попадает в каноническую мышцу; `specializationVolumeFactor`: 1 зона ×1.1, 2 зоны
+  одной мышцы ×1.2 (кап ×1.3) — выборы РАЗЛИЧАЮТСЯ; emphasis/MRV/isWeak — матчинг через
+  каноническую мышцу (`listHasMuscle`). Блоки расписания — точный дедуп целей.
+- **bb-builder**: `baseRotationFor` — MAV × (1.0 + 0.1×зон); не-цели — MEV как раньше.
+  Подбор упражнений получает гранулярные зоны (weakZones) → махи/обратные разведения при
+  выборе головок. WEAK_PATTERN_REQ гарантирует паттерны зон.
+- **bb-finalize**: `applySpecializationPass` — targetMuscles/focusMuscle через collapse
+  (гранулярные зоны работают в RIR-добивке/спец-частоте).
+- **cycle-to-plan**: program-добивка матчит упражнения по канонической мышце (delt_mid →
+  каталог shoulders).
+- **UI (BbAutoConstructor)**: чипы специализации — запрет конфликта регионов
+  (`isRegionConflict`: shoulders+delt_mid нельзя, delt_mid+delt_rear можно); подсказка с
+  расчётным объёмом целей (`specVolumeSummary`: «Средняя дельта ≈10 сетов/нед (2 зоны)»).
+- Тесты: `bb-specialization-unified.test.ts` **27** (+4: гранулярный top-2, 1 зона vs 2 зоны
+  ×1.1/×1.2 и грудь 0.7/1.1, план 2 зон > 1 зоны при стабильных не-целях, блоки с точным
+  дедупом).
+- Проверено: tsc 0; целевые **55/55**; bb+TrainingScreen_parts 1643/1644 (1 падение — чужой
+  cardio-constructor WIP); полный прогон ~6022/6026 — падения только чужие/пред-существующие
+  (course-sync, profile-diaries-e2e, bb-macrocycle v7, stretch-session,
+  macrocycle-panel-cycle-slots, manual-constructor-steps, cardio-constructor).
+
 ## BB-авто: планировщик блоков специализации (Aug 17 2026, uncommitted)
 
 Поверх единой модели акцентов (специализация 1-2 мышц): **для планов > 10 недель

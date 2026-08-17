@@ -28,7 +28,7 @@ import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exer
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
-import { findSubstitutions } from '../exercise-substitution.engine';
+import { findGentleSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
@@ -50,7 +50,8 @@ import type { BBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
 import { applyDUPOverlay, type DUPConfig } from './bb-dup.engine';
 import type { BBPlanValidationResult } from './bb-validator.engine';
-import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, buildSpecializationSchedule, specResForWeekSchedule, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
+import { isMobilityRestricted } from './bb-mobility.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
 export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
@@ -552,24 +553,9 @@ function isBBJunk(ex: any): boolean {
 }
 
 /** PRO: Biomechanics-based filtering — исключить упражнения по ограничениям мобильности.
- *  Экспортируется для использования в cycle-to-plan.ts. */
-export const MOBILITY_PATTERNS: Record<string, RegExp> = {
-  shoulder: /overhead|жим.*стоя|ohp|за.*голов|behind.?neck|upright.?row|тяга.*подбород|арнольд|arnold/i,
-  hip: /atg|ass.?to.?grass|глубок.*присед|гоблет.*присед|goblet.*squat|sissy|сисси/i,
-  ankle: /присед.*штанг|back.?squat|front.?squat|выпад|lunge|болгар|bulgarian/i,
-  lower_back: /станов.*классич|conventional.*deadlift|тяга.*наклон|barbell.?row|good.?morning|гудморнинг|румынск.*штанг|rdl.*barbell/i,
-  wrist: /бицепс.*штанг|barbell.?curl|ez.?bar| француз.*штанг|french.?press.*barbell|skullcrusher.*barbell/i,
-};
-
-export function isMobilityRestricted(ex: any, restrictions?: string[]): boolean {
-  if (!restrictions || restrictions.length === 0) return false;
-  const n = (ex.name || '').toLowerCase();
-  for (const r of restrictions) {
-    const pattern = MOBILITY_PATTERNS[r];
-    if (pattern && pattern.test(n)) return true;
-  }
-  return false;
-}
+ *  Единый источник — bb-mobility.engine.ts (используется и bb-finalize).
+ *  Реэкспорт для обратной совместимости (cycle-to-plan.ts). */
+export { MOBILITY_PATTERNS, isMobilityRestricted } from './bb-mobility.engine';
 /** Маппинг PRO-мышц в group каталога для getExercisesByGroup(). */
 const PRO_MUSCLE_TO_GROUP: Record<string, string> = {
   delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
@@ -1114,8 +1100,8 @@ function buildSession(
     // Полностью исключённые группы пропускаем (dedupeMuscles уже отфильтровал, дублируем страховку)
     if (excludedMuscles.has(repKey)) continue;
     // Градированные травмы: не пропускаем, но применим замену ниже
-    const isGraded = gradedInjuries.some(inj => catalogGroupFor(inj.muscle) === muscle);
-    const injuryFactor = gradedInjuries.find(inj => catalogGroupFor(inj.muscle) === muscle);
+    const isGraded = gradedInjuries.some(inj => collapseKey(inj.muscle) === muscle);
+    const injuryFactor = gradedInjuries.find(inj => collapseKey(inj.muscle) === muscle);
 
     const resolved = resolveCharacter(repKey, character);
     let role: 'primary' | 'accessory' = 'accessory';
@@ -1831,12 +1817,15 @@ function buildSession(
       const postInjuryWtPct = injuryFactor.weightPct ?? 1.0;
       const newExDatas: any[] = [];
       for (const exData of pl.exDatas) {
-        const subs = findSubstitutions((exData as any).name || exData.id, pl.muscle, new Set([pl.muscle]));
+        // BUG-FIX (щадящий режим): для ГРАДИРОВАННОЙ травмы (exclude=false) мышца
+        // должна ОСТАВАТЬСЯ в плане — заменяем на безопасную альтернативу ТОЙ ЖЕ
+        // группы (findGentleSubstitutions), а НЕ на упражнение другой мышцы.
+        // findSubstitutions здесь использовался ошибочно: он уводит упражнения
+        // травмированной группы на ДРУГИЕ мышцы (полное исключение), поэтому
+        // травмированная мышца не получала работу вообще.
+        const subs = findGentleSubstitutions((exData as any).name || exData.id, pl.muscle);
         if (subs.length > 0) {
-          // BUG-B3: для градированной травмы нужна мягкая замена (min volumePct),
-          // а не первая попавшаяся (которая может быть полной заменой volumePct=1.0).
-          // Сортируем по volumePct ascending и берём самую мягкую.
-          // Это гарантирует снижение нагрузки, а не её сохранение/рост.
+          // Самая мягкая замена (min volumePct) — гарантированное снижение нагрузки
           const sortedSubs = [...subs].sort((a, b) => (a.volumePct || 1) - (b.volumePct || 1));
           const sub = sortedSubs[0];
           const subEx = sub.exercise;
@@ -1845,12 +1834,18 @@ function buildSession(
             ...(subEx as any),
             substitutionWeightPct: sub.weightPct * postInjuryWtPct,
             substitutionVolumePct: sub.volumePct * postInjuryVolPct,
+            repsCap: injuryFactor.repsCap ?? (sub as any).repsCap ?? (exData as any).repsCap,
             originalName: (exData as any).name,
             substitutionReason: sub.reason,
             substituted: sub.exercise.name !== ((exData as any).name || exData.id),
           });
         } else {
-          newExDatas.push(exData);
+          newExDatas.push({
+            ...(exData as any),
+            substitutionWeightPct: postInjuryWtPct,
+            substitutionVolumePct: postInjuryVolPct,
+            repsCap: injuryFactor.repsCap ?? (exData as any).repsCap,
+          });
         }
       }
       // Ограничиваем пул замен исходным числом упражнений (exerciseCount),
@@ -2315,10 +2310,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const baseRotationFor = (m: string, lm: { mav: number; mev: number; mrv: number }, res: SpecializationResolution): number => {
     if (res.active) {
       // Фокус-мышца в спец-блоке: MAV (её эмфазис ×1.3 применится per-session,
-      // без стэкинга 1.1×1.3). Цели блока: MAV×1.1. Остальные: поддерживающий
-      // объём MEV (перераспределение «volume bucket», не добавление).
-      if (res.focus && m === res.focus) return lm.mav;
-      return res.targets.includes(m) ? Math.round(lm.mav * 1.1) : lm.mev;
+      // без стэкинга 1.1×1.3). Цели блока: MAV × (1.0 + 0.1×зон) — одна зона
+      // ×1.1, две зоны одной мышцы (delt_mid+delt_rear) ×1.2. Остальные:
+      // поддерживающий объём MEV (перераспределение «volume bucket»).
+      if (res.focus && m === canonicalMuscle(res.focus)) return lm.mav;
+      const heads = res.targets.filter(t => canonicalMuscle(t) === m).length;
+      if (heads > 0) return Math.round(lm.mav * Math.min(1.3, 1.0 + 0.1 * heads));
+      return lm.mev;
     }
     if (input.volumeGoal === 'mev') return lm.mev;
     if (input.volumeGoal === 'mrv') return lm.mrv;
@@ -3015,6 +3013,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const normLvl = normLevel(level);
     const autoFeedMuscles = ['calves', 'glutes', 'abs', 'forearms', 'hamstrings', 'shoulders', 'biceps', 'triceps'];
     for (const m of autoFeedMuscles) {
+      // BUG-FIX: auto-MEV-feeder НЕ должен добавлять упражнения для исключённых
+      // травмами мышц (exclude=true) или в щадящем режиме (graded — объём
+      // снижен намеренно) — иначе «legs exclude» возвращало ноги в план,
+      // а щадящий режим раздувался до MEV.
+      if (excludedMuscles.has(m) || excludedMuscles.has(collapseKey(m))) continue;
+      if (gradedInjuries.some(inj => collapseKey(inj.muscle) === m)) continue;
       let weekSets = 0;
       for (const s of wk1.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) weekSets += e.sets;
       const lm = getVolumeLandmarks(normLvl, m);
@@ -3168,6 +3172,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     excludedExercises: exclIds,
     avoidAxialLoad: avAxial,
     excludedMuscles: [...excludedMuscles],
+    gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
+    mobilityRestrictions: input.mobilityRestrictions,
     ensureMinimumVolume: true,
     workMax,
     mrvMultiplier: effectiveMrvMult,

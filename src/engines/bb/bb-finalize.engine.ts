@@ -16,6 +16,7 @@ import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
+import { isMobilityRestricted } from './bb-mobility.engine';
 import { specResForWeekSchedule, type SpecializationSchedule } from './bb-specialization.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
@@ -76,6 +77,7 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
         if (!pattern.test(x.name || '')) return false;
         if (working.some((e: any) => e.name === x.name)) return false;
         if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+        if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
         return true;
       });
       if (candidate) {
@@ -95,6 +97,7 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
       if (!pattern.test(x.name || '')) return false;
       if (working.some((e: any) => e.name === x.name)) return false;
       if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
       return true;
     });
     if (!candidate) continue;
@@ -818,6 +821,7 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
       if (trueMuscleOf(x) !== muscle) return false;
       if (!pattern.test(x.name || '')) return false;
       if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
       if (options.equipment?.length) {
         const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
         if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
@@ -939,6 +943,12 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
 function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   const tag = session.sessionTag || '';
+  // BUG-FIX: проход не должен добавлять упражнения для мышц, исключённых
+  // травмами (exclude=true) или в щадящем режиме (graded) — иначе «legs
+  // exclude» возвращало икры/ягодицы, а щадящий режим раздувался до MEV.
+  const excludedMuscles = new Set(options.excludedMuscles || []);
+  const gradedMuscles = new Set(options.gradedMuscles || []);
+  const muscleExcluded = (m: string) => excludedMuscles.has(m) || gradedMuscles.has(m);
   const weekCountOf = (m: string) => week.sessions.filter((s: any) => s.exercises.some((e: any) => e.muscle === m && !(e as any).warmupActivator)).length;
   const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
   const equipmentOk = (c: any) => {
@@ -950,7 +960,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   const isEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
   const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string): void => {
-    const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !working.some((e: any) => e.name === c.name));
+    const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !working.some((e: any) => e.name === c.name) && !isMobilityRestricted(c, options.mobilityRestrictions));
     if (!candidate) return;
     const baseWeight = options.workMax?.[muscle] || 40;
     if (working.length < maxEx) {
@@ -990,7 +1000,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
     }
   };
   // Икры: в Legs-сессиях стоя (растянутая икроножная) + сидя (камбаловидная).
-  if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag)) {
+  if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag) && !muscleExcluded('calves')) {
     const calves = working.filter((e: any) => e.muscle === 'calves');
     const calvesSessions = weekCountOf('calves');
     const standing = calves.find((e: any) => /носк|calf/i.test(e.name || '') && !/сидя|sitting|seated/i.test(e.name || ''));
@@ -1013,7 +1023,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
     }
   }
   // Пресс: скручивания/подъёмы ног добираются до MEV (5 сетов) в Upper/FullBody.
-  if (/Upper|Pull|Push|Torso|FullBody/.test(tag)) {
+  if (/Upper|Pull|Push|Torso|FullBody/.test(tag) && !muscleExcluded('abs')) {
     const absEx = working.find((e: any) => e.muscle === 'abs');
     if (absEx) {
       const targetSets = isEnhanced ? 5 : 4;
@@ -1027,7 +1037,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   }
   // Предплечья — с тягами (Pull/Back/Upper/FullBody): хватовая работа.
   // Не дублируем: максимум 2 источника в неделю (иначе > MRV).
-  if (/Pull|Back|Upper|Torso|FullBody/.test(tag)) {
+  if (/Pull|Back|Upper|Torso|FullBody/.test(tag) && !muscleExcluded('forearms')) {
     const hasForearms = working.some((e: any) => e.muscle === 'forearms');
     if (!hasForearms && weekCountOf('forearms') < 2) {
       addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват)');
@@ -1035,7 +1045,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   }
   // Трапеции: шраги доводятся до MEV (natural 5 / enhanced 6) сетов — stretch
   // + задержка вверху; если шрагов в сессии нет — добавляем (до 2 источников).
-  if (/Pull|Back|Upper|Torso|FullBody/.test(tag)) {
+  if (/Pull|Back|Upper|Torso|FullBody/.test(tag) && !muscleExcluded('traps')) {
     const shrug = working.find((e: any) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
     if (shrug) {
       const targetSets = isEnhanced ? 6 : 5;
@@ -1049,7 +1059,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   }
   // Ягодицы: hip thrust/отведение в Legs/FullBody — natural-сплиты теряют их
   // полностью (0 direct) из-за лимита упражнений и отсутствия в musclePlans.
-  if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag)) {
+  if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag) && !muscleExcluded('glutes')) {
     const gl = working.filter((e: any) => e.muscle === 'glutes');
     if (!gl.length && weekCountOf('glutes') < 2) {
       addEx('glutes', /мост|hip.?thrust|отведен.*бедр|abduction|kick.?back/i, isEnhanced ? 5 : 4, [12, 18], 'Ягодицы: hip thrust/отведение (покрытие группы)');
@@ -1078,6 +1088,9 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   if (session.exercises.some((e: any) => e.warmupActivator)) return;
   const lead = WARMUP_LEAD[session.sessionTag || ''] || session.exercises.find((e: any) => e.role === 'primary')?.muscle;
+  // BUG-FIX: не добавлять разминку для мышцы, исключённой травмой (exclude=true).
+  const excludedMuscles = new Set(options.excludedMuscles || []);
+  if (!lead || excludedMuscles.has(lead)) return;
   const pattern = WARMUP_ACTIVATOR[lead];
   if (!pattern) return;
   const candidate = EXERCISE_CATALOG.find((x: any) => {
@@ -1235,6 +1248,14 @@ export interface BBFinalizeOptions {
   excludedExercises?: string[];
   avoidAxialLoad?: boolean;
   excludedMuscles?: string[];
+  /** Мышцы с ГРАДИРОВАННОЙ травмой (щадящий режим, exclude=false):
+   *  остаются в плане со сниженным весом/объёмом/повторами. Добивочные
+   *  проходы (MEV-feeders/fill/малые группы) НЕ должны добивать их до MEV —
+   *  иначе щадящий режим раздувается обратно. */
+  gradedMuscles?: string[];
+  /** Ограничения мобильности (биомеханика): shoulder/hip/ankle/lower_back/wrist.
+   *  Добавляемые финализатором упражнения тоже фильтруются. */
+  mobilityRestrictions?: string[];
   ensureMinimumVolume?: boolean;
   workMax?: Record<string, number>;
   mrvMultiplier?: number;
@@ -1518,12 +1539,14 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
   if (!options.level) return;
   const excluded = new Set(options.excludedExercises || []);
   const excludedMuscles = new Set(options.excludedMuscles || []);
+  const gradedMuscles = new Set(options.gradedMuscles || []);
   const equipment = options.equipment || [];
   const candidates = EXERCISE_CATALOG.filter(candidate => {
     if (candidate.type !== 'isolation' && (candidate as any).exerciseType !== 'isolation' || bbExerciseTier(candidate) > 2) return false;
     if (excluded.has(candidate.id) || excluded.has(candidate.name)) return false;
     if (excludedMuscles.has(candidate.group) || excludedMuscles.has(trueMuscleOf(candidate) || '')) return false;
     if (options.avoidAxialLoad && isAxialLoadExercise(candidate as any)) return false;
+    if (isMobilityRestricted(candidate, options.mobilityRestrictions)) return false;
     if (equipment.length > 0) {
       const candidateEquipment = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
       if (candidateEquipment.length > 0 && !candidateEquipment.some(item => equipment.includes(item))) return false;
@@ -1550,6 +1573,9 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
 
     for (const { muscle, landmarks, effectiveSets, target } of deficitByMuscle) {
       if (!landmarks || effectiveSets >= landmarks.mev) continue;
+      // Щадящий режим: градированная травма намеренно снижает объём —
+      // feeder-добивка до MEV отменяет снижение, пропускаем.
+      if (gradedMuscles.has(muscle)) continue;
       // Интеграция с builder-feeder: если мышца уже получила MEV coverage
       // (builder-путь, до normalize) — finalize не дублирует свою добивку.
       const weekHasBuilderFeeder = week.sessions.some(s => s.exercises.some(e => e.muscle === muscle && /MEV coverage/.test(e.rationale || '')));
@@ -1591,7 +1617,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
   }
 }
 
-function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalizeOptions, 'equipment' | 'excludedExercises' | 'avoidAxialLoad' | 'excludedMuscles'> = {}): void {
+function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalizeOptions, 'equipment' | 'excludedExercises' | 'avoidAxialLoad' | 'excludedMuscles' | 'mobilityRestrictions'> = {}): void {
   const optionsEquipment = options.equipment || [];
   const excluded = new Set(options.excludedExercises || []);
   const excludedMuscles = new Set(options.excludedMuscles || []);
@@ -1631,6 +1657,7 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
             if (excluded.has(candidate.id) || excluded.has(candidate.name)) return false;
             if (excludedMuscles.has(candidate.group) || excludedMuscles.has(trueMuscleOf(candidate) || '')) return false;
             if (options.avoidAxialLoad && isAxialLoadExercise(candidate as any)) return false;
+            if (isMobilityRestricted(candidate, options.mobilityRestrictions)) return false;
             if (usedNames.has(candidate.name) || bbExerciseTier(candidate) > 2) return false;
             if (trueMuscleOf(candidate) !== exercise.muscle) return false;
             if (optionsEquipment.length > 0) {
@@ -1689,11 +1716,11 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     };
     const catalogExercise = EXERCISE_CATALOG.find(item => item.name === exercise.name || item.id === exercise.exerciseName);
     const unknownWithEquipmentRestriction = equipment.length > 0 && !catalogExercise;
-    const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || excludedMuscles.has(exercise.muscle) || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || unknownWithEquipmentRestriction || !equipmentAllowed(catalogExercise as any);
+    const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || excludedMuscles.has(exercise.muscle) || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || isMobilityRestricted(exercise, options.mobilityRestrictions) || unknownWithEquipmentRestriction || !equipmentAllowed(catalogExercise as any);
     if (excludedMuscles.has(exercise.muscle)) continue;
     if (!unsafe) continue;
     const replacement = EXERCISE_CATALOG
-      .filter(candidate => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && equipmentAllowed(candidate))
+      .filter(candidate => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && !isMobilityRestricted(candidate, options.mobilityRestrictions) && equipmentAllowed(candidate))
       .sort((a, b) => (exercise.role === 'primary' ? (bbExerciseTier(a) - bbExerciseTier(b)) : ((a.type === 'isolation' ? 0 : 1) - (b.type === 'isolation' ? 0 : 1))))[0];
     if (!replacement) continue;
     const oldName = exercise.name;
@@ -2182,6 +2209,8 @@ for (const week of next.weeks) {
   // вытесняют calves/traps/abs из Lower/Upper). Для natural — 3 сета,
   // для enhanced 3+ — 4 (крупные) / 3 (малые).
   if (!options.preserveSource) {
+    const excludedMusclesFinal = new Set(options.excludedMuscles || []);
+    const gradedMusclesFinal = new Set(options.gradedMuscles || []);
     const fillSets = (muscle: string) => ['calves', 'abs', 'traps', 'forearms'].includes(muscle) ? 3 : (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 4 : 3);
     for (const week of next.weeks) {
       if (isPrepControlled(week)) continue; // prep-недели не добираем
@@ -2210,6 +2239,9 @@ for (const week of next.weeks) {
           ? ['traps', 'abs']
           : ['glutes', 'quads', 'hamstrings', 'calves', 'abs'];
       for (const muscle of needMuscles) {
+        // BUG-FIX: fill не должен добирать мышцы, исключённые травмами (exclude=true)
+        // или находящиеся в щадящем режиме (graded — объём снижен намеренно).
+        if (excludedMusclesFinal.has(muscle) || gradedMusclesFinal.has(muscle)) continue;
         if (present.has(muscle)) continue;
         // Дубли малых групп по сессиям: abs до 2 источников (natural) / 3
         // (enhanced 1-3, MEV выше); traps/calves до 2 (обе Pull/Lower сессии).
@@ -2227,6 +2259,7 @@ for (const week of next.weeks) {
         const candidate = EXERCISE_CATALOG.find((x: any) => {
           if (trueMuscleOf(x) !== muscle) return false;
           if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
+          if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
           if (options.equipment?.length) {
             const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
             if (eq.length && !eq.some((e: string) => options.equipment!.includes(e))) return false;

@@ -31,6 +31,7 @@ import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
+import { canonicalMuscle } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -156,6 +157,16 @@ function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
   if (weakPoints.includes(muscle)) return true;
   const PARENT: Record<string, string> = { delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders' };
   return weakPoints.includes(PARENT[muscle] ?? '');
+}
+
+/** Гранулярные зоны (подгруппы) — их можно сочетать внутри одного региона:
+ *  delt_mid + delt_rear = две зоны плеч. Канонические мышцы с зонами
+ *  НЕ сочетаются: shoulders + delt_mid = перекрытие одной зоны. */
+const GRANULAR_ZONES = new Set(['chest_upper', 'chest_lower', 'back_width', 'back_thickness', 'delt_front', 'delt_mid', 'delt_rear']);
+function isRegionConflict(a: string, b: string): boolean {
+  if (!a || !b || a === b) return false;
+  if (canonicalMuscle(a) !== canonicalMuscle(b)) return false;
+  return !(GRANULAR_ZONES.has(a) && GRANULAR_ZONES.has(b));
 }
 
 /** Метка подгруппы спины (backSubgroup) для UI-бейджа. */
@@ -349,7 +360,7 @@ export const BbAutoConstructor: React.FC = () => {
   useEffect(() => { setWeakPoints(specTargets); }, [specTargets]);
   const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
   // PRO: mobility restrictions — biomechanics-based exercise filtering
-  const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>([]);
+  const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>(prof.mobilityRestrictions || []);
 
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
@@ -919,6 +930,27 @@ export const BbAutoConstructor: React.FC = () => {
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
+  // Расчётный объём целей специализации для подсказки: цель = MAV × (1.0 + 0.1×зон)
+  // (1 зона ×1.1, 2 зоны одной мышцы ×1.2 — как в движке). Остальные — MEV.
+  const specVolumeSummary = useMemo(() => {
+    if (specTargets.length === 0) return '';
+    const RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', quads: 'Квадры', hamstrings: 'Бицепс бедра', shoulders: 'Плечи', biceps: 'Бицепс', triceps: 'Трицепс', calves: 'Икры', glutes: 'Ягодицы', abs: 'Пресс', traps: 'Трапеции', forearms: 'Предплечья' };
+    const parts: string[] = [];
+    for (const t of specTargets) {
+      const c = canonicalMuscle(t);
+      const lm = (allLandmarks as Record<string, { mav: number }>)[c];
+      if (!lm) continue;
+      const heads = specTargets.filter(x => canonicalMuscle(x) === c).length;
+      const mult = Math.min(1.3, 1.0 + 0.1 * heads);
+      const label = WEAK_GROUPS.find(([id]) => id === t)?.[1] || RU[c] || t;
+      parts.push(`${label} ≈${Math.round(lm.mav * mult)} сетов/нед${heads > 1 && GRANULAR_ZONES.has(t) ? ` (${heads} зоны)` : ''}`);
+    }
+    return parts.join(' · ');
+  }, [specTargets, allLandmarks]);
+  // Чип недоступен: достигнут лимит 2 целей ИЛИ конфликт региона
+  // (shoulders + delt_mid нельзя; delt_mid + delt_rear можно).
+  const specChipDisabled = (id: string, on: boolean) =>
+    !!on ? false : specTargets.length >= 2 || specTargets.some(t => isRegionConflict(t, id));
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
 
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
@@ -960,7 +992,7 @@ export const BbAutoConstructor: React.FC = () => {
   }, [builtPlan, bbLevel, weakPoints, autoDeload, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier]);
 
   useEffect(() => {
-    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
+    try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
   }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
 
   // FIX-19: Авто-загрузка сохранённого плана при монтировании
@@ -1782,7 +1814,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
               {WEAK_GROUPS.map(([id, l]) => {
                 const on = specNextTargets.includes(id);
-                const disabled = !on && specNextTargets.length >= 2;
+                const disabled = !on && (specNextTargets.length >= 2 || specNextTargets.some(t => isRegionConflict(t, id)));
                 return <button key={id} disabled={disabled} onClick={() => setSpecNextTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
                   style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:32,
                     background: on ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
@@ -2033,7 +2065,7 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                     {WEAK_GROUPS.map(([id, l]) => {
                       const on = specTargets.includes(id);
-                      const disabled = !on && specTargets.length >= 2;
+                      const disabled = specChipDisabled(id, on);
                       return (
                         <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
                           style={{
@@ -2049,7 +2081,7 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   {specTargets.length > 0 && (
                     <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                      Специализация: {specTargets.join(', ')} — 14-24 сета/нед, 2-4 сессии, первыми в тренировке. Остальные мышцы — поддерживающий объём (MEV).
+                      Специализация: {specTargets.join(', ')} — {specVolumeSummary}. Первыми в тренировке, RIR 0-1 на изоляциях. Остальные мышцы — поддерживающий объём (MEV).
                     </div>
                   )}
                   {renderSpecPlanner()}
@@ -2166,7 +2198,7 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
             {WEAK_GROUPS.map(([id, l]) => {
               const on = specTargets.includes(id);
-              const disabled = !on && specTargets.length >= 2;
+              const disabled = specChipDisabled(id, on);
               return (
                 <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
                   style={{
@@ -2182,7 +2214,7 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
           {specTargets.length > 0 && (
             <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-              Специализация: {specTargets.join(', ')} — 14-24 сета/нед, 2-4 сессии, первыми в тренировке. Остальные мышцы — поддерживающий объём (MEV).
+              Специализация: {specTargets.join(', ')} — {specVolumeSummary}. Первыми в тренировке, RIR 0-1 на изоляциях. Остальные мышцы — поддерживающий объём (MEV).
             </div>
           )}
           {renderSpecPlanner()}
@@ -2354,13 +2386,13 @@ export const BbAutoConstructor: React.FC = () => {
       <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
         {WEAK_GROUPS.map(([id,l]) => {
           const on = specTargets.includes(id);
-          const disabled = !on && specTargets.length >= 2;
+          const disabled = specChipDisabled(id, on);
           return <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
             style={{ padding:'5px 10px', borderRadius:14, fontSize:11, fontWeight:700, cursor:disabled?'default':'pointer', border:on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.02)', color:on?'#00e68a':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.6)', opacity:disabled?0.5:1 }}>{l}{on?' ✓':''}</button>;
         })}
       </div>
       <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>
-        💡 Специализация: выбранные мышцы — 14-24 сета/нед, 2-4 сессии, первыми в тренировке, RIR 0-1 на изоляциях. Остальные — поддерживающий объём (MEV).
+        💡 Специализация: {specTargets.length > 0 ? `${specVolumeSummary}. ` : ''}Выбранные зоны — первыми в тренировке, RIR 0-1 на изоляциях. Остальные — поддерживающий объём (MEV).
       </div>
       {renderSpecPlanner()}
       <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'bb_cycle' ? buildBb() : setStep('split')}>
