@@ -777,7 +777,7 @@ return (
       {/* Внутренние шаги редактора: содержимое показывается по одному шагу */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {editorSteps.map((s, si) => (
-          <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined}>
+          <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined} title={EDITOR_STEP_INFO[s].hint}>
             {si < estepIdx ? '✓ ' : ''}{EDITOR_STEP_LABELS[s]}
           </button>
         ))}
@@ -1119,6 +1119,7 @@ return (
         }
         const dayByDow: Record<number, { idx: number; label: string; muscles: string[] }> = {};
         dayLabels.forEach((d) => { dayByDow[d.idx % 7] = d; });
+        const todayIdx = (new Date().getDay() + 6) % 7;
         return (
           <div className="constructor-surface" style={{ ...CARD, padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
@@ -1130,15 +1131,17 @@ return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(52px, 1fr))', gap: 4 }}>
               {WEEKDAYS.map((day, wi) => {
                 const d = dayByDow[wi];
+                const isToday = wi === todayIdx;
                 const fill = d ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)';
                 return (
                   <div key={wi} style={{
                     minHeight: 64, borderRadius: 6, padding: '6px 4px',
                     background: fill,
-                    border: d ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.05)',
+                    border: isToday ? '2px solid #00e68a' : (d ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.05)'),
                     textAlign: 'center',
+                    boxShadow: isToday ? '0 0 10px rgba(0,230,138,0.25)' : 'none',
                   }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: d ? '#00e68a' : DIM }}>{day}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: d ? '#00e68a' : DIM }}>{day}{isToday ? ' · сегодня' : ''}</div>
                     {d ? (
                       <>
                         <div style={{ fontSize: 10, color: DIM_STRONG, marginTop: 4, fontWeight: 600 }}>{d.label}</div>
