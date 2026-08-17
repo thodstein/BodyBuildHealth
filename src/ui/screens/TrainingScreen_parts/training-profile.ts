@@ -39,6 +39,9 @@ export interface TrainingProfile {
   monthsSinceLastCourse: number;
   totalYearsOnPharma: number;
   injuries: { muscle: string; from: string; to?: string; weightPct?: number; volumePct?: number; repsCap?: number; exclude?: boolean }[];
+  /** Ограничения мобильности (биомеханика): shoulder/hip/ankle/lower_back/wrist.
+   *  Упражнения с ограниченным движением заменяются на безопасные альтернативы. */
+  mobilityRestrictions?: string[];
   /** Способность к bodyweight-упражнениям: если не подтверждена — подтягивания
    *  не ставятся как primary (заменяются pulldown/машиной). */
   bodyweightCapability?: {
@@ -81,6 +84,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   monthsSinceLastCourse: 0,
   totalYearsOnPharma: 0,
   injuries: [],
+  mobilityRestrictions: [],
   bodyweightCapability: undefined,
 };
 
@@ -109,6 +113,7 @@ export function loadTrainingProfile(): TrainingProfile {
         equipment: s.training?.equipment ?? DEFAULT_PROFILE.equipment,
         loadStrategy: (s.training as any).loadStrategy ?? DEFAULT_PROFILE.loadStrategy,
         bodyweightCapability: (s.training as any).bodyweightCapability ?? DEFAULT_PROFILE.bodyweightCapability,
+        mobilityRestrictions: (s.training as any).mobilityRestrictions ?? DEFAULT_PROFILE.mobilityRestrictions,
         pmSquat: s.training?.pmSquat ?? DEFAULT_PROFILE.pmSquat,
         pmBench: s.training?.pmBench ?? DEFAULT_PROFILE.pmBench,
         pmDead: s.training?.pmDeadlift ?? DEFAULT_PROFILE.pmDead,
@@ -155,6 +160,7 @@ export function saveTrainingProfile(p: TrainingProfile): void {
     if (p.equipment?.length) next.training.equipment = p.equipment;
     if (p.loadStrategy) (next.training as any).loadStrategy = p.loadStrategy;
     if (p.bodyweightCapability) (next.training as any).bodyweightCapability = p.bodyweightCapability;
+    (next.training as any).mobilityRestrictions = p.mobilityRestrictions ?? [];
     if (p.pmSquat) next.training.pmSquat = p.pmSquat;
     if (p.pmBench) next.training.pmBench = p.pmBench;
     if (p.pmDead) next.training.pmDeadlift = p.pmDead;

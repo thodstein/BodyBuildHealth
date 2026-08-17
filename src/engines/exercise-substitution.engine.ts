@@ -12,7 +12,7 @@
 
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
 import type { Exercise } from '../core/types';
-import { derivePattern } from './movement-pattern';
+import { derivePattern, trueMuscleOf } from './movement-pattern';
 
 /** Паттерн движения упражнения: из каталога либо выведенный эвристически. */
 function patternOf(ex: Exercise): string {
@@ -150,6 +150,83 @@ export function findSubstitutions(
       reason: `Не найдена безопасная замена — упражнение выполняется с уменьшенным весом (60%) и объёмом (50%). Рекомендуется консультация с тренером`,
       weightPct: 0.6,
       volumePct: 0.5,
+      repsMin: 12,
+      repsMax: 15,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Мягкая замена для ГРАДИРОВАННОЙ травмы (щадящий режим, exclude=false):
+ * в отличие от findSubstitutions (полное исключение — замена на упражнения
+ * ДРУГИХ групп), здесь мышца ОСТАЁТСЯ в плане, а упражнение меняется на
+ * безопасную альтернативу ТОЙ ЖЕ группы с низким jointStress.
+ * Если безопасной альтернативы нет — возвращается исходное упражнение
+ * (нагрузка снижается множителями substitutionWeightPct/VolumePct в buildSession).
+ */
+export function findGentleSubstitutions(exerciseName: string, muscleGroup: string): SubstitutionResult[] {
+  const ex = EXERCISE_CATALOG.find(e => e.name === exerciseName || e.id === exerciseName);
+  if (!ex) return [];
+  const results: SubstitutionResult[] = [];
+
+  // Точное соответствие целевой мышце: PRO-ключ (quads/biceps) либо каталог-группа (legs/arms).
+  // getGradedInjuries раскрывает зоны (legs → quads/hamstrings/glutes/calves), поэтому
+  // на входе здесь канонические ключи; trueMuscleOf перекрывает оба варианта.
+  const isSameGroup = (e: Exercise) => {
+    const t = trueMuscleOf(e);
+    return (e.group || '') === muscleGroup || (t !== null && t === muscleGroup);
+  };
+
+  // 1) Изоляции той же группы с низким jointStress (идеально для щадящего режима)
+  const gentleIsolation = EXERCISE_CATALOG.filter(
+    e => e.id !== ex.id &&
+      isSameGroup(e) &&
+      e.type === 'isolation' &&
+      e.jointStress === 'low'
+  );
+  for (const repl of gentleIsolation) {
+    results.push({
+      exercise: repl,
+      confidence: 'high',
+      reason: `Щадящая замена той же мышцы: ${repl.name} — изоляция с низким jointStress`,
+      weightPct: 0.8,
+      volumePct: 0.8,
+      repsMin: 10,
+      repsMax: 18,
+    });
+  }
+
+  // 2) Та же группа, низкий jointStress, другое оборудование (штанга → машина/гантели)
+  if (results.length === 0) {
+    const sameGroupLowStress = EXERCISE_CATALOG.filter(
+      e => e.id !== ex.id &&
+        isSameGroup(e) &&
+        e.jointStress === 'low' &&
+        e.equipment !== ex.equipment
+    );
+    for (const repl of sameGroupLowStress) {
+      results.push({
+        exercise: repl,
+        confidence: 'medium',
+        reason: `Щадящая замена той же мышцы: ${repl.name} — ниже суставная нагрузка (${repl.jointStress})`,
+        weightPct: 0.75,
+        volumePct: 0.8,
+        repsMin: 10,
+        repsMax: 15,
+      });
+    }
+  }
+
+  // 3) Если безопасной замены нет — оставляем исходное упражнение (нагрузку снизит buildSession)
+  if (results.length === 0) {
+    results.push({
+      exercise: ex,
+      confidence: 'medium',
+      reason: `Безопасной замены не найдено — ${ex.name} выполняется со сниженным весом/объёмом (щадящий режим)`,
+      weightPct: 0.6,
+      volumePct: 0.6,
       repsMin: 12,
       repsMax: 15,
     });

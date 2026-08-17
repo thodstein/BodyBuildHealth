@@ -81,23 +81,40 @@ function reintegrationProgress(toDate: string): number {
   return 0;
 }
 
+type InjuryMode = 'exclude' | 'graded';
+
+/** Дефолтная градация щадящего режима (мышца остаётся, нагрузка снижена). */
+export function gradedDefaults(): { exclude: false; weightPct: number; volumePct: number; repsCap: number } {
+  return { exclude: false, weightPct: 0.6, volumePct: 0.6, repsCap: 15 };
+}
+
 export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
   const [open, setOpen] = useState(false);
   const [customMuscle, setCustomMuscle] = useState('');
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState('');
+  // Режим, в котором добавляются НОВЫЕ травмы (переключается чипами в шапке).
+  const [mode, setMode] = useState<InjuryMode>('exclude');
 
   const activeCount = injuries.filter(isActive).length;
   const totalCount = injuries.length;
 
   const addInjury = (muscle: string) => {
     if (injuries.some(i => i.muscle === muscle && isActive(i))) return;
-    onChange([...injuries, { muscle, from: todayStr() }]);
+    if (mode === 'graded') {
+      onChange([...injuries, { muscle, from: todayStr(), ...gradedDefaults() }]);
+    } else {
+      onChange([...injuries, { muscle, from: todayStr(), exclude: true }]);
+    }
   };
 
   const addCustom = () => {
     if (!customMuscle.trim()) return;
-    onChange([...injuries, { muscle: customMuscle.trim(), from: customFrom, to: customTo || undefined }]);
+    if (mode === 'graded') {
+      onChange([...injuries, { muscle: customMuscle.trim(), from: customFrom, to: customTo || undefined, ...gradedDefaults() }]);
+    } else {
+      onChange([...injuries, { muscle: customMuscle.trim(), from: customFrom, to: customTo || undefined, exclude: true }]);
+    }
     setCustomMuscle('');
     setCustomTo('');
   };
@@ -138,15 +155,27 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                   Отметьте травмированные мышцы — план <b style={{ color: '#f87171' }}>защитит их</b>. Два режима на каждую травму:
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                  <span style={{ flex: '1 1 45%', padding: '5px 7px', borderRadius: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 9, lineHeight: 1.4 }}>
-                    <b style={{ color: '#f87171' }}>⛔ Исключить</b><br />упражнения заменяются безопасными аналогами
-                  </span>
-                  <span style={{ flex: '1 1 45%', padding: '5px 7px', borderRadius: 6, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', fontSize: 9, lineHeight: 1.4 }}>
-                    <b style={{ color: '#fbbf24' }}>⚡ Щадящая</b><br />мышца остаётся, но вес/объём/повторы снижаются
-                  </span>
+                  <button type="button" onClick={() => setMode('exclude')}
+                    style={{
+                      flex: '1 1 45%', padding: '5px 7px', borderRadius: 6, cursor: 'pointer', textAlign: 'left' as const,
+                      background: mode === 'exclude' ? 'rgba(239,68,68,0.22)' : 'rgba(239,68,68,0.12)',
+                      border: mode === 'exclude' ? '2px solid #ef4444' : '1px solid rgba(239,68,68,0.3)',
+                      color: '#f87171', fontSize: 9, lineHeight: 1.4,
+                    }}>
+                    <b>⛔ Исключить</b><br />упражнения заменяются безопасными аналогами{mode === 'exclude' ? ' — выбран' : ''}
+                  </button>
+                  <button type="button" onClick={() => setMode('graded')}
+                    style={{
+                      flex: '1 1 45%', padding: '5px 7px', borderRadius: 6, cursor: 'pointer', textAlign: 'left' as const,
+                      background: mode === 'graded' ? 'rgba(245,158,11,0.22)' : 'rgba(245,158,11,0.12)',
+                      border: mode === 'graded' ? '2px solid #f59e0b' : '1px solid rgba(245,158,11,0.3)',
+                      color: '#fbbf24', fontSize: 9, lineHeight: 1.4,
+                    }}>
+                    <b>⚡ Щадящая</b><br />мышца остаётся, но вес/объём/повторы снижаются{mode === 'graded' ? ' — выбран' : ''}
+                  </button>
                 </div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginTop: 6 }}>
-                  Даты «с/до» = период активности; после заживления нагрузка плавно возвращается (50% → 75% → 100%).
+                  Режим применяется к <b style={{ color: 'rgba(255,255,255,0.7)' }}>новым</b> травмам (в списке ниже его можно поменять у каждой). Даты «с/до» = период активности; после заживления нагрузка плавно возвращается (50% → 75% → 100%).
                 </div>
               </div>
 
@@ -264,7 +293,13 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                               <button onClick={() => {
                                 const next = [...injuries];
                                 const current = next[i];
-                                next[i] = { ...current, exclude: !(current.exclude ?? true), weightPct: current.exclude !== false ? 0.6 : undefined, volumePct: current.exclude !== false ? 0.6 : undefined, repsCap: current.exclude !== false ? 15 : undefined };
+                                if (current.exclude === false) {
+                                  // ⚡ Щадящая → ⛔ Исключить: сброс градации
+                                  next[i] = { ...current, exclude: true, weightPct: undefined, volumePct: undefined, repsCap: undefined };
+                                } else {
+                                  // ⛔ Исключить → ⚡ Щадящая: дефолтная градация
+                                  next[i] = { ...current, ...gradedDefaults() };
+                                }
                                 onChange(next);
                               }}
                                 style={{
