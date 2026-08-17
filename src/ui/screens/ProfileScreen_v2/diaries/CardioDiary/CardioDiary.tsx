@@ -14,10 +14,13 @@ import {
   cardioLogStats, cardioWeekAdherence,
   type CardioLogEntry,
 } from '../../../../../engines/lms/cardio-diary.engine';
-import { loadActiveCardioCycle, cardioWeekForDate, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
+import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const ACCENT = '#4ade80';
+
+const HINT_COLOR: Record<string, string> = { test: '#4ade80', deload: '#fbbf24', taper: '#eab308', peak: '#f87171' };
+const HINT_ICON: Record<string, string> = { test: '🔬', deload: '🧘', taper: '📉', peak: '🎭' };
 
 const TYPES: { id: CardioType; label: string; color: string }[] = [
   { id: 'zone2', label: 'Zone 2', color: '#4ade80' },
@@ -63,6 +66,17 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     } catch { return null; }
   }, [log]);
 
+  // Тренерская подсказка текущей недели (замер/делод/taper/пик).
+  const weekHint = useMemo(() => {
+    try {
+      const cycle = loadActiveCardioCycle();
+      if (!cycle) return null;
+      const weekForDate = cardioWeekForDate(cycle, todayIso(), cycle.startDate);
+      const currentWeek = Math.min(weekForDate ? weekForDate.week : 1, cycle.totalWeeks);
+      return cardioCoachHints(cycle).find(h => h.week === currentWeek && h.kind !== 'work') ?? null;
+    } catch { return null; }
+  }, []);
+
   const add = () => {
     const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
     const entry: CardioLogEntry = {
@@ -102,6 +116,12 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
       />
 
       {flash && <div style={{ color: ACCENT, fontSize: 13, fontWeight: 600, padding: '4px 2px' }} role="status">{flash}</div>}
+
+      {weekHint && (
+        <div style={{ fontSize: 12, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+          {HINT_ICON[weekHint.kind] ?? '💡'} Нед {weekHint.week}: {weekHint.text}
+        </div>
+      )}
 
       {adherence && (
         <div style={{ ...glassCard, padding: 12, marginBottom: 12 }}>

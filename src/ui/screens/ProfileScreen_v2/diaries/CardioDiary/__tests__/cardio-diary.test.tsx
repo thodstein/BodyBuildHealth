@@ -73,4 +73,16 @@ describe('CardioDiary — CSR', () => {
     render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
     expect(screen.queryByText(/план vs факт/)).toBeNull();
   });
+
+  it('активный цикл, идущий 3 недели (cut): тренерская подсказка текущей недели видна', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 21);
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, id: 'cd-h', startDate: start, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    // Неделя 4 в cut-цикле — делод → подсказка «Нед 4: …Делод…».
+    expect(screen.getByText(/Нед 4:/)).toBeTruthy();
+  });
 });
