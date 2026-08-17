@@ -69,6 +69,16 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('📋 В буфер')).toBeTruthy();
   });
 
+  it('Итог: предпросмотр «Неделя 1» с днями виден после авто-сборки', async () => {
+    render(<ProgramManagerPanelWithProvider />);
+    fireEvent.click(screen.getAllByText('ББ')[0]);
+    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
+    fireEvent.click(screen.getByText('Далее: Недели →'));
+    fireEvent.click(screen.getByText('Далее: Итог →'));
+    await waitFor(() => expect(screen.getByText(/🗓 Неделя 1:/)).toBeTruthy(), { timeout: 15000 });
+    expect(screen.getAllByText(/упр\./).length).toBeGreaterThan(0);
+  });
+
   it('pro: внутренние шаги редактора (Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты → Итог) с «← Назад»', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getByText('Профессиональный'));
