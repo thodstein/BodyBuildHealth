@@ -381,6 +381,15 @@ describe('CardioDayCard — кардио-слой дня', () => {
     render(<CardioDayCard cycle={c} />);
     expect(screen.getByText(/не записано/)).toBeTruthy();
   });
+
+  it('CSR: cut-цикл 3 недели — тренерская подсказка недели (делод) видна', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 21);
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, id: 'day-h', startDate: start, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    render(<CardioDayCard cycle={c} />);
+    expect(screen.getByText(/Нед 4:/)).toBeTruthy();
+  });
 });
 
 describe('CardioDiaryStep — старт-контроль (5C)', () => {

@@ -4,12 +4,14 @@
  * (кардио + силовые sRPE). Является кардио-слоем в дневнике/конструкторах.
  */
 import React, { useMemo } from 'react';
-import { cardioEquipmentLabel, loadActiveCardioCycle, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
+import { cardioEquipmentLabel, loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
 import { cardioDayLoad, loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { CARD, ROW, BTN_PRIMARY } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
+const HINT_COLOR: Record<string, string> = { test: '#4ade80', deload: '#fbbf24', taper: '#eab308', peak: '#f87171' };
+const HINT_ICON: Record<string, string> = { test: '🔬', deload: '🧘', taper: '📉', peak: '🎭' };
 
 function todayIso(): string {
   const d = new Date();
@@ -23,6 +25,13 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
 
   const today = todayIso();
   const load = useMemo(() => cardioDayLoad(cycle, log, srpe, today, cycle?.startDate), [cycle, log, srpe, today]);
+  // Тренерская подсказка текущей недели (замер/делод/taper/пик).
+  const weekHint = useMemo(() => {
+    if (!cycle) return null;
+    const weekForDate = cardioWeekForDate(cycle, today, cycle.startDate);
+    const currentWeek = Math.min(weekForDate ? weekForDate.week : 1, cycle.totalWeeks);
+    return cardioCoachHints(cycle).find(h => h.week === currentWeek && h.kind !== 'work') ?? null;
+  }, [cycle, today]);
 
   return (
     <div style={CARD}>
@@ -42,6 +51,11 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
           {load.planned.length === 0
             ? 'План: кардио на сегодня нет.'
             : 'План: ' + load.planned.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')}
+        </div>
+      )}
+      {weekHint && (
+        <div style={{ fontSize: 10, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '4px 8px' }}>
+          {HINT_ICON[weekHint.kind] ?? '💡'} Нед {weekHint.week}: {weekHint.text}
         </div>
       )}
       <div style={{ fontSize: 11, color: load.done.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.45)' }}>
