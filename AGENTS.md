@@ -1,5 +1,43 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## BB-авто: травмы — щадящий режим, честный exclude, мобильность (Aug 18 2026, pushed 7efe9c96)
+
+Жалобы: «щадящий режим в выборе травм не выбирается — мышца нажимается один раз и
+исключается»; «проработать группы мышц травм»; «не забудь мобильность». **Объёмная модель
+(MEV/MAV/MRV, уровень/стаж/PED/цель/капы/валидаторы) НЕ менялась** — BB 1240/1240,
+TrainingScreen_parts 417/417, tsc 0.
+
+- **UI `InjurySelectCard.tsx`**: чипы «⛔ Исключить» / «⚡ Щадящая» в шапке модалки стали
+  кликабельными — задают режим для НОВЫХ травм (`mode` state); `addInjury`/`addCustom`
+  добавляют с `exclude: true` или `gradedDefaults()` (exclude:false, 0.6/0.6/15); тумблер
+  в списке переключает режим существующей травмы (градация сбрасывается/ставится).
+- **`manual-plan-builder.ts`**: `expandInjuryMuscle` — зонные ключи раскрываются в
+  PRO-мышцы движка: legs→[quads,hamstrings,glutes,calves], arms→[biceps,triceps,forearms],
+  core→[abs,lower_back]; применяется в `getExcludedMuscles`/`getGradedInjuries`. Раньше
+  травма «Колено» (legs) НЕ матчилась ни с одной мышцей — план вообще не менялся.
+- **`exercise-substitution.engine.ts`**: NEW `findGentleSubstitutions` — щадящая замена
+  ТОЛЬКО той же мышцы (изоляция low jointStress → low stress + другое оборудование →
+  исходное со снижением 0.6/0.6). Старый `findSubstitutions` (для exclude) уводил на
+  ДРУГИЕ группы — градированная мышца не прорабатывалась. bb-builder использует gentle
+  для graded + пробрасывает `repsCap` из травмы (раньше слайдер повторов не влиял).
+- **Финализатор уважает травмы**: `gradedMuscles` в BBFinalizeOptions (buildBBPlan и
+  cycle-to-plan пробрасывают); auto-MEV-feeder (builder) / addAdaptiveMEVFeeders /
+  fill-проход / ensureSmallMuscleQuality / addWarmupActivator не добавляют упражнения
+  для excluded (раньше «legs exclude» возвращало ноги: fill добавлял присед с весом
+  15.8 кг от абс-шаблона) и не раздувают graded до MEV (щадящий объём намеренно снижен).
+- **Мобильность**: NEW `bb-mobility.engine.ts` — единый источник `MOBILITY_PATTERNS`/
+  `isMobilityRestricted` (фикс паттернов: lower_back «станов.*классик» — ловил «классич»
+  вместо «классика»; wrist — «бицепс.*штанг» не матчил «Подъём штанги на бицепс», добавлен
+  «штанг.*бицепс» и «ez.?гриф»); bb-builder реэкспортирует для cycle-to-plan. Финализатор
+  фильтрует добавляемые/заменяемые упражнения (fill/feeders/малые группы/warmup/rotation/
+  repair/arm-heads/weak-pattern). UI: чипы мобильности сохраняются в профиль
+  (`TrainingProfile.mobilityRestrictions` ↔ UnifiedSettings training) и восстанавливаются.
+- Тесты: NEW `bb-injury-gentle.test.ts` (15), `bb-mobility.test.ts` (12),
+  `injury-select-card.test.tsx` (6). Полный bb-прогон 1240/1240; падение
+  macrocycle-panel-cycle-slots A5 — пред-существующее (чужой WIP).
+- ВАЖНО: bb-builder/bb-finalize/cycle-to-plan/BbAutoConstructor правки попали в HEAD через
+  чужой коммит c18c03bda (`git add -A`); в этом коммите — только мои 8 файлов.
+
 ## BB-авто: гранулярные зоны специализации + проверка выбора (Aug 18 2026, uncommitted)
 
 Жалоба: «выбор средняя+задняя дельта даёт то же значение, что и просто плечи» — зоны
