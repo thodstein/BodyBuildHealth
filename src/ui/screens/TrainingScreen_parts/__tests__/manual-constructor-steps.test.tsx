@@ -23,6 +23,14 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('🆕 Создать новую')).toBeTruthy();
   });
 
+  it('онбординг: баннер «Как работает конструктор» при первом запуске, скрывается навсегда по кнопке', () => {
+    render(<ProgramManagerPanelWithProvider />);
+    expect(screen.getByText('👋 Как работает ручной конструктор')).toBeTruthy();
+    fireEvent.click(screen.getByText('Понятно, поехали →'));
+    expect(screen.queryByText('👋 Как работает ручной конструктор')).toBeNull();
+    expect(localStorage.getItem('he_manual_onboarding_done')).toBe('1');
+  });
+
   it('standard: создание → «Далее: Недели →» (первый шаг Параметры), затем «Далее: Итог →» + «← Назад»', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);

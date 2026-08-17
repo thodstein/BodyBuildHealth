@@ -192,6 +192,10 @@ export const ProgramManagerPanel: React.FC = () => {
     try { return (localStorage.getItem('he_manual_mode') as ManualMode) || 'standard'; } catch { return 'standard'; }
   });
   useEffect(() => { try { localStorage.setItem('he_manual_mode', manualMode); } catch {} }, [manualMode]);
+  // Онбординг конструктора — показывается при первом запуске, скрывается кнопкой
+  const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_manual_onboarding_done') !== '1'; } catch { return true; }
+  });
 
   // Последовательные шаги конструктора. Создание/открытие программы
   // автоматически переводит на шаг «Редактор», сохранение на «Итог» — обратно в выбор.
@@ -667,6 +671,19 @@ export const ProgramManagerPanel: React.FC = () => {
           </div>
         </div>
 
+        {/* Онбординг при первом запуске: как работает конструктор */}
+        {onboardingOpen && (
+          <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>👋 Как работает ручной конструктор</div>
+            <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.55 }}>
+              1. <b>Выбор</b> — создайте программу, склонируйте из библиотеки или подключите ПЛ-цикл.<br />
+              2. <b>Редактор</b> — заполните параметры, недели и упражнения (в PRO-режиме добавятся анализ и инструменты тренера).<br />
+              3. <b>Итог</b> — проверьте метрики и сохраните.
+            </div>
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start' }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch { /* ignore */ } }}>Понятно, поехали →</button>
+          </div>
+        )}
+
         {/* Выбор режима: «Стандартный» / «Профессиональный» */}
         <ManualModeToggle mode={manualMode} onMode={setManualMode} />
 
@@ -756,6 +773,19 @@ export const ProgramManagerPanel: React.FC = () => {
       <div style={{ fontSize: 11, color: DIM }}>
         Создавайте программы с нуля, клонируйте готовые из библиотеки или подключайте LMS-циклы (без изменения их процентовок).
       </div>
+
+      {/* Онбординг при первом запуске: как работает конструктор */}
+      {onboardingOpen && (
+        <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>👋 Как работает ручной конструктор</div>
+          <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.55 }}>
+            1. <b>Выбор</b> — создайте программу, склонируйте из библиотеки или подключите ПЛ-цикл.<br />
+            2. <b>Редактор</b> — заполните параметры, недели и упражнения (в PRO-режиме добавятся анализ и инструменты тренера).<br />
+            3. <b>Итог</b> — проверьте метрики и сохраните.
+          </div>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start' }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch { /* ignore */ } }}>Понятно, поехали →</button>
+        </div>
+      )}
 
       {/* Выбор режима: «Стандартный» / «Профессиональный» */}
       <ManualModeToggle mode={manualMode} onMode={setManualMode} />
