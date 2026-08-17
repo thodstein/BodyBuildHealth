@@ -658,9 +658,9 @@ return (
           🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
         </span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
-        <ProgramMetricsCSV program={program} dir={dir} onToast={showToast} />
+        <span className="editor-topbar-hide-mobile"><ProgramMetricsCSV program={program} dir={dir} onToast={showToast} /></span>
         {program.meta.updatedAt && (
-          <span style={{ fontSize: 11, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
+          <span className="editor-topbar-hide-mobile" style={{ fontSize: 11, color: DIM, fontWeight: 500 }} title={`Создано: ${new Date(program.meta.createdAt).toLocaleString('ru-RU')}\nОбновлено: ${new Date(program.meta.updatedAt).toLocaleString('ru-RU')}`}>
             · {(() => {
               const diff = Date.now() - new Date(program.meta.updatedAt).getTime();
               if (diff < 0 || diff < 60000) return 'только что';

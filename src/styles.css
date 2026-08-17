@@ -578,6 +578,7 @@
   .manual-constructor__sticky-header { position: sticky; top: 0; max-width: 100%; overflow-x: auto; }
   .manual-constructor--editor { gap: 8px !important; }
   .manual-constructor--editor .editor-topbar { align-items: stretch !important; }
+  .manual-constructor--editor .editor-topbar-hide-mobile { display: none !important; }
   .manual-constructor--editor .editor-topbar > div:last-child { width: 100%; margin-left: 0 !important; }
   .manual-constructor--editor .editor-meta-card > div { flex-direction: column !important; }
   .manual-constructor--editor .editor-week-card { padding: 9px !important; }

@@ -37,7 +37,7 @@ import { MethodologyEncyclopedia } from './MethodologyEncyclopedia';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { BbContextPanel } from './program-editor-context-panels';
-import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
+import { BBEditor, PLEditor, BBConstraintsPanel, TRAINING_DAY_NAMES } from './ProgramEditorComponents';
 import { ProgramEditor } from './ProgramEditorView';
 import { ConfirmDialogProvider, useConfirmDialog } from './ConfirmDialog';
 import { TrainingModal } from './TrainingModal';
@@ -82,6 +82,7 @@ import type { Exercise } from '../../../core/types';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
 import { ManualProgramWizard, type WizardStep, type WizardDirection } from './ManualProgramWizard';
 import { buildBBUserProgramFromProfile } from './auto-fill-draft';
+import { sessionDayOfWeek } from './program-editor-logic';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -475,6 +476,17 @@ export const ProgramManagerPanel: React.FC = () => {
             )}
             <span style={finalBadge('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.85)')}>📝 Упражнений: {totalExercises}</span>
           </div>
+          {dir === 'bb' && p.bb?.weeks?.[0] && (() => {
+            const w1 = p.bb.weeks[0];
+            const days = w1.sessions.map((s, i) => `${TRAINING_DAY_NAMES[sessionDayOfWeek(s, i)]} ${s.name || 'День ' + (i + 1)} (${s.blocks.filter(b => b.exerciseName).length} упр.)`);
+            if (days.length === 0) return null;
+            return (
+              <div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}>
+                <b style={{ color: DIM_STRONG }}>🗓 Неделя 1:</b>
+                {days.map((d, i) => <span key={i} style={finalBadge('rgba(255,255,255,0.05)', 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0.8)')}>{d}</span>)}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Валидация */}
