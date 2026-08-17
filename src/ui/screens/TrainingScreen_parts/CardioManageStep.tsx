@@ -17,6 +17,11 @@ import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
 import { SectionCard, GroupHeading, SectionNav, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, InfoBanner } from './CardioUI';
 
+const GOAL_COLOR: Record<string, string> = {
+  health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
+  maintenance: '#8b5cf6', recovery: '#71717a',
+};
+
 export const CardioManageStep: React.FC<{
   cycle: CardioCycle | null;
   library: CardioCycle[];
@@ -42,6 +47,9 @@ export const CardioManageStep: React.FC<{
   const [copyFlash, setCopyFlash] = useState(false);
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
+
+  /** Год кардио из библиотеки (до 4 циклов) — для визуализации последовательности. */
+  const yearPlan = cardioYearPlan(library.slice(0, 4));
 
   /** «📆 Год кардио»: последовательность циклов из библиотеки → сводка в буфер. */
   const copyYear = () => {
@@ -190,6 +198,43 @@ export const CardioManageStep: React.FC<{
           </div>
         </SectionCard>
       )}
+
+      {/* ── Год кардио: визуальная последовательность циклов ── */}
+      <GroupHeading icon="📆" text="Год кардио" desc="Последовательность циклов из библиотеки (до 4) — как блоки года." />
+      <SectionCard id="sec-year" title="📆 Год кардио" right={
+        <button style={BTN} onClick={copyYear} title="Сводка «Год кардио» в буфер" aria-label="Год кардио в буфер">
+          {yearFlash ? '✅ Год в буфере' : '📋 Сводка в буфер'}
+        </button>
+      }>
+        {yearPlan ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 2, height: 18, borderRadius: 3, overflow: 'hidden' }}>
+              {yearPlan.blocks.map(b => (
+                <div key={b.cycle.id} title={`${b.cycle.name}: нед ${b.startWeek}-${b.startWeek + b.totalWeeks - 1}`} style={{ flex: b.totalWeeks, background: GOAL_COLOR[b.cycle.goal] ?? '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                  {b.totalWeeks >= 10 ? `${b.startWeek}` : ''}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {yearPlan.blocks.map(b => (
+                <div key={b.cycle.id} style={ROW}>
+                  <span style={{ width: 40, fontSize: 11, fontWeight: 800, color: GOAL_COLOR[b.cycle.goal] ?? '#888' }}>нед {b.startWeek}</span>
+                  <span style={{ flex: 1, fontSize: 11, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.cycle.name}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{CARDIO_GOAL_LABELS[b.cycle.goal]} · {b.totalWeeks} нед</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{b.summary.avgMinutesPerWeek} мин/нед</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+              Итого: {yearPlan.totalWeeks} нед · в среднем {yearPlan.avgMinutesPerWeek} мин/нед · {yearPlan.avgKcalPerWeek} ккал/нед
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            Циклов в библиотеке пока нет — соберите и сохраните циклы, чтобы увидеть их последовательность за год.
+          </div>
+        )}
+      </SectionCard>
 
       {/* ── Ручная настройка недели ── */}
       <GroupHeading icon="🛠" text="Конструктор недели" desc="Раскладка по дням, ±10% минут и редактор сессий конкретной недели." />

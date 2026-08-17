@@ -171,6 +171,17 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByText(/→/)).toBeTruthy();
   });
 
+  it('шаг 4: «Год кардио» показывает визуализацию последовательности циклов', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    expect(screen.getAllByText(/Год кардио/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Итого:/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/нед · в среднем/).length).toBeGreaterThan(0);
+  });
+
   it('шаг 5: доступны авто-режим и дневник', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
