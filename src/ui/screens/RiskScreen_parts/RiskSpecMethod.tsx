@@ -273,7 +273,7 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
             Интегральный риск
           </div>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-            R = Σ(w × m × E × U × Π(1−k*))
+            R = Σ(w × m × E × U × Π(1−k*)) · агрегация: union (нелинейно)
           </div>
           {calcSnapshot && (
             <div style={{ marginTop: 6, fontSize: 8, color: '#22c55e', fontWeight: 600 }}>
@@ -323,6 +323,18 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
               <span>U: ×{result.u_i.toFixed(2)}</span>
               <span>Поддержка: {result.supportCount} веществ</span>
             </div>
+
+            {result.overallVerification !== undefined && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '6px 10px', borderRadius: 8,
+                background: result.overallVerification >= 0.5 ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.08)',
+                border: `1px solid ${result.overallVerification >= 0.5 ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.25)'}`,
+                fontSize: 10, color: result.overallVerification >= 0.5 ? '#4ade80' : '#fbbf24',
+              }}>
+                {result.overallVerification >= 0.5 ? '🔬' : '⚠'} Индекс риска · верифицировано анализами: {Math.round(result.overallVerification * 100)}% систем
+                {result.overallVerification < 0.5 && <span style={{ color: 'rgba(255,255,255,0.5)' }}>— оценка по фармакологии, сдайте анализы</span>}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -359,6 +371,9 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>
                       {totalMechs} мех. · защищено {protectedMechs}/{totalMechs}
                       {delta > 0 && <span style={{ color: '#4ade80', marginLeft: 6 }}>↓{Math.round(delta)}%</span>}
+                      {organ.verification !== undefined && organ.verification < 0.5 && (
+                        <span style={{ color: '#fbbf24', marginLeft: 6 }}>⚠ не верифицировано</span>
+                      )}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -427,6 +442,15 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                         </div>
                       );
                     })}
+                    {organ.floors && organ.floors.length > 0 && (
+                      <div style={{ marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        {organ.floors.map((f, i) => (
+                          <div key={i} style={{ fontSize: 9, color: '#fca5a5', lineHeight: 1.5 }}>
+                            ⚓ {f.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

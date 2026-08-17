@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import type { TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
+import { unionPct } from '../../../engines/risk-engine-tz-spec';
 
 // ════════════════════════════════════════════════════════════════════
 //  CalcSystemPanel — панель «Риск системы + под-риски + мониторинг»
@@ -58,8 +59,8 @@ export const CalcSystemPanel: React.FC<{
   contra?: Array<{ substanceId?: string; label?: string; severity?: string; message?: string }>;
 }> = ({ risk, panel, groups, note, contra }) => {
   const riskColor = (p: number) => (p >= 75 ? '#f87171' : p >= 50 ? '#f97316' : p >= 25 ? '#f59e0b' : '#22c55e');
-  const sumPct = (mechs: string[]) => (risk ? mechs.reduce((s, m) => s + (risk.mechanisms.find(x => x.id === m)?.rawPercent ?? 0), 0) : 0);
-  const sumAfter = (mechs: string[]) => (risk ? mechs.reduce((s, m) => s + (risk.mechanisms.find(x => x.id === m)?.afterPercent ?? 0), 0) : 0);
+  const sumPct = (mechs: string[]) => (risk ? unionPct(mechs.map(m => risk.mechanisms.find(x => x.id === m)?.rawPercent ?? 0)) : 0);
+  const sumAfter = (mechs: string[]) => (risk ? unionPct(mechs.map(m => risk.mechanisms.find(x => x.id === m)?.afterPercent ?? 0)) : 0);
   const showSub = groups && groups.length > 0 && !!risk;
   const contraList = (contra || []).filter(c => c?.label || c?.message);
   return (
@@ -70,6 +71,16 @@ export const CalcSystemPanel: React.FC<{
             ⚖️ Риск системы (механизм-модель): <b style={{ color: riskColor(risk.rawPercent) }}>{risk.rawPercent}%</b> → <b style={{ color: '#4ade80' }}>{risk.afterPercent}%</b> после поддержки
             {risk.k_protect > 0 && <span style={{ color: '#4ade80' }}> · защита {risk.k_protect}%</span>}
           </div>
+          {risk.floors && risk.floors.length > 0 && (
+            <div style={{ marginBottom: 3 }}>
+              {risk.floors.map((f, i) => (
+                <div key={i} style={{ fontSize: 6, color: '#fca5a5', lineHeight: 1.5 }}>⚓ {f.label}</div>
+              ))}
+            </div>
+          )}
+          {risk.verification !== undefined && risk.verification < 0.5 && (
+            <div style={{ fontSize: 6, color: '#fbbf24', marginBottom: 3 }}>⚠ Система не верифицирована анализами — оценка по фармакологии</div>
+          )}
           {showSub && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 3 }}>
               {groups!.map(g => {

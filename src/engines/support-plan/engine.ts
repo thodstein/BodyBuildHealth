@@ -597,7 +597,13 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     let tzResultFinal: TzSpecResult | null = null;
     let peakWeek = 0;
 
-    let tzInputFinal = buildTzInput(state, substances);
+    // Процедуры (эритроцитаферез/флеботомия) — реальные вмешательства,
+    // снижающие hem1 (прямое удаление RBC-массы); включаются в расчёт
+    // «с поддержкой» как k-записи (PROCEDURE_DB), не как вещества.
+    const procedureIds = (unifiedRec?.procedures || [])
+      .filter(p => p.id === 'erythrocytapheresis' || p.id === 'phlebotomy')
+      .map(p => p.id);
+    let tzInputFinal = buildTzInput(state, [...substances, ...procedureIds]);
     if (!tzInputFinal) {
       tzInputFinal = {
         drugClass: 'aas', drugName: 'none', dose: 0, duration: 12,

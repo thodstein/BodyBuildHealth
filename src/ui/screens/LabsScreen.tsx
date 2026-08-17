@@ -1896,6 +1896,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>
                         {tzSpecResult.overallCategory} · K_protect {tzSpecResult.k_protect_overall}%
                       </div>
+                      {tzSpecResult.overallVerification !== undefined && (
+                        <div style={{ fontSize: 8, marginTop: 2, color: tzSpecResult.overallVerification >= 0.5 ? '#4ade80' : '#fbbf24' }}>
+                          {tzSpecResult.overallVerification >= 0.5 ? '🔬' : '⚠'} Индекс риска · верифицировано анализами: {Math.round(tzSpecResult.overallVerification * 100)}% систем
+                          {tzSpecResult.overallVerification < 0.5 && ' — оценка по фармакологии'}
+                        </div>
+                      )}
                       <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, margin: '4px 10px 0', overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${Math.min(100, tzSpecResult.overallAfter)}%`, borderRadius: 2,
                           background: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }} />
@@ -1907,11 +1913,23 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         return (
                           <div key={organ.id} style={{ padding: '4px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.02)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: 9, fontWeight: 600 }}>{organ.icon} {organ.name}</span>
+                              <span style={{ fontSize: 9, fontWeight: 600 }}>
+                                {organ.icon} {organ.name}
+                                {organ.verification !== undefined && organ.verification < 0.5 && (
+                                  <span style={{ color: '#fbbf24', marginLeft: 3 }}>⚠</span>
+                                )}
+                              </span>
                               <span style={{ fontSize: 10, fontWeight: 700, color: cc(organ.afterPercent) }}>
                                 {organ.rawPercent}% → {organ.afterPercent}%
                               </span>
                             </div>
+                            {organ.floors && organ.floors.length > 0 && (
+                              <div style={{ marginTop: 1 }}>
+                                {organ.floors.map((f, i) => (
+                                  <div key={i} style={{ fontSize: 7, color: '#fca5a5', lineHeight: 1.4 }}>⚓ {f.label}</div>
+                                ))}
+                              </div>
+                            )}
                             <div style={{ height: 2, background: 'rgba(255,255,255,0.05)', borderRadius: 1, marginTop: 1, overflow: 'hidden' }}>
                               <div style={{ height: '100%', width: `${Math.min(100, organ.afterPercent)}%`, background: cc(organ.afterPercent), borderRadius: 1 }} />
                             </div>

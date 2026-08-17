@@ -45,7 +45,7 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
         <span style={{ width: 3, height: 14, borderRadius: 2, background: ACCENT, display: 'inline-block' }} />
         Интегральный риск
         <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', marginLeft: 'auto' }}>
-          R = &Sigma;(w &times; m &times; E &times; U &times; &Pi;(1&minus;k*))
+          R = &Sigma;(w &times; m &times; E &times; U &times; &Pi;(1&minus;k*)) &middot; union
         </span>
       </div>
 
@@ -97,6 +97,19 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
         <span>Поддержка: {tz.supportCount} веществ</span>
       </div>
 
+      {/* ── Верификация анализами ── */}
+      {tz.overallVerification !== undefined && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, padding: '4px 8px', borderRadius: 6,
+          background: tz.overallVerification >= 0.5 ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.08)',
+          border: `1px solid ${tz.overallVerification >= 0.5 ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.25)'}`,
+          fontSize: 8, color: tz.overallVerification >= 0.5 ? '#4ade80' : '#fbbf24',
+        }}>
+          {tz.overallVerification >= 0.5 ? '🔬' : '⚠'} Индекс риска · верифицировано анализами: {Math.round(tz.overallVerification * 100)}% систем
+          {tz.overallVerification < 0.5 && <span style={{ color: 'rgba(255,255,255,0.5)' }}>— оценка по фармакологии, сдайте анализы</span>}
+        </div>
+      )}
+
       {/* ── Системы ── */}
       <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>
         Риск по системам
@@ -127,6 +140,9 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
                 <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>
                   {totalMechs} мех. &middot; защищено {protectedMechs}/{totalMechs}
                   {delta > 0 && <span style={{ color: '#4ade80', marginLeft: 4 }}>&darr;{Math.round(delta)}%</span>}
+                  {organ.verification !== undefined && organ.verification < 0.5 && (
+                    <span style={{ color: '#fbbf24', marginLeft: 4 }}>⚠ не верифицировано</span>
+                  )}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -194,6 +210,15 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after }) => {
                     </div>
                   );
                 })}
+                {organ.floors && organ.floors.length > 0 && (
+                  <div style={{ marginTop: 4, padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    {organ.floors.map((f, i) => (
+                      <div key={i} style={{ fontSize: 7, color: '#fca5a5', lineHeight: 1.5 }}>
+                        ⚓ {f.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

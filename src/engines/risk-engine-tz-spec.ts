@@ -96,11 +96,17 @@ export interface TzSpecOrganResult {
   maxRaw: number;
   category: 'low'|'moderate'|'high'|'very_high';
   mechanisms: TzSpecMechanismResult[]; k_protect: number;
+  /** Верификация системы анализами: доля механизмов с релевантными маркерами (0..1) */
+  verification: number;
+  /** Сработавшие якорные floors (лабораторные пороги из руководств) */
+  floors: ClinicalFloor[];
 }
 export interface TzSpecResult {
   organs: TzSpecOrganResult[]; overallRaw: number; overallAfter: number;
   overallCategory: string; k_protect_overall: number;
   d_cov: number; u_i: number; supportCount: number; explanation: string;
+  /** Доля систем, верифицированных анализами (0..1) */
+  overallVerification: number;
 }
 
 // ── DRUG_CLASSES ──
@@ -129,14 +135,110 @@ function getFormFactor(form:string,organId:string):number{if(form==='inject')ret
 function getCombinationFactor(count:number):number{if(count<=1)return 1.0;if(count===2)return 1.2;return 1.5}
 function getPenaltyFactor(d_cov:number):number{return 1+0.25*(1-d_cov)}
 
+// ── Субаддитивная агрегация (competing risks) ──
+// Механизмы одного органа — конкурирующие пути повреждения: система = union,
+// а не сумма. 7%+7%+7% → 19.6%, 50%+50% → 75%. Каноническая формула
+// competing-risks (эпидемиология/токсикология): S = 1 − Π(1 − pᵢ).
+export function unionPct(pcts:number[]):number{
+  const valid=pcts.filter(p=>Number.isFinite(p)&&p>0);
+  if(valid.length===0)return 0;
+  let product=1;
+  for(const p of valid)product*=Math.max(0,1-Math.min(100,p)/100);
+  return Math.min(100,Math.round((1-product)*1000)/10);
+}
+
+// ── Документированные парные синергии механизмов ──
+// Литературные взаимодействия: пара путей ускоряет повреждение сильнее,
+// чем по отдельности (KDIGO: СКФ×альбуминурия; атеротромбоз: липиды×тромбоз).
+const SYNERGY_PAIRS:Array<{a:string;b:string;s:number;label:string}>=[
+  {a:'cv2',b:'cv4',s:0.25,label:'дислипидемия × протромботическое состояние (атеротромбоз)'},
+  {a:'cv3',b:'cv1',s:0.25,label:'задержка Na/H₂O × ремоделирование (гипертензивное сердце)'},
+  {a:'hem1',b:'cv4',s:0.25,label:'эритроцитоз × тромбоз (гипервязкость)'},
+  {a:'liv1',b:'liv2',s:0.2,label:'гепатоцеллюлярное × холестаз'},
+  {a:'ren1',b:'ren3',s:0.25,label:'СКФ × альбуминурия (KDIGO)'},
+  {a:'cns1',b:'cns2',s:0.2,label:'нейромедиаторный × окислительный стресс'},
+];
+
+/** Применяет парные синергии к процентам механизмов (мутация, кап 100). */
+export function applyMechanismSynergies(mechs:Array<{id:string;rawPercent:number;afterPercent:number}>):void{
+  for(const pair of SYNERGY_PAIRS){
+    const a=mechs.find(m=>m.id===pair.a);
+    const b=mechs.find(m=>m.id===pair.b);
+    if(!a||!b||a.rawPercent<=0||b.rawPercent<=0)continue;
+    const pa=a.rawPercent,pb=b.rawPercent;
+    a.rawPercent=Math.min(100,Math.round(pa*(1+pair.s*pb/100)*10)/10);
+    b.rawPercent=Math.min(100,Math.round(pb*(1+pair.s*pa/100)*10)/10);
+    const paA=a.afterPercent,pbA=b.afterPercent;
+    a.afterPercent=Math.min(100,Math.round(paA*(1+pair.s*pbA/100)*10)/10);
+    b.afterPercent=Math.min(100,Math.round(pbA*(1+pair.s*paA/100)*10)/10);
+  }
+}
+
+// ── Релевантные лабораторные маркеры механизмов (для per-system верификации) ──
+const MECH_LAB_MARKERS:Record<string,string[]>={
+  cv1:['BNP','CK'],cv2:['LDL','HDL','TG','TC'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
+  liv1:['ALT','AST'],liv2:['GGT','BIL'],liv3:['ALT','AST','GGT'],
+  ren1:['eGFR','CREAT','UREA','URIC'],ren2:['eGFR'],ren3:['UACR'],ren4:['K','NA','MG','CA'],
+  cns1:['PRL'],cns2:['CRP','HOMOCYSTEINE','IL6','TNFA','FERRITIN'],cns3:['HOMOCYSTEINE'],cns4:['TSH','CORTISOL','T3','T4','DHEAS'],cns5:['GLU'],cns6:[],
+  rep1:['LH','FSH'],rep2:['TT','FT','SHBG'],rep3:['FSH'],rep4:['E2'],rep5:['LH','TT'],
+  hem1:['HCT','HGB','RBC','WBC'],hem2:['GLU','HOMA'],hem3:['GLU'],hem4:['K'],hem5:['K','NA','MG','CA'],
+};
+
+// ── Якорные floors из клинических руководств ──
+// Доказанная лабораторная патология задаёт нижнюю границу риска системы
+// НЕЗАВИСИМО от таргетов препарата (eGFR 25 опасен и без ренального таргета).
+export interface ClinicalFloor{organId:string;label:string;level:number}
+
+export function clinicalFloorsForLabs(labValues:Record<string,number>):ClinicalFloor[]{
+  const floors:ClinicalFloor[]=[];
+  const v=(k:string)=>labValues[k];
+  const push=(cond:boolean,organId:string,label:string,level:number)=>{if(cond)floors.push({organId,label,level});};
+  push(v('HCT')!==undefined&&v('HCT')!>=54,'hematologic','HCT ≥ 54% — эритроцитоз (порог флеботомии)',50);
+  push(v('HCT')!==undefined&&v('HCT')!>=51,'hematologic','HCT ≥ 51% — эритроцитоз',25);
+  push(v('LDL')!==undefined&&v('LDL')!>=4.9,'cardio','LDL ≥ 4.9 ммоль/л (ESC/EAS: очень высокий риск)',50);
+  push(v('LDL')!==undefined&&v('LDL')!>=3.4,'cardio','LDL ≥ 3.4 ммоль/л',25);
+  push(v('eGFR')!==undefined&&v('eGFR')!<30,'renal','eGFR < 30 — ХБП G4',75);
+  push(v('eGFR')!==undefined&&v('eGFR')!<60,'renal','eGFR < 60 — ХБП G3',50);
+  push(v('UACR')!==undefined&&v('UACR')!>300,'renal','UACR > 300 — альбуминурия A3',50);
+  push(v('UACR')!==undefined&&v('UACR')!>30,'renal','UACR > 30 — альбуминурия A2',25);
+  push((v('ALT')!==undefined&&v('ALT')!>200)||(v('AST')!==undefined&&v('AST')!>200),'hepatic','АЛТ/АСТ > 5×ULN — гепатоцеллюлярное повреждение',50);
+  push((v('ALT')!==undefined&&v('ALT')!>80)||(v('AST')!==undefined&&v('AST')!>80),'hepatic','АЛТ/АСТ > 2×ULN',25);
+  push(v('K')!==undefined&&v('K')!<3.0,'cardio','K < 3.0 ммоль/л — аритмогенный риск',50);
+  push(v('LH')!==undefined&&v('FSH')!==undefined&&v('LH')!<0.5&&v('FSH')!<0.5,'reproductive','LH/FSH < 0.5 — полная супрессия HPTA',50);
+  push(v('PRL')!==undefined&&v('PRL')!>50,'cns','Пролактин > 50 нг/мл',50);
+  push(v('PRL')!==undefined&&v('PRL')!>25,'cns','Пролактин > 25 нг/мл',25);
+  push(v('GLU')!==undefined&&v('GLU')!<2.8,'cns','Глюкоза < 2.8 ммоль/л — нейроглюкопения',50);
+  push(v('HOMA')!==undefined&&v('HOMA')!>5,'hematologic','HOMA-IR > 5 — выраженная инсулинорезистентность',25);
+  return floors;
+}
+
+// ── Медицинские процедуры как k-записи ──
+// Клинические вмешательства (не вещества) со своим вкладом в снижение
+// механизмов. Эритроцитаферез/флеботомия — прямое удаление RBC-массы:
+// единственное вмешательство, реально меняющее hem1 (а не только вязкость).
+// Назначаются в tz-mapper (procedures) при HCT ≥ 52 — doctorOnly.
+export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:number;q:'A'|'B'|'C';source:string}>> = {
+  erythrocytapheresis: [
+    {organId:'hematologic',mechId:'hem1',k:0.45,q:'A',source:'Эритроцитаферез — прямое удаление RBC-массы (1-я линия при HCT>52%)'},
+  ],
+  phlebotomy: [
+    {organId:'hematologic',mechId:'hem1',k:0.30,q:'A',source:'Флеботомия 450 мл → ↓HCT на 3-5%'},
+  ],
+};
+
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
-function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number):number{
+function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number):number{
   // Базовые defaults с учётом guaranteed эффектов ААС
   const baseDefaults:Record<string,number>={cv1:1,cv2:2,cv3:1,cv4:2,cv5:1,liv1:2,liv2:1,liv3:0,ren1:1,ren2:1,ren3:0,ren4:1,cns1:2,cns2:2,cns3:0,cns4:1,cns5:0,cns6:0,rep1:3,rep2:3,rep3:2,rep4:1,rep5:2,hem1:2,hem2:0,hem3:0,hem4:0,hem5:0};
   // Масштабируем по дозе: doseFactor 1.0-2.0 → умножаем m_i
   const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
   const raw = baseDefaults[mechId] ?? 0;
-  const defaults = Math.min(3, Math.round(raw * mult));
+  // Дозозависимость эритроцитоза: при дозе ≤200 мг/нед (TRT-диапазон)
+  // клинически значимая полицитемия редка (Endocrine Society 2018:
+  // HCT>52% в основном при супрафизиологических дозах) — гарантированный
+  // минимум m_i=1 вместо 2; без анализов индекс не «страшный».
+  const hem1Base = mechId==='hem1' && rawDose !== undefined && rawDose <= 200 ? 1 : raw;
+  const defaults = Math.min(3, Math.round(hem1Base * mult));
 
   // Все доступные лабораторные маркеры
   const ldl=labValues['LDL'];const hdl=labValues['HDL'];const tg=labValues['TG'];const tc=labValues['TC'];
@@ -510,8 +612,12 @@ export function calculateTzSpecRiskTimeline(input: TzSpecInput, totalWeeks?: num
       organAfterPercents[o.id] = o.afterPercent;
     }
 
-    const overallRaw = Math.round(Object.values(organPercents).reduce((a, b) => a + b, 0) / (Object.keys(organPercents).length || 1));
-    const overallAfter = Math.round(Object.values(organAfterPercents).reduce((a, b) => a + b, 0) / (Object.keys(organAfterPercents).length || 1));
+    const overallRaw = Object.keys(organPercents).length > 0
+      ? Math.max(...Object.values(organPercents))
+      : 0;
+    const overallAfter = Object.keys(organAfterPercents).length > 0
+      ? Math.max(...Object.values(organAfterPercents))
+      : 0;
 
     results.push({
       week: w,
@@ -579,12 +685,11 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
   // Собираем поддержку
   const supportLookup=new Map<string,Array<{organId:string;mechId:string;k:number;q:'A'|'B'|'C'}>>();
   for(const subId of supportSubstances){
-    const entries=SUPPLEMENTS_DB[subId]||PHARMACY_DB[subId];
+    const entries=SUPPLEMENTS_DB[subId]||PHARMACY_DB[subId]||PROCEDURE_DB[subId];
     if(entries)supportLookup.set(subId,entries);
   }
 
   const organResults:TzSpecOrganResult[]=[];
-  let overallBefore=0,overallAfter=0;
 
   for(const sys of SYSTEMS){
     const mechResults:TzSpecMechanismResult[]=[];
@@ -603,7 +708,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
         // Per-drug duration (timeline: drug B started week 6, now week 8 → 2 weeks, not 8)
         const drugDuration = drug.effDuration ?? duration;
         const T_drug=getDurationFactor(drugDuration);
-        const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight);
+        const m_i=getMiFromLab(mech.id,labValues,D_i,mechWeight,drug.dose);
         // Генетический множитель для этого механизма
         const gMult = geneticBoost[mech.id] || 1.0;
         const m_i_adj = m_i * gMult * nutritionMult * trainingMult;
@@ -639,8 +744,11 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
       if(hasPlasmaTrio&&(mech.id==='hem1'||mech.id==='cv4'||mech.id==='cv3')) productK*=0.90;
       // Фибринолитическое трио: натто+серра+бромелайн → 3 пути фибринолиза,
       // дополнительное снижение тромботического/реологического риска.
+      // hem1 (эритроцитоз) включён: гипервязкость — ключевое последствие
+      // эритроцитоза, фибринолитики снижают вязкость/фибриноген плазмы
+      // (паритет с tz-bridge-boosters: «2 меха ТЗ: эритроцитоз + тромбоз»).
       const hasFibrinoTrio=['nattokinase','serrapeptase','bromelain'].every(s=>supportLookup.has(s));
-      if(hasFibrinoTrio&&(mech.id==='hem2'||mech.id==='cv4')) productK*=0.90;
+      if(hasFibrinoTrio&&(mech.id==='hem2'||mech.id==='cv4'||mech.id==='hem1')) productK*=0.90;
       productK=Math.max(0.30,productK);
       mechAfter=mechRaw*productK;
 
@@ -648,7 +756,7 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
       const mechId=mech.id;
       mechResults.push({
         id:mechId,name:TZ_MECH_LABELS[mechId]||mechId,weight:mech.weight,
-        m_i:Math.round(mechRaw/(mech.weight*U_i*(C_mech||1)||1)),
+        m_i:Math.min(3,Math.round(mechRaw/(mech.weight*U_i*(C_mech||1)||1))),
         E_i:Math.round(T_i*100)/100,raw:Math.round(mechRaw*10)/10,
         afterSupport:Math.round(mechAfter*10)/10,
         k_used:Math.round((1-productK)*100),q_label:bestQ,
@@ -657,9 +765,18 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
       });
     }
 
-    const rawPercent=sys.maxRaw>0?Math.min(100,Math.round((totalBefore/sys.maxRaw)*100)):0;
-    const afterPercent=sys.maxRaw>0?Math.min(100,Math.round((totalAfter/sys.maxRaw)*100)):0;
-    const k_protect=totalBefore>0?Math.round(((totalBefore-totalAfter)/totalBefore)*100):0;
+    // ── Агрегация системы: union (competing risks), НЕ сумма ──
+    // Механизмы — конкурирующие пути повреждения одного органа.
+    // 7%+7%+7% → 19.6%, а не 21%; 50%+50% → 75%, а не 100%.
+    applyMechanismSynergies(mechResults);
+    const rawPercent=unionPct(mechResults.map(m=>m.rawPercent));
+    const afterPercent=unionPct(mechResults.map(m=>m.afterPercent));
+    const k_protect=rawPercent>0?Math.round(((rawPercent-afterPercent)/rawPercent)*100):0;
+
+    // Per-system верификация: доля механизмов с релевантными маркерами
+    const verification=mechResults.length>0
+      ? mechResults.reduce((s,m)=>s+(MECH_LAB_MARKERS[m.id]?.some(mk=>labValues[mk]!==undefined)?1:0),0)/mechResults.length
+      : 0;
 
     organResults.push({
       id:sys.id,name:sys.name,icon:sys.icon,
@@ -668,14 +785,38 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
       maxRaw:sys.maxRaw,
       category:afterPercent<25?'low':afterPercent<50?'moderate':afterPercent<75?'high':'very_high',
       mechanisms:mechResults,k_protect,
+      verification,floors:[],
     });
-    overallBefore+=rawPercent;overallAfter+=afterPercent;
   }
 
-  const n=organResults.length||1;
-  const overallRaw=Math.round(overallBefore/n);
-  const overallAfterAvg=Math.round(overallAfter/n);
-  const overallK=overallRaw>0?Math.round(((overallRaw-overallAfterAvg)/overallRaw)*100):0;
+  // ── Якорные floors: лабораторные пороги из руководств ──
+  // Поднимают риск системы до нижней границы категории независимо от таргетов.
+  // Процедуры (эритроцитаферез/флеботомия) МЕНЯЮТ состояние (HCT падает),
+  // поэтому для hematologic они пробивают якорь на afterPercent:
+  // «до процедуры — high, после — ниже».
+  const floors=clinicalFloorsForLabs(labValues);
+  const hasBloodProcedure=supportLookup.has('erythrocytapheresis')||supportLookup.has('phlebotomy');
+  for(const f of floors){
+    const organ=organResults.find(o=>o.id===f.organId);
+    if(!organ)continue;
+    organ.floors.push(f);
+    if(organ.rawPercent<f.level)organ.rawPercent=f.level;
+    const floorAfter=(f.organId==='hematologic'&&hasBloodProcedure)?0:f.level;
+    if(organ.afterPercent<floorAfter)organ.afterPercent=floorAfter;
+    organ.category=organ.afterPercent<25?'low':organ.afterPercent<50?'moderate':organ.afterPercent<75?'high':'very_high';
+    organ.k_protect=organ.rawPercent>0?Math.round(((organ.rawPercent-organ.afterPercent)/organ.rawPercent)*100):0;
+  }
+
+  // ── Общий индекс = худшая система (клинический принцип) ──
+  // Органы коррелированы (один препарат бьёт по всем системам), поэтому
+  // union по органам переоценивает: 6 систем по 25% дали бы 82% «очень
+  // высокий» для обычного курса. Триаж идёт по худшей системе.
+  const overallRaw=organResults.length>0?Math.max(...organResults.map(o=>o.rawPercent)):0;
+  const overallAfter=organResults.length>0?Math.max(...organResults.map(o=>o.afterPercent)):0;
+  const overallK=overallRaw>0?Math.round(((overallRaw-overallAfter)/overallRaw)*100):0;
+  const overallVerification=organResults.length>0
+    ? organResults.reduce((s,o)=>s+o.verification,0)/organResults.length
+    : 0;
 
   const highOrgans=organResults.filter(o=>o.afterPercent>=50);
   const suppIDs=[...supportLookup.keys()];
@@ -684,16 +825,19 @@ export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
     'Модель: механизм-ориентированный интегральный индекс риска (ТЗ).',
     `Курс: ${drugNames}, ${duration} нед.`,
     'Формула: R = Σ(w × m × E × U × Π(1−k*)), суммирование по препаратам.',
+    'Агрегация: union (competing risks) — механизмы и системы комбинируются нелинейно.',
     suppIDs.length>0?`Поддержка (${suppIDs.length}): ${suppIDs.join(', ')}.`:'Поддержка не выбрана.',
     highOrgans.length>0?`Наибольший риск: ${highOrgans.map(o=>`${o.icon} ${o.name} (${o.afterPercent}%)`).join(', ')}.`:'Все системы в норме.',
-  ].join('\n');
+    floors.length>0?`Якорные пороги анализов: ${floors.map(f=>f.label).join('; ')}.`:'',
+  ].filter(Boolean).join('\n');
 
   return{
     organs:organResults,
-    overallRaw,overallAfter:overallAfterAvg,
-    overallCategory:getCategoryLabel(overallAfterAvg<25?'low':overallAfterAvg<50?'moderate':overallAfterAvg<75?'high':'very_high'),
+    overallRaw,overallAfter,
+    overallCategory:getCategoryLabel(overallAfter<25?'low':overallAfter<50?'moderate':overallAfter<75?'high':'very_high'),
     k_protect_overall:overallK,d_cov:labCoverage,u_i:U_i,
     supportCount:suppIDs.length,explanation,
+    overallVerification,
   };
 }
 

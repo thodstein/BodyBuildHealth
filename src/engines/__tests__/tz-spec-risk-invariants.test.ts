@@ -37,11 +37,12 @@ describe('TZ mechanism risk invariants', () => {
         expect(mech.afterPercent).toBeLessThanOrEqual(100);
         expect(mech.afterPercent).toBeLessThanOrEqual(mech.rawPercent);
       }
-      // Сумма долей механизмов сходится к проценту системы (до капа 100)
+      // Механизмы комбинируются нелинейно (union): система ≤ суммы долей
       const sumMech = organ.mechanisms.reduce((s, m) => s + m.rawPercent, 0);
-      if (organ.rawPercent < 100) {
-        expect(Math.abs(sumMech - organ.rawPercent)).toBeLessThanOrEqual(organ.mechanisms.length * 2);
-      }
+      expect(organ.rawPercent).toBeLessThanOrEqual(sumMech + 0.01);
+      // union: система не меньше максимума механизма
+      const maxMech = organ.mechanisms.reduce((s, m) => Math.max(s, m.rawPercent), 0);
+      expect(organ.rawPercent).toBeGreaterThanOrEqual(maxMech - 0.01);
     }
     expect(result.overallRaw).toBeGreaterThanOrEqual(0);
     expect(result.overallRaw).toBeLessThanOrEqual(100);

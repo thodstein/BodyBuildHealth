@@ -877,7 +877,12 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const tzFinalRisk = useMemo(() => {
     if (!finalRec || finalRec.subs.length === 0) return null;
     try {
-      const inp = buildTzInput(state, finalRec.subs.map(s => s.substanceId));
+      // Процедуры (эритроцитаферез/флеботомия) включаются в расчёт «с поддержкой»
+      // как k-записи PROCEDURE_DB — реальное вмешательство, снижающее hem1.
+      const procedureIds = (finalRec.procedures || [])
+        .filter(p => p.id === 'erythrocytapheresis' || p.id === 'phlebotomy')
+        .map(p => p.id);
+      const inp = buildTzInput(state, [...finalRec.subs.map(s => s.substanceId), ...procedureIds]);
       if (!inp) return null;
       const result = calculateTzSpecRisk(inp);
       // Единый вход для вкладки «Риски» (механизм-модель): snapshot полного TzSpecInput,
@@ -4058,14 +4063,21 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
   }
   // Системные риски (механизм-модель, единый расчёт с калькулятором)
   try {
-    const inp = buildTzInput(state, rec.subs.map(s => s.substanceId));
+    const procedureIds = (rec.procedures || [])
+      .filter(p => p.id === 'erythrocytapheresis' || p.id === 'phlebotomy')
+      .map(p => p.id);
+    const inp = buildTzInput(state, [...rec.subs.map(s => s.substanceId), ...procedureIds]);
     if (inp) {
       const tz = calculateTzSpecRisk(inp);
       lines.push('');
-      lines.push(`СИСТЕМНЫЕ РИСКИ (механизм-модель, 0-100%): общий ${tz.overallRaw}% → ${tz.overallAfter}%`);
+      lines.push(`СИСТЕМНЫЕ РИСКИ (механизм-модель, индекс 0-100): общий ${tz.overallRaw}% → ${tz.overallAfter}%`);
+      if (tz.overallVerification !== undefined) {
+        lines.push(`Верифицировано анализами: ${Math.round(tz.overallVerification * 100)}% систем${tz.overallVerification < 0.5 ? ' — оценка по фармакологии, сдайте анализы' : ''}`);
+      }
       for (const o of tz.organs) {
-        lines.push(`- ${o.name}: ${o.rawPercent}% → ${o.afterPercent}% (защита ${o.k_protect}%)`);
+        lines.push(`- ${o.name}: ${o.rawPercent}% → ${o.afterPercent}% (защита ${o.k_protect}%)${o.verification !== undefined && o.verification < 0.5 ? ' [не верифицировано]' : ''}`);
         for (const m of o.mechanisms) lines.push(`    ${m.name}: ${m.rawPercent}% → ${m.afterPercent}%`);
+        for (const f of o.floors || []) lines.push(`    ⚓ ${f.label}`);
       }
     }
   } catch {}
