@@ -653,6 +653,7 @@ return (
         <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: isPro ? 'rgba(167,139,250,0.12)' : 'rgba(0,230,138,0.10)', border: isPro ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(0,230,138,0.25)', color: isPro ? '#c4b5fd' : '#00e68a', whiteSpace: 'nowrap' }}>{isPro ? '🎓 PRO' : '✋ Стандарт'}</span>
         <span style={{ fontSize: 10, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>
           🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
         </span>
@@ -1349,12 +1350,18 @@ return (
 
       {/* P2.11: редактирование constraints (оборудование, травмы, avoidAxialLoad, любимые/исключённые) + progression — pro-only, шаг «👤 Профиль» */}
       {isPro && estep === 'profile' && dir === 'bb' && program.bb && (
+        <>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>⚙️ Ограничения и прогрессия</span>
+          <span style={{ fontSize: 10, color: DIM }}>Оборудование, травмы и стратегия нагрузки</span>
+        </div>
         <BBConstraintsPanel
           constraints={program.bb.constraints ?? { equipment: [] }}
           progression={program.bb.progression ?? { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }}
           onChangeConstraints={(constraints) => onChange({ ...program, bb: { ...program.bb!, constraints } })}
           onChangeProgression={(progression) => onChange({ ...program, bb: { ...program.bb!, progression } })}
         />
+        </>
       )}
 
       {estep === 'weeks' && !showTableView && (dir === 'bb' || dir === 'pl' || dir === 'hybrid') && (

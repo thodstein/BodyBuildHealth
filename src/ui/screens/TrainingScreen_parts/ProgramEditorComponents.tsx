@@ -391,9 +391,10 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {sessions.length === 0 && (
-        <div style={{ padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.35)' }}>
+        <div style={{ padding: 12, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>В этой неделе пока нет тренировок</div>
-          <div style={{ fontSize: 10, color: DIM, marginTop: 3 }}>Нажмите кнопку ниже, чтобы создать первый день, например «Пн · Грудь / Трицепс».</div>
+          <div style={{ fontSize: 10, color: DIM }}>Создайте первый день, например «Пн · Грудь / Трицепс».</div>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={addSession}>+ Добавить первый день</button>
         </div>
       )}
       {sessions.map((s, si) => {
