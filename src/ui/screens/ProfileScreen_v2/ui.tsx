@@ -243,9 +243,9 @@ export const SliderInput: React.FC<{
   color?: string;
   /** Куда направлена шкала: 'good' = выше лучше (↑ хорошо), 'bad' = выше хуже (↓ плохо). */
   direction?: 'good' | 'bad';
-  /** Подпись минимального значения шкалы (например, «спокоен» для стресса 1-10). */
+  /** Подпись минимального значения шкалы (что значит 1), например «спокойствие, без напряжения». */
   minLabel?: string;
-  /** Подпись максимального значения шкалы (например, «пик стресса» для стресса 1-10). */
+  /** Подпись максимального значения шкалы (что значит 5/10), например «пик стресса, тревога». */
   maxLabel?: string;
 }> = ({ value: rawValue, onChange, min, max, step = 1, label, unit, color, direction, minLabel, maxLabel }) => {
   const c = color || colors.primary;
@@ -258,15 +258,6 @@ export const SliderInput: React.FC<{
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}>{label}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            {direction && dirColor && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, color: dirColor,
-                background: `${dirColor}1a`, border: `1px solid ${dirColor}44`,
-                padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap',
-              }}>
-                {direction === 'good' ? '↑ хорошо' : '↓ плохо'}
-              </span>
-            )}
             <span style={{
               fontSize: 11, fontWeight: 700, color: c,
               background: `${c}1a`, border: `1px solid ${c}33`,
@@ -307,9 +298,9 @@ export const SliderInput: React.FC<{
         }} />
       </div>
       {(minLabel || maxLabel) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
-          <span>{minLabel ? `${min} = ${minLabel}` : ''}</span>
-          <span>{maxLabel ? `${max} = ${maxLabel}` : ''}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.35 }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{minLabel ? `${min} — ${minLabel}` : ''}</span>
+          <span style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>{maxLabel ? `${max} — ${maxLabel}` : ''}</span>
         </div>
       )}
     </div>
