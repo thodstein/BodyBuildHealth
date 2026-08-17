@@ -86,7 +86,7 @@ describe('experienced enhanced back prescription', () => {
     const plan = buildBBPlan({
       patternId: 'ppl_6', level: 'enhanced', trainingYears: 6,
       goal: 'mass', weeks: 1, workMax: WM,
-      weakPoints: ['back'], focusGroup: 'back', specialization: true,
+      weakPoints: ['back'], specialization: true,
       pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
     });
     const pulls = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Pull');
@@ -100,7 +100,7 @@ describe('experienced enhanced back prescription', () => {
       workMax: { ...WM, legs: 140 },
       level: 'enhanced', trainingYears: 6,
       peds: ['AAS'], pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
-      mode: 'adapt', weakPoints: ['back'], focusGroup: 'back', specialization: true,
+      mode: 'adapt', weakPoints: ['back'], specialization: true,
       equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
     } as any);
     // Одинаковый профиль vertical pull не должен повторяться в каждой сессии:
@@ -139,7 +139,7 @@ describe('experienced enhanced back prescription', () => {
       workMax: WM,
       level: 'enhanced', trainingYears: 6,
       peds: ['AAS'], pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
-      mode: 'adapt', weakPoints: ['back'], focusGroup: 'back', specialization: true,
+      mode: 'adapt', weakPoints: ['back'], specialization: true,
       equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
     } as any);
     const backExercises = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).filter(e => e.muscle === 'back');

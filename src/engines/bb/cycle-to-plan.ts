@@ -28,6 +28,7 @@ import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-
 import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, isSpecializationWeak, isSpecializationFocus, buildSpecializationSchedule, specResForWeekSchedule, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -362,6 +363,8 @@ export interface CycleToPlanInput {
   /** P1-7 (audit 2026-08): цель мезоцикла — для cross-mesocycle continuity (extractMesocycleProgression). */
   goal?: string;
   specialization?: boolean;
+  /** Явное расписание блоков специализации (недели + цели 1-2 мышцы; [] = баланс). */
+  specializationSchedule?: SpecializationBlock[];
   /** Фокус-группа (акцент +30% объём). */
   focusGroup?: string;
   /** Уровень атлета (для volume-landmarks валидации). */
@@ -805,6 +808,15 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const weakPoints = mode === 'faithful' ? [] : (input.weakPoints || []);
   const focusGroup = mode === 'faithful' ? '' : (input.focusGroup || '');
   const specialization = mode === 'faithful' ? false : (input.specialization || false);
+  // Единый резолвер акцентов: focus/weak/specialization без стэкинга,
+  // канонический top-2, specialization без слабых групп — no-op.
+  const specRes = resolveSpecialization(focusGroup, weakPoints, specialization);
+  const meta = cycle.meta;
+  const totalWeeks = meta.weeks;
+  // Расписание блоков специализации (методика: блок 6-10 нед → баланс/другие цели).
+  const specSchedule = buildSpecializationSchedule(
+    focusGroup, weakPoints, specialization, totalWeeks, input.specializationSchedule,
+  );
   // P1-7 (audit 2026-08): cross-mesocycle continuity — auto-progress весов из предыдущего плана.
   // Применяется только в adapt режиме (faithful сохраняет цикл дословно).
   let workMax = inputWorkMax;
@@ -812,8 +824,6 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     const progression = extractMesocycleProgression(input.previousPlan, level, input.goal || 'mass');
     workMax = applyWeightProgression(workMax, progression);
   }
-  const meta = cycle.meta;
-  const totalWeeks = meta.weeks;
   const daysPerWeek = meta.sessionsPerWeek;
   // L7: src2-* циклы имеют явную много-недельную разкладку (cycle.weeks[][]).
   // Если она есть и совпадает по длине с totalWeeks — используем каждую неделю дословно (multi-week faithful).
@@ -840,8 +850,6 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона).
   // Faithful: всегда 1.0 — не меняем объём программы.
   const volGoalMult = mode === 'faithful' ? 1.0 : (volumeGoal === 'mev' ? 0.70 : volumeGoal === 'mrv' ? 1.15 : 1.0);
-  // specialization: weak groups +10%, others на MEV (×0.7)
-  const specWeak = specialization ? weakPoints.slice(0, 2) : [];
 
   // excludedExercises — Set для быстрого lookup по ID и имени
   const exclIdSet = new Set(excludedExercises);
@@ -881,7 +889,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   if (autoDeload) rationale.push(`🔋 Авто-делод: ${deloadType || 'pump'} (по ACWR)`);
   if (avoidAxialLoad) rationale.push(`🦴 Осевая нагрузка убрана (присед/становая/жим стоя → безопасные альтернативы)`);
   if (volumeGoal !== 'mav') rationale.push(`📊 Цель объёма: ${volumeGoal.toUpperCase()} (×${volGoalMult})`);
-  if (specialization) rationale.push(`🎯 Специализация: ${specWeak.join(', ')} на MAV+10%, остальные на MEV`);
+  if (specSchedule.active) rationale.push(`🎯 Специализация (блоки): ${specializationScheduleText(specSchedule)}`);
   if (focusGroup) rationale.push(`⭐ Фокус-группа: ${focusGroup} (+30% объём)`);
   if (excludedExercises.length > 0) rationale.push(`🚫 Исключённые упражнения: ${excludedExercises.length} шт. — заменены на альтернативы`);
   if (favoriteExercises.length > 0) rationale.push(`⭐ Любимые упражнения: ${favoriteExercises.length} шт. — приоритет при замене`);
@@ -891,6 +899,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // Build weeks
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
+    // Акценты НЕДЕЛИ по расписанию блоков специализации.
+    const weekSpec = specResForWeekSchedule(specSchedule, w);
     // L7: для каждой недели берём дословный набор дней из tpl.weeks[w-1], если есть.
     const currentWeekDays = (hasExplicitWeeks && (cycle as any).weeks[w - 1]) ? (cycle as any).weeks[w - 1] : week1Days;
     const sessions: BBSession[] = currentWeekDays.map((daySpec: any, dayIdx: number) => {
@@ -969,22 +979,24 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         // Добавить в seen (дедупликация)
         seenNames.add(finalExName);
         // P0-3 (audit 2026-08): используем isWeak из bb-builder для маппинга гранулярных групп
-        const isWeakMuscle = isWeak(muscle, weakPoints);
-        const isFocus = focusGroup === muscle || (focusGroup && isWeak(focusGroup, [muscle])) || (focusGroup && isWeak(muscle, [focusGroup]));
+        const isWeakMuscle = isSpecializationWeak(muscle, weekSpec);
+        const isFocus = isSpecializationFocus(muscle, weekSpec);
         const isSubstituted = finalExName !== exSpec.name;
 
         // Volume boost: weak groups + PED adaptation + volumeGoal + specialization + focusGroup.
         // PED: primary × mrvMult, accessory × max(1, mrvMult×0.8) — как в buildBBPlan.
         // Faithful: pedFactor=1.0 — не меняем объём программы.
         const pedFactor = (mode === 'adapt' && peds.length > 0) ? (isPrimary ? mrvMult : Math.max(1.0, mrvMult * 0.8)) : 1.0;
-        // P0-3: specialization — specWeak теперь проверяется через isWeak (гранулярные группы)
-        const specFactor = specialization ? (specWeak.some(sw => isWeak(muscle, [sw]) || sw === muscle) ? 1.10 : 0.70) : 1.0;
-        // focusGroup: +30%
-        const focusFactor = isFocus ? 1.30 : 1.0;
+        // Единый фактор акцентов НЕДЕЛИ (блок специализации или баланс):
+        // focus ×1.3 / цель блока ×1.1 / weak ×1.2 / остальные ×0.7 — без
+        // стэкинга (1.2×1.3) и без реза фокус-мышцы (0.7×1.3).
+        const specFactor = specializationVolumeFactor(muscle, weekSpec);
+        // focusGroup: +30% (входит в specFactor)
+        const focusFactor = 1.0;
         // P0-1: female glute boost ×1.2 (как в buildBBPlan:590) —女性 glutes требуют большего объёма
         const femaleGluteBoost = (input.sex === 'female' && muscle === 'glutes') ? 1.2 : 1.0;
         // volumeGoal: MEV×0.7 / MAV×1.0 / MRV×1.15
-        const setMult = (isWeakMuscle ? 1.2 : 1.0) * pedFactor * volGoalMult * specFactor * focusFactor * femaleGluteBoost;
+        const setMult = specFactor * pedFactor * volGoalMult * focusFactor * femaleGluteBoost;
         const baseSets = exSpec.sets[0]?.sets || 3;
         let targetSets = Math.max(1, Math.round(baseSets * setMult));
         // Минимум 2 сета для любого упражнения (ББ-практика)
@@ -1184,7 +1196,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
 
   return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
     reorder: mode !== 'faithful',
-    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
+    specializationSchedule: specSchedule,
     methodology: input.methodology,
     level,
     volumeGoal,
@@ -1243,6 +1256,8 @@ export interface ProgramToBBPlanOpts {
   };
   volumeGoal?: BBVolumeGoal;
   specialization?: boolean;
+  /** Явное расписание блоков специализации (недели + цели 1-2 мышцы; [] = баланс). */
+  specializationSchedule?: SpecializationBlock[];
   /** Режим адаптации: 'faithful' = программа дословно (только safety-фильтры), 'adapt' = + добивка слабых групп */
   mode?: 'faithful' | 'adapt';
   /** Единая методика порядка упражнений для всех BB-источников. */
@@ -1446,6 +1461,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   }
   const weakPoints = mode === 'faithful' ? [] : (opts.weakPoints || []);
   const focusGroup = mode === 'faithful' ? undefined : opts.focusGroup;
+  // Единый резолвер акцентов (program-путь): без стэкинга, канонический top-2.
+  const specRes = resolveSpecialization(focusGroup, weakPoints, opts.specialization);
+  // Расписание блоков специализации (методика: блок 6-10 нед → баланс/другие цели).
+  const specSchedule = buildSpecializationSchedule(
+    focusGroup, weakPoints, opts.specialization, totalWeeks, opts.specializationSchedule,
+  );
   const excludedMuscles = getExcludedMuscles(opts.injuries || [], new Date().toISOString().slice(0, 10));
   const gradedInjuries = getGradedInjuries(opts.injuries || [], new Date().toISOString().slice(0, 10));
   const exclIds = new Set(opts.excludedExercises || []);
@@ -1475,6 +1496,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   if (mode === 'faithful') rationale.push(`🔒 Режим: Точно по программе (прогрессия/RIR/warmup сохранены дословно)`);
   else rationale.push(`🔧 Режим: Адаптация (структура программы сохранена + добивка слабых групп)`);
   if (weakPoints.length > 0) rationale.push(`🔥 Слабые группы (+accessory добивка): ${weakPoints.join(', ')}`);
+  if (specSchedule.active) rationale.push(`🎯 Специализация (блоки): ${specializationScheduleText(specSchedule)}`);
   if (focusGroup) rationale.push(`⭐ Фокус-группа (+30% объём): ${focusGroup}`);
   if (excludedMuscles.size > 0) rationale.push(`⚠ Исключены мышцы (травма): ${[...excludedMuscles].join(', ')}`);
   if (opts.peds && opts.peds.length > 0) rationale.push(`💉 PED: MRV ×${mrvMult.toFixed(2)}`);
@@ -1485,6 +1507,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   for (let wIdx = 0; wIdx < program.weeks.length; wIdx++) {
     const pw = program.weeks[wIdx];
     const weekNum = pw.week || (wIdx + 1);
+    // Акценты НЕДЕЛИ по расписанию блоков специализации.
+    const weekSpec = specResForWeekSchedule(specSchedule, weekNum);
     const isDeload = !!pw.deload;
     const volMult = pw.volumeMultiplier ?? 1.0;
     const intMult = pw.intensityMultiplier ?? 1.0;
@@ -1635,9 +1659,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         let adjRir = rir;
         let usedSets = workSets;
         if (mode === 'adapt') {
-          // P0-3 (audit 2026-08): isWeak из bb-builder для маппинга гранулярных групп
-          const isWeakMuscle = isWeak(muscle, weakPoints);
-          const isFocus = focusGroup === muscle || (focusGroup ? isWeak(focusGroup, [muscle]) : false) || (focusGroup ? isWeak(muscle, [focusGroup]) : false);
+          // Единый резолвер акцентов НЕДЕЛИ: focus ×1.3 / weak ×1.15 — без стэкинга.
+          const isWeakMuscle = isSpecializationWeak(muscle, weekSpec);
+          const isFocus = isSpecializationFocus(muscle, weekSpec);
           if (isWeakMuscle) adjSets = Math.round(adjSets * 1.15);
           if (isFocus) adjSets = Math.round(adjSets * 1.30);
           if (isWeakMuscle) adjRir = Math.max(0, rir - 1);
@@ -1694,7 +1718,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           workSets: usedSets,
           restSeconds: restSec,
           exerciseName: finalExName,
-          comment: `${role === 'primary' ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${usedSets.length}×${reps} @${Math.round(workWeight)} кг, RIR ${adjRir}.${ex.notes ? ' ' + ex.notes : ''}${ex.progression ? ' ' + ex.progression : ''}${mode === 'adapt' && isWeak(muscle, weakPoints) ? ' 🔥 Слабая группа.' : ''}${mode === 'adapt' && (focusGroup === muscle || (focusGroup ? isWeak(muscle, [focusGroup]) : false)) ? ' ⭐ Фокус.' : ''} ${formatExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec })}`,
+          comment: `${role === 'primary' ? '🎯 Основное' : '📌 Добивочное'}: ${muscle}. ${usedSets.length}×${reps} @${Math.round(workWeight)} кг, RIR ${adjRir}.${ex.notes ? ' ' + ex.notes : ''}${ex.progression ? ' ' + ex.progression : ''}${mode === 'adapt' && isSpecializationWeak(muscle, specRes) ? ' 🔥 Слабая группа.' : ''}${mode === 'adapt' && isSpecializationFocus(muscle, specRes) ? ' ⭐ Фокус.' : ''} ${formatExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec })}`,
           executionProfile: buildExerciseInstructions({ exerciseName: finalExName, muscle, role, trainingFocus: opts.trainingFocus, restSeconds: restSec }),
           warmupSets: role === 'primary' ? parseWarmup(workWeight, pd.warmup) : [],
           rationale: `${finalExName} (${muscle}) из программы «${program.name}» недели ${weekNum}`,
@@ -1702,11 +1726,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       }
 
       // ▓▓ ADAPT MODE: добивка слабых групп accessory упражнениями в конце дня ▓▓
-      if (mode === 'adapt' && weakPoints.length > 0 && exercises.length > 0) {
+      const adaptWeakPoints = [...new Set([...weakPoints, ...weekSpec.weak])];
+      if (mode === 'adapt' && adaptWeakPoints.length > 0 && exercises.length > 0) {
         const allDayMuscles = new Set(exercises.map(e => e.muscle));
         const seenNames = new Set(exercises.map(e => e.name));
         // 1. Слабая группа, уже представленная в дне (но не primary) → +1 isolation добивка
-        for (const wp of weakPoints) {
+        for (const wp of adaptWeakPoints) {
           if (allDayMuscles.has(wp)) {
             const candidates = EXERCISE_CATALOG.filter(e => (e.group || '').toLowerCase() === wp && !seenNames.has(e.name) && trueMuscleOf(e) !== null);
             if (candidates.length > 0) {
@@ -1731,7 +1756,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         // добивка в дни-антагонисты или synergist (Push-день + biceps/triceps weak → ok)
         const isLegsDay = sessionTag === 'Legs' || String(sessionTag).startsWith('Lower');
         const isUpperDay = !isLegsDay;
-        for (const wp of weakPoints) {
+        for (const wp of adaptWeakPoints) {
           if (allDayMuscles.has(wp)) continue;
           // совместимость: arms/shoulders/calves/abs → в upper day; legs group → в legs day; иначе skip
           const isWpLegs = ['quads', 'hamstrings', 'glutes', 'calves'].includes(wp);
@@ -1932,7 +1957,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
   return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
     reorder: mode !== 'faithful',
-    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
+    specializationSchedule: specSchedule,
     methodology: opts.methodology,
     level: opts.level ?? levelForLandmarks,
     volumeGoal: opts.volumeGoal,

@@ -16,6 +16,7 @@ import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
+import { specResForWeekSchedule, type SpecializationSchedule } from './bb-specialization.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место). */
@@ -1222,6 +1223,10 @@ export interface BBFinalizeOptions {
   reorder?: boolean;
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   priorityMuscles?: string[];
+  /** Расписание блоков специализации — per-week цели для спец-проходов
+   *  (RIR 0-1, спец-частота, икры). Без него — старый режим: priorityMuscles
+   *  на весь план. */
+  specializationSchedule?: SpecializationSchedule;
   level?: string;
   volumeGoal?: 'mev' | 'mav' | 'mrv';
   phaseSafety?: boolean;
@@ -1266,11 +1271,9 @@ const SPEC_FREQ_TAGS: Record<string, string[]> = {
 };
 export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions): void {
   const priority = options.priorityMuscles || [];
-  if (!priority.length) return;
-  const focus = priority[priority.length - 1];
+  const schedule = options.specializationSchedule;
+  if (!priority.length && !schedule) return;
   const collapse = (k: string) => WEAK_TO_MUSCLE[k] || k;
-  const targetMuscles = new Set(priority.map(collapse));
-  const focusMuscle = focus ? collapse(focus) : '';
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
     const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
@@ -1279,6 +1282,15 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
 
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue;
+    // Цели НЕДЕЛИ: по активному расписанию блоков специализации или весь
+    // priorityMuscles (legacy/неактивное расписание). Фокус-мышца
+    // спец-частоты — последняя цель.
+    const weekTargets = (schedule && schedule.active)
+      ? specResForWeekSchedule(schedule, week.week).targets
+      : priority.map(collapse);
+    if (!weekTargets.length) continue;
+    const targetMuscles = new Set(weekTargets);
+    const focusMuscle = weekTargets[weekTargets.length - 1];
     // Спец-частота ≥2×/нед: целевая мышца получает изоляции во второй сессии.
     if (focusMuscle && focusMuscle !== '') {
       const freq = week.sessions.filter(s => s.exercises.some((e: any) => e.muscle === focusMuscle && !(e as any).warmupActivator)).length;

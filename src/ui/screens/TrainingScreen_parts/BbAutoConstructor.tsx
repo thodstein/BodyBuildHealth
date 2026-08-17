@@ -280,7 +280,39 @@ export const BbAutoConstructor: React.FC = () => {
   }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
-  const [bbFocus, setBbFocus] = useState<string>('');
+  // Единая модель акцентов: 1-2 отстающие мышцы (специализация). focusGroup и
+  // отдельный режим специализации больше не выбираются в UI — движок получает
+  // specialization: true + weakPoints: targets (без стэкинга 1.2×1.3).
+  const [specTargets, setSpecTargets] = useState<string[]>((prof.weakPoints || []).slice(0, 2));
+  // 📅 Планирование блоков специализации (для планов > 10 нед): блок 1 →
+  // баланс / те же мышцы / другие мышцы. Методика: блок 6-10 нед.
+  const [specBlockWeeks, setSpecBlockWeeks] = useState<number>(10);
+  const [specNextMode, setSpecNextMode] = useState<'balance' | 'same' | 'new'>('balance');
+  const [specNextTargets, setSpecNextTargets] = useState<string[]>([]);
+  // Явные блоки для движка (пусто = один блок по умолчанию + баланс).
+  const buildSpecBlocks = useMemo(() => {
+    if (specTargets.length === 0) return undefined;
+    const b1End = Math.min(Math.max(6, Math.min(10, specBlockWeeks)), bbWeeks);
+    const blocks: { weekStart: number; weekEnd: number; targets: string[] }[] = [
+      { weekStart: 1, weekEnd: b1End, targets: specTargets.slice(0, 2) },
+    ];
+    if (b1End < bbWeeks) {
+      if (specNextMode === 'same') blocks.push({ weekStart: b1End + 1, weekEnd: bbWeeks, targets: specTargets.slice(0, 2) });
+      else if (specNextMode === 'new' && specNextTargets.length > 0) blocks.push({ weekStart: b1End + 1, weekEnd: bbWeeks, targets: specNextTargets.slice(0, 2) });
+    }
+    return blocks;
+  }, [specTargets, specBlockWeeks, specNextMode, specNextTargets, bbWeeks]);
+  const specSchedulePreview = useMemo(() => {
+    if (specTargets.length === 0) return '';
+    const b1End = Math.min(Math.max(6, Math.min(10, specBlockWeeks)), bbWeeks);
+    const parts: string[] = [`нед 1-${b1End} [${specTargets.slice(0, 2).join(', ')}]`];
+    if (b1End < bbWeeks) {
+      if (specNextMode === 'same') parts.push(`нед ${b1End + 1}-${bbWeeks} [${specTargets.slice(0, 2).join(', ')}]`);
+      else if (specNextMode === 'new' && specNextTargets.length > 0) parts.push(`нед ${b1End + 1}-${bbWeeks} [${specNextTargets.slice(0, 2).join(', ')}]`);
+      else parts.push(`нед ${b1End + 1}-${bbWeeks} баланс`);
+    }
+    return parts.join(' → ');
+  }, [specTargets, specBlockWeeks, specNextMode, specNextTargets, bbWeeks]);
   const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(
     ((prof as any).trainingFocus || 'hypertrophy') as 'strength' | 'hypertrophy' | 'endurance',
   );
@@ -313,6 +345,8 @@ export const BbAutoConstructor: React.FC = () => {
     ...(prof.workMax || {}),
   }));
   const [weakPoints, setWeakPoints] = useState<string[]>(prof.weakPoints || []);
+  // weakPoints — зеркало specTargets (единый источник выбора в UI).
+  useEffect(() => { setWeakPoints(specTargets); }, [specTargets]);
   const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
   // PRO: mobility restrictions — biomechanics-based exercise filtering
   const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>([]);
@@ -321,7 +355,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
   const [autoRegOn, setAutoRegOn] = useState(false);
-  const [specializationMode, setSpecializationMode] = useState(false);
+  // specializationMode больше не выбирается в UI: специализация включается
+  // автоматически при выборе 1-2 отстающих мышц (specTargets).
+  const specializationMode = specTargets.length > 0;
   const [editMode, setEditMode] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [exerciseEdits, setExerciseEdits] = useState<Record<string, { sets: number; reps: number; weight: number }>>({});
   const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number; sessionIdx: number } | null>(null);
@@ -877,8 +913,8 @@ export const BbAutoConstructor: React.FC = () => {
     daysPerWeek: bbDays,
     weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     sex: linked.profile?.settings?.personal?.sex,
-    focusGroup: bbFocus || undefined,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, bbFocus, linked.profile?.settings?.personal?.sex]);
+    focusGroup: undefined,
+  }), [bbLevel, bbGoal, bbDays, weakPoints, linked.profile?.settings?.personal?.sex]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
@@ -1100,7 +1136,8 @@ export const BbAutoConstructor: React.FC = () => {
         plan = programToBBPlan(customProgram, {
           workMax: bbWorkMax,
           weakPoints,
-          focusGroup: bbFocus,
+          focusGroup: '',
+          specializationSchedule: buildSpecBlocks,
           injuries,
           intTechnique: intensityTech,
           autoDeload,
@@ -1157,9 +1194,10 @@ export const BbAutoConstructor: React.FC = () => {
           favoriteExercises: bbFavEx,
           excludedExercises: bbExclEx,
           avoidAxialLoad: prof.avoidAxialLoad || false,
-          volumeGoal: bbVolGoal as any,
-           specialization: specializationMode,
-           focusGroup: bbFocus,
+           volumeGoal: bbVolGoal as any,
+            specialization: specializationMode,
+            specializationSchedule: buildSpecBlocks,
+            focusGroup: '',
             level: bbLevel,
             trainingYears: bbTrainingYears,
             bodyweightCapability: prof.bodyweightCapability,
@@ -1193,8 +1231,9 @@ export const BbAutoConstructor: React.FC = () => {
        plan = buildBBPlan({
          patternId: selectedSplitId, level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, weeks: bbWeeks,
          bodyweightCapability: prof.bodyweightCapability,
-        workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
-        specialization: specializationMode,
+         workMax: bbWorkMax, weakPoints, focusGroup: '', volumeGoal: bbVolGoal as any,
+         specialization: specializationMode,
+         specializationSchedule: buildSpecBlocks,
         injuries,
         planStartWeek: new Date().toISOString().slice(0, 10),
         favoriteExercises: bbFavEx,
@@ -1391,12 +1430,13 @@ export const BbAutoConstructor: React.FC = () => {
            patternName: exportPlan.pattern.name,
           level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
           peds, pedDoses, courseIntensity: courseIntensity as string,
-           weakPoints, focusGroup: bbFocus, intensityTechnique: intensityTech,
+           weakPoints, focusGroup: '', intensityTechnique: intensityTech,
            loadStrategy, autoDeload, deloadType, planMode,
            trainingFocus: bbTrainingFocus,
            methodology: bbMethodology,
            equipment: bbEquipment.slice(),
            specialization: specializationMode,
+           specBlocks: buildSpecBlocks,
            daysPerWeek: bbDays,
            source: bbSource,
            programPath: bbProgramPath,
@@ -1471,14 +1511,33 @@ export const BbAutoConstructor: React.FC = () => {
     if (v.params.weeks) setBbWeeks(v.params.weeks);
     if (v.params.volumeGoal) setBbVolGoal(v.params.volumeGoal);
     if (Array.isArray(v.params.peds)) setPeds(v.params.peds as PED[]);
-    if (Array.isArray(v.params.weakPoints)) setWeakPoints(v.params.weakPoints);
-    if (v.params.focusGroup != null) setBbFocus(v.params.focusGroup);
+    if (Array.isArray(v.params.weakPoints)) setSpecTargets(v.params.weakPoints);
+    if (v.params.focusGroup != null && v.params.focusGroup !== '') {
+      // Миграция старых вариантов: focusGroup → первая отстающая мышца.
+      setSpecTargets(prev => prev.length > 0 ? prev : [v.params.focusGroup as string]);
+    }
     if (v.params.loadStrategy) setLoadStrategy(v.params.loadStrategy as LoadStrategy);
     if (v.params.deloadType) setDeloadType(v.params.deloadType as DeloadType);
     if (v.params.intensityTechnique) setIntensityTech(v.params.intensityTechnique as IntensityTechnique);
     if (v.params.methodology) setBbMethodology(v.params.methodology as SessionMethodology);
     if (Array.isArray(v.params.equipment)) setBbEquipment(v.params.equipment);
-    if (v.params.specialization != null) setSpecializationMode(Boolean(v.params.specialization));
+    if (v.params.specialization != null) {
+      // Миграция: старый флаг специализации → выбор отстающих мышц.
+      if (v.params.specialization && v.params.weakPoints?.length) setSpecTargets(v.params.weakPoints.slice(0, 2));
+    }
+    if (Array.isArray(v.params.specBlocks) && v.params.specBlocks.length > 0) {
+      const b1 = v.params.specBlocks[0];
+      const b2 = v.params.specBlocks[1];
+      if (b1?.weekEnd) setSpecBlockWeeks(Math.max(6, Math.min(10, b1.weekEnd)));
+      if (b2) {
+        const same = JSON.stringify(b2.targets || []) === JSON.stringify(b1?.targets || []);
+        if (same) setSpecNextMode('same');
+        else if ((b2.targets || []).length > 0) { setSpecNextMode('new'); setSpecNextTargets(b2.targets.slice(0, 2)); }
+        else setSpecNextMode('balance');
+      } else {
+        setSpecNextMode('balance');
+      }
+    }
     if (v.params.pedDoses) setPedDoses({ ...v.params.pedDoses });
     if (v.params.courseIntensity) setCourseIntensity(v.params.courseIntensity as 'mild' | 'moderate' | 'heavy');
     if (v.params.autoDeload != null) setAutoDeload(Boolean(v.params.autoDeload));
@@ -1693,6 +1752,52 @@ export const BbAutoConstructor: React.FC = () => {
     );
   };
 
+  // 📅 Планирование блоков специализации (для планов > 10 нед).
+  // Методика: блок 6-10 нед → на выбор: баланс / те же мышцы / другие мышцы.
+  const renderSpecPlanner = () => {
+    if (specTargets.length === 0 || bbWeeks <= 10) return null;
+    const remainder = Math.max(0, bbWeeks - specBlockWeeks);
+    return (
+      <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.18)' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:4 }}>📅 Планирование блоков (специализация 6-10 нед)</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Блок 1:</span>
+          <PopupNumber label="" value={specBlockWeeks} min={6} max={10} suffix=" нед" onChange={v => setSpecBlockWeeks(Math.max(6, Math.min(10, Math.round(v))))} />
+          {remainder > 0 && <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>→ остаток {remainder} нед:</span>}
+        </div>
+        {remainder > 0 && (
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
+            {([['balance', '↩ Баланс'], ['same', '🔁 Продолжить те же'], ['new', '🎯 Другие мышцы']] as const).map(([id, label]) => (
+              <button key={id} onClick={() => setSpecNextMode(id)}
+                style={{ padding:'4px 10px', borderRadius:999, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:32,
+                  border: specNextMode === id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
+                  background: specNextMode === id ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
+                  color: specNextMode === id ? '#ec4899' : 'rgba(255,255,255,0.6)' }}>{label}</button>
+            ))}
+          </div>
+        )}
+        {remainder > 0 && specNextMode === 'new' && (
+          <div style={{ marginTop:6 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:4 }}>🎯 Мышцы блока 2 (1-2):</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+              {WEAK_GROUPS.map(([id, l]) => {
+                const on = specNextTargets.includes(id);
+                const disabled = !on && specNextTargets.length >= 2;
+                return <button key={id} disabled={disabled} onClick={() => setSpecNextTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
+                  style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:32,
+                    background: on ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: on ? '1px solid rgba(236,72,153,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                    color: on ? '#ec4899' : disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.6)',
+                    opacity: disabled ? 0.5 : 1 }}>{on ? '✓ ' : ''}{l}</button>;
+              })}
+            </div>
+          </div>
+        )}
+        {specSchedulePreview && <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.45)', lineHeight:1.5 }}>Итог: {specSchedulePreview}</div>}
+      </div>
+    );
+  };
+
   const renderParams = () => (
     <div>
       <div style={H}>📋 Шаг 1: Базовые параметры</div>
@@ -1839,12 +1944,6 @@ export const BbAutoConstructor: React.FC = () => {
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <PopupSelect
-                      label='🎯 Фокус-группа'
-                      value={bbFocus}
-                      onChange={setBbFocus}
-                      options={[{ id: '', label: 'Баланс (без акцента)' }, ...WEAK_GROUPS.map(([id, l]) => ({ id, label: l }))]}
-                    />
-                    <PopupSelect
                       label='🔥 Интенсив-техника'
                       value={intensityTech}
                       onChange={v => setIntensityTech(v as IntensityTechnique)}
@@ -1929,28 +2028,31 @@ export const BbAutoConstructor: React.FC = () => {
                     {autoDeload ? '✅ Авто-делод при перегрузке' : '⬜ Авто-делод при перегрузке'} (ACWR&gt;1.3)
                   </button>
 
-                  {/* Слабые группы (мульти-чипсы) */}
-                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🔥 Слабые группы мышц (ББ-акцент)</div>
+                  {/* Отстающие мышцы (специализация, 1-2) */}
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                     {WEAK_GROUPS.map(([id, l]) => {
-                      const on = weakPoints.includes(id);
+                      const on = specTargets.includes(id);
+                      const disabled = !on && specTargets.length >= 2;
                       return (
-                        <button key={id} onClick={() => setWeakPoints(wp => on ? wp.filter(x => x !== id) : [...wp, id])}
+                        <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
                           style={{
-                            padding: '5px 10px', borderRadius: 999, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 38,
+                            padding: '5px 10px', borderRadius: 999, cursor: disabled ? 'default' : 'pointer', fontSize: 10, fontWeight: 700, minHeight: 38,
                             background: on ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
                             border: on ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                            color: on ? '#fbbf24' : 'rgba(255,255,255,0.75)',
+                            color: on ? '#fbbf24' : disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
+                            opacity: disabled ? 0.5 : 1,
                           }}
                         >{on ? '✓ ' : ''}{l}</button>
                       );
                     })}
                   </div>
-                  {weakPoints.length > 0 && (
-                    <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-                      Количество слабых групп: {weakPoints.length}. Отстающие группы получат ~20-30% дополнительный объём топлива.
+                  {specTargets.length > 0 && (
+                    <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                      Специализация: {specTargets.join(', ')} — 14-24 сета/нед, 2-4 сессии, первыми в тренировке. Остальные мышцы — поддерживающий объём (MEV).
                     </div>
                   )}
+                  {renderSpecPlanner()}
                 </div>
               )}
             </>
@@ -1980,7 +2082,6 @@ export const BbAutoConstructor: React.FC = () => {
            { id:'hypertrophy', label:'Гипертрофия: RIR 2-3' },
            { id:'endurance', label:'Выносливость: RIR 3-4' },
          ]} />
-         <PopupSelect label="Фокус-группа" value={bbFocus} onChange={setBbFocus} options={[{ id:'', label:'Нет' }, ...WEAK_GROUPS.map(([id,l]) => ({ id, label: l }))]} />
           <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="compound_first — базовые раньше изоляции; pre_exhaust — изоляция основной мышцы ПЕРВОЙ (предутомление)" options={[ 
             { id:'compound_first', label:'Базовые → изоляция (по умолчанию)' }, 
             { id:'pre_exhaust', label:'Pre-exhaust: изоляция первой' }, 
@@ -2058,6 +2159,33 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
           Любимые получают приоритет при отборе упражнений. Не любимые полностью исключаются из генерации плана. Синхронизируется с профилем (🧬 Профиль тренированности).
+        </div>
+        {/* Отстающие мышцы (специализация, 1-2) — единый блок акцентов */}
+        <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {WEAK_GROUPS.map(([id, l]) => {
+              const on = specTargets.includes(id);
+              const disabled = !on && specTargets.length >= 2;
+              return (
+                <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
+                  style={{
+                    padding: '5px 10px', borderRadius: 999, cursor: disabled ? 'default' : 'pointer', fontSize: 10, fontWeight: 700, minHeight: 38,
+                    background: on ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.04)',
+                    border: on ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                    color: on ? '#fbbf24' : disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
+                    opacity: disabled ? 0.5 : 1,
+                  }}
+                >{on ? '✓ ' : ''}{l}</button>
+              );
+            })}
+          </div>
+          {specTargets.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+              Специализация: {specTargets.join(', ')} — 14-24 сета/нед, 2-4 сессии, первыми в тренировке. Остальные мышцы — поддерживающий объём (MEV).
+            </div>
+          )}
+          {renderSpecPlanner()}
         </div>
       </div>
       )}
@@ -2221,25 +2349,20 @@ export const BbAutoConstructor: React.FC = () => {
         {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={500} suffix=' кг' onChange={v => setBbWorkMax(p => ({ ...p, [k]: v }))} />)}
       </div>
       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:ACCENT }}>🎯 Слабые группы</div>
-        <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color:'rgba(255,255,255,0.5)', cursor:'pointer', marginLeft:'auto', padding:'3px 8px', borderRadius:8, background:specializationMode?'rgba(236,72,153,0.12)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <input type="checkbox" checked={specializationMode} onChange={e => setSpecializationMode(e.target.checked)} style={{ accentColor:'#ec4899' }} />
-          Режим специализации
-        </label>
+        <div style={{ fontSize:11, fontWeight:700, color:ACCENT }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
       </div>
       <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
         {WEAK_GROUPS.map(([id,l]) => {
-          const on = weakPoints.includes(id);
-          return <button key={id} onClick={() => setWeakPoints(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])}
-            style={{ padding:'5px 10px', borderRadius:14, fontSize:11, fontWeight:700, cursor:'pointer', border:on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.02)', color:on?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}{on?' ✓':''}</button>;
+          const on = specTargets.includes(id);
+          const disabled = !on && specTargets.length >= 2;
+          return <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => on ? t.filter(x => x !== id) : [...t, id])}
+            style={{ padding:'5px 10px', borderRadius:14, fontSize:11, fontWeight:700, cursor:disabled?'default':'pointer', border:on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.02)', color:on?'#00e68a':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.6)', opacity:disabled?0.5:1 }}>{l}{on?' ✓':''}</button>;
         })}
       </div>
       <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>
-        💡 Слабые группы получают: +20% объёма, приоритетное размещение (первые упражнения), снижение RIR на 0.5 (тяжелее).
+        💡 Специализация: выбранные мышцы — 14-24 сета/нед, 2-4 сессии, первыми в тренировке, RIR 0-1 на изоляциях. Остальные — поддерживающий объём (MEV).
       </div>
-      {specializationMode && <div style={{ marginBottom:10, padding:'6px 10px', borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.15)', fontSize:11, color:'rgba(255,255,255,0.7)' }}>
-        🔴 Режим специализации: топ-2 слабые группы на MAV+10%, остальные на MEV (поддерживающий объём).
-      </div>}
+      {renderSpecPlanner()}
       <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'bb_cycle' ? buildBb() : setStep('split')}>
         {planMode === 'bb_cycle' ? '⚡ Собрать план по циклу →' : 'Далее: выбрать сплит →'}
       </button>
@@ -2907,7 +3030,7 @@ export const BbAutoConstructor: React.FC = () => {
                     const editKey = `${si}-${ei}`;
                     const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
                     const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
-                    const comment = e.comment || exerciseComment(e, weakPoints, bbFocus, currentPhase);
+                    const comment = e.comment || exerciseComment(e, weakPoints, '', currentPhase);
                     const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
                     const isCompound = isCompoundEx(e);
                     const _cat = EXERCISE_CATALOG.find(c => c.name === (e.exerciseName || e.name));
@@ -2957,11 +3080,6 @@ export const BbAutoConstructor: React.FC = () => {
                               {isWeakMuscle(e.muscle, weakPoints) && (
                                 <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(250,204,21,0.15)', color:'#facc15', border:'0.5px solid rgba(250,204,21,0.3)' }}>
                                   🔥 Отстающая
-                                </span>
-                              )}
-                              {bbFocus === e.muscle && (
-                                <span style={{ fontSize:11, fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(236,72,153,0.15)', color:'#ec4899', border:'0.5px solid rgba(236,72,153,0.3)' }}>
-                                  ⭐ Специализация
                                 </span>
                               )}
                               {featureBadges.map((fb, fbi) => (
@@ -3769,7 +3887,7 @@ export const BbAutoConstructor: React.FC = () => {
                       </div>
                     )}
                     {altExercises.length > 0 && <div style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Альтернативы: {altExercises.map(x => x.name).join(', ')}</div>}
-                    <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>💡 {exerciseComment(e, weakPoints, bbFocus, currentPhase)}</div>
+                    <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>💡 {exerciseComment(e, weakPoints, '', currentPhase)}</div>
                   </div>;
                 })}
               </div>

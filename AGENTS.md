@@ -1,5 +1,43 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## BB-авто: планировщик блоков специализации (Aug 17 2026, uncommitted)
+
+Поверх единой модели акцентов (специализация 1-2 мышц): **для планов > 10 недель
+пользователь выбирает, что будет после блока** — возврат к балансу / продолжение тех же
+мышц / другие мышцы (методика: блок 6-10 нед, затем ребаланс или смена приоритета;
+Rapid Strength, T-Nation, Alpha Progression: 3 цикла фокуса + 1 без).
+
+- **NEW в `bb-specialization.engine.ts`**: `SpecializationBlock` (weekStart/weekEnd/targets,
+  [] = баланс), `SpecializationSchedule`, `buildSpecializationSchedule(focus, weak, spec,
+  totalWeeks, explicit?)` — явные блоки клампятся/сортируются, пропуски и хвост заполняются
+  баланс-блоками; legacy-путь без explicit = один блок 10 нед + баланс; без специализации —
+  расписание неактивно (weak-эмфазис сохраняется). `specResForWeekSchedule(schedule, week)`
+  — per-week цели; НЕактивное расписание отдаёт legacy weak-список (weak-планы без спец
+  не сломаны). `specializationScheduleText` для rationale («нед 1-8 [chest] → нед 9-12 баланс»).
+- **bb-builder**: `BBBuilderInput.specializationSchedule?`; целевой объём считается ОДНОЙ
+  картой на уникальный набор целей (`rotationMapByKey`: первичная + блок-2 + баланс);
+  недельный цикл берёт карту по `specResForWeekSchedule(schedule, w)`; buildSession получает
+  week-aware weak/focus (в баланс-неделях weak-эмфазис снят, focus сохраняется); MRV-капы и
+  volumeTargets — по первичному блоку; cross-day feeders — union целей всех блоков;
+  rationale — расписание блоков. Фокус-мышца в спец-блоке = MAV (без стэкинга 1.1×1.3).
+- **bb-finalize**: `BBFinalizeOptions.specializationSchedule?`; `applySpecializationPass`
+  week-aware (RIR 0-1/спец-частота/икры только в неделях активного блока; неактивное
+  расписание → legacy priorityMuscles на весь план).
+- **cycle-to-plan**: `specializationSchedule?` в обоих входах; `specResForWeekSchedule`
+  в недельных циклах (specFactor/RIR/добивка per-week); priorityMuscles = union блоков;
+  rationale — расписание.
+- **UI (BbAutoConstructor)**: «📅 Планирование блоков» в блоке отстающих мышц (виден при
+  целях + bbWeeks > 10): длина блока 1 (6-10 нед, степпер), выбор «↩ Баланс / 🔁 Продолжить
+  те же / 🎯 Другие мышцы» (+ чипы 1-2 для блока 2), строка итога «нед 1-10 [chest] → …».
+  `buildSpecBlocks` прокидывается во все 3 пути сборки; сохранение/восстановление вариантов
+  (`params.specBlocks` + миграция старых). Кап specTargets 1-2 при загрузке.
+- Тесты: `bb-specialization-unified.test.ts` **25** (+10: расписание legacy/явные блоки/
+  заполнение пропусков/клампы/no-op/specResForWeek/text; generic 12 нед блок1→блок2
+  (объём переключается по неделям), same-продолжение, баланс после блока, cycle-путь).
+- Проверено: tsc 0; bb+TrainingScreen_parts **1612/1612** (144 файла); полный прогон
+  **5960/5964** — 4 падения пред-существующие/чужие (bb-macrocycle v7, sleep-facts,
+  stretch-session, macrocycle-panel-cycle-slots).
+
 ## Ручной конструктор: внутренние шаги редактора + липкая шапка (Aug 17 2026, pushed 9e6563ff6 + 4ab04abc1)
 
 Пошаговая структура внутри шага «2 Редактор» (поверх флоу Выбор → Редактор → Итог):
@@ -31,6 +69,83 @@
   (`PLPlanView.tsx:973` unterminated string literal — файл другого агента, не трогается).
 - Файлы других агентов не тронуты; запушены только свои: `ProgramEditorView.tsx`, `styles.css`,
   `manual-constructor-steps.test.tsx`.
+
+## BB-авто: единая модель акцентов — специализация 1-2 отстающих мышц (Aug 17 2026, uncommitted)
+
+Жалоба: «три одинаковых блока (фокус-группа / слабые группы / режим специализации) — пользователь
+не понимает, зачем три раза выбирать одно и то же». Исследование методики (Rapid Strength,
+Metal Strength, T-Nation, Alpha Progression): специализация = **1-2 отстающие мышцы** (14-24
+сета/нед, 2-4 сессии, первыми в тренировке), остальные — поддерживающий объём (MEV), блок
+6-10 нед. Три механизма сведены к одному.
+
+- **NEW `bb-specialization.engine.ts`** — единый резолвер `resolveSpecialization(focusGroup,
+  weakPoints, specialization)` + факторы `specializationVolumeFactor` (focus ×1.3 > spec-цель
+  ×1.1 > weak ×1.2 > 1; не-цели при специализации ×0.7), `specializationEmphasisFactor`
+  (generic per-session: только emphasis, перераспределение уже в целевом объёме),
+  `specializationMrvFactor` (кап: focus ×1.3 / weak ×1.2), `isSpecializationWeak/Focus`,
+  `canonicalizeMuscles`.
+- **Стэкинг убит**: focus+weak больше не дают 1.2×1.3=1.56 (фокус выигрывает); MRV-кап
+  тоже без стэкинга. **Top-2 специализации — канонические** (раньше ['shoulders','chest'] →
+  ['shoulders','delt_front'] — один регион занимал 2 слота; `expandWeakForSpecialization`
+  удалён). **Specialization без слабых групп — no-op** (раньше generic переводил ВСЕ мышцы
+  в special-режим, cycle резал все до ×0.7). **Фокус-мышца при специализации не режется**
+  (раньше cycle давал 0.7×1.3=0.91). Generic «остальные» при специализации: MEV×1.5 → **MEV**
+  (методика: поддерживающий объём; финализатор MEV-guard страхует от недобора).
+- **Уровень/стаж/PED/recovery/nutrition/lab/goal-множители НЕ тронуты** — применяются
+  ПОВЕРХ факторов резолвера (bb-builder:2291-2330, 2352-2361; cycle-to-plan setMult).
+- **UI (BbAutoConstructor)**: один блок «🎯 Отстающие мышцы (специализация, 1-2)» — чипы
+  как в старом фокусе, максимум 2 выбора (остальные disabled); в шаге 1 (generic) и в
+  «Доп. настройке программы» (cycle/library). Селектор «Фокус-группа», блок «Слабые группы»
+  и чекбокс «Режим специализации» удалены. `specializationMode = specTargets.length > 0`
+  (авто), `weakPoints = specTargets` (зеркало), `focusGroup: ''` во все пути. Бейджи плана:
+  «🔥 Отстающая» (⭐ Специализация убран). Миграция вариантов: `focusGroup` → targets[0],
+  `specialization+weakPoints` → targets.
+- Тесты: NEW `bb-specialization-unified.test.ts` (15: резолвер, канонический top-2, no-op
+  без слабых, фокус не режется, generic/cycle инварианты, enhanced back ≥18 не сломан);
+  обновлён `bb-back-quality.integration.test.ts` (3: без focusGroup).
+- Проверено: tsc 0; bb-область **1201/1201** (107 файлов); TrainingScreen_parts **401/401**;
+  полный прогон **5950/5954** — 4 падения пред-существующие/чужие (bb-macrocycle v7,
+  sleep-facts, stretch-session, macrocycle-panel-cycle-slots — задокументированы ранее).
+
+## Механизм-модель рисков: union-агрегация + якорные floors + верификация (Aug 17 2026, uncommitted)
+
+Жалоба: «общий риск по системе = сумма процентов механизмов — 7%×3 даёт 21%, это неверно».
+Медицинское решение главного врача: **субаддитивная агрегация (competing risks) + якорные
+лабораторные пороги + честная семантика «индекс риска»**. Движок `risk-engine-tz-spec.ts`
+(калькулятор поддержки + вкладка «Риски» — единый вход, цифры идентичны).
+
+- **Union вместо суммы**: `unionPct` (S = 1 − Π(1−pᵢ)) — каноническая формула competing-risks
+  (эпидемиология/токсикология). 7+7+7 → 19.6 (не 21), 50+50 → 75 (не 100), 30+30+30 → 65.7.
+  Применяется: система = union механизмов, общий риск = union систем (было среднее
+  арифметическое), timeline-недели. `maxRaw`/формулы механизмов/поддержка Π(1−k) не тронуты.
+- **Парные синергии** (`applyMechanismSynergies`, литературные, s=0.2-0.25): cv2×cv4
+  (атеротромбоз), cv3×cv1 (гипертензивное сердце), hem1×cv4 (гипервязкость), liv1×liv2,
+  ren1×ren3 (KDIGO), cns1×cns2. Вместо произвольного глобального k=0.3.
+- **Якорные floors** (`clinicalFloorsForLabs`) — лабораторные пороги из руководств поднимают
+  риск системы НЕЗАВИСИМО от таргетов препарата (раньше eGFR 25 на препарате без ренального
+  таргета давал 0): HCT≥54→гемато≥50, LDL≥4.9→кардио≥50, eGFR<30→ренальный≥75 / <60→≥50,
+  UACR>300→≥50, ALT/AST>200→печень≥50, K<3.0→кардио≥50, LH+FSH<0.5→репродуктивный≥50,
+  PRL>50→ЦНС≥50, GLU<2.8→ЦНС≥50, HOMA>5→гемато≥25. Floor поднимает и категорию.
+- **Учёт без анализов**: floors не срабатывают (доказать «не ниже» без данных нельзя), но
+  гарантированные эффекты ААС (baseDefaults: супрессия HPTA, дислипидемия, эритроцитоз) и
+  штраф U_i остаются; **per-system верификация** (`organ.verification` — доля механизмов с
+  релевантными маркерами, `overallVerification`) + UI-бейджи «⚠ не верифицировано — оценка
+  по фармакологии, сдайте анализы» (TzRiskCard, RiskSpecMethod, CalcSystemPanel).
+- **Семантика**: UI называет результат «индекс риска», не «вероятность»; floors показываются
+  как «⚓ HCT ≥ 54% — эритроцитоз (порог флеботомии)»; под-риски в CalcSystemPanel считаются
+  union'ом (не суммой чипов). Бейджи верификации/floors во ВСЕХ точках отображения:
+  TzRiskCard, RiskSpecMethod, CalcSystemPanel, LabsTzRiskTab, инлайн-секция LabsScreen,
+  текстовый экспорт Calc.mapper («[не верифицировано]», «⚓ …»).
+- Тесты: NEW `tz-spec-union-floors.test.ts` (24: union-свойства, синергии, floors, сценарные
+  кейсы — трен+HCT55→гемато high, оксандролон+ALT250→печень high, eGFR25 без таргета→ренальный
+  very_high, без анализов→floors нет+верификация 0); обновлён `tz-spec-risk-invariants.test.ts`
+  (система ≤ суммы механизмов, ≥ максимума — вместо «сумма сходится»).
+- Проверено: tsc 0; затронутые области 355/355 (tz-spec-union-floors 24, invariants 6,
+  support-calc-ped-e2e 13, support-calc-e2e 12, ped-catalog-audit 106, support-calc-audit 42,
+  pharmacology-mandatory 16, tz-bridge-boosters-tiered 35, support-new-substances 38,
+  support-profile-autopull 15, ped-risk-matrix 37, calc-UI 9, hydrate-crash 2); полный прогон
+  5926/5930 — 4 падения чужие/пред-существующие (bb-macrocycle v7, sleep-facts, stretch-session,
+  macrocycle-panel-cycle-slots — чужой WIP, задокументированы ранее).
 
 ## Кардио-конструктор: структуризация вкладок + единый UI-слой (Aug 17 2026, pushed c7f0ab8aa)
 

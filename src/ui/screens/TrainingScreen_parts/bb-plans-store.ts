@@ -28,6 +28,8 @@ export interface SavedBBPlan {
     methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
     equipment?: string[];
     specialization?: boolean;
+    /** Расписание блоков специализации (сохранение/восстановление плана блоков). */
+    specBlocks?: { weekStart: number; weekEnd: number; targets: string[] }[];
     daysPerWeek?: number;
     source?: 'cycle' | 'program';
     programPath?: 'library' | 'cycle';

@@ -50,6 +50,7 @@ import type { BBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
 import { applyDUPOverlay, type DUPConfig } from './bb-dup.engine';
 import type { BBPlanValidationResult } from './bb-validator.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, buildSpecializationSchedule, specResForWeekSchedule, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
 export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
@@ -92,6 +93,9 @@ export interface BBBuilderInput {
   focusGroup?: string;           // группа специализации → MAV↑↑
   volumeGoal?: BBVolumeGoal;     // цель по объёму: MEV | MAV | MRV
   specialization?: boolean;      // true = слабые на MAV+10%, остальные на MEV
+  /** Явное расписание блоков специализации (недели + цели 1-2 мышцы; [] = баланс).
+   *  Без него: один блок 6-10 нед, затем возврат к балансу. */
+  specializationSchedule?: SpecializationBlock[];
   injuries?: Injury[];           // травмы — группы с активной травмой исключаются из плана
   planStartWeek?: string;        // ISO-дата начала мезоцикла (неделя 1) — для per-week оценки травм (fix F)
   favoriteExercises?: string[];  // Любимые упражнения — +15 приоритет при отборе
@@ -596,25 +600,6 @@ export function isWeak(muscle: string, weakPoints: string[]): boolean {
   }
   return weakPoints.includes(PARENT_MUSCLE[muscle] ?? '');
 }
-/** Развернуть родительские/гранулярные группы для проверки специализации.
- *  P0-2 (audit 2026-08): раньше разворачивало только shoulders → delt_*,
- *  но гранулярные слабые (chest_upper, back_width) НЕ разворачивались в канонические
- *  мышцы (chest, back), и специализация для них не работала (landmarksForRotation
- *  для 'chest_upper' возвращает null). Теперь разворачиваем все гранулярные ключи
- *  через WEAK_TO_MUSCLE в канонические мышцы. */
-function expandWeakForSpecialization(weakPoints: string[]): string[] {
-  const expanded = [...weakPoints];
-  // Разворачиваем родительские группы в дочерние (shoulders → 3 delt)
-  if (weakPoints.includes('shoulders')) expanded.push('delt_front', 'delt_mid', 'delt_rear');
-  // P0-2: добавляем канонические мышцы для гранулярных слабых групп
-  for (const wp of weakPoints) {
-    const canonical = WEAK_TO_MUSCLE[wp];
-    if (canonical && canonical !== wp && !expanded.includes(canonical)) {
-      expanded.push(canonical);
-    }
-  }
-  return expanded;
-}
 function musclesForTag(tag?: string): string[] {
   if (!tag) return [];
   if (TAG_MUSCLES[tag]) return TAG_MUSCLES[tag];
@@ -1062,6 +1047,8 @@ function buildSession(
   bodyweightCapability?: BBBuilderInput['bodyweightCapability'],
 ): BBSession {
   const character = sched.character as DayCharacter;
+  // Единый резолвер акцентов для per-session логики (без стэкинга 1.2×1.3).
+  const specRes = resolveSpecialization(focusGroup, weakPoints, specialization);
     // Focus-группа инжектируется в сессию, только если тег совместим:
     // FullBody — всегда, Legs/Lower — только для ног/ягодиц,
     // Upper/Push/Pull — только для верхних групп.
@@ -1251,8 +1238,8 @@ function buildSession(
       else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.15));
       else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
     }
-    if (isWeak(muscle, weakPoints)) sets = Math.round(sets * 1.2);
-    if (focusGroup === muscle || (focusGroup && isWeak(muscle, [focusGroup]))) sets = Math.round(sets * 1.3);
+    const specVol = specializationEmphasisFactor(muscle, specRes);
+    if (specVol !== 1) sets = Math.round(sets * specVol);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
     sets = Math.round(sets * getPhaseVolumeMult(phase));
     // MEV-гарантия на этапе распределения: мышца не опускается ниже MEV/частота
@@ -2227,6 +2214,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     : inputWorkMax;
   const weakPoints = input.weakPoints || [];
   const focusGroup = input.focusGroup;
+  // Единый резолвер акцентов: focus/weak/specialization больше не складываются
+  // (1.2 × 1.3 = 1.56), top-2 специализации — канонические, specialization без
+  // слабых групп — no-op. Уровень/стаж/PED/recovery/nutrition/lab/goal-множители
+  // применяются ПОВЕРХ факторов резолвера и не меняются.
+  const specRes = resolveSpecialization(focusGroup, weakPoints, input.specialization);
+  // Расписание блоков специализации (методика: блок 6-10 нед → баланс или
+  // следующий блок с другими/теми же целями — на выбор пользователя).
+  const specSchedule = buildSpecializationSchedule(
+    focusGroup, weakPoints, input.specialization, input.weeks, input.specializationSchedule,
+  );
   const sessions = sessionsOf(pattern);
   const injuries = input.injuries || [];
   const favIds = input.favoriteExercises || [];
@@ -2270,7 +2267,6 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const muscleVolumeRotation: Record<string, number> = {};
   const mrvByMuscle: Record<string, number> = {};
   const volumeTargets: Record<string, BBVolumeTarget> = {};
-  const specWeak = input.specialization ? expandWeakForSpecialization(input.weakPoints || []).slice(0, 2) : [];
   // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022)
   // BUG-FIX: используем Number.isFinite() вместо != null для защиты от строк/NaN/undefined.
   const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
@@ -2288,45 +2284,51 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (Number.isFinite(input.proteinPerKg)) n *= (input.proteinPerKg as number) >= 2.0 ? 1.1 : (input.proteinPerKg as number) >= 1.6 ? 1.05 : (input.proteinPerKg as number) < 1.0 ? 0.85 : 1.0;
     return n;
   })()));
+  // Общая цепочка модификаторов целевого объёма (уровень/стаж/PED/lab/meso) —
+  // применяется к ЛЮБОМУ варианту целевого объёма (спец-блок или баланс).
+  const applyRotationModifiers = (m: string, v: number): number => {
+    // B7: при смене cut (×0.75) → mass (×1.1) скачок 1.47x. Капнем mass на ×1.05, чтобы плавнее.
+    if (input.goal === 'cut') v = Math.round(v * 0.75);  // дефицит калорий → восстановление ↓25%, объём соответственно
+    if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.05);
+    // PED-адаптация: увеличиваем целевой объём пропорционально MRV-множителю
+    v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
+    if (m === 'back' && input.trainingYears !== undefined) {
+      v = Math.round(v * backProfile.targetMult);
+    }
+    // Enhanced объём ног масштабируется подтверждённым стажем.
+    if (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined) {
+      v = Math.round(v * legProfile.targetMult);
+    }
+    // Enhanced объём груди/плеч масштабируется подтверждённым стажем.
+    if (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined) {
+      v = Math.round(v * torsoProfile.targetMult);
+    }
+    // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
+    v = Math.round(v * (input.labMrvMultiplier ?? 1));
+    // PRO: cross-mesocycle volume progression — +1-2 сета per muscle из предыдущего мезо
+    if (mesoProgression) {
+      v = applyVolumeProgression(m, v, mesoProgression);
+    }
+    return v;
+  };
+  // Базовый целевой объём мышцы для резолвера (спец-блок или баланс).
+  const baseRotationFor = (m: string, lm: { mav: number; mev: number; mrv: number }, res: SpecializationResolution): number => {
+    if (res.active) {
+      // Фокус-мышца в спец-блоке: MAV (её эмфазис ×1.3 применится per-session,
+      // без стэкинга 1.1×1.3). Цели блока: MAV×1.1. Остальные: поддерживающий
+      // объём MEV (перераспределение «volume bucket», не добавление).
+      if (res.focus && m === res.focus) return lm.mav;
+      return res.targets.includes(m) ? Math.round(lm.mav * 1.1) : lm.mev;
+    }
+    if (input.volumeGoal === 'mev') return lm.mev;
+    if (input.volumeGoal === 'mrv') return lm.mrv;
+    return lm.mav;
+  };
   for (const m of Object.keys(muscleSessionCount)) {
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
-      let v: number;
-      if (input.specialization) {
-        // P1-6 (audit 2026-07): специализация — слабые (топ-2) на MAV+10%,
-        // остальные на MEV×1.5 (maintenance-higher MEV, антиатрофия).
-        // Раньше: 0.85×MAV (близко к MEV) → спад массы в не-слабых.
-        // MEV×1.5 = достаточно для сохранения без атрофии (Schoenfeld 2017).
-        v = specWeak.includes(m) ? Math.round(lm.mav * 1.1) : Math.round(lm.mev * 1.5);
-      } else {
-        v = lm.mav;
-        if (input.volumeGoal === 'mev') v = lm.mev;
-        else if (input.volumeGoal === 'mrv') v = lm.mrv;
-      }
-      // B7: при смене cut (×0.75) → mass (×1.1) скачок 1.47x. Капнем mass на ×1.05, чтобы плавнее.
-      if (input.goal === 'cut') v = Math.round(v * 0.75);  // дефицит калорий → восстановление ↓25%, объём соответственно
-      if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.05);
-      // PED-адаптация: увеличиваем целевой объём пропорционально MRV-множителю
-      v = Math.round(v * (pedAdapt?.combinedMrvMultiplier ?? 1));
-      if (m === 'back' && input.trainingYears !== undefined) {
-        v = Math.round(v * backProfile.targetMult);
-      }
-      // Enhanced объём ног масштабируется подтверждённым стажем.
-      // quads/hamstrings/glutes — большие группы, на курсе восстанавливаются
-      // быстрее, но объём не должен расти только из-за флага enhanced.
-      if (['quads', 'hamstrings', 'glutes'].includes(m) && input.trainingYears !== undefined) {
-        v = Math.round(v * legProfile.targetMult);
-      }
-      // Enhanced объём груди/плеч масштабируется подтверждённым стажем.
-      if (['chest', 'shoulders'].includes(m) && input.trainingYears !== undefined) {
-        v = Math.round(v * torsoProfile.targetMult);
-      }
-      // P0-5: лабораторная коррекция - снижение объёма при ALT/CRP/HCT/гормонах
-      v = Math.round(v * (input.labMrvMultiplier ?? 1));
-      // PRO: cross-mesocycle volume progression — +1-2 сета per muscle из предыдущего мезо
-      if (mesoProgression) {
-        v = applyVolumeProgression(m, v, mesoProgression);
-      }
+      let v = baseRotationFor(m, lm, specRes);
+      v = applyRotationModifiers(m, v);
       v = muscleVolumeRotation[m] = v;
       volumeTargets[m] = buildBBVolumeTarget({
         muscle: m,
@@ -2334,8 +2336,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         landmarks: lm,
         rotationSets: v,
         volumeGoal: input.volumeGoal || 'mav',
-        weakPoint: isWeak(m, weakPoints),
-        focus: focusGroup === m || (focusGroup ? isWeak(m, [focusGroup]) : false),
+        weakPoint: isSpecializationWeak(m, specRes),
+        focus: isSpecializationFocus(m, specRes),
         // BUG-FIX: recoveryMultiplier уже применён к rotationSets (v) на строках выше
         // (v *= recoveryMult * nutritionMult * pedAdapt * labMrvMultiplier * goal).
         // Передаём 1.0 чтобы избежать двойного применения.
@@ -2356,8 +2358,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (['biceps', 'triceps', 'glutes', 'shoulders'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
         capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
       }
-      if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
-      if (focusGroup === m || (focusGroup && isWeak(m, [focusGroup]))) capMrv = Math.round(capMrv * 1.3);
+      const specMrv = specializationMrvFactor(m, specRes);
+      if (specMrv !== 1) capMrv = Math.round(capMrv * specMrv);
       mrvByMuscle[m] = capMrv;
     }
   }
@@ -2378,10 +2380,33 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (['biceps', 'triceps'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
         capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
       }
-      if (isWeak(m, weakPoints)) capMrv = Math.round(capMrv * 1.2);
+      const specMrvPro = specializationMrvFactor(m, specRes);
+      if (specMrvPro !== 1) capMrv = Math.round(capMrv * specMrvPro);
       mrvByMuscle[m] = capMrv;
     }
   }
+
+  // Целевые объёмы для остальных блоков расписания (другие цели / баланс):
+  // одна карта на уникальный набор целей. Первичная карта (muscleVolumeRotation)
+  // уже посчитана выше; капы/targets строятся по первичному блоку.
+  const rotationMapByKey = new Map<string, Record<string, number>>();
+  rotationMapByKey.set(specRes.targets.join('|'), muscleVolumeRotation);
+  for (const block of specSchedule.blocks) {
+    const key = block.targets.join('|');
+    if (rotationMapByKey.has(key)) continue;
+    const res: SpecializationResolution = block.targets.length > 0
+      ? { targets: block.targets, focus: specRes.focus, weak: block.targets, active: true }
+      : { targets: [], focus: specRes.focus, weak: [], active: false };
+    const map: Record<string, number> = {};
+    for (const m of Object.keys(muscleSessionCount)) {
+      const lm = landmarksForRotation(level, m, pattern.rotationDays);
+      if (!lm) continue;
+      map[m] = applyRotationModifiers(m, baseRotationFor(m, lm, res));
+    }
+    rotationMapByKey.set(key, map);
+  }
+  // Все цели всех блоков (для feeders/компенсации слабых групп по всему плану).
+  const allSpecTargets = Array.from(new Set(specSchedule.blocks.flatMap(b => b.targets)));
 
   // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/deload (fix A)
   // fix N: deload-частота зависит от реальной нагрузки (ACWR). При ratio>1.5 —
@@ -2441,8 +2466,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const weekPhase = phaseByWeek.get(w) || 'accumulation';
     const weekVolumeMult = weekPhase === 'deload' ? 0.6
       : Math.min(1.10, 0.85 + ((w - 1) / Math.max(1, input.weeks - 1)) * 0.25);
+    // Акценты НЕДЕЛИ по расписанию блоков специализации (цели блока или баланс).
+    const weekSpec = specResForWeekSchedule(specSchedule, w);
+    const weekRotation = rotationMapByKey.get(weekSpec.targets.join('|')) || muscleVolumeRotation;
     const scaledVolumeRotation: Record<string, number> = {};
-    for (const [m, v] of Object.entries(muscleVolumeRotation)) {
+    for (const [m, v] of Object.entries(weekRotation)) {
       scaledVolumeRotation[m] = Math.round(v * weekVolumeMult);
     }
     // Ротация: НЕ сбрасываем — накапливаем все использованные упражнения
@@ -2502,7 +2530,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints, focusGroup, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability);
+       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weekSpec.weak, weekSpec.focus || undefined, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -2762,7 +2790,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     `Сплит «${pattern.name}» (${pattern.rotationDays}дн ротация, ${pattern.sessionsPerRotation} сессий)`,
     `Уровень ${level}, цель ${input.goal}, ${input.weeks} нед`,
     `Объём ${input.volumeGoal || 'MAV'}: ` + Object.entries(muscleVolumeRotation).map(([m, v]) => `${m}=${v}`).join(', '),
-    `Специализация: ${focusGroup || 'нет'}`,
+    ...(specSchedule.active ? [`Специализация (блоки): ${specializationScheduleText(specSchedule)}`] : [`Специализация: нет`]),
     `Фазовая периодизация (distributePhases): накопление → интенсификация${deloadFreq > 0 ? ' → разгрузка (deload)' : ''} (RIR по фазе + волна); вес = workMax×%1RM(RIR)`,
     `Прогрессия весов: double_progression (prescribeLoad) — еженедельный рост от недели к неделе с учётом фазы.`,
     `Ротация упражнений: накапливает использованные весь план — недели получают РАЗНЫЕ упражнения (пока пул не исчерпан, затем fallback).`,
@@ -2835,8 +2863,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   // Cross-day weakPoints compensation: если слабая группа получает < MEV за неделю (потому что
   // не входит ни в один дневной тег), добавить feeder-сет в ближайший релевантный день.
-  finalPlan = weakPoints.length > 0
-    ? compensateCrossDayWeakPoints(finalPlan, weakPoints, level, workMax, eqList, effectiveMrvMult, avAxial, phaseByWeek)
+  finalPlan = (weakPoints.length > 0 || allSpecTargets.length > 0)
+    ? compensateCrossDayWeakPoints(finalPlan, [...new Set([...weakPoints, ...allSpecTargets])], level, workMax, eqList, effectiveMrvMult, avAxial, phaseByWeek)
     : finalPlan;
   // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
   for (const w of finalPlan.weeks) {
@@ -3130,7 +3158,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   return finalizeBBPlan(output, {
     reorder: true,
     methodology: input.methodology,
-    priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+    priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
+    specializationSchedule: specSchedule,
     level,
     volumeGoal: input.volumeGoal,
     phaseSafety: true,
