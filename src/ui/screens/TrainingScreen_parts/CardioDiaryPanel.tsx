@@ -9,13 +9,15 @@ import {
   type CardioLogEntry,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
-import { cardioWeightAdvice, cardioWeekForDate, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
+import { cardioWeightAdvice, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType, type CardioCoachHint } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, INPUT, CHIP, CHIP_ACTIVE } from './CardioUI';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
 const ADVICE_COLOR: Record<string, string> = { reduce: '#f87171', keep: '#22c55e', increase: '#3b82f6' };
+const HINT_COLOR: Record<string, string> = { test: '#4ade80', deload: '#fbbf24', taper: '#eab308', peak: '#f87171' };
+const HINT_ICON: Record<string, string> = { test: '🔬', deload: '🧘', taper: '📉', peak: '🎭' };
 
 function newId(): string {
   return 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
@@ -47,6 +49,13 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     const currentWeek = weekForDate ? weekForDate.week : 1;
     return cardioWeekAdherence(cycle, Math.min(currentWeek, cycle.totalWeeks), log, cycle.startDate);
   }, [log, cycle]);
+  // Тренерская подсказка текущей недели (замер/делод/taper/пик).
+  const weekHint = useMemo<CardioCoachHint | null>(() => {
+    if (!cycle) return null;
+    const weekForDate = cardioWeekForDate(cycle, todayIso(), cycle.startDate);
+    const currentWeek = Math.min(weekForDate ? weekForDate.week : 1, cycle.totalWeeks);
+    return cardioCoachHints(cycle).find(h => h.week === currentWeek && h.kind !== 'work') ?? null;
+  }, [cycle]);
   // Выполнение цикла в целом: прошедшие недели (сессии/минуты), до текущей.
   const cycleStats = useMemo(() => {
     if (!cycle) return null;
@@ -99,6 +108,11 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       {adherence && (
         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
           Неделя {adherence.week}: выполнено {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин ({adherence.pctMinutes}%)
+        </div>
+      )}
+      {weekHint && (
+        <div style={{ fontSize: 11, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.65)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>
+          {HINT_ICON[weekHint.kind] ?? '💡'} {weekHint.text}
         </div>
       )}
       {cycleStats && (

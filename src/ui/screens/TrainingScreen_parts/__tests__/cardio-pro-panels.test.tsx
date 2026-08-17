@@ -303,6 +303,16 @@ describe('CardioProgressCard', () => {
     expect(html).toContain('Прогресс цикла');
     expect(html).toContain('из 12');
   });
+
+  it('цикл со стартом на неделе 4: на текущей неделе видна подсказка taper/делод', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 21); // цикл идёт 3 недели → текущая неделя 4
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, id: 'p-2', startDate: start, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    render(<CardioProgressCard cycle={c} />);
+    // Неделя 4 в cut-цикле — делод (каждые 4 нед) → подсказка «Нед 4:».
+    expect(screen.getByText(/Нед 4:/)).toBeTruthy();
+  });
 });
 
 describe('CardioDiaryPanel — adherence текущей недели', () => {
@@ -319,6 +329,16 @@ describe('CardioDiaryPanel — adherence текущей недели', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-2', startDate: start });
     render(<CardioDiaryPanel cycle={c} />);
     expect(screen.getByText(/Неделя 2: выполнено/)).toBeTruthy();
+  });
+
+  it('цикл, идущий 3 недели (cut): на текущей неделе видна тренерская подсказка', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 21);
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8, id: 'dp-h', startDate: start, competitions: [{ id: 'c', name: 'Шоу', week: 8 }] });
+    render(<CardioDiaryPanel cycle={c} />);
+    // Неделя 4 в cut-цикле — делод → подсказка «🧘 …Делод…».
+    expect(screen.getByText(/Делод/)).toBeTruthy();
   });
 });
 

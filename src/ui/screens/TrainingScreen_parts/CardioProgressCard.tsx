@@ -5,7 +5,8 @@
  */
 import React, { useMemo } from 'react';
 import {
-  cardioWeekForDate, cardioNextSession, cardioEquipmentLabel, DAY_LABELS_RU, CARDIO_PHASE_LABELS, type CardioCycle, type CardioType,
+  cardioWeekForDate, cardioNextSession, cardioEquipmentLabel, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
+  cardioCoachHints, type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL } from './CardioUI';
@@ -16,6 +17,9 @@ function todayIso(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+const HINT_COLOR: Record<string, string> = { test: '#4ade80', deload: '#fbbf24', taper: '#eab308', peak: '#f87171' };
+const HINT_ICON: Record<string, string> = { test: '🔬', deload: '🧘', taper: '📉', peak: '🎭' };
 
 export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cycle }) => {
   const data = useMemo(() => {
@@ -30,6 +34,8 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
     const actual = done.reduce((s, a) => s + a.doneSessions, 0);
     const adherence = planned > 0 ? Math.round((actual / planned) * 100) : null;
     const nextStart = cycle.weeks.find(w => w.week >= current && (w.phase === 'taper' || w.phase === 'peak'));
+    // Подсказка текущей недели (тренерские заметки).
+    const hint = current >= 1 ? cardioCoachHints(cycle).find(h => h.week === current) ?? null : null;
     return {
       current,
       pct,
@@ -39,6 +45,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
       nextStart,
       nextSession: cardioNextSession(cycle, todayIso(), cycle.startDate),
       totalWeeks: cycle.totalWeeks,
+      hint,
     };
   }, [cycle]);
 
@@ -63,6 +70,11 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
           </span>
         )}
       </div>
+      {data.hint && data.hint.kind !== 'work' && (
+        <div style={{ fontSize: 10, color: HINT_COLOR[data.hint.kind] ?? 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 8px' }}>
+          {HINT_ICON[data.hint.kind] ?? '💡'} Нед {data.hint.week}: {data.hint.text}
+        </div>
+      )}
       {data.nextSession && (() => {
         const d = new Date(data.nextSession!.date);
         const dow = (d.getDay() + 6) % 7;
