@@ -220,6 +220,20 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (isLastEditorStep) onNext?.();
     else setEstep(editorSteps[estepIdx + 1]);
   }, [onNext, editorSteps, estepIdx, isLastEditorStep]);
+  const goPrevStep = useCallback(() => {
+    if (estepIdx > 0) setEstep(editorSteps[estepIdx - 1]);
+  }, [editorSteps, estepIdx]);
+  // Клавиатурная навигация по внутренним шагам (←/→); не перехватывает ввод в полях
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); goNextStep(); }
+      else if (e.key === 'ArrowLeft' && estepIdx > 0) { e.preventDefault(); goPrevStep(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goNextStep, goPrevStep, estepIdx]);
   // При переключении внутреннего шага — скролл контента наверх (липкая шапка остаётся сверху)
   const editorRootRef = useRef<HTMLDivElement | null>(null);
   const scrollEditorTop = useCallback(() => {
@@ -637,7 +651,7 @@ return (
           )}
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
           {estepIdx > 0 && (
-            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => setEstep(editorSteps[estepIdx - 1])}>
+            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={goPrevStep}>
               ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
             </button>
           )}
@@ -706,7 +720,12 @@ return (
       </div>
 
       {/* P2-1/F5: подсказка при пустой программе — прямая CTA авто-черновика (шаг «🎛 Параметры») */}
-      {estep === 'params' && program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0)) && (
+      {estep === 'params' && (() => {
+        const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
+        const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;
+        if (!bbEmpty && !plEmpty) return null;
+        const emptyDir: 'bb' | 'pl' = bbEmpty ? 'bb' : 'pl';
+        return (
         <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 14, borderLeft: '3px solid #00e68a' }}>
           <div style={{ fontSize: 12, color: DIM_STRONG, lineHeight: 1.5, marginBottom: 8 }}>
             💡 Пустая программа. Заполните автоматически на основе вашего профиля или возьмите готовую из библиотеки.
@@ -715,12 +734,13 @@ return (
             <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()} title="Автоматическая сборка на основе цели/уровня/дней">
               {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
             </button>
-            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen('bb')}>
+            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen(emptyDir)}>
               📥 Загрузить из библиотеки
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* P1-1: planner-bridge баннер — рекомендация от калькулятора */}
       {bridgeApply && (

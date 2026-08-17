@@ -96,4 +96,22 @@ describe('Ручной конструктор — последовательны
     fireEvent.click(screen.getByText('3 Итог'));
     expect(screen.queryByText('💾 Сохранить и завершить')).toBeNull();
   });
+
+  it('клавиатура: ArrowRight → следующий шаг, ArrowLeft → предыдущий (вне полей ввода)', async () => {
+    const { container } = render(<ProgramManagerPanelWithProvider />);
+    fireEvent.click(screen.getAllByText('ББ')[0]);
+    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
+    const editor = container.querySelector('.manual-constructor--editor');
+    expect(editor).toBeTruthy();
+    // ArrowLeft на первом шаге — ничего не меняет
+    fireEvent.keyDown(editor!, { key: 'ArrowLeft' });
+    expect(screen.getByText('Далее: Недели →')).toBeTruthy();
+    // ArrowRight → шаг «Недели»
+    fireEvent.keyDown(editor!, { key: 'ArrowRight' });
+    expect(screen.getByText('Далее: Итог →')).toBeTruthy();
+    expect(screen.getByText('шаг 2 из 2')).toBeTruthy();
+    // ArrowLeft → назад на «Параметры»
+    fireEvent.keyDown(editor!, { key: 'ArrowLeft' });
+    expect(screen.getByText('Далее: Недели →')).toBeTruthy();
+  });
 });
