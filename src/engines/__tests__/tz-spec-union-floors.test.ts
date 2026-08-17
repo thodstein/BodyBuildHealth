@@ -247,3 +247,43 @@ describe('эритроцитоз (hem1): фибринолитики, проце�
     }
   });
 });
+
+describe('фармакология подключена к механизмам', () => {
+  const riskOf = (drugName: string, dose = 500) => {
+    const drugClass = drugName.includes('ins_') ? 'insulin' as const
+      : ['cjc1295','ghrp6','ipamorelin','ghrp2','sermorelin','mk677','igf1_lr3','igf1_des','mgf','peg_mgf','bpc157','tb500','ghk_cu','ss31','semax','selank','epitalon','dsip','mots_c','hgh_frag','aod9604','thymosin_a1','gonadorelin','melanotan2','foxo4_dri','semaglutide','tirzepatide'].includes(drugName)
+        ? 'gh' as const : 'aas' as const;
+    return calculateTzSpecRisk(input({
+      drugName, dose,
+      drugs: [{ drugClass, drugName, dose, form: 'inject' as const }],
+    }));
+  };
+
+  it('тестостероны, нандролоны, тренболоны дают ненулевой риск', () => {
+    for (const name of ['test_enan', 'test_prop', 'test_cyp', 'test_undec', 'deca', 'npp', 'tren_acet', 'tren_enan', 'tren_hex']) {
+      expect(riskOf(name).overallRaw).toBeGreaterThan(0);
+    }
+  });
+
+  it('оралы и SARMs дают ненулевой риск', () => {
+    for (const name of ['methand', 'oxan', 'stan', 'trena', 'superdrol', 'anadrol', 'ostarine', 'rad140', 'lgd', 's23']) {
+      expect(riskOf(name).overallRaw).toBeGreaterThan(0);
+    }
+  });
+
+  it('MGF/PEG-MGF (анаболические пептиды) дают риск гипогликемии/метаболический', () => {
+    const mgf = riskOf('mgf');
+    expect(mgf.overallRaw).toBeGreaterThan(0);
+    const hema = mgf.organs.find(o => o.id === 'hematologic')!;
+    expect(hema.mechanisms.some(m => m.id === 'hem3' && m.raw > 0)).toBe(true);
+  });
+
+  it('GH-пептиды с весами дают риск; без весов — 0 (восстановительные)', () => {
+    expect(riskOf('cjc1295').overallRaw).toBeGreaterThan(0);
+    expect(riskOf('mk677').overallRaw).toBeGreaterThan(0);
+    expect(riskOf('igf1_lr3').overallRaw).toBeGreaterThan(0);
+    // восстановительные пептиды не дают механизм-риска (by design)
+    expect(riskOf('bpc157').overallRaw).toBe(0);
+    expect(riskOf('tb500').overallRaw).toBe(0);
+  });
+});
