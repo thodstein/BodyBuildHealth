@@ -35,6 +35,7 @@ interface ActiveSession {
   durationMin: number;
   remainingSec: number;
   paused: boolean;
+  targetHr?: { min?: number; max?: number };
 }
 
 interface TodaySession {
@@ -81,8 +82,8 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
-  const start = (type: CardioType, durationMin: number) => {
-    setActive({ type, durationMin, remainingSec: durationMin * 60, paused: false });
+  const start = (type: CardioType, durationMin: number, targetHr?: { min?: number; max?: number }) => {
+    setActive({ type, durationMin, remainingSec: durationMin * 60, paused: false, targetHr });
     setFinished(null);
   };
 
@@ -143,7 +144,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
       {active && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '8px 0' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин{active.targetHr?.max ? ` · 🎯 ЧСС ${active.targetHr.min}-${active.targetHr.max}` : ''}</div>
           <div style={{ fontSize: 40, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a' }}>{fmt(active.remainingSec)}</div>
           {(() => {
             const protocol = cardioSessionProtocol({ type: active.type, durationMin: active.durationMin });
@@ -195,7 +196,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
                   <span style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)' }}>🎯 ЧСС {s.targetHr.min}-{s.targetHr.max} уд/мин</span>
                 )}
               </span>
-              <button style={BTN_PRIMARY} onClick={() => start(s.type, s.durationMin)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
+              <button style={BTN_PRIMARY} onClick={() => start(s.type, s.durationMin, s.targetHr)} aria-label={`Старт ${TYPE_LABEL[s.type]}`}>▶️ Старт</button>
               <button style={BTN} onClick={reschedule} aria-label="Перенести на другой день">↗</button>
               <button style={BTN} onClick={() => skip(s.type, s.durationMin)} aria-label={`Пропустить ${TYPE_LABEL[s.type]}`}>⏭</button>
             </div>

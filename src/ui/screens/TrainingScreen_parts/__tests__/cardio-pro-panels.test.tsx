@@ -258,6 +258,14 @@ describe('CardioSessionTimer', () => {
     unmount();
   });
 
+  it('CSR: активная сессия показывает целевую ЧСС-зону во время таймера', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-6', age: 40 });
+    const { unmount } = render(<CardioSessionTimer cycle={c} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Старт/ })[0]);
+    expect(screen.getByText(/🎯 ЧСС/)).toBeTruthy();
+    unmount();
+  });
+
   it('CSR: старт → завершить → сохранить записывает сессию в дневник', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-2' });
     const { unmount } = render(<CardioSessionTimer cycle={c} />);
