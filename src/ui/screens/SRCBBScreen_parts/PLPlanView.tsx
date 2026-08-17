@@ -6,7 +6,7 @@
  * Тапер-поля (attemptStrategy/peakMode/...) читаются из контекста taper-state.tsx;
  * остальные зависимости — через api (единый объект).
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { getCycleById, LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { originalCycleWeeks, getPLWeakPointRecommendations, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../../engines/rir-matrix.engine';
@@ -32,6 +32,7 @@ import type { BridgeSession } from '../../../engines/training-integration.engine
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
+import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
 const ACCENT = '#00e68a';
@@ -131,6 +132,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   } = api;
   // 🏁 Тапер-поля — из контекста (taper-state.tsx).
   const { attemptStrategy, peakMode, taperWeeksToAdd, mockMeetOn, meetWeekOn, postMeetOn, taperNote, taperAttemptOverride } = usePLTaper();
+
+  // 📤 Экспорт: цепочка Формат → Объём → (Блок/Неделя) → Экспорт.
+  const [expOpen, setExpOpen] = useState(false);
+  const [expFormat, setExpFormat] = useState<'xlsx' | 'pdf' | null>(null);
+  const [expScope, setExpScope] = useState<'all' | 'block' | 'week' | 'full' | null>(null);
+  const [expBlock, setExpBlock] = useState<PLBlockId | null>(null);
+  const [expWeek, setExpWeek] = useState<number | null>(null);
 
   const displayPhaseForWeek = (week: LMSBuildOutput['weeks'][number], totalWeeks: number): string => {
     return week.macroPhase
@@ -328,9 +336,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 </div>
               )}
               <div style={{ display:'flex', gap:6, marginTop:8, alignItems:'center', flexWrap:'wrap' }}>
-                <button onClick={() => setEditMode(m => !m)} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11 }}>{editMode ? '✓ Готово' : '✏️ Правка плана'}</button>
+                <button onClick={() => setEditMode(m => !m)} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border: editMode ? '1px solid #f59e0b' : '1px solid rgba(245,158,11,0.55)', background: editMode ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>{editMode ? '✓ Готово' : '✏️ Правка плана'}</button>
                 {editMode && <button onClick={() => setSrcEdits({})} disabled={Object.keys(srcEdits).length===0} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11, opacity: Object.keys(srcEdits).length===0?0.4:1 }}>↺ Сбросить</button>}
                 {editMode && <span style={{ ...SMALL }}>правка недели 1 применяется к «Выполнение»</span>}
+                <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
+                <button onClick={() => { const link = plShareLink({ title: builtSrc.template.meta.title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.href.split('#')[0] }); openPLShare(link); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {
@@ -975,6 +985,94 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   ? 'Разгрузка — восстановление перед следующим мезо. После неё начните новый цикл: PM0 = текущий расчётный PM (он вырос за мезо по формуле PM0×(1+k)^нед).'
                   : 'Система считает дальнейшие недели сама: вес = PM_нед × %ПМ, где PM_нед = PM0×(1+k)^нед (k=0.5% натурал / 1.5-2.5% на курсе). Переходите по неделям ◀▶ — фазы Base→Build→Peak чередуются автоматически.'}</div>
               </div>
+              {/* 📤 Экспорт: цепочка Формат → Объём → (Блок/Неделя) → Экспорт */}
+              {expOpen && (() => {
+                const blocks = plBlockGroups(W);
+                const scopeLabel = expScope === 'all' ? `Весь план (${W.length} нед)`
+                  : expScope === 'full' ? `Всё вместе (${W.length} нед + сводка)`
+                  : expScope === 'block' ? `Блок «${expBlock ? PL_BLOCK_LABEL[expBlock] : ''}»`
+                  : expScope === 'week' ? `Неделя ${expWeek}`
+                  : '';
+                const ready = !!expFormat && !!expScope && (expScope !== 'block' || !!expBlock) && (expScope !== 'week' || !!expWeek);
+                const summary = expScope === 'full' && builtSrc.cycleMetrics ? [
+                  { label: 'Тоннаж', value: Math.round(builtSrc.cycleMetrics.tonnage).toLocaleString('ru-RU') + ' кг·пов' },
+                  { label: 'КПШ', value: String(builtSrc.cycleMetrics.kpsh) },
+                  { label: 'Средний вес', value: Math.round(builtSrc.cycleMetrics.avgWeight) + ' кг' },
+                  { label: 'Отн. интенсивность', value: Math.round(builtSrc.cycleMetrics.relIntensity * 100) + '%' },
+                  { label: 'УОИ', value: builtSrc.cycleMetrics.uoi.toFixed(2) },
+                  { label: 'Сессий', value: String(builtSrc.cycleMetrics.sessions) },
+                ] : undefined;
+                const doExport = () => {
+                  if (!ready) return;
+                  const sel: LMSBuildOutput['weeks'] = expScope === 'all' || expScope === 'full'
+                    ? W
+                    : expScope === 'block'
+                      ? (blocks.find(b => b.id === expBlock)?.weeks ?? W)
+                      : W.filter(w => w.week === expWeek);
+                  const title = builtSrc.template.meta.title;
+                  if (expFormat === 'xlsx') {
+                    downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);
+                    onNote(`📥 Excel сохранён: ${scopeLabel} (${sel.length} нед).`);
+                  } else {
+                    printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }));
+                    onNote(`🖨 PDF: окно печати — ${scopeLabel}.`);
+                  }
+                  setExpOpen(false);
+                };
+                const stepBtn = (on: boolean, label: string, sub: string, onClick: () => void, color: string, ariaLabel?: string) => (
+                  <button onClick={onClick} aria-label={ariaLabel} style={{ padding:'10px 12px', borderRadius:10, textAlign:'left', cursor:'pointer', border: on ? '1px solid ' + color : '1px solid rgba(255,255,255,0.12)', background: on ? color + '22' : 'rgba(255,255,255,0.03)', color:'#fff' }}>
+                    <div style={{ fontSize:13, fontWeight:800, color: on ? color : 'rgba(255,255,255,0.85)' }}>{label}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{sub}</div>
+                  </button>
+                );
+                return (
+                  <div style={{ position:'fixed', inset:0, zIndex:210, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setExpOpen(false)}>
+                    <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
+                        <span style={{ fontSize:14, fontWeight:700, color:'#60a5fa' }}>📤 Экспорт плана</span>
+                        <button onClick={() => setExpOpen(false)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
+                      </div>
+                      <div style={{ flex:1, overflowY:'auto', padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
+                        {!expFormat && <>
+                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>1 · Формат</div>
+                          {stepBtn(expFormat === 'xlsx', '📊 Excel (.xlsx)', 'Таблица для Excel / Google Sheets', () => setExpFormat('xlsx'), '#60a5fa')}
+                          {stepBtn(expFormat === 'pdf', '🖨 PDF', 'Окно печати → «Сохранить как PDF»', () => setExpFormat('pdf'), '#f59e0b')}
+                        </>}
+                        {expFormat && !expScope && <>
+                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>2 · Что выгружаем</div>
+                          {stepBtn(expScope === 'all', '📋 Весь план', 'Тренировочный план — все недели', () => setExpScope('all'), '#00e68a')}
+                          {stepBtn(expScope === 'block', '🧩 Отдельный блок на выбор', 'Основной цикл / тапер / mock / соревнования / пост-старт', () => setExpScope('block'), '#a78bfa')}
+                          {stepBtn(expScope === 'week', '📅 Одна неделя на выбор', 'Выберите номер недели', () => setExpScope('week'), '#eab308')}
+                          {stepBtn(expScope === 'full', '📦 Всё вместе', 'Все недели + сводка цикла + прикиды', () => setExpScope('full'), '#f59e0b')}
+                        </>}
+                        {expFormat && expScope === 'block' && <>
+                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>3 · Выберите блок</div>
+                          {blocks.map(b => <div key={b.id} style={{ width:'100%' }}>{stepBtn(expBlock === b.id, `${b.icon} ${b.label}`, `нед ${b.range} · ${b.weeks.length} нед`, () => setExpBlock(b.id), '#a78bfa', `Экспорт блок ${b.id}`)}</div>)}                          {blocks.length === 0 && <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Отдельных блоков нет — план однородный.</div>}
+                        </>}
+                        {expFormat && expScope === 'week' && <>
+                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>3 · Выберите неделю</div>
+                          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(72px, 1fr))', gap:4 }}>
+                            {W.map(w => {
+                              const ph2 = displayPhaseForWeek(w, totalW);
+                              const active2 = expWeek === w.week;
+                              return <button key={w.week} onClick={() => setExpWeek(w.week)} aria-label={'Экспорт неделя ' + w.week} style={{ padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border: active2 ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)', background: active2 ? 'rgba(234,179,8,0.18)' : 'rgba(255,255,255,0.03)', color:'#fff' }}>
+                                <div>{w.week}</div>
+                                <div style={{ fontSize:8, color: PH_COLOR[ph2 as keyof typeof PH_COLOR] ?? 'rgba(255,255,255,0.4)' }}>{PH_RU[ph2 as keyof typeof PH_RU] ?? ph2}</div>
+                              </button>;
+                            })}
+                          </div>
+                        </>}
+                      </div>
+                      <div style={{ display:'flex', gap:6, padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+                        <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.7)', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
+                        <button onClick={doExport} disabled={!ready} style={{ flex:1, padding:'10px 12px', borderRadius:8, fontSize:12, fontWeight:800, cursor:'pointer', border:'none', background: ready ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.1)', color: ready ? '#000' : 'rgba(255,255,255,0.35)' }}>
+                          {ready ? `📥 Экспорт: ${expFormat === 'xlsx' ? 'Excel' : 'PDF'} · ${scopeLabel}` : 'Выберите формат и объём'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>;
           })()}
     </>

@@ -409,10 +409,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           pedDoses,
           nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+           autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
             pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
-           faithful: true,
-           ...rec,
+            faithful: true,
+            ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
           const source = output.weeks[index % output.weeks.length];
