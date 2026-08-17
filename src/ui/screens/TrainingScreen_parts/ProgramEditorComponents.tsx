@@ -619,7 +619,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           onTouchMove={onTouchMove}
           className={`bb-block-row editor-exercise-card${expandedBlock === bi ? ' is-expanded' : ''}`}
           style={{
-            display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 0',
+            display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px',
             borderTop: overIdx === bi ? '2px solid #00e68a' : '2px solid transparent',
             transition: 'border-color 0.1s',
             background: touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
@@ -656,7 +656,6 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           </select>
           <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
           <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 44 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
-            <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
            <button
              className="bb-block-expand"
              type="button"
@@ -664,6 +663,9 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
              aria-expanded={expandedBlock === bi}
            >{expandedBlock === bi ? '▲ Детали' : '▼ Детали'}</button>
           </div>
+
+          {/* Схема подходов — отдельной строкой, чтобы ряд с упражнением не был перегружен */}
+          <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
           
           {/* Авто-разминка для compound с заданным весом — единый канон warmup-ramp.engine */}
           {b.type === 'compound' && b.sets[0]?.weight && b.sets[0].weight > 0 && (() => {
@@ -713,10 +715,10 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           {/* Ряд 2: комментарий + кнопки управления */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <input 
-            style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '1 1 120px', minWidth: 90, minHeight: 44 }}
+            style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: '1 1 180px', minWidth: 120, minHeight: 44 }}
             value={b.note || ''} 
             onChange={e => updateBlock(bi, { note: e.target.value })} 
-            placeholder="💬 Комментарий" 
+            placeholder="💬 Комментарий к упражнению (техника, цель, примечания)" 
           />
           {b.rationale && (
             <span style={{ fontSize: 10, color: DIM, flex: '0 0 auto', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={b.rationale}>📝</span>
@@ -829,9 +831,9 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
         <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '6px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
              <span className="editor-set-index">{i + 1}</span>
-             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />
+             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" placeholder="повт" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>×</span>
-             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR: повторения в запасе" aria-label={`RIR подхода ${i + 1}`} inputMode="numeric" />
+             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR: повторения в запасе" placeholder="RIR" aria-label={`RIR подхода ${i + 1}`} inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>@</span>
             {weightMode === 'pct' ? (
               <>
@@ -858,8 +860,9 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
             {(['drop_set', 'myo_reps', 'pause_rep', 'rest_pause', 'mechanical_drop'] as IntensityTechnique[]).map(tech => {
               const active = hasTechnique(s, tech);
               const lbl: Record<string, string> = { drop_set: '↓DRP', myo_reps: 'MYO', pause_rep: 'PRS', rest_pause: 'RP', mechanical_drop: 'MD' };
+              const titleMap: Record<string, string> = { drop_set: 'Дроп-сет: досет со сниженным весом', myo_reps: 'Мио-репсы: мини-сеты после отказа', pause_rep: 'Пауза-повтор: пауза в растянутой позиции', rest_pause: 'Отдых-пауза: короткие паузы внутри подхода', mechanical_drop: 'Механический дроп: смена положения/упражнения' };
               const clr: Record<string, string> = { drop_set: '#f59e0b', myo_reps: '#a78bfa', pause_rep: '#22c55e', rest_pause: '#3b82f6', mechanical_drop: '#ef4444' };
-              return <button key={tech} type="button" onClick={() => toggleTechnique(i, tech)} style={{ padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: active ? `1px solid ${clr[tech]}` : '1px solid rgba(255,255,255,0.08)', background: active ? `${clr[tech]}20` : 'transparent', color: active ? clr[tech] : DIM, minHeight: 44 }}>{lbl[tech]}</button>;
+              return <button key={tech} type="button" title={titleMap[tech]} onClick={() => toggleTechnique(i, tech)} style={{ padding: '4px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: active ? `1px solid ${clr[tech]}` : '1px solid rgba(255,255,255,0.08)', background: active ? `${clr[tech]}20` : 'transparent', color: active ? clr[tech] : DIM, minHeight: 44 }}>{lbl[tech]}</button>;
             })}
           </div>
           {hasTechnique(s, 'drop_set') && (

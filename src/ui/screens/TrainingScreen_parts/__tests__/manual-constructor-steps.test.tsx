@@ -32,11 +32,18 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('🎛 Параметры')).toBeTruthy();
     expect(screen.getByText('🗓 Недели')).toBeTruthy();
     expect(screen.getByText('шаг 1 из 2')).toBeTruthy();
-    // На первом шаге кнопки «← Назад» нет
+    // Заголовок активного шага с описанием
+    expect(screen.getByText('Параметры программы')).toBeTruthy();
+    expect(screen.getByText('Название, цель, уровень, дни и недели + заметки тренера')).toBeTruthy();
+    // На первом шаге кнопки «← Назад» нет, галочек на пройденных шагах нет
     expect(screen.queryByText('← Назад: Параметры')).toBeNull();
+    expect(screen.queryByText('✓ 🎛 Параметры')).toBeNull();
     fireEvent.click(screen.getByText('Далее: Недели →'));
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
     expect(screen.getByText('шаг 2 из 2')).toBeTruthy();
+    expect(screen.getByText('Недели и упражнения')).toBeTruthy();
+    // Пройденный шаг «Параметры» получает галочку
+    expect(screen.getByText('✓ 🎛 Параметры')).toBeTruthy();
     // На втором шаге появляется «← Назад: Параметры» — возврат на первый шаг
     expect(screen.getByText('← Назад: Параметры')).toBeTruthy();
     fireEvent.click(screen.getByText('← Назад: Параметры'));
@@ -67,6 +74,8 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('🔄 Обратная связь')).toBeTruthy();
     expect(screen.getByText('🔧 Инструменты')).toBeTruthy();
     expect(screen.getByText('шаг 1 из 6')).toBeTruthy();
+    // Заголовок активного шага (профиль)
+    expect(screen.getByText('Данные атлета')).toBeTruthy();
     // «Далее» ведёт по шагам pro
     fireEvent.click(screen.getByText('Далее: Параметры →'));
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();

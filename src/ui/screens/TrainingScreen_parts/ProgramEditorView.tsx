@@ -88,6 +88,14 @@ const EDITOR_STEP_LABELS: Record<EditorStep, string> = {
 const EDITOR_STEP_BTN_LABELS: Record<EditorStep, string> = {
   profile: 'Профиль', params: 'Параметры', weeks: 'Недели', analysis: 'Анализ', feedback: 'Обратная связь', tools: 'Инструменты',
 };
+const EDITOR_STEP_INFO: Record<EditorStep, { title: string; hint: string }> = {
+  profile: { title: 'Данные атлета', hint: 'ПМ, workMax, оборудование и ограничения — основа авто-сборки' },
+  params: { title: 'Параметры программы', hint: 'Название, цель, уровень, дни и недели + заметки тренера' },
+  weeks: { title: 'Недели и упражнения', hint: 'Расписание недели, упражнения, сеты, веса и RIR' },
+  analysis: { title: 'Метрики и периодизация', hint: 'Score, MRV, объём, прогрессия и лаб-коррекция' },
+  feedback: { title: 'Обратная связь', hint: 'sRPE, RIR-калибровка, готовность, чек-ин и what-if' },
+  tools: { title: 'Инструменты и история', hint: 'Подбор сплита, замены, ПЛ-диагностика и ревизии' },
+};
 
 export function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -188,6 +196,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   };
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   // Внутренний шаг редактора: standard = [Параметры, Недели], pro = [Профиль, Параметры, Недели, Анализ, Обратная связь, Инструменты]
   const editorSteps = isPro ? PRO_EDITOR_STEPS : STANDARD_EDITOR_STEPS;
   // Шаг восстанавливается из sessionStorage (he_editor_step) — возврат из «Итога» не сбрасывает позицию
@@ -244,6 +253,52 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
       else if (typeof root.scrollIntoView === 'function') root.scrollIntoView({ block: 'start', behavior: 'smooth' });
     } catch { /* jsdom и т.п. — scroll API может отсутствовать */ }
+  }, []);
+  // Детерминированная фиксация шапки: sticky может не сработать из-за
+  // overflow:hidden на main/внутренней обёртке и transform-анимаций предков,
+  // поэтому при уходе верха редактора за экран переключаем шапку в position:fixed
+  // с замером левого края/ширины (window + ближайший скроллер + ResizeObserver).
+  const editorHeaderRef = useRef<HTMLDivElement | null>(null);
+  const [headerPinned, setHeaderPinned] = useState(false);
+  const [headerPad, setHeaderPad] = useState(0);
+  const [headerRect, setHeaderRect] = useState<{ left: number; width: number } | null>(null);
+  useEffect(() => {
+    let scroller: HTMLElement | null = null;
+    let ro: ResizeObserver | null = null;
+    const measure = () => {
+      const root = editorRootRef.current;
+      const header = editorHeaderRef.current;
+      if (!root || !header) return;
+      const r = root.getBoundingClientRect();
+      if (r.top < 0) {
+        setHeaderPinned(true);
+        setHeaderPad(header.offsetHeight);
+        setHeaderRect({ left: r.left, width: r.width });
+      } else {
+        setHeaderPinned(false);
+        setHeaderPad(0);
+        setHeaderRect(null);
+      }
+    };
+    try {
+      const root = editorRootRef.current;
+      if (!root) return;
+      if (typeof ResizeObserver !== 'undefined') {
+        ro = new ResizeObserver(() => measure());
+        ro.observe(root);
+      }
+      scroller = root.closest('.screen.training-screen, main') as HTMLElement | null;
+      scroller?.addEventListener('scroll', measure, { passive: true });
+      window.addEventListener('scroll', measure, { passive: true });
+      window.addEventListener('resize', measure);
+      measure();
+    } catch { /* jsdom: getBoundingClientRect/ResizeObserver могут отсутствовать */ }
+    return () => {
+      ro?.disconnect();
+      scroller?.removeEventListener('scroll', measure);
+      window.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+    };
   }, []);
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
@@ -589,12 +644,18 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     }, [program, dir, showToast]);
 
 return (
-      <div className="manual-constructor manual-constructor--editor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-       {/* Липкая навигация: шапка + пилюли внутренних шагов всегда наверху */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
+      <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: headerPinned ? headerPad : undefined }}>
+       {/* Липкая навигация: шапка + пилюли внутренних шагов всегда наверху
+           (position:fixed с замером, когда sticky-скролл-контекст недоступен) */}
+        <div ref={editorHeaderRef} style={headerPinned && headerRect
+          ? { position: 'fixed', top: 0, left: headerRect.left, width: headerRect.width, zIndex: 60, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }
+          : { position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
         <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 44 }} onClick={safeBack}>← К списку</button>
         <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
+        </span>
         {isPro && <RecoveryBadge onApplyAutoDeload={autoFillDraft} />}
         <ProgramMetricsCSV program={program} dir={dir} onToast={showToast} />
         {program.meta.updatedAt && (
@@ -649,14 +710,16 @@ return (
           {dir === 'pl' && program.pl && (
             <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 44, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>
           )}
-          <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => handleSave('Ручная правка')}>💾 Сохранить</button>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
+            {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
+          </button>
           {estepIdx > 0 && (
-            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={goPrevStep}>
+            <button style={{ ...BTN_GHOST, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep}>
               ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
             </button>
           )}
           {onNext && (
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 11, minHeight: 44 }} onClick={goNextStep}>
+            <button style={{ ...BTN, padding: '10px 18px', fontSize: 12, minHeight: 44 }} onClick={goNextStep}>
               Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
             </button>
           )}
@@ -710,12 +773,20 @@ return (
 
       {/* Внутренние шаги редактора: содержимое показывается по одному шагу */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        {editorSteps.map(s => (
+        {editorSteps.map((s, si) => (
           <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined}>
-            {EDITOR_STEP_LABELS[s]}
+            {si < estepIdx ? '✓ ' : ''}{EDITOR_STEP_LABELS[s]}
           </button>
         ))}
         <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 'auto' }}>шаг {estepIdx + 1} из {editorSteps.length}</span>
+      </div>
+      {/* Заголовок и описание активного шага + прогресс */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>{EDITOR_STEP_INFO[estep].title}</span>
+        <span style={{ fontSize: 11, color: DIM, lineHeight: 1.3 }}>{EDITOR_STEP_INFO[estep].hint}</span>
+      </div>
+      <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', borderRadius: 2, background: 'linear-gradient(90deg,#00e68a,#00c8a0)', width: `${Math.round(((estepIdx + 1) / editorSteps.length) * 100)}%`, transition: 'width .3s ease' }} />
       </div>
       </div>
 
@@ -750,6 +821,21 @@ return (
           <button style={{ ...BTN_GHOST, padding: '6px 14px', fontSize: 11, minHeight: 44 }} onClick={() => { clearPlannerApply(); setBridgeApply(null); }}>✕</button>
         </div>
       )}
+
+      {/* Пустой-state для про-шагов анализа/обратной связи/инструментов при несобранной программе */}
+      {isPro && (estep === 'analysis' || estep === 'feedback' || estep === 'tools') && (() => {
+        const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
+        const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;
+        if (!bbEmpty && !plEmpty) return null;
+        return (
+          <div className="constructor-surface" style={{ ...CARD, padding: 12, borderLeft: '3px solid #60a5fa' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>📊 Сначала соберите программу</div>
+            <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.45 }}>
+              Авто-сборка (⚡ Создать автоматически) или загрузка из библиотеки на шаге «🎛 Параметры» — затем здесь появятся анализ, обратная связь и инструменты.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: пошаговые секции (профиль / анализ / обратная связь / инструменты) ═════════ */}
       {isPro && estep === 'profile' && (
@@ -985,6 +1071,22 @@ return (
       {/* Шаг «🗓 Недели»: расписание, таблица плана, редактор недель/сессий, статистика */}
       {estep === 'weeks' && (
       <>
+      {(() => {
+        const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
+        const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;
+        if (!bbEmpty && !plEmpty) return null;
+        return (
+          <div className="constructor-surface" style={{ ...CARD, padding: 12, borderLeft: '3px solid #f59e0b' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>🗓 Недели пока пустые</div>
+            <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.45, marginBottom: 8 }}>
+              Соберите программу автоматически или загрузите из библиотеки — здесь появятся расписание недели и упражнения.
+            </div>
+            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()}>
+              {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
+            </button>
+          </div>
+        );
+      })()}
       {showTableView && dir === 'bb' && program.bb && (
         <PlanSummaryTable program={program} showWeek={execWeek} onShowWeekChange={setExecWeek} />
       )}

@@ -826,34 +826,49 @@ export const ProgramManagerPanel: React.FC = () => {
           </div>
         )}
         {filteredPrograms().length === 0 && programs.length > 0 && <div style={{ fontSize: 11, color: DIM, padding: '12px 0' }}>Ничего не найдено по фильтру.</div>}
-        {filteredPrograms().map(p => (
-          <div key={p.meta.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[p.meta.direction], minWidth: 28 }}>{DIR_LABEL[p.meta.direction]}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: DIM_STRONG, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.meta.title}</div>
-              <div style={{ fontSize: 10, color: DIM }}>
-                {p.meta.daysPerWeek}д/нед · {p.meta.weeks} нед · {SOURCE_LABEL[p.meta.source] ?? p.meta.source}
-                {p.meta.updatedAt && ' · ' + new Date(p.meta.updatedAt).toLocaleDateString()}
+        {filteredPrograms().map(p => {
+          const dc = DIR_COLOR[p.meta.direction];
+          const goalLabel = GOAL_OPTS.find(g => g.id === p.meta.goal)?.label ?? p.meta.goal;
+          const levelLabel = LEVEL_OPTS.find(l => l.id === p.meta.level)?.label ?? p.meta.level;
+          const chip: React.CSSProperties = { padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.82)', whiteSpace: 'nowrap' };
+          const iconBtn: React.CSSProperties = { ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minWidth: 36, minHeight: 36, lineHeight: 1 };
+          return (
+            <div key={p.meta.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 14, background: `linear-gradient(135deg, ${dc}14, rgba(24,24,27,0.6))`, border: `1px solid ${dc}30`, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, background: dc + '1a', border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+                {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : '⚡'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.meta.title}</div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
+                  <span style={chip}>🎯 {goalLabel}</span>
+                  <span style={chip}>📶 {levelLabel}</span>
+                  <span style={chip}>🗓 {p.meta.daysPerWeek}д × {p.meta.weeks}н</span>
+                  {p.meta.updatedAt && <span style={chip}>📅 {new Date(p.meta.updatedAt).toLocaleDateString('ru-RU')}</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, alignItems: 'flex-end' }}>
+                <button style={{ ...BTN, padding: '6px 16px', fontSize: 12, minHeight: 40 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  <button style={iconBtn} onClick={() => {
+                    const clone = JSON.parse(JSON.stringify(p));
+                    clone.meta.id = newId('prog');
+                    clone.meta.title = p.meta.title + ' (копия)';
+                    clone.meta.source = 'custom';
+                    clone.meta.createdAt = new Date().toISOString();
+                    clone.meta.updatedAt = new Date().toISOString();
+                    clone.meta.revisions = [{ ts: new Date().toISOString(), note: 'Клон «' + p.meta.title + '»' }];
+                    saveUserProgram(clone, 'Клонирование');
+                    refresh();
+                    flash('📋 Клонировано: ' + clone.meta.title);
+                  }} title="Клонировать">⧉</button>
+                  <button style={iconBtn} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
+                  <button style={iconBtn} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
+                  <button style={{ ...iconBtn, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)} title="Удалить">✕</button>
+                </div>
               </div>
             </div>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => openExisting(p.meta.id)}>Открыть</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => {
-              const clone = JSON.parse(JSON.stringify(p));
-              clone.meta.id = newId('prog');
-              clone.meta.title = p.meta.title + ' (копия)';
-              clone.meta.source = 'custom';
-              clone.meta.createdAt = new Date().toISOString();
-              clone.meta.updatedAt = new Date().toISOString();
-              clone.meta.revisions = [{ ts: new Date().toISOString(), note: 'Клон «' + p.meta.title + '»' }];
-              saveUserProgram(clone, 'Клонирование');
-              refresh();
-              flash('📋 Клонировано: ' + clone.meta.title);
-            }} title="Клонировать">⧉</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44 }} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
-            <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)}>✕</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* P2-5: панель сравнения двух программ */}
