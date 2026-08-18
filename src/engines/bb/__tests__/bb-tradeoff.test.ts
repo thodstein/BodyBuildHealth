@@ -5,9 +5,12 @@ import {
   specializationScheduleText,
 } from '../bb-specialization.engine';
 import { buildBBPlan } from '../bb-builder.engine';
+import { convertCycleToBBPlan, programToBBPlan } from '../cycle-to-plan';
+import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { aggregateBBVolume } from '../bb-volume.engine';
 import { getVolumeLandmarks } from '../../volume-landmarks.engine';
 import { rankBBSplits } from '../bb-selector.engine';
+import { allZoneSpecs } from '../bb-specialization-registry';
 
 /**
  * Донорское перераспределение специализации (цель за счёт доноров):
@@ -39,6 +42,44 @@ const effectiveSets = (plan: ReturnType<typeof buildBBPlan>, week: number, muscl
 };
 
 describe('tradeoff-политика (движок)', () => {
+  it('registry покрывает все UI-зоны и у каждой есть target pattern', () => {
+    const expected = ['chest', 'chest_upper', 'chest_lower', 'back', 'back_width', 'back_thickness', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'quads', 'hamstrings', 'glutes', 'calves', 'biceps', 'triceps', 'forearms', 'abs', 'traps'];
+    const specs = allZoneSpecs();
+    expect(new Set(specs.map(x => x.key))).toEqual(new Set(expected));
+    for (const spec of specs) {
+      expect(spec.canonical).toBeTruthy();
+      expect(spec.patterns.length).toBeGreaterThan(0);
+    }
+  });
+
+  it.each([
+    ['back_thickness', 'legs'],
+    ['chest_upper', 'triceps'],
+    ['delt_mid', 'chest'],
+    ['quads', 'hamstrings'],
+    ['hamstrings', 'quads'],
+    ['glutes', 'quads'],
+    ['calves', 'legs'],
+    ['biceps', 'triceps'],
+    ['triceps', 'biceps'],
+    ['forearms', 'arms'],
+    ['abs', 'core'],
+    ['traps', 'forearms'],
+  ])('generic matrix: target %s за счёт donor %s не ломает план', (target, donor) => {
+    const plan = buildBBPlan({
+      patternId: 'ppl_6', level: 'intermediate', trainingYears: 3,
+      goal: 'mass', weeks: 5, workMax: WM,
+      weakPoints: [target], specialization: true,
+      specializationSchedule: [{
+        weekStart: 1, weekEnd: 5, targets: [target],
+        tradeoff: { mode: 'reduce_direct_to_floor', donorMuscles: [donor], preserveIndirect: true },
+      }],
+    });
+    expect(plan.validation?.valid).not.toBe(false);
+    expect(plan.weeks.length).toBe(5);
+    expect(plan.rationale.some(r => r.includes('Донорское перераспределение')) || plan.rationale.some(r => r.includes('Специализация'))).toBe(true);
+  }, 30000);
+
   it('нормализация: дедуп доноров, mode none отбрасывается', () => {
     const s = buildSpecializationSchedule(undefined, ['back_thickness'], true, 12, [
       {
@@ -206,4 +247,71 @@ describe('selector: специализация учитывает доноров
     expect(ranked[0].score).toBeGreaterThan(ppl!.score);
     expect(ppl!.rationale.some(r => r.includes('доноры ног'))).toBe(true);
   });
+});
+
+describe('cycle adapt: специализация и доноры', () => {
+  it('cycle adapt с back_thickness + biceps donor: план валиден, донор урезан', () => {
+    const plan = convertCycleToBBPlan({
+      cycle: CYCLE_01,
+      workMax: { ...WM, legs: 140 },
+      level: 'intermediate',
+      mode: 'adapt',
+      weakPoints: ['back_thickness'],
+      specialization: true,
+      specializationSchedule: [{
+        weekStart: 1, weekEnd: 5, targets: ['back_thickness'],
+        tradeoff: { mode: 'remove_direct_when_indirect_covers_floor', donorMuscles: ['biceps'], preserveIndirect: true },
+      }],
+      equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+    } as any);
+    expect(plan.weeks.length).toBeGreaterThan(0);
+    expect(plan.validation?.valid).not.toBe(false);
+    expect(plan.rationale.some(r => r.includes('Специализация'))).toBe(true);
+  }, 30000);
+});
+
+describe('program adapt: специализация и доноры', () => {
+  it('program adapt с back_thickness + arms donor: план валиден', () => {
+    const program: any = {
+      name: 'Test program', author: 'test', type: 'bodybuilding', goal: 'bodybuilding',
+      direction: 'bodybuilding', level: 'intermediate', durationWeeks: 5, daysPerWeek: 4,
+      sessionTimeMin: '60', description: '', targetAudience: '', equipmentNeeded: [],
+      weeks: Array.from({ length: 5 }, (_, i) => ({
+        week: i + 1, phase: 'accumulation', volumeMultiplier: 1, intensityMultiplier: 1, deload: false,
+        days: [
+          { day: 1, name: 'Push', focus: 'chest', warmup: '', exercises: [
+            { name: 'Жим штанги лёжа', sets: 4, reps: '8', rir: 2 },
+            { name: 'Жим гантелей сидя', sets: 3, reps: '10', rir: 2 },
+          ] },
+          { day: 2, name: 'Pull', focus: 'back', warmup: '', exercises: [
+            { name: 'Тяга штанги в наклоне', sets: 4, reps: '8', rir: 2 },
+            { name: 'Сгибание рук со штангой', sets: 3, reps: '10', rir: 2 },
+          ] },
+          { day: 3, name: 'Legs', focus: 'legs', warmup: '', exercises: [
+            { name: 'Присед со штангой', sets: 4, reps: '8', rir: 2 },
+            { name: 'Румынская тяга', sets: 3, reps: '10', rir: 2 },
+          ] },
+          { day: 4, name: 'Arms', focus: 'arms', warmup: '', exercises: [
+            { name: 'Сгибание рук с гантелями', sets: 3, reps: '12', rir: 2 },
+            { name: 'Разгибание рук на блоке', sets: 3, reps: '12', rir: 2 },
+          ] },
+        ],
+      })),
+      progressionModel: '', deloadProtocol: '', customization: [], warnings: [], expectedResults: '',
+    };
+    const plan = programToBBPlan(program, {
+      workMax: { ...WM, legs: 140 },
+      level: 'intermediate',
+      mode: 'adapt',
+      weakPoints: ['back_thickness'],
+      specialization: true,
+      specializationSchedule: [{
+        weekStart: 1, weekEnd: 5, targets: ['back_thickness'],
+        tradeoff: { mode: 'remove_direct_when_indirect_covers_floor', donorMuscles: ['arms'], preserveIndirect: true },
+      }],
+    } as any);
+    expect(plan.weeks.length).toBeGreaterThan(0);
+    expect(plan.validation?.valid).not.toBe(false);
+    expect(plan.rationale.some(r => r.includes('Специализация'))).toBe(true);
+  }, 30000);
 });

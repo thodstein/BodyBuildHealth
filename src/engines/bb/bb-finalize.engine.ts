@@ -160,8 +160,9 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
  * freshness/rotation. Добавляются реальные упражнения из каталога, а не
  * переименованные копии; затем бюджет распределяется по ним.
  */
-function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions): void {
+function allocateExperiencedBackSession(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (tradeoffDonorsForWeek(options, (week as any)?.week ?? 0).has('back')) return;
   // FullBody уже планирует back штатно через buildSession; дополнительный
   // allocation здесь вытесняет ноги/руки/плечи из остальных FullBody-сессий.
   if (!/^(Upper|UpperPower|UpperHyp|Pull|Back|ChestBack|Torso)$/i.test(session.sessionTag || '')) return;
@@ -325,6 +326,7 @@ function allocateExperiencedBackSession(session: any, options: BBFinalizeOptions
  */
 function ensureBackBalance(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
+  if (tradeoffDonorsForWeek(options, (week as any)?.week ?? 0).has('back')) return;
   // Deload: не добираем/не добавляем (объём восстановительный; добавление
   // новых упражнений в deload даёт 1-сетовые после deload-протокола).
   if (week && ((week as any).phase === 'deload' || (week as any).deload)) return;
@@ -648,8 +650,10 @@ function ensureGlutesBlock(session: any, options: BBFinalizeOptions, target: num
   });
 }
 
-function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions): void {
+function allocateExperiencedLegSession(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  const legDonors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
+  if (['quads', 'hamstrings', 'glutes', 'calves'].some(m => legDonors.has(m))) return;
   if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) return;
   const years = options.trainingYears ?? 0;
   // Ноги 2×/нед: нечётный день = тяж quads + памп hams; чётный = тяж hams + памп quads.
@@ -669,8 +673,10 @@ function allocateExperiencedLegSession(session: any, options: BBFinalizeOptions)
  *  Также не допускает rear delt в Push-днях (rear delt — Pull-работа).
  *  Для enhanced: чередование тяж/памп по дню (нечётный — тяж: жим 4-5×6-10
  *  RIR 1-2; чётный — памп: 3-4×10-15 + fly/кроссовер 3×12-18). */
-function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptions): void {
+function diversifyExperiencedChestSession(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  const donors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
+  if (donors.has('chest') || donors.has('shoulders')) return;
   if (!/^(Push|Chest|ChestBack|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) return;
   // Задняя дельта не работает в Push-дне (rear delt — тяговая мышца, идёт со спиной).
   const rearDelt = session.exercises.find((e: any) => e.muscle === 'shoulders' && /обратн|rear|задн.*дельт|задн.*пуч/i.test(e.name));
@@ -780,8 +786,9 @@ function diversifyExperiencedChestSession(session: any, options: BBFinalizeOptio
 }
 
 /** Гарантирует rear delt работу в Pull-дне (задняя дельта — тяговая мышца). */
-function ensureRearDeltInPull(session: any, options: BBFinalizeOptions): void {
+function ensureRearDeltInPull(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (tradeoffDonorsForWeek(options, (week as any)?.week ?? 0).has('shoulders')) return;
   if (!/^(Pull|Back|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) return;
   const hasRear = session.exercises.some((e: any) => e.muscle === 'shoulders' && /обратн|rear|задн.*дельт|задн.*пуч|лиц.*тяга|face.?pull/i.test(e.name));
   if (hasRear) return;
@@ -1903,12 +1910,12 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   for (const week of next.weeks) {
     if (isPrepControlled(week)) continue; // prep-недели: объём и состав фиксированы
     for (const session of week.sessions) {
-    allocateExperiencedBackSession(session, options);
+    allocateExperiencedBackSession(session, week, options);
     ensureBackBalance(session, week, options);
     allocateExperiencedArmSession(session, week, options);
-    allocateExperiencedLegSession(session, options);
-    diversifyExperiencedChestSession(session, options);
-    ensureRearDeltInPull(session, options);
+    allocateExperiencedLegSession(session, week, options);
+    diversifyExperiencedChestSession(session, week, options);
+    ensureRearDeltInPull(session, week, options);
     ensureArmHeadCoverage(session, week, options);
     // Специализация/малые группы — только для генераторных планов (pattern.id):
     // произвольные/faithful входы сохраняют исходный набор упражнений.
