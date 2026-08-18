@@ -1,6 +1,7 @@
 /**
  * annual-training-cardio.test.ts — 6.1: кардио-слой годового плана (engine-only).
- * cardioGoalForAnnualPhase, annualCardioSpecs, buildAnnualCardioCycles, annualCardioText.
+ * cardioGoalForAnnualPhase, annualCardioSpecs, buildAnnualCardioCycles, annualCardioText,
+ * annualCardioWeekMinutes, maxAnnualCardioMinutes (кардио-слой heatmap).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -8,6 +9,8 @@ import {
   annualCardioSpecs,
   buildAnnualCardioCycles,
   annualCardioText,
+  annualCardioWeekMinutes,
+  maxAnnualCardioMinutes,
 } from '../annual-training-cardio.engine';
 import { annualPlanFromMacro } from '../block-builders.engine';
 import type { BBMacrocycle } from '../../lms/macrocycle.engine';
@@ -161,5 +164,40 @@ describe('annualCardioText — сводка кардио-слоя', () => {
     expect(lines.some(l => /Нед 13-18 .*: bb_prep, \d+ мин\/нед, taper 3 нед \+ пик\./.test(l))).toBe(true);
     expect(lines.some(l => /Нед 1-8 .*: maintenance, \d+ мин\/нед\./.test(l))).toBe(true);
     expect(lines.some(l => /Нед 19-20 .*: recovery/.test(l))).toBe(true);
+  });
+});
+
+describe('annualCardioWeekMinutes / maxAnnualCardioMinutes — кардио-слой heatmap', () => {
+  it('минуты недели года = неделе кардио-цикла блока; вне блока/без цикла — 0', () => {
+    const plan = annualPlanFromMacro(makeBBMacro());
+    const out = buildAnnualCardioCycles(plan, { referenceIso: '2026-01-01', bodyWeight: 80 });
+    const hyperKey = out.specs.find(s => s.phase === 'hypertrophy')!.blockKey;
+    const prepKey = out.specs.find(s => s.phase === 'contest_prep')!.blockKey;
+    const cycles = { [hyperKey]: out.cycles[hyperKey], [prepKey]: out.cycles[prepKey] };
+    // Неделя 1 (гипертрофия) → первая неделя кардио-цикла гипертрофии.
+    expect(annualCardioWeekMinutes(plan, cycles, 1)).toBe(out.cycles[hyperKey].weeks[0].totalMinutes);
+    // Неделя 15 → 3-я неделя prep-цикла (13+3−1).
+    expect(annualCardioWeekMinutes(plan, cycles, 15)).toBe(out.cycles[prepKey].weeks[2].totalMinutes);
+    // Вне блоков (макро 20 нед, последняя неделя перехода) и без плана.
+    expect(annualCardioWeekMinutes(plan, cycles, 3)).toBe(out.cycles[hyperKey].weeks[2].totalMinutes);
+    expect(annualCardioWeekMinutes(plan, {}, 3)).toBe(0);
+    expect(annualCardioWeekMinutes(null, cycles, 3)).toBe(0);
+    // Неделя без собранного цикла (strength не в cycles) — 0.
+    expect(annualCardioWeekMinutes(plan, cycles, 10)).toBe(0);
+  });
+
+  it('масштаб: max = максимальные минуты среди недель года', () => {
+    const plan = annualPlanFromMacro(makeBBMacro());
+    const out = buildAnnualCardioCycles(plan, { referenceIso: '2026-01-01', bodyWeight: 80 });
+    const hyperKey = out.specs.find(s => s.phase === 'hypertrophy')!.blockKey;
+    const prepKey = out.specs.find(s => s.phase === 'contest_prep')!.blockKey;
+    const cycles = { [hyperKey]: out.cycles[hyperKey], [prepKey]: out.cycles[prepKey] };
+    const max = maxAnnualCardioMinutes(plan, cycles);
+    const weeks: number[] = [];
+    for (let w = 1; w <= plan.totalWeeks; w++) weeks.push(annualCardioWeekMinutes(plan, cycles, w));
+    expect(max).toBe(Math.max(...weeks, 0));
+    expect(max).toBeGreaterThan(0);
+    expect(maxAnnualCardioMinutes(null, cycles)).toBe(0);
+    expect(maxAnnualCardioMinutes(plan, {})).toBe(0);
   });
 });

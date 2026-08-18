@@ -200,3 +200,41 @@ export function annualCardioText(specs: AnnualCardioSpec[], cycles: Record<strin
     return `Нед ${s.startWeek}-${s.startWeek + s.weeks - 1} [${s.description}]: ${s.goal}, ${minutes}${taper}.`;
   });
 }
+
+/**
+ * Кардио-минуты недели года (кардио-слой heatmap макроцикла).
+ * cycles — карта blockKey → CardioCycle (из he_annual_cardio_cycles).
+ * Неделя w года: если блок имеет собранный кардио-цикл, возвращается totalMinutes
+ * недели цикла, соответствующей позиции недели внутри блока; иначе 0.
+ */
+export function annualCardioWeekMinutes(
+  plan: AnnualTrainingPlan | null | undefined,
+  cycles: Record<string, CardioCycle>,
+  week: number,
+): number {
+  if (!plan) return 0;
+  const block = plan.blocks.find(b => {
+    const s = Math.max(1, Math.round(b.ref.startWeek || 1));
+    const len = Math.max(1, Math.round(b.ref.weeks || 1));
+    return week >= s && week < s + len;
+  });
+  if (!block) return 0;
+  const cycle = cycles[block.ref.blockKey];
+  if (!cycle || !cycle.weeks.length) return 0;
+  const k = week - Math.max(1, Math.round(block.ref.startWeek || 1)) + 1;
+  const cw = cycle.weeks.find(x => x.week === clamp(k, 1, cycle.totalWeeks));
+  return cw ? cw.totalMinutes : 0;
+}
+
+/** Максимум кардио-минут по неделям года (масштаб для heatmap). */
+export function maxAnnualCardioMinutes(
+  plan: AnnualTrainingPlan | null | undefined,
+  cycles: Record<string, CardioCycle>,
+): number {
+  if (!plan) return 0;
+  let m = 0;
+  for (let w = 1; w <= Math.max(1, plan.totalWeeks); w++) {
+    m = Math.max(m, annualCardioWeekMinutes(plan, cycles, w));
+  }
+  return m;
+}

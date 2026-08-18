@@ -38,7 +38,7 @@ import {
   importProgramIntoAnnualBlock, weekForDate,
 } from '../../../engines/annual-training/block-builders.engine';
 import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-training-print';
-import { annualCardioSpecs, annualCardioText } from '../../../engines/annual-training/annual-training-cardio.engine';
+import { annualCardioSpecs, annualCardioText, annualCardioWeekMinutes } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
   saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario, restoreAnnualScenario,
   compareAnnualScenarios, annualPlanStorageBytes, loadAnnualCardioCycles, type AnnualScenario,
@@ -2629,19 +2629,63 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     })}
                   </div>
                 )}
-                {/* 🗺 Heatmap фаз по неделям (интенсивность) */}
-                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 2 }} className="macro-week-heatmap">
-                  {Array.from({ length: total }, (_, i) => {
-                    const w = i + 1;
-                    const block = blocks.find(b => w >= b.weekOffset && w < b.weekOffset + b.weeks);
-                    const active = w === currentWeekIdx;
-                    return (
-                      <div key={w} className="macro-week-cell" aria-label={`Нед ${w}: ${block?.label ?? '—'}`}
-                        title={`Нед ${w}: ${block?.label ?? '—'}${block ? ` · ${block.weeks}н` : ''}`}
-                        style={{ width: 8, height: 8, borderRadius: 2, background: block?.color ?? 'rgba(255,255,255,0.05)', outline: active ? '1.5px solid #fff' : 'none' }} />
-                    );
-                  })}
-                </div>
+                {/* 🗺 Heatmap фаз по неделям (интенсивность) + ❤️ кардио-слой */}
+                {(() => {
+                  // Кардио-слой heatmap: минуты недели из годовых кардио-циклов (he_annual_cardio_cycles),
+                  // fallback — одиночный цикл, привязанный к макро (macro.cardioCycleId).
+                  const cardioByBlock: Record<string, ReturnType<typeof loadCardioCycles>[number]> = {};
+                  if (annualPlan) {
+                    const amap = loadAnnualCardioCycles();
+                    const lib = loadCardioCycles();
+                    for (const s of annualCardioSpecs(annualPlan)) {
+                      const cid = amap[s.blockKey];
+                      const c = cid ? lib.find(x => x.id === cid) : undefined;
+                      if (c) cardioByBlock[s.blockKey] = c;
+                    }
+                  }
+                  const singleCardio = !annualPlan && (src as { cardioCycleId?: string }).cardioCycleId
+                    ? loadCardioCycles().find(c => c.id === (src as { cardioCycleId?: string }).cardioCycleId)
+                    : undefined;
+                  const cardioMin = (w: number): number => {
+                    if (annualPlan && Object.keys(cardioByBlock).length > 0) {
+                      return annualCardioWeekMinutes(annualPlan, cardioByBlock, w);
+                    }
+                    if (singleCardio) {
+                      const cw = singleCardio.weeks.find(x => x.week === Math.min(singleCardio.totalWeeks, Math.max(1, w)));
+                      return cw ? cw.totalMinutes : 0;
+                    }
+                    return 0;
+                  };
+                  let cardioMax = 0;
+                  for (let w = 1; w <= total; w++) cardioMax = Math.max(cardioMax, cardioMin(w));
+                  const hasCardio = cardioMax > 0;
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }} className="macro-week-heatmap">
+                        {Array.from({ length: total }, (_, i) => {
+                          const w = i + 1;
+                          const block = blocks.find(b => w >= b.weekOffset && w < b.weekOffset + b.weeks);
+                          const active = w === currentWeekIdx;
+                          const cmin = cardioMin(w);
+                          return (
+                            <div key={w} className="macro-week-cell" aria-label={`Нед ${w}: ${block?.label ?? '—'}${cmin > 0 ? ` · ❤️ кардио ${cmin} мин` : ''}`}
+                              title={`Нед ${w}: ${block?.label ?? '—'}${block ? ` · ${block.weeks}н` : ''}${cmin > 0 ? ` · ❤️ кардио ${cmin} мин` : ''}`}
+                              style={{ position: 'relative', width: 8, height: 8, borderRadius: 2, background: block?.color ?? 'rgba(255,255,255,0.05)', outline: active ? '1.5px solid #fff' : 'none', overflow: 'hidden' }}>
+                              {hasCardio && cmin > 0 && (
+                                <div style={{ position: 'absolute', left: 0, bottom: 0, height: 3, width: `${Math.max(25, Math.round((cmin / cardioMax) * 100))}%`, background: '#f97316', borderRadius: 1 }} />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {hasCardio && (
+                        <div style={{ fontSize: 9, color: 'rgba(249,115,22,0.85)', marginTop: 3, fontWeight: 600 }}>
+                          ▮ Кардио-слой: минуты/нед (макс {cardioMax} мин{annualPlan ? ' · по блокам года' : ' · цикл макро'})
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {/* ⚡ ACWR из дневника (sRPE) + сессии */}
                 {(() => {
                   const d = diaryMacroStats();
