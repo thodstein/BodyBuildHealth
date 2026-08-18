@@ -7,12 +7,16 @@ const MAX_PAGE_PIXELS = 4_000_000;
 
 async function recognizePdf(buffer: Buffer): Promise<string> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  // Vercel's function bundler does not automatically include PDF.js' worker.
+  // Disable worker mode explicitly and provide the flag before getDocument.
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = '';
   const { createWorker } = await import('tesseract.js');
   const pdf = await pdfjs.getDocument({
     data: new Uint8Array(buffer),
     disableWorker: true,
     useWorkerFetch: false,
     isEvalSupported: false,
+    useWorker: false,
   } as any).promise;
   if (pdf.numPages > MAX_PAGES) throw new Error(`PDF содержит ${pdf.numPages} страниц, максимум ${MAX_PAGES}`);
 
