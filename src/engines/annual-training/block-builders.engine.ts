@@ -487,13 +487,16 @@ function buildPLBlock(
 
 type PLBlockPhase = MacroBlock['phase'];
 
-/** Подобрать СРЦ-цикл под длину блока, не ломая явно выбранный пользователем цикл. */
+/** Подобрать СРЦ-цикл под длину блока, не ломая явно выбранный пользователем цикл.
+ *  direction (P2-10, Aug 18 2026): направление цикла для подбора — 'strength' (ПЛ-цель,
+ *  по умолчанию) или 'bodybuilding'/'general' (без ограничения направления). */
 export function selectPLCycleForBlock(
   requestedCycleId: string | undefined,
   phase: PLBlockPhase,
   weeks: number,
   level?: string,
   allowAutoReplace = true,
+  direction: 'strength' | 'bodybuilding' | 'general' = 'strength',
 ): { cycleId?: string; warning?: string } {
   const requested = requestedCycleId ? getCycleById(requestedCycleId) : undefined;
   if (requested && (!allowAutoReplace || requested.meta.weeks >= weeks)) return { cycleId: requested.meta.id };
@@ -504,7 +507,11 @@ export function selectPLCycleForBlock(
     competition: ['peak', 'strength'],
     transition: ['mixed', 'endurance'],
   };
-  const candidates = LMS_CYCLES.filter(cycle => normalizeCycleDirection(cycle.meta.direction) === 'strength');
+  const candidates = LMS_CYCLES.filter(cycle => {
+    const nd = normalizeCycleDirection(cycle.meta.direction);
+    if (direction === 'general') return true;
+    return direction === 'strength' ? nd === 'strength' : nd !== 'strength';
+  });
   const ranked = candidates
     .map(cycle => {
       const levelPenalty = level && cycle.meta.level === level ? 0 : 1;
@@ -591,8 +598,15 @@ function buildBBBlock(
   weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'BB', peakApplied);
   let taperApplied = false;
   if (state.config.taper?.enabled) {
-    weeks = applyBlockTaperToWeeks(weeks, state.config.taper.weeks ?? 2);
-    taperApplied = true;
+    // P1-2 (Aug 18 2026): пик-неделя bb-contest-prep уже содержит СВОЮ taper-кривую
+    // (объём/интенсивность/вода/натрий). Накладывать поверх generic-taper (×0.45/RIR+2)
+    // — двойная резка финальной недели (63→31 сетов). Пик «поглощает» общий тапер.
+    if (peakApplied) {
+      warnings.push('Пик-неделя включает свой taper-протокол — общий «📉 Taper внутри блока» не применён (двойная резка объёма была бы ошибкой).');
+    } else {
+      weeks = applyBlockTaperToWeeks(weeks, state.config.taper.weeks ?? 2);
+      taperApplied = true;
+    }
   }
   return {
     blockKey: state.ref.blockKey,
@@ -763,14 +777,21 @@ export function activeBlockForWeek(plan: AnnualTrainingPlan, week: number): Annu
 }
 
 /** Неделя года (1-индекс) для ISO-даты: неделя 1 = reference (по умолчанию сегодня).
- *  Будущее: нед 1 = сегодня; прошлое: нед 2 = 7-13 дней назад и т.д. */
-export function annualWeekForDate(isoDate: string, reference?: Date | string): number | null {
+ *  Будущее: нед 1 = сегодня; прошлое: нед 2 = 7-13 дней назад и т.д.
+ *  Единая каноническая реализация (P2-1, Aug 18 2026) — UI реэкспортирует её
+ *  как macroWeekForDate вместо дублирующей копии. */
+export function weekForDate(isoDate: string, reference?: Date | string): number | null {
   const d = new Date(isoDate).getTime();
   const ref = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
   if (!Number.isFinite(d) || !Number.isFinite(ref)) return null;
   const diffDays = (d - ref) / 86400000;
   const week = diffDays >= 0 ? Math.floor(diffDays / 7) + 1 : 1 + Math.floor(-diffDays / 7);
   return Math.max(1, week);
+}
+
+/** Обратно-совместимый алиас (используется annualPlanPhaseForDate и тестами). */
+export function annualWeekForDate(isoDate: string, reference?: Date | string): number | null {
+  return weekForDate(isoDate, reference);
 }
 
 /** Фаза/блок годового плана на дату (для питания, дневника и других экранов). */
@@ -913,13 +934,21 @@ export function updateAnnualBlockWeeks(
   if (idx < 0) return plan;
   const blocks = [...plan.blocks];
   const block = blocks[idx];
+  // P1-3 (Aug 18 2026): roundtrip с программой ДЛИННЕЕ блока больше не обрезается молча —
+  // явное предупреждение (раньше 12 нед → 8 терялись без следов).
+  let warning: string | undefined;
+  if (weeks.length > block.ref.weeks) {
+    warning = `⚠ Программа длиннее блока (${weeks.length} нед > ${block.ref.weeks}) — сохранены первые ${block.ref.weeks}; расширьте блок в макро (длина блока) и повторите импорт.`;
+  } else if (weeks.length < block.ref.weeks) {
+    warning = `⚠ Программа короче блока (${weeks.length} нед < ${block.ref.weeks}) — оставшиеся недели заполнены повтором шаблона.`;
+  }
   const result: AnnualBlockBuildResult = {
     blockKey,
     kind: block.ref.kind,
     weeks: loopWeeksToLength(weeks, block.ref.weeks),
     program: program ?? block.result?.program ?? null,
     bbPlan: block.result?.bbPlan ?? null,
-    warnings: warnings ?? block.result?.warnings ?? [],
+    warnings: [...(warnings ?? block.result?.warnings ?? []), ...(warning ? [warning] : [])],
     taperApplied: block.result?.taperApplied ?? false,
     peakApplied: block.result?.peakApplied ?? false,
     configHash: configHashOf(block.config, block.ref),
@@ -948,11 +977,37 @@ export function importProgramIntoAnnualBlock(
 /* ─────────────────────────── Композиция года ────────────────────────────── */
 
 /**
+ * Склеить недели ВСЕХ блоков с перенумерацией (1..totalWeeks):
+ * несобранные блоки заполняются СКЕЛЕТОМ фаз (P1-1, Aug 18 2026) — экспорт года
+ * больше не укорачивается молча: meta.weeks всегда совпадает с фактической длиной,
+ * а пропуски помечаются предупреждением (раньше: 20 нед в meta, 8 фактических).
+ */
+function composeAnnualWeeks(plan: AnnualTrainingPlan): { weeks: UserWeek[]; missing: string[] } {
+  const out: UserWeek[] = [];
+  let weekNo = 1;
+  const missing: string[] = [];
+  for (const block of plan.blocks) {
+    const weeks = block.result?.weeks?.length
+      ? block.result.weeks
+      : skeletonWeeks(block.ref.weeks, block.config.daysPerWeek ?? 3);
+    if (!block.result?.weeks?.length) {
+      missing.push(`«${block.ref.description ?? block.ref.phase}» (нед ${block.ref.startWeek}–${block.ref.startWeek + block.ref.weeks - 1})`);
+    }
+    for (const w of weeks) {
+      out.push({ ...w, week: weekNo });
+      weekNo += 1;
+    }
+  }
+  return { weeks: out, missing };
+}
+
+/**
  * Собрать единую UserProgram из собранных блоков:
  *  - только BB/MANUAL → direction 'bb';
  *  - есть PL и не-PL → 'hybrid' (plRef из первого PL-блока + bbWeeks);
  *  - только PL → программа первого PL-блока со сводкой блоков в notes.
- * Несобранные блоки пропускаются с предупреждением в notes.
+ * Несобранные блоки заполняются скелетами фаз (длина года сохраняется),
+ * пропуски перечисляются в warnings/notes.
  */
 export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): UserProgram | null {
   const builtBlocks = plan.blocks.filter(b => b.status === 'built' && b.result);
@@ -960,9 +1015,10 @@ export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): 
   const kinds = builtBlocks.map(b => b.ref.kind);
   const hasPL = kinds.includes('PL');
   const hasNonPL = kinds.some(k => k !== 'PL');
-  const warnings = plan.blocks
-    .filter(b => b.status !== 'built')
-    .map(b => `блок «${b.ref.description ?? b.ref.phase}» не собран`);
+  const nonPLBlocks = plan.blocks.filter(b => b.ref.kind !== 'PL');
+  const { weeks: merged, missing } = composeAnnualWeeks(plan);
+  const { weeks: nonPLMerged, missing: nonPLMissing } = composeAnnualWeeks({ ...plan, blocks: nonPLBlocks });
+  const warnings = missing.map(m => `блок ${m} не собран — недели пустые`);
   const blockSummary = builtBlocks.map(b =>
     `нед ${b.ref.startWeek}-${b.ref.startWeek + b.ref.weeks - 1}: ${b.ref.phase} (${b.ref.kind})`).join('; ');
 
@@ -971,7 +1027,6 @@ export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): 
     prog.meta.title = title ?? `Годовой план (${plan.totalWeeks} нед)`;
     prog.meta.weeks = plan.totalWeeks;
     prog.meta.daysPerWeek = Math.max(1, ...builtBlocks.map(b => b.result?.weeks?.[0]?.sessions?.length ?? 3));
-    const merged = mergeBlockWeeks(plan);
     if (prog.bb) prog.bb.weeks = merged;
     prog.meta.notes = [blockSummary, ...(warnings.length ? ['⚠ ' + warnings.join('; ')] : [])].join('\n');
     return prog;
@@ -994,21 +1049,24 @@ export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): 
   prog.meta.title = title ?? `Годовой план (гибрид, ${plan.totalWeeks} нед)`;
   prog.meta.weeks = plan.totalWeeks;
   prog.meta.daysPerWeek = Math.max(1, ...builtBlocks.map(b => b.result?.weeks?.[0]?.sessions?.length ?? 3));
-  prog.meta.notes = notesLine;
+  // Несобранные не-PL блоки заполняются скелетами (длина bb-части = сумма недель не-PL блоков).
+  const nonPLNotes = nonPLMissing.map(m => `блок ${m} не собран — недели пустые`);
+  prog.meta.notes = [blockSummary, ...([...warnings, ...nonPLNotes].length ? ['⚠ ' + [...warnings, ...nonPLNotes].join('; ')] : [])].join('\n');
   if (prog.hybrid) {
     const plProg = plBlock.result?.program;
     prog.hybrid.plRef = {
       sourceCycleId: plProg?.pl?.sourceCycleId ?? '',
       sessionIndices: (plProg?.pl?.schedule ?? []).map(s => s.sessionIdx),
     };
-    prog.hybrid.bbWeeks = mergeBlockWeeks({ ...plan, blocks: plan.blocks.filter(b => b.ref.kind !== 'PL') });
+    prog.hybrid.bbWeeks = nonPLMerged;
     prog.hybrid.workMax = plProg?.pl?.workMax;
-    prog.hybrid.notes = notesLine;
+    prog.hybrid.notes = prog.meta.notes;
   }
   return prog;
 }
 
-/** Склеить недели собранных блоков с перенумерацией (1..totalWeeks). */
+/** Склеить недели собранных блоков с перенумерацией (1..totalWeeks).
+ *  Несобранные блоки пропускаются (для композиции используйте composeAnnualProgram). */
 export function mergeBlockWeeks(plan: AnnualTrainingPlan): UserWeek[] {
   const out: UserWeek[] = [];
   let weekNo = 1;

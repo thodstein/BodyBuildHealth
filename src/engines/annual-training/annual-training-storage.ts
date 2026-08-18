@@ -20,11 +20,15 @@ export function isAnnualTrainingPlanShape(value: unknown): value is AnnualTraini
   if (typeof o.id !== 'string') return false;
   if (typeof o.totalWeeks !== 'number' || !Number.isInteger(o.totalWeeks) || o.totalWeeks < 1) return false;
   if (!Array.isArray(o.blocks)) return false;
+  const seenKeys = new Set<string>();
   return o.blocks.every(b => {
     if (!b || typeof b !== 'object') return false;
     const r = (b as any).ref;
     if (!r || typeof r !== 'object') return false;
-    if (typeof r.blockKey !== 'string') return false;
+    if (typeof r.blockKey !== 'string' || r.blockKey.length === 0) return false;
+    if (seenKeys.has(r.blockKey)) return false;
+    seenKeys.add(r.blockKey);
+    if (!['PL', 'BB', 'MANUAL'].includes(r.kind)) return false;
     if (typeof r.startWeek !== 'number' || !Number.isInteger(r.startWeek) || r.startWeek < 1) return false;
     if (typeof r.weeks !== 'number' || !Number.isInteger(r.weeks) || r.weeks < 1) return false;
     return ['unbuilt', 'built', 'stale', 'error'].includes((b as any).status);
@@ -39,13 +43,50 @@ export function canonicalJson(value: unknown): string {
   return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}';
 }
 
-/** Сохранить годовой план. Возвращает сохранённый объект. */
+/**
+ * Компактная форма плана для хранения (P0-1, Aug 18 2026):
+ *  - `result.bbPlan` (BBPlan-снапшот) НЕ хранится — это самый тяжёлый кусок
+ *    (до ~1.1 МБ на 20-нед блок); при «🚀 В ББ-авто» после перезагрузки блок
+ *    пересобирается (движок детерминирован);
+ *  - `result.program` для BB/MANUAL НЕ хранится (воспроизводится из weeks);
+ *    для PL-блоков program маленький и хранится (нужен для «✍ В редактор» и композиции).
+ * Полный год 52 нед после компактизации — ~1.5-2 МБ вместо 6.5 МБ (вмещается в localStorage).
+ */
+export function toStoredPlan(plan: AnnualTrainingPlan): AnnualTrainingPlan {
+  return {
+    ...plan,
+    blocks: plan.blocks.map(b => {
+      if (!b.result || b.ref.kind === 'PL') return b;
+      return {
+        ...b,
+        result: { ...b.result, bbPlan: null, program: null },
+      };
+    }),
+  };
+}
+
+/** Размер JSON-представления плана (для UI-индикатора «сколько занимает в хранилище»). */
+export function annualPlanStorageBytes(plan: AnnualTrainingPlan): number {
+  try { return JSON.stringify(toStoredPlan(plan)).length; } catch { return 0; }
+}
+
+export const ANNUAL_PLAN_QUOTA_KEY = 'he_annual_plan_quota_error';
+
+/** Сохранить годовой план. Возвращает сохранённый объект.
+ *  В storage пишется КОМПАКТНАЯ форма (toStoredPlan); возвращается полный план для памяти.
+ *  При переполнении localStorage — событие he-annual-plan-quota-error (UI показывает флеш),
+ *  план остаётся в памяти. */
 export function saveAnnualTrainingPlan(plan: AnnualTrainingPlan): AnnualTrainingPlan {
   const stored = { ...plan, updatedAt: new Date().toISOString() };
   try {
-    localStorage.setItem(ANNUAL_PLAN_KEY, JSON.stringify(stored));
+    localStorage.setItem(ANNUAL_PLAN_KEY, JSON.stringify(toStoredPlan(stored)));
   } catch {
     /* quota — план остаётся в памяти, событие не шлём (потребители перечитали бы старую версию) */
+    try {
+      window.dispatchEvent(new CustomEvent('he-annual-plan-quota-error', {
+        detail: { planId: stored.id, bytes: annualPlanStorageBytes(stored) },
+      }));
+    } catch { /* ignore */ }
     return stored;
   }
   window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated', {
@@ -150,13 +191,13 @@ function scenarioStorage(): AnnualScenario[] {
   } catch { return []; }
 }
 
-/** Сохранить снимок сборки (кап 6, новые первыми). */
+/** Сохранить снимок сборки (кап 6, новые первыми). Хранится компактная форма. */
 export function saveAnnualScenario(plan: AnnualTrainingPlan, label: string): AnnualScenario[] {
   const list: AnnualScenario[] = [{
     id: 'asc_' + Date.now().toString(36),
     label: label || `Снапшот ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`,
     ts: Date.now(),
-    plan: JSON.parse(JSON.stringify(plan)) as AnnualTrainingPlan,
+    plan: toStoredPlan(JSON.parse(JSON.stringify(plan)) as AnnualTrainingPlan),
   }, ...scenarioStorage()].slice(0, ANNUAL_SCENARIOS_CAP);
   try { localStorage.setItem(ANNUAL_SCENARIOS_KEY, JSON.stringify(list)); } catch { /* quota */ }
   return list;

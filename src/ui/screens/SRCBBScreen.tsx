@@ -504,9 +504,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       if (!ctx) { setMethodNote('⚠ Контекст правки не найден — нажмите «✏️ Редактировать микроцикл» в блоке'); return; }
       // Сохраняем фактическую длительность, выбранную в текущем конструкторе,
       // а не исходное значение блока из he_macro_edit_ctx.
-      const weeks = ctx.isBB
-        ? Math.min(24, Math.max(4, Math.round(bbWeeks)))
-        : Math.max(1, Math.round(cycleWeeks));
+      // P2-8 (Aug 18 2026): единый кламп 1-52 для ПЛ и ББ (раньше ББ 4-24, ПЛ 1-∞ —
+      // нельзя было сохранить короткий блок из ББ-конструктора).
+      const weeks = Math.max(1, Math.min(52, Math.round(ctx.isBB ? bbWeeks : cycleWeeks)));
       const blockIdx = ctx.blockIdx;
       if (ctx.isBB) {
         const raw = localStorage.getItem('he_bb_macro');

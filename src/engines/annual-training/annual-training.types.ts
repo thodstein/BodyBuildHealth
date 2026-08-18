@@ -11,7 +11,7 @@
  * кэшируется в AnnualBlockState. Изменение макро-разметки помечает блок 'stale',
  * но НЕ перезаписывает собранный результат — пользователь решает, пересобирать ли.
  */
-import type { UserWeek, UserProgram, Phase } from '../user-program/user-program.types';
+import type { UserWeek, UserProgram } from '../user-program/user-program.types';
 
 /** Тип конструктора блока годового плана. */
 export type AnnualBlockKind = 'PL' | 'BB' | 'MANUAL';
@@ -168,9 +168,4 @@ export interface AnnualBuildOutcome {
   skipped: number;
   failed: number;
   errors: { blockKey: string; message: string }[];
-}
-
-/** Каноническая фаза недели для блока (phase-bridge). */
-export function phaseOfBlockKind(phase: string, kind: AnnualBlockKind, mapper: (p: string) => Phase | undefined): Phase {
-  return mapper(phase) ?? 'accumulation';
 }

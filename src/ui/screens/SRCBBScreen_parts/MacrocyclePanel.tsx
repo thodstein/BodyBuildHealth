@@ -24,7 +24,7 @@ import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, buildBBContestPrep, normalizeContestCategory, isoToday, isoAddDays, PHASE_LABELS_RU, PEAK_PHASE_COLORS, CONTEST_SPECIALIZATION_LABELS, deserializeBBPrepConfig, type BBContestPrepConfig, type BBContestPrepResult } from '../../../engines/bb/bb-contest-prep.engine';
 import { autodraftBBPlan } from '../../../engines/manual-constructor/manual-draft.engine';
-import { createFromBuild } from '../../../engines/user-program/program-store';
+import { createBlank, createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
@@ -35,15 +35,18 @@ import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
   validateAnnualPlan, activeBlockForWeek, recommendKindForPhase, cloneBlockConfigFrom,
-  importProgramIntoAnnualBlock,
+  importProgramIntoAnnualBlock, weekForDate,
 } from '../../../engines/annual-training/block-builders.engine';
 import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-training-print';
 import {
   saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario, restoreAnnualScenario,
-  compareAnnualScenarios, type AnnualScenario,
+  compareAnnualScenarios, annualPlanStorageBytes, type AnnualScenario,
 } from '../../../engines/annual-training/annual-training-storage';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
+
+/** Единый канон недели для даты (P2-1): движок block-builders.engine, не дублируем. */
+export const macroWeekForDate = weekForDate;
 
 /** Кардио-фазы (кардио-слой в «Итог года»). */
 const CARDIO_PHASE_LABEL_RU: Record<string, string> = {
@@ -166,19 +169,6 @@ export const ACWR_ZONE_LABEL: Record<ACWRZone, string> = {
   caution: 'осторожно (1.3–1.5)',
   dangerous: 'опасно (>1.5)',
 };
-
-/** Неделя макро для даты (неделя 1 = reference, по умолчанию сегодня). */
-export function macroWeekForDate(isoDate: string, reference?: Date | string): number | null {
-  const d = new Date(isoDate).getTime();
-  const ref = reference == null ? Date.now() : (reference instanceof Date ? reference.getTime() : new Date(reference).getTime());
-  if (!Number.isFinite(d) || !Number.isFinite(ref)) return null;
-  const diffDays = (d - ref) / 86400000;
-  // Будущее: нед 1 = сегодня; прошлое: нед 2 = 7-13 дней назад и т.д.
-  const week = diffDays >= 0
-    ? Math.floor(diffDays / 7) + 1
-    : 1 + Math.floor(-diffDays / 7);
-  return Math.max(1, week);
-}
 
 export interface PrepCheckInStats {
   last: { date: string; weight: number } | null;
@@ -348,12 +338,23 @@ function escapeIcs(value: string): string {
 /** Дата в формате ICS: YYYYMMDD (без часового пояса). */
 function icsDate(d: Date | null): string {
   if (!d || !Number.isFinite(d.getTime())) return '';
-  return d.toISOString().slice(0, 10).replace(/-/g, '');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+/** Дата + 1 день (ICS DTEND — эксклюзивна: событие «неделя» должно заканчиваться утром следующей недели). */
+function icsDatePlusOne(d: Date | null): string {
+  if (!d || !Number.isFinite(d.getTime())) return '';
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+  return icsDate(next);
 }
 
 /**
  * Экспорт макроцикла в календарь (.ics): блоки фаз (диапазоны дат от «сегодня»)
  * и соревнования (дата или воскресенье недели).
+ * P2-4 (Aug 18 2026): DTEND = начало + 1 день (стандарт ICS: конец — эксклюзивный).
  */
 export function buildMacroIcs(src: Macrocycle | BBMacrocycle, reference?: Date | string): string {
   const lines: string[] = [
@@ -367,7 +368,7 @@ export function buildMacroIcs(src: Macrocycle | BBMacrocycle, reference?: Date |
       ? (PHASE_LABEL_RU[b.phase as MacroPhase] ?? b.phase)
       : (BB_PHASE_LABEL_RU[b.phase as BBMacroPhase] ?? b.phase);
     const ds = icsDate(macroWeekStartDate(b.weekOffset, reference));
-    const de = icsDate(macroWeekEndDate(b.weekOffset + b.weeks - 1, reference));
+    const de = icsDatePlusOne(macroWeekEndDate(b.weekOffset + b.weeks - 1, reference));
     if (!ds || !de) continue;
     lines.push(
       'BEGIN:VEVENT',
@@ -384,13 +385,20 @@ export function buildMacroIcs(src: Macrocycle | BBMacrocycle, reference?: Date |
       'BEGIN:VEVENT',
       `SUMMARY:🏁 ${escapeIcs(c.name)} [${c.priority}]`,
       `DTSTART;VALUE=DATE:${dd}`,
-      `DTEND;VALUE=DATE:${dd}`,
+      `DTEND;VALUE=DATE:${addIcsDay(dd)}`,
       `DESCRIPTION:${escapeIcs(`Неделя ${c.week} макроцикла`)}`,
       'END:VEVENT',
     );
   }
   lines.push('END:VCALENDAR');
   return lines.join('\r\n');
+}
+
+/** YYYYMMDD + 1 день (для однодневного события ICS). */
+function addIcsDay(yyyymmdd: string): string {
+  if (!/^\d{8}$/.test(yyyymmdd)) return yyyymmdd;
+  const d = new Date(Number(yyyymmdd.slice(0, 4)), Number(yyyymmdd.slice(4, 6)) - 1, Number(yyyymmdd.slice(6, 8)) + 1);
+  return icsDate(d);
 }
 
 /** HTML-страница для печати макроцикла (фазы, циклы, соревнования, итог года). */
@@ -463,7 +471,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const isBB = effGoal === 'bodybuilding';
   // MC-4: use storageKey prop for isolation (default to STORAGE_KEY/BB_STORAGE_KEY)
   const plKey = storageKey ?? STORAGE_KEY;
-  const bbKey = isBB ? (storageKey ?? BB_STORAGE_KEY) : BB_STORAGE_KEY;
+  // P2-3 (Aug 18 2026): bbKey больше не зависит от isBB — в изолированном контексте
+  // (storageKey='he_bb_macro') оба направления читают СВОЙ ключ, а не глобальный.
+  const bbKey = storageKey ?? BB_STORAGE_KEY;
   const [macro, setMacro] = useState<Macrocycle | null>(() => {
     try {
       const raw = localStorage.getItem(plKey);
@@ -865,8 +875,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       const fresh = loadAnnualTrainingPlan();
       if (fresh) setAnnualPlan(fresh);
     };
+    // P0-1: quota при сохранении (план слишком большой) — явный флеш вместо тихой потери.
+    const onQuota = (e: Event) => {
+      const bytes = (e as CustomEvent<{ bytes?: number }>).detail?.bytes ?? 0;
+      const mb = (bytes / 1024 / 1024).toFixed(1);
+      setAnnualStatusNote(`⚠ План не сохранён — превышен лимит хранилища (~5 МБ, сейчас ${mb} МБ). Уменьшите год или соберите блоки по отдельности.`);
+    };
     window.addEventListener('he-annual-training-plan-updated', onUpdated);
-    return () => window.removeEventListener('he-annual-training-plan-updated', onUpdated);
+    window.addEventListener('he-annual-plan-quota-error', onQuota);
+    return () => {
+      window.removeEventListener('he-annual-training-plan-updated', onUpdated);
+      window.removeEventListener('he-annual-plan-quota-error', onQuota);
+    };
   }, []);
 
   /** Пик-неделя по умолчанию для BB-блока: профиль (вес/пол/категория) +
@@ -1023,14 +1043,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
           return;
         }
         const block = plan.blocks[selectedBlockIdx];
-        if (block.status !== 'built' || !block.result?.program) {
+        if (block.status !== 'built' || !block.result) {
           setAnnualStatusNote('⚠ Блок не собран — сначала «⚙️ Собрать блок»');
           return;
+        }
+        // P0-1: после перезагрузки result.program для BB/MANUAL отсутствует (компактное
+        // хранение) — восстанавливаем UserProgram из недель блока.
+        let program = block.result.program;
+        if (!program) {
+          const prog = createBlank(block.ref.kind === 'PL' ? 'pl' : 'bb');
+          prog.meta.title = `Блок: ${block.ref.description ?? block.ref.phase} (${block.ref.weeks} нед)`;
+          prog.meta.weeks = block.ref.weeks;
+          if (block.ref.kind === 'PL' && prog.pl) prog.pl.schedule = [];
+          if (block.ref.kind !== 'PL' && prog.bb) prog.bb.weeks = block.result.weeks;
+          program = prog;
         }
         applyToPlanner({
           kind: 'annual_block',
           label: `Блок года: ${block.ref.description ?? block.ref.phase} (${block.ref.kind})`,
-          data: { blockKey: block.ref.blockKey, program: block.result.program },
+          data: { blockKey: block.ref.blockKey, program },
         });
         setAnnualStatusNote('✍ Блок открыт в ручном конструкторе — сохраните программу, изменения вернутся в блок');
         return;
@@ -1044,7 +1075,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         const prog = composeAnnualProgram(plan);
         if (!prog) { setAnnualStatusNote('⚠ Не удалось собрать программу года'); return; }
         applyToPlanner({ kind: 'program', label: prog.meta.title, data: { program: prog } });
-        setAnnualStatusNote(`✅ «${prog.meta.title}» передана в ручной конструктор — подтвердите в баннере «Калькулятор рекомендует»`);
+        // P1-1: несобранные блоки заполнены пустыми неделями — честно сообщаем.
+        const missing = plan.blocks.filter(b => b.status !== 'built')
+          .map(b => `«${b.ref.description ?? b.ref.phase}» (нед ${b.ref.startWeek}–${b.ref.startWeek + b.ref.weeks - 1})`);
+        const note = missing.length
+          ? `✅ «${prog.meta.title}» передана в ручной конструктор · ⚠ блоки ${missing.join(', ')} не собраны — их недели пустые`
+          : `✅ «${prog.meta.title}» передана в ручной конструктор — подтвердите в баннере «Калькулятор рекомендует»`;
+        setAnnualStatusNote(note);
         return;
       }
       let plan = withDefaultPeakConfigs(loadAnnualTrainingPlan() ?? annualPlanFromMacro(src));
@@ -2105,6 +2142,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     const errs = annualPlan.blocks.filter(b => b.status === 'error').length;
                     return `Блоки: ${annualPlan.blocks.length} · ✅ ${built}${stale ? ` · ⚠ устарело ${stale}` : ''}${errs ? ` · ❌ ошибок ${errs}` : ''} · статус: ${annualPlan.status}`;
                   })()}
+                  {(() => {
+                    // P0-1: размер плана в хранилище (компактная форма) — предупреждение до переполнения.
+                    const bytes = annualPlanStorageBytes(annualPlan);
+                    const mb = bytes / 1024 / 1024;
+                    const danger = mb > 4;
+                    return (
+                      <div style={{ marginTop: 4, fontSize: 9, fontWeight: 700, color: danger ? '#f87171' : 'rgba(255,255,255,0.4)' }}
+                        title="Компактная форма: без снапшотов BBPlan/program BB-блоков (восстанавливаются при передаче)">
+                        🗄 План: {(mb * 1024).toFixed(0)} КБ (лимит ~5 МБ){danger ? ' — близко к лимиту, соберите блоки по отдельности' : ''}
+                      </div>
+                    );
+                  })()}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, marginTop: 6 }}>
                   {annualPlan.blocks.map((b, i) => {
                     const statusIcon = b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
@@ -2281,10 +2330,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           📉 Taper внутри блока{taperCfg?.enabled ? ` (${taperCfg.weeks ?? 2} нед) ✓` : ''}
                         </button>
                         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {b.ref.kind === 'BB' && b.status === 'built' && Boolean(b.result?.bbPlan) && (
+                          {b.ref.kind === 'BB' && b.status === 'built' && Boolean(b.result) && (
                             <button type="button" onClick={() => {
                               try {
-                                localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: b.result!.bbPlan, date: new Date().toISOString() }));
+                                // P0-1: после перезагрузки bbPlan не хранится (компактное хранение) —
+                                // пересобираем блок (движок детерминирован) и берём свежий снапшот.
+                                let bbPlan = b.result?.bbPlan ?? null;
+                                if (!bbPlan) {
+                                  const src = currentMacroSource();
+                                  const planForRebuild = loadAnnualTrainingPlan() ?? annualPlanFromMacro(src!);
+                                  const rebuilt = src
+                                    ? buildAnnualBlock(planForRebuild.blocks.find(x => x.ref.blockKey === b.ref.blockKey) ?? planForRebuild.blocks[0], planForRebuild, src, { daysPerWeek: 4, level: effLevel })
+                                    : null;
+                                  bbPlan = rebuilt?.result?.bbPlan ?? null;
+                                  if (rebuilt?.status !== 'built' || !bbPlan) {
+                                    setAnnualStatusNote('⚠ Не удалось пересобрать блок для передачи — «⚙️ Собрать блок» и повторите');
+                                    return;
+                                  }
+                                }
+                                localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: bbPlan, date: new Date().toISOString() }));
                                 // Контекст передачи блока: ББ-авто предзаполняет шаг «🏁 Contest prep».
                                 localStorage.setItem('he_bb_plan_saved_ctx', JSON.stringify({
                                   blockKey: b.ref.blockKey,
