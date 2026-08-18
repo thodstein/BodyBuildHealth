@@ -14,6 +14,21 @@ async function recognizePdf(buffer: Buffer): Promise<string> {
   // function instead of relying on the browser public asset.
   const workerPath = join(dirname(fileURLToPath(import.meta.url)), '../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
   (pdfjs as any).GlobalWorkerOptions.workerSrc = workerPath;
+  const quick = await (pdfjs as any).getDocument({ data: new Uint8Array(buffer), disableWorker: true, useWorker: false } as any).promise;
+  try {
+    const text: string[] = [];
+    for (let number = 1; number <= quick.numPages; number++) {
+      const page = await quick.getPage(number);
+      const content = await page.getTextContent();
+      const row = content.items.map((item: any) => item.str || '').join(' ').trim();
+      if (row) text.push(row);
+    }
+    const quickText = text.join('\n');
+    if (quickText.length > 80) return quickText;
+  } finally {
+    await quick.cleanup?.();
+    await (quick as any).destroy?.();
+  }
   const { createWorker } = await import('tesseract.js');
   const pdf = await pdfjs.getDocument({
     data: new Uint8Array(buffer),
