@@ -59,7 +59,7 @@ const api = (): PLPlanViewApi => ({
   best: { cycle: { meta: { id: 'cycle-01', title: 'Тестовый цикл', direction: 'powerlifting', period: 'силовой', level: 'II-KMS', weeks: 8, sessionsPerWeek: 3, correctionPct: 0.005 } }, score: 0, rationale: [], warnings: [] } as never,
   plWeakPoints: [],
   linked: { readiness: { recovery: 80, fatigue: 30, sleep: 70 } } as never,
-  runFocus: null, diaryAutoreg: null, calibratePmFromDiary: () => {},
+  runFocus: null, diaryAutoreg: null, calibratePmFromDiary: () => {}, applyPmFromCycle: () => {},
   e1rmSeries: [], exerciseE1rm: [], exTrendSeries: [], playerDays: [],
   selectedTrendEx: null, setSelectedTrendEx: () => {},
   tempoStr: '', getTempo: () => ({ tempo: '', restSec: 90 } as never), methodHints: { volumeMult: 1, technique: null, label: '' },

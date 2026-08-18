@@ -56,7 +56,7 @@ const api = (): PLPlanViewApi => ({
   best: { cycle: { meta: { id: 'cycle-01', title: 'Тестовый цикл', direction: 'powerlifting', period: 'силовой', level: 'II-KMS', weeks: 8, sessionsPerWeek: 3, correctionPct: 0.005 } }, score: 0, rationale: [], warnings: [] } as never,
   plWeakPoints: [],
   linked: { readiness: { recovery: 80, fatigue: 30, sleep: 70 } } as never,
-  runFocus: null, diaryAutoreg: null, calibratePmFromDiary: () => {},
+  runFocus: null, diaryAutoreg: null, calibratePmFromDiary: () => {}, applyPmFromCycle: () => {},
   e1rmSeries: [], exerciseE1rm: [], exTrendSeries: [], playerDays: [],
   selectedTrendEx: null, setSelectedTrendEx: () => {},
   tempoStr: '', getTempo: () => ({ tempo: '', restSec: 90 } as never), methodHints: { volumeMult: 1, technique: null, label: '' },
@@ -95,11 +95,41 @@ describe('PLPlanView', () => {
     // off: база из pmRow 200 (balanced) → присед 185/192.5/205
     expect(screen.getAllByText('185').length).toBeGreaterThan(0);
     expect(screen.queryByText('166.5')).toBeNull();
+    // «Попытки на соревнования» считаются от ПМ ПО ЦИКЛУ (pmRow финальной недели 200),
+    // а не от «дневниковых» PM0-полей (pmSquat 180 → было бы 157.5/166.5/180)
+    expect(screen.getByText(/рекоменд.: 175\/185\/200/)).toBeTruthy();
+    expect(screen.getByText(/рекоменд.: 122\.5\/130\/140/)).toBeTruthy();
+    expect(screen.queryByText(/рекоменд.: 157\.5\/166\.5\/180/)).toBeNull();
     fireEvent.click(screen.getAllByText('🤖 Авто')[0]);
     // auto ×0.9: 185×0.9 = 166.5 (round 0.1)
     expect(screen.getAllByText('166.5').length).toBeGreaterThan(0);
     expect(screen.queryByText('185')).toBeNull();
     // карточка «Попытки на соревнования» тоже масштабируется и показывает hint множителя
     expect(screen.getByText(/попытки ×0\.90/)).toBeTruthy();
+  });
+
+  it('кнопка «📊 Из цикла» ставит ПМ0 из прогноза цикла (pmRow финальной недели), а не из дневника', () => {
+    const a = api();
+    a.srcWeek = 8;
+    let applied: { squat: number; bench: number; deadlift: number } | null = null;
+    let noted = '';
+    a.applyPmFromCycle = pm => { applied = pm; };
+    a.onNote = n => { noted = n; };
+    render(<PLPlanView api={a} />);
+    // кнопка активна: pmRow финальной недели даёт ПМ 200/140, отличные от PM0-полей 180/120
+    const btn = screen.getByText(/📊 Из цикла/);
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(btn);
+    expect(applied).toEqual({ squat: 200, bench: 140, deadlift: 220 });
+    expect(noted).toContain('📊 ПМ0 установлены из цикла');
+    expect(noted).toContain('присед 200 · жим 140 · тяга 220');
+  });
+
+  it('кнопка «📊 Из цикла» неактивна, когда ПМ по циклу совпадает с PM0-полями', () => {
+    const a = api();
+    a.srcWeek = 8;
+    a.pmSquat = 200; a.pmBench = 140; a.pmDead = 220;
+    render(<PLPlanView api={a} />);
+    expect((screen.getByText(/📊 Из цикла/) as HTMLButtonElement).disabled).toBe(true);
   });
 });

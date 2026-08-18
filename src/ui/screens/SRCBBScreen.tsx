@@ -1083,6 +1083,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     else setPmDead(last);
   };
 
+  const applyPmFromCycle = (pm: { squat: number; bench: number; deadlift: number }) => {
+    if (pm.squat > 0) setPmSquat(pm.squat);
+    if (pm.bench > 0) setPmBench(pm.bench);
+    if (pm.deadlift > 0) setPmDead(pm.deadlift);
+  };
+
   // V7 расширение: тренд 1ПМ по выбранному упражнению во времени
   const exTrendSeries = useMemo(() => {
     if (!selectedTrendEx || !strengthLogs.length) return [] as { date: string; e1: number; w: number; r: number }[];
@@ -1330,7 +1336,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             pmAutoRegMode, setPmAutoRegMode, pmDiary,
             best: ranked[0] as never,
             plWeakPoints,
-            linked, runFocus, diaryAutoreg, calibratePmFromDiary,
+            linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
             tempoStr, getTempo, methodHints,
           }} />

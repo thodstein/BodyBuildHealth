@@ -105,6 +105,8 @@ export interface PLPlanViewApi {
   runFocus: any;
   diaryAutoreg: DiaryAutoregResult | null;
   calibratePmFromDiary: (lift: 'squat' | 'bench' | 'deadlift') => void;
+  /** Установить ПМ0 из прогноза цикла (pmRow финальной/соревновательной недели). */
+  applyPmFromCycle: (pm: { squat: number; bench: number; deadlift: number }) => void;
   e1rmSeries: { label: string; lift: string; color?: string; pts: { val: number }[] }[];
   exerciseE1rm: { name: string; e1: number; w: number; r: number }[];
   exTrendSeries: { e1: number }[];
@@ -126,7 +128,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
     selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
     autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead, best,
     pmAutoRegMode, setPmAutoRegMode, pmDiary,
-    plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary,
+    plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
     e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
     tempoStr, getTempo, methodHints,
   } = api;
@@ -526,6 +528,22 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
                 // Попытки тоже масштабируются множителем режима на лету (паритет с карточкой прикидов).
                 const scale = (w: number) => Math.round(w * arMult * 10) / 10;
+                // База попыток — ПМ ПО ЦИКЛУ: прогноз pmRow финальной (соревновательной)
+                // недели уже учитывает пройденный цикл (прогрессия PM0→пик), а не
+                // «дневниковые» поля pmSquat/pmBench/pmDead (PM0 из профиля/калибровки).
+                const meetWk = W.find(w => w.meetAttempts && w.meetAttempts.lifts.length > 0) ?? W[W.length - 1];
+                const cyclePm = (re: RegExp, fallback: number): number => {
+                  const row = meetWk?.pmRow ?? {};
+                  const key = Object.keys(row).find(k => re.test(k.toLowerCase().replace('ё', 'е')));
+                  const v = key ? row[key] : NaN;
+                  return Number.isFinite(v) && v > 0 ? v : fallback;
+                };
+                const basePm = {
+                  squat: cyclePm(/присед|сквот/, pmSquat),
+                  bench: cyclePm(/жим.*леж|леж.*жим/, pmBench),
+                  deadlift: cyclePm(/станов/, pmDead),
+                };
+                const cyclePmApplied = !!(meetWk?.pmRow && (basePm.squat !== pmSquat || basePm.bench !== pmBench || basePm.deadlift !== pmDead));
                 const arBtn = (m: AutoRegMode, label: string) => {
                   const active = autoRegMode === m;
                   return (
@@ -552,22 +570,31 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     </span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                    {([['Присед', pmSquat], ['Жим', pmBench], ['Становая', pmDead]] as const).map(([name, value]) => {
+                    {([['Присед', basePm.squat], ['Жим', basePm.bench], ['Становая', basePm.deadlift]] as const).map(([name, value]) => {
                       const a = competitionAttempts(value);
                       return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {scale(a.openerRange[0])}–{scale(a.openerRange[1])} кг</div><div>2: {scale(a.secondRange[0])}–{scale(a.secondRange[1])} кг</div><div>3: {scale(a.thirdRange[0])}–{scale(a.thirdRange[1])} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {scale(a.opener)}/{scale(a.second)}/{scale(a.third)}</div></div>;
                     })}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
+<button
                       disabled={!hasDiary}
                       onClick={() => {
-                        calibratePmFromDiary('squat'); calibratePmFromDiary('bench'); calibratePmFromDiary('deadlift');
-                        onNote('📈 ПМ обновлены из дневника — попытки на соревнования пересчитаны автоматически.');
-                      }}
-                      style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: hasDiary ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', color: hasDiary ? '#00e68a' : 'rgba(255,255,255,0.3)', background: hasDiary ? 'rgba(0,230,138,0.08)' : 'transparent' }}
-                      title="Заполнить ПМ из последних 1ПМ дневника тренировок (как в полях ПМ) — попытки пересчитаются"
-                    >📈 Из дневника{diaryApplied ? ` (присед ${diaryVals.squat ?? '—'} · жим ${diaryVals.bench ?? '—'} · тяга ${diaryVals.deadlift ?? '—'})` : ''}</button>
-                    {!hasDiary && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>нет записей в дневнике — попытки от введённых ПМ</span>}
+                          calibratePmFromDiary('squat'); calibratePmFromDiary('bench'); calibratePmFromDiary('deadlift');
+                          onNote('📈 ПМ0 обновлены из дневника — пересоберите план: попытки считаются от ПМ по циклу (прогноз финальной недели).');
+                        }}
+                        style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: hasDiary ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', color: hasDiary ? '#00e68a' : 'rgba(255,255,255,0.3)', background: hasDiary ? 'rgba(0,230,138,0.08)' : 'transparent' }}
+                        title="Заполнить ПМ0 из последних 1ПМ дневника тренировок (как в полях ПМ) — план пересоберите, попытки пересчитаются от прогноза цикла"
+                      >📈 Из дневника{diaryApplied ? ` (присед ${diaryVals.squat ?? '—'} · жим ${diaryVals.bench ?? '—'} · тяга ${diaryVals.deadlift ?? '—'})` : ''}</button>
+                    <button
+                      disabled={!cyclePmApplied}
+                      onClick={() => {
+                          applyPmFromCycle({ squat: basePm.squat, bench: basePm.bench, deadlift: basePm.deadlift });
+                          onNote(`📊 ПМ0 установлены из цикла (прогноз финальной недели): присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift} — пересоберите план.`);
+                        }}
+                        style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: cyclePmApplied ? '1px solid rgba(96,165,250,0.35)' : '1px solid rgba(255,255,255,0.08)', color: cyclePmApplied ? '#60a5fa' : 'rgba(255,255,255,0.3)', background: cyclePmApplied ? 'rgba(96,165,250,0.08)' : 'transparent' }}
+                        title="Установить ПМ0 из прогноза цикла (pmRow финальной недели, уже с учётом пройденного цикла) — пересоберите план"
+                      >📊 Из цикла{cyclePmApplied ? ` (присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift})` : ''}</button>
+                    {!hasDiary && !cyclePmApplied && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>нет записей в дневнике — попытки от ПМ по циклу</span>}
                   </div>
                 </MetricCard>
                 );
