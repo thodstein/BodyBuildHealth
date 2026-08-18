@@ -14,6 +14,7 @@ import {
   _resetKvForTests,
   type KvRow,
   type KvTransport,
+  type IdbAdapter,
 } from '../cloud-kv';
 
 class FakeTransport implements KvTransport {
@@ -394,5 +395,131 @@ describe('расхождение часов устройства и сервер
     const applied = await pullKvNow();
     expect(applied).toBe(0);
     expect(localStorage.getItem('he_weight_log')).toBe('[{"w":80}]');
+  });
+});
+
+describe('синхронизация IndexedDB (анализы/курс/дневник силы)', () => {
+  class FakeIdb implements IdbAdapter {
+    stores = new Map<string, Map<string, any>>();
+    constructor() {
+      for (const s of ['labs_log', 'course_log', 'workout_log', 'training_log']) this.stores.set(s, new Map());
+    }
+    async getAll(store: string) { return [...(this.stores.get(store)?.values() || [])]; }
+    async get(store: string, id: string) { return this.stores.get(store)?.get(String(id)); }
+    async put(store: string, rec: any) { this.stores.get(store)!.set(String(rec.id), rec); }
+    async delete(store: string, id: string) { this.stores.get(store)!.delete(String(id)); }
+    has(store: string, id: string) { return this.stores.get(store)!.has(String(id)); }
+    count(store: string) { return this.stores.get(store)!.size; }
+  }
+
+  function seedIdbCloud(t: FakeTransport, store: string, rec: any, tsMs: number): void {
+    const key = `idb:${store}:${rec.id}`;
+    t.cloud.set(key, [{
+      id: 'tk_test',
+      key,
+      chunk_index: 0,
+      chunk_count: 1,
+      value: JSON.stringify(rec),
+      updated_at: new Date(tsMs).toISOString(),
+    }]);
+  }
+
+  it('новый анализ с телефона доезжает до ПК', async () => {
+    const t = new FakeTransport();
+    const idbA = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    // телефон записал анализ → pull выгружает его в облако
+    idbA.put('labs_log', { id: 'lab1', code: 'HGB', name: 'Гемоглобин', value: 150, unit: 'г/л', date: '2026-08-19' });
+    await pullKvNow();
+    expect(t.cloud.has('idb:labs_log:lab1')).toBe(true);
+    expect(JSON.parse(t.cloud.get('idb:labs_log:lab1')![0].value)).toMatchObject({ code: 'HGB', value: 150 });
+
+    // «ПК»: новое устройство, тот же транспорт, пустой IndexedDB
+    _resetKvForTests();
+    localStorage.clear();
+    const idbB = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbB });
+    expect(idbB.has('labs_log', 'lab1')).toBe(true);
+    expect(await idbB.get('labs_log', 'lab1')).toMatchObject({ code: 'HGB', value: 150 });
+  });
+
+  it('правка анализа на ПК доезжает до телефона (запись на телефоне не менялась)', async () => {
+    const t = new FakeTransport();
+    const idbA = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    idbA.put('labs_log', { id: 'lab1', code: 'HGB', value: 150, date: '2026-08-10' });
+    await pullKvNow();
+    expect(JSON.parse(t.cloud.get('idb:labs_log:lab1')![0].value)).toMatchObject({ value: 150 });
+    const phoneMeta = localStorage.getItem('he_sync_meta_idb_v1');
+
+    // «ПК»: правит запись (v155) и синкается — в облаке обновлённое значение
+    _resetKvForTests();
+    const idbB = new FakeIdb();
+    idbB.put('labs_log', { id: 'lab1', code: 'HGB', value: 155, date: '2026-08-19' });
+    localStorage.setItem('he_sync_meta_idb_v1', phoneMeta || '{}'); // ПК знает состояние облака
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbB });
+    expect(JSON.parse(t.cloud.get('idb:labs_log:lab1')![0].value)).toMatchObject({ value: 155 });
+
+    // «телефон»: возвращаем его мету (запись локально не менялась) → правка ПК применяется
+    _resetKvForTests();
+    localStorage.setItem('he_sync_meta_idb_v1', phoneMeta || '{}');
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    expect(await idbA.get('labs_log', 'lab1')).toMatchObject({ value: 155 });
+  });
+
+  it('локальная правка (ещё не синкалась) побеждает удалённую версию', async () => {
+    const t = new FakeTransport();
+    const idbA = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    idbA.put('labs_log', { id: 'lab1', code: 'HGB', value: 150, date: '2026-08-10' });
+    await pullKvNow();
+    // локальная правка после последней синхронизации
+    idbA.put('labs_log', { id: 'lab1', code: 'HGB', value: 160, date: '2026-08-19' });
+    // в облаке «чужой» вариант правки
+    seedIdbCloud(t, 'labs_log', { id: 'lab1', code: 'HGB', value: 140, date: '2026-08-19' }, Date.now() - 10_000);
+    const applied = await pullKvNow();
+    expect(applied).toBe(0); // удалённая версия НЕ применяется
+    expect(await idbA.get('labs_log', 'lab1')).toMatchObject({ value: 160 });
+    // но локальная правка выгружается в облако
+    expect(JSON.parse(t.cloud.get('idb:labs_log:lab1')![0].value)).toMatchObject({ value: 160 });
+  });
+
+  it('удаление анализа локально → удаляется в облаке', async () => {
+    const t = new FakeTransport();
+    const idbA = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    idbA.put('labs_log', { id: 'lab1', code: 'HGB', value: 150, date: '2026-08-10' });
+    await pullKvNow();
+    expect(t.cloud.has('idb:labs_log:lab1')).toBe(true);
+    idbA.delete('labs_log', 'lab1');
+    await pullKvNow();
+    expect(t.cloud.has('idb:labs_log:lab1')).toBe(false);
+    expect(t.removeCalls).toContain('idb:labs_log:lab1');
+  });
+
+  it('удаление в облаке → применяется локально (если запись не менялась)', async () => {
+    const t = new FakeTransport();
+    const idbA = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    idbA.put('course_log', { id: 'c1', substance: 'test', dose: 250, date: '2026-08-01' });
+    await pullKvNow();
+    expect(idbA.count('course_log')).toBe(1);
+    // ПК удалил запись курса — облако чистое
+    t.cloud.delete('idb:course_log:c1');
+    const applied = await pullKvNow();
+    expect(applied).toBe(1);
+    expect(idbA.count('course_log')).toBe(0);
+  });
+
+  it('стабильная сигнатура не зависит от порядка полей записи', async () => {
+    const t = new FakeTransport();
+    const idbA = new FakeIdb();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, idbAdapter: idbA });
+    idbA.put('workout_log', { id: 'w1', date: '2026-08-19', exercises: [{ name: 'Жим', sets: 3 }] });
+    await pullKvNow();
+    // то же содержимое с другим порядком полей — не считается изменением
+    idbA.put('workout_log', { exercises: [{ sets: 3, name: 'Жим' }], id: 'w1', date: '2026-08-19' });
+    await pullKvNow();
+    expect(t.replaceCalls.filter(k => k === 'idb:workout_log:w1')).toHaveLength(1);
   });
 });

@@ -22,6 +22,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { db } from './db';
 
 export const CHUNK_SIZE = 100_000;
 const PULL_PAGE = 1000;
@@ -33,8 +34,13 @@ const KEEPALIVE_MAX_BYTES = 48_000;
 export const META_KEY = 'he_sync_meta_v1';
 const CONFLICT_WINDOW_MS = 500;
 
+/** IndexedDB-хранилища с реальными пользовательскими данными (анализы, курс, дневник силы). */
+export const IDB_STORES = ['labs_log', 'course_log', 'workout_log', 'training_log'] as const;
+const IDB_META_KEY = 'he_sync_meta_idb_v1';
+const IDB_KV_PREFIX = 'idb:';
+
 /** Ключи, которые НЕ синхронизируются (сессия/ключи шифрования/синк-внутренности). */
-export const EXCLUDED_KEYS = new Set(['he_session_v2', 'he_crypto_key', 'he_last_active', META_KEY]);
+export const EXCLUDED_KEYS = new Set(['he_session_v2', 'he_crypto_key', 'he_last_active', META_KEY, IDB_META_KEY]);
 export const EXCLUDED_PREFIXES = ['he_sync_ts_', 'he_draft_', 'he_nav_', 'he_admin_'];
 
 export interface KvRow {
@@ -75,16 +81,43 @@ let started = false;
 let flushing = false;
 let lifecycleAttached = false;
 
-/**
- * Сдвиг часов устройства относительно сервера (сервер_сейчас − устройство_сейчас).
- * Все mtime хранятся в серверном времени — иначе LWW ломается при расхождении
- * часов телефона и ПК (устройство с «спешащими» часами всегда побеждает).
- */
+let idbBusy = false;
+let idbEnabled = false;
+
+/** Адаптер IndexedDB — тесты подставляют фейковый. */
+export interface IdbAdapter {
+  getAll(store: string): Promise<any[]>;
+  get(store: string, id: string): Promise<any | undefined>;
+  put(store: string, rec: any): Promise<void>;
+  delete(store: string, id: string): Promise<void>;
+}
+
+const defaultIdbAdapter: IdbAdapter = {
+  async getAll(store) {
+    try { return (await db.getAll(store)) || []; } catch { return []; }
+  },
+  async get(store, id) {
+    try { return await db.get(store, id); } catch { return undefined; }
+  },
+  async put(store, rec) {
+    try { await db.put(store, rec); } catch { /* DB not init */ }
+  },
+  async delete(store, id) {
+    try { await db.delete(store, id); } catch { /* DB not init */ }
+  },
+};
+
+let idbAdapter: IdbAdapter = defaultIdbAdapter;
+
+/** Серверные часы (калибруются из HTTP Date-заголовка при pull). */
 let skewMs = 0;
 
 /** key → локальный mtime (мс). Персистится в he_sync_meta_v1. */
 let mtimes = new Map<string, number>();
 const dirty = new Set<string>();
+
+/** IndexedDB: kvKey (idb:<store>:<id>) → { sig, ts, deleted? } — последняя известная сигнатура и время. */
+let idbMeta = new Map<string, { sig: string; ts: number; deleted?: boolean }>();
 
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let metaTimer: ReturnType<typeof setTimeout> | null = null;
@@ -123,7 +156,14 @@ export function isKvSyncEnabled(): boolean {
  */
 export async function initKvSync(
   userId: string,
-  opts?: { transport?: KvTransport; token?: string; flushDelayMs?: number; pullIntervalMs?: number; reloadFn?: () => void },
+  opts?: {
+    transport?: KvTransport;
+    token?: string;
+    flushDelayMs?: number;
+    pullIntervalMs?: number;
+    reloadFn?: () => void;
+    idbAdapter?: IdbAdapter;
+  },
 ): Promise<KvSyncState> {
   const hasEnv = !!(SUPABASE_URL && SUPABASE_ANON);
   if (!opts?.transport && !hasEnv) {
@@ -151,10 +191,13 @@ export async function initKvSync(
     return state;
   }
   loadMeta();
+  loadIdbMeta();
   started = true;
   const flushDelay = opts?.flushDelayMs ?? FLUSH_DELAY_MS;
   setFlushDelay(flushDelay);
   if (opts?.reloadFn) reloadFn = opts.reloadFn;
+  if (opts?.idbAdapter) idbAdapter = opts.idbAdapter;
+  idbEnabled = true;
   await pullWithTimeout();
   void flush();
   attachLifecycle(opts?.pullIntervalMs ?? PULL_INTERVAL_MS);
@@ -187,6 +230,10 @@ export function _resetKvForTests(): void {
   mtimes = new Map();
   lifecycleAttached = false;
   skewMs = 0;
+  idbAdapter = defaultIdbAdapter;
+  idbBusy = false;
+  idbEnabled = false;
+  idbMeta = new Map();
   reloadFn = () => { try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ } };
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
   if (metaTimer != null) { clearTimeout(metaTimer); metaTimer = null; }
@@ -342,6 +389,174 @@ function loadMeta(): void {
   } catch { mtimes = new Map(); }
 }
 
+/* ------------------------------------------------------------------ */
+/* IndexedDB-синхронизация (анализы, курс, дневник силы)               */
+/* ------------------------------------------------------------------ */
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
+function idbKvKey(store: string, id: string): string {
+  return IDB_KV_PREFIX + store + ':' + id;
+}
+
+function parseIdbKvKey(k: string): { store: string; id: string } | null {
+  if (!k.startsWith(IDB_KV_PREFIX)) return null;
+  const rest = k.slice(IDB_KV_PREFIX.length);
+  const i = rest.indexOf(':');
+  if (i <= 0 || i === rest.length - 1) return null;
+  return { store: rest.slice(0, i), id: rest.slice(i + 1) };
+}
+
+function loadIdbMeta(): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(IDB_META_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw) as Record<string, { sig: string; ts: number }>;
+      idbMeta = new Map(Object.entries(obj));
+    }
+  } catch { idbMeta = new Map(); }
+}
+
+function persistIdbMeta(): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const data = JSON.stringify(Object.fromEntries(idbMeta));
+    origSetItem ? origSetItem(IDB_META_KEY, data) : localStorage.setItem(IDB_META_KEY, data);
+  } catch { /* quota — не критично */ }
+}
+
+/** Выгрузка изменённых/новых записей IndexedDB и удалений. */
+async function pushIdb(): Promise<void> {
+  if (!started || !transport || !token || !idbEnabled || idbBusy) return;
+  idbBusy = true;
+  let changed = false;
+  try {
+    const localKeys = new Set<string>();
+    for (const store of IDB_STORES) {
+      let recs: any[] = [];
+      try { recs = await idbAdapter.getAll(store); } catch { continue; }
+      for (const rec of recs) {
+        const id = rec?.id;
+        if (id == null) continue;
+        const kvKey = idbKvKey(store, String(id));
+        localKeys.add(kvKey);
+        const sig = stableStringify(rec);
+        const prev = idbMeta.get(kvKey);
+        if (prev && prev.sig === sig) continue;
+        const ts = new Date(serverNowMs()).toISOString();
+        const chunks = chunkValue(JSON.stringify(rec));
+        const rows: KvRow[] = chunks.map((c, i) => ({
+          id: token,
+          key: kvKey,
+          chunk_index: i,
+          chunk_count: i === 0 ? chunks.length : 0,
+          value: c,
+          updated_at: ts,
+        }));
+        await transport.replaceKey(rows);
+        idbMeta.set(kvKey, { sig, ts: Date.parse(ts) });
+        changed = true;
+      }
+    }
+    // локальные удаления → удалить в облаке
+    for (const [kvKey, meta] of idbMeta) {
+      if (localKeys.has(kvKey)) continue;
+      const parsed = parseIdbKvKey(kvKey);
+      if (!parsed) { idbMeta.delete(kvKey); continue; }
+      let localRec: any;
+      try { localRec = await idbAdapter.get(parsed.store, parsed.id); } catch { localRec = undefined; }
+      if (localRec) continue; // запись есть, просто цикл начался до неё — не трогаем
+      await transport.removeKey(token, kvKey);
+      idbMeta.delete(kvKey);
+      changed = true;
+    }
+  } catch (e) {
+    setState({ status: 'error', error: (e as Error)?.message || 'idb push failed' });
+  } finally {
+    idbBusy = false;
+    if (changed) persistIdbMeta();
+  }
+}
+
+/** Применение удалённых записей IndexedDB (LWW по сигнатуре). */
+async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
+  if (!started || !idbEnabled) return 0;
+  let applied = 0;
+  let metaChanged = false;
+  const remoteKeys = new Set<string>();
+  for (const [k, keyRows] of byKey) {
+    if (!k.startsWith(IDB_KV_PREFIX)) continue;
+    remoteKeys.add(k);
+    const parsed = parseIdbKvKey(k);
+    if (!parsed || !IDB_STORES.includes(parsed.store as any)) continue;
+    const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
+    if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) continue;
+    let rec: any;
+    try { rec = JSON.parse(joinChunks(keyRows.filter(r => r.chunk_index < count))); } catch { continue; }
+    if (!rec?.id) continue;
+    const remoteTs = Math.max(...keyRows.map(r => Date.parse(r.updated_at) || 0));
+    const localRec = await idbAdapter.get(parsed.store, String(rec.id));
+    const remoteSig = stableStringify(rec);
+    const prev = idbMeta.get(k);
+    if (!localRec) {
+      if (prev && prev.deleted) continue; // локально удалена — не воскрешаем
+      if (prev) {
+        // новая локальная правка-удаление: помечаем, выгрузку удаления сделает pushIdb
+        idbMeta.set(k, { sig: prev.sig, ts: prev.ts, deleted: true });
+        metaChanged = true;
+        continue;
+      }
+      await idbAdapter.put(parsed.store, rec);
+      idbMeta.set(k, { sig: remoteSig, ts: remoteTs });
+      applied++;
+      metaChanged = true;
+    } else {
+      const localSig = stableStringify(localRec);
+      if (prev && prev.sig === localSig) {
+        // локально не менялось с последней синхронизации — принимаем удалённую версию
+        if (localSig !== remoteSig) {
+          await idbAdapter.put(parsed.store, rec);
+          idbMeta.set(k, { sig: remoteSig, ts: remoteTs });
+          applied++;
+          metaChanged = true;
+        } else {
+          idbMeta.set(k, { sig: localSig, ts: Math.max(prev.ts, remoteTs) });
+          metaChanged = true;
+        }
+      }
+      // localSig !== prev.sig → локальная правка: победит pushIdb
+    }
+  }
+  // удаления в облаке: локально не менялось → применяем
+  for (const [kvKey, meta] of idbMeta) {
+    if (remoteKeys.has(kvKey)) continue;
+    const parsed = parseIdbKvKey(kvKey);
+    if (!parsed) continue;
+    const localRec = await idbAdapter.get(parsed.store, parsed.id);
+    if (!localRec) {
+      idbMeta.delete(kvKey);
+      metaChanged = true;
+      continue;
+    }
+    if (stableStringify(localRec) === meta.sig) {
+      await idbAdapter.delete(parsed.store, parsed.id);
+      idbMeta.delete(kvKey);
+      applied++;
+      metaChanged = true;
+    }
+  }
+  if (metaChanged) persistIdbMeta();
+  return applied;
+}
+
 async function flush(): Promise<void> {
   if (!started || !transport || !token || flushing) return;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -372,6 +587,7 @@ async function flush(): Promise<void> {
     }
     writeMetaNow();
     setState({ status: 'idle', lastSyncAt: Date.now(), error: undefined });
+    await pushIdb();
   } catch (e) {
     setState({ status: 'error', error: (e as Error)?.message || 'sync error' });
   } finally {
@@ -401,6 +617,7 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   }
   let applied = 0;
   for (const [k, keyRows] of byKey) {
+    if (k.startsWith(IDB_KV_PREFIX)) continue; // IndexedDB-записи обрабатывает pullIdb
     const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
     if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) {
       // неполная/битая запись в облаке: если локально данные есть — локальные новее,
@@ -428,7 +645,10 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   }
   reconcileLocalKeys(byKey);
   writeMetaNow();
+  applied += await pullIdb(byKey);
   setState({ status: 'idle', lastPullAt: Date.now(), error: undefined });
+  // выгрузка локальных правок IndexedDB (изменения анализов/курса/дневника без LS-триггера)
+  await pushIdb();
   if (opts?.reload && applied > 0) {
     console.debug('[kv] background pull applied', applied, 'keys — reload');
     scheduleReload();

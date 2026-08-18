@@ -18,16 +18,25 @@
   **LWW по СЕРВЕРНОМУ времени**: `skewMs` калибруется из HTTP Date-заголовка (pull на raw
   fetch), все mtime штампуются серверными часами — иначе телефон со «спешащими» часами
   всегда побеждал ПК и его записи не доходили (баг: с ПК → на телефон не передавалось).
+  **IndexedDB-синк (labs_log, course_log, workout_log, training_log)**: анализы/курс/
+  дневник силы хранятся в IndexedDB, а не localStorage — синк расширен на них: ключи
+  `idb:<store>:<id>`, LWW по сигнатуре записи (`stableStringify` с сортировкой ключей,
+  meta `he_sync_meta_idb_v1`); pull применяет удалённую версию, если локально запись не
+  менялась с последней синхронизации, локальная правка побеждает и выгружается; локальное
+  удаление помечается tombstone (`deleted`) и НЕ воскрешается pull'ом, выгрузка удаления
+  делает pushIdb; pushIdb вызывается в конце pull() (каждые 30с/при входе/focus).
   Исключения: `he_session_v2`, `he_crypto_key`, `he_last_active`, `he_sync_*`, `he_draft_*`,
   `he_nav_*`, `he_admin_*`.
 - **`auth-module.ts`**: `initKvSync(user.id)` после входа в TG-пути (до onLogin — pull
   применяется до рендера). Вне Telegram (PWA/браузер) синк выключен by design.
 - **`supabase/migrations/20260818_user_kv.sql`** (NEW): таблица + RLS по
   `current_setting('request.headers')::jsonb->>'x-user-token'` + grants anon/authenticated.
-- **Тесты**: `cloud-kv.test.ts` 31/31 (чанки/суррогатные пары, исключения, LWW-конфликты,
+- **Тесты**: `cloud-kv.test.ts` 37/37 (чанки/суррогатные пары, исключения, LWW-конфликты,
   токен, pull/push/remove, залечивание неполной записи, рестарт без повторного push,
   keepalive-бюджет, фоновый pull/авто-reload, skew-тесты: часы телефона спешат на 1ч —
-  запись ПК побеждает). `src/test/setup.ts` — mock localStorage дополнен стандартными
+  запись ПК побеждает; IndexedDB: телефон→ПК, ПК→телефон, локальная правка побеждает,
+  удаление в обе стороны, tombstone без воскрешения, стабильная сигнатура при порядке
+  полей). `src/test/setup.ts` — mock localStorage дополнен стандартными
   `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
 - **ВАЖНО**: Supabase-проект из `.env` был удалён (NXDOMAIN), пользователь восстановил —
   проверил: DNS резолвится, ключ работает, таблиц нет кроме `labs`; SQL-миграцию применяет
