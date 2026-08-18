@@ -1,5 +1,45 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## MC-5 завершён: редизайн годового планировщика + «✏️ Редактировать микроцикл» (Aug 18 2026, uncommitted)
+
+Финал редизайна MacrocyclePanel: новый порядок секций, кнопки «✏️ Редактировать микроцикл» с
+сохранением правки в годовой план через баннер, все native-селекты «Сборки года» на PopupSelect.
+Движки макроцикла/годового плана НЕ менялись; убран чужой WIP MC-5 (мёртвые state/баннер,
+`setSubView('bb-auto')` — такого subView нет). **tsc 0 по проекту**.
+
+- **MacrocyclePanel.tsx — порядок секций**: today-card → блоки недель → активный блок → «⚙️ Фазы»
+  (SectionCard с PopupNumber и «Пересчитать» = `applyEdit`, бывш. «Действия») → «Сборка года» →
+  «📖 Обоснование» + «❤️ Кардио» (недельные точки, empty-state без цикла) + «📸 Сценарии» (новые
+  секции, вставлены перед «Итог года») → «📊 Итог года» (ACWR-блок на месте) → «📈 Вертикально» →
+  «🎯 Действия» в самом низу (весь блок кнопок перенесён verbatim).
+- **«✏️ Редактировать микроцикл»**: в today-card (ПЛ с cycleId → `block.cycleId`, ББ → `''`) и в
+  активном блоке (ПЛ/ББ). Проп `onEditMicrocycle?: (cycleId, weeks, phase, isBB, blockIdx?)`;
+  `blockIdx` — индекс блока (ПЛ-блоки без cycleId всё равно открывают конструктор).
+- **SRCBBScreen.tsx**: обработчик пишет `he_macro_edit_ctx` `{isBB, cycleId, weeks, phase, blockIdx}`
+  и открывает конструктор: ББ → `setBbWeeks(clamp 4-24)` + plan; ПЛ → `setSelectedCycleId` +
+  `setCycleWeeks` + plan (без авто-сборки). В subView 'plan' обоих табов — **зелёный баннер**
+  «✏️ Правка блока годового плана: N нед · фаза «…» · цикл «…»» с «💾 Сохранить в годовой план»
+  (`saveMacroEdit`: target = blocks[blockIdx] с fallback по phase, delta недель применяется к
+  СУММЕ недель фазы через `rebalanceMacrocycle`/`rebalanceBbMacrocycle`, запись `he_pl_macro`/
+  `he_bb_macro`, dispatch he-pl/he-bb-macrocycle-updated + he-annual-training-plan-updated,
+  возврат в subView 'macro', флеш «✅ Правка сохранена в годовой план») и «✕ Отменить».
+- **«Сборка года»**: все native-селекты → PopupSelect («СРЦ-цикл блока» с «— авто-цикл по фазе —»,
+  «Сплит блока» с «— авто-сплит —», «Цель блока», «Шаблон ручного блока», «⧉ Копировать из
+  блока…»); taper-чекбокс → кнопка-тумблер «📉 Taper внутри блока (2 нед)» (#f59e0b active);
+  🎭 Пик-неделя осталась checkbox.
+- **SRCBBScreen — карточка «🏁 Тапер/пик в макроцикле (ПЛ)»**: 2×2 grid (`1fr 1fr`): Раскладка
+  тапера / Весовая цель тапера (PopupSelect) / 🤖 Подобрать / 🎯 Mock meet; ниже на всю ширину
+  🔄 Пост-старт восстановление + подсказка. Шапка «🗓 Годовое планирование» со «🆕 Строить с нуля»
+  / «← К параметрам» УДАЛЕНА (карточка режима в plan-вью не тронута).
+- **Тесты**: macrocycle-panel-cycle-slots 37/37 (исправлены 2 флейка-assert'а A5: `getByText(/⚡
+  ACWR/)` и `/Дневник: …/` → `getAllByText(...).length > 0` — вложенные текстовые узлы Итога года
+  давали несколько матчей; пред-существующее, документировано в раунде «Дневники профиля»);
+  macrocycle-panel-annual-build 20/20 («📉 Taper внутри блока (2 нед)» на месте);
+  macrocycle-cardio-layer + macrocycle-panel-actions + macrocycle-ui-prefs зелёные; SRCBBScreen_parts
+  **111/111 (13 файлов)**; движковые macrocycle-наборы 89/89; bb-auto-smoke 5/5, bb-auto-annual-ctx 5/5.
+- ВАЖНО: полный прогон до моего раунда — 6179/6182 (3 падения — чужой WIP MC-5, теперь убран);
+  отложенными из плана остаются интеграционные карточки в PL/BB-авто и heatmap макроцикла.
+
 ## Кардио: сборка из ББ prep-плана + блок годового плана + UI (Aug 18 2026, pushed 0b61d030b)
 
 Этап 6 кардио-интеграции: кардио-цикл строится ИЗ единого ББ prep-плана (`goals.bbContestPrepPlan`),

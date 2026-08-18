@@ -439,9 +439,13 @@ interface Props {
   /** 🏁 Схема тапера, выбранная в ПЛ-авто (канон lms-taper.engine) — карточка
    *  «Тапер к старту» показывает реальные цифры схемы. */
   taperMode?: TaperMode;
+  /** 📝 MC-5: callback при редактировании цикла в блоке.
+   *  Вызывается при нажатии «✏️ Редактировать цикл» — открывает конструктор
+   *  с предзагруженными данными цикла и возвращает обновлённый cycleId/weeks. */
+  onEditMicrocycle?: (cycleId: string, weeks: number, phase: string, isBB: boolean, blockIdx?: number) => void;
 }
 
-export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange, storageKey, taperMode }) => {
+export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, onApplyMacrocycle, onLevelChange, onGoalChange, storageKey, taperMode, onEditMicrocycle }) => {
   // Локальные редактируемые значения (если onLevelChange/onGoalChange не переданы — селекторы disabled)
   const [localLevel, setLocalLevel] = useState<string>(level);
   const [localGoal, setLocalGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(goal);
@@ -1182,7 +1186,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             <span>💪 Фокус ББ</span><strong>{focusLabel}</strong><small>Изменить</small>
           </button>}
         </div>
-        {activePopup && (
+{activePopup && (
           <div className="macrocycle-control-popup" role="dialog" aria-label="Настройка параметра">
             <div className="macrocycle-control-popup__header">
               <strong>{activePopup === 'level' ? '🎓 Уровень спортсмена' : activePopup === 'goal' ? '🎯 Направление' : activePopup === 'duration' ? '🗓 Горизонт планирования' : '💪 Фокус ББ'}</strong>
@@ -1510,9 +1514,15 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 {block && blockIdx >= 0 && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                     {isBB
-                      ? <button type="button" onClick={() => openBuilder(blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44 }}>⚙️ Собрать этот блок</button>
+                      ? <>
+                          <button type="button" onClick={() => openBuilder(blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44 }}>⚙️ Собрать этот блок</button>
+                          <button type="button" onClick={() => onEditMicrocycle?.('', block.weeks, block.phase, true, blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44, marginLeft: 8 }}>✏️ Редактировать микроцикл</button>
+                        </>
                       : ('cycleId' in block && block.cycleId
-                          ? <button type="button" onClick={() => applyBlock(blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44 }}>✓ Применить цикл</button>
+                          ? <>
+                              <button type="button" onClick={() => applyBlock(blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44 }}>✓ Применить цикл</button>
+                              <button type="button" onClick={() => onEditMicrocycle?.(block.cycleId as string, block.weeks, block.phase, false, blockIdx)} style={{ ...BTN_GHOST, fontSize: 10, padding: '6px 10px', minHeight: 44, marginLeft: 8 }}>✏️ Редактировать микроцикл</button>
+                            </>
                           : null)}
                   </div>
                 )}
@@ -1714,9 +1724,14 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 );
               })()}
               {'cycleId' in activeBlock && activeBlock.cycleId && (
-                <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 2 }}>
-                  ✓ Применить как активный цикл
-                </button>
+                <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                  <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44, flex: 1 }}>
+                    ✓ Применить как активный цикл
+                  </button>
+                  <button type="button" onClick={() => onEditMicrocycle?.(activeBlock.cycleId as string, activeBlock.weeks, activeBlock.phase, false, selectedBlockIdx)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, flex: 1 }}>
+                    ✏️ Редактировать микроцикл
+                  </button>
+                </div>
               )}
               {!isBB && (
                 <div style={{ ...SMALL, marginTop: 6, color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
@@ -1727,6 +1742,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 <>
                   <button type="button" onClick={() => openBuilder(selectedBlockIdx)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%', borderColor: 'rgba(0,230,138,0.3)', color: '#00e68a' }}>
                     ⚙️ Собрать этот цикл (сплит + фазы)
+                  </button>
+                  <button type="button" onClick={() => onEditMicrocycle?.('', activeBlock.weeks, activeBlock.phase, true, selectedBlockIdx)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
+                    ✏️ Редактировать микроцикл
                   </button>
                   {/* 🎭 Пик-неделя (тапер ББ): единая система — протокол для prep-блока */}
                   {activeBlock.phase === 'contest_prep' && (() => {
@@ -1852,84 +1870,39 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             );
           })()}
 
-          {/* 🎯 Действия: применение макроцикла, сохранение, экспорт, год → конструкторы */}
-          <SectionHead icon="🎯" title="Действия" />
-          {onApplyMacrocycle && (isBB ? bbMacro : macro) && (
-            <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
-              🗓 Применить весь макроцикл
-            </button>
-          )}
-
-          {/* Действия годового плана: сохранить + сводка + «Начать работу по циклу» */}
-          {(isBB ? bbMacro : macro) && (
-            <>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button
-                onClick={() => {
-                  try {
-                    if (isBB && bbMacro) { localStorage.setItem(bbKey, serializeBbMacro(bbMacro)); }
-                    else if (macro) { localStorage.setItem(plKey, serializeMacro(macro)); }
-                    setMacroSavedFlash(true);
-                    window.setTimeout(() => setMacroSavedFlash(false), 2000);
-                  } catch { /* ignore */ }
-                }}
-                style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-              >
-                {macroSavedFlash ? '✅ Сохранено' : '💾 Сохранить'}
-              </button>
-              <button
-                onClick={copyMacroSummary}
-                style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-                title="Скопировать текстовую сводку макроцикла"
-              >
-                {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
-              </button>
-              <button
-                onClick={() => {
-                  const source = isBB ? bbMacro : macro;
-                  if (!source) return;
-                  if (onApplyMacrocycle) onApplyMacrocycle(source);
-                  else if (onApplyCycle) onApplyCycle((source as any).blocks?.[0]?.cycleId || '', source.totalWeeks);
-                }}
-                style={{ ...BTN, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-              >
-                ▶️ Начать работу по циклу
-              </button>
+          {/* ⚙️ Фазы: правка длительности фаз (перенесено после активного блока) */}
+          <SectionCard>
+            <SectionHead icon="⚙️" title="Фазы" />
+            <div className="macrocycle-phase-editor">
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>Правка длительности фаз</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(82px, 1fr))', gap: isCompact ? 4 : 6 }}>
+                {(isBB ? BB_PHASES : PL_PHASES).map((phase: BBMacroPhase | MacroPhase) => {
+                  const src = isBB ? bbMacro! : macro!;
+                  const phaseWeeks = src.blocks.filter(b => b.phase === phase).reduce((sum, b) => sum + b.weeks, 0);
+                  if (phaseWeeks === 0) return null;
+                  const pc = isBB ? BB_PHASE_COLOR[phase as BBMacroPhase] : PHASE_COLOR[phase as MacroPhase];
+                  const pi = isBB ? BB_PHASE_ICON[phase as BBMacroPhase] : PHASE_ICON[phase as MacroPhase];
+                  const pl = isBB ? BB_PHASE_LABEL_RU[phase as BBMacroPhase] : PHASE_LABEL_RU[phase as MacroPhase];
+                  return (
+                    <div key={phase}>
+                      <div style={{ fontSize: 9, color: pc, textAlign: 'center', fontWeight: 700, marginBottom: 3 }}>{pi} {pl}</div>
+                      <PopupNumber
+                        label="Недель"
+                        value={editWeeks[phase] ?? phaseWeeks}
+                        min={1}
+                        max={Math.max(1, src.totalWeeks)}
+                        suffix=" нед"
+                        hint={`Длительность фазы «${pl}» (сумма блоков сейчас: ${phaseWeeks})`}
+                        onChange={v => { if (Number.isFinite(v) && v >= 1) setEditWeeks(prev => ({ ...prev, [phase]: Math.min(src.totalWeeks, Math.round(v)) })); }}
+                      />
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>сумма блоков: {phaseWeeks}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={applyEdit} style={{ ...BTN_GHOST, fontSize: 11, padding: '6px 12px', minHeight: 44, marginTop: 6 }}>Пересчитать</button>
             </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <button onClick={printMacro} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-                title="Открыть макроцикл в окне печати">
-                🖨 Печать макроцикла
-              </button>
-              <button onClick={downloadIcs} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-                title="Скачать макроцикл как календарь (.ics)">
-                📅 Календарь (.ics)
-              </button>
-            </div>
-            {isBB && (
-              <>
-                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                  <button type="button" onClick={sendWholeYearToManual} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-                    title="Собрать весь год в одну программу и отправить в ручной конструктор">
-                    📦 Год → ручной режим
-                  </button>
-                  <button type="button" onClick={sendWholeYearToBbAuto} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
-                    title="Собрать весь год в одну программу и передать в ББ-авто">
-                    📦 Год → ББ-авто
-                  </button>
-                </div>
-                {yearNote && (
-                  <div role="status" style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, fontSize: 11, lineHeight: 1.5,
-                    background: yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? 'rgba(0,230,138,0.08)' : 'rgba(245,158,11,0.08)',
-                    border: `1px solid ${yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? 'rgba(0,230,138,0.25)' : 'rgba(245,158,11,0.3)'}`,
-                    color: yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? '#00e68a' : '#f59e0b' }}>
-                    {yearNote}
-                  </div>
-                )}
-              </>
-            )}
-            </>
-          )}
+          </SectionCard>
 
           {/* 🧩 Сборка года по конструкторам: каждый блок — своим конструктором (ПЛ/ББ/ручной) */}
           {(isBB ? bbMacro : macro) && (
@@ -2124,28 +2097,22 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     </div>
                     {b.ref.kind === 'PL' && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                        <select aria-label="СРЦ-цикл блока" value={b.config.cycleId ?? b.ref.cycleId ?? ''}
-                          onChange={e => applyAnnualConfig(b.ref.blockKey, { cycleId: e.target.value || undefined })}
-                          style={{ ...SEL, flex: 1, minWidth: 180, fontSize: 10 }}>
-                          <option value="">— авто-цикл по фазе —</option>
-                          {LMS_CYCLES.map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title}</option>)}
-                        </select>
+                        <PopupSelect label="СРЦ-цикл блока" value={b.config.cycleId ?? b.ref.cycleId ?? ''}
+                          hint="Цикл СРЦ для блока; «— авто-цикл по фазе —» — подбор по фазе при сборке"
+                          options={[{ id: '', label: '— авто-цикл по фазе —', desc: '' }, ...LMS_CYCLES.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` }))]}
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { cycleId: v || undefined })} />
                       </div>
                     )}
                     {b.ref.kind === 'BB' && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                        <select aria-label="Сплит блока" value={b.config.splitPattern ?? ''}
-                          onChange={e => applyAnnualConfig(b.ref.blockKey, { splitPattern: e.target.value || undefined })}
-                          style={{ ...SEL, flex: 1, minWidth: 150, fontSize: 10 }}>
-                          <option value="">— авто-сплит —</option>
-                          {SPLIT_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                        <select aria-label="Цель блока" value={b.config.goal ?? ''}
-                          onChange={e => applyAnnualConfig(b.ref.blockKey, { goal: e.target.value || undefined })}
-                          style={{ ...SEL, minWidth: 110, fontSize: 10 }}>
-                          <option value="">— цель по фазе —</option>
-                          {['hypertrophy', 'mass', 'strength', 'strength_mass', 'cut', 'recomp'].map(g => <option key={g} value={g}>{g}</option>)}
-                        </select>
+                        <PopupSelect label="Сплит блока" value={b.config.splitPattern ?? ''}
+                          hint="Сплит ББ-блока; «— авто-сплит —» — подбор по фазе при сборке"
+                          options={[{ id: '', label: '— авто-сплит —', desc: '' }, ...SPLIT_PATTERNS.map(p => ({ id: p.id, label: p.name, desc: '' }))]}
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { splitPattern: v || undefined })} />
+                        <PopupSelect label="Цель блока" value={b.config.goal ?? ''}
+                          hint="Цель ББ-блока; «— цель по фазе —» — по фазе макроцикла"
+                          options={[{ id: '', label: '— цель по фазе —', desc: '' }, ...['hypertrophy', 'mass', 'strength', 'strength_mass', 'cut', 'recomp'].map(g => ({ id: g, label: g, desc: '' }))]}
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { goal: v || undefined })} />
                         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', minHeight: 32 }}>
                           <input type="checkbox" checked={!!b.config.peakWeek} style={{ width: 16, height: 16, accentColor: '#f59e0b' }}
                             onChange={e => applyAnnualConfig(b.ref.blockKey, { peakWeek: e.target.checked, peakConfig: e.target.checked ? b.config.peakConfig : undefined })} />
@@ -2155,24 +2122,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     )}
                     {b.ref.kind === 'MANUAL' && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
-                        <select aria-label="Шаблон ручного блока" value={b.config.templateFromBlockKey ?? ''}
-                          onChange={e => applyAnnualConfig(b.ref.blockKey, { templateFromBlockKey: e.target.value || undefined })}
-                          style={{ ...SEL, flex: 1, minWidth: 170, fontSize: 10 }}>
-                          <option value="">— пустой скелет —</option>
-                          {templateBlocks.map(t => (
-                            <option key={t.ref.blockKey} value={t.ref.blockKey}>
-                              нед {t.ref.startWeek}–{t.ref.startWeek + t.ref.weeks - 1} · {t.ref.phase}
-                            </option>
-                          ))}
-                        </select>
+                        <PopupSelect label="Шаблон ручного блока" value={b.config.templateFromBlockKey ?? ''}
+                          hint="Шаблон структуры из собранного блока; «— пустой скелет —» — чистые сессии"
+                          options={[{ id: '', label: '— пустой скелет —', desc: '' }, ...templateBlocks.map(t => ({ id: t.ref.blockKey, label: `нед ${t.ref.startWeek}–${t.ref.startWeek + t.ref.weeks - 1} · ${t.ref.phase}`, desc: '' }))]}
+                          onChange={v => applyAnnualConfig(b.ref.blockKey, { templateFromBlockKey: v || undefined })} />
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', minHeight: 32 }}>
-                        <input type="checkbox" checked={!!b.config.taper?.enabled} style={{ width: 16, height: 16, accentColor: '#f59e0b' }}
-                          onChange={e => applyAnnualConfig(b.ref.blockKey, { taper: { enabled: e.target.checked, weeks: 2 } })} />
-                        📉 Taper внутри блока (2 нед)
-                      </label>
+                      <button type="button" aria-pressed={!!b.config.taper?.enabled}
+                        onClick={() => applyAnnualConfig(b.ref.blockKey, { taper: { enabled: !b.config.taper?.enabled, weeks: 2 } })}
+                        style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.taper?.enabled ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.12)', color: b.config.taper?.enabled ? '#f59e0b' : 'rgba(255,255,255,0.65)' }}>
+                        📉 Taper внутри блока (2 нед){b.config.taper?.enabled ? ' ✓' : ''}
+                      </button>
                       <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                         {b.ref.kind === 'BB' && b.status === 'built' && Boolean(b.result?.bbPlan) && (
                           <button type="button" onClick={() => {
@@ -2227,15 +2188,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     </div>
                     {otherBlocks.length > 0 && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
-                        <select aria-label="Копировать настройки из блока" value="" onChange={e => { if (e.target.value) copyBlockFrom(e.target.value); }}
-                          style={{ ...SEL, flex: 1, minWidth: 180, fontSize: 10 }}>
-                          <option value="">⧉ Копировать настройки из блока…</option>
-                          {otherBlocks.map(x => (
-                            <option key={x.ref.blockKey} value={x.ref.blockKey}>
-                              нед {x.ref.startWeek}–{x.ref.startWeek + x.ref.weeks - 1} · {x.ref.phase} · {x.ref.kind === 'PL' ? 'ПЛ' : x.ref.kind === 'BB' ? 'ББ' : '✍'}
-                            </option>
-                          ))}
-                        </select>
+                        <PopupSelect label="⧉ Копировать настройки из блока…" value=""
+                          hint="Скопировать конструктор/конфиг (цикл, сплит, taper, пик, шаблон) из другого блока"
+                          options={otherBlocks.map(x => ({ id: x.ref.blockKey, label: `нед ${x.ref.startWeek}–${x.ref.startWeek + x.ref.weeks - 1} · ${x.ref.phase} · ${x.ref.kind === 'PL' ? 'ПЛ' : x.ref.kind === 'BB' ? 'ББ' : '✍'}`, desc: '' }))}
+                          onChange={v => { if (v) copyBlockFrom(v); }} />
                       </div>
                     )}
                   </div>
@@ -2249,6 +2205,112 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   {annualStatusNote}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* 📖 Обоснование (rationale) — русский текст в акцентной карточке */}
+          {(isBB ? bbMacro : macro) && (
+            <div className="macrocycle-rationale" style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.18)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 14 }}>📖</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', textTransform: 'uppercase', letterSpacing: 0.3 }}>Обоснование плана</span>
+              </div>
+              {(isBB ? bbMacro!.rationale : macro!.rationale).map((r, i) => (
+                <div key={i} style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.6, padding: '2px 0 2px 14px', position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 2, top: 4, color: '#00e68a', fontSize: 10 }}>▸</span>
+                  {r}
+                </div>
+              ))}
+              {(isBB ? bbMacro!.rationale : macro!.rationale).length === 0 && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Обоснование появится после построения макроцикла.</div>
+              )}
+            </div>
+          )}
+
+          {/* ❤️ Кардио: привязанный CardioCycle (ссылка в macrocycle.cardioCycleId) */}
+          {(isBB ? bbMacro : macro) && (() => {
+            const src = isBB ? bbMacro! : macro!;
+            const total = Math.max(1, src.totalWeeks);
+            return (
+              <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macro-cardio-layer">
+                <SectionHead icon="❤️" title="Кардио" />
+                {(() => {
+                  const cardioId = (src as { cardioCycleId?: string }).cardioCycleId;
+                  if (!cardioId) return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Кардио-цикл не привязан. Постройте цикл в конструкторе кардио и привяжите его (🔗 Интеграции → годовой план).</div>;
+                  const cardio = loadCardioCycles().find(c => c.id === cardioId);
+                  if (!cardio) {
+                    return <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>❤️ Кардио привязано ({cardioId}), но цикл не найден в библиотеке.</div>;
+                  }
+                  const cs = cardioCycleSummary(cardio);
+                  const cardioPhaseColor: Record<string, string> = {
+                    base: '#22c55e', build: '#3b82f6', maintenance: '#8b5cf6', contest_prep: '#f59e0b', taper: '#eab308', peak: '#ef4444', transition: '#71717a',
+                  };
+                  const cw = cardio.weeks.find(x => x.week === Math.min(cardio.totalWeeks, Math.max(1, currentWeekIdx)));
+                  return (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700 }}>❤️ Кардио: {cardio.name}</span>
+                        <span>{cardio.totalWeeks} нед · {cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал/нед · {cs.hiitWeeks} HIIT-нед</span>
+                        {cw && <span style={{ color: 'rgba(255,255,255,0.4)' }}>📍 сейчас: {CARDIO_PHASE_LABEL_RU[cw.phase]}{cw.deload ? ' · делод' : ''}{cw.taper ? ' · taper' : ''}</span>}
+                      </div>
+                      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        {Array.from({ length: total }, (_, i) => {
+                          const w = i + 1;
+                          const c = cardio.weeks.find(x => x.week === w);
+                          const active = w === currentWeekIdx;
+                          return (
+                            <div key={w} title={c ? `Нед ${w}: ${CARDIO_PHASE_LABEL_RU[c.phase]} · ${c.totalMinutes} мин` : `Нед ${w}: вне кардио-цикла`}
+                              aria-label={`Нед ${w}: ${c ? CARDIO_PHASE_LABEL_RU[c.phase] : '—'}`}
+                              style={{ width: 8, height: 8, borderRadius: 2, background: c ? (cardioPhaseColor[c.phase] ?? '#888') : 'rgba(255,255,255,0.04)', outline: active ? '1.5px solid #fff' : 'none' }} />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
+
+          {/* 📸 Сценарии года: снапшоты для сравнения планов */}
+          {(isBB ? bbMacro : macro) && (
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-scenarios">
+              <SectionHead icon="📸" title="Сценарии года" right={<button type="button" onClick={() => {
+                  const src = isBB ? bbMacro : macro;
+                  if (!src) return;
+                  setScenarios(saveMacroScenario(`Сценарий ${scenarios.length + 1} · ${src.totalWeeks} нед`, src));
+                }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }} title="Снимок текущего макроцикла как сценарий">📸 Снимок</button>} />
+              {scenarios.length === 0 && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                  Сохраните сценарий (например, соревнование в июне), перестройте план (например, сентябрь) — и сравните фазы.
+                </div>
+              )}
+              {scenarios.map(s => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{new Date(s.ts).toLocaleDateString('ru-RU')}</span>
+                  <button type="button" onClick={() => setCompareWith(compareWith?.id === s.id ? null : s)} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} title="Сравнить с текущим макроциклом">{compareWith?.id === s.id ? '✕ Закрыть' : '⇄ Сравнить'}</button>
+                  <button type="button" aria-label={`Удалить сценарий ${s.label}`} onClick={() => setScenarios(removeMacroScenario(s.id))} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 4, minHeight: 44, minWidth: 44, flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+              {compareWith && (() => {
+                const src = isBB ? bbMacro : macro;
+                if (!src) return null;
+                const diffs = compareMacroScenarios(compareWith.data, src);
+                return (
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }} className="macrocycle-scenario-compare">
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>⇄ {compareWith.label} → текущий ({src.totalWeeks} нед)</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>{scenarioSummary(compareWith.data)} → {scenarioSummary(src)}</div>
+                    {diffs.map(d => (
+                      <div key={d.phase} style={{ display: 'flex', gap: 6, fontSize: 10, alignItems: 'baseline' }}>
+                        <span style={{ flex: 1, color: 'rgba(255,255,255,0.75)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.phase}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{d.weeksA} → {d.weeksB} нед</span>
+                        <span style={{ fontWeight: 700, flexShrink: 0, color: d.diff > 0 ? '#00e68a' : d.diff < 0 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>{d.diff > 0 ? `+${d.diff}` : d.diff}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -2322,41 +2384,6 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     );
                   })}
                 </div>
-                {/* ❤️ Кардио-слой: привязанный CardioCycle (ссылка в macrocycle.cardioCycleId) */}
-                {(() => {
-                  const cardioId = (src as { cardioCycleId?: string }).cardioCycleId;
-                  if (!cardioId) return null;
-                  const cardio = loadCardioCycles().find(c => c.id === cardioId);
-                  if (!cardio) {
-                    return <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>❤️ Кардио привязано ({cardioId}), но цикл не найден в библиотеке.</div>;
-                  }
-                  const cs = cardioCycleSummary(cardio);
-                  const cardioPhaseColor: Record<string, string> = {
-                    base: '#22c55e', build: '#3b82f6', maintenance: '#8b5cf6', contest_prep: '#f59e0b', taper: '#eab308', peak: '#ef4444', transition: '#71717a',
-                  };
-                  const cw = cardio.weeks.find(x => x.week === Math.min(cardio.totalWeeks, Math.max(1, currentWeekIdx)));
-                  return (
-                    <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.55)' }} className="macro-cardio-layer">
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700 }}>❤️ Кардио: {cardio.name}</span>
-                        <span>{cardio.totalWeeks} нед · {cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал/нед · {cs.hiitWeeks} HIIT-нед</span>
-                        {cw && <span style={{ color: 'rgba(255,255,255,0.4)' }}>📍 сейчас: {CARDIO_PHASE_LABEL_RU[cw.phase]}{cw.deload ? ' · делод' : ''}{cw.taper ? ' · taper' : ''}</span>}
-                      </div>
-                      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {Array.from({ length: total }, (_, i) => {
-                          const w = i + 1;
-                          const c = cardio.weeks.find(x => x.week === w);
-                          const active = w === currentWeekIdx;
-                          return (
-                            <div key={w} title={c ? `Нед ${w}: ${CARDIO_PHASE_LABEL_RU[c.phase]} · ${c.totalMinutes} мин` : `Нед ${w}: вне кардио-цикла`}
-                              aria-label={`Нед ${w}: ${c ? CARDIO_PHASE_LABEL_RU[c.phase] : '—'}`}
-                              style={{ width: 8, height: 8, borderRadius: 2, background: c ? (cardioPhaseColor[c.phase] ?? '#888') : 'rgba(255,255,255,0.04)', outline: active ? '1.5px solid #fff' : 'none' }} />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
                 {/* ⚡ ACWR из дневника (sRPE) + сессии */}
                 {(() => {
                   const d = diaryMacroStats();
@@ -2422,96 +2449,84 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             );
           })()}
 
-          {/* 📸 Сценарии года: снапшоты для сравнения планов */}
-          <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }} className="macrocycle-scenarios">
-            <SectionHead icon="📸" title="Сценарии года" right={<button type="button" onClick={() => {
-                const src = isBB ? bbMacro : macro;
-                if (!src) return;
-                setScenarios(saveMacroScenario(`Сценарий ${scenarios.length + 1} · ${src.totalWeeks} нед`, src));
-              }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 44 }} title="Снимок текущего макроцикла как сценарий">📸 Снимок</button>} />
-            {scenarios.length === 0 && (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                Сохраните сценарий (например, соревнование в июне), перестройте план (например, сентябрь) — и сравните фазы.
-              </div>
-            )}
-            {scenarios.map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{new Date(s.ts).toLocaleDateString('ru-RU')}</span>
-                <button type="button" onClick={() => setCompareWith(compareWith?.id === s.id ? null : s)} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} title="Сравнить с текущим макроциклом">{compareWith?.id === s.id ? '✕ Закрыть' : '⇄ Сравнить'}</button>
-                <button type="button" aria-label={`Удалить сценарий ${s.label}`} onClick={() => setScenarios(removeMacroScenario(s.id))} style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: 4, minHeight: 44, minWidth: 44, flexShrink: 0 }}>✕</button>
-              </div>
-            ))}
-            {compareWith && (() => {
-              const src = isBB ? bbMacro : macro;
-              if (!src) return null;
-              const diffs = compareMacroScenarios(compareWith.data, src);
-              return (
-                <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }} className="macrocycle-scenario-compare">
-                  <div style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', marginBottom: 4 }}>⇄ {compareWith.label} → текущий ({src.totalWeeks} нед)</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>{scenarioSummary(compareWith.data)} → {scenarioSummary(src)}</div>
-                  {diffs.map(d => (
-                    <div key={d.phase} style={{ display: 'flex', gap: 6, fontSize: 10, alignItems: 'baseline' }}>
-                      <span style={{ flex: 1, color: 'rgba(255,255,255,0.75)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.phase}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{d.weeksA} → {d.weeksB} нед</span>
-                      <span style={{ fontWeight: 700, flexShrink: 0, color: d.diff > 0 ? '#00e68a' : d.diff < 0 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>{d.diff > 0 ? `+${d.diff}` : d.diff}</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
+          {/* 🎯 Действия: применение макроцикла, сохранение, экспорт, год → конструкторы */}
+          <SectionHead icon="🎯" title="Действия" />
+          {onApplyMacrocycle && (isBB ? bbMacro : macro) && (
+            <button onClick={() => { const source = isBB ? bbMacro : macro; if (source) onApplyMacrocycle(source); }} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%' }}>
+              🗓 Применить весь макроцикл
+            </button>
+          )}
 
-          {/* ⚙️ Фазы и обоснование */}
-          <SectionCard>
-            <SectionHead icon="⚙️" title="Фазы и обоснование" />
-            <div className="macrocycle-phase-editor">
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>Правка длительности фаз</div>
-             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(82px, 1fr))', gap: isCompact ? 4 : 6 }}>
-              {(isBB ? BB_PHASES : PL_PHASES).map((phase: BBMacroPhase | MacroPhase) => {
-                const src = isBB ? bbMacro! : macro!;
-                const phaseWeeks = src.blocks.filter(b => b.phase === phase).reduce((sum, b) => sum + b.weeks, 0);
-                if (phaseWeeks === 0) return null;
-                const pc = isBB ? BB_PHASE_COLOR[phase as BBMacroPhase] : PHASE_COLOR[phase as MacroPhase];
-                const pi = isBB ? BB_PHASE_ICON[phase as BBMacroPhase] : PHASE_ICON[phase as MacroPhase];
-                const pl = isBB ? BB_PHASE_LABEL_RU[phase as BBMacroPhase] : PHASE_LABEL_RU[phase as MacroPhase];
-                return (
-                <div key={phase}>
-                  <div style={{ fontSize: 9, color: pc, textAlign: 'center', fontWeight: 700, marginBottom: 3 }}>{pi} {pl}</div>
-                  <PopupNumber
-                    label="Недель"
-                    value={editWeeks[phase] ?? phaseWeeks}
-                    min={1}
-                    max={Math.max(1, src.totalWeeks)}
-                    suffix=" нед"
-                    hint={`Длительность фазы «${pl}» (сумма блоков сейчас: ${phaseWeeks})`}
-                    onChange={v => { if (Number.isFinite(v) && v >= 1) setEditWeeks(prev => ({ ...prev, [phase]: Math.min(src.totalWeeks, Math.round(v)) })); }}
-                  />
-                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>сумма блоков: {phaseWeeks}</div>
+          {/* Действия годового плана: сохранить + сводка + «Начать работу по циклу» */}
+          {(isBB ? bbMacro : macro) && (
+            <>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button
+                onClick={() => {
+                  try {
+                    if (isBB && bbMacro) { localStorage.setItem(bbKey, serializeBbMacro(bbMacro)); }
+                    else if (macro) { localStorage.setItem(plKey, serializeMacro(macro)); }
+                    setMacroSavedFlash(true);
+                    window.setTimeout(() => setMacroSavedFlash(false), 2000);
+                  } catch { /* ignore */ }
+                }}
+                style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+              >
+                {macroSavedFlash ? '✅ Сохранено' : '💾 Сохранить'}
+              </button>
+              <button
+                onClick={copyMacroSummary}
+                style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                title="Скопировать текстовую сводку макроцикла"
+              >
+                {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
+              </button>
+              <button
+                onClick={() => {
+                  const source = isBB ? bbMacro : macro;
+                  if (!source) return;
+                  if (onApplyMacrocycle) onApplyMacrocycle(source);
+                  else if (onApplyCycle) onApplyCycle((source as any).blocks?.[0]?.cycleId || '', source.totalWeeks);
+                }}
+                style={{ ...BTN, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+              >
+                ▶️ Начать работу по циклу
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button onClick={printMacro} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                title="Открыть макроцикл в окне печати">
+                🖨 Печать макроцикла
+              </button>
+              <button onClick={downloadIcs} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                title="Скачать макроцикл как календарь (.ics)">
+                📅 Календарь (.ics)
+              </button>
+            </div>
+            {isBB && (
+              <>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button type="button" onClick={sendWholeYearToManual} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                    title="Собрать весь год в одну программу и отправить в ручной конструктор">
+                    📦 Год → ручной режим
+                  </button>
+                  <button type="button" onClick={sendWholeYearToBbAuto} style={{ ...BTN_GHOST, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
+                    title="Собрать весь год в одну программу и передать в ББ-авто">
+                    📦 Год → ББ-авто
+                  </button>
                 </div>
-                );
-              })}
-            </div>
-            <button onClick={applyEdit} style={{ ...BTN_GHOST, fontSize: 11, padding: '6px 12px', minHeight: 44, marginTop: 6 }}>Пересчитать</button>
-          </div>
-
-          {/* 📖 Обоснование (rationale) — русский текст в акцентной карточке */}
-          <div className="macrocycle-rationale" style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.18)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 14 }}>📖</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', textTransform: 'uppercase', letterSpacing: 0.3 }}>Обоснование плана</span>
-            </div>
-            {(isBB ? bbMacro!.rationale : macro!.rationale).map((r, i) => (
-              <div key={i} style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.6, padding: '2px 0 2px 14px', position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 2, top: 4, color: '#00e68a', fontSize: 10 }}>▸</span>
-                {r}
-              </div>
-            ))}
-            {(isBB ? bbMacro!.rationale : macro!.rationale).length === 0 && (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Обоснование появится после построения макроцикла.</div>
+                {yearNote && (
+                  <div role="status" style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, fontSize: 11, lineHeight: 1.5,
+                    background: yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? 'rgba(0,230,138,0.08)' : 'rgba(245,158,11,0.08)',
+                    border: `1px solid ${yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? 'rgba(0,230,138,0.25)' : 'rgba(245,158,11,0.3)'}`,
+                    color: yearNote.startsWith('✅') || yearNote.startsWith('🚀') ? '#00e68a' : '#f59e0b' }}>
+                    {yearNote}
+                  </div>
+                )}
+              </>
             )}
-          </div>
-          </SectionCard>
+            </>
+          )}
         </div>
       )}
 

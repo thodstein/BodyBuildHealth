@@ -468,8 +468,8 @@ describe('MacrocyclePanel — слоты циклов на пик (карточ�
     expect(screen.getByLabelText('Текущая неделя 4')).toBeTruthy();
 
     // ACWR-строка в Итоге года (обе сессии старше 7 дней → 7д=0; в 28-дневное окно попадает одна)
-    expect(screen.getByText(/⚡ ACWR/)).toBeTruthy();
-    expect(screen.getByText(/Дневник: 0 сессий \(7д\) · 1 \(28д\)/)).toBeTruthy();
+    expect(screen.getAllByText(/⚡ ACWR/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Дневник: 0 сессий \(7д\) · 1 \(28д\)/).length).toBeGreaterThan(0);
   });
 
   it('C11: карточка «🔔 Сегодня» показывает активную фазу и быстрый старт', () => {

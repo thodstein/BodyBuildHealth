@@ -47,7 +47,7 @@ import { parseProgressionRationale, progressionTiles, splitDescriptionPoints } f
 import { DeloadProtocolCard } from './TrainingScreen_parts/DeloadProtocolCard';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './TrainingScreen_parts/CardioLinkCard';
-import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
+import { deserializeMacro, deserializeBbMacro, buildBbMacrocycle, serializeMacro, serializeBbMacro, rebalanceMacrocycle, rebalanceBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
 import { macroPhaseToLmsPhase, bbMacroPhaseToUserPhase, isDeloadLikeBbMacroPhase } from '../../engines/periodization/phase-bridge';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
@@ -488,6 +488,70 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   };
 
   // ── 🧠 Тренерский слой (lms-taper-coach.engine): контекст спортсмена + подбор ──
+  /** MC-5: контекст правки микроцикла блока годового плана (записан MacrocyclePanel). */
+  const getMacroEditCtx = (): { isBB: boolean; cycleId: string; weeks: number; phase: string; blockIdx: number } | null => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('he_macro_edit_ctx') || 'null');
+      if (!raw || typeof raw !== 'object') return null;
+      return { isBB: !!raw.isBB, cycleId: String(raw.cycleId ?? ''), weeks: Number(raw.weeks ?? 0), phase: String(raw.phase ?? ''), blockIdx: Number(raw.blockIdx ?? -1) };
+    } catch { return null; }
+  };
+
+  const saveMacroEdit = () => {
+    try {
+      const ctx = getMacroEditCtx();
+      if (!ctx) { setMethodNote('⚠ Контекст правки не найден — нажмите «✏️ Редактировать микроцикл» в блоке'); return; }
+      const weeks = Math.max(1, Math.round(ctx.weeks));
+      const blockIdx = ctx.blockIdx;
+      if (ctx.isBB) {
+        const raw = localStorage.getItem('he_bb_macro');
+        if (!raw) { setMethodNote('⚠ BB-макроцикл не найден'); return; }
+        const macro = deserializeBbMacro(raw);
+        if (!macro) { setMethodNote('⚠ BB-макроцикл повреждён'); return; }
+        const target = (blockIdx >= 0 && blockIdx < macro.blocks.length) ? macro.blocks[blockIdx] : macro.blocks.find(b => b.phase === ctx.phase);
+        if (!target) { setMethodNote('⚠ Блок BB-макроцикла не найден'); return; }
+        const phaseTotal = macro.blocks.filter(b => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
+        const next = rebalanceBbMacrocycle(macro, { [target.phase]: Math.max(1, phaseTotal + (weeks - target.weeks)) });
+        localStorage.setItem('he_bb_macro', serializeBbMacro(next));
+      } else {
+        const raw = localStorage.getItem('he_pl_macro');
+        if (!raw) { setMethodNote('⚠ ПЛ-макроцикл не найден'); return; }
+        const macro = deserializeMacro(raw);
+        if (!macro) { setMethodNote('⚠ ПЛ-макроцикл повреждён'); return; }
+        const target = (blockIdx >= 0 && blockIdx < macro.blocks.length) ? macro.blocks[blockIdx] : macro.blocks.find(b => b.phase === ctx.phase);
+        if (!target) { setMethodNote('⚠ Блок ПЛ-макроцикла не найден'); return; }
+        const phaseTotal = macro.blocks.filter(b => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
+        const next = rebalanceMacrocycle(macro, [{ phase: target.phase, weeks: Math.max(1, phaseTotal + (weeks - target.weeks)) }]);
+        localStorage.setItem('he_pl_macro', serializeMacro(next));
+      }
+      try { localStorage.removeItem('he_macro_edit_ctx'); } catch { /* ignore */ }
+      window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated'));
+      window.dispatchEvent(new CustomEvent('he-bb-macrocycle-updated'));
+      window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated'));
+      setSubView('macro');
+      setMethodNote('✅ Правка сохранена в годовой план');
+    } catch (error) {
+      setMethodNote(`⚠ Ошибка сохранения правки: ${(error as Error).message}`);
+    }
+  };
+
+  const renderMacroEditBanner = () => {
+    const ctx = getMacroEditCtx();
+    if (!ctx || (mainTab === 'bb') !== ctx.isBB) return null;
+    return (
+      <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, minWidth: 0 }}>
+          ✏️ Правка блока годового плана: {ctx.weeks} нед · фаза «{ctx.phase}»{!ctx.isBB && ctx.cycleId ? ` · цикл «${getCycleById(ctx.cycleId)?.meta.title ?? ctx.cycleId}»` : ''}
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Соберите план с нужным числом недель и нажмите «💾 Сохранить в годовой план».</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <button type="button" onClick={saveMacroEdit} style={{ ...BTN, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>💾 Сохранить в годовой план</button>
+          <button type="button" onClick={() => { try { localStorage.removeItem('he_macro_edit_ctx'); } catch { /* ignore */ } setSubView('macro'); }} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>✕ Отменить</button>
+        </div>
+      </div>
+    );
+  };
+
   const buildCoachCtx = (): TaperCoachCtx => {
     const lastWk = builtSrc?.weeks[builtSrc.weeks.length - 1];
     return {
@@ -1160,6 +1224,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
       {mainTab === 'pl' && subView === 'plan' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          {renderMacroEditBanner()}
           <div style={H}>🏆 Авто-подбор силового цикла</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, minWidth: 0 }}>
             <PopupSelect label="Уровень спортсмена" value={level} onChange={setLevel} options={[['novice','Новичок'],['II-KMS','II разряд — КМС'],['KMS-MS','КМС — МС'],['MS-MSMK','МС — МСМК'],['II-MS','II разряд — МС'],['intermediate','Средний']].map(([id,label]) => ({ id, label }))} />
@@ -1349,6 +1414,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
       {mainTab === 'bb' && subView === 'plan' && (
         <div>
+          {renderMacroEditBanner()}
           <div style={H}>💪 Авто-подбор бодибилдинг-сплита</div>
            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
              <PopupSelect label="Уровень спортсмена" value={bbLevel} onChange={setBbLevel} options={[['beginner','Новичок'],['intermediate','Средний'],['advanced','Опытный'],['enhanced','Enhanced (на курсе)']].map(([id,label]) => ({ id, label }))} />
@@ -1690,32 +1756,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {subView === 'macro' && mainTab === 'pl' && (
         <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 8 }}>🏁 Тапер/пик в макроцикле (ПЛ)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 6, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <PopupSelect label="Раскладка тапера" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация)" options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
             <PopupSelect label="Весовая цель тапера" value={macroWeightGoal} onChange={v => setMacroWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём" options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g], desc: '' }))} />
             <button
               onClick={() => { try { const r = recommendTaperConfig(buildCoachCtx()); setMacroTaperMode(r.mode); setMacroWeightGoal(r.weightGoal); setMacroMockMeet(r.mockMeet); setMacroPostMeet(r.postMeet); setMethodNote(`🤖 Тренер подобрал тапер макроцикла: ${r.rationale.join(' ')}`); } catch (error) { setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`); } }}
-              style={{ alignSelf: 'flex-end', minHeight: 40, borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '8px 12px', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+              style={{ minHeight: 40, borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '8px 12px', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
               title="Подобрать схему/весовую цель тапера макроцикла под усталость, ACWR, вес и план ПМ"
             >🤖 Подобрать</button>
+            <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 40, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : 'rgba(255,255,255,0.6)' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : 'rgba(255,255,255,0.6)' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
-            <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : 'rgba(255,255,255,0.6)' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
-            <span style={{ alignSelf: 'center', fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
-          </div>
-        </div>
-      )}
-      {/* 🗓 Шапка годового планировщика — как в ББ-авто: «Строить с нуля» / «К параметрам» */}
-      {subView === 'macro' && (
-        <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>🗓 Годовое планирование {mainTab === 'pl' ? 'ПЛ' : 'ББ'}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>Постройте макроцикл и начните работу по нему — или стройте план с нуля, как раньше.</div>
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button style={{ ...BTN_GHOST, minHeight: 40, fontSize: 11 }} onClick={() => { setSubView('plan'); setMethodNote('🆕 Строим с нуля — без годового плана'); }} title="Вернуться к параметрам и собрать план без годового плана">🆕 Строить с нуля</button>
-            <button style={{ ...BTN_GHOST, minHeight: 40, fontSize: 11 }} onClick={() => setSubView('plan')} title="Вернуться к параметрам плана">← К параметрам</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : 'rgba(255,255,255,0.6)' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
+            <span style={{ alignSelf: 'center', fontSize: 10, color: 'rgba(255,255,255,0.45)', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
           </div>
         </div>
       )}
@@ -1743,9 +1796,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             if (!macro) { setSubView('plan'); return; }
             applyBBMacrocycle(macro);
            } catch (error) {
-             setMethodNote(`⚠ Макроцикл ББ не применён: ${(error as Error).message}`);
-             setSubView('plan');
-           }
+              setMethodNote(`⚠ Макроцикл ББ не применён: ${(error as Error).message}`);
+              setSubView('plan');
+            }
         } else {
           // ПЛ-авто: загрузить выбранный СРЦ-цикл
           try {
@@ -1757,6 +1810,20 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           }
           setSubView('plan');
         }
+      }} onEditMicrocycle={(cycleId, weeks, phase, isBB, blockIdx) => {
+        // MC-5: сохраняем контекст правки блока и открываем конструктор с его данными.
+        try {
+          localStorage.setItem('he_macro_edit_ctx', JSON.stringify({ isBB, cycleId, weeks, phase, blockIdx }));
+        } catch { /* ignore */ }
+        if (isBB) {
+          // ББ-авто: недели блока уже в параметрах плана.
+          setBbWeeks(Math.min(24, Math.max(4, weeks)));
+        } else if (cycleId) {
+          // ПЛ-авто: предзагружаем цикл блока.
+          setSelectedCycleId(cycleId);
+          setCycleWeeks(weeks);
+        }
+        setSubView('plan');
       }} />}
       {subView === 'macro' && <div style={{ marginTop: 8 }}><CardioLinkCard /></div>}
       {subView === 'competition' && <PLCompetitionTab api={{
