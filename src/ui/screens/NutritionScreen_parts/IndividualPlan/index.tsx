@@ -113,7 +113,7 @@ const MedicalDisclaimer: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) =
 );
 
 const ReportTab: React.FC = () => {
-  const { generateFullNutritionReport, nutritionReport } = usePlanCtx();
+  const { generateFullNutritionReport, nutritionReport, plannerMode } = usePlanCtx();
   const [generated, setGenerated] = useState(false);
   const [microSearch, setMicroSearch] = useState('');
   const r = nutritionReport;
@@ -182,6 +182,7 @@ const ReportTab: React.FC = () => {
         </div>}
 
         {/* Micros grid */}
+        {plannerMode !== 'pro' && <div style={{ ...card, color:'rgba(255,255,255,0.7)', fontSize:9 }}>📊 В простом режиме доступны базовые КБЖУ. Перейдите в Pro для микроанализа и расширенного отчёта.</div>}
         {r.micros && Object.keys(r.micros).length > 0 && <div style={card}>
           <div style={{ fontSize:9, fontWeight:600, color:'#a78bfa', marginBottom:4 }}>
             💊 Микронутриенты

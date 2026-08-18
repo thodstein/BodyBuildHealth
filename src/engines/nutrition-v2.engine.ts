@@ -7,7 +7,7 @@ export interface NutritionV2Input {
   sex: 'male' | 'female';
   bodyFatPercent?: number;
   pal: number;
-  goal: 'deficit' | 'maintenance' | 'bulk' | 'mini_cut' | 'cut';
+  goal: 'deficit' | 'maintenance' | 'bulk' | 'mini_cut' | 'cut' | 'strength' | 'recomp' | 'rehab';
   trainingDaysPerWeek?: number;
   avgTrainingMinutes?: number;
 }
@@ -31,6 +31,11 @@ export interface NutritionV2Output {
 
 export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   const v2 = getNutritionV2Data();
+
+  // Д-16: 'cut' — маппинг fat_loss/cutting из планировщика. Все ветки дефицита
+  // (goalMult/белок/карб-флор/адаптация) трактуют 'cut' как deficit — раньше
+  // адаптивные фичи учитывали его, а goalMult/proteinFactor/carbMinFromVolume — нет.
+  const isDeficit = input.goal === 'deficit' || input.goal === 'mini_cut' || input.goal === 'cut';
 
   // 1. Calculate LBM (lean body mass) — athletic default BF% (B8 fix)
   const bfPct = (input.bodyFatPercent && input.bodyFatPercent > 3) ? input.bodyFatPercent : (input.sex === 'male' ? 12 : 22);
@@ -88,7 +93,8 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
 
   // Target kcal = maintenance TDEE × goal multiplier (B2+B3 fix: single penalty, not double)
   const goalMult = input.goal === 'deficit' ? 0.85
-    : input.goal === 'mini_cut' ? 0.82  // B3: single multiplier instead of double penalty
+    : input.goal === 'mini_cut' ? 0.82
+    : input.goal === 'cut' ? 0.85
     : input.goal === 'bulk' ? 1.08
     : 1.0;
   let targetKcal = Math.round(tdee * goalMult);
@@ -96,7 +102,7 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   // 7. Macros — sport dietology standard: LBM-based protein, weight-based fat, residual carbs (B2+B3 fix)
   const profileGPerKg = v2.proteinGPerKg || 0;
   const proteinFactor = profileGPerKg > 0 ? profileGPerKg
-    : input.goal === 'deficit' || input.goal === 'mini_cut' ? 2.5
+    : isDeficit ? 2.5
     : input.goal === 'bulk' ? 2.0
     : 2.0;
   const proteinG = Math.round(lbm * proteinFactor);
@@ -123,16 +129,16 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   else carbMinFromVolume = 2.0;
   if (input.goal === 'deficit') carbMinFromVolume *= 0.7;
   else if (input.goal === 'mini_cut') carbMinFromVolume *= 0.6;
+  else if (input.goal === 'cut') carbMinFromVolume *= 0.7;
   else if (input.goal === 'bulk') carbMinFromVolume *= 1.2;
   const trainingCarbFloor = Math.round(input.weightKg * carbMinFromVolume);
   // Raise carb floor if training demands more (but don't exceed calorie budget)
   carbsG = Math.max(carbsG, Math.min(trainingCarbFloor, Math.max(carbFloorG, Math.round((targetKcal - proteinKcal - fatKcal) / 3.5))));
 
   // kcal from macros — should be close to targetKcal (B2 fix: one unified pathway)
+  // Audit-fix: ниже убран повторный пересчёт carbsG (дублировал строку выше и
+  // затирал поднятый тренировочный карб-флор) — carbsG остаётся как рассчитан.
   let kcal = proteinKcal + fatKcal + carbsG * 4;
-  // Scale to match target exactly (absorb rounding differences into carbs)
-  carbsG = Math.max(carbFloorG, Math.round((targetKcal - proteinKcal - fatKcal) / 4));
-  kcal = proteinKcal + fatKcal + carbsG * 4;
 
   // Safety bounds (B12 fix)
   const minKcal = Math.round(proteinKcal + fatKcal + carbFloorG * 4);

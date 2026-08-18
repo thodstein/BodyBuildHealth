@@ -141,6 +141,10 @@ function pct(v: number | undefined, scale: number): number {
   return (v ?? 0) * scale;
 }
 
+function safeWeight(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // 3. STEP 1: PHASE MODIFIERS
 // ═══════════════════════════════════════════════════════════════════
@@ -496,7 +500,8 @@ export function calcMealScoreV2(
       const food = FOOD_DB.find(f => f.id === p.foodId);
       if (!food) return null;
       const score = calculateOverallScore(food, profile, timing);
-      return { food, score, weightG: p.weightGrams };
+      const weightG = safeWeight(p.weightGrams);
+      return weightG > 0 ? { food, score, weightG } : null;
     })
     .filter((e): e is NonNullable<typeof e> => e !== null);
 
@@ -520,7 +525,7 @@ export function calcMealScoreV2(
 
   // Modifiers for the meal
   const modifiers: { name: string; value: number }[] = [];
-  const leucineTotal = entries.reduce((s, e) => s + (e.food.amino_acid_profile_100g?.leucine_mg ?? 0) * e.weightG / 100, 0);
+  const leucineTotal = entries.reduce((s, e) => s + (e.food.amino_acid_profile_100g?.leucine_mg ?? (e.food.protein || 0) * 75) * e.weightG / 100, 0);
   if (leucineTotal >= 3000) modifiers.push({ name: 'Лейциновый триггер (mTOR)', value: 1.5 });
   const avgEnzyme = entries.reduce((s, e) => s + (e.food.gastro_tags?.enzyme_demand_score ?? 3) * e.weightG, 0) / totalW;
   if (avgEnzyme > 7) modifiers.push({ name: 'Высокая ферментная нагрузка', value: -2.0 });
@@ -639,7 +644,7 @@ export function calcDIAAS(f: FoodItem): { diaas: number; limitingAA: string; sco
 }
 
 export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[]): { diaas: number; limitingAA: string; reliable: boolean } {
-  const entries = products.map(p => ({ f: FOOD_DB.find(x => x.id === p.foodId), w: p.weightGrams })).filter(e => e.f);
+  const entries = products.map(p => ({ f: FOOD_DB.find(x => x.id === p.foodId), w: safeWeight(p.weightGrams) })).filter(e => e.f && e.w > 0);
   const totalW = entries.reduce((s, e) => s + e.w, 0);
   if (totalW === 0) return { diaas: 0, limitingAA: '—', reliable: false };
 
@@ -688,7 +693,7 @@ export function analyzeDailyDiet(
   meals: { timing?: MealTiming; products: { foodId: string; weightGrams: number }[] }[],
   profile: UserDietProfile,
 ): DailyDietReport {
-  const allProducts = meals.flatMap(m => m.products.map(p => ({ ...p, timing: m.timing })));
+  const allProducts = meals.flatMap(m => m.products.map(p => ({ ...p, weightGrams: safeWeight(p.weightGrams), timing: m.timing })).filter(p => p.weightGrams > 0));
   const totalW = allProducts.reduce((s, p) => s + p.weightGrams, 0);
 
   // Helper: total of a field
@@ -752,8 +757,14 @@ export function analyzeDailyDiet(
 
   // Insulin ricochet
   const intraMeal = meals.find(m => m.timing === 'intra_workout');
+  const intraCarbs = intraMeal
+    ? intraMeal.products.reduce((s, p) => {
+        const f = FOOD_DB.find(x => x.id === p.foodId);
+        return s + (f ? (f.carbs || 0) * Math.max(0, p.weightGrams) / 100 : 0);
+      }, 0)
+    : 0;
   const insulinRicohet = intraMeal && (profile.pharma.HGH || profile.pharma.INSULIN_USE)
-    ? (sumF(f => f.carbs) > profile.weightKg && !intraMeal.products.some(p => p.foodId === 'amylopectin'))
+    ? (intraCarbs > profile.weightKg && !intraMeal.products.some(p => p.foodId === 'amylopectin'))
     : false;
 
   // PRAL

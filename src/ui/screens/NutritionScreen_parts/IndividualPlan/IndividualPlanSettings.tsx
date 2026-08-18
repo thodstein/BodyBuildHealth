@@ -113,6 +113,7 @@ export const IndividualPlanSettings: React.FC = () => {
     trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
+    plannerMode, setPlannerMode,
     dietPrefs, setDietPrefs,
     userRecipes, labAnalysis, labs,
     errorMsg, setErrorMsg,
@@ -210,6 +211,40 @@ export const IndividualPlanSettings: React.FC = () => {
     try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch {}
   };
 
+  if (plannerMode === 'minimal') {
+    return (
+      <>
+        <GlassCard title="⚡ Быстрый КБЖУ" icon="⚡" color="#f59e0b">
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.72)', lineHeight:1.5, marginBottom:8 }}>
+            Минимальный режим: только базовые данные и расчёт сухого КБЖУ. Расширенные настройки сохранены и доступны после возврата в Pro.
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, marginBottom:6 }}>
+            <PopupNumber label="Вес" value={weight} min={30} max={250} suffix="кг" onChange={setWeight} />
+            <PopupNumber label="Рост" value={height} min={100} max={250} suffix="см" onChange={setHeight} />
+            <PopupNumber label="Возраст" value={age} min={14} max={100} suffix="лет" onChange={setAge} />
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:6 }}>
+            <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
+            <PopupNumber label="Приёмов пищи" value={mealsCount} min={3} max={8} onChange={setMealsCount} />
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
+            {GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
+            <div style={{ padding:7, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#00e68a' }}>{effectiveKcal}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>ккал</div></div>
+            <div style={{ padding:7, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#3b82f6' }}>Б {effectiveP} / Ж {effectiveF} / У {effectiveC}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>граммы в день</div></div>
+          </div>
+          {errorMsg && <div style={{ fontSize:9, color:'#ef4444', padding:'5px 8px', marginBottom:6, background:'rgba(239,68,68,0.06)', borderRadius:6 }}>⚠️ {errorMsg}</div>}
+          <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
+        </GlassCard>
+        <GlassCard title="Режим планировщика" icon="🧬" color="#60a5fa">
+          <button onClick={() => setPlannerMode('simple')} style={{ width:'100%', padding:9, borderRadius:8, cursor:'pointer', background:'#202023', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa', fontSize:10, fontWeight:700 }}>🍽 Перейти в простой режим</button>
+          <button onClick={() => setPlannerMode('pro')} style={{ width:'100%', padding:9, marginTop:5, borderRadius:8, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.25)', color:'#00e68a', fontSize:10, fontWeight:700 }}>🧬 Вернуться в Pro</button>
+        </GlassCard>
+      </>
+    );
+  }
+
   return (
     <>
 
@@ -242,7 +277,15 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {/* Кнопка генерации (Pro Engine — единый движок) */}
       {true && (
-      <GlassCard title="🧬 Генерация плана" icon="🧬" color="#00e68a">
+       <GlassCard title="🧬 Генерация плана" icon="🧬" color="#00e68a">
+         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:8 }}>
+           {[
+             { id:'pro' as const, label:'🧬 Pro', color:'#00e68a', hint:'Полный V2-анализ' },
+             { id:'simple' as const, label:'🍽 Простой', color:'#60a5fa', hint:'КБЖУ без V2-оценок' },
+             { id:'minimal' as const, label:'⚡ Быстрый', color:'#f59e0b', hint:'Минимум данных' },
+           ].map(mode => <button key={mode.id} onClick={() => setPlannerMode(mode.id)} title={mode.hint} style={{ padding:'7px 3px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700, background: plannerMode === mode.id ? `${mode.color}22` : '#202023', border: plannerMode === mode.id ? `1px solid ${mode.color}` : '1px solid rgba(255,255,255,0.06)', color: plannerMode === mode.id ? mode.color : 'rgba(255,255,255,0.7)' }}>{mode.label}</button>)}
+         </div>
+         <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', marginBottom:8 }}>{plannerMode === 'pro' ? 'Полный подбор с V2-скорингом, микроанализом и расширенными рекомендациями.' : plannerMode === 'simple' ? 'Рацион подбирается по КБЖУ и ограничениям без V2-оценок.' : 'Остаются базовые параметры и сухое КБЖУ; необязательные настройки не используются.'}</div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
           ✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин
         </div>
@@ -354,8 +397,8 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
       {/* 🏁 Тапер ББ — единая система пикинга (для обоих полов) */}
-      {true && (
-        <GlassCard title="Тапер ББ (пик-неделя)" icon="🏁" color="#f59e0b">
+       {plannerMode === 'pro' && (
+       <GlassCard title="Тапер ББ (пик-неделя)" icon="🏁" color="#f59e0b">
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 6, lineHeight: 1.45 }}>
             Пикинг к шоу: тренировочный тапер + 7-дневная пик-неделя (карбс/вода/натрий по дням).
             {bbPrepConfig
@@ -387,8 +430,8 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
         {/* 💧 Electrolytes — quick settings (фарма перенесена в «🧬 v2 Скоринг», здесь только электролиты во избежание дубля) */}
-      {true && (
-        <GlassCard title="💧 Электролиты" icon="💧" color="#06b6d4">
+       {plannerMode === 'pro' && (
+         <GlassCard title="💧 Электролиты" icon="💧" color="#06b6d4">
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6 }}>
             <PopupNumber label="Натрий" value={Number(v2Labs.sodium)||3500} min={0} max={10000} step={100} suffix="мг" onChange={v=>setV2Labs((p:any)=>({...p,sodium:v}))} />
             <PopupNumber label="Калий" value={Number(v2Labs.potassium)||4500} min={0} max={10000} step={100} suffix="мг" onChange={v=>setV2Labs((p:any)=>({...p,potassium:v}))} />
@@ -399,8 +442,8 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
         {/* v2 Scoring Profile — moved to top */}
-      {true && (
-        <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
+       {plannerMode === 'pro' && (
+         <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
             <div style={{ marginBottom: 4 }}>Качество рациона оценивается по шкале 0–10 на основе: состава макронутриентов, содержания клетчатки, профиля аминокислот и микронутриентной плотности. Результат влияет на подбор продуктов и расчёт итогового скоринга каждого приёма пищи.</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>

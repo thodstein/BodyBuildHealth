@@ -38,7 +38,7 @@ import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
   type GoalId, type PhaseId, type BudgetLevel, type NutritionLevel,
-  type PlanType, type CycleType,
+  type PlanType, type CycleType, type PlannerMode,
   type DrugInjection, type MealPrepStep, type SavedPlan
 } from "./types";
 import { getProfileSafe, GlassCard, PillBtn, inputStyle, selectStyle, greenBtn, reportPillStyle } from "./ui";
@@ -253,6 +253,7 @@ export interface PlanCtx {
   v2Labs: Record<string, string>; setV2Labs: (v: any) => void;
   v2Pharma: Record<string, boolean>; setV2Pharma: (v: any) => void;
   histamineSensitive: boolean; setHistamineSensitive: (v: boolean) => void;
+  plannerMode: PlannerMode; setPlannerMode: (v: PlannerMode) => void;
   dietPrefs: string[]; setDietPrefs: (v: string[]) => void;
   errorMsg: string | null; setErrorMsg: (v: string | null) => void;
   // P0-2: useProEngine — всегда TRUE (мёртвый toggle удалён); защита от деградации — try/catch fallback на классический путь в generatePlan.
@@ -971,9 +972,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try { const v = (s as any)?.nutrition?.histamineSensitive; if (typeof v === 'boolean') return v; } catch {}
     try { return localStorage.getItem('he_planner_histamine') === 'true'; } catch { return false; }
   });
+  const [plannerMode, setPlannerMode] = useState<PlannerMode>(() => {
+    try {
+      const value = localStorage.getItem('he_planner_mode');
+      return value === 'simple' || value === 'minimal' || value === 'pro' ? value : 'pro';
+    } catch { return 'pro'; }
+  });
+  const plannerModeRef = useRef<PlannerMode>(plannerMode);
+  useEffect(() => { plannerModeRef.current = plannerMode; }, [plannerMode]);
   useEffect(() => { try { localStorage.setItem('he_planner_labs', JSON.stringify(v2Labs)); } catch {} }, [v2Labs]);
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
+  useEffect(() => { try { localStorage.setItem('he_planner_mode', plannerMode); } catch {} }, [plannerMode]);
    useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
    // FIX save-buttons: пользовательские рецепты читались из he_user_recipes, но НИКОГДА
    // не сохранялись — созданный рецепт пропадал при перезагрузке.
@@ -1753,9 +1763,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
           calciumTargetOverride: _caInfo ? _caInfo.target : undefined,
           sodiumTargetOverride: _peakTargets?.phase ? _peakTargets.sodiumMg : (_legacyPeakDay ? Math.round((isTrain ? Math.max(3000, 3000 + weight * 5) : 2300) * _legacyPeakDay.sodiumMod) : undefined),
-          menstrualPhaseNote: _mp ? _mp.note : undefined,
-          carbGiPref: _mp ? _mp.carbGiPref : undefined,
-        };
+           menstrualPhaseNote: _mp ? _mp.note : undefined,
+           carbGiPref: _mp ? _mp.carbGiPref : undefined,
+           quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
+         };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
         // #2 Голод: высокий → белок/клетчатка/объхм; хронический → refeed.
@@ -1787,7 +1798,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber, leucine_mg: it.leucine_mg,
           })), totals: { kcal: m?.totals?.kcal || 0, p: m?.totals?.p || 0, f: m?.totals?.f || 0, c: m?.totals?.c || 0, fiber: m?.totals?.fiber || 0 },
           conflictWarnings: undefined, synergyNotes: undefined,
-          rationale: m.rationale, mpsCheck: m.mpsCheck, target: m.target,
+           rationale: m.rationale, mpsCheck: plannerModeRef.current === 'pro' ? m.mpsCheck : undefined, target: m.target,
         }));
         const dayKcalForPct = Math.max(1, v2.totals.kcal);
         const mealTimesPro = meals.map((m: { time: string; label: string; totals: { kcal: number } }) => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
@@ -1840,7 +1851,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           redSNote: _redSNote,
           energyAvailability: _ea,
           hungerNote: _hungerNote,
-          healthScore: { score: _healthScore, status: _healthStatus, micro: _microAvg, fiber: _fiberScore, mps: _mpsScore, ea: _eaScore, diversity: _divScore, conflicts: _conflicts },
+          healthScore: plannerModeRef.current === 'pro' ? { score: _healthScore, status: _healthStatus, micro: _microAvg, fiber: _fiberScore, mps: _mpsScore, ea: _eaScore, diversity: _divScore, conflicts: _conflicts } : null,
         };
       };
 
@@ -2775,7 +2786,10 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
 
-  const generateRecommendations = () => { setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections: Array.isArray(injections) ? injections : [], linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {}, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode })); };
+  const generateRecommendations = () => {
+    if (plannerModeRef.current !== 'pro') { setRecommendations([]); return; }
+    setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections: Array.isArray(injections) ? injections : [], linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {}, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, dietPauseMode }));
+  };
 
   useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [Array.isArray(injections) ? injections.length : 0]);
 
@@ -2977,7 +2991,8 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
      customNotes, setCustomNotes,
     dietPrefs, setDietPrefs,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
-    histamineSensitive, setHistamineSensitive,
+     histamineSensitive, setHistamineSensitive,
+     plannerMode, setPlannerMode,
     labAnalysis,
     errorMsg, setErrorMsg,
     useProEngine,
@@ -2985,7 +3000,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     labs,
   }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
-  const renderMealList = useRenderMealList(ctx);
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, renderMealList }), [ctx, renderMealList]);
+  const renderMealList = useRenderMealList({ ...ctx, plannerMode });
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, renderMealList }), [ctx, plannerMode, renderMealList]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };

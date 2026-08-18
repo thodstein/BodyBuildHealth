@@ -6,6 +6,7 @@ export type BudgetLevel = 'low' | 'medium' | 'max' | 'enhanced';
 export type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
 export type PlanType = 'classic' | 'keto' | 'highcarb' | 'mediterranean' | 'vegetarian';
 export type CycleType = 'none' | 'macro' | 'butch' | 'cheatmeal' | 'carbload';
+export type PlannerMode = 'pro' | 'simple' | 'minimal';
 
 export interface DrugInjection { id: string; name: string; time: string; dose: number; unit: string; type: string; esterType: 'rapid' | 'short' | 'long' | 'none'; halfLifeHours: number; trainLinked: boolean; trainTiming: 'before' | 'after' | 'both' | 'none'; }
 export interface MealPrepStep { step: number; action: string; duration: number; items: string[]; items_standby?: boolean; items_parallel?: boolean; items_can_boil_simultaneously?: boolean; }

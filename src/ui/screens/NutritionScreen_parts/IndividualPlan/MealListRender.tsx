@@ -23,7 +23,7 @@ const _dayMicrosCache = new WeakMap<object, { visibleMicros: any[] } | null>();
 const _similarFoodsCache = new WeakMap<object, any[]>();
 
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
-  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, phase, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal } = ctx;
+  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal } = ctx;
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
@@ -37,7 +37,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           <div style={{padding:'10px 12px',background:d.isTrainingDay?'linear-gradient(135deg, rgba(0,230,138,0.1), rgba(0,200,160,0.03))':'#202023'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
               <span style={{fontSize:20,filter:d.isTrainingDay?'none':'grayscale(0.5)'}}>{d.isTrainingDay?'🏋️':'😴'}</span>
-              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:800,color:d.isTrainingDay?'#00e68a':'rgba(255,255,255,0.85)'}}>{d.isTrainingDay?'🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ':'😴 ДЕНЬ ОТДЫХА'}</div> <span style={{fontSize:10,fontWeight:700,color:'#a78bfa',background:'rgba(167,139,250,0.12)',padding:'1px 5px',borderRadius:6,border:'1px solid rgba(167,139,250,0.25)',marginLeft:4,verticalAlign:'middle'}}>Pro движок</span>
+              <div style={{flex:1}}><div style={{fontSize:12,fontWeight:800,color:d.isTrainingDay?'#00e68a':'rgba(255,255,255,0.85)'}}>{d.isTrainingDay?'🏆 ТРЕНИРОВОЧНЫЙ ДЕНЬ':'😴 ДЕНЬ ОТДЫХА'}</div> {plannerMode === 'pro' && <span style={{fontSize:10,fontWeight:700,color:'#a78bfa',background:'rgba(167,139,250,0.12)',padding:'1px 5px',borderRadius:6,border:'1px solid rgba(167,139,250,0.25)',marginLeft:4,verticalAlign:'middle'}}>Pro движок</span>}
               {weightLogEntries.length >= 3 && (() => { const vals = weightLogEntries.map(e => e.weight); const min = Math.min(...vals); const max = Math.max(...vals); const range = max - min || 1; const h = 24; const w = 80; const pts = vals.map((v,i) => `${Math.round(i/(vals.length-1)*w)},${Math.round(h-(v-min)/range*h)}`).join(' '); const trend = vals.length >= 2 && vals[vals.length-1] < vals[0]; return (<div style={{display:'inline-flex',alignItems:'center',gap:3,marginLeft:6}}><svg width={w} height={h} style={{verticalAlign:'middle'}}><polyline points={pts} fill="none" stroke={trend?'#22c55e':'#ef4444'} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{fontSize:10,color:trend?'#22c55e':'#ef4444',fontWeight:600}}>{trend?'↓':'↑'} {Math.abs(vals[vals.length-1]-vals[0]).toFixed(1)} кг</span></div>); })()}</div>
               <div style={{padding:'4px 10px',borderRadius:8,background:d.isTrainingDay?'rgba(0,230,138,0.1)':'rgba(255,255,255,0.03)',border:d.isTrainingDay?'1px solid rgba(0,230,138,0.2)':'1px solid rgba(255,255,255,0.06)'}}>
                 <div style={{fontSize:16,fontWeight:900,color:Math.abs(totalKcal-(effectiveKcal||0))<=Math.max(50,(effectiveKcal||0)*0.08)?'#00e68a':'#f59e0b',lineHeight:1}}>{totalKcal}<span style={{fontSize:8,fontWeight:400,color:'rgba(255,255,255,0.5)'}}>/{effectiveKcal||'---'}</span></div>
@@ -82,8 +82,8 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
         {d.meals.map((m: any, mi: number) => {
           const mealKcal = Math.round(m.totals?.kcal || 0); const mealP = Math.round(m.totals?.p || 0); const mealF = Math.round(m.totals?.f || 0); const mealC = Math.round(m.totals?.c || 0);
           // FIX week-perf: метрики считаются один раз на объект приёма (WeakMap)
-          let _mm = _mealMetricsCache.get(m);
-          if (!_mm) {
+           let _mm = plannerMode === 'pro' ? _mealMetricsCache.get(m) : undefined;
+           if (plannerMode === 'pro' && !_mm) {
             _mm = {
               diaas: calcMealDIAAS((m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 }))).diaas,
               gl: Math.round((m.items || []).reduce((s: number, it: any) => { const fd = FOOD_DB.find((f: any) => f.id === it.id); const gi = fd?.gi || 0; return s + (gi * (it.c || 0) / 100); }, 0)),
@@ -91,9 +91,9 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
             };
             _mealMetricsCache.set(m, _mm);
           }
-          const mealDiaas = { diaas: _mm.diaas };
-          const mealGL = _mm.gl;
-          const mealII = _mm.ii;
+           const mealDiaas = { diaas: _mm?.diaas || 0 };
+           const mealGL = _mm?.gl || 0;
+           const mealII = _mm?.ii || 0;
           const isPreWorkout = m.label?.toLowerCase().includes('предтрен'); const isPostWorkout = m.label?.toLowerCase().includes('пост-трен'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : '#00e68a';
           return (
             <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}

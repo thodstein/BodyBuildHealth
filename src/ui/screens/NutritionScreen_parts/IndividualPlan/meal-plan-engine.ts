@@ -125,6 +125,7 @@ export interface MealPlanInput {
   menstrualPhaseNote?: string;
   // #5 Menstrual carb GI preference ('low' = strict low-GI in luteal/menstrual).
   carbGiPref?: 'low' | 'normal' | 'high';
+  quality?: 'full' | 'basic';
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -363,13 +364,14 @@ const _pickCtx: { tasteProfile: any; deprioritizedIds: Set<string> | undefined; 
 let _tasteProfile: any = undefined;
 let _deprioritizedIds: Set<string> | undefined = undefined;
 let _categoryPref: any = undefined;
+let _qualityMode: 'full' | 'basic' = 'full';
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
   if (arr.length === 1) return arr[0];
   const weights = arr.map((f, i) => {
     const score = (f as any).bb_quality_score ?? 5;
-    let w = Math.max(0.5, Math.pow(score, 1.5));
+    let w = _qualityMode === 'full' ? Math.max(0.5, Math.pow(score, 1.5)) : 1;
     // A: taste profile boost — foods matching user's taste preferences get higher weight
     if (_tasteProfile) { const ts = tasteMatchScore(f, _tasteProfile); if (ts > 0) w *= (1 + ts * 0.3); }
     // B: deprioritize frequently-replaced foods
@@ -510,6 +512,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const _cpref = opts?.categoryPref; if (_cpref) _baseFiltered = _baseFiltered.filter(f => matchesCategoryPref(f, _cpref));
   const basePool = _baseFiltered;
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
+    if (_qualityMode === 'basic') return arr.filter(f => !isPremiumOrExotic(f.id));
     if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 8);
     // Д-3: 'low' budget = affordable quality AND not premium/exotic (abalone, game, macadamia, etc.)
     if (budget === 'low') return arr.filter(f => (f.bb_quality_score ?? 5) <= 7 && !isPremiumOrExotic(f.id));
@@ -1097,6 +1100,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (!input.mealsCount || typeof input.mealsCount !== 'number' || isNaN(input.mealsCount) || input.mealsCount < 3) {
     input = { ...input, mealsCount: 5 };
   }
+  _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
   const tBreakfast = input.wakeTime || '07:30';
@@ -1615,10 +1619,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
-  notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
+  if (_qualityMode === 'full') notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
   notes.push(`Диверсификация: ${uniqueFoods} уникальных продуктов (${Object.keys(categories).length} категорий)`);
   if (input.isCutting) notes.push('Сушка: повышенная плотность белка, заниженные углеводы у ужина');
-  if (mpsSummary.prePostWindow) notes.push('Pre/post-workout окно реализовано (полноценное анаболическое обеспечение тренировки)');
+  if (_qualityMode === 'full' && mpsSummary.prePostWindow) notes.push('Pre/post-workout окно реализовано (полноценное анаболическое обеспечение тренировки)');
   // Fiber check
   const fiberG = Math.round(totals.fiber);
   const fiberTarget = input.sex === 'female' ? 25 : 35;
@@ -1825,7 +1829,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // микронутриентно-адекватным, а не только диагностированным). Добавляем целевой
   // продукт для самого критичного дефицита (<60% RDA) в самый лёгкий приём, затем
   // пересчитываем макро-totals — kcal пересчитается блоком Atwater ниже.
-  const microBoost = activelyCloseTopDeficiency(meals, !!input.isVegetarian, input.sex || 'male', input.excludedIds || new Set());
+  const microBoost = _qualityMode === 'full'
+    ? activelyCloseTopDeficiency(meals, !!input.isVegetarian, input.sex || 'male', input.excludedIds || new Set())
+    : { note: null };
   if (microBoost.note) {
     notes.push('🧬 ' + microBoost.note);
     totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
@@ -1834,28 +1840,31 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───
   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
   meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
-  const deficiencyClosure = closeFoodDeficiencies(meals, !!input.isVegetarian, input.sex || 'male');
+  const deficiencyClosure = _qualityMode === 'full'
+    ? closeFoodDeficiencies(meals, !!input.isVegetarian, input.sex || 'male')
+    : [];
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // #1 Микронутриентный coverage: фазо-зависимые RDA + верхние пределы + structured summary.
   // Считаем ПОСЛЕ activelyCloseTopDeficiency (учитывает добавленный продукт).
   const _microItems = meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount })));
-  const _microRes = analyzeMicroCoverage(
+  const _microRes = _qualityMode === 'full' ? analyzeMicroCoverage(
     (() => { const tot: Record<string, number> = {}; _microItems.forEach(it => { const f = FOOD_DB.find(x => x.id === it.id); if (f && f.micros) { const r = (it.amount||0)/100; for (const [k,v] of Object.entries(f.micros)) tot[k] = (tot[k]||0) + (v||0)*r; } }); for (const k of Object.keys(tot)) tot[k] = Math.round(tot[k]*10)/10; return tot; })(),
     input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride,
-  );
+  ) : { coverage: [], topDeficitNutrient: null, surpluses: [], totals: {} };
   // Nutrients already covered by closeFoodDeficiencies (avoid duplicate deficit notes).
   const _existingMicroKeys = new Set(['Fe','Mg','Zn','K','Ca','Omega3','Se','VitC','VitD','VitB12','VitB9']);
-  for (const c of _microRes.coverage) {
+  for (const c of _qualityMode === 'full' ? _microRes.coverage : []) {
     if (c.status === 'low') { notes.push(`🟡 ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — близко к дефициту`); }
     else if (c.status === 'deficit' && !_existingMicroKeys.has(c.nutrient)) { notes.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`); }
   }
-  if (_microRes.surpluses.length > 0) notes.push(..._microRes.surpluses);
+  if (_qualityMode === 'full' && _microRes.surpluses.length > 0) notes.push(..._microRes.surpluses);
   // #1 женская фаза цикла: проброс заметки в plan notes.
   if (input.menstrualPhaseNote) notes.push(input.menstrualPhaseNote);
   // #2 Электролиты: натриевый баланс + K:Na соотношение.
-  {
-    const na = _microRes.totals['Na'] || 0;
-    const k  = _microRes.totals['K'] || 0;
+  if (_qualityMode === 'full') {
+    const totals = _microRes.totals as Record<string, number>;
+    const na = totals['Na'] || 0;
+    const k = totals['K'] || 0;
     const naTarget = input.isTrainingDay ? Math.max(3000, Math.round(3000 + input.weightKg * 5)) : 2300;
     if (na < 1500 && input.sodiumTargetOverride === undefined) { // peak-week управляет Na намеренно
       const gapMg = Math.round(naTarget - na);
@@ -1951,6 +1960,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _tasteProfile = undefined;
     _deprioritizedIds = undefined;
     _categoryPref = undefined;
+    _qualityMode = 'full';
   }
 }
 

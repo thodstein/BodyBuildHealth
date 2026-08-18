@@ -82,12 +82,20 @@ export const MealComposer: React.FC = () => {
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
     setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
-    setPlanTab,
+     setPlanTab, plannerMode,
   } = usePlanCtx();
 
   const [composerMode, setComposerMode] = useState<ComposerMode>('basic');
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>({});
   const [selectedMealForTargeting, setSelectedMealForTargeting] = useState<number | null>(null);
+  const allowAdvancedComposer = plannerMode === 'pro';
+  React.useEffect(() => {
+    if (!allowAdvancedComposer && composerMode !== 'basic') {
+      setComposerMode('basic');
+      setSelectedMealForTargeting(null);
+      setAdvancedFilter({});
+    }
+  }, [allowAdvancedComposer, composerMode]);
 
   const currentDay = dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null);
   const dayProducts = useMemo(() => getProductsFromDayPlan(currentDay), [currentDay]);
@@ -180,6 +188,7 @@ export const MealComposer: React.FC = () => {
             onAdvancedFilterChange={setAdvancedFilter}
             gapResult={gapResult}
             gapSummary={gapSummary}
+            allowAdvanced={allowAdvancedComposer}
           />
 
           {/* KBJU progress bars */}

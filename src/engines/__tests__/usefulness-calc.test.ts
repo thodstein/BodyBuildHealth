@@ -44,11 +44,20 @@ describe('calcMealScoreV2', () => {
     expect(Number.isFinite(r.compositeScore)).toBe(true);
   });
 
-  it('все веса = 0 → нет NaN (totalW-guard)', () => {
+  it('все веса = 0 → скор 0 без NaN (пустой приём не скорится)', () => {
     const r = calcMealScoreV2([{ foodId: 'chicken_breast', weightGrams: 0 }, { foodId: 'rice_white', weightGrams: 0 }], getDefaultProfile());
     expect(Number.isFinite(r.compositeScore)).toBe(true);
-    expect(r.compositeScore).toBeGreaterThanOrEqual(1);
-    expect(r.compositeScore).toBeLessThanOrEqual(10);
+    expect(r.compositeScore).toBe(0);
+    expect(r.productScores).toHaveLength(0);
+  });
+
+  it('отрицательные и NaN-веса исключаются из расчёта', () => {
+    const r = calcMealScoreV2([
+      { foodId: 'chicken_breast', weightGrams: -100 },
+      { foodId: 'rice_white', weightGrams: Number.NaN },
+    ], getDefaultProfile());
+    expect(r.compositeScore).toBe(0);
+    expect(r.productScores).toHaveLength(0);
   });
 
   it('100г курицы → корректные макросы и скор в 1-10', () => {
@@ -134,6 +143,16 @@ describe('analyzeDailyDiet', () => {
   it('mTOR: 150г курицы + 40г сыворотки триггерит', () => {
     const r = analyzeDailyDiet([{ products: [{ foodId: 'chicken_breast', weightGrams: 150 }, { foodId: 'whey_isolate', weightGrams: 40 }] }], prof);
     expect(r.mtorTriggered).toBe(true);
+  });
+
+  it('insulinRicohet учитывает только intra-workout углеводы', () => {
+    const p = getDefaultProfile();
+    p.pharma.INSULIN_USE = true;
+    const r = analyzeDailyDiet([
+      { timing: 'regular', products: [{ foodId: 'rice_white', weightGrams: 500 }] },
+      { timing: 'intra_workout', products: [{ foodId: 'chicken_breast', weightGrams: 100 }] },
+    ], p);
+    expect(r.insulinRicohet).toBe(false);
   });
 });
 

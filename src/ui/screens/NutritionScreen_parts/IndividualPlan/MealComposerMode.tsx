@@ -12,6 +12,7 @@ interface Props {
   onAdvancedFilterChange: (f: AdvancedFilter) => void;
   gapResult?: NutrientGapResult | null;
   gapSummary?: GapSummary[];
+  allowAdvanced?: boolean;
 }
 
 const btnCardStyle: React.CSSProperties = {
@@ -66,7 +67,7 @@ const sliderStyle: React.CSSProperties = {
 };
 
 export const MealComposerMode: React.FC<Props> = ({
-  mode, onModeChange, advancedFilter, onAdvancedFilterChange, gapResult, gapSummary,
+  mode, onModeChange, advancedFilter, onAdvancedFilterChange, gapResult, gapSummary, allowAdvanced = true,
 }) => {
   const [showAdvSettings, setShowAdvSettings] = useState(false);
 
@@ -100,7 +101,7 @@ export const MealComposerMode: React.FC<Props> = ({
 
       {/* Mode selection buttons */}
       <div style={{ display: 'flex', gap: 6, marginBottom: mode === 'advanced' || mode === 'targeting' ? 8 : 0 }}>
-        <div
+        {allowAdvanced && <div
           style={mode === 'basic' ? activeCardStyle : btnCardStyle}
           onClick={() => onModeChange('basic')}
         >
@@ -109,8 +110,8 @@ export const MealComposerMode: React.FC<Props> = ({
           <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
             Подбор по КБЖУ
           </span>
-        </div>
-        <div
+        </div>}
+        {allowAdvanced && <div
           style={mode === 'advanced' ? { ...activeCardStyle, borderColor: 'rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.08)', boxShadow: '0 0 16px rgba(139,92,246,0.06)' } : btnCardStyle}
           onClick={() => onModeChange('advanced')}
         >
@@ -119,7 +120,7 @@ export const MealComposerMode: React.FC<Props> = ({
           <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3 }}>
             DIAAS · GI · PRAL · Обработка
           </span>
-        </div>
+        </div>}
         <div
           style={mode === 'targeting' ? { ...activeCardStyle, borderColor: 'rgba(6,182,212,0.4)', background: 'rgba(6,182,212,0.08)', boxShadow: '0 0 16px rgba(6,182,212,0.06)' } : btnCardStyle}
           onClick={() => onModeChange('targeting')}

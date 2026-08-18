@@ -77,6 +77,7 @@ export const IndividualPlanResults: React.FC = () => {
     linkToTraining, trainStart,
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
+    plannerMode,
     setErrorMsg,
     setPlanTab,
   } = usePlanCtx();
@@ -100,6 +101,7 @@ export const IndividualPlanResults: React.FC = () => {
     const _di = Math.max(0, Math.min(selectedDayIndex, planDays === 3 ? 2 : planDays === 7 ? 6 : 0));
     const activePlan = planDays === 1 ? dayPlan : planDays === 3 ? threeDayPlan?.days?.[_di] : weekPlan?.days?.[_di];
     if (!activePlan || !Array.isArray(activePlan.meals)) { setCorrectIssues([]); return; }
+    if (plannerMode !== 'pro') { setCalcResults(null); setCalcDailyReport(null); return; }
     const profile = getDefaultProfile();
     profile.phase = (v2Phase as any) || 'LEAN_MASS';
     profile.pharma.AAS_ORAL = v2Pharma.AAS_ORAL || false;
@@ -456,7 +458,7 @@ export const IndividualPlanResults: React.FC = () => {
         </GlassCard>
       </>)}
       {/* #8 Health-score дня */}
-      {generated && dayPlan && (dayPlan as any).healthScore && (() => {
+      {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).healthScore && (() => {
         const hs = (dayPlan as any).healthScore;
         const col = hs.status === 'green' ? '#22c55e' : hs.status === 'yellow' ? '#f59e0b' : '#ef4444';
         const bg = hs.status === 'green' ? 'rgba(34,197,94,0.08)' : hs.status === 'yellow' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
@@ -482,7 +484,7 @@ export const IndividualPlanResults: React.FC = () => {
         );
       })()}
       {/* Pro Engine MPS-сводка */}
-      {generated && dayPlan && (dayPlan as any).mpsSummary && (
+      {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).mpsSummary && (
         <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', marginBottom:8 }}>
           <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:4 }}>🧬 Muscle Protein Synthesis</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
@@ -512,7 +514,7 @@ export const IndividualPlanResults: React.FC = () => {
       )}
       {/* Адаптация по дневнику: баннер компенсации вчерашнего отклонения */}
       {/* #1 Микронутриентный coverage — структура по 16 нутриентам */}
-      {generated && dayPlan && (dayPlan as any).microSummary && (dayPlan as any).microSummary.coverage && (() => {
+      {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).microSummary && (dayPlan as any).microSummary.coverage && (() => {
         const cov = (dayPlan as any).microSummary.coverage as any[];
         const ordered = [...cov].sort((a,b) => a.pct - b.pct);
         const colorFor = (s: string) => s === 'deficit' ? '#ef4444' : s === 'high' ? '#f97316' : s === 'low' ? '#f59e0b' : '#22c55e';
@@ -591,7 +593,7 @@ export const IndividualPlanResults: React.FC = () => {
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).hungerNote}</div>
       )}
       {generated && dayPlan && <DailyDietDashboard />}
-      {generated && dayPlan && (
+      {plannerMode === 'pro' && generated && dayPlan && (
         <NutritionQualityCard
           meals={(dayPlan as any)?.meals?.map((m: any) => ({
             foods: (m.items || []).map((it: any) => ({
@@ -1369,7 +1371,7 @@ export const IndividualPlanResults: React.FC = () => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
             <button onClick={generateAllergenReport} style={reportPillStyle('#ef4444', activeReports.includes('allergen') && !!allergenReport)}>⚠️ Аллергены</button>
             <button onClick={generateNutrientReport} style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}>🧬 Нутриенты</button>
-            <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>
+            {plannerMode === 'pro' && <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>}
             <button onClick={generateRiskReport} style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}>🩺 Риски здоровья</button>
               {(Array.isArray(injections) ? injections.length : 0) > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
             <button onClick={generateFullNutritionReport} style={reportPillStyle('#3b82f6', activeReports.includes('nutrition') && !!nutritionReport)}>📋 Полный отчёт</button>
@@ -1378,7 +1380,7 @@ export const IndividualPlanResults: React.FC = () => {
               if (!dayPlan) { setErrorMsg('Сначала создайте план питания.'); return; }
               generateAllergenReport();
               generateNutrientReport();
-              generateQualityReport();
+              if (plannerMode === 'pro') generateQualityReport();
               generateRiskReport();
               if ((Array.isArray(injections) ? injections.length : 0) > 0) generateDrugCompatReport();
               generateRecommendations();
@@ -1412,7 +1414,7 @@ export const IndividualPlanResults: React.FC = () => {
               </div>
             </div>
           )}
-          {qualityReport && activeReports.includes('quality') && (
+          {plannerMode === 'pro' && qualityReport && activeReports.includes('quality') && (
             <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
