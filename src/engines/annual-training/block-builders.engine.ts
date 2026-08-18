@@ -61,10 +61,10 @@ export function macroBlockKey(block: MacroBlock | BBMacroBlock, idx: number): st
 
 /** Тип конструктора из макро-блока. */
 export function blockKindFromMacro(block: MacroBlock | BBMacroBlock): AnnualBlockKind {
+  if ('trainingFocus' in block) return 'BB';
   const kind = (block as MacroBlock).kind;
   if (kind === 'BB') return 'BB';
-  if (kind === 'SRC') return 'PL';
-  return 'PL'; // BBMacroBlock (без kind) → BB-макроцикл, но kind отсутствует
+  return 'PL';
 }
 
 /** Определить, BB-ли это макроцикл (по признаку trainingFocus). */
@@ -453,10 +453,14 @@ function buildPLBlock(
   if (selectedCycle && selectedCycle.meta.weeks < state.ref.weeks) {
     warnings.push(`Цикл «${selectedCycle.meta.title}» короче блока (${selectedCycle.meta.weeks} нед < ${state.ref.weeks}) — шаблон цикла повторён для заполнения фазы.`);
   }
+  if (selectedCycle && selectedCycle.meta.weeks > state.ref.weeks) {
+    warnings.push(`Цикл «${selectedCycle.meta.title}» длиннее блока (${selectedCycle.meta.weeks} нед > ${state.ref.weeks}) — обрезан до длины блока.`);
+  }
   weeks = loopWeeksToLength(weeks, state.ref.weeks);
   weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'PL');
   let taperApplied = false;
-  if (state.config.taper?.enabled) {
+  const hasContent = weeks.some(w => w.sessions.some(s => s.blocks.length > 0));
+  if (state.config.taper?.enabled && hasContent) {
     const t = state.config.taper;
     const advanced = t.mode != null || t.weightGoal != null || t.mockMeet === true || t.postMeet === true;
     if (advanced) {
@@ -644,7 +648,8 @@ function buildManualBlock(
   }
   weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'MANUAL');
   let taperApplied = false;
-  if (state.config.taper?.enabled) {
+  const hasContent = weeks.some(w => w.sessions.some(s => s.blocks.length > 0));
+  if (state.config.taper?.enabled && hasContent) {
     weeks = applyBlockTaperToWeeks(weeks, state.config.taper.weeks ?? 2);
     taperApplied = true;
   }
@@ -688,6 +693,14 @@ export function buildAnnualBlock(
       case 'MANUAL': result = buildManualBlock(state, plan, opts); break;
       default:
         throw new Error(`Неизвестный тип конструктора блока: ${(state.ref as any).kind}`);
+    }
+    // Авто-подбор мог заменить явно выбранный цикл (слишком короткий для блока):
+    // синхронизируем config.cycleId, чтобы UI показывал то, что реально собрано.
+    if (state.ref.kind === 'PL' && state.config.cycleId && result.program?.pl?.sourceCycleId
+      && result.program.pl.sourceCycleId !== state.config.cycleId) {
+      const syncedConfig = { ...state.config, cycleId: result.program.pl.sourceCycleId };
+      result = { ...result, configHash: configHashOf(syncedConfig, state.ref) };
+      return { ...state, config: syncedConfig, status: 'built', result, builtAt: nowIso(), error: undefined };
     }
     return { ...state, status: 'built', result, builtAt: nowIso(), error: undefined };
   } catch (e) {
@@ -988,7 +1001,7 @@ export function composeAnnualProgram(plan: AnnualTrainingPlan, title?: string): 
       sourceCycleId: plProg?.pl?.sourceCycleId ?? '',
       sessionIndices: (plProg?.pl?.schedule ?? []).map(s => s.sessionIdx),
     };
-    prog.hybrid.bbWeeks = mergeBlockWeeks(plan);
+    prog.hybrid.bbWeeks = mergeBlockWeeks({ ...plan, blocks: plan.blocks.filter(b => b.ref.kind !== 'PL') });
     prog.hybrid.workMax = plProg?.pl?.workMax;
     prog.hybrid.notes = notesLine;
   }

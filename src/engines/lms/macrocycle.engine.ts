@@ -578,7 +578,10 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
   }
   // P0: offsets всегда строятся заново из валидных длительностей.
   // Не зажимаем отдельные offset независимо: это могло создать перекрытия.
-  const offsetLimit = preserveTotalWeeks ? macro.totalWeeks : Math.max(1, newBlocks.reduce((sum, block) => sum + block.weeks, 0));
+  // Если ужать сумму до totalWeeks невозможно (все блоки по 1 неделе) —
+  // не клампим по totalWeeks, иначе блоки получают одинаковые offset'ы.
+  const rawSum = newBlocks.reduce((sum, block) => sum + block.weeks, 0);
+  const offsetLimit = preserveTotalWeeks && rawSum <= macro.totalWeeks ? macro.totalWeeks : Math.max(1, rawSum);
   let normalizedOffset = 1;
   for (const block of newBlocks) {
     block.weeks = Math.max(1, Math.round(Number(block.weeks) || 1));

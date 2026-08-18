@@ -5,13 +5,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ANNUAL_PLAN_KEY, saveAnnualTrainingPlan, loadAnnualTrainingPlan,
   removeAnnualTrainingPlan, migrateAnnualPlanFromMacroStorage,
-  isAnnualTrainingPlanShape,
+  isAnnualTrainingPlanShape, canonicalJson,
   ANNUAL_SCENARIOS_KEY, saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario,
   restoreAnnualScenario, compareAnnualScenarios,
   saveAnnualCardioCycles, loadAnnualCardioCycles, removeAnnualCardioCycles,
 } from '../annual-training-storage';
 import { annualPlanFromMacro, setAnnualBlockKind } from '../block-builders.engine';
-import { buildBbMacrocycle, serializeBbMacro } from '../../lms/macrocycle.engine';
+import { buildBbMacrocycle, serializeBbMacro, buildMacrocycle } from '../../lms/macrocycle.engine';
 import type { AnnualTrainingPlan } from '../annual-training.types';
 
 beforeEach(() => {
@@ -32,6 +32,23 @@ describe('save/load', () => {
 
   it('нет ключа → null', () => {
     expect(loadAnnualTrainingPlan()).toBeNull();
+  });
+
+  it('валидация формы отклоняет нулевую/нецелую длину блока', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    const plan = annualPlanFromMacro(macro);
+    expect(isAnnualTrainingPlanShape(plan)).toBe(true);
+    const zeroWeeks = { ...plan, blocks: plan.blocks.map((b, i) => i === 0 ? { ...b, ref: { ...b.ref, weeks: 0 } } : b) };
+    expect(isAnnualTrainingPlanShape(zeroWeeks)).toBe(false);
+    const badStart = { ...plan, blocks: plan.blocks.map((b, i) => i === 1 ? { ...b, ref: { ...b.ref, startWeek: 0 } } : b) };
+    expect(isAnnualTrainingPlanShape(badStart)).toBe(false);
+  });
+
+  it('canonicalJson: порядок ключей не влияет на сравнение', () => {
+    const a = { cycleId: 'x', taper: { enabled: true, weeks: 2 }, list: [1, { b: 2, a: 1 }] };
+    const b = { taper: { weeks: 2, enabled: true }, list: [1, { a: 1, b: 2 }], cycleId: 'x' };
+    expect(canonicalJson(a)).toBe(canonicalJson(b));
+    expect(canonicalJson({ ...a, cycleId: 'y' })).not.toBe(canonicalJson(b));
   });
 
   it('битый JSON → null', () => {

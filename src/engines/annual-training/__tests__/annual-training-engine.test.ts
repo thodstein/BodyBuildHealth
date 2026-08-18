@@ -16,7 +16,7 @@ import {
   selectPLCycleForBlock, applyPLBlockTaperToWeeks, applyBlockPhaseToWeeks,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
-import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
+import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { createBlank } from '../../user-program/program-store';
 
 const CYCLE_ID = LMS_CYCLES[0]?.meta.id ?? 'cycle_unknown';
@@ -167,6 +167,20 @@ describe('сборка блоков', () => {
     const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
     expect(built.result!.weeks).toHaveLength(plan.blocks[0].ref.weeks);
     expect(built.result!.program?.pl?.sourceCycleId).toBeTruthy();
+  });
+
+  it('PL: авто-замена короткого цикла синхронизирует config.cycleId с собранным', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const blockWeeks = plan.blocks[0].ref.weeks; // 8 нед
+    const short = LMS_CYCLES.find(c => normalizeCycleDirection(c.meta.direction) === 'strength' && c.meta.weeks < blockWeeks);
+    if (!short) return; // в каталоге нет коротких циклов — тест не применим
+    const state = { ...plan.blocks[0], config: { ...plan.blocks[0].config, cycleId: short.meta.id } };
+    const built = buildAnnualBlock(state, plan, macro, DEFAULT_OPTS);
+    const used = built.result!.program?.pl?.sourceCycleId;
+    expect(used).toBeTruthy();
+    // Инвариант M4: конфиг показывает тот цикл, которым реально собран блок.
+    expect(built.config.cycleId).toBe(used);
   });
 
   it('PL-блок: СРЦ-цикл → недели с упражнениями + program.pl.sourceCycleId', () => {
@@ -581,7 +595,8 @@ describe('валидация разметки года', () => {
     expect(merged[51].week).toBe(52);
     const prog = composeAnnualProgram(outcome.plan);
     expect(prog!.meta.direction).toBe('hybrid');
-    expect(prog!.hybrid!.bbWeeks).toHaveLength(52);
+    // bbWeeks — только BB/MANUAL-блоки (13 strength + 4 transition), ПЛ-слой живёт в plRef.
+    expect(prog!.hybrid!.bbWeeks).toHaveLength(17);
     // Несобранных блоков нет → в notes нет предупреждений «не собран».
     expect(prog!.meta.notes).not.toContain('не собран');
   });
@@ -605,7 +620,8 @@ describe('композиция года', () => {
     const prog = composeAnnualProgram(built.plan);
     expect(prog!.meta.direction).toBe('hybrid');
     expect(prog!.hybrid!.plRef.sourceCycleId).toBe(CYCLE_ID);
-    expect(prog!.hybrid!.bbWeeks).toHaveLength(21);
+    // Единственный BB-блок (strength, 8 нед) — ПЛ-недели не дублируются в bbWeeks.
+    expect(prog!.hybrid!.bbWeeks).toHaveLength(8);
   });
 
   it('только PL → программа первого PL-блока со сводкой блоков', () => {

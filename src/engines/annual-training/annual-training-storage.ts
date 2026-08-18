@@ -17,14 +17,26 @@ export const ANNUAL_PLAN_VERSION = 1;
 export function isAnnualTrainingPlanShape(value: unknown): value is AnnualTrainingPlan {
   if (!value || typeof value !== 'object') return false;
   const o = value as Record<string, unknown>;
-  if (typeof o.id !== 'string' || typeof o.totalWeeks !== 'number') return false;
+  if (typeof o.id !== 'string') return false;
+  if (typeof o.totalWeeks !== 'number' || !Number.isInteger(o.totalWeeks) || o.totalWeeks < 1) return false;
   if (!Array.isArray(o.blocks)) return false;
   return o.blocks.every(b => {
     if (!b || typeof b !== 'object') return false;
     const r = (b as any).ref;
-    if (!r || typeof r.blockKey !== 'string' || typeof r.startWeek !== 'number' || typeof r.weeks !== 'number') return false;
+    if (!r || typeof r !== 'object') return false;
+    if (typeof r.blockKey !== 'string') return false;
+    if (typeof r.startWeek !== 'number' || !Number.isInteger(r.startWeek) || r.startWeek < 1) return false;
+    if (typeof r.weeks !== 'number' || !Number.isInteger(r.weeks) || r.weeks < 1) return false;
     return ['unbuilt', 'built', 'stale', 'error'].includes((b as any).status);
   });
+}
+
+/** Канонический JSON: ключи объектов сортируются (для стабильных сравнений). */
+export function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']';
+  const obj = value as Record<string, unknown>;
+  return '{' + Object.keys(obj).sort().map(k => JSON.stringify(k) + ':' + canonicalJson(obj[k])).join(',') + '}';
 }
 
 /** Сохранить годовой план. Возвращает сохранённый объект. */
@@ -33,7 +45,8 @@ export function saveAnnualTrainingPlan(plan: AnnualTrainingPlan): AnnualTraining
   try {
     localStorage.setItem(ANNUAL_PLAN_KEY, JSON.stringify(stored));
   } catch {
-    /* quota — план остаётся в памяти */
+    /* quota — план остаётся в памяти, событие не шлём (потребители перечитали бы старую версию) */
+    return stored;
   }
   window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated', {
     detail: { planId: stored.id, status: stored.status, totalWeeks: stored.totalWeeks },
@@ -190,7 +203,7 @@ function diffBlock(a: AnnualBlockState | undefined, b: AnnualBlockState | undefi
   if (a && b) {
     base.kindA = a.ref.kind; base.kindB = b.ref.kind;
     base.statusA = a.status; base.statusB = b.status;
-    base.configChanged = stableHash(a.config) !== stableHash(b.config);
+    base.configChanged = canonicalJson(a.config) !== canonicalJson(b.config);
     base.resultChanged = (a.result?.configHash ?? '') !== (b.result?.configHash ?? '')
       || (a.status === 'built') !== (b.status === 'built');
     if (!base.configChanged && !base.resultChanged && a.ref.kind === b.ref.kind && a.status === b.status) return null;

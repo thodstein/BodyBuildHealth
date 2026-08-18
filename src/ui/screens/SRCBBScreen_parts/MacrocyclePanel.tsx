@@ -50,6 +50,15 @@ const CARDIO_PHASE_LABEL_RU: Record<string, string> = {
   base: 'База', build: 'Наращивание', maintenance: 'Поддержание', contest_prep: 'Prep', taper: 'Taper', peak: 'Пик', transition: 'Переход',
 };
 
+/** Периоды СРЦ-циклов, подходящие фазам макроцикла (канон pickCycleForPhase). */
+const PHASE_CYCLE_PERIODS: Record<MacroPhase, string[]> = {
+  endurance: ['endurance', 'mixed'],
+  strength: ['strength', 'mixed'],
+  peak: ['peak', 'strength'],
+  competition: ['peak', 'strength'],
+  transition: ['mixed', 'endurance'],
+};
+
 /** Маппинг названий категорий профиля → id категорий движка пик-недели. */
 const PEAK_CATEGORY_MAP: Record<string, string> = {
   'mens_physique': 'mens_physique', "men's physique": 'mens_physique', 'менс физик': 'mens_physique',
@@ -676,9 +685,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
 
   const applyEdit = () => {
     if (isBB && bbMacro) {
-      setBbMacro(rebalanceBbMacrocycle(bbMacro, editWeeks, { preserveTotalWeeks: false }));
+      const next = rebalanceBbMacrocycle(bbMacro, editWeeks, { preserveTotalWeeks: false });
+      setBbMacro(next);
+      setTotalWeeks(next.totalWeeks);
       setEditWeeks({});
-      setTotalWeeks(bbMacro.blocks.reduce((sum, block) => sum + (editWeeks[block.phase] ?? block.weeks), 0));
       return;
     }
     if (!macro) return;
@@ -843,7 +853,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     try {
       const existing = loadAnnualTrainingPlan();
       const plan = existing ? syncAnnualPlan(existing, src) : annualPlanFromMacro(src);
-      setAnnualPlan(plan);
+      // Сохраняем сразу: подписчики he-annual-training-plan-updated (питание и др.)
+      // и повторные сессии видят актуальную разметку, а не только память.
+      setAnnualPlan(saveAnnualTrainingPlan(plan));
     } catch { /* ignore */ }
   }, [macro, bbMacro, isBB]);
   // Живое обновление: ручной конструктор вернул блок (completeAnnualBlockImport)
@@ -980,9 +992,12 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const restoreScenario = (id: string) => {
     const restored = restoreAnnualScenario(id);
     if (!restored) { setScenarioNote('⚠ Снапшот не найден'); return; }
-    saveAnnualTrainingPlan(restored);
-    setAnnualPlan(restored);
-    setScenarioNote(`📥 Снапшот восстановлен — ${restored.blocks.filter(b => b.status === 'built').length} собранных блоков, статус ${restored.status}`);
+    // Ресинхронизация с текущей макро-разметкой (снапшот мог ссылаться на старую).
+    const src = currentMacroSource();
+    const plan = src ? syncAnnualPlan(restored, src) : restored;
+    saveAnnualTrainingPlan(plan);
+    setAnnualPlan(plan);
+    setScenarioNote(`📥 Снапшот восстановлен — ${plan.blocks.filter(b => b.status === 'built').length} собранных блоков, статус ${plan.status}`);
   };
   const dropScenario = (id: string) => setScenarioList(removeAnnualScenario(id));
 
@@ -1775,7 +1790,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 const phaseTotal = phaseBlocks.reduce((sum, x) => sum + x.block.weeks, 0);
                 const cycleOptions = [
                   { id: '', label: '— цикл —', desc: '' },
-                  ...LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) === 'strength').map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` })),
+                  ...LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) === 'strength'
+                    && (PHASE_CYCLE_PERIODS[activeBlock.phase as MacroPhase] ?? []).includes(c.meta.period))
+                    .map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` })),
                 ];
                 const splitTotal = splitCycles.reduce((sum, slot) => sum + (slot.weeks || 0), 0);
                 const splitReady = splitCycles.filter(slot => slot.cycleId).length >= 2;
@@ -2651,7 +2668,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   const source = isBB ? bbMacro : macro;
                   if (!source) return;
                   if (onApplyMacrocycle) onApplyMacrocycle(source);
-                  else if (onApplyCycle) onApplyCycle((source as any).blocks?.[0]?.cycleId || '', source.totalWeeks);
+                  else if (onApplyCycle) {
+                    const cid = (source as any).blocks?.[0]?.cycleId;
+                    if (cid) onApplyCycle(cid, source.totalWeeks);
+                  }
                 }}
                 style={{ ...BTN, flex: 1, fontSize: 11, padding: '8px 12px', minHeight: 44 }}
               >
