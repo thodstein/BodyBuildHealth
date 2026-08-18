@@ -6,6 +6,7 @@ import {
 } from '../bb-specialization.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
+import { getVolumeLandmarks } from '../../volume-landmarks.engine';
 
 /**
  * Донорское перераспределение специализации (цель за счёт доноров):
@@ -119,6 +120,23 @@ describe('generic: донорское перераспределение', () =>
     const sum = (p: typeof a) => p.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
       .filter(e => !(e as any).warmupActivator).reduce((acc, e) => acc + e.sets, 0);
     expect(sum(a)).toBe(sum(b));
+  }, 30000);
+
+  it('floor учитывает PED/стаж: enhanced донор не режется ниже адаптированного MEV', () => {
+    const donor = buildBBPlan({
+      patternId: 'ppl_6', level: 'enhanced', trainingYears: 6,
+      goal: 'mass', weeks: 12, workMax: WM,
+      weakPoints: ['back_thickness'], specialization: true,
+      pedDoses: { AAS: 500 }, courseIntensity: 'moderate',
+      specializationSchedule: [{
+        weekStart: 1, weekEnd: 5, targets: ['back_thickness'],
+        tradeoff: { mode: 'remove_direct_when_indirect_covers_floor', donorMuscles: ['biceps'], preserveIndirect: true },
+      }],
+    });
+    // Адаптированный MEV enhanced biceps = 8 × (adaptedMrv / baseMrv) ≥ 8.
+    const lm = getVolumeLandmarks('enhanced', 'biceps');
+    expect(lm).toBeTruthy();
+    expect(effectiveSets(donor, 1, 'biceps')).toBeGreaterThanOrEqual(lm!.mev);
   }, 30000);
 });
 

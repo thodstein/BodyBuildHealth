@@ -43,17 +43,26 @@ export interface TradeoffWeekReport {
   notes: string[];
 }
 
-/** Убрать прямые изоляции донора, сохраняя effective ≥ MEV. */
+/** Убрать прямые изоляции донора, сохраняя effective ≥ адаптированный MEV.
+ *  Floor масштабируется тем же соотношением, что и MRV-кап (PED, стаж,
+ *  recovery, nutrition, lab, spec-факторы) — без новых коэффициентов. */
 function trimDonorIsolations(
   week: BBWeek,
   donorCanonical: Set<string>,
   mode: VolumeTradeoffPolicy['mode'],
-  level: string,
+  opts: TradeoffApplyOptions,
 ): number {
   const volume = aggregateBBVolume(week.sessions);
   const removed: number[] = [0];
   const directNow = (m: string) => volume[m]?.directSets ?? 0;
   const effectiveNow = (m: string) => volume[m]?.effectiveSets ?? 0;
+  const adaptedMev = (m: string): number => {
+    const lm = getVolumeLandmarks(opts.level, m);
+    if (!lm) return 4;
+    const adaptedMrv = opts.mrvByMuscle[m] ?? lm.mrv;
+    if (lm.mrv <= 0) return lm.mev;
+    return Math.max(1, Math.round(lm.mev * (adaptedMrv / lm.mrv)));
+  };
 
   for (const session of week.sessions) {
     for (const ex of session.exercises as BBExercise[]) {
@@ -62,8 +71,7 @@ function trimDonorIsolations(
       const m = canonicalMuscle(ex.muscle);
       if (!donorCanonical.has(m)) continue;
       if (!isIsolationName(ex.exerciseName || ex.name || '')) continue;
-      const lm = getVolumeLandmarks(level, m);
-      const floor = lm?.mev ?? 4;
+      const floor = adaptedMev(m);
       const indirect = effectiveNow(m) - directNow(m);
       const targetDirect = mode === 'remove_direct_when_indirect_covers_floor' && indirect >= floor
         ? 0
@@ -178,7 +186,7 @@ export function applyTradeoffToWeek(
 ): TradeoffWeekReport {
   const donorCanonical = new Set(policy.donorMuscles.map(canonicalMuscle));
   const targetCanonical = new Set(targets.map(canonicalMuscle));
-  const removedSets = trimDonorIsolations(week, donorCanonical, policy.mode, opts.level);
+  const removedSets = trimDonorIsolations(week, donorCanonical, policy.mode, opts);
   const { transferred, notes } = addToRecipient(week, targetCanonical, targets, opts, removedSets);
   return {
     week: week.week,
