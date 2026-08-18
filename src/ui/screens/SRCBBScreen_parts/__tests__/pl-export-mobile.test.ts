@@ -165,20 +165,15 @@ describe('openPLShare — системная передача плана', () =>
 });
 
 describe('мобильная выдача файла через браузер телефона', () => {
-  it('строит URL /api/pl-download с именем и base64', () => {
-    const u = buildMobileDownloadUrl('plan.xlsx', 'aGVsbG8=', 'https://app.vercel.app');
-    expect(u).toContain('https://app.vercel.app/api/pl-download?');
-    const qs = new URLSearchParams(u.split('?')[1]);
-    expect(qs.get('name')).toBe('plan.xlsx');
-    expect(qs.get('b64')).toBe('aGVsbG8=');
+  it('строит хэш-ссылку #pl-download-<ext>-<base64> на страницу приложения', () => {
+    const u = buildMobileDownloadUrl('plan.xlsx', 'aGVsbG8=', 'https://app.example.com/');
+    expect(u).toBe('https://app.example.com/#pl-download-xlsx-aGVsbG8=');
   });
 
-  it('экранирует имя файла и данные (без пробелов в URL)', () => {
-    const u = buildMobileDownloadUrl('ПЛ план.xlsx', 'data+with/slash', 'https://a.io');
-    expect(u).toContain('api/pl-download');
+  it('хэш-ссылка без пробелов и с правильным расширением', () => {
+    const u = buildMobileDownloadUrl('ПЛ план.pdf', 'data+with/slash', 'https://a.io/app');
     expect(u).not.toContain(' ');
-    const qs = new URLSearchParams(u.split('?')[1]);
-    expect(qs.get('name')).toBe('ПЛ план.xlsx');
+    expect(u).toContain('#pl-download-pdf-');
   });
 
   it('detectMobile в jsdom-окружении (десктоп) возвращает false', () => {

@@ -148,10 +148,12 @@ export function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-/** URL файла через serverless-функцию — браузер телефона скачает его сам. */
-export function buildMobileDownloadUrl(filename: string, b64: string, origin: string = window.location.origin): string {
-  const q = new URLSearchParams({ name: filename, b64 });
-  return `${origin}/api/pl-download?${q.toString()}`;
+/** URL для скачивания на телефоне: хэш-ссылка на саму страницу приложения.
+ * Страница в браузере телефона (не WebView) видит #pl-download-<ext>-<b64>
+ * и сама скачивает файл — работает на любой статике (Vercel / GitHub Pages). */
+export function buildMobileDownloadUrl(filename: string, b64: string, base: string = window.location.href.split('#')[0]): string {
+  const ext = (filename.split('.').pop() || 'bin').toLowerCase();
+  return `${base}#pl-download-${ext}-${b64}`;
 }
 
 /** Сохранение файла на устройство.

@@ -179,6 +179,41 @@ export default function App() {
     return () => window.removeEventListener('hashchange', applyHash);
   }, [go]);
 
+  // Авто-скачивание на телефоне: страница открыта в браузере (не в WebView
+  // Telegram) с хэшем #pl-download-<ext>-<base64> — скачиваем файл и чистим хэш.
+  useEffect(() => {
+    const applyDownload = () => {
+      try {
+        const m = window.location.hash.match(/^#pl-download-(xlsx|pdf|csv|json|txt)-([A-Za-z0-9+/=]+)$/);
+        if (!m) return;
+        const ext = m[1];
+        const b64 = m[2];
+        const mime: Record<string, string> = {
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          pdf: 'application/pdf', csv: 'text/csv', json: 'application/json', txt: 'text/plain',
+        };
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mime[ext] || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pl-plan-${new Date().toISOString().slice(0, 10)}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } }, 500);
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch (e) {
+        console.warn('[App] auto-download failed:', e);
+      }
+    };
+    applyDownload();
+    window.addEventListener('hashchange', applyDownload);
+    return () => window.removeEventListener('hashchange', applyDownload);
+  }, []);
+
   // Swipe removed — only within-tab swiping allowed
 
   // Swipe removed
