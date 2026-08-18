@@ -5,9 +5,9 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, macrocycleToActiveCycle,
+  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, resizeMacroBlock, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
-  buildBbMacrocycle, rebalanceBbMacrocycle, serializeBbMacro, deserializeBbMacro,
+  buildBbMacrocycle, rebalanceBbMacrocycle, resizeBbMacroBlock, serializeBbMacro, deserializeBbMacro,
   macroWeekStartDate, macroWeekEndDate, weeksUntilWeek, formatMacroDate,
   projectPmGrowthMultiplier, taperWeeksForBlock, moveMacroBlock,
   PHASE_COLOR, PHASE_LABEL_RU, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, BB_PHASE_ICON,
@@ -475,6 +475,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [trainingFocus, setTrainingFocus] = useState<BBTrainingFocus>('hypertrophy');
   const [selectedBlockIdx, setSelectedBlockIdx] = useState<number>(-1);
   const [editWeeks, setEditWeeks] = useState<Record<string, number>>({});
+  const [editBlockWeeks, setEditBlockWeeks] = useState<number | null>(null);
   // Явное сохранение: кратковременный флеш «Сохранено» (автосохранение уже есть).
   const [macroSavedFlash, setMacroSavedFlash] = useState(false);
   // Флеш «Сводка скопирована».
@@ -535,7 +536,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         setCompetitions(restored?.competitions ?? []);
       }
       setSelectedBlockIdx(-1);
-      setEditWeeks({});
+       setEditWeeks({});
+       setEditBlockWeeks(null);
     } catch {
       setMacro(null);
       setBbMacro(null);
@@ -602,7 +604,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setCompWeek(restored.competitionWeek ?? 44);
       setCompetitions(restored.competitions ?? []);
       setSelectedBlockIdx(-1);
-      setEditWeeks({});
+       setEditWeeks({});
+       setEditBlockWeeks(null);
     };
     const syncBb = (raw?: string | null) => {
       const serialized = raw ?? localStorage.getItem(bbKey);
@@ -614,7 +617,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       setTrainingFocus(restored.trainingFocus);
       setCompetitions(restored.competitions ?? []);
       setSelectedBlockIdx(-1);
-      setEditWeeks({});
+       setEditWeeks({});
+       setEditBlockWeeks(null);
     };
     const onStorage = (event: StorageEvent) => {
       if (event.key === plKey) sync(event.newValue);
@@ -668,8 +672,9 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
 
   const applyEdit = () => {
     if (isBB && bbMacro) {
-      setBbMacro(rebalanceBbMacrocycle(bbMacro, editWeeks));
+      setBbMacro(rebalanceBbMacrocycle(bbMacro, editWeeks, { preserveTotalWeeks: false }));
       setEditWeeks({});
+      setTotalWeeks(bbMacro.blocks.reduce((sum, block) => sum + (editWeeks[block.phase] ?? block.weeks), 0));
       return;
     }
     if (!macro) return;
@@ -677,7 +682,25 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
       phase,
       weeks: editWeeks[phase] ?? macro.blocks.filter(block => block.phase === phase).reduce((sum, block) => sum + block.weeks, 0),
     })).filter(edit => edit.weeks > 0);
-    setMacro(rebalanceMacrocycle(macro, edits));
+    const next = rebalanceMacrocycle(macro, edits, { preserveTotalWeeks: false });
+    setMacro(next);
+    setTotalWeeks(next.totalWeeks);
+    setEditWeeks({});
+  };
+
+  const applyBlockEdit = (idx: number) => {
+    const weeks = editBlockWeeks;
+    if (weeks == null || !Number.isFinite(weeks) || weeks < 1) return;
+    if (isBB && bbMacro) {
+      const next = resizeBbMacroBlock(bbMacro, idx, weeks);
+      setBbMacro(next);
+      setTotalWeeks(next.totalWeeks);
+    } else if (macro) {
+      const next = resizeMacroBlock(macro, idx, weeks);
+      setMacro(next);
+      setTotalWeeks(next.totalWeeks);
+    }
+    setEditBlockWeeks(null);
   };
 
   const applyBlock = (idx: number) => {
@@ -1724,7 +1747,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 );
               })()}
               {'cycleId' in activeBlock && activeBlock.cycleId && (
-                <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
                   <button onClick={() => applyBlock(selectedBlockIdx)} style={{ ...BTN, fontSize: 11, padding: '8px 12px', minHeight: 44, flex: 1 }}>
                     ✓ Применить как активный цикл
                   </button>
@@ -1732,8 +1755,13 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     ✏️ Редактировать микроцикл
                   </button>
                 </div>
-              )}
-              {!isBB && (
+               )}
+               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                 <PopupNumber label="Недель блока" value={editBlockWeeks ?? activeBlock.weeks} min={1} max={104} suffix=" нед"
+                   onChange={v => setEditBlockWeeks(Number.isFinite(v) ? Math.max(1, Math.round(v)) : editBlockWeeks)} />
+                 <button type="button" onClick={() => applyBlockEdit(selectedBlockIdx)} style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10 }}>Пересчитать блок</button>
+               </div>
+               {!isBB && (
                 <div style={{ ...SMALL, marginTop: 6, color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>
                   Тапер и прикидки применяются автоматически при «✓ Применить макроцикл»: тапер к финалу peak-блока, meet-неделя (прикиды + разминка) на неделе соревнований, mock meet и пост-старт разгрузка. Раскладка/весовая цель — настройки над панелью; отдельный тапер-калькулятор — вкладка «🏁 Пик/Соревнования».
                 </div>
@@ -1934,8 +1962,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   title="Сохранить снимок сборки года (кап 6)">
                   📸 Снапшот
                 </button>
-              </div>
-              {annualPlan && (() => {
+               </div>
+                {annualPlan && (() => {
                 const v = validateAnnualPlan(annualPlan);
                 if (v.warnings.length === 0) return null;
                 return (
@@ -2111,7 +2139,12 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           onChange={v => applyAnnualConfig(b.ref.blockKey, { splitPattern: v || undefined })} />
                         <PopupSelect label="Цель блока" value={b.config.goal ?? ''}
                           hint="Цель ББ-блока; «— цель по фазе —» — по фазе макроцикла"
-                          options={[{ id: '', label: '— цель по фазе —', desc: '' }, ...['hypertrophy', 'mass', 'strength', 'strength_mass', 'cut', 'recomp'].map(g => ({ id: g, label: g, desc: '' }))]}
+                           options={[{ id: '', label: '— цель по фазе —', desc: '' },
+                             { id: 'mass', label: 'Масса', desc: '' },
+                             { id: 'cut', label: 'Сушка', desc: '' },
+                             { id: 'recomp', label: 'Рекомпозиция', desc: '' },
+                             { id: 'maintenance', label: 'Поддержание', desc: '' },
+                             { id: 'strength_mass', label: 'Сила + масса', desc: '' }]}
                           onChange={v => applyAnnualConfig(b.ref.blockKey, { goal: v || undefined })} />
                         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', minHeight: 32 }}>
                           <input type="checkbox" checked={!!b.config.peakWeek} style={{ width: 16, height: 16, accentColor: '#f59e0b' }}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildMacrocycleMulti, buildMacrocycle, serializeMacro, deserializeMacro,
-  rebalanceMacrocycle,
+  rebalanceMacrocycle, resizeMacroBlock, resizeBbMacroBlock, buildBbMacrocycle,
   type CompetitionEvent, type Macrocycle,
 } from '../macrocycle.engine';
 
@@ -285,6 +285,22 @@ describe('buildMacrocycleMulti — cycleId per competition', () => {
     const m = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
     const compBlocks = m.blocks.filter(b => b.competitionId === 'c1');
     expect(compBlocks).toHaveLength(0); // C не создаёт блоков
+  });
+
+  it('resizeMacroBlock меняет общую длину и offsets без перераспределения соседей', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const before = macro.blocks.map(block => block.weeks);
+    const resized = resizeMacroBlock(macro, 0, before[0] + 3);
+    expect(resized.blocks[0].weeks).toBe(before[0] + 3);
+    expect(resized.totalWeeks).toBe(macro.totalWeeks + 3);
+    expect(resized.blocks[1].weekOffset).toBe(resized.blocks[0].weekOffset + resized.blocks[0].weeks);
+  });
+
+  it('resizeBbMacroBlock меняет общий календарь BB-блоков', () => {
+    const macro = buildBbMacrocycle({ level: 'advanced', totalWeeks: 12, trainingFocus: 'hypertrophy' });
+    const resized = resizeBbMacroBlock(macro, 0, macro.blocks[0].weeks + 2);
+    expect(resized.totalWeeks).toBe(macro.totalWeeks + 2);
+    expect(resized.blocks[1].weekOffset).toBe(resized.blocks[0].weekOffset + resized.blocks[0].weeks);
   });
 });
 

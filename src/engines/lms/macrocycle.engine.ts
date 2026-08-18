@@ -512,7 +512,8 @@ export interface MacroRebalanceEdit {
  * Fix: allocation ensures minimum 1 week per block to prevent
  * blocks from disappearing when target < number of blocks in a phase group.
  */
-export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit[]): Macrocycle {
+export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit[], options: { preserveTotalWeeks?: boolean } = {}): Macrocycle {
+  const preserveTotalWeeks = options.preserveTotalWeeks ?? true;
   const editMap = new Map(edits.map(e => [e.phase, Math.max(1, e.weeks)]));
   const phaseGroups = new Map<MacroPhase, MacroBlock[]>();
   for (const block of macro.blocks) {
@@ -556,7 +557,7 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
   }
   // подогнать под totalWeeks: разницу в последний блок
   const sum = newBlocks.reduce((s, b) => s + b.weeks, 0);
-  if (sum !== macro.totalWeeks && newBlocks.length > 0) {
+  if (preserveTotalWeeks && sum !== macro.totalWeeks && newBlocks.length > 0) {
     let difference = macro.totalWeeks - sum;
     if (difference > 0) {
       const recipient = hasCompetitionEvents
@@ -577,10 +578,11 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
   }
   // P0: offsets всегда строятся заново из валидных длительностей.
   // Не зажимаем отдельные offset независимо: это могло создать перекрытия.
+  const offsetLimit = preserveTotalWeeks ? macro.totalWeeks : Math.max(1, newBlocks.reduce((sum, block) => sum + block.weeks, 0));
   let normalizedOffset = 1;
   for (const block of newBlocks) {
     block.weeks = Math.max(1, Math.round(Number(block.weeks) || 1));
-    block.weekOffset = Math.max(1, Math.min(macro.totalWeeks, normalizedOffset));
+    block.weekOffset = Math.max(1, Math.min(offsetLimit, normalizedOffset));
     normalizedOffset += block.weeks;
   }
   const newTotal = newBlocks.reduce((s, b) => s + b.weeks, 0);
@@ -600,6 +602,34 @@ export function rebalanceMacrocycle(macro: Macrocycle, edits: MacroRebalanceEdit
     competitionDate: mainCompetition?.date ?? macro.competitionDate,
     competitions,
     rationale,
+  };
+}
+
+/** Изменить длительность конкретного PL-блока, не перераспределяя соседние блоки. */
+export function resizeMacroBlock(macro: Macrocycle, blockIndex: number, weeks: number): Macrocycle {
+  if (blockIndex < 0 || blockIndex >= macro.blocks.length || !Number.isFinite(weeks)) return macro;
+  const blocks = macro.blocks.map((block, index) => index === blockIndex
+    ? { ...block, weeks: Math.max(1, Math.round(weeks)) }
+    : { ...block });
+  let offset = 1;
+  const rebased = blocks.map(block => {
+    const next = { ...block, weekOffset: offset };
+    offset += next.weeks;
+    return next;
+  });
+  const competitions = macro.competitions?.map(competition => {
+    const block = rebased.find(candidate => candidate.competitionId === competition.id);
+    if (!block) return competition;
+    return { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) };
+  });
+  const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
+  return {
+    ...macro,
+    blocks: rebased,
+    totalWeeks: rebased.reduce((sum, block) => sum + block.weeks, 0),
+    competitionWeek: mainCompetition?.week ?? macro.competitionWeek,
+    competitions,
+    rationale: rebased.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset}), ${block.kind}${block.cycleId ? ` (${block.cycleId})` : ''}`),
   };
 }
 
@@ -997,7 +1027,9 @@ export function bbTrainingFocusForWeek(macro: BBMacrocycle, weekNumber: number):
 export function rebalanceBbMacrocycle(
   macro: BBMacrocycle,
   edits: Partial<Record<BBMacroPhase, number>>,
+  options: { preserveTotalWeeks?: boolean } = {},
 ): BBMacrocycle {
+  const preserveTotalWeeks = options.preserveTotalWeeks ?? true;
   const targetByPhase = new Map<BBMacroPhase, number>();
   for (const phase of BB_PHASES) {
     const current = macro.blocks
@@ -1022,13 +1054,15 @@ export function rebalanceBbMacrocycle(
     return { ...block, weeks };
   });
 
-  let difference = macro.totalWeeks - blocks.reduce((sum, block) => sum + block.weeks, 0);
-  for (let i = blocks.length - 1; i >= 0 && difference < 0; i--) {
-    const reduction = Math.min(blocks[i].weeks - 1, -difference);
-    blocks[i].weeks -= reduction;
-    difference += reduction;
+  if (preserveTotalWeeks) {
+    let difference = macro.totalWeeks - blocks.reduce((sum, block) => sum + block.weeks, 0);
+    for (let i = blocks.length - 1; i >= 0 && difference < 0; i--) {
+      const reduction = Math.min(blocks[i].weeks - 1, -difference);
+      blocks[i].weeks -= reduction;
+      difference += reduction;
+    }
+    if (difference > 0 && blocks.length > 0) blocks[blocks.length - 1].weeks += difference;
   }
-  if (difference > 0 && blocks.length > 0) blocks[blocks.length - 1].weeks += difference;
 
   let offset = 1;
   const rebasedBlocks = blocks.map(block => {
@@ -1049,6 +1083,32 @@ export function rebalanceBbMacrocycle(
   return {
     ...macro,
     blocks: rebasedBlocks,
+    competitions,
+    rationale: rebasedBlocks.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset})`),
+  };
+}
+
+/** Изменить длительность конкретного BB-блока, не перераспределяя соседние блоки. */
+export function resizeBbMacroBlock(macro: BBMacrocycle, blockIndex: number, weeks: number): BBMacrocycle {
+  if (blockIndex < 0 || blockIndex >= macro.blocks.length || !Number.isFinite(weeks)) return macro;
+  const blocks = macro.blocks.map((block, index) => index === blockIndex
+    ? { ...block, weeks: Math.max(1, Math.round(weeks)) }
+    : { ...block });
+  let offset = 1;
+  const rebasedBlocks = blocks.map(block => {
+    const next = { ...block, weekOffset: offset };
+    offset += next.weeks;
+    return next;
+  });
+  const competitions = macro.competitions?.map(competition => {
+    const block = rebasedBlocks.find(candidate => candidate.competitionId === competition.id);
+    if (!block) return competition;
+    return { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) };
+  });
+  return {
+    ...macro,
+    blocks: rebasedBlocks,
+    totalWeeks: rebasedBlocks.reduce((sum, block) => sum + block.weeks, 0),
     competitions,
     rationale: rebasedBlocks.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset})`),
   };

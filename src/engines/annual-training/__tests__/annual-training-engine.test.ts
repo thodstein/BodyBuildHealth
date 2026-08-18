@@ -13,6 +13,7 @@ import {
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
   importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
   recommendKindForPhase, cloneBlockConfigFrom, annualWeekForDate, annualPlanPhaseForDate,
+  selectPLCycleForBlock,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -154,6 +155,20 @@ describe('синхронизация и stale', () => {
 });
 
 describe('сборка блоков', () => {
+  it('selectPLCycleForBlock подбирает цикл под фазу и длину блока', () => {
+    const selected = selectPLCycleForBlock(undefined, 'strength', 12, 'intermediate');
+    expect(selected.cycleId).toBeTruthy();
+    expect(selected.warning).toContain('Автоподбор');
+  });
+
+  it('PL-блок повторяет короткий цикл до длины фазы с предупреждением', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[0], plan, macro, DEFAULT_OPTS);
+    expect(built.result!.weeks).toHaveLength(plan.blocks[0].ref.weeks);
+    expect(built.result!.program?.pl?.sourceCycleId).toBeTruthy();
+  });
+
   it('PL-блок: СРЦ-цикл → недели с упражнениями + program.pl.sourceCycleId', () => {
     const macro = makePLMacro();
     const plan = annualPlanFromMacro(macro);
@@ -166,13 +181,13 @@ describe('сборка блоков', () => {
     expect(state.result!.weeks[0].phase).toBe('accumulation');
   });
 
-  it('PL-блок без цикла: скелет + предупреждение, не ошибка', () => {
+  it('PL-блок без цикла: автоподбор цикла по фазе, не ошибка', () => {
     const macro = makePLMacro();
     const plan = annualPlanFromMacro(macro);
     const state = { ...plan.blocks[3], config: { ...plan.blocks[3].config, cycleId: undefined } };
     const built = buildAnnualBlock(state, plan, macro, {});
     expect(built.status).toBe('built');
-    expect(built.result!.warnings.some(w => w.includes('без СРЦ-цикла'))).toBe(true);
+    expect(built.result!.program?.pl?.sourceCycleId).toBeTruthy();
     expect(built.result!.weeks).toHaveLength(1);
   });
 

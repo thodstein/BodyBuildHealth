@@ -502,7 +502,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     try {
       const ctx = getMacroEditCtx();
       if (!ctx) { setMethodNote('⚠ Контекст правки не найден — нажмите «✏️ Редактировать микроцикл» в блоке'); return; }
-      const weeks = Math.max(1, Math.round(ctx.weeks));
+      // Сохраняем фактическую длительность, выбранную в текущем конструкторе,
+      // а не исходное значение блока из he_macro_edit_ctx.
+      const weeks = ctx.isBB
+        ? Math.min(24, Math.max(4, Math.round(bbWeeks)))
+        : Math.max(1, Math.round(cycleWeeks));
       const blockIdx = ctx.blockIdx;
       if (ctx.isBB) {
         const raw = localStorage.getItem('he_bb_macro');
@@ -511,6 +515,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         if (!macro) { setMethodNote('⚠ BB-макроцикл повреждён'); return; }
         const target = (blockIdx >= 0 && blockIdx < macro.blocks.length) ? macro.blocks[blockIdx] : macro.blocks.find(b => b.phase === ctx.phase);
         if (!target) { setMethodNote('⚠ Блок BB-макроцикла не найден'); return; }
+        if (weeks === target.weeks) { setMethodNote('⚠ Недель не изменилось — задайте другую длительность в конструкторе'); return; }
         const phaseTotal = macro.blocks.filter(b => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
         const next = rebalanceBbMacrocycle(macro, { [target.phase]: Math.max(1, phaseTotal + (weeks - target.weeks)) });
         localStorage.setItem('he_bb_macro', serializeBbMacro(next));
@@ -521,6 +526,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         if (!macro) { setMethodNote('⚠ ПЛ-макроцикл повреждён'); return; }
         const target = (blockIdx >= 0 && blockIdx < macro.blocks.length) ? macro.blocks[blockIdx] : macro.blocks.find(b => b.phase === ctx.phase);
         if (!target) { setMethodNote('⚠ Блок ПЛ-макроцикла не найден'); return; }
+        if (weeks === target.weeks) { setMethodNote('⚠ Недель не изменилось — задайте другую длительность в конструкторе'); return; }
         const phaseTotal = macro.blocks.filter(b => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
         const next = rebalanceMacrocycle(macro, [{ phase: target.phase, weeks: Math.max(1, phaseTotal + (weeks - target.weeks)) }]);
         localStorage.setItem('he_pl_macro', serializeMacro(next));

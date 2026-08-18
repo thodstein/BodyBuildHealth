@@ -35,7 +35,7 @@ import { makeEmptySessionsForWeek } from '../periodization/designer-to-program';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import type { BBPlan } from '../bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, type BBContestPrepConfig } from '../bb/bb-contest-prep.engine';
-import { getCycleById } from '../../data/lms-cycles/lms-cycle-index';
+import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { cycleTemplateToFullProgram } from '../bb/cycle-to-plan';
 import type { FullProgram, ProgramWeek } from '../complete-program-library.engine';
 
@@ -353,33 +353,39 @@ function buildPLBlock(
   opts: AnnualBuildOptions,
 ): AnnualBlockBuildResult {
   const warnings: string[] = [];
-  const cycleId = state.config.cycleId ?? state.ref.cycleId;
+  const requestedCycleId = state.config.cycleId ?? state.ref.cycleId;
+  const cycleSelection = selectPLCycleForBlock(requestedCycleId, state.ref.phase as MacroBlock['phase'], state.ref.weeks, opts.level, true);
+  const cycleId = cycleSelection.cycleId;
+  if (cycleSelection.warning) warnings.push(cycleSelection.warning);
+  const selectedCycle = cycleId ? getCycleById(cycleId) : undefined;
   let weeks: UserWeek[];
   let program: UserProgram | null = null;
   if (cycleId) {
-    const cycle = getCycleById(cycleId);
-    if (!cycle) {
+    if (!selectedCycle) {
       warnings.push(`Цикл «${cycleId}» не найден — блок собран как скелет фаз.`);
       weeks = skeletonWeeks(state.ref.weeks, opts.daysPerWeek ?? 3);
     } else {
-      const full = cycleTemplateToFullProgram(cycle);
+      const full = cycleTemplateToFullProgram(selectedCycle);
       weeks = fullProgramWeeksToUserWeeks(full);
       const base = createBlank('pl');
       base.meta.title = `Блок: ${state.ref.description ?? state.ref.phase} (${state.ref.weeks} нед)`;
       base.meta.goal = 'powerlifting';
       base.meta.level = opts.level ?? 'intermediate';
       base.meta.weeks = state.ref.weeks;
-      base.meta.daysPerWeek = cycle.meta.sessionsPerWeek;
+      base.meta.daysPerWeek = selectedCycle.meta.sessionsPerWeek;
       if (base.pl) {
         base.pl.sourceCycleId = cycleId;
-        base.pl.schedule = Array.from({ length: cycle.meta.sessionsPerWeek }, (_, i) => ({ sessionIdx: i, dayOfWeek: i }));
-        base.pl.notes = `Годовой блок нед ${state.ref.startWeek}-${state.ref.startWeek + state.ref.weeks - 1} · «${cycle.meta.title}».`;
+        base.pl.schedule = Array.from({ length: selectedCycle.meta.sessionsPerWeek }, (_, i) => ({ sessionIdx: i, dayOfWeek: i }));
+        base.pl.notes = `Годовой блок нед ${state.ref.startWeek}-${state.ref.startWeek + state.ref.weeks - 1} · «${selectedCycle.meta.title}».`;
       }
       program = base;
     }
   } else {
     warnings.push('PL-блок без СРЦ-цикла — выберите цикл (config.cycleId) или создайте блок вручную.');
     weeks = skeletonWeeks(state.ref.weeks, opts.daysPerWeek ?? 3);
+  }
+  if (selectedCycle && selectedCycle.meta.weeks < state.ref.weeks) {
+    warnings.push(`Цикл «${selectedCycle.meta.title}» короче блока (${selectedCycle.meta.weeks} нед < ${state.ref.weeks}) — шаблон цикла повторён для заполнения фазы.`);
   }
   weeks = loopWeeksToLength(weeks, state.ref.weeks);
   weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'PL');
@@ -398,6 +404,49 @@ function buildPLBlock(
     taperApplied,
     peakApplied: false,
     configHash: configHashOf(state.config, state.ref),
+  };
+}
+
+type PLBlockPhase = MacroBlock['phase'];
+
+/** Подобрать СРЦ-цикл под длину блока, не ломая явно выбранный пользователем цикл. */
+export function selectPLCycleForBlock(
+  requestedCycleId: string | undefined,
+  phase: PLBlockPhase,
+  weeks: number,
+  level?: string,
+  allowAutoReplace = true,
+): { cycleId?: string; warning?: string } {
+  const requested = requestedCycleId ? getCycleById(requestedCycleId) : undefined;
+  if (requested && (!allowAutoReplace || requested.meta.weeks >= weeks)) return { cycleId: requested.meta.id };
+  const phasePeriod: Record<PLBlockPhase, string[]> = {
+    endurance: ['endurance', 'mixed'],
+    strength: ['strength', 'mixed'],
+    peak: ['peak', 'strength'],
+    competition: ['peak', 'strength'],
+    transition: ['mixed', 'endurance'],
+  };
+  const candidates = LMS_CYCLES.filter(cycle => normalizeCycleDirection(cycle.meta.direction) === 'strength');
+  const ranked = candidates
+    .map(cycle => {
+      const levelPenalty = level && cycle.meta.level === level ? 0 : 1;
+      const periodPenalty = phasePeriod[phase].includes(cycle.meta.period) ? 0 : 1;
+      const lengthPenalty = cycle.meta.weeks >= weeks ? cycle.meta.weeks - weeks : 1000 + weeks - cycle.meta.weeks;
+      return { cycle, score: levelPenalty * 10000 + periodPenalty * 1000 + lengthPenalty };
+    })
+    .sort((a, b) => a.score - b.score);
+  const selected = ranked[0]?.cycle;
+  if (!selected) {
+    return { cycleId: requested?.meta.id, warning: `Не найден подходящий СРЦ-цикл для фазы «${phase}» — используется скелет блока.` };
+  }
+  const changed = requested && requested.meta.id !== selected.meta.id;
+  return {
+    cycleId: selected.meta.id,
+    warning: changed
+      ? `Автоподстройка: цикл «${requested.meta.title}» заменён на «${selected.meta.title}» под блок ${weeks} нед.`
+      : requested
+        ? undefined
+        : `Автоподбор: для фазы «${phase}» выбран цикл «${selected.meta.title}» (${selected.meta.weeks} нед).`,
   };
 }
 
