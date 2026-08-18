@@ -349,7 +349,18 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                    const link = plShareLink({ title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, telegramUrl: url, plan: W });
                    const result = await openPLShare(link, { title: `ПЛ: ${title}`, text: digest, url });
                    onNote(result === 'shared' ? '📲 План передан через системное меню «Поделиться».' : '📲 Открыт Telegram с текстом плана.');
-                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
+                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Telegram Mini App</button>
+                 <button onClick={async () => {
+                   const title = builtSrc.template.meta.title;
+                   const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(W)), `pl-plan-${selectedCycleId}.xlsx`);
+                   onNote(res === 'saved' ? '✅ Excel сохранён в выбранную папку.' : res === 'shared' ? '📤 Выберите «Сохранить в файлы» в системном меню.' : '📥 Excel: выберите «Сохранить файл» в открывшемся окне.');
+                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:8, border:'1px solid rgba(0,230,138,0.55)', background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>💾 Сохранить Excel</button>
+                 <button onClick={() => {
+                   const title = builtSrc.template.meta.title;
+                   const scope = `Весь план (${totalW} нед)`;
+                   const opened = printPLHtml(buildPLPrintHtml(title, scope, W), { title, text: plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead }) });
+                   onNote(opened ? '🖨 Откройте печать и выберите «Сохранить как PDF».' : '🖨 В просмотре нажмите «Печать / Сохранить PDF».');
+                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:8, border:'1px solid rgba(245,158,11,0.55)', background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🖨 Сохранить PDF</button>
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {

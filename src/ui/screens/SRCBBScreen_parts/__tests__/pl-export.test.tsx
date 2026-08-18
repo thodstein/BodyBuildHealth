@@ -175,7 +175,7 @@ describe('PLPlanView — цепочка экспорта', () => {
 
   it('📲 Поделиться в ТГ: openPLShare вызывается со ссылкой Telegram Mini App', () => {
     render(<PLPlanView api={api()} />);
-    fireEvent.click(screen.getByText('📲 Поделиться в ТГ'));
+    fireEvent.click(screen.getByText('📲 Telegram Mini App'));
     expect(shareSpy).toHaveBeenCalledTimes(1);
     const [link] = shareSpy.mock.calls[0];
     expect(link).toContain('https://t.me/share/url?url=');
