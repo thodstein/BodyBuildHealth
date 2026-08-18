@@ -6,6 +6,7 @@ import { applyMacroTaperToPLWeeks, type MacroTaperOpts } from '../../engines/lms
 import { recommendTaperConfig, coachPLPeakPlan, pmFeasibility, projectPmToMeet, compareTaperScenarios, evaluateMeetAttemptsFromDiary, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
 import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type PeakWeekLayout, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
 import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
+import { detectLift } from '../../engines/lms/lms-to-pl';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../engines/rir-matrix.engine';
 import { autoRegulate, shouldTrainToday, type AutoRegOutput } from '../../engines/pro/autoregulation-pro.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
@@ -1090,21 +1091,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   }, []);
   const e1rmSeries = useMemo(() => {
     if (!strengthLogs.length) return [];
-    const LIFT_KW: Record<string, string[]> = { squat: ['присед'], bench: ['жим лёжа', 'жим лёж'], deadlift: ['становая'] };
     const byLift: Record<string, Map<string, number>> = { squat: new Map(), bench: new Map(), deadlift: new Map() };
     for (const log of strengthLogs) {
       for (const ex of (log.exercises || [])) {
-        const nm = (ex.exerciseName || '').toLowerCase();
-        for (const [lift, kws] of Object.entries(LIFT_KW)) {
-          if (!kws.some(k => nm.includes(k))) continue;
-          let best = 0;
-          for (const st of (ex.sets || [])) {
-            const w = +st.weight || 0, r = +st.reps || 0;
-            if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > best) best = e1; }
-          }
-          if (best > 0) { const cur = byLift[lift].get(log.date) || 0; if (best > cur) byLift[lift].set(log.date, best); }
-          break;
+        const lift = detectLift(ex.exerciseName || '', ex.group || '');
+        if (!lift) continue;
+        const key = lift === 'dead' ? 'deadlift' : lift;
+        let best = 0;
+        for (const st of (ex.sets || [])) {
+          const w = +st.weight || 0, r = +st.reps || 0;
+          if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > best) best = e1; }
         }
+        if (best > 0) { const cur = byLift[key].get(log.date) || 0; if (best > cur) byLift[key].set(log.date, best); }
       }
     }
     const COL: Record<string, string> = { squat: 'var(--accent)', bench: '#60a5fa', deadlift: '#f59e0b' };
@@ -1136,10 +1134,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   }, [strengthLogs]);
 
   const calibratePmFromDiary = (lift: 'squat' | 'bench' | 'deadlift') => {
-    const keywords: Record<typeof lift, string[]> = {
-      squat: ['присед'], bench: ['жим лёжа', 'жим лежа'], deadlift: ['становая'],
-    };
-    const series = e1rmSeries.find(s => keywords[lift].some(k => s.label.toLowerCase().includes(k) || s.lift === lift));
+    const series = e1rmSeries.find(s => s.lift === lift);
     const last = series?.pts.at(-1)?.val;
     if (last == null) return;
     if (lift === 'squat') setPmSquat(last);
@@ -1249,9 +1244,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               return (
                 <>
                   <div role="group" aria-label="Предельные максимумы основных упражнений" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
-                    <div><PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />{exerciseE1rm.some(e => /присед/i.test(e.name)) && <button onClick={() => calibratePmFromDiary('squat')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
-                    <div><PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />{exerciseE1rm.some(e => /жим лёж/i.test(e.name)) && <button onClick={() => calibratePmFromDiary('bench')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
-                    <div><PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />{exerciseE1rm.some(e => /становая/i.test(e.name)) && <button onClick={() => calibratePmFromDiary('deadlift')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
+                    <div><PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />{exerciseE1rm.some(e => detectLift(e.name, '') === 'squat') && <button onClick={() => calibratePmFromDiary('squat')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
+                    <div><PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />{exerciseE1rm.some(e => detectLift(e.name, '') === 'bench') && <button onClick={() => calibratePmFromDiary('bench')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
+                    <div><PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />{exerciseE1rm.some(e => detectLift(e.name, '') === 'dead') && <button onClick={() => calibratePmFromDiary('deadlift')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
                   </div>
                   {exs.length > 3 && (
                     <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid var(--accent-dim)' }}>

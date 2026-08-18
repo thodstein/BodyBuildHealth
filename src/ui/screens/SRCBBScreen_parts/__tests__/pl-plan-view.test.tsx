@@ -132,4 +132,39 @@ describe('PLPlanView', () => {
     render(<PLPlanView api={a} />);
     expect((screen.getByText(/📊 Из цикла/) as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('карточка попыток: серия из дневника видна в бейдже «📈 Из дневника» (жим «Жим штанги лёжа» из каталога)', () => {
+    const a = api();
+    a.srcWeek = 8;
+    // Серия строится в SRCBBScreen через detectLift: «Жим штанги лёжа» → bench (раньше
+    // матчинг подстрокой «жим лёжа» не ловил каноническое имя каталога — серия не строилась).
+    a.e1rmSeries = [
+      { lift: 'squat', label: 'Присед', color: '#00e68a', pts: [{ date: '2026-08-01', val: 190 }, { date: '2026-08-10', val: 195 }] },
+      { lift: 'bench', label: 'Жим', color: '#60a5fa', pts: [{ date: '2026-08-01', val: 135 }, { date: '2026-08-10', val: 140 }] },
+      { lift: 'deadlift', label: 'Становая', color: '#f59e0b', pts: [{ date: '2026-08-01', val: 230 }] },
+    ];
+    let noted = '';
+    a.onNote = n => { noted = n; };
+    render(<PLPlanView api={a} />);
+    // бейдж показывает последние значения серий
+    expect(screen.getByText(/📈 Из дневника \(присед 195 · жим 140 · тяга 230\)/)).toBeTruthy();
+    const btn = screen.getByText(/📈 Из дневника/);
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+    // клик без реального стейта ПМ0 не падает (в тесте calibratePmFromDiary — no-op)
+    fireEvent.click(btn);
+    expect(noted).toContain('ПМ0 обновлены из дневника');
+  });
+
+  it('карточка попыток: без серий дневника кнопка «📈 Из дневника» не disabled, клик — подсказка', () => {
+    const a = api();
+    a.srcWeek = 8;
+    a.e1rmSeries = [];
+    let noted = '';
+    a.onNote = n => { noted = n; };
+    render(<PLPlanView api={a} />);
+    const btn = screen.getByText('📈 Из дневника') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    fireEvent.click(btn);
+    expect(noted).toContain('нет записей 1ПМ');
+  });
 });
