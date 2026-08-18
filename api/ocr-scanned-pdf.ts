@@ -8,13 +8,13 @@ const MAX_PAGE_PIXELS = 4_000_000;
 async function recognizePdf(buffer: Buffer): Promise<string> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const { createWorker } = await import('tesseract.js');
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer), disableWorker: true }).promise;
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer), disableWorker: true } as any).promise;
   if (pdf.numPages > MAX_PAGES) throw new Error(`PDF содержит ${pdf.numPages} страниц, максимум ${MAX_PAGES}`);
 
   const worker = await createWorker('rus+eng');
   try {
     await worker.setParameters({
-      tessedit_pageseg_mode: '3',
+      tessedit_pageseg_mode: 3 as any,
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
     });
@@ -35,7 +35,7 @@ async function recognizePdf(buffer: Buffer): Promise<string> {
   } finally {
     await worker.terminate();
     await pdf.cleanup?.();
-    await pdf.destroy?.();
+    await (pdf as any).destroy?.();
   }
 }
 
