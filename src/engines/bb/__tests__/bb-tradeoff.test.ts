@@ -270,6 +270,26 @@ describe('cycle adapt: специализация и доноры', () => {
   }, 30000);
 });
 
+describe('faithful: tradeoff не трогает донора', () => {
+  it('cycle faithful с schedule — состав исходного цикла сохраняется', () => {
+    const plan = convertCycleToBBPlan({
+      cycle: CYCLE_01,
+      workMax: { ...WM, legs: 140 },
+      level: 'intermediate',
+      mode: 'faithful',
+      weakPoints: ['back_thickness'],
+      specialization: true,
+      specializationSchedule: [{
+        weekStart: 1, weekEnd: 5, targets: ['back_thickness'],
+        tradeoff: { mode: 'remove_direct_when_indirect_covers_floor', donorMuscles: ['biceps'], preserveIndirect: true },
+      }],
+      equipment: ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'],
+    } as any);
+    expect(plan.weeks.length).toBeGreaterThan(0);
+    expect(plan.rationale.some(r => r.includes('Донорское перераспределение'))).toBe(false);
+  }, 30000);
+});
+
 describe('program adapt: специализация и доноры', () => {
   it('program adapt с back_thickness + arms donor: план валиден', () => {
     const program: any = {
