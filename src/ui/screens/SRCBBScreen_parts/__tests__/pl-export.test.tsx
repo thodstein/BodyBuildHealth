@@ -89,10 +89,29 @@ describe('pl-export хелперы', () => {
 
   it('buildPLExcelWorkbook: лист «План» + сводка (full)', () => {
     const wb = buildPLExcelWorkbook('Тест', plExportRows(W), [{ label: 'Тоннаж', value: '1000 кг·пов' }]);
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets['План']);
-    expect(rows.length).toBe(12);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets['План'], { header: 1 }) as unknown[];
+    // заголовок + пустая строка + шапка + 12 строк данных
+    expect(rows.length).toBe(15);
+    expect((rows[0] as string[])[0]).toBe('Тест');
+    expect((rows[2] as string[])[0]).toBe('Неделя');
+    expect(wb.Sheets['План']['!freeze']).toBeTruthy();
+    expect(wb.Sheets['План']['!autofilter']).toBeTruthy();
     const summary = XLSX.utils.sheet_to_json(wb.Sheets['Сводка']);
     expect(summary.length).toBe(1);
+  });
+
+  it('buildPLPrintHtml: округление весов + оформление', () => {
+    const html = buildPLPrintHtml('Тест', 'Весь план', [
+      {
+        week: 1, pmRow: { 'Присед': 100.5555555 }, days: [{
+          exercises: [{ name: 'Присед', load: 'main', workSets: [{ sets: 3, reps: 5, weight: 100.5555555, pct: 0.8, rir: 2 }] }],
+        }], sourcePhase: 'base',
+      } as never,
+    ]);
+    expect(html).toContain('100.6');
+    expect(html).not.toContain('100.5555555');
+    expect(html).toContain('week-head');
+    expect(html).toContain('@media print');
   });
 
   it('buildPLPrintHtml: заголовок/неделя/день/упражнение + XSS-экранирование', () => {
@@ -133,7 +152,7 @@ describe('PLPlanView — цепочка экспорта', () => {
     expect(dlSpy).toHaveBeenCalledTimes(1);
     const [wb, filename] = dlSpy.mock.calls[0];
     expect(filename).toContain('cycle-01');
-    expect(XLSX.utils.sheet_to_json(wb.Sheets['План']).length).toBe(12);
+    expect(XLSX.utils.sheet_to_json(wb.Sheets['План'], { header: 1 } as never).length).toBe(15);
   });
 
   it('PDF · Отдельный блок «Тапер»: печать только тапер-недель', () => {
@@ -158,9 +177,10 @@ describe('PLPlanView — цепочка экспорта', () => {
     fireEvent.click(screen.getByLabelText('Экспорт неделя 1'));
     fireEvent.click(screen.getByText(/Сохранить Excel на телефон.*Неделя 1/));
     const [wb] = dlSpy.mock.calls[0];
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets['План']) as { Неделя: number }[];
-    expect(rows.length).toBe(3);
-    expect(rows.every(r => r.Неделя === 1)).toBe(true);
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets['План'], { header: 1 } as never) as (number | string)[][];
+    const data = raw.slice(3).filter(r => typeof r[0] === 'number');
+    expect(data.length).toBe(3);
+    expect(data.every(r => r[0] === 1)).toBe(true);
   });
 
   it('Excel · Всё вместе: лист «Сводка» присутствует', () => {

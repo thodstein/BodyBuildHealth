@@ -73,14 +73,49 @@ export function plExportRows(weeks: LMSPlanWeek[]): PLExportRow[] {
 }
 
 // ── Excel ──
+/** Округление веса до 0.1 кг (100.5, а не 100.5555555). */
+export function roundW(n: number): number {
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+}
+
 export function buildPLExcelWorkbook(title: string, rows: PLExportRow[], summary?: { label: string; value: string }[]): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Неделя: '', День: '', Нагрузка: '', Упражнение: '', Сеты: '', Повторы: '', 'Вес (кг)': '', '% ПМ': '', RIR: '' }]);
-  ws['!cols'] = [{ wch: 7 }, { wch: 5 }, { wch: 9 }, { wch: 32 }, { wch: 6 }, { wch: 8 }, { wch: 9 }, { wch: 7 }, { wch: 6 }];
+  const HEADERS = ['Неделя', 'День', 'Нагрузка', 'Упражнение', 'Сеты', 'Повторы', 'Вес (кг)', '% ПМ', 'RIR'];
+  const aoa: (string | number)[][] = [
+    [title],
+    [],
+    HEADERS,
+    ...rows.map(r => [r.Неделя, r.День, r.Нагрузка, r.Упражнение, r.Сеты, r.Повторы, roundW(r['Вес (кг)']), Math.round(r['% ПМ']), r.RIR]),
+  ];
+  if (rows.length === 0) aoa.push(['', '', '', '', '', '', '', '', '']);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 7 }, { wch: 5 }, { wch: 10 }, { wch: 34 }, { wch: 6 }, { wch: 8 }, { wch: 10 }, { wch: 7 }, { wch: 6 }];
+  ws['!rows'] = [{ hpt: 22 }, { hpt: 8 }, { hpt: 20 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }];
+  ws['!freeze'] = { xSplit: 0, ySplit: 3 };
+  if (rows.length > 0) {
+    ws['!autofilter'] = { ref: `A3:I${3 + rows.length}` };
+    for (let i = 0; i < rows.length; i++) {
+      const rr = 3 + i;
+      const cW = XLSX.utils.encode_cell({ r: rr, c: 6 });
+      if (ws[cW]) ws[cW].z = '0.0';
+      const cP = XLSX.utils.encode_cell({ r: rr, c: 7 });
+      if (ws[cP]) ws[cP].z = '0"%"';
+    }
+  }
+  // Оформление шапки (жирный белый текст на зелёном) — насколько позволяет формат xlsx.
+  for (let c = 0; c < HEADERS.length; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 2, c })];
+    if (cell) cell.s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '0A6E46' } } };
+  }
+  const tcell = ws['A1'];
+  if (tcell) tcell.s = { font: { bold: true, sz: 14, color: { rgb: '0A6E46' } } };
   XLSX.utils.book_append_sheet(wb, ws, 'План');
   if (summary && summary.length > 0) {
     const sws = XLSX.utils.aoa_to_sheet([['Метрика', 'Значение'], ...summary.map(s => [s.label, s.value])]);
-    sws['!cols'] = [{ wch: 22 }, { wch: 26 }];
+    sws['!cols'] = [{ wch: 24 }, { wch: 30 }];
+    const sh = sws['A1'];
+    if (sh) sh.s = { font: { bold: true } };
     XLSX.utils.book_append_sheet(wb, sws, 'Сводка');
   }
   wb.Props = { Title: title };
@@ -217,24 +252,40 @@ export function buildPLPrintHtml(
   const safeTitle = escHtml(title);
   const safeScope = escHtml(scopeLabel);
   const date = escHtml(new Date().toLocaleDateString('ru-RU'));
+  const phaseColor = (w: LMSPlanWeek): string => {
+    const ph = (w.macroPhase || w.sourcePhase || '').toLowerCase();
+    if (ph.includes('peak') || ph.includes('competition')) return '#b91c1c';
+    if (ph.includes('deload') || ph.includes('transition')) return '#2563eb';
+    if (ph.includes('build') || ph.includes('accumul')) return '#15803d';
+    return '#0a6e46';
+  };
+  const phaseLabel = (w: LMSPlanWeek): string => {
+    const ph = (w.macroPhase || w.sourcePhase || '').toLowerCase();
+    if (ph.includes('peak') || ph.includes('competition')) return 'Пик';
+    if (ph.includes('deload') || ph.includes('transition')) return 'Разгрузка';
+    if (ph.includes('build') || ph.includes('accumul')) return 'Накопление';
+    return 'База';
+  };
   const weekBlocks = weeks.map(w => {
     const dayBlocks = (w.days ?? []).map((d, di) => {
       const rows = (d.exercises ?? []).map(e => {
         const sets = (e.workSets ?? [])
-          .map(ws => `${ws.sets}×${ws.reps} @ ${ws.weight} кг (${Math.round(ws.pct * 100)}% · RIR ${ws.rir})`)
+          .map(ws => `${ws.sets}×${ws.reps} @ ${roundW(ws.weight)} кг (${Math.round(ws.pct * 100)}% · RIR ${ws.rir})`)
           .join(' + ');
-        return `<tr><td>${escHtml(e.name)}</td><td>${escHtml(plLoadLabel(e.load))}</td><td>${escHtml(sets)}</td></tr>`;
+        return `<tr><td>${escHtml(e.name)}</td><td><span class="chip">${escHtml(plLoadLabel(e.load))}</span></td><td class="mono">${escHtml(sets)}</td></tr>`;
       }).join('');
       return `<h4>День ${di + 1}</h4><table><thead><tr><th>Упражнение</th><th>Нагрузка</th><th>Подходы</th></tr></thead><tbody>${rows || '<tr><td colspan="3">—</td></tr>'}</tbody></table>`;
     }).join('');
-    const pm = Object.entries(w.pmRow ?? {}).map(([n, v]) => `${escHtml(n)}: ${v} кг`).join(' · ');
-    return `<section><h3>Неделя ${w.week}${pm ? ` — ${pm}` : ''}</h3>${dayBlocks}</section>`;
+    const pm = Object.entries(w.pmRow ?? {}).map(([n, v]) => `${escHtml(n)}: ${roundW(v)} кг`).join(' · ');
+    const color = phaseColor(w);
+    const label = phaseLabel(w);
+    return `<div class="week"><div class="week-head" style="background:${color}">Неделя ${w.week} · ${label}${pm ? ` <span class="wkpm">— ${pm}</span>` : ''}</div>${dayBlocks}</div>`;
   }).join('');
   const summaryHtml = opts?.summary && opts.summary.length > 0
-    ? `<section><h3>Сводка цикла</h3><table><tbody>${opts.summary.map(s => `<tr><td>${escHtml(s.label)}</td><td>${escHtml(s.value)}</td></tr>`).join('')}</tbody></table></section>`
+    ? `<div class="week"><div class="week-head" style="background:#0a6e46">📊 Сводка цикла</div><table><tbody>${opts.summary.map(s => `<tr><td>${escHtml(s.label)}</td><td>${escHtml(s.value)}</td></tr>`).join('')}</tbody></table></div>`
     : '';
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${safeTitle} — план</title>
-<style>body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin:0 0 4px}h2{font-size:13px;color:#555;margin:0 0 16px;font-weight:400}h3{margin:18px 0 6px;font-size:15px;border-bottom:1px solid #ccc;padding-bottom:4px}h4{margin:10px 0 4px;font-size:13px}table{border-collapse:collapse;width:100%;margin-bottom:10px}th,td{border:1px solid #ccc;padding:5px 8px;font-size:12px;text-align:left}th{background:#f2f2f2}section{page-break-inside:avoid}@media print{body{margin:12px}}</style></head>
+<style>body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;padding:26px;color:#111;background:#fff}h1{font-size:24px;margin:0 0 2px;color:#0a6e46}h2{font-size:13px;color:#666;margin:0 0 18px;font-weight:400}.week{margin:0 0 18px;border:1px solid #e2e2e2;border-radius:10px;overflow:hidden}.week-head{padding:9px 12px;color:#fff;font-weight:700;font-size:14px}.week-head .wkpm{font-weight:400;opacity:.92}h4{margin:8px 12px 4px;font-size:13px;color:#333}table{border-collapse:collapse;width:100%;margin-bottom:8px}th{background:#f4f6f5;color:#0a6e46;text-transform:uppercase;letter-spacing:.05em;font-size:10px;padding:7px 10px;text-align:left;border-top:1px solid #e2e2e2;border-bottom:1px solid #e2e2e2}td{border-bottom:1px solid #eee;padding:7px 10px;font-size:12px}tr:nth-child(even) td{background:#fafbfa}.chip{display:inline-block;padding:1px 7px;border-radius:10px;background:#0a6e46;color:#fff;font-size:10px;font-weight:700}.mono{font-variant-numeric:tabular-nums}.week{page-break-inside:avoid}@media print{body{padding:10px}}</style></head>
 <body><h1>${safeTitle}</h1><h2>${safeScope} · ${date}</h2>${weekBlocks}${summaryHtml}</body></html>`;
 }
 
@@ -371,7 +422,7 @@ export function plShareDigest(o: { title: string; weeks: LMSPlanWeek[]; pmSquat:
     const dayLines: string[] = [];
     (w.days ?? []).forEach((d, di) => {
       const ex = (d.exercises ?? []).map(e => {
-        const sets = (e.workSets ?? []).map(ws => `${ws.sets}×${ws.reps}@${ws.weight}кг`).join(' + ');
+        const sets = (e.workSets ?? []).map(ws => `${ws.sets}×${ws.reps}@${roundW(ws.weight)}кг`).join(' + ');
         return sets ? `${e.name} ${sets}` : e.name;
       }).join(' · ');
       if (ex) dayLines.push(`  День ${di + 1}: ${ex}`);
