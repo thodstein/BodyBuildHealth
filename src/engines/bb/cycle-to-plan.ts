@@ -1222,7 +1222,19 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     }
   }
 
-  return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
+  return finalizeBBPlan({
+    ...finalPlan,
+    volumeLandmarks,
+    muscleFrequency,
+    // Контекст специализации/лимитов сохраняется для повторной финализации.
+    specializationSchedule: specSchedule,
+    priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
+    mrvMultiplier: mrvMult,
+    maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24,
+    maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10,
+    gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
+    mobilityRestrictions: input.mobilityRestrictions,
+  }, {
     reorder: mode !== 'faithful',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
@@ -2012,7 +2024,19 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     }
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
-  return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
+  return finalizeBBPlan({
+    ...finalPlan,
+    volumeLandmarks,
+    muscleFrequency,
+    // Контекст специализации/лимитов сохраняется для повторной финализации.
+    specializationSchedule: specSchedule,
+    priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
+    mrvMultiplier: pedMrvMult,
+    maxWorkingSets: String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 60 : String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 40 : 24,
+    maxExercises: String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 18 : String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 14 : 10,
+    gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
+    mobilityRestrictions: opts.mobilityRestrictions,
+  }, {
     reorder: mode !== 'faithful',
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,

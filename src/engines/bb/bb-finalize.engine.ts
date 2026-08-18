@@ -18,7 +18,6 @@ import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
-import { isMobilityRestricted } from './bb-mobility.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место). */

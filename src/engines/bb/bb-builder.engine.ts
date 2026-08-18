@@ -297,6 +297,16 @@ export interface BBPlan {
     excludedMuscles?: string[];
     avoidAxialLoad?: boolean;
   };
+  /** Контекст специализации и лимитов — сохраняется в плане, чтобы повторная
+   *  финализация (после ручных правок в «Коррекции») не теряла донорскую
+   *  политику и не возвращала объём донорам. */
+  specializationSchedule?: import('./bb-specialization.engine').SpecializationSchedule;
+  priorityMuscles?: string[];
+  mrvMultiplier?: number;
+  maxWorkingSets?: number;
+  maxExercises?: number;
+  gradedMuscles?: string[];
+  mobilityRestrictions?: string[];
 }
 
 /**
@@ -3167,7 +3177,23 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Exercise cap is enforced by the shared finalizer's priority-aware
   // fatigue budget. Do not truncate the array here: raw tail deletion can
   // remove the only exercise for a muscle or a protected primary.
-  const output = { ...finalPlan, level, volumeLandmarks, muscleFrequency, volumeTargets, mrvByMuscle };
+  const output = {
+    ...finalPlan,
+    level,
+    volumeLandmarks,
+    muscleFrequency,
+    volumeTargets,
+    mrvByMuscle,
+    // Контекст специализации/лимитов сохраняется в плане для повторной
+    // финализации (revalidate после ручных правок).
+    specializationSchedule: specSchedule,
+    priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
+    mrvMultiplier: effectiveMrvMult,
+    maxWorkingSets: (level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24),
+    maxExercises: (level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10),
+    gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
+    mobilityRestrictions: input.mobilityRestrictions,
+  };
   syncBBPlanSetShape(output);
   const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears });
   const validationWarnings = validation.issues

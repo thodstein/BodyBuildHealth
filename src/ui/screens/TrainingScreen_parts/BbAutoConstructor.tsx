@@ -1105,6 +1105,18 @@ export const BbAutoConstructor: React.FC = () => {
       excludedExercises: edited.safetyConstraints?.excludedExercises,
       excludedMuscles: edited.safetyConstraints?.excludedMuscles,
       avoidAxialLoad: edited.safetyConstraints?.avoidAxialLoad,
+      // Контекст специализации сохраняется при повторной финализации:
+      // иначе донорский объём мог вернуться после ручных правок.
+      specializationSchedule: edited.specializationSchedule,
+      priorityMuscles: edited.priorityMuscles,
+      trainingYears: bbTrainingYears,
+      mrvMultiplier: edited.mrvMultiplier,
+      ensureMinimumVolume: true,
+      controlledRotation: false,
+      maxWorkingSets: edited.maxWorkingSets,
+      maxExercises: edited.maxExercises,
+      gradedMuscles: edited.gradedMuscles,
+      mobilityRestrictions: edited.mobilityRestrictions,
     });
   };
 
