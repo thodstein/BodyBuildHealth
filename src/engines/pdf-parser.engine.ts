@@ -424,12 +424,12 @@ function detectProviderFromText(text: string): string | null {
 
 interface TextItem { str: string; x: number; y: number; width: number; height: number; }
 
-async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer): Promise<any> {
+async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer, disableWorker = false): Promise<any> {
   const pdfData = new Uint8Array(data);
   // In SSR/Node test runners there is no browser Worker implementation. PDF.js
   // otherwise tries to create a fake worker from the configured CDN URL, which
   // fails before text extraction even starts (and made valid PDFs look empty).
-  if (typeof Worker === 'undefined') {
+  if (disableWorker || typeof Worker === 'undefined') {
     return pdfjsLib.getDocument({ data: pdfData, disableWorker: true }).promise;
   }
   try {
@@ -863,6 +863,8 @@ export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<Parsed
       pdfjsLib.GlobalWorkerOptions.workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
+    // Scanned PDFs need page rendering. Telegram WebView often cannot load
+    // the PDF.js worker URL, while the main-thread renderer works reliably.
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
     let fullText = '';
     let allItems: TextItem[] = [];
@@ -920,16 +922,16 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
     Tesseract = await import('tesseract.js') as any;
   } catch (initError: any) {
     console.error('ocrScannedPdf init failed:', initError);
-    return '';
+    throw new Error(`OCR сканированного PDF недоступен: ${initError?.message || String(initError)}`);
   }
   try {
     if (typeof Worker !== 'undefined') {
       const { resolvePdfjsWorkerSrc } = await import('./ocr-assets');
-      const workerSrc = (await resolvePdfjsWorkerSrc()).workerSrc;
-      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+      // Scanned pages are rendered on the main thread below, so no PDF.js
+      // worker URL is needed here. This avoids Telegram WebView worker errors.
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
-    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
+    const pdf = await openPdfDocument(pdfjsLib, arrayBuffer, true);
     const MAX_PAGE_PX = 1800000;
     const texts: string[] = [];
     const worker = await createRussianOcrWorker(Tesseract);
@@ -957,7 +959,7 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
     return texts.join('\n');
   } catch (err: any) {
     console.warn('ocrScannedPdf failed:', err);
-    return '';
+    throw new Error(`Не удалось обработать сканированный PDF: ${err?.message || String(err)}`);
   }
 }
 
