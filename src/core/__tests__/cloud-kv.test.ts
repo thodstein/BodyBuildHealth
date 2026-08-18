@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   CHUNK_SIZE,
   META_KEY,
@@ -280,5 +280,62 @@ describe('синхронизация (движок с фейковым тран�
     const t = new FakeTransport();
     await init(t);
     expect(getKvSyncState().status).toBe('idle');
+  });
+});
+
+describe('фоновый pull и авто-обновление', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('стартовый pull НЕ перезагружает страницу', async () => {
+    const t = new FakeTransport();
+    const reload = vi.fn();
+    t.seed('he_profile_v2', '{"v":1}', Date.now());
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, reloadFn: reload });
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"v":1}');
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('фоновый pull применяет новые данные и планирует перезагрузку', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    const reload = vi.fn();
+    t.seed('he_profile_v2', '{"v":1}', 1000);
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, reloadFn: reload });
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"v":1}');
+
+    // другое устройство обновило данные в облаке
+    t.seed('he_profile_v2', '{"v":2}', 9000);
+    const applied = await pullKvNow();
+    expect(applied).toBe(1);
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"v":2}');
+    expect(reload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1300);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('фоновый pull без новых данных не перезагружает', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    const reload = vi.fn();
+    t.seed('he_profile_v2', '{"v":1}', 1000);
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, reloadFn: reload });
+    const applied = await pullKvNow();
+    expect(applied).toBe(0);
+    await vi.advanceTimersByTimeAsync(1300);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('интервальный pull забирает изменения с другого устройства', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    const reload = vi.fn();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, pullIntervalMs: 100, reloadFn: reload });
+    t.seed('he_weight_log', '[{"w":82}]', 5000);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(localStorage.getItem('he_weight_log')).toBe('[{"w":82}]');
+    // один reload на первое применение; повторные тики новых данных не приносят
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });

@@ -27,6 +27,8 @@ export const CHUNK_SIZE = 100_000;
 const PULL_PAGE = 1000;
 export const PULL_TIMEOUT_MS = 3000;
 export const FLUSH_DELAY_MS = 2500;
+export const PULL_INTERVAL_MS = 30_000;
+const RELOAD_DELAY_MS = 1200;
 const KEEPALIVE_MAX_BYTES = 48_000;
 export const META_KEY = 'he_sync_meta_v1';
 const CONFLICT_WINDOW_MS = 500;
@@ -79,6 +81,12 @@ const dirty = new Set<string>();
 
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let metaTimer: ReturnType<typeof setTimeout> | null = null;
+let pullInterval: ReturnType<typeof setInterval> | null = null;
+let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+let reloadFn: () => void = () => {
+  try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ }
+};
 
 let installed = false;
 const origSetItem = typeof localStorage !== 'undefined' ? localStorage.setItem.bind(localStorage) : null;
@@ -108,7 +116,7 @@ export function isKvSyncEnabled(): boolean {
  */
 export async function initKvSync(
   userId: string,
-  opts?: { transport?: KvTransport; token?: string; flushDelayMs?: number },
+  opts?: { transport?: KvTransport; token?: string; flushDelayMs?: number; pullIntervalMs?: number; reloadFn?: () => void },
 ): Promise<KvSyncState> {
   const hasEnv = !!(SUPABASE_URL && SUPABASE_ANON);
   if (!opts?.transport && !hasEnv) {
@@ -139,16 +147,17 @@ export async function initKvSync(
   started = true;
   const flushDelay = opts?.flushDelayMs ?? FLUSH_DELAY_MS;
   setFlushDelay(flushDelay);
+  if (opts?.reloadFn) reloadFn = opts.reloadFn;
   await pullWithTimeout();
   void flush();
-  attachLifecycle();
+  attachLifecycle(opts?.pullIntervalMs ?? PULL_INTERVAL_MS);
   setState({ status: 'idle', lastPullAt: state.lastPullAt, error: undefined });
   return state;
 }
 
-/** Принудительная загрузка из облака (используется при online-событии). */
+/** Принудительная загрузка из облака (фоновый pull с авто-обновлением при изменениях). */
 export async function pullKvNow(): Promise<number> {
-  return pull();
+  return pull({ reload: true });
 }
 
 /** Принудительная выгрузка изменённых ключей. */
@@ -170,8 +179,11 @@ export function _resetKvForTests(): void {
   dirty.clear();
   mtimes = new Map();
   lifecycleAttached = false;
+  reloadFn = () => { try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ } };
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
   if (metaTimer != null) { clearTimeout(metaTimer); metaTimer = null; }
+  if (reloadTimer != null) { clearTimeout(reloadTimer); reloadTimer = null; }
+  if (pullInterval != null) { clearInterval(pullInterval); pullInterval = null; }
   if (installed && origSetItem && origRemoveItem && typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem = origSetItem;
@@ -355,7 +367,7 @@ async function flush(): Promise<void> {
   }
 }
 
-async function pull(): Promise<number> {
+async function pull(opts?: { reload?: boolean }): Promise<number> {
   if (!transport || !token) return 0;
   const rows: KvRow[] = [];
   try {
@@ -400,7 +412,23 @@ async function pull(): Promise<number> {
   reconcileLocalKeys(byKey);
   writeMetaNow();
   setState({ status: 'idle', lastPullAt: Date.now(), error: undefined });
+  if (opts?.reload && applied > 0) {
+    console.debug('[kv] background pull applied', applied, 'keys — reload');
+    scheduleReload();
+  }
   return applied;
+}
+
+/**
+ * Данные с другого устройства появились в облаке, а мы уже открыты и не перечитаем
+ * экраны сами → мягкий перезапуск страницы (данные уже записаны в localStorage).
+ */
+function scheduleReload(): void {
+  if (reloadTimer != null || (typeof document !== 'undefined' && document.visibilityState !== 'visible')) return;
+  reloadTimer = setTimeout(() => {
+    reloadTimer = null;
+    try { reloadFn(); } catch { /* no-op */ }
+  }, RELOAD_DELAY_MS);
 }
 
 /** Локальные ключи, которых нет ни в облаке, ни в mtimes (никогда не синкались) → выгрузить. */
@@ -422,7 +450,7 @@ async function pullWithTimeout(): Promise<void> {
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; }, PULL_TIMEOUT_MS);
   try {
-    await pull();
+    await pull(); // стартовый pull: reload не нужен — приложение ещё не отрисовано
   } catch { /* ошибка обработана внутри pull */ }
   if (!timedOut) clearTimeout(timer);
 }
@@ -459,11 +487,11 @@ function keepAliveFlush(): void {
   }
 }
 
-function attachLifecycle(): void {
+function attachLifecycle(pullIntervalMs: number): void {
   if (lifecycleAttached || typeof window === 'undefined') return;
   lifecycleAttached = true;
   window.addEventListener('online', () => {
-    void pull();
+    void pull({ reload: true });
     void flush();
   });
   document.addEventListener('visibilitychange', () => {
@@ -471,7 +499,15 @@ function attachLifecycle(): void {
       writeMetaNow();
       void flush();
       keepAliveFlush();
+    } else {
+      // вернулись в приложение → подтянуть изменения с другого устройства
+      void pull({ reload: true });
+      void flush();
     }
+  });
+  window.addEventListener('focus', () => {
+    void pull({ reload: true });
+    void flush();
   });
   window.addEventListener('pagehide', () => {
     writeMetaNow();
@@ -481,6 +517,12 @@ function attachLifecycle(): void {
     writeMetaNow();
     keepAliveFlush();
   });
+  // фоновый цикл: pull + повторная попытка flush (застрявшие dirty-ключи)
+  pullInterval = setInterval(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    void pull({ reload: true });
+    void flush();
+  }, pullIntervalMs);
 }
 
 /* ------------------------------------------------------------------ */
