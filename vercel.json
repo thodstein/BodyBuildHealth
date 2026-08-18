@@ -4,7 +4,7 @@
   "installCommand": "npm ci",
   "outputDirectory": "dist",
   "functions": {
-    "api/ocr-scanned-pdf.ts": { "maxDuration": 300, "memory": 2048 }
+    "api/ocr-scanned-pdf.ts": { "maxDuration": 300, "memory": 3009 }
   },
   "headers": [
     {
