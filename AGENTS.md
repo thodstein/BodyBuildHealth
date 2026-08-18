@@ -1,5 +1,33 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Облачная синхронизация через Telegram (Aug 18 2026, uncommitted)
+
+Привязка данных к аккаунту Telegram: localStorage (ключи `he_*`, включая фото) синхронизируется
+с Supabase (таблица `user_kv`), чтобы на телефоне и компьютере (Telegram Mini App) были одни и
+те же данные. Логинов/паролей нет — Telegram сам идентифицирует пользователя.
+
+- **`src/core/cloud-kv.ts`** (NEW): sync-токен `tk_<sha256(VITE_CRYPTO_KEY + ':' + tgId)>`
+  в заголовке `x-user-token`, RLS отдаёт пользователю только его строки; pull при входе
+  (LWW по mtime ключа, окно 500 мс), push через перехват `localStorage.setItem/removeItem`
+  (debounce 2.5 с) + keepalive-флаш на pagehide/beforeunload (бюджет 48КБ) + реконнект по
+  `online`; чанки по 100k символов (без разрыва суррогатных пар), реальный `chunk_count`
+  только в чанке 0 — неполная запись пропускается и «залечивается» локальным push;
+  reconcile: локальные ключи без mtime (никогда не синкались) выгружаются при ините;
+  мета mtime в `he_sync_meta_v1`. Исключения: `he_session_v2`, `he_crypto_key`,
+  `he_last_active`, `he_sync_*`, `he_draft_*`, `he_nav_*`, `he_admin_*`.
+- **`auth-module.ts`**: `initKvSync(user.id)` после входа в TG-пути (до onLogin — pull
+  применяется до рендера). Вне Telegram (PWA/браузер) синк выключен by design.
+- **`supabase/migrations/20260818_user_kv.sql`** (NEW): таблица + RLS по
+  `current_setting('request.headers')::jsonb->>'x-user-token'` + grants anon/authenticated.
+- **Тесты**: `cloud-kv.test.ts` 24/24 (чанки/суррогатные пары, исключения, LWW-конфликты,
+  токен, pull/push/remove, залечивание неполной записи, рестарт без повторного push,
+  keepalive-бюджет). `src/test/setup.ts` — mock localStorage дополнен стандартными
+  `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
+- **ВАЖНО**: Supabase-проект из `.env` был удалён (NXDOMAIN), пользователь восстановил —
+  проверил: DNS резолвится, ключ работает, таблиц нет кроме `labs`; SQL-миграцию применяет
+  пользователь (SQL Editor). Документация: `docs/TELEGRAM-CLOUD-SYNC.md`.
+- Проверено: tsc 0; cloud-kv 24/24; src/core/__tests__ 317/317.
+
 ## MC-5 завершён: редизайн годового планировщика + «✏️ Редактировать микроцикл» (Aug 18 2026, uncommitted)
 
 Финал редизайна MacrocyclePanel: новый порядок секций, кнопки «✏️ Редактировать микроцикл» с

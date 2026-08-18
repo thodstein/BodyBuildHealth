@@ -2,6 +2,7 @@ import { db } from '../core/db';
 import type { LocalUserProfile } from '../core/auth-manager';
 import { ensureAdmin } from '../core/auth-manager';
 import type { UserProfile, UserRole } from '../core/types';
+import { initKvSync } from '../core/cloud-kv';
 
 function toAppProfile(p: LocalUserProfile): UserProfile {
   return {
@@ -58,6 +59,7 @@ export async function renderAuthModule(container: HTMLElement, onLogin: (profile
       }
 
       localStorage.setItem('he_session_v2', JSON.stringify({ id: user.id, email: user.email, ts: Date.now() }));
+      try { await initKvSync(user.id); } catch (e) { console.warn('KvSync init failed:', e); }
       onLogin(toAppProfile(user));
       return;
     }
