@@ -21,8 +21,10 @@ class FakeTransport implements KvTransport {
   replaceCalls: string[] = [];
   removeCalls: string[] = [];
   keepAliveRows: KvRow[] = [];
+  serverOffsetMs = 0;
 
-  async pull(_token: string, onRows: (rows: KvRow[]) => void): Promise<void> {
+  async pull(_token: string, onRows: (rows: KvRow[]) => void, onServerNow?: (ms: number) => void): Promise<void> {
+    if (onServerNow) onServerNow(Date.now() + this.serverOffsetMs);
     onRows([...this.cloud.values()].flat());
   }
 
@@ -337,5 +339,60 @@ describe('фоновый pull и авто-обновление', () => {
     expect(localStorage.getItem('he_weight_log')).toBe('[{"w":82}]');
     // один reload на первое применение; повторные тики новых данных не приносят
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('расхождение часов устройства и сервера (LWW по серверному времени)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('свои записи штампуются серверным временем, а не часами устройства', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    // часы телефона спешат на 1 час относительно сервера
+    t.serverOffsetMs = -3_600_000;
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    localStorage.setItem('he_profile_v2', '{"v":1}');
+    await flushKvNow();
+    const ts = Date.parse(t.cloud.get('he_profile_v2')![0].updated_at);
+    const serverNow = Date.now() - 3_600_000;
+    expect(Math.abs(ts - serverNow)).toBeLessThan(60_000);
+    // без серверной калибровки было бы Date.now() (на 1 час больше)
+    expect(Math.abs(ts - Date.now())).toBeGreaterThan(3_000_000);
+  });
+
+  it('запись с ПК (корректные часы) побеждает, даже если часы телефона спешат', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    t.serverOffsetMs = -3_600_000; // телефон «убежал» на 1 час вперёд
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+
+    // телефон записал свои данные 5 минут назад (по серверным часам)
+    vi.setSystemTime(Date.now() - 300_000);
+    localStorage.setItem('he_lab_reports', '[{"lab":"phone"}]');
+    await flushKvNow();
+    vi.setSystemTime(Date.now() + 300_000);
+
+    // ПК записал данные позже — в облаке серверное время этой записи НОВЕЕ
+    t.seed('he_lab_reports', '[{"lab":"pc"}]', Date.now() - 3_600_000 + 30_000);
+
+    const applied = await pullKvNow();
+    expect(applied).toBe(1);
+    expect(localStorage.getItem('he_lab_reports')).toBe('[{"lab":"pc"}]');
+  });
+
+  it('более свежие локальные данные не перезатираются старыми из облака', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    t.serverOffsetMs = 0;
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    localStorage.setItem('he_weight_log', '[{"w":80}]');
+    await flushKvNow();
+    // облако получило старую версию (от другого устройства, записано раньше)
+    t.seed('he_weight_log', '[{"w":70}]', Date.now() - 60_000);
+    const applied = await pullKvNow();
+    expect(applied).toBe(0);
+    expect(localStorage.getItem('he_weight_log')).toBe('[{"w":80}]');
   });
 });

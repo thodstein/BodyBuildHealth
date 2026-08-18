@@ -8,20 +8,26 @@
 
 - **`src/core/cloud-kv.ts`** (NEW): sync-токен `tk_<sha256(VITE_CRYPTO_KEY + ':' + tgId)>`
   в заголовке `x-user-token`, RLS отдаёт пользователю только его строки; pull при входе
-  (LWW по mtime ключа, окно 500 мс), push через перехват `localStorage.setItem/removeItem`
-  (debounce 2.5 с) + keepalive-флаш на pagehide/beforeunload (бюджет 48КБ) + реконнект по
-  `online`; чанки по 100k символов (без разрыва суррогатных пар), реальный `chunk_count`
-  только в чанке 0 — неполная запись пропускается и «залечивается» локальным push;
-  reconcile: локальные ключи без mtime (никогда не синкались) выгружаются при ините;
-  мета mtime в `he_sync_meta_v1`. Исключения: `he_session_v2`, `he_crypto_key`,
-  `he_last_active`, `he_sync_*`, `he_draft_*`, `he_nav_*`, `he_admin_*`.
+  (LWW по mtime ключа, окно 500 мс) + фоновый pull каждые 30 с + при возврате в приложение
+  (visibilitychange/focus) + авто-перезагрузка страницы при появлении данных с другого
+  устройства; push через перехват `localStorage.setItem/removeItem` (debounce 2.5 с) +
+  keepalive-флаш на pagehide/beforeunload (бюджет 48КБ) + реконнект по `online`; чанки по
+  100k символов (без разрыва суррогатных пар), реальный `chunk_count` только в чанке 0 —
+  неполная запись пропускается и «залечивается» локальным push; reconcile: локальные ключи
+  без mtime (никогда не синкались) выгружаются при ините; мета mtime в `he_sync_meta_v1`.
+  **LWW по СЕРВЕРНОМУ времени**: `skewMs` калибруется из HTTP Date-заголовка (pull на raw
+  fetch), все mtime штампуются серверными часами — иначе телефон со «спешащими» часами
+  всегда побеждал ПК и его записи не доходили (баг: с ПК → на телефон не передавалось).
+  Исключения: `he_session_v2`, `he_crypto_key`, `he_last_active`, `he_sync_*`, `he_draft_*`,
+  `he_nav_*`, `he_admin_*`.
 - **`auth-module.ts`**: `initKvSync(user.id)` после входа в TG-пути (до onLogin — pull
   применяется до рендера). Вне Telegram (PWA/браузер) синк выключен by design.
 - **`supabase/migrations/20260818_user_kv.sql`** (NEW): таблица + RLS по
   `current_setting('request.headers')::jsonb->>'x-user-token'` + grants anon/authenticated.
-- **Тесты**: `cloud-kv.test.ts` 24/24 (чанки/суррогатные пары, исключения, LWW-конфликты,
+- **Тесты**: `cloud-kv.test.ts` 31/31 (чанки/суррогатные пары, исключения, LWW-конфликты,
   токен, pull/push/remove, залечивание неполной записи, рестарт без повторного push,
-  keepalive-бюджет). `src/test/setup.ts` — mock localStorage дополнен стандартными
+  keepalive-бюджет, фоновый pull/авто-reload, skew-тесты: часы телефона спешат на 1ч —
+  запись ПК побеждает). `src/test/setup.ts` — mock localStorage дополнен стандартными
   `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
 - **ВАЖНО**: Supabase-проект из `.env` был удалён (NXDOMAIN), пользователь восстановил —
   проверил: DNS резолвится, ключ работает, таблиц нет кроме `labs`; SQL-миграцию применяет

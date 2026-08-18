@@ -57,7 +57,7 @@ export interface KvSyncState {
 
 /** Транспорт вынесен в интерфейс — тесты подставляют фейковый. */
 export interface KvTransport {
-  pull(token: string, onRows: (rows: KvRow[]) => void): Promise<void>;
+  pull(token: string, onRows: (rows: KvRow[]) => void, onServerNow?: (ms: number) => void): Promise<void>;
   replaceKey(rows: KvRow[]): Promise<void>;
   removeKey(token: string, key: string): Promise<void>;
   keepAlivePush(rows: KvRow[]): void;
@@ -74,6 +74,13 @@ let transport: KvTransport | null = null;
 let started = false;
 let flushing = false;
 let lifecycleAttached = false;
+
+/**
+ * Сдвиг часов устройства относительно сервера (сервер_сейчас − устройство_сейчас).
+ * Все mtime хранятся в серверном времени — иначе LWW ломается при расхождении
+ * часов телефона и ПК (устройство с «спешащими» часами всегда побеждает).
+ */
+let skewMs = 0;
 
 /** key → локальный mtime (мс). Персистится в he_sync_meta_v1. */
 let mtimes = new Map<string, number>();
@@ -179,6 +186,7 @@ export function _resetKvForTests(): void {
   dirty.clear();
   mtimes = new Map();
   lifecycleAttached = false;
+  skewMs = 0;
   reloadFn = () => { try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ } };
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
   if (metaTimer != null) { clearTimeout(metaTimer); metaTimer = null; }
@@ -266,9 +274,13 @@ function setFlushDelay(ms: number): void {
   flushDelayMs = ms;
 }
 
+function serverNowMs(): number {
+  return Date.now() + skewMs;
+}
+
 function markDirty(k: string): void {
   if (!started || !token || isKvExcludedKey(k)) return;
-  mtimes.set(k, Date.now());
+  mtimes.set(k, serverNowMs());
   dirty.add(k);
   persistMeta();
   scheduleFlush();
@@ -344,7 +356,7 @@ async function flush(): Promise<void> {
         await transport.removeKey(token, k);
         mtimes.delete(k);
       } else {
-        const ts = new Date(mtimes.get(k) || Date.now()).toISOString();
+        const ts = new Date(mtimes.get(k) || serverNowMs()).toISOString();
         const chunks = chunkValue(v);
         const rows: KvRow[] = chunks.map((c, i) => ({
           id: token,
@@ -371,7 +383,12 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   if (!transport || !token) return 0;
   const rows: KvRow[] = [];
   try {
-    await transport.pull(token, r => rows.push(...r));
+    // onServerNow калибрует skewMs ДО обработки строк (часы сервера — источник правды)
+    await transport.pull(
+      token,
+      r => rows.push(...r),
+      serverNow => { skewMs = serverNow - Date.now(); },
+    );
   } catch (e) {
     setState({ status: 'error', error: (e as Error)?.message || 'pull failed' });
     return 0;
@@ -391,7 +408,7 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
       let hasLocal = false;
       try { hasLocal = localStorage.getItem(k) != null; } catch { hasLocal = false; }
       if (hasLocal) {
-        if (!mtimes.has(k)) mtimes.set(k, Date.now());
+        if (!mtimes.has(k)) mtimes.set(k, serverNowMs());
         dirty.add(k);
       }
       continue;
@@ -439,7 +456,7 @@ function reconcileLocalKeys(remoteByKey: Map<string, KvRow[]>): void {
     const k = localStorage.key(i);
     if (!k || !k.startsWith('he_') || isKvExcludedKey(k)) continue;
     if (!mtimes.has(k) && !remoteKeys.has(k)) {
-      mtimes.set(k, Date.now());
+      mtimes.set(k, serverNowMs());
       dirty.add(k);
     }
   }
@@ -464,7 +481,7 @@ function keepAliveFlush(): void {
     let v: string | null = null;
     try { v = localStorage.getItem(k); } catch { continue; }
     if (v == null) continue;
-    const ts = new Date(mtimes.get(k) || Date.now()).toISOString();
+    const ts = new Date(mtimes.get(k) || serverNowMs()).toISOString();
     const total = encoder.encode(v).length + 48;
     // слишком большие ключи отправляет обычный flush (visibilitychange/pagehide);
     // keepalive-запрос лимитирован браузером (~64КБ)
@@ -532,20 +549,36 @@ function attachLifecycle(pullIntervalMs: number): void {
 class SupabaseKvTransport implements KvTransport {
   constructor(private client: SupabaseClient) {}
 
-  async pull(token: string, onRows: (rows: KvRow[]) => void): Promise<void> {
-    let from = 0;
+  async pull(token: string, onRows: (rows: KvRow[]) => void, onServerNow?: (ms: number) => void): Promise<void> {
+    if (!SUPABASE_URL || !SUPABASE_ANON) throw new Error('Supabase not configured');
+    let offset = 0;
     for (;;) {
-      const { data, error } = await this.client
-        .from('user_kv')
-        .select('*')
-        .eq('id', token)
-        .order('key')
-        .order('chunk_index')
-        .range(from, from + PULL_PAGE - 1);
-      if (error) throw new Error(error.message);
-      onRows((data as KvRow[]) || []);
+      const qs = new URLSearchParams({
+        select: '*',
+        id: `eq.${token}`,
+        order: 'key.asc,chunk_index.asc',
+        limit: String(PULL_PAGE),
+        offset: String(offset),
+      });
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/user_kv?${qs.toString()}`, {
+        headers: {
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+          'x-user-token': token,
+          Accept: 'application/json',
+        },
+      });
+      if (!resp.ok) throw new Error(`pull failed: HTTP ${resp.status}`);
+      // серверные часы из Date-заголовка — единый источник правды для LWW
+      if (onServerNow) {
+        const dateHeader = resp.headers.get('date');
+        const serverNow = dateHeader ? Date.parse(dateHeader) : 0;
+        if (serverNow) onServerNow(serverNow);
+      }
+      const data = (await resp.json()) as KvRow[];
+      onRows(data || []);
       if (!data || data.length < PULL_PAGE) break;
-      from += PULL_PAGE;
+      offset += PULL_PAGE;
     }
   }
 
