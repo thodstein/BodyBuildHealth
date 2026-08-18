@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMacrocycleMulti, buildMacrocycle, serializeMacro, deserializeMacro,
   rebalanceMacrocycle, resizeMacroBlock, resizeBbMacroBlock, buildBbMacrocycle,
-  splitMacroPhaseIntoCycles,
+  splitMacroPhaseIntoCycles, mergeMacroPhase, setMacroBlockCycle,
   type CompetitionEvent, type Macrocycle,
 } from '../macrocycle.engine';
 
@@ -322,6 +322,36 @@ describe('buildMacrocycleMulti — cycleId per competition', () => {
     const split = splitMacroPhaseIntoCycles(macro, 'strength', ['cycle-A', 'cycle-B'], [8, 8]);
     expect(split.totalWeeks).toBe(macro.totalWeeks + (8 + 8 - macro.blocks.find(b => b.phase === 'strength')!.weeks));
     expect(split.blocks.filter(b => b.phase === 'strength').reduce((sum, b) => sum + b.weeks, 0)).toBe(16);
+  });
+
+  it('splitMacroPhaseIntoCycles: нулевые недели = поровну от текущей суммы фазы', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const phaseTotal = macro.blocks.filter(b => b.phase === 'strength').reduce((sum, b) => sum + b.weeks, 0);
+    const split = splitMacroPhaseIntoCycles(macro, 'strength', ['cycle-A', 'cycle-B'], [0, 0]);
+    const blocks = split.blocks.filter(b => b.phase === 'strength');
+    expect(blocks[0].weeks + blocks[1].weeks).toBe(phaseTotal);
+    expect(split.totalWeeks).toBe(macro.totalWeeks);
+  });
+
+  it('setMacroBlockCycle меняет только цикл блока, недели/offsets не трогает', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const updated = setMacroBlockCycle(macro, 0, 'cycle-NEW');
+    expect(updated.blocks[0].cycleId).toBe('cycle-NEW');
+    expect(updated.blocks[0].weeks).toBe(macro.blocks[0].weeks);
+    expect(updated.blocks[1].weekOffset).toBe(macro.blocks[1].weekOffset);
+    expect(updated.totalWeeks).toBe(macro.totalWeeks);
+  });
+
+  it('mergeMacroPhase сводит все блоки фазы в один с сохранением суммы недель', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const split = splitMacroPhaseIntoCycles(macro, 'strength', ['cycle-A', 'cycle-B'], [6, 4]);
+    expect(split.blocks.filter(b => b.phase === 'strength')).toHaveLength(2);
+    const merged = mergeMacroPhase(split, 'strength');
+    const mergedBlocks = merged.blocks.filter(b => b.phase === 'strength');
+    expect(mergedBlocks).toHaveLength(1);
+    expect(mergedBlocks[0].weeks).toBe(10);
+    expect(mergedBlocks[0].cycleId).toBe('cycle-A');
+    expect(merged.totalWeeks).toBe(split.totalWeeks);
   });
 });
 

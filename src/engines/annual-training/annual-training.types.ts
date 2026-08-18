@@ -66,8 +66,19 @@ export interface AnnualBlockConfig {
   focusGroup?: string;
   /** BB: режим специализации (слабые на MAV+10%). */
   specialization?: boolean;
-  /** Тапер внутри блока (финальные недели блока, Bosquet 2005). */
-  taper?: { enabled: boolean; weeks?: number };
+  /** Тапер внутри блока (финальные недели блока, Bosquet 2005 / канон lms-taper.engine). */
+  taper?: {
+    enabled: boolean;
+    weeks?: number;
+    /** PL: раскладка тапера (classic/pl/pro/wf) — канон lms-taper.engine. */
+    mode?: string;
+    /** PL: весовая цель (auto/lose/gain/maintain) — множитель объёма кривой. */
+    weightGoal?: string;
+    /** PL: mock meet (прикиды-синглы) на финальной неделе тапера. */
+    mockMeet?: boolean;
+    /** PL: пост-старт восстановление (метка на финальной неделе). */
+    postMeet?: boolean;
+  };
   /** BB: применить пик-неделю (contests) к последней неделе блока. */
   peakWeek?: boolean;
   /** BB: сериализованный BBContestPrepConfig (JSON-safe). */

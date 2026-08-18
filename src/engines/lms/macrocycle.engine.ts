@@ -650,10 +650,10 @@ export function splitMacroPhaseIntoCycles(
   const firstIndex = phaseIndexes[0];
   const original = macro.blocks[phaseIndexes[0]];
   const phaseTotal = phaseIndexes.reduce((sum, index) => sum + macro.blocks[index].weeks, 0);
-  const requested = ids.map((_, index) => Math.max(1, Math.round(weeks?.[index] ?? 0)));
+  const requested = (weeks ?? []).filter((value): value is number => Number.isFinite(value) && value > 0).slice(0, ids.length);
   const requestedTotal = requested.reduce((sum, value) => sum + value, 0);
   const total = requestedTotal > 0 ? requestedTotal : Math.max(2, phaseTotal);
-  const firstWeeks = requestedTotal > 0 ? requested[0] : Math.max(1, Math.floor(total / 2));
+  const firstWeeks = requestedTotal > 0 ? (requested[0] ?? 0) : Math.max(1, Math.floor(total / 2));
   const splitWeeks = [firstWeeks, Math.max(1, total - firstWeeks)];
   const replacement = ids.map((cycleId, index) => ({
     ...original,
@@ -683,6 +683,55 @@ export function splitMacroPhaseIntoCycles(
     competitionWeek: mainCompetition?.week ?? macro.competitionWeek,
     competitions,
     rationale: rebased.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset}), ${block.kind}${block.cycleId ? ` (${block.cycleId})` : ''}`),
+  };
+}
+
+/** Свести все блоки фазы в один (сумма недель сохраняется, цикл — первого блока). */
+export function mergeMacroPhase(macro: Macrocycle, phase: MacroPhase): Macrocycle {
+  const phaseIndexes = macro.blocks.map((block, index) => block.phase === phase ? index : -1).filter(index => index >= 0);
+  if (phaseIndexes.length <= 1) return macro;
+  const first = macro.blocks[phaseIndexes[0]];
+  const total = phaseIndexes.reduce((sum, index) => sum + macro.blocks[index].weeks, 0);
+  const merged = { ...first, weeks: total };
+  const nextBlocks = macro.blocks.filter((_, index) => !phaseIndexes.includes(index));
+  nextBlocks.splice(phaseIndexes[0], 0, merged);
+  let offset = 1;
+  const rebased = nextBlocks.map(block => {
+    const next = { ...block, weekOffset: offset };
+    offset += next.weeks;
+    return next;
+  });
+  const competitions = macro.competitions?.map(competition => {
+    const block = rebased.find(candidate => candidate.competitionId === competition.id);
+    return block
+      ? { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) }
+      : competition;
+  });
+  const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
+  return {
+    ...macro,
+    blocks: rebased,
+    totalWeeks: rebased.reduce((sum, block) => sum + block.weeks, 0),
+    competitionWeek: mainCompetition?.week ?? macro.competitionWeek,
+    competitions,
+    rationale: rebased.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset}), ${block.kind}${block.cycleId ? ` (${block.cycleId})` : ''}`),
+  };
+}
+
+/** Заменить цикл конкретного PL-блока (недели и offsets не меняются). */
+export function setMacroBlockCycle(macro: Macrocycle, blockIndex: number, cycleId: string): Macrocycle {
+  if (blockIndex < 0 || blockIndex >= macro.blocks.length) return macro;
+  const blocks = macro.blocks.map((block, index) => index === blockIndex
+    ? {
+        ...block,
+        cycleId: cycleId || undefined,
+        description: cycleId ? (getCycleById(cycleId)?.meta.title ?? block.description) : block.description,
+      }
+    : block);
+  return {
+    ...macro,
+    blocks,
+    rationale: blocks.map(b => `${b.phase}: ${b.weeks} нед (с ${b.weekOffset}), ${b.kind}${b.cycleId ? ` (${b.cycleId})` : ''}`),
   };
 }
 

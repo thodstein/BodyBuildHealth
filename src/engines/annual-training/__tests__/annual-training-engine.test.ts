@@ -13,7 +13,7 @@ import {
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
   importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
   recommendKindForPhase, cloneBlockConfigFrom, annualWeekForDate, annualPlanPhaseForDate,
-  selectPLCycleForBlock,
+  selectPLCycleForBlock, applyPLBlockTaperToWeeks,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -202,6 +202,41 @@ describe('сборка блоков', () => {
     expect(weeks[6].sessions.some(s => s.blocks.some(b => b.note?.includes('[annual-taper:0.65]')))).toBe(true);
     const twice = applyBlockTaperToWeeks(weeks, 2);
     expect(twice).toEqual(weeks);
+  });
+
+  it('PL taper с раскладкой: реальная кривая (mode) вместо фиксированных ×0.65/×0.45', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const block = plan.blocks[0];
+    const built = buildAnnualBlock({ ...block, config: { ...block.config, taper: { enabled: true, weeks: 2, mode: 'pro' } } }, plan, macro, DEFAULT_OPTS);
+    expect(built.result!.taperApplied).toBe(true);
+    const weeks = built.result!.weeks;
+    const last = weeks[weeks.length - 1];
+    expect(last.note?.includes('[annual-pl-taper:')).toBe(true);
+    const lastSessionNote = last.sessions[0]?.note ?? '';
+    expect(lastSessionNote).toContain('Финальная');
+    const again = applyPLBlockTaperToWeeks(weeks, { weeks: 2, mode: 'pro' });
+    expect(again.applied).toBe(false);
+  });
+
+  it('PL taper: mock meet (прикиды) и пост-старт — метки на финальной неделе', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const block = plan.blocks[0];
+    const built = buildAnnualBlock({ ...block, config: { ...block.config, taper: { enabled: true, weeks: 2, mockMeet: true, postMeet: true } } }, plan, macro, DEFAULT_OPTS);
+    const last = built.result!.weeks[built.result!.weeks.length - 1];
+    expect(last.note).toContain('🎯 Mock meet');
+    expect(last.note).toContain('🔄 Пост-старт');
+  });
+
+  it('PL taper: весовая цель lose снижает объём кривой (×0.9)', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const block = plan.blocks[0];
+    const built = buildAnnualBlock({ ...block, config: { ...block.config, taper: { enabled: true, weeks: 2, mode: 'classic', weightGoal: 'lose' } } }, plan, macro, DEFAULT_OPTS);
+    const last = built.result!.weeks[built.result!.weeks.length - 1];
+    const vol = (last.note ?? '').match(/\[annual-pl-taper:([\d.]+)\]/)?.[1];
+    expect(Number(vol)).toBeCloseTo(0.405, 2);
   });
 
   it('BB-блок: autodraft → недели длины блока + program.bb', () => {

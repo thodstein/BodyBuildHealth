@@ -46,7 +46,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
   it('⚙️ Собрать блок: собирается только выбранный блок', async () => {
     await buildPlMacroAndOpen();
     // Клик по строке блока в списке сборки выбирает его (нед 1–N первой строки).
-    const row = screen.getByText(/^· нед 1–/);
+    const row = screen.getByLabelText(/^Блок .*недели 1-/);
     fireEvent.click(row);
     fireEvent.click(screen.getByText('⚙️ Собрать блок'));
     await waitFor(() => expect(screen.getByText(/✅ Блок «/)).toBeTruthy(), { timeout: 30000 });
@@ -86,7 +86,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     fireEvent.click(screen.getByText('OK'));
     fireEvent.click(screen.getByText('Построить макроцикл'));
     await waitFor(() => expect(screen.getByText(/устарело|статус: stale/)).toBeTruthy(), { timeout: 30000 });
-    expect(screen.getAllByText(/— изменился: пересоберите/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/изменился — пересоберите/).length).toBeGreaterThan(0);
   });
 
   it('десериализация макро с cycleId: PL-блоки получают цикл по умолчанию', async () => {
@@ -102,17 +102,17 @@ describe('MacrocyclePanel — сборка года по конструктор�
 
   it('выбор блока открывает панель настроек (конструктор/цикл/taper)', async () => {
     await buildPlMacroAndOpen();
-    fireEvent.click(screen.getByText(/^· нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
     expect(screen.getByText('ПЛ (СРЦ-цикл)')).toBeTruthy();
     expect(screen.getByText('ББ (ББ-авто)')).toBeTruthy();
     expect(screen.getByText('✍ Ручной')).toBeTruthy();
-    expect(screen.getByText('📉 Taper внутри блока (2 нед)')).toBeTruthy();
+    expect(screen.getByText('📉 Taper внутри блока')).toBeTruthy();
   });
 
   it('смена конструктора блока → блок помечается устаревшим', async () => {
     await buildPlMacroAndOpen();
-    fireEvent.click(screen.getByText(/^· нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('✍ Ручной')).toBeTruthy());
     fireEvent.click(screen.getByText('⚙️ Собрать блок'));
     await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[0].status).toBe('built'), { timeout: 30000 });
@@ -126,7 +126,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
 
   it('✍ В редактор без собранного блока → предупреждение', async () => {
     await buildPlMacroAndOpen();
-    fireEvent.click(screen.getByText(/^· нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('✍ В редактор')).toBeTruthy());
     fireEvent.click(screen.getByText('✍ В редактор'));
     await waitFor(() => expect(screen.getByText(/⚠ Блок не собран/)).toBeTruthy());
@@ -136,7 +136,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     await buildPlMacroAndOpen();
     fireEvent.click(screen.getByText('📦 Собрать весь год'));
     await waitFor(() => expect(loadAnnualTrainingPlan()?.status).toBe('built'), { timeout: 30000 });
-    fireEvent.click(screen.getByText(/^✅ нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('✍ В редактор')).toBeTruthy());
     fireEvent.click(screen.getByText('✍ В редактор'));
     await waitFor(() => expect(screen.getByText(/✍ Блок открыт в ручном конструкторе/)).toBeTruthy());
@@ -152,7 +152,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
     await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
     // Выбрать BB-блок (strength, индекс 1) в списке сборки.
-    fireEvent.click(screen.getByText(/strength · ББ/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByLabelText(/Пик-неделя/)).toBeTruthy());
     fireEvent.click(screen.getByLabelText(/Пик-неделя/));
     await waitFor(() => expect(screen.getByText(/Настройки блока сохранены/)).toBeTruthy());
@@ -171,7 +171,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     localStorage.setItem('he_pl_macro', serializeMacro(macro));
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
     await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
-    fireEvent.click(screen.getByText(/strength · ББ/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
     fireEvent.click(screen.getByText('⚙️ Собрать блок'));
     await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[1].status).toBe('built'), { timeout: 30000 });
@@ -220,7 +220,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={onApplyCycle} />);
     fireEvent.click(screen.getByText('Построить макроцикл'));
     await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
-    fireEvent.click(screen.getByText(/^· нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('⚙️ Блок: нед', { exact: false })).toBeTruthy());
     fireEvent.click(screen.getByText('⚙️ Собрать блок'));
     await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks[0].status).toBe('built'), { timeout: 30000 });
@@ -245,7 +245,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
 
   it('💡 Рекомендуем: подсказка конструктора для несоответствующей фазы', async () => {
     await buildPlMacroAndOpen();
-    fireEvent.click(screen.getByText(/^· нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('✍ Ручной')).toBeTruthy());
     fireEvent.click(screen.getByText('✍ Ручной'));
     await waitFor(() => expect(screen.getByText(/💡 Рекомендуем: ПЛ/)).toBeTruthy());
@@ -253,7 +253,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
 
   it('➕ Кросс-направление: в ПЛ-блок вставляется ББ-цикл (сушка)', async () => {
     await buildPlMacroAndOpen();
-    fireEvent.click(screen.getByText(/^· нед 1–/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 1-/));
     await waitFor(() => expect(screen.getByText('🏋️ ББ-цикл (масса/сушка)')).toBeTruthy());
     fireEvent.click(screen.getByText('🏋️ ББ-цикл (масса/сушка)'));
     await waitFor(() => expect(screen.getByText('Какой ББ-цикл вставить в этот блок?')).toBeTruthy());
@@ -271,7 +271,7 @@ describe('MacrocyclePanel — сборка года по конструктор�
     localStorage.setItem('he_pl_macro', serializeMacro(macro));
     render(<MacrocyclePanel level="II-KMS" goal="powerlifting" onApplyCycle={() => {}} />);
     await waitFor(() => expect(screen.getByText('🧩 Сборка года по конструкторам')).toBeTruthy());
-    fireEvent.click(screen.getByText(/strength · ББ/));
+    fireEvent.click(screen.getByLabelText(/^Блок .*недели 7-12/));
     await waitFor(() => expect(screen.getByText('📥 Из ББ-авто')).toBeTruthy());
     // Без сохранённого плана — предупреждение.
     fireEvent.click(screen.getByText('📥 Из ББ-авто'));

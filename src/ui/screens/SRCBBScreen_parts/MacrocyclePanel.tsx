@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, resizeMacroBlock, splitMacroPhaseIntoCycles, macrocycleToActiveCycle,
+  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, resizeMacroBlock, splitMacroPhaseIntoCycles, mergeMacroPhase, setMacroBlockCycle, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
   buildBbMacrocycle, rebalanceBbMacrocycle, resizeBbMacroBlock, serializeBbMacro, deserializeBbMacro,
   macroWeekStartDate, macroWeekEndDate, weeksUntilWeek, formatMacroDate,
@@ -14,7 +14,7 @@ import {
   type Macrocycle, type MacroBlock, type MacroPhase, type MacroInput, type BBMacrocycle, type BBMacroBlock, type BBMacroPhase, type CompetitionEvent,
 } from '../../../engines/lms/macrocycle.engine';
 import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
-import { buildPLTaperCurve, type TaperMode } from '../../../engines/lms/lms-taper.engine';
+import { buildPLTaperCurve, TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
@@ -1771,44 +1771,70 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 </div>
               )}
               {!isBB && activeBlock && (() => {
-                const phaseBlocks = macro?.blocks.filter(b => b.phase === activeBlock.phase) ?? [];
+                const phaseBlocks = (macro?.blocks ?? []).map((b, i) => ({ block: b, index: i })).filter(x => x.block.phase === activeBlock.phase);
+                const phaseTotal = phaseBlocks.reduce((sum, x) => sum + x.block.weeks, 0);
+                const cycleOptions = [
+                  { id: '', label: '— цикл —', desc: '' },
+                  ...LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) === 'strength').map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` })),
+                ];
                 const splitTotal = splitCycles.reduce((sum, slot) => sum + (slot.weeks || 0), 0);
-                const splitReady = splitCycles.filter(slot => slot.cycleId).length >= 2 && splitTotal > 0;
+                const splitReady = splitCycles.filter(slot => slot.cycleId).length >= 2;
+                const persistCycles = (next: Macrocycle, note: string) => {
+                  setMacro(next);
+                  setTotalWeeks(next.totalWeeks);
+                  try {
+                    const existing = loadAnnualTrainingPlan();
+                    const synced = syncAnnualPlan(existing ?? annualPlanFromMacro(next), next);
+                    setAnnualPlan(synced);
+                    saveAnnualTrainingPlan(synced);
+                    setAnnualStatusNote(`${note} — блоки помечены устаревшими, пересоберите год`);
+                  } catch {
+                    setAnnualStatusNote(`${note} (годовой план пересинхронизируется при сборке)`);
+                  }
+                };
                 return (
-                  <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }} className="macrocycle-phase-split">
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }} className="macrocycle-phase-cycles">
                     <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>
-                      ✂️ Разбить фазу «{PHASE_LABEL_RU[activeBlock.phase as MacroPhase] ?? activeBlock.phase}» на 2 цикла
-                      {phaseBlocks.length > 1 ? ` · уже ${phaseBlocks.length} блок(а) в фазе` : ''}
+                      🔄 Циклы фазы «{PHASE_LABEL_RU[activeBlock.phase as MacroPhase] ?? activeBlock.phase}» · {phaseBlocks.length} блок(а) · всего {phaseTotal} нед
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      {splitCycles.map((slot, index) => {
-                        const filteredCycles = LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) === 'strength');
-                        return (
-                          <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <PopupSelect
-                              label={`Цикл ${index + 1}`}
-                              value={slot.cycleId}
-                              options={[{ id: '', label: '— цикл —', desc: '' }, ...filteredCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` }))]}
-                              onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, cycleId: v } : p))}
-                            />
-                            <PopupNumber label={`Недель цикла ${index + 1}`} value={slot.weeks} min={1} max={52} suffix=" нед"
-                              onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, weeks: Number.isFinite(v) ? Math.max(1, Math.round(v)) : p.weeks } : p))} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6 }}>
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Итого: {splitTotal} нед · суммарно по фазе сейчас: {phaseBlocks.reduce((sum, b) => sum + b.weeks, 0)} нед</span>
-                      <button type="button" disabled={!splitReady} onClick={() => {
-                        if (!macro) return;
-                        const next = splitMacroPhaseIntoCycles(macro, activeBlock.phase as MacroPhase, splitCycles.map(s => s.cycleId), splitCycles.map(s => s.weeks || 1));
-                        setMacro(next);
-                        setTotalWeeks(next.totalWeeks);
-                        setSplitCycles([{ cycleId: '', weeks: 0 }, { cycleId: '', weeks: 0 }]);
-                        setAnnualStatusNote('✂️ Фаза разбита на 2 цикла — блоки помечены устаревшими, пересоберите год');
-                      }} style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10, opacity: splitReady ? 1 : 0.5, cursor: splitReady ? 'pointer' : 'not-allowed' }}>
-                        ✂️ Разбить фазу
-                      </button>
+                    {phaseBlocks.map(({ block, index }) => (
+                      <div key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 4, padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', gridColumn: '1 / -1' }}>
+                          Блок {index + 1} · нед {block.weekOffset}–{block.weekOffset + block.weeks - 1} · {block.cycleId ? `«${getCycleById(block.cycleId)?.meta.title ?? block.cycleId}»` : 'без цикла'}
+                        </div>
+                        <PopupSelect label={`Цикл блока ${index + 1}`} value={block.cycleId ?? ''} options={cycleOptions}
+                          onChange={v => { if (!macro) return; persistCycles(setMacroBlockCycle(macro, index, v), '✅ Цикл блока изменён'); }} />
+                        <PopupNumber label="Недель блока" value={block.weeks} min={1} max={104} suffix=" нед"
+                          onChange={v => { if (!macro) return; persistCycles(resizeMacroBlock(macro, index, v), '✅ Длина блока изменена'); }} />
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                      {phaseBlocks.length === 1 ? (
+                        <>
+                          {splitCycles.map((slot, index) => (
+                            <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
+                              <PopupSelect label={`Новый цикл ${index + 1}`} value={slot.cycleId} options={cycleOptions}
+                                onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, cycleId: v } : p))} />
+                              <PopupNumber label={`Недель ${index + 1} (0 = поровну)`} value={slot.weeks} min={0} max={52} suffix=" нед"
+                                onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, weeks: Number.isFinite(v) ? Math.max(0, Math.round(v)) : p.weeks } : p))} />
+                            </div>
+                          ))}
+                          <button type="button" disabled={!splitReady} onClick={() => {
+                            if (!macro) return;
+                            const next = splitMacroPhaseIntoCycles(macro, activeBlock.phase as MacroPhase, splitCycles.map(s => s.cycleId), splitCycles.map(s => s.weeks || 0));
+                            setSplitCycles([{ cycleId: '', weeks: 0 }, { cycleId: '', weeks: 0 }]);
+                            persistCycles(next, '✂️ Фаза разбита на 2 цикла и сохранена');
+                          }} style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10, opacity: splitReady ? 1 : 0.5, cursor: splitReady ? 'pointer' : 'not-allowed' }}>
+                            ✂️ Разбить и сохранить
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={() => { if (!macro) return; persistCycles(mergeMacroPhase(macro, activeBlock.phase as MacroPhase), '↔ Фаза сведена в один цикл и сохранена'); }}
+                          style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10 }}>
+                          ↔ Свести в один цикл
+                        </button>
+                      )}
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Изменения сохраняются сразу</span>
                     </div>
                   </div>
                 );
@@ -2062,16 +2088,37 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     const errs = annualPlan.blocks.filter(b => b.status === 'error').length;
                     return `Блоки: ${annualPlan.blocks.length} · ✅ ${built}${stale ? ` · ⚠ устарело ${stale}` : ''}${errs ? ` · ❌ ошибок ${errs}` : ''} · статус: ${annualPlan.status}`;
                   })()}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, marginTop: 6 }}>
                   {annualPlan.blocks.map((b, i) => {
                     const statusIcon = b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
-                    const kindIcon = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍';
-                    const note = b.status === 'stale' ? ' — изменился: пересоберите' : b.status === 'error' ? ` — ${b.error ?? 'ошибка'}` : b.status === 'unbuilt' ? ' — не собран' : '';
+                    const kindLabel = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
+                    const note = b.status === 'stale' ? 'изменился — пересоберите' : b.status === 'error' ? (b.error ?? 'ошибка') : b.status === 'unbuilt' ? 'не собран' : 'собран';
+                    const phaseColor = (isBB ? BB_PHASE_COLOR[b.ref.phase as BBMacroPhase] : PHASE_COLOR[b.ref.phase as MacroPhase]) ?? '#888';
+                    const phaseIcon = isBB ? (BB_PHASE_ICON[b.ref.phase as BBMacroPhase] ?? '') : (PHASE_ICON[b.ref.phase as MacroPhase] ?? '');
+                    const phaseLabel = isBB ? (BB_PHASE_LABEL_RU[b.ref.phase as BBMacroPhase] ?? b.ref.phase) : (PHASE_LABEL_RU[b.ref.phase as MacroPhase] ?? b.ref.phase);
+                    const isSel = selectedBlockIdx === i;
                     return (
-                      <div key={b.ref.blockKey} onClick={() => setSelectedBlockIdx(i)} style={{ cursor: 'pointer', opacity: b.status === 'built' ? 1 : 0.75, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        {statusIcon} нед {b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1} · {b.ref.phase} · {kindIcon}{note}
+                      <div key={b.ref.blockKey} role="button" tabIndex={0}
+                        onClick={() => setSelectedBlockIdx(i)}
+                        onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedBlockIdx(i); } }}
+                        aria-label={`Блок ${phaseLabel}: недели ${b.ref.startWeek}-${b.ref.startWeek + b.ref.weeks - 1} · ${kindLabel} · ${note}`}
+                        className="macrocycle-week-card"
+                        style={{
+                          background: `linear-gradient(180deg, ${phaseColor}30, ${phaseColor}10)`,
+                          border: isSel ? `1.5px solid ${phaseColor}` : `1px solid ${phaseColor}40`,
+                          borderRadius: 10, padding: '8px 10px', cursor: 'pointer',
+                          opacity: b.status === 'built' ? 1 : 0.8, display: 'flex', flexDirection: 'column', gap: 3,
+                        }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: phaseColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phaseIcon} {phaseLabel}</span>
+                          <span style={{ fontSize: 10, flexShrink: 0 }} title={note}>{statusIcon}</span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>Нед {b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1}</span>
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kindLabel} · {note}</span>
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
               {/* 📸 Снапшоты сборки года: сравнение и восстановление */}
@@ -2091,6 +2138,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               {/* ⚙️ Настройки выбранного блока (конструктор/цикл/сплит/taper/пик) */}
               {annualPlan && selectedBlockIdx >= 0 && selectedBlockIdx < annualPlan.blocks.length && (() => {
                 const b = annualPlan.blocks[selectedBlockIdx];
+                const taperCfg = b.config.taper;
                 const recommended = recommendKindForPhase(b.ref.phase, isBB ? 'bb' : 'pl');
                 const otherBlocks = annualPlan.blocks.filter(x => x.ref.blockKey !== b.ref.blockKey);
                 const kindOptions: { id: AnnualBlockKind; label: string }[] = [
@@ -2208,63 +2256,100 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           onChange={v => applyAnnualConfig(b.ref.blockKey, { templateFromBlockKey: v || undefined })} />
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-                      <button type="button" aria-pressed={!!b.config.taper?.enabled}
-                        onClick={() => applyAnnualConfig(b.ref.blockKey, { taper: { enabled: !b.config.taper?.enabled, weeks: 2 } })}
-                        style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.taper?.enabled ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.12)', color: b.config.taper?.enabled ? '#f59e0b' : 'rgba(255,255,255,0.65)' }}>
-                        📉 Taper внутри блока (2 нед){b.config.taper?.enabled ? ' ✓' : ''}
-                      </button>
-                      <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {b.ref.kind === 'BB' && b.status === 'built' && Boolean(b.result?.bbPlan) && (
-                          <button type="button" onClick={() => {
-                            try {
-                              localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: b.result!.bbPlan, date: new Date().toISOString() }));
-                              // Контекст передачи блока: ББ-авто предзаполняет шаг «🏁 Contest prep».
-                              localStorage.setItem('he_bb_plan_saved_ctx', JSON.stringify({
-                                blockKey: b.ref.blockKey,
-                                phase: b.ref.phase,
-                                weeks: b.ref.weeks,
-                                peakWeek: !!b.config.peakWeek,
-                                peakConfig: b.config.peakConfig ?? null,
-                                taper: b.config.taper ?? null,
-                              }));
-                              window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
-                              setAnnualStatusNote('🚀 Блок передан в ББ-авто — откройте шаг «План»' + (b.config.peakWeek ? ' (пик-неделя предзаполнена в «🏁 Contest prep»)' : ''));
-                            } catch { setAnnualStatusNote('⚠ Не удалось передать блок в ББ-авто'); }
-                          }}
-                            style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
-                            title="Передать собранный BBPlan блока в ББ-авто (шаг «План»)">
-                            🚀 В ББ-авто
-                          </button>
-                        )}
-                        {b.ref.kind === 'PL' && b.status === 'built' && (b.config.cycleId ?? b.ref.cycleId) && (
-                          <button type="button" onClick={() => {
-                            const cycleId = b.config.cycleId ?? b.ref.cycleId;
-                            if (cycleId && onApplyCycle) {
-                              onApplyCycle(cycleId, b.ref.weeks);
-                              setAnnualStatusNote('✓ СРЦ-цикл блока передан в ПЛ-авто');
-                            } else {
-                              setAnnualStatusNote('⚠ Применение цикла недоступно в этом контексте');
-                            }
-                          }}
-                            style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
-                            title="Передать СРЦ-цикл блока в ПЛ-авто (построить план)">
-                            ✓ В ПЛ-авто
-                          </button>
-                        )}
-                        {b.ref.kind === 'BB' && (
-                          <button type="button" onClick={() => importBbSavedIntoBlock(b.ref.blockKey)}
-                            style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
-                            title="Импортировать последний сохранённый план из ББ-авто (he_bb_plan_saved) в этот блок">
-                            📥 Из ББ-авто
-                          </button>
-                        )}
-                        <button type="button" onClick={() => runAnnualBuild('editor')}
-                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
-                          title="Открыть собранный блок в ручном конструкторе; после сохранения изменения вернутся в блок">
-                          ✍ В редактор
+                    <div style={{ marginTop: 2 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button type="button" aria-pressed={!!taperCfg?.enabled}
+                          onClick={() => applyAnnualConfig(b.ref.blockKey, { taper: { ...(taperCfg ?? { weeks: 2, mode: 'classic' }), enabled: !taperCfg?.enabled } })}
+                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: taperCfg?.enabled ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.12)', color: taperCfg?.enabled ? '#f59e0b' : 'rgba(255,255,255,0.65)' }}>
+                          📉 Taper внутри блока{taperCfg?.enabled ? ` (${taperCfg.weeks ?? 2} нед) ✓` : ''}
                         </button>
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {b.ref.kind === 'BB' && b.status === 'built' && Boolean(b.result?.bbPlan) && (
+                            <button type="button" onClick={() => {
+                              try {
+                                localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: b.result!.bbPlan, date: new Date().toISOString() }));
+                                // Контекст передачи блока: ББ-авто предзаполняет шаг «🏁 Contest prep».
+                                localStorage.setItem('he_bb_plan_saved_ctx', JSON.stringify({
+                                  blockKey: b.ref.blockKey,
+                                  phase: b.ref.phase,
+                                  weeks: b.ref.weeks,
+                                  peakWeek: !!b.config.peakWeek,
+                                  peakConfig: b.config.peakConfig ?? null,
+                                  taper: b.config.taper ?? null,
+                                }));
+                                window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
+                                setAnnualStatusNote('🚀 Блок передан в ББ-авто — откройте шаг «План»' + (b.config.peakWeek ? ' (пик-неделя предзаполнена в «🏁 Contest prep»)' : ''));
+                              } catch { setAnnualStatusNote('⚠ Не удалось передать блок в ББ-авто'); }
+                            }}
+                              style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                              title="Передать собранный BBPlan блока в ББ-авто (шаг «План»)">
+                              🚀 В ББ-авто
+                            </button>
+                          )}
+                          {b.ref.kind === 'PL' && b.status === 'built' && (b.config.cycleId ?? b.ref.cycleId) && (
+                            <button type="button" onClick={() => {
+                              const cycleId = b.config.cycleId ?? b.ref.cycleId;
+                              if (cycleId && onApplyCycle) {
+                                onApplyCycle(cycleId, b.ref.weeks);
+                                setAnnualStatusNote('✓ СРЦ-цикл блока передан в ПЛ-авто');
+                              } else {
+                                setAnnualStatusNote('⚠ Применение цикла недоступно в этом контексте');
+                              }
+                            }}
+                              style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                              title="Передать СРЦ-цикл блока в ПЛ-авто (построить план)">
+                              ✓ В ПЛ-авто
+                            </button>
+                          )}
+                          {b.ref.kind === 'BB' && (
+                            <button type="button" onClick={() => importBbSavedIntoBlock(b.ref.blockKey)}
+                              style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                              title="Импортировать последний сохранённый план из ББ-авто (he_bb_plan_saved) в этот блок">
+                              📥 Из ББ-авто
+                            </button>
+                          )}
+                          <button type="button" onClick={() => runAnnualBuild('editor')}
+                            style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32 }}
+                            title="Открыть собранный блок в ручном конструкторе; после сохранения изменения вернутся в блок">
+                            ✍ В редактор
+                          </button>
+                        </div>
                       </div>
+                      {taperCfg?.enabled && (
+                        <div style={{ marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 6 }}>
+                            <PopupNumber label="Недель тапера" value={taperCfg.weeks ?? 2} min={1} max={4} suffix=" нед"
+                              hint="Реальная taper-кривая (Bosquet / ПЛ-пик / про / Classic WF) на финале блока"
+                              onChange={v => applyAnnualConfig(b.ref.blockKey, { taper: { ...taperCfg, weeks: Math.max(1, Math.min(4, Math.round(v))) } })} />
+                            {b.ref.kind === 'PL' && (
+                              <>
+                                <PopupSelect label="Раскладка тапера" value={taperCfg.mode ?? 'classic'}
+                                  options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m] }))}
+                                  hint="Канон lms-taper.engine: классика — разгрузка Bosquet; ПЛ-пик — интенсификация 90/95/100%; про — усталость-зависимая кривая; Classic WF"
+                                  onChange={v => applyAnnualConfig(b.ref.blockKey, { taper: { ...taperCfg, mode: v } })} />
+                                <PopupSelect label="Весовая цель" value={taperCfg.weightGoal ?? 'auto'}
+                                  options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g] }))}
+                                  hint="Сгонка к категории — объём кривой ×0.9; набор/стабильный — полный объём"
+                                  onChange={v => applyAnnualConfig(b.ref.blockKey, { taper: { ...taperCfg, weightGoal: v } })} />
+                              </>
+                            )}
+                          </div>
+                          {b.ref.kind === 'PL' && (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                              <button type="button" aria-pressed={!!taperCfg.mockMeet}
+                                onClick={() => applyAnnualConfig(b.ref.blockKey, { taper: { ...taperCfg, mockMeet: !taperCfg.mockMeet } })}
+                                style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: taperCfg.mockMeet ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.12)', color: taperCfg.mockMeet ? '#a78bfa' : 'rgba(255,255,255,0.65)' }}>
+                                🎯 Mock meet (прикиды){taperCfg.mockMeet ? ' ✓' : ''}
+                              </button>
+                              <button type="button" aria-pressed={!!taperCfg.postMeet}
+                                onClick={() => applyAnnualConfig(b.ref.blockKey, { taper: { ...taperCfg, postMeet: !taperCfg.postMeet } })}
+                                style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: taperCfg.postMeet ? 'rgba(52,211,153,0.5)' : 'rgba(255,255,255,0.12)', color: taperCfg.postMeet ? '#34d399' : 'rgba(255,255,255,0.65)' }}>
+                                🔄 Пост-старт{taperCfg.postMeet ? ' ✓' : ''}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {otherBlocks.length > 0 && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>

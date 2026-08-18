@@ -35,6 +35,7 @@ import { makeEmptySessionsForWeek } from '../periodization/designer-to-program';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import type { BBPlan } from '../bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, type BBContestPrepConfig } from '../bb/bb-contest-prep.engine';
+import { buildPLTaperCurve, type TaperMode, type TaperWeightGoal } from '../lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { cycleTemplateToFullProgram } from '../bb/cycle-to-plan';
 import type { FullProgram, ProgramWeek } from '../complete-program-library.engine';
@@ -283,6 +284,64 @@ export function applyBlockTaperToWeeks(
   });
 }
 
+/**
+ * Реальный taper блока по канону lms-taper.engine (buildPLTaperCurve):
+ * объём/RIR последних N недель из кривой выбранной раскладки (classic/pl/pro/wf),
+ * весовая цель как множитель объёма, mock meet (прикиды) и пост-старт — метками.
+ * Идемпотентен по метке `[annual-pl-taper:`.
+ */
+export function applyPLBlockTaperToWeeks(
+  weeks: UserWeek[],
+  cfg: { weeks?: number; mode?: string; weightGoal?: string; mockMeet?: boolean; postMeet?: boolean },
+): { weeks: UserWeek[]; applied: boolean } {
+  const n = Math.max(1, Math.min(weeks.length - 1, Math.round(cfg.weeks ?? 2)));
+  if (weeks.length <= 1) return { weeks, applied: false };
+  if (weeks.some(w => w.sessions.some(s => s.blocks.some(b => b.note?.includes('[annual-pl-taper:'))))) {
+    return { weeks, applied: false };
+  }
+  const curve = buildPLTaperCurve({
+    taperWeeks: n,
+    mode: (cfg.mode as TaperMode) ?? 'classic',
+    weightGoal: (cfg.weightGoal as TaperWeightGoal) ?? 'auto',
+  });
+  const last = weeks.length;
+  const next = weeks.map(w => {
+    const fromEnd = last - w.week;
+    const pt = curve[curve.length - 1 - fromEnd];
+    if (!pt || fromEnd >= curve.length) return w;
+    const mark = `[annual-pl-taper:${pt.volumePct}]`;
+    return {
+      ...w,
+      note: [w.note, mark].filter(Boolean).join(' · '),
+      sessions: w.sessions.map(s => ({
+        ...s,
+        note: [s.note, `📉 ${pt.label}`].filter(Boolean).join(' · '),
+        blocks: s.blocks.map(block => {
+          const targetCount = Math.max(1, Math.round(block.sets.length * pt.volumePct));
+          const sets: UserSet[] = Array.from({ length: targetCount }, (_, i) => {
+            const src = block.sets[i] ?? block.sets[0];
+            if (!src) return { reps: 8, rir: 3 };
+            const rir = pt.rirTarget != null
+              ? pt.rirTarget
+              : clampRir((Number.isFinite(src.rir) ? src.rir : 2) + pt.rirShift);
+            return { ...src, rir };
+          });
+          return { ...block, sets, note: [block.note, mark].filter(Boolean).join(' · ') };
+        }),
+      })),
+    };
+  });
+  const finalWeeks = next.map((w, i) => {
+    if (i !== last - 1) return w;
+    const labels: string[] = [];
+    if (cfg.mockMeet) labels.push('🎯 Mock meet: прикиды-синглы');
+    if (cfg.postMeet) labels.push('🔄 Пост-старт восстановление (объём ×0.5, RIR +3)');
+    if (labels.length === 0) return w;
+    return { ...w, note: [w.note, ...labels].filter(Boolean).join(' · ') };
+  });
+  return { weeks: finalWeeks, applied: true };
+}
+
 /* ─────────────────────────── Сборка блока ───────────────────────────────── */
 
 function cloneWeeksWithFreshIds(weeks: UserWeek[]): UserWeek[] {
@@ -391,8 +450,16 @@ function buildPLBlock(
   weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'PL');
   let taperApplied = false;
   if (state.config.taper?.enabled) {
-    weeks = applyBlockTaperToWeeks(weeks, state.config.taper.weeks ?? 2);
-    taperApplied = true;
+    const t = state.config.taper;
+    const advanced = t.mode != null || t.weightGoal != null || t.mockMeet === true || t.postMeet === true;
+    if (advanced) {
+      const res = applyPLBlockTaperToWeeks(weeks, t);
+      weeks = res.weeks;
+      taperApplied = res.applied;
+    } else {
+      weeks = applyBlockTaperToWeeks(weeks, t.weeks ?? 2);
+      taperApplied = true;
+    }
   }
   return {
     blockKey: state.ref.blockKey,
