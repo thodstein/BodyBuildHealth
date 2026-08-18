@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { LMSPlanWeek } from '../../../../engines/lms/lms-builder.engine';
-import { saveFileToDevice, plShareDigest, plShareLink, plTelegramAppUrl, printPLHtml, openPLShare } from '../pl-export';
+import { saveFileToDevice, plShareDigest, plShareLink, plTelegramAppUrl, printPLHtml, openPLShare, buildMobileDownloadUrl, detectMobile } from '../pl-export';
 
 const mkEx = (name: string, pct: number, sets: number) => ({
   name, group: 'Грудь', coef: 1, mnosz: 1, pm: 200, rir: 2,
@@ -161,6 +161,28 @@ describe('openPLShare — системная передача плана', () =>
     expect(result).toBe('opened');
     expect(openTelegramLink).toHaveBeenCalledWith('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01');
     expect(share).not.toHaveBeenCalled();
+  });
+});
+
+describe('мобильная выдача файла через браузер телефона', () => {
+  it('строит URL /api/pl-download с именем и base64', () => {
+    const u = buildMobileDownloadUrl('plan.xlsx', 'aGVsbG8=', 'https://app.vercel.app');
+    expect(u).toContain('https://app.vercel.app/api/pl-download?');
+    const qs = new URLSearchParams(u.split('?')[1]);
+    expect(qs.get('name')).toBe('plan.xlsx');
+    expect(qs.get('b64')).toBe('aGVsbG8=');
+  });
+
+  it('экранирует имя файла и данные (без пробелов в URL)', () => {
+    const u = buildMobileDownloadUrl('ПЛ план.xlsx', 'data+with/slash', 'https://a.io');
+    expect(u).toContain('api/pl-download');
+    expect(u).not.toContain(' ');
+    const qs = new URLSearchParams(u.split('?')[1]);
+    expect(qs.get('name')).toBe('ПЛ план.xlsx');
+  });
+
+  it('detectMobile в jsdom-окружении (десктоп) возвращает false', () => {
+    expect(detectMobile()).toBe(false);
   });
 });
 

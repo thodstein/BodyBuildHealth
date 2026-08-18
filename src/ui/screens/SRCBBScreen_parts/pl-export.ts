@@ -122,14 +122,58 @@ export function buildPLExcelWorkbook(title: string, rows: PLExportRow[], summary
   return wb;
 }
 
-export type FileSaveResult = 'saved' | 'shared' | 'downloaded';
+export type FileSaveResult = 'saved' | 'shared' | 'downloaded' | 'opened';
+
+/** Телефон ли это (в т.ч. Telegram WebView). На телефоне прямое скачивание
+ * WebView блокирует — файл отдаём через браузер телефона. */
+export function detectMobile(): boolean {
+  try {
+    if (/Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent)) return true;
+    if (navigator.maxTouchPoints > 1 && window.innerWidth < 768) return true;
+  } catch { /* ignore */ }
+  return false;
+}
+
+/** Blob → base64 (без префикса data:). */
+export function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const s = String(r.result || '');
+      const i = s.indexOf(',');
+      resolve(i >= 0 ? s.slice(i + 1) : s);
+    };
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
+/** URL файла через serverless-функцию — браузер телефона скачает его сам. */
+export function buildMobileDownloadUrl(filename: string, b64: string, origin: string = window.location.origin): string {
+  const q = new URLSearchParams({ name: filename, b64 });
+  return `${origin}/api/pl-download?${q.toString()}`;
+}
 
 /** Сохранение файла на устройство.
- * Приоритет — нативная системная панель (navigator.share с файлом): работает в
- * мобильном PWA и Telegram WebView («Сохранить в Файлы», отправить в чат и т.п.),
- * где классическое <a download> и window.open заблокированы. Фолбэк — скачивание
- * ссылкой (десктоп/браузер). */
+ * Телефон: открываем файл в браузере телефона (tg.openLink / window.open),
+ * там скачивание работает (в WebView Telegram прямое скачивание запрещено).
+ * ПК/десктоп: системный picker → share файла → классическое скачивание. */
 export async function saveFileToDevice(blob: Blob, filename: string): Promise<FileSaveResult> {
+  if (detectMobile()) {
+    try {
+      const b64 = await blobToBase64(blob);
+      const url = buildMobileDownloadUrl(filename, b64);
+      const tg = (window as unknown as { Telegram?: { WebApp?: { openLink?: (u: string) => void } } }).Telegram?.WebApp;
+      if (tg?.openLink) {
+        tg.openLink(url);
+      } else {
+        window.open(url, '_blank');
+      }
+      return 'opened';
+    } catch (e) {
+      // редкий сбой чтения blob — проваливаемся в десктопный поток
+    }
+  }
   // На поддерживаемых мобильных браузерах это единственный способ гарантировать
   // запись именно в «Файлы/Загрузки», а не просто открыть share-sheet.
   const picker = (window as unknown as {

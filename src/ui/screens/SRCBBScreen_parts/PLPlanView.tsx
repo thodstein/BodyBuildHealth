@@ -1104,11 +1104,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   setExpOpen(false);
                   if (expFormat === 'xlsx') {
                     const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);
-                     onNote(res === 'saved'
-                       ? `✅ Excel сохранён в выбранную папку (${scopeLabel}, ${sel.length} нед.).`
-                       : res === 'shared'
-                       ? `📤 Excel: открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
-                       : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
+                    onNote(res === 'saved'
+                      ? `✅ Excel сохранён в выбранную папку (${scopeLabel}, ${sel.length} нед.).`
+                      : res === 'shared'
+                      ? `📤 Открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
+                      : res === 'opened'
+                      ? `🌐 Файл открыт в браузере телефона — там появится загрузка (${scopeLabel}, ${sel.length} нед.).`
+                      : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
                   } else {
                     const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }), {
                       title,
