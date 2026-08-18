@@ -231,13 +231,20 @@ export function warmupPlateSequence(workingWeight: number, barWeight: number = 2
 // ═══════════════════════════════════════════════════════════════════════════
 
 const IPF_WEIGHT_CLASSES_MEN = [59, 66, 74, 83, 93, 105, 120, 120];
+/** IPF Classic/Equipped женские категории (кг). */
+export const IPF_WEIGHT_CLASSES_WOMEN = [43, 47, 52, 57, 63, 69, 76, 84, 84];
+/** Общие (не-IPF) женские категории (кг). */
+export const GENERAL_WEIGHT_CLASSES_WOMEN = [44, 48, 52, 56, 60, 67.5, 75, 82.5, 90, 100, 110];
 
-export function selectWeightClass(
-  bodyWeight: number, fed: string,
+export function selectWeightClassForSex(
+  sex: 'male' | 'female',
+  bodyWeight: number,
+  fed: string = 'IPF',
 ): { weightClass: number; cuttingRequired: boolean; cuttingAmount: number; recommendation: string } {
-  const classes = fed === 'IPF' ? IPF_WEIGHT_CLASSES_MEN : [60, 67.5, 75, 82.5, 90, 100, 110, 125, 140];
+  const classes = sex === 'female'
+    ? (fed === 'IPF' ? IPF_WEIGHT_CLASSES_WOMEN : GENERAL_WEIGHT_CLASSES_WOMEN)
+    : (fed === 'IPF' ? IPF_WEIGHT_CLASSES_MEN : [60, 67.5, 75, 82.5, 90, 100, 110, 125, 140]);
 
-  // Find the class just above current weight
   const above = classes.find(c => c >= bodyWeight);
   const below = [...classes].reverse().find(c => c < bodyWeight);
 
@@ -266,6 +273,12 @@ export function selectWeightClass(
   }
 
   return { weightClass: bodyWeight, cuttingRequired: false, cuttingAmount: 0, recommendation: 'Нет подходящей категории.' };
+}
+
+export function selectWeightClass(
+  bodyWeight: number, fed: string,
+): { weightClass: number; cuttingRequired: boolean; cuttingAmount: number; recommendation: string } {
+  return selectWeightClassForSex('male', bodyWeight, fed);
 }
 
 export interface WeightCutRecommendation {

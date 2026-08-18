@@ -575,6 +575,7 @@ function buildBBBlock(
     sleepHours: opts.sleepHours,
     stressLevel: opts.stressLevel,
     sex: opts.sex,
+    athleteMode: state.config.athleteMode ?? opts.athleteMode,
   });
   // Зациклить BB-недели до длины блока (bb-builder ограничен 16 неделями).
   let plan: BBPlan = draft.weeks.length >= state.ref.weeks

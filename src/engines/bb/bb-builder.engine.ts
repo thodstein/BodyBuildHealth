@@ -30,6 +30,8 @@ import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
+import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
+import { athletePolicyHints, athletePolicySummary } from '../athlete-context.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
@@ -104,6 +106,10 @@ export interface BBBuilderInput {
   excludedExercises?: string[];  // Нелюбимые упражнения — полностью исключаются из пула
   avoidAxialLoad?: boolean;      // Убрать осевую нагрузку (присед/становая/жим стоя/гудморнинг)
   sex?: 'male' | 'female';       // Пол — для приоритета glutes в ножные дни (женский сплит)
+  /** Явный режим контекста. Не заменяет sex, PED, стаж, recovery или MRV-капы. */
+  athleteMode?: AthleteMode;
+  /** Полный сериализуемый контекст спортсмена для отчёта/мостов. */
+  athleteContext?: AthleteContext;
   intensityTechnique?: IntensityTechnique; // П6: техника интенсивности для каждого primary
   autoDeload?: boolean;          // авто-делод по ACWR
   deloadType?: DeloadType;       // тип делода (pump/strength/rest)
@@ -266,6 +272,9 @@ export interface BBPlan {
   rationale: string[];
   /** P2-4: уровень пользователя (для bb-metrics без duck-typing). */
   level?: string;
+  /** Явный контекст спортсмена (пол/режим) — прозрачно, без скрытого изменения pipeline. */
+  athleteMode?: AthleteMode;
+  athleteContext?: AthleteContext;
   /** Volume-landmarks (MEV/MAV/MRV) по пиковой неделе — единый источник, как в PL/ручном. */
   volumeLandmarks?: VolumeLandmarkRow[];
   /** Частота тренировок каждой мышцы в неделю (1×/2×/3×) — ключевой фактор гипертрофии. */
@@ -3208,7 +3217,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const seen = new Set(output.rationale);
     for (const w of validationWarnings) if (!seen.has(w)) { seen.add(w); output.rationale.push(w); }
   }
-  return finalizeBBPlan(output, {
+  const finalized = finalizeBBPlan(output, {
     reorder: true,
     methodology: input.methodology,
     priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
@@ -3236,6 +3245,16 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     supersetMode: input.supersetMode,
     volumeScheme: input.volumeScheme,
   });
+  if (input.athleteContext) {
+    finalized.athleteContext = input.athleteContext;
+    finalized.athleteMode = input.athleteMode ?? 'standard';
+    const hints = athletePolicyHints(input.athleteContext);
+    if (hints.warnings.length > 0) {
+      finalized.rationale.push(`♀ ${athletePolicySummary(input.athleteContext)}`);
+      for (const w of hints.warnings) finalized.rationale.push(`⚠ ${w}`);
+    }
+  }
+  return finalized;
 }
 
 /**

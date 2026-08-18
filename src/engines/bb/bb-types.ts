@@ -10,6 +10,7 @@
 import type { DayCharacter } from './bb-day-types';
 import type { SplitPattern } from './bb-split-patterns';
 import type { VolumeLandmarkRow } from '../volume-landmarks.engine';
+import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
@@ -74,6 +75,8 @@ export interface BBPlan {
   rotationMuscleVolume: Record<string, number>;
   rationale: string[];
   level?: string;
+  athleteMode?: AthleteMode;
+  athleteContext?: AthleteContext;
   volumeLandmarks?: VolumeLandmarkRow[];
   muscleFrequency?: Record<string, number>;
   volumeTargets?: Record<string, any>;

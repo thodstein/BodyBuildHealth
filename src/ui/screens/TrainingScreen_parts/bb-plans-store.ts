@@ -46,6 +46,8 @@ export interface SavedBBPlan {
     programId?: string;
     planMode: string;
     cycleId?: string;
+    /** Явный режим контекста спортсмена (прозрачно; legacy-варианты = standard). */
+    athleteMode?: 'standard' | 'female_context';
   };
   metrics: {
     totalSets: number;
@@ -119,6 +121,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       programId: typeof rawParams.programId === 'string' ? rawParams.programId : undefined,
       planMode: rawParams.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split',
       cycleId: typeof rawParams.cycleId === 'string' ? rawParams.cycleId : undefined,
+      athleteMode: rawParams.athleteMode === 'female_context' ? 'female_context' : 'standard',
     },
     metrics: {
       totalSets: Number(value.metrics?.totalSets) || 0, avgRir: Number(value.metrics?.avgRir) || 0,

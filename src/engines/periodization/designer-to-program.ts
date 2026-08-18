@@ -54,6 +54,9 @@ export interface DesignerToUserWeeksOptions {
   avoidAxialLoad?: boolean;
   excludedExercises?: string[];
   favoriteExercises?: string[];
+  /** Пол (BB: glute-приоритет) и явный режим контекста. */
+  sex?: 'male' | 'female';
+  athleteMode?: 'standard' | 'female_context';
 }
 
 /**
@@ -126,6 +129,8 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
       avoidAxialLoad: opts.avoidAxialLoad,
       excludedExercises: opts.excludedExercises,
       favoriteExercises: opts.favoriteExercises,
+      sex: opts.sex,
+      athleteMode: opts.athleteMode,
     });
     const userProg = createFromBuild(bbPlan, {
       goal: opts.goal,

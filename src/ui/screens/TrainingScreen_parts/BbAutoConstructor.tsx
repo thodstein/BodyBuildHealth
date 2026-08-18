@@ -39,6 +39,7 @@ import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulat
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply } from './planner-bridge';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
+import type { AthleteMode, AthleteContext, AthleteSex } from '../../../engines/athlete-context.engine';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -304,6 +305,18 @@ export const BbAutoConstructor: React.FC = () => {
   }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
+  // ♀ Режим спортсмена: явный контекст. Включается только пользователем;
+  // MRV/RIR/caps и PED/recovery pipeline не меняются автоматически.
+  const profileSex = linked.profile?.settings?.personal?.sex;
+  const [athleteMode, setAthleteMode] = useState<'standard' | 'female_context'>('standard');
+  const athleteContext: AthleteContext | undefined = useMemo(() => {
+    if (athleteMode !== 'female_context') return undefined;
+    return {
+      sex: (profileSex === 'female' ? 'female' : 'male') as AthleteSex,
+      athleteMode,
+      trainingYears: bbTrainingYears > 0 ? bbTrainingYears : undefined,
+    };
+  }, [athleteMode, profileSex, bbTrainingYears]);
   // 📅 Многоблочная специализация: список блоков (3-6 нед каждый), у каждого
   // блока цели 1-2, режим доноров и мышцы-доноры. Остаток плана — баланс.
   interface UISpecBlock {
@@ -1263,6 +1276,8 @@ export const BbAutoConstructor: React.FC = () => {
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
             sex: linked.profile?.settings?.personal?.sex,
+            athleteMode,
+            athleteContext,
             bodyFat: linked.profile.settings.personal.bodyFat,
             leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
             hrvMs: linked.profile.settings.lifestyle.morningHRV,
@@ -1308,8 +1323,10 @@ export const BbAutoConstructor: React.FC = () => {
            mode: bbAdaptMode,
            methodology: bbMethodology,
            trainingFocus: bbTrainingFocus,
-           goal: bbGoal,
-            sex: linked.profile?.settings?.personal?.sex,
+            goal: bbGoal,
+             sex: linked.profile?.settings?.personal?.sex,
+             athleteMode,
+             athleteContext,
              bodyFat: linked.profile.settings.personal.bodyFat,
              leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
              hrvMs: linked.profile.settings.lifestyle.morningHRV,
@@ -1352,6 +1369,8 @@ export const BbAutoConstructor: React.FC = () => {
         equipment: bbEquipment,
         methodology: bbMethodology,
         sex: linked.profile?.settings?.personal?.sex,
+        athleteMode,
+        athleteContext,
         // P0-5: лабораторная коррекция MRV
         labMrvMultiplier: labAdjust.mrvMultiplier,
          labWarnings: labAdjust.warnings,
@@ -1545,6 +1564,7 @@ export const BbAutoConstructor: React.FC = () => {
            programPath: bbProgramPath,
            programId: selectedProgramId || undefined,
            cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
+           athleteMode,
         };
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
@@ -1951,6 +1971,29 @@ export const BbAutoConstructor: React.FC = () => {
   const renderParams = () => (
     <div>
       <div style={H}>📋 Шаг 1: Базовые параметры</div>
+
+      {/* ♀ Режим спортсмена: явный контекст, без скрытого изменения объёма */}
+      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background: athleteMode === 'female_context' ? 'rgba(236,72,153,0.07)' : 'rgba(255,255,255,0.03)', border: athleteMode === 'female_context' ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ fontSize:11, fontWeight:700, color: athleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.75)', marginBottom:6 }}>♀ Режим спортсмена</div>
+        <div style={{ display:'flex', gap:6 }}>
+          <button onClick={() => setAthleteMode('standard')} style={{
+            flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
+            border: athleteMode === 'standard' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+            background: athleteMode === 'standard' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
+            color: athleteMode === 'standard' ? '#00e68a' : 'rgba(255,255,255,0.6)',
+          }}>Стандартный</button>
+          <button onClick={() => setAthleteMode('female_context')} style={{
+            flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
+            border: athleteMode === 'female_context' ? '2px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
+            background: athleteMode === 'female_context' ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.02)',
+            color: athleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.6)',
+          }}>♀ Женский контекст</button>
+        </div>
+        <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)', lineHeight:1.5 }}>
+          Основная модель объёма, RIR и капы сохраняются. Режим добавляет прозрачный контекст (пол, категории, safety-подсказки) и действует только на следующую сборку.
+          {profileSex === 'female' && athleteMode === 'standard' && <span style={{ color:'rgba(236,72,153,0.8)' }}> В профиле указан женский пол — можно включить контекст.</span>}
+        </div>
+      </div>
 
       {/* Plan mode: cycle vs generic split */}
       <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
@@ -2525,7 +2568,11 @@ export const BbAutoConstructor: React.FC = () => {
       <div>
         <div style={{ ...H, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <span>📋 Шаг 4: План — {builtPlan.pattern.name}</span>
-          <button
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            {builtPlan.athleteMode === 'female_context' && (
+              <span style={{ fontSize:10, fontWeight:700, color:'#ec4899', padding:'3px 8px', borderRadius:20, background:'rgba(236,72,153,0.12)', border:'1px solid rgba(236,72,153,0.3)' }}>♀ Женский контекст</span>
+            )}
+            <button
             disabled={!!builtPlan.validation && !builtPlan.validation.valid}
             style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e', fontSize:11, padding:'4px 10px' }}
             onClick={handleSendToExecution}
@@ -2533,6 +2580,7 @@ export const BbAutoConstructor: React.FC = () => {
           >
             ▶ Начать работу по циклу/программе
           </button>
+          </div>
         </div>
 
         {/* Phase banner */}

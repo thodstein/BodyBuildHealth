@@ -66,6 +66,8 @@ export interface AnnualBlockConfig {
   focusGroup?: string;
   /** BB: режим специализации (слабые на MAV+10%). */
   specialization?: boolean;
+  /** Явный контекст спортсмена для сборки блока (BB). */
+  athleteMode?: 'standard' | 'female_context';
   /** Тапер внутри блока (финальные недели блока, Bosquet 2005 / канон lms-taper.engine). */
   taper?: {
     enabled: boolean;
@@ -154,6 +156,8 @@ export interface AnnualBuildOptions {
   stressLevel?: number;
   /** Пол (BB: glute-приоритет). */
   sex?: 'male' | 'female';
+  /** Явный контекст спортсмена (BB-блоки). */
+  athleteMode?: 'standard' | 'female_context';
   /** Какие блоки собирать: 'missing' — только unbuilt/stale/error, 'all' — всё заново. */
   rebuild?: 'missing' | 'all';
   /** false — собрать блоки плана «как есть» без синхронизации с макро-разметкой

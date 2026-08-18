@@ -26,6 +26,7 @@ import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
+import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -81,6 +82,9 @@ export interface LMSBuildInput {
   nutrition?: { calorieSurplus?: number; proteinPerKg?: number };
   /** Exact source mode: preserve source sets, reps, order and frequency. */
   faithful?: boolean;
+  /** Явный контекст спортсмена; не меняет силовой pipeline автоматически. */
+  athleteMode?: AthleteMode;
+  athleteContext?: AthleteContext;
 }
 
 
@@ -138,6 +142,9 @@ export interface LMSBuildOutput {
   cycleMetrics: SRCycleMetrics;
   /** Валидация объёма по группам мышц против MEV/MAV/MRV (volume-landmarks). */
   plVolumeLandmarks?: PLVolumeLandmark[];
+  /** Явный контекст спортсмена (пол/режим) — прозрачно, без скрытого изменения pipeline. */
+  athleteMode?: AthleteMode;
+  athleteContext?: AthleteContext;
 }
 
 /**
@@ -1402,7 +1409,19 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные 2 нед — объём ×0.65/0.45, интенсивность сохранена (Bosquet 2005).' : '';
 
-  return { template, progressionRationale: proRationale + taperNote, weeks: taperedWeeks, cycleMetrics, plVolumeLandmarks: getPLVolumeLandmarks(taperedWeeks, template.meta.level, combinedMrvMult) };
+  const contextNote = input.athleteMode === 'female_context' && input.athleteContext?.sex === 'female'
+    ? ` ♀ Женский контекст: базовая модель объёма/RIR и капы сохранены (без скрытых изменений).`
+    : '';
+
+  return {
+    template,
+    progressionRationale: proRationale + taperNote + contextNote,
+    weeks: taperedWeeks,
+    cycleMetrics,
+    plVolumeLandmarks: getPLVolumeLandmarks(taperedWeeks, template.meta.level, combinedMrvMult),
+    athleteMode: input.athleteMode,
+    athleteContext: input.athleteContext,
+  };
 }
 
 /**

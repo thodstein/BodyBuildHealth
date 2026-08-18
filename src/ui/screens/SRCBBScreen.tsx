@@ -31,6 +31,7 @@ import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from '.
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
+import type { AthleteMode, AthleteContext } from '../../engines/athlete-context.engine';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
@@ -128,6 +129,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const _plSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
   const _profPL = loadTrainingProfile();
   const [level, setLevel] = useState<string>(_plSaved?.plLevel || 'II-KMS');
+  // ♀ Режим спортсмена: явный контекст (пол/режим) — pipeline PL не меняется автоматически.
+  const [plAthleteMode, setPlAthleteMode] = useState<'standard' | 'female_context'>(_plSaved?.plAthleteMode === 'female_context' ? 'female_context' : 'standard');
+  const plSex: 'male' | 'female' = (() => {
+    try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; }
+  })();
+  const plAthleteContext: AthleteContext | undefined = plAthleteMode === 'female_context'
+    ? { sex: plSex, athleteMode: plAthleteMode, competitionFederation: 'ipf' }
+    : undefined;
   const [goal, setGoal] = useState<string>(_plSaved?.plGoal || 'strength');
   const [dir, setDir] = useState<string>(_plSaved?.plDir || 'powerlifting');
   // State для MacrocyclePanel (редактируемые level/goal в годовом плане)
@@ -254,7 +263,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plAthleteMode })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, plAthleteMode]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
@@ -383,6 +392,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
       faithful: true,
+      athleteMode: plAthleteMode,
+      athleteContext: plAthleteContext,
       ...rec,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
@@ -428,6 +439,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
            autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
             pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
             faithful: true,
+            athleteMode: plAthleteMode,
+            athleteContext: plAthleteContext,
             ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
@@ -1233,6 +1246,31 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг']].map(([id,label]) => ({ id, label }))} />
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
+          </div>
+          {/* ♀ Режим спортсмена: явный контекст PL (pipeline не меняется автоматически) */}
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: plAthleteMode === 'female_context' ? 'rgba(236,72,153,0.07)' : 'rgba(255,255,255,0.03)', border: plAthleteMode === 'female_context' ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: plAthleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.75)', marginBottom: 6 }}>♀ Режим спортсмена</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setPlAthleteMode('standard')} style={{
+                flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 11,
+                border: plAthleteMode === 'standard' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                background: plAthleteMode === 'standard' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
+                color: plAthleteMode === 'standard' ? '#00e68a' : 'rgba(255,255,255,0.6)',
+              }}>Стандартный</button>
+              <button onClick={() => setPlAthleteMode('female_context')} style={{
+                flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 11,
+                border: plAthleteMode === 'female_context' ? '2px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
+                background: plAthleteMode === 'female_context' ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.02)',
+                color: plAthleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.6)',
+              }}>♀ Женский контекст</button>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+              Проценты, RIR, объём и капы рассчитываются от вашего ПМ без автоматических изменений по полу. Контекст действует на следующую сборку.
+              {plSex === 'female' && plAthleteMode === 'standard' && <span style={{ color: 'rgba(236,72,153,0.8)' }}> В профиле указан женский пол — можно включить контекст.</span>}
+            </div>
+            {builtSrc?.athleteMode === 'female_context' && (
+              <div style={{ marginTop: 6, fontSize: 10, fontWeight: 700, color: '#ec4899' }}>♀ Женский контекст применён к текущему плану.</div>
+            )}
           </div>
            {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
