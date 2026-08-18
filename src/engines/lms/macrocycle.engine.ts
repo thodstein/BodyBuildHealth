@@ -619,9 +619,9 @@ export function resizeMacroBlock(macro: Macrocycle, blockIndex: number, weeks: n
   });
   const competitions = macro.competitions?.map(competition => {
     const block = rebased.find(candidate => candidate.competitionId === competition.id);
-    if (!block) return competition;
+    if (!block) return { ...competition, week: 0 };
     return { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) };
-  });
+  }).filter(competition => competition.week > 0);
   const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
   return {
     ...macro,
@@ -654,7 +654,9 @@ export function splitMacroPhaseIntoCycles(
   const requestedTotal = requested.reduce((sum, value) => sum + value, 0);
   const total = requestedTotal > 0 ? requestedTotal : Math.max(2, phaseTotal);
   const firstWeeks = requestedTotal > 0 ? (requested[0] ?? 0) : Math.max(1, Math.floor(total / 2));
-  const splitWeeks = [firstWeeks, Math.max(1, total - firstWeeks)];
+  // Слот «0» = остаток фазы (не добавляем лишнюю неделю); если заданы оба — как указано.
+  const secondWeeks = requested.length >= 2 ? Math.max(1, requested[1]) : Math.max(1, phaseTotal - firstWeeks);
+  const splitWeeks = [firstWeeks, secondWeeks];
   const replacement = ids.map((cycleId, index) => ({
     ...original,
     cycleId,
@@ -673,8 +675,8 @@ export function splitMacroPhaseIntoCycles(
     const block = rebased.find(candidate => candidate.competitionId === competition.id);
     return block
       ? { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) }
-      : competition;
-  });
+      : { ...competition, week: 0 };
+  }).filter(competition => competition.week > 0);
   const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
   return {
     ...macro,
@@ -705,8 +707,8 @@ export function mergeMacroPhase(macro: Macrocycle, phase: MacroPhase): Macrocycl
     const block = rebased.find(candidate => candidate.competitionId === competition.id);
     return block
       ? { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) }
-      : competition;
-  });
+      : { ...competition, week: 0 };
+  }).filter(competition => competition.week > 0);
   const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
   return {
     ...macro,
@@ -1174,13 +1176,13 @@ export function rebalanceBbMacrocycle(
   });
   const competitions = macro.competitions?.map(competition => {
     const block = rebasedBlocks.find(candidate => candidate.competitionId === competition.id);
-    if (!block) return competition;
+    if (!block) return { ...competition, week: 0 };
     // Сохраняем исходную неделю события, если она ещё попадает в блок. При
     // сокращении блока безопасно прижимаем её к ближайшей границе, а не
     // молча переносим на новую последнюю неделю фазы.
     const week = Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1));
     return { ...competition, week };
-  });
+  }).filter(competition => competition.week > 0);
 
   return {
     ...macro,
@@ -1204,9 +1206,9 @@ export function resizeBbMacroBlock(macro: BBMacrocycle, blockIndex: number, week
   });
   const competitions = macro.competitions?.map(competition => {
     const block = rebasedBlocks.find(candidate => candidate.competitionId === competition.id);
-    if (!block) return competition;
+    if (!block) return { ...competition, week: 0 };
     return { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) };
-  });
+  }).filter(competition => competition.week > 0);
   return {
     ...macro,
     blocks: rebasedBlocks,
@@ -1426,5 +1428,15 @@ export function moveMacroBlock(
     offset += next.weeks;
     return next;
   });
-  return { ...src, blocks: rebased } as Macrocycle | BBMacrocycle;
+  // Недели соревнований пересчитываются вслед за перемещённым блоком
+  // (иначе маркеры 🏁 и «до старта» ссылались бы на старую позицию).
+  const competitions = 'competitions' in src && src.competitions
+    ? src.competitions.map(competition => {
+        const block = rebased.find(candidate => candidate.competitionId === competition.id);
+        return block
+          ? { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) }
+          : { ...competition, week: 0 };
+      }).filter(competition => competition.week > 0)
+    : undefined;
+  return { ...src, blocks: rebased, competitions } as Macrocycle | BBMacrocycle;
 }

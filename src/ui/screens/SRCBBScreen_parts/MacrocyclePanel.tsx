@@ -1930,7 +1930,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   })()}
                   {/* ⚖️ Чек-ин prep (D15): динамика веса из дневника к целевому */}
                   {activeBlock.phase === 'contest_prep' && (() => {
-                    const prepStartIso = formatMacroDate(macroWeekStartDate(activeBlock.weekOffset)).split('.').reverse().join('-');
+                    const prepStartIso = (() => { const d = macroWeekStartDate(activeBlock.weekOffset); return d ? d.toISOString().slice(0, 10) : ''; })();
                     const targetW = (() => {
                       try { const s = getProfile()?.settings as any; const w = Number(s?.goals?.targetWeight); return Number.isFinite(w) && w > 30 ? w : null; } catch { return null; }
                     })();

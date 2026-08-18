@@ -161,7 +161,9 @@ export function syncAnnualPlan(plan: AnnualTrainingPlan, macro: Macrocycle | BBM
       // Layout не изменился. Если пользователь менял конфиг после сборки — stale.
       const configChanged = exact.result && exact.result.configHash !== configHashOf(exact.config, exact.ref);
       const status = exact.status === 'built' && configChanged ? 'stale' : exact.status;
-      return { ...exact, ref: { ...ref, ...exact.ref }, status };
+      // Свежая разметка побеждает для competitionId/description (иначе после
+      // замены соревнования на той же неделе пик-конфиг строился бы с устаревшей датой).
+      return { ...exact, ref: { ...exact.ref, ...ref }, status };
     }
     // Тот же индекс блока, но layout изменился (недели/фаза/цикл) → результат
     // сохраняем, но помечаем stale (НЕ перезаписываем без подтверждения).
@@ -211,6 +213,7 @@ export function applyBlockPhaseToWeeks(
   weeks: UserWeek[],
   phase: string,
   kind: AnnualBlockKind,
+  skipLastWeek = false,
 ): UserWeek[] {
   const bbMod = BB_PHASE_MOD[phase];
   const plMod = PL_PHASE_MOD[phase];
@@ -219,7 +222,10 @@ export function applyBlockPhaseToWeeks(
   const deload = phase === 'transition';
   const userPhase = useBB ? bbMacroPhaseToUserPhase(phase as any) : macroPhaseToUserPhase(phase as any);
   if (!mod) return weeks.map(w => ({ ...w, phase: userPhase }));
-  return weeks.map(w => ({
+  return weeks.map((w, wi) => {
+    // Пик-неделя применяется поверх (после) фазовой модуляции — финал блока не урезается дважды.
+    if (skipLastWeek && wi === weeks.length - 1) return { ...w, phase: userPhase };
+    return {
     ...w,
     phase: userPhase,
     deload: deload || w.deload,
@@ -240,7 +246,8 @@ export function applyBlockPhaseToWeeks(
         return { ...block, sets };
       }),
     })),
-  }));
+  };
+  });
 }
 
 /**
@@ -576,7 +583,8 @@ function buildBBBlock(
   const prog = createFromBuild(plan, { title: `Блок: ${state.ref.description ?? state.ref.phase} (${state.ref.weeks} нед)`, goal, level });
   let weeks = loopWeeksToLength(prog.bb?.weeks ?? [], state.ref.weeks);
   // Фаза блока применяется один раз — на уровне недель (объём/RIR/deload).
-  weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'BB');
+  // Пик-неделя уже наложена на финал плана — финальную неделю не модулируем повторно.
+  weeks = applyBlockPhaseToWeeks(weeks, state.ref.phase, 'BB', peakApplied);
   let taperApplied = false;
   if (state.config.taper?.enabled) {
     weeks = applyBlockTaperToWeeks(weeks, state.config.taper.weeks ?? 2);
@@ -627,6 +635,10 @@ function buildManualBlock(
   if (template && template.length > 0) {
     weeks = loopWeeksToLength(template, state.ref.weeks);
     warnings.push('Структура скопирована из блока-шаблона — отредактируйте в ручном конструкторе.');
+    if (state.config.taper?.enabled && weeks.some(w => w.sessions.some(s => s.blocks.some(b =>
+      b.note?.includes('[annual-taper:') || b.note?.includes('[annual-pl-taper:'))))) {
+      warnings.push('⚠ Шаблон уже содержит taper-недели — их объём не пересчитается; используйте шаблон без taper.');
+    }
   } else {
     weeks = skeletonWeeks(state.ref.weeks, state.config.daysPerWeek ?? opts.daysPerWeek ?? 3);
   }

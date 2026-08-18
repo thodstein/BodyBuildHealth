@@ -13,7 +13,7 @@ import {
   setAnnualBlockConfig, setAnnualBlockKind, updateAnnualBlockWeeks,
   importProgramIntoAnnualBlock, validateAnnualPlan, activeBlockForWeek,
   recommendKindForPhase, cloneBlockConfigFrom, annualWeekForDate, annualPlanPhaseForDate,
-  selectPLCycleForBlock, applyPLBlockTaperToWeeks,
+  selectPLCycleForBlock, applyPLBlockTaperToWeeks, applyBlockPhaseToWeeks,
 } from '../block-builders.engine';
 import type { Macrocycle, MacroBlock, BBMacrocycle } from '../../lms/macrocycle.engine';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -189,6 +189,26 @@ describe('сборка блоков', () => {
     expect(built.status).toBe('built');
     expect(built.result!.program?.pl?.sourceCycleId).toBeTruthy();
     expect(built.result!.weeks).toHaveLength(1);
+  });
+
+  it('BB пик-неделя: финал блока не модулируется фазой повторно (skipLastWeek)', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const built = buildAnnualBlock(plan.blocks[1], plan, macro, DEFAULT_OPTS);
+    const base = built.result!.weeks;
+    const setsOf = (w: { sessions: Array<{ blocks: Array<{ sets: unknown[] }> }> }) =>
+      w.sessions.reduce((s, ses) => s + ses.blocks.reduce((a, b) => a + b.sets.length, 0), 0);
+    const modulated = applyBlockPhaseToWeeks(base, 'contest_prep', 'BB', true);
+    expect(setsOf(modulated[modulated.length - 1])).toBe(setsOf(base[base.length - 1]));
+    expect(setsOf(modulated[0])).toBeLessThan(setsOf(base[0]));
+  });
+
+  it('syncAnnualPlan: свежая разметка побеждает для competitionId (той же блокKey)', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const macro2: Macrocycle = { ...macro, blocks: macro.blocks.map((b, i) => (i === 3 ? { ...b, competitionId: 'new-comp' } : b)) };
+    const synced = syncAnnualPlan(plan, macro2);
+    expect(synced.blocks[3].ref.competitionId).toBe('new-comp');
   });
 
   it('PL taper: финальная ×0.45/RIR+2, предпоследняя ×0.65/RIR+1, идемпотентно', () => {

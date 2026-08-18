@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMacrocycleMulti, buildMacrocycle, serializeMacro, deserializeMacro,
   rebalanceMacrocycle, resizeMacroBlock, resizeBbMacroBlock, buildBbMacrocycle,
-  splitMacroPhaseIntoCycles, mergeMacroPhase, setMacroBlockCycle,
+  splitMacroPhaseIntoCycles, mergeMacroPhase, setMacroBlockCycle, moveMacroBlock,
   type CompetitionEvent, type Macrocycle,
 } from '../macrocycle.engine';
 
@@ -331,6 +331,43 @@ describe('buildMacrocycleMulti — cycleId per competition', () => {
     const blocks = split.blocks.filter(b => b.phase === 'strength');
     expect(blocks[0].weeks + blocks[1].weeks).toBe(phaseTotal);
     expect(split.totalWeeks).toBe(macro.totalWeeks);
+  });
+
+  it('splitMacroPhaseIntoCycles: один слот «0» = остаток фазы, лишняя неделя не добавляется', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const phaseTotal = macro.blocks.filter(b => b.phase === 'strength').reduce((sum, b) => sum + b.weeks, 0);
+    const split = splitMacroPhaseIntoCycles(macro, 'strength', ['cycle-A', 'cycle-B'], [6, 0]);
+    const blocks = split.blocks.filter(b => b.phase === 'strength');
+    expect(blocks[0].weeks).toBe(6);
+    expect(blocks[0].weeks + blocks[1].weeks).toBe(Math.max(phaseTotal, 6));
+    expect(split.totalWeeks).toBe(macro.totalWeeks + Math.max(0, 6 - phaseTotal));
+  });
+
+  it('mergeMacroPhase удаляет осиротевшее соревнование (week: 0)', () => {
+    const events: CompetitionEvent[] = [
+      { id: 'c1', name: 'A', week: 12, priority: 'A' },
+      { id: 'c2', name: 'B', week: 20, priority: 'B' },
+    ];
+    const macro = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 24 });
+    expect(macro.competitions).toHaveLength(2);
+    // Сводим и peak, и competition фазы: c2 теряет оба блока → orphan → отфильтрован.
+    const merged = mergeMacroPhase(mergeMacroPhase(macro, 'peak'), 'competition');
+    expect(merged.blocks.filter(b => b.phase === 'competition')).toHaveLength(1);
+    expect(merged.competitions).toHaveLength(1);
+    expect(merged.competitions![0].id).toBe('c1');
+  });
+
+  it('moveMacroBlock пересчитывает неделю соревнования вслед за блоком', () => {
+    const events: CompetitionEvent[] = [{ id: 'c1', name: 'Кубок', week: 16, priority: 'A' }];
+    const macro = buildMacrocycleMulti(events, { level: 'intermediate', goal: 'powerlifting', totalWeeks: 20 });
+    const compIdx = macro.blocks.findIndex(b => b.phase === 'competition');
+    expect(compIdx).toBeGreaterThan(-1);
+    const moved = moveMacroBlock(macro, compIdx, 0) as Macrocycle;
+    const comp = moved.competitions?.[0];
+    const block = moved.blocks.find(b => b.competitionId === comp?.id)!;
+    expect(comp).toBeTruthy();
+    expect(comp!.week).toBeGreaterThanOrEqual(block.weekOffset);
+    expect(comp!.week).toBeLessThanOrEqual(block.weekOffset + block.weeks - 1);
   });
 
   it('setMacroBlockCycle меняет только цикл блока, недели/offsets не трогает', () => {
