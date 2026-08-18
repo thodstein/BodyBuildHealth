@@ -552,6 +552,21 @@ async function createRussianOcrWorker(Tesseract: any) {
   });
 }
 
+function isMobileWebView(): boolean {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  return /Android|iPhone|iPad|iPod/i.test(ua) ||
+    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+}
+
+async function configureLabOcrWorker(worker: any, mobile: boolean): Promise<void> {
+  if (typeof worker.setParameters !== 'function') return;
+  await worker.setParameters({
+    tessedit_pageseg_mode: mobile ? '6' : '3',
+    preserve_interword_spaces: '1',
+    user_defined_dpi: mobile ? '220' : '300',
+  });
+}
+
 function groupByRows(items: TextItem[], yTolerance = 5): TextItem[][] {
   if (items.length === 0) return [];
   const sorted = [...items].sort((a, b) => {
@@ -966,7 +981,8 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
       throw new Error('Сканированный PDF больше 12 МБ. Сожмите файл или загрузите страницы по одной.');
     }
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer, true);
-    const MAX_PAGE_PX = 1000000;
+    const mobile = isMobileWebView();
+    const MAX_PAGE_PX = mobile ? 1000000 : 4000000;
     const MAX_SCAN_PAGES = 8;
     if (pdf.numPages > MAX_SCAN_PAGES) {
       throw new Error(`В сканированном PDF ${pdf.numPages} страниц. Максимум для Telegram Mini App: ${MAX_SCAN_PAGES}.`);
@@ -974,10 +990,11 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
     const texts: string[] = [];
     const worker = await createRussianOcrWorker(Tesseract);
     try {
+      await configureLabOcrWorker(worker, mobile);
       for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
         const page = await pdf.getPage(pageNumber);
         const vp = page.getViewport({ scale: 1 });
-        const effectiveScale = Math.min(2, Math.sqrt(MAX_PAGE_PX / Math.max(1, vp.width * vp.height)));
+        const effectiveScale = Math.min(mobile ? 1.5 : 2.5, Math.sqrt(MAX_PAGE_PX / Math.max(1, vp.width * vp.height)));
         const viewport = page.getViewport({ scale: effectiveScale });
         const canvas = document.createElement('canvas');
         canvas.width = Math.ceil(viewport.width);
@@ -989,6 +1006,15 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
         try {
           const { data } = await worker.recognize(enhanced);
           if (data.text?.trim()) texts.push(data.text);
+          // A second sparse-table pass materially improves desktop scans where
+          // values sit in separate columns. Mobile keeps one pass to avoid a
+          // second long-running WASM operation in Telegram WebView.
+          if (!mobile && typeof worker.setParameters === 'function') {
+            await worker.setParameters({ tessedit_pageseg_mode: '6' });
+            const second = await worker.recognize(enhanced);
+            if (second.data.text?.trim()) texts.push(second.data.text);
+            await worker.setParameters({ tessedit_pageseg_mode: '3' });
+          }
         } finally {
           page.cleanup?.();
           canvas.width = 1;
