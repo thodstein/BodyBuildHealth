@@ -4,7 +4,14 @@ export async function registerSW() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js');
+    // Telegram Mini Apps are often hosted below the domain root. Registering
+    // `/sw.js` there attaches a stale root worker and prevents new OCR chunks
+    // from reaching the WebView. Resolve the worker from the current app URL
+    // and bypass the browser HTTP cache during update checks.
+    const swUrl = new URL('sw.js', document.baseURI);
+    const reg = await navigator.serviceWorker.register(swUrl.href, {
+      updateViaCache: 'none',
+    });
 
     reg.update();
 
