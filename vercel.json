@@ -5,6 +5,9 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/tesseract/(.*)", "destination": "/tesseract/$1" },
+    { "source": "/pdfjs/(.*)", "destination": "/pdfjs/$1" },
+    { "source": "/sw.js", "destination": "/sw.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

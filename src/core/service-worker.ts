@@ -8,7 +8,15 @@ export async function registerSW() {
     // `/sw.js` there attaches a stale root worker and prevents new OCR chunks
     // from reaching the WebView. Resolve the worker from the current app URL
     // and bypass the browser HTTP cache during update checks.
-    const swUrl = new URL('sw.js', document.baseURI);
+    // Change the script URL when the OCR runtime changes. This also breaks out
+    // of an old root-scope registration left by previous Mini App versions.
+    const swUrl = new URL('sw.js?runtime=ocr-3', document.baseURI);
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    for (const existing of registrations) {
+      if (existing.scope !== new URL('./', document.baseURI).href || existing.active?.scriptURL !== swUrl.href) {
+        await existing.unregister();
+      }
+    }
     const reg = await navigator.serviceWorker.register(swUrl.href, {
       updateViaCache: 'none',
     });
