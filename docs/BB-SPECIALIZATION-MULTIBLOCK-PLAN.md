@@ -64,3 +64,27 @@ interface VolumeTradeoffPolicy {
 - Факторы: level × years × goal × volumeGoal × PED × recovery/nutrition/lab × ACWR × фазы.
 - Инварианты: 0 underfill, 0 MRV overflow, 0 single-set, indirect сохранён, донор не возвращён финализатором, восстановление после блока.
 - generic/cycle/program adapt; faithful без авто-tradeoff.
+
+## Статус (Aug 18 2026) — реализация завершена
+
+### Движок
+- `bb-specialization.engine.ts`: резолвер/факторы/блоки/расписание/композитные доноры; **валидация min-3 нед** для явных блоков специализации (расширение вправо/влево, план короче MIN не трогается).
+- `bb-specialization-registry.ts`: 19 зон = WEAK_GROUPS UI (parity-тест), patterns/donorRecommendations.
+- `bb-tradeoff.engine.ts`: трим доноров (включая primary compounds) с floor = адаптированный MEV, перенос в паттерн-совпадающие упражнения (cap 5, session caps, cap-fix после каждого сета), отчёт.
+- `bb-finalize.engine.ts`: guards доноров во ВСЕХ additive-проходах (back/legs/chest/rear-delt/arms/heads/small-muscle/feeders/fill/MEV-repair/cap-adj).
+- `bb-selector.engine.ts`: donor-aware скоринг сплитов.
+
+### Parity-фиксы (критический анализ Aug 18)
+1. **program-путь: floor донора с полным множителем** (было PED-only) — `mrvMult` → `pedMrvMult` в `tradeoffMrvByMuscle`; регресс-тест «lab 1.5 → трицепс режется меньше».
+2. **per-week MRV-кап в cycle/program adapt** теперь учитывает `specializationMrvFactor` (weak ×1.2 / focus ×1.3) — паритет с generic `mrvByMuscle`.
+3. **tradeoff-капы целей в cycle/program** поднимаются specMrv (цели всех блоков ∪ focus) — паритет с generic; иначе перенос «съедался» базовым капом.
+4. **faithful no-op**: tradeoff не применяется (тест на rationale).
+5. **baseline invariance**: пустое расписание (только баланс) = отсутствие расписания (deep-equal сетов).
+
+### Зоны вне поддержки (задокументировано)
+`upper_back` / `rear_delts` / `chest_mid` / `lower_back` НЕ добавляются: не экспонируются в UI WEAK_GROUPS (покрыты delt_rear / back_width+back_thickness+traps / chest_upper+chest_lower), `lower_back` не имеет объёмных landmarks (добавление = изменение объёмной модели, запрещено).
+
+### Тесты
+- `bb-tradeoff.test.ts` **30** (registry parity, матрица 12 target/donor, min-3, нормализация, floor-scaling lab, faithful, baseline invariance, multi-block, восстановление после блока, selector).
+- `bb-specialization-unified.test.ts` **29**.
+- Полный bb + TrainingScreen_parts: **148 файлов / 1695 тестов**, tsc 0.

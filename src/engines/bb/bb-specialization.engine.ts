@@ -303,6 +303,22 @@ export function buildSpecializationSchedule(
     const end = Math.min(SPECIALIZATION_BLOCK_WEEKS, safeTotalWeeks);
     blocks = [{ id: 'spec-block-1', weekStart: 1, weekEnd: end, targets: base.targets }];
   }
+  // Методика (T-Nation): блок специализации НЕ короче 3 недель. Явные блоки
+  // с целями длиной 1-2 нед расширяются (вправо, если влезает; иначе влево);
+  // баланс-блоки и планы короче MIN не трогаем (нечего расширять).
+  for (const b of blocks) {
+    if (b.targets.length === 0) continue;
+    const len = b.weekEnd - b.weekStart + 1;
+    if (len >= SPECIALIZATION_MIN_BLOCK_WEEKS) continue;
+    const deficit = SPECIALIZATION_MIN_BLOCK_WEEKS - len;
+    if (b.weekEnd + deficit <= safeTotalWeeks) {
+      b.weekEnd = b.weekEnd + deficit;
+    } else {
+      const newStart = b.weekEnd - SPECIALIZATION_MIN_BLOCK_WEEKS + 1;
+      if (newStart >= 1) b.weekStart = newStart;
+    }
+  }
+  blocks.sort((a, b) => a.weekStart - b.weekStart);
   // Заполняем пропуски балансом и обрезаем пересечения: следующий блок
   // начинается после фактического конца предыдущего, а не поверх него.
   const filled: SpecializationBlock[] = [];

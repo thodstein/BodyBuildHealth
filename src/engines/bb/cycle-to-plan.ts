@@ -28,7 +28,7 @@ import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-
 import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
-import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
 import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 
 /**
@@ -1006,11 +1006,13 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (mode === 'adapt' && mrvMult >= 1.3 && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle)) {
           targetSets = Math.round(targetSets * 1.4);
         }
-        // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult
+        // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult.
+        // Parity с generic: кап цели специализации поднимается specMrv (weak ×1.2,
+        // focus ×1.3), иначе буст акцента недели стирается капом.
         if (mode === 'adapt') {
           const lm = (allLandmarks as any)[muscle];
           if (lm && lm.mrv) {
-            const mrvCap = Math.round(lm.mrv * mrvMult);
+            const mrvCap = Math.round(lm.mrv * mrvMult * specializationMrvFactor(muscle, weekSpec));
             targetSets = Math.min(targetSets, mrvCap);
           }
         }
@@ -1182,8 +1184,13 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // рассчитанного объёма, базовые коэффициенты не меняются.
   if (mode === 'adapt' && specSchedule.active) {
     const tradeoffMrvByMuscle: Record<string, number> = {};
+    // Parity с generic (bb-builder mrvByMuscle): капы целей специализации
+    // поднимаются specMrv (weak ×1.2 / focus ×1.3) — иначе перенос объёма
+    // в цель упирался бы в базовый MRV и «съедался» капом переноса.
+    const tradeoffTargets = Array.from(new Set(specSchedule.blocks.flatMap(b => b.targets)));
+    const tradeoffSpecRes = { targets: tradeoffTargets, focus: specSchedule.focus, weak: tradeoffTargets, active: tradeoffTargets.length > 0 };
     for (const [m, lm] of Object.entries(allLandmarks)) {
-      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * mrvMult);
+      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * mrvMult * specializationMrvFactor(m, tradeoffSpecRes));
     }
     const capLevel = String(level);
     const tradeoffReports = applyTradeoffToPlan(
@@ -1718,10 +1725,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (opts.peds && opts.peds.length > 0 && mrvMult >= 1.3 && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle)) {
             adjSets = Math.round(adjSets * 1.4);
           }
-          // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult
+          // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult.
+          // Parity с generic: кап цели специализации поднимается specMrv (weak ×1.2,
+          // focus ×1.3), иначе буст акцента недели стирается капом.
           const lm = (allLandmarks as any)[muscle];
           if (lm && lm.mrv) {
-            const mrvCap = Math.round(lm.mrv * mrvMult);
+            const mrvCap = Math.round(lm.mrv * mrvMult * specializationMrvFactor(muscle, weekSpec));
             adjSets = Math.min(adjSets, mrvCap);
           }
           if (adjSets !== sets) {
@@ -2004,8 +2013,11 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     // floor донора и капы переноса масштабируются тем же effective
     // (PED × recovery × nutrition × lab), иначе recovery/lab занижали
     // floor донора в program-пути (mrvMult здесь — только PED).
+    // + Parity с generic: капы целей поднимаются specMrv (weak ×1.2 / focus ×1.3).
+    const tradeoffTargets = Array.from(new Set(specSchedule.blocks.flatMap(b => b.targets)));
+    const tradeoffSpecRes = { targets: tradeoffTargets, focus: specSchedule.focus, weak: tradeoffTargets, active: tradeoffTargets.length > 0 };
     for (const [m, lm] of Object.entries(allLandmarks)) {
-      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * pedMrvMult);
+      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * pedMrvMult * specializationMrvFactor(m, tradeoffSpecRes));
     }
     const capLevel = String(opts.level ?? levelForLandmarks);
     const tradeoffReports = applyTradeoffToPlan(

@@ -92,6 +92,27 @@ describe('tradeoff-политика (движок)', () => {
     expect(s.blocks[1].tradeoff).toBeUndefined();
   });
 
+  it('валидация: блок специализации НЕ короче 3 недель (расширение вправо/влево)', () => {
+    // 1-1 (цели) на 12 нед → расширяется до 1-3
+    const right = buildSpecializationSchedule(undefined, ['chest'], true, 12, [{ weekStart: 1, weekEnd: 1, targets: ['chest'] }]);
+    const specBlock = right.blocks.find(b => b.targets.length > 0)!;
+    expect(specBlock.weekStart).toBe(1);
+    expect(specBlock.weekEnd).toBe(3);
+    // 12-12 (цели) на 12 нед → расширяется влево до 10-12
+    const left = buildSpecializationSchedule(undefined, ['chest'], true, 12, [{ weekStart: 12, weekEnd: 12, targets: ['chest'] }]);
+    const specBlockL = left.blocks.find(b => b.targets.length > 0)!;
+    expect(specBlockL.weekStart).toBe(10);
+    expect(specBlockL.weekEnd).toBe(12);
+    // План короче MIN: 2-нед план с целями остаётся как есть (некуда расширяться)
+    const short = buildSpecializationSchedule(undefined, ['chest'], true, 2, [{ weekStart: 1, weekEnd: 1, targets: ['chest'] }]);
+    const specBlockS = short.blocks.find(b => b.targets.length > 0)!;
+    expect(specBlockS.weekStart).toBe(1);
+    expect(specBlockS.weekEnd).toBe(1);
+    // Баланс-блоки не расширяются
+    const balance = buildSpecializationSchedule(undefined, [], false, 12, [{ weekStart: 2, weekEnd: 2, targets: [] }]);
+    expect(balance.blocks.every(b => b.targets.length === 0)).toBe(true);
+  });
+
   it('tradeoffForWeek: политика только в своих неделях', () => {
     const s = buildSpecializationSchedule(undefined, ['back_thickness'], true, 12, [
       {
@@ -113,6 +134,24 @@ describe('tradeoff-политика (движок)', () => {
     expect(specializationScheduleText(s)).toContain('доноры: biceps');
     expect(specializationScheduleText(s)).toContain('нед 6-12 баланс');
   });
+
+  it('baseline invariance: пустое расписание (только баланс) = отсутствие расписания', () => {
+    const without = buildBBPlan({
+      patternId: 'ppl_6', level: 'intermediate', trainingYears: 3,
+      goal: 'mass', weeks: 6, workMax: WM,
+    });
+    const withEmpty = buildBBPlan({
+      patternId: 'ppl_6', level: 'intermediate', trainingYears: 3,
+      goal: 'mass', weeks: 6, workMax: WM,
+      specializationSchedule: [{ weekStart: 1, weekEnd: 6, targets: [] }],
+    });
+    const shape = (p: ReturnType<typeof buildBBPlan>) => p.weeks.map(w =>
+      w.sessions.map(s =>
+        s.exercises.map(e => ({ name: e.name, muscle: e.muscle, sets: e.sets, workSets: e.workSets?.length }))
+      )
+    );
+    expect(shape(withEmpty)).toEqual(shape(without));
+  }, 30000);
 });
 
 describe('generic: донорское перераспределение', () => {
