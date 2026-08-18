@@ -29,7 +29,6 @@ const PULL_PAGE = 1000;
 export const PULL_TIMEOUT_MS = 3000;
 export const FLUSH_DELAY_MS = 2500;
 export const PULL_INTERVAL_MS = 30_000;
-const RELOAD_DELAY_MS = 1200;
 const KEEPALIVE_MAX_BYTES = 48_000;
 export const META_KEY = 'he_sync_meta_v1';
 const CONFLICT_WINDOW_MS = 500;
@@ -59,6 +58,8 @@ export interface KvSyncState {
   lastSyncAt?: number;
   lastPullAt?: number;
   error?: string;
+  /** Появились данные с другого устройства — ждут перезагрузки/применения пользователем. */
+  pendingUpdate?: { applied: number; at: number };
 }
 
 /** Транспорт вынесен в интерфейс — тесты подставляют фейковый. */
@@ -122,7 +123,6 @@ let idbMeta = new Map<string, { sig: string; ts: number; deleted?: boolean }>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let metaTimer: ReturnType<typeof setTimeout> | null = null;
 let pullInterval: ReturnType<typeof setInterval> | null = null;
-let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 let reloadFn: () => void = () => {
   try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ }
@@ -205,7 +205,7 @@ export async function initKvSync(
   return state;
 }
 
-/** Принудительная загрузка из облака (фоновый pull с авто-обновлением при изменениях). */
+/** Принудительная загрузка из облака (фоновый pull; при новых данных — флаг pendingUpdate). */
 export async function pullKvNow(): Promise<number> {
   return pull({ reload: true });
 }
@@ -218,6 +218,16 @@ export async function flushKvNow(): Promise<void> {
 /** Best-effort выгрузка маленьких изменений (pagehide/beforeunload). */
 export function flushKvKeepAlive(): void {
   keepAliveFlush();
+}
+
+/** Перезагрузка приложения по кнопке «Обновить» (данные уже записаны локально). */
+export function reloadKvView(): void {
+  try { reloadFn(); } catch { /* no-op */ }
+}
+
+/** Снять флаг «есть обновления» (например, после нажатия ✕ в баннере). */
+export function clearKvPendingUpdate(): void {
+  if (state.pendingUpdate) setState({ ...state, pendingUpdate: undefined });
 }
 
 /** Сброс состояния (используется только в тестах). */
@@ -234,10 +244,10 @@ export function _resetKvForTests(): void {
   idbBusy = false;
   idbEnabled = false;
   idbMeta = new Map();
+  state = { status: 'off' };
   reloadFn = () => { try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ } };
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
   if (metaTimer != null) { clearTimeout(metaTimer); metaTimer = null; }
-  if (reloadTimer != null) { clearTimeout(reloadTimer); reloadTimer = null; }
   if (pullInterval != null) { clearInterval(pullInterval); pullInterval = null; }
   if (installed && origSetItem && origRemoveItem && typeof localStorage !== 'undefined') {
     try {
@@ -650,22 +660,11 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
   // выгрузка локальных правок IndexedDB (изменения анализов/курса/дневника без LS-триггера)
   await pushIdb();
   if (opts?.reload && applied > 0) {
-    console.debug('[kv] background pull applied', applied, 'keys — reload');
-    scheduleReload();
+    console.debug('[kv] background pull applied', applied, 'keys — show update hint');
+    // без авто-перезагрузки: данные уже записаны локально, ждём пользователя
+    setState({ ...state, pendingUpdate: { applied, at: Date.now() } });
   }
   return applied;
-}
-
-/**
- * Данные с другого устройства появились в облаке, а мы уже открыты и не перечитаем
- * экраны сами → мягкий перезапуск страницы (данные уже записаны в localStorage).
- */
-function scheduleReload(): void {
-  if (reloadTimer != null || (typeof document !== 'undefined' && document.visibilityState !== 'visible')) return;
-  reloadTimer = setTimeout(() => {
-    reloadTimer = null;
-    try { reloadFn(); } catch { /* no-op */ }
-  }, RELOAD_DELAY_MS);
 }
 
 /** Локальные ключи, которых нет ни в облаке, ни в mtimes (никогда не синкались) → выгрузить. */

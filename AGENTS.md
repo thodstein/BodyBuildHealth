@@ -9,8 +9,12 @@
 - **`src/core/cloud-kv.ts`** (NEW): sync-токен `tk_<sha256(VITE_CRYPTO_KEY + ':' + tgId)>`
   в заголовке `x-user-token`, RLS отдаёт пользователю только его строки; pull при входе
   (LWW по mtime ключа, окно 500 мс) + фоновый pull каждые 30 с + при возврате в приложение
-  (visibilitychange/focus) + авто-перезагрузка страницы при появлении данных с другого
-  устройства; push через перехват `localStorage.setItem/removeItem` (debounce 2.5 с) +
+  (visibilitychange/focus) + уведомление о новых данных БЕЗ авто-перезагрузки: движок
+  ставит `state.pendingUpdate` → `KvUpdateBanner.tsx` (глобальный, в App.tsx) показывает
+  «🔄 Новые данные с другого устройства» с кнопкой «Обновить» (`reloadKvView`) и ✕
+  (`clearKvPendingUpdate`) — экран больше не перезагружается постоянно; свежие данные
+  всегда при входе (initKvSync делает pull до рендера); push через перехват
+  `localStorage.setItem/removeItem` (debounce 2.5 с) +
   keepalive-флаш на pagehide/beforeunload (бюджет 48КБ) + реконнект по `online`; чанки по
   100k символов (без разрыва суррогатных пар), реальный `chunk_count` только в чанке 0 —
   неполная запись пропускается и «залечивается» локальным push; reconcile: локальные ключи
@@ -31,13 +35,14 @@
   применяется до рендера). Вне Telegram (PWA/браузер) синк выключен by design.
 - **`supabase/migrations/20260818_user_kv.sql`** (NEW): таблица + RLS по
   `current_setting('request.headers')::jsonb->>'x-user-token'` + grants anon/authenticated.
-- **Тесты**: `cloud-kv.test.ts` 37/37 (чанки/суррогатные пары, исключения, LWW-конфликты,
+- **Тесты**: `cloud-kv.test.ts` 38/38 (чанки/суррогатные пары, исключения, LWW-конфликты,
   токен, pull/push/remove, залечивание неполной записи, рестарт без повторного push,
-  keepalive-бюджет, фоновый pull/авто-reload, skew-тесты: часы телефона спешат на 1ч —
+  keepalive-бюджет, фоновый pull → pendingUpdate без авто-reload + reloadKvView/
+  clearKvPendingUpdate, skew-тесты: часы телефона спешат на 1ч —
   запись ПК побеждает; IndexedDB: телефон→ПК, ПК→телефон, локальная правка побеждает,
   удаление в обе стороны, tombstone без воскрешения, стабильная сигнатура при порядке
-  полей). `src/test/setup.ts` — mock localStorage дополнен стандартными
-  `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
+  полей) + `kv-update-banner.test.tsx` 3/3. `src/test/setup.ts` — mock localStorage
+  дополнен стандартными `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
 - **ВАЖНО**: Supabase-проект из `.env` был удалён (NXDOMAIN), пользователь восстановил —
   проверил: DNS резолвится, ключ работает, таблиц нет кроме `labs`; SQL-миграцию применяет
   пользователь (SQL Editor). Документация: `docs/TELEGRAM-CLOUD-SYNC.md`.

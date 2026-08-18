@@ -13,6 +13,7 @@ import { ProfileScreen_v2 } from './ui/screens/ProfileScreen_v2/ProfileScreen_v2
 import { ArticlesScreen } from './ui/screens/ArticlesScreen';
 
 import { ToastContainer } from './ui/ToastContainer';
+import { KvUpdateBanner } from './ui/KvUpdateBanner';
 import { setLocale, getLocale } from './data/interactions-labels';
 
 type Tab = 'home' | 'pharma' | 'training' | 'labs' | 'risks' | 'support' | 'nutrition' | 'profile' | 'articles' | 'marketplace';
@@ -273,6 +274,7 @@ export default function App() {
         </div>
       </main>
       <ToastContainer />
+      <KvUpdateBanner />
       <nav className="tabs">
         {PRIMARY_NAV.map(item => (
           <button

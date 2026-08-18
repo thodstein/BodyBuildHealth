@@ -11,6 +11,8 @@ import {
   flushKvKeepAlive,
   pullKvNow,
   getKvSyncState,
+  clearKvPendingUpdate,
+  reloadKvView,
   _resetKvForTests,
   type KvRow,
   type KvTransport,
@@ -286,7 +288,7 @@ describe('синхронизация (движок с фейковым тран�
   });
 });
 
-describe('фоновый pull и авто-обновление', () => {
+describe('фоновый pull и уведомление об обновлении', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -300,7 +302,7 @@ describe('фоновый pull и авто-обновление', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it('фоновый pull применяет новые данные и планирует перезагрузку', async () => {
+  it('фоновый pull применяет данные и ставит флаг pendingUpdate БЕЗ авто-перезагрузки', async () => {
     vi.useFakeTimers();
     const t = new FakeTransport();
     const reload = vi.fn();
@@ -313,33 +315,52 @@ describe('фоновый pull и авто-обновление', () => {
     const applied = await pullKvNow();
     expect(applied).toBe(1);
     expect(localStorage.getItem('he_profile_v2')).toBe('{"v":2}');
+    // данные уже записаны, но экран не перезагружается автоматически
     expect(reload).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(1300);
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(getKvSyncState().pendingUpdate).toMatchObject({ applied: 1 });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(reload).not.toHaveBeenCalled();
   });
 
-  it('фоновый pull без новых данных не перезагружает', async () => {
+  it('кнопка «Обновить» (reloadKvView) перезагружает; ✕ снимает флаг', async () => {
     vi.useFakeTimers();
     const t = new FakeTransport();
     const reload = vi.fn();
     t.seed('he_profile_v2', '{"v":1}', 1000);
     await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, reloadFn: reload });
-    const applied = await pullKvNow();
-    expect(applied).toBe(0);
-    await vi.advanceTimersByTimeAsync(1300);
-    expect(reload).not.toHaveBeenCalled();
+    t.seed('he_profile_v2', '{"v":2}', 9000);
+    await pullKvNow();
+    expect(getKvSyncState().pendingUpdate).toBeTruthy();
+
+    clearKvPendingUpdate();
+    expect(getKvSyncState().pendingUpdate).toBeUndefined();
+
+    // снова появились данные → кнопка вызывает reloadKvView → reloadFn
+    t.seed('he_profile_v2', '{"v":3}', 99000);
+    await pullKvNow();
+    expect(getKvSyncState().pendingUpdate).toBeTruthy();
+    reloadKvView();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it('интервальный pull забирает изменения с другого устройства', async () => {
+  it('фоновый pull без новых данных не ставит флаг', async () => {
     vi.useFakeTimers();
     const t = new FakeTransport();
-    const reload = vi.fn();
-    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, pullIntervalMs: 100, reloadFn: reload });
+    t.seed('he_profile_v2', '{"v":1}', 1000);
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    const applied = await pullKvNow();
+    expect(applied).toBe(0);
+    expect(getKvSyncState().pendingUpdate).toBeUndefined();
+  });
+
+  it('интервальный pull забирает изменения с другого устройства и ставит флаг', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20, pullIntervalMs: 100 });
     t.seed('he_weight_log', '[{"w":82}]', 5000);
     await vi.advanceTimersByTimeAsync(1500);
     expect(localStorage.getItem('he_weight_log')).toBe('[{"w":82}]');
-    // один reload на первое применение; повторные тики новых данных не приносят
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(getKvSyncState().pendingUpdate).toBeTruthy();
   });
 });
 
