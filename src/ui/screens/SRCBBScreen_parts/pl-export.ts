@@ -254,10 +254,10 @@ export function buildPLPrintHtml(
   const date = escHtml(new Date().toLocaleDateString('ru-RU'));
   const phaseColor = (w: LMSPlanWeek): string => {
     const ph = (w.macroPhase || w.sourcePhase || '').toLowerCase();
-    if (ph.includes('peak') || ph.includes('competition')) return '#b91c1c';
-    if (ph.includes('deload') || ph.includes('transition')) return '#2563eb';
-    if (ph.includes('build') || ph.includes('accumul')) return '#15803d';
-    return '#0a6e46';
+    if (ph.includes('peak') || ph.includes('competition')) return '#c02626';
+    if (ph.includes('deload') || ph.includes('transition')) return '#7c3aed';
+    if (ph.includes('build') || ph.includes('accumul')) return '#0284c7';
+    return '#059669';
   };
   const phaseLabel = (w: LMSPlanWeek): string => {
     const ph = (w.macroPhase || w.sourcePhase || '').toLowerCase();
@@ -266,27 +266,39 @@ export function buildPLPrintHtml(
     if (ph.includes('build') || ph.includes('accumul')) return 'Накопление';
     return 'База';
   };
+  const chip = (l: string): string => {
+    const cls = l === 'ОСН' ? 'o' : l === 'ДОП' ? 'd' : 'a';
+    return `<span class="chip ${cls}">${l}</span>`;
+  };
+  // Карточки ПМ из последней недели (прогноз/пик цикла).
+  const lastPm = weeks.length ? (weeks[weeks.length - 1].pmRow ?? {}) : {};
+  const pmsHtml = Object.keys(lastPm).length
+    ? `<div class="pms">${Object.entries(lastPm).map(([n, v]) =>
+        `<div class="pm-card"><div class="k">${escHtml(n)}</div><div class="v">${roundW(v)}</div><div class="u">кг</div></div>`).join('')}</div>`
+    : '';
+  // Сводка цикла — карточки.
+  const summaryHtml = opts?.summary && opts.summary.length > 0
+    ? `<div class="summary">${opts.summary.map(s =>
+        `<div class="sum-item"><div class="k">${escHtml(s.label)}</div><div class="v">${escHtml(s.value)}</div></div>`).join('')}</div>`
+    : '';
   const weekBlocks = weeks.map(w => {
     const dayBlocks = (w.days ?? []).map((d, di) => {
-      const rows = (d.exercises ?? []).map(e => {
-        const sets = (e.workSets ?? [])
-          .map(ws => `${ws.sets}×${ws.reps} @ ${roundW(ws.weight)} кг (${Math.round(ws.pct * 100)}% · RIR ${ws.rir})`)
-          .join(' + ');
-        return `<tr><td>${escHtml(e.name)}</td><td><span class="chip">${escHtml(plLoadLabel(e.load))}</span></td><td class="mono">${escHtml(sets)}</td></tr>`;
-      }).join('');
-      return `<h4>День ${di + 1}</h4><table><thead><tr><th>Упражнение</th><th>Нагрузка</th><th>Подходы</th></tr></thead><tbody>${rows || '<tr><td colspan="3">—</td></tr>'}</tbody></table>`;
+      const rows = (d.exercises ?? []).flatMap(e =>
+        (e.workSets ?? []).map(ws =>
+          `<tr><td class="ex">${escHtml(e.name)}</td><td>${chip(plLoadLabel(e.load))}</td><td class="num">${ws.sets}</td><td class="num">${ws.reps}</td><td class="num">${roundW(ws.weight)}</td><td class="num">${Math.round(ws.pct * 100)}%</td><td class="num">${ws.rir}</td></tr>`,
+        ),
+      ).join('');
+      return rows
+        ? `<h4>День ${di + 1}</h4><table><thead><tr><th>Упражнение</th><th>Нагрузка</th><th class="num">Сеты</th><th class="num">Повт</th><th class="num">Вес, кг</th><th class="num">% ПМ</th><th class="num">RIR</th></tr></thead><tbody>${rows}</tbody></table>`
+        : '';
     }).join('');
-    const pm = Object.entries(w.pmRow ?? {}).map(([n, v]) => `${escHtml(n)}: ${roundW(v)} кг`).join(' · ');
-    const color = phaseColor(w);
-    const label = phaseLabel(w);
-    return `<div class="week"><div class="week-head" style="background:${color}">Неделя ${w.week} · ${label}${pm ? ` <span class="wkpm">— ${pm}</span>` : ''}</div>${dayBlocks}</div>`;
+    const pm = Object.entries(w.pmRow ?? {}).map(([n, v]) => `${escHtml(n)} ${roundW(v)} кг`).join(' · ');
+    return `<div class="week"><div class="week-head" style="background:${phaseColor(w)}"><span>Неделя ${w.week} · ${phaseLabel(w)}</span>${pm ? `<span class="wkpm">${pm}</span>` : ''}</div><div class="week-body">${dayBlocks || '<p class="empty">Данных нет</p>'}</div></div>`;
   }).join('');
-  const summaryHtml = opts?.summary && opts.summary.length > 0
-    ? `<div class="week"><div class="week-head" style="background:#0a6e46">📊 Сводка цикла</div><table><tbody>${opts.summary.map(s => `<tr><td>${escHtml(s.label)}</td><td>${escHtml(s.value)}</td></tr>`).join('')}</tbody></table></div>`
-    : '';
+  const footer = `<div class="footer">Health Engine · BB-builder · ${date}<br>План носит справочный характер. Рекомендуется согласовать нагрузку с тренером и врачом.</div>`;
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${safeTitle} — план</title>
-<style>body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;padding:26px;color:#111;background:#fff}h1{font-size:24px;margin:0 0 2px;color:#0a6e46}h2{font-size:13px;color:#666;margin:0 0 18px;font-weight:400}.week{margin:0 0 18px;border:1px solid #e2e2e2;border-radius:10px;overflow:hidden}.week-head{padding:9px 12px;color:#fff;font-weight:700;font-size:14px}.week-head .wkpm{font-weight:400;opacity:.92}h4{margin:8px 12px 4px;font-size:13px;color:#333}table{border-collapse:collapse;width:100%;margin-bottom:8px}th{background:#f4f6f5;color:#0a6e46;text-transform:uppercase;letter-spacing:.05em;font-size:10px;padding:7px 10px;text-align:left;border-top:1px solid #e2e2e2;border-bottom:1px solid #e2e2e2}td{border-bottom:1px solid #eee;padding:7px 10px;font-size:12px}tr:nth-child(even) td{background:#fafbfa}.chip{display:inline-block;padding:1px 7px;border-radius:10px;background:#0a6e46;color:#fff;font-size:10px;font-weight:700}.mono{font-variant-numeric:tabular-nums}.week{page-break-inside:avoid}@media print{body{padding:10px}}</style></head>
-<body><h1>${safeTitle}</h1><h2>${safeScope} · ${date}</h2>${weekBlocks}${summaryHtml}</body></html>`;
+<style>.pl-print{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#111827;background:#fff;margin:0;padding:26px;box-sizing:border-box}.pl-print .cover{background:linear-gradient(120deg,#065f46 0%,#0e9f6e 55%,#065f46 100%);color:#fff;padding:26px 30px 22px;border-radius:14px;margin:0 0 20px}.pl-print .brand{font-size:11px;letter-spacing:.22em;text-transform:uppercase;opacity:.85;font-weight:700}.pl-print h1{font-size:26px;margin:8px 0 4px;font-weight:800}.pl-print .sub{font-size:13px;opacity:.92}.pl-print .pms{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}.pl-print .pm-card{flex:1;min-width:120px;background:#f6faf8;border:1px solid #dde7e2;border-radius:12px;padding:12px 14px}.pl-print .pm-card .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:700}.pl-print .pm-card .v{font-size:24px;font-weight:800;color:#065f46;margin-top:2px}.pl-print .pm-card .u{font-size:11px;color:#6b7280}.pl-print .summary{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}.pl-print .sum-item{flex:1;min-width:110px;border:1px solid #dde7e2;border-left:3px solid #059669;border-radius:8px;padding:8px 12px;background:#fbfdfc}.pl-print .sum-item .k{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}.pl-print .sum-item .v{font-weight:700;font-size:14px}.pl-print .week{margin:0 0 20px;border:1px solid #dde7e2;border-radius:12px;overflow:hidden;page-break-inside:avoid}.pl-print .week-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:#fff;padding:10px 16px;font-weight:800;font-size:14px}.pl-print .week-head .wkpm{font-weight:400;opacity:.94;font-size:12px}.pl-print .week-body{padding:12px 16px 14px}.pl-print h4{margin:12px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#065f46}.pl-print table{width:100%;border-collapse:collapse;margin:0 0 12px}.pl-print thead{display:table-header-group}.pl-print th{background:#eef5f1;color:#14532d;font-size:10px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:8px 10px;border-bottom:2px solid #059669}.pl-print td{padding:8px 10px;font-size:12px;border-bottom:1px solid #eef1ef}.pl-print tr:nth-child(even) td{background:#fbfdfc}.pl-print tr{page-break-inside:avoid}.pl-print .num{text-align:right;font-variant-numeric:tabular-nums}.pl-print .ex{font-weight:600}.pl-print .chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;color:#fff}.pl-print .chip.o{background:#059669}.pl-print .chip.d{background:#b45309}.pl-print .chip.a{background:#6b7280}.pl-print .empty{color:#9ca3af;font-size:12px;margin:4px 0}.pl-print .footer{margin-top:26px;padding-top:12px;border-top:1px solid #dde7e2;font-size:9px;color:#9ca3af;line-height:1.6}.pl-print section,.pl-print .week{page-break-inside:avoid}@media print{.pl-print{padding:10px}.pl-print .cover{border-radius:0}}</style></head>
+<body class="pl-print"><div class="cover"><div class="brand">Health Engine · BB-builder · Планировщик ПЛ</div><h1>${safeTitle}</h1><div class="sub">${safeScope} · ${date}</div></div>${pmsHtml}${summaryHtml}${weekBlocks}${footer}</body></html>`;
 }
 
 /** Печать/PDF. В обычном браузере — окно печати (десктоп). В WebView/Telegram
@@ -358,19 +370,18 @@ export function showPrintOverlay(html: string, title: string, text?: string): vo
   printBtn.addEventListener('click', () => {
     // Telegram WebView (Android) НЕ печатает из iframe — работает только
     // window.print() главного окна. Вставляем план во временный скрытый
-    // контейнер, скрываем приложение на печати и вызываем системную печать.
+    // контейнер (класс .pl-print — стили уже отмасштабированы этим классом),
+    // скрываем приложение на печати и вызываем системную печать.
     try {
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const styles = Array.from(doc.querySelectorAll('style')).map(s => s.textContent || '').join('\n');
       const bodyContent = (doc.body ? doc.body.innerHTML : '') || html;
       const root = document.createElement('div');
       root.id = PRINT_ROOT_ID;
+      root.className = 'pl-print';
       root.setAttribute('style', 'display:none');
-      // Скопируем стили плана, ограничив их контейнером печати (иначе утекут в приложение).
-      const scoped = styles.replace(/([^{}@][^{}]*)\{/g, (_m: string, sel: string) =>
-        sel.split(',').map((x: string) => `#${PRINT_ROOT_ID} ${x.trim()}`).join(',') + '{');
       const st = document.createElement('style');
-      st.textContent = scoped
+      st.textContent = styles
         + `\n@media print{body>*:not(#${PRINT_ROOT_ID}){display:none !important}#${PRINT_ROOT_ID}{display:block !important}}`;
       root.innerHTML = bodyContent;
       document.body.appendChild(st);
