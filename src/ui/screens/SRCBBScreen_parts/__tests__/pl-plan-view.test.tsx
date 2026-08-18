@@ -3,7 +3,8 @@
  * рендер календаря, план-таблицы, тапер-меток и карточки прикидов без падений.
  */
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { PLPlanView, type PLPlanViewApi } from '../PLPlanView';
 import type { LMSBuildOutput } from '../../../../engines/lms/lms-builder.engine';
 
@@ -80,5 +81,23 @@ describe('PLPlanView', () => {
     const a = api();
     render(<PLPlanView api={a} />);
     expect(screen.getAllByText(/Присед/).length).toBeGreaterThan(0);
+  });
+
+  it('карточка прикидов: переключение «🤖 Авто» меняет веса на лету (база из pmRow, множитель в отображении)', () => {
+    const a = api();
+    a.srcWeek = 8;
+    a.autoRegResult = { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never;
+    const Harness = () => {
+      const [mode, setMode] = useState<'off' | 'auto' | 'diary'>('off');
+      return <PLPlanView api={{ ...a, autoRegMode: mode, setAutoRegMode: m => setMode(m) }} />;
+    };
+    render(<Harness />);
+    // off: база из pmRow 200 (balanced) → присед 185/192.5/205
+    expect(screen.getAllByText('185').length).toBeGreaterThan(0);
+    expect(screen.queryByText('166.5')).toBeNull();
+    fireEvent.click(screen.getByText('🤖 Авто'));
+    // auto ×0.9: 185×0.9 = 166.5 (round 0.1)
+    expect(screen.getAllByText('166.5').length).toBeGreaterThan(0);
+    expect(screen.queryByText('185')).toBeNull();
   });
 });

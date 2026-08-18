@@ -4,7 +4,7 @@
  * параметров и тренерской карточки.
  */
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { PLCompetitionTab, type PLCompetitionTabApi } from '../PLCompetitionTab';
 import { PLTaperProvider } from '../taper-state';
 
@@ -12,6 +12,8 @@ const api = (): PLCompetitionTabApi => ({
   builtSrc: null,
   setBuiltSrc: () => {},
   onNote: () => {},
+  autoRegMode: 'off',
+  setAutoRegMode: () => {},
   cycle: {
     peds: [], pedDoses: {}, courseIntensity: 'moderate', pedAuto: false,
     autoRegMode: 'off', autoRegResult: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never,
@@ -44,5 +46,35 @@ describe('PLCompetitionTab', () => {
     const saved = { plMeetList: [{ id: 'm1', name: 'Старт', weeksToStart: 1, fed: 'ipf', plannedPm: {}, strategy: 'balanced' }], plMainMeetId: 'm1' };
     render(<PLTaperProvider saved={saved}><PLCompetitionTab api={api()} /></PLTaperProvider>);
     expect(screen.getByText(/🧠 92%/)).toBeTruthy();
+  });
+
+  it('клик по «🤖 Авто» вызывает api.setAutoRegMode + заметку (реальный переключатель)', () => {
+    const calls: string[] = [];
+    const notes: string[] = [];
+    const a = api();
+    a.setAutoRegMode = m => { calls.push(m); };
+    a.onNote = m => { notes.push(m); };
+    render(<PLCompetitionTab api={a} />);
+    fireEvent.click(screen.getByText('🤖 Авто'));
+    expect(calls).toEqual(['auto']);
+    expect(notes).toEqual(['🔄 Режим авторегуляции: 🤖 Авто']);
+  });
+
+  it('активный режим подсвечен: auto → «🤖 Авто» активна, «ВЫКЛ» нет', () => {
+    const a = api();
+    a.cycle.autoRegMode = 'auto';
+    render(<PLCompetitionTab api={a} />);
+    const autoBtn = screen.getByText('🤖 Авто');
+    expect(autoBtn.style.background).toBe('rgb(96, 165, 250)');
+    expect(autoBtn.style.color).toBe('rgb(0, 0, 0)');
+    const offBtn = screen.getByText('ВЫКЛ');
+    expect(offBtn.style.color).not.toBe('rgb(0, 0, 0)');
+  });
+
+  it('активный режим «ВЫКЛ» тоже подсвечен (фон #71717a, текст чёрный)', () => {
+    render(<PLCompetitionTab api={api()} />);
+    const offBtn = screen.getByText('ВЫКЛ');
+    expect(offBtn.style.background).toBe('rgb(113, 113, 122)');
+    expect(offBtn.style.color).toBe('rgb(0, 0, 0)');
   });
 });

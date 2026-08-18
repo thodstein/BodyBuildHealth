@@ -77,9 +77,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   } = t;
   const { peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult, plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead } = cyc;
   const setAutoRegMode = (mode: AutoRegMode) => {
-    // Обновляем режим авторегуляции в ciclo и сохраняем via api
-    // (реализация зависит от родительского SRCBBScreen — здесь простой апдейт через onNote)
-    onNote(`🔄 Режим авторегуляции переключен на ${mode}`);
+    // Реальный переключатель режима авторегуляции — state живёт в родительском SRCBBScreen.
+    api.setAutoRegMode(mode);
+    onNote(`🔄 Режим авторегуляции: ${mode === 'auto' ? '🤖 Авто' : mode === 'diary' ? '📓 Авто-дневник' : 'ВЫКЛ'}`);
   };
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
 
@@ -285,7 +285,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           </button>
           <button
             onClick={() => setAutoRegMode('off')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'off' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'off' ? '#71717a' : 'rgba(255,255,255,0.6)' }}>
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'off' ? '#71717a' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'off' ? '#000' : 'rgba(255,255,255,0.6)' }}>
             ВЫКЛ
           </button>
         </div>
@@ -418,7 +418,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           </div>
         ) : (() => {
           const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
-          const scale = (w: number) => w;
+          // Прикиды отображаются от БАЗЫ (pmRow недели, без авторегуляции) × множитель
+          // режима — переключение 🤖 Авто/ВЫКЛ меняет веса карточки на лету (паритет с движком).
+          const scale = (w: number) => Math.round(w * arMult * 10) / 10;
           const mockWk = taperPlan.weeks.find(w => w.mockMeet);
           const meetWk = taperPlan.weeks.find(w => w.meetWeek);
           const peakWk = [...taperPlan.weeks].reverse().find(w => w.taperWeek && w.meetAttempts);
@@ -527,14 +529,20 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 </div>
               </div>
               {/* Прикиды */}
-              {[peakWk, mockWk, meetWk].filter(Boolean).map(wk => wk && (
+              {[peakWk, mockWk, meetWk].filter(Boolean).map(wk => wk && (() => {
+                // База прикидов — из pmRow недели (без авторегуляции): переключение режима
+                // меняет отображаемые веса, а не накапливает множители поверх сохранённых.
+                const att = wk.meetAttempts
+                  ? computeMeetAttemptsFromPmRow(wk.pmRow, wk.meetAttempts.strategy) ?? wk.meetAttempts
+                  : null;
+                return (
                 <div key={wk.week} style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: wk.meetWeek ? 'rgba(234,179,8,0.06)' : wk.mockMeet ? 'rgba(167,139,250,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.25)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#fbbf24', marginBottom: 4 }}>
-                    {wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Mock meet' : '🏁 Выход на пик'} · нед {wk.week} · {MEET_STRATEGY_PCT_LABEL[wk.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}
-                    {arMult !== 1 ? ` · авторегуляция ×${arMult.toFixed(2)}` : ''}
+                    {wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Mock meet' : '🏁 Выход на пик'} · нед {wk.week} · {MEET_STRATEGY_PCT_LABEL[att?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}
+                    {arMult !== 1 ? ` · 🤖 авторегуляция ×${arMult.toFixed(2)}` : ''}
                   </div>
                   {wk.taperNote && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 4 }}>⚠ {wk.taperNote}</div>}
-                  {wk.meetAttempts?.lifts.map(l => {
+                  {att?.lifts.map(l => {
                     const ov = taperAttemptOverride[l.name];
                     const opener = ov ? ov[0] : scale(l.opener);
                     const second = ov ? ov[1] : scale(l.second);
@@ -560,8 +568,8 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                       </div>
                     );
                   })}
-                  {wk.meetAttempts?.lifts[0] && taperAttemptOverride[wk.meetAttempts.lifts[0].name] && (() => {
-                    const ov = taperAttemptOverride[wk.meetAttempts!.lifts[0].name];
+                  {att?.lifts[0] && taperAttemptOverride[att.lifts[0].name] && (() => {
+                    const ov = taperAttemptOverride[att.lifts[0].name];
                     return (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
                         {['опенер', 'вторая', 'третья'].map((label, i) => (
@@ -571,9 +579,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                               onChange={e => {
                                 const v = Number(e.target.value);
                                 setTaperAttemptOverride(cur => {
-                                  const next = [...(cur[wk.meetAttempts!.lifts[0].name] || [0, 0, 0])];
+                                  const next = [...(cur[att.lifts[0].name] || [0, 0, 0])];
                                   next[i] = Number.isFinite(v) && v >= 0 ? Math.min(v, 500) : 0;
-                                  return { ...cur, [wk.meetAttempts!.lifts[0].name]: next };
+                                  return { ...cur, [att.lifts[0].name]: next };
                                 });
                               }}
                               style={{ width: 60, padding: '3px 5px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: 10, fontWeight: 700, minHeight: 26, boxSizing: 'border-box' }} />
@@ -582,14 +590,15 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                       </div>
                     );
                   })()}
-                  {wk.meetAttempts?.lifts[0] && (() => {
-                    const opener = scale(wk.meetAttempts!.lifts[0].opener);
+                  {att?.lifts[0] && (() => {
+                    const opener = scale(att.lifts[0].opener);
                     if (!opener) return null;
                     const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     return <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>;
                   })()}
                 </div>
-              ))}
+                );
+              })())}
               {/* Последние тяжёлые */}
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
                 ⏱ Последние тяжёлые до старта: присед — {LAST_HEAVY_DAYS.squat} дн. · жим — {LAST_HEAVY_DAYS.bench} дн. · тяга — {LAST_HEAVY_DAYS.deadlift} дн.

@@ -8,7 +8,7 @@
  */
 import React, { useState } from 'react';
 import { getCycleById, LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
-import { originalCycleWeeks, getPLWeakPointRecommendations, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
+import { originalCycleWeeks, getPLWeakPointRecommendations, computeMeetAttemptsFromPmRow, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../../engines/rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../../../engines/periodization/phase-bridge';
 import { shouldTrainToday, type AutoRegOutput } from '../../../engines/pro/autoregulation-pro.engine';
@@ -548,13 +548,38 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               })()}
               {(wk.meetAttempts && wk.meetAttempts.lifts.length > 0) && (() => {
                 const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
-                // Прикиды и warmup масштабируются в ДВИЖКЕ (appendPLTaperWeeks.autoReg) —
-                // здесь показываем итоговые числа плана как есть (scale = identity).
-                const scale = (w: number) => w;
+                // База прикидов — из pmRow недели (без авторегуляции); множитель «🤖 Авто»
+                // применяется при отображении — переключение режима меняет веса на лету
+                // (паритет с движком appendPLTaperWeeks.autoReg).
+                const base = computeMeetAttemptsFromPmRow(wk.pmRow, wk.meetAttempts.strategy) ?? wk.meetAttempts;
+                const scale = (w: number) => Math.round(w * arMult * 10) / 10;
+                const arBtn = (m: AutoRegMode, label: string) => {
+                  const active = autoRegMode === m;
+                  return (
+                    <button
+                      onClick={() => setAutoRegMode(m)}
+                      title={m === 'auto' ? 'Формульная авторегуляция: вес × топ-сет множитель, объём, RIR' : m === 'diary' ? 'Корректировка весов из последней сессии дневника' : 'Плановые веса без корректировок'}
+                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.6)' }}>
+                      {label}
+                    </button>
+                  );
+                };
                 return (
-                <MetricCard title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})${arMult !== 1 ? ` · авторегуляция ×${arMult.toFixed(2)}` : ''}`} icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'} accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
+                <MetricCard title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[base.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'} accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                    {arBtn('diary', '📓 Авто-дневник')}
+                    {arBtn('auto', '🤖 Авто')}
+                    {arBtn('off', 'ВЫКЛ')}
+                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : 'rgba(255,255,255,0.4)' }}>
+                      {autoRegMode === 'auto'
+                        ? (arMult !== 1 ? `прикиды ×${arMult.toFixed(2)}` : 'множитель 1.00')
+                        : autoRegMode === 'diary'
+                          ? 'дневник правит веса тренировок (прикиды по плану)'
+                          : 'прикиды по плану'}
+                    </span>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
-                    {wk.meetAttempts.lifts.map(l => (
+                    {base.lifts.map(l => (
                       <div key={l.name} style={{ padding: 6, borderRadius: 6, background: wk.meetWeek ? 'rgba(234,179,8,0.08)' : wk.mockMeet ? 'rgba(167,139,250,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.3)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.2)'}`, fontSize: 10 }}>
                         <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.name}</b>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
@@ -567,11 +592,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </div>
                   {/* Разминка по опенеру (канон warmupToOpener в MeetAttemptsInfo) — от масштабированного опенера */}
                   {(() => {
-                    const first = wk.meetAttempts!.lifts[0];
-                    if (!first || !first.warmup || first.warmup.length === 0) return null;
+                    const first = base.lifts[0];
+                    if (!first) return null;
+                    const openerScaled = scale(first.opener);
+                    const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(openerScaled * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     return (
                       <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
-                        🔥 Разминка под опенер {first.opener} кг ({first.name}): {first.warmup.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({first.warmup.map(s => s.weight).join('/')} кг)
+                        🔥 Разминка под опенер {openerScaled} кг ({first.name}): {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)
                       </div>
                     );
                   })()}
