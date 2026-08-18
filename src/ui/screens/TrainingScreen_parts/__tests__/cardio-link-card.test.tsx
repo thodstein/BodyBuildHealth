@@ -86,14 +86,48 @@ describe('CardioLinkCard — CSR', () => {
     expect(screen.getByText('Не подключено')).toBeTruthy();
   });
 
-  it('«Пересчитать под ACWR» адаптирует и сохраняет цикл', () => {
+  it('«Пересчитать под ACWR»: дифф-подтверждение, «✅ Применить» сохраняет цикл (E4)', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'cc-2', name: 'Сушка-кардио' });
     saveCardioCycle(c);
     setCardioLink({ cycleId: 'cc-2', sport: 'bb', linkedAt: 'x' });
+    // 2 тяжёлые sRPE-сессии за последние 2 дня → ACWR dangerous (ratio≈4) → цикл изменится.
+    const iso = (off: number) => { const d = new Date(); d.setDate(d.getDate() - off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    saveSRPESession({ date: iso(0), sRPE: 10, durationMin: 60 });
+    saveSRPESession({ date: iso(1), sRPE: 10, durationMin: 60 });
     render(<CardioLinkCard />);
     fireEvent.click(screen.getByRole('button', { name: /Пересчитать под ACWR/ }));
-    expect(screen.getByText(/✅ Кардио/)).toBeTruthy();
-    expect(loadCardioCycles()).toHaveLength(1);
+    // Дифф показан, цикл НЕ изменён до подтверждения.
+    expect(screen.getByText(/что изменится/i)).toBeTruthy();
+    const before = loadCardioCycles()[0].weeks;
+    fireEvent.click(screen.getByRole('button', { name: /Применить пересчёт кардио/ }));
+    expect(screen.getByText(/✅ Кардио адаптировано под ACWR/)).toBeTruthy();
+    expect(loadCardioCycles()[0].weeks).not.toEqual(before);
+  });
+
+  it('«✕ Отмена» не сохраняет пересчёт (E4)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'cc-cancel' });
+    saveCardioCycle(c);
+    setCardioLink({ cycleId: 'cc-cancel', sport: 'bb', linkedAt: 'x' });
+    const iso = (off: number) => { const d = new Date(); d.setDate(d.getDate() - off); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    saveSRPESession({ date: iso(0), sRPE: 10, durationMin: 60 });
+    saveSRPESession({ date: iso(1), sRPE: 10, durationMin: 60 });
+    render(<CardioLinkCard />);
+    fireEvent.click(screen.getByRole('button', { name: /Пересчитать под ACWR/ }));
+    expect(screen.getByText(/что изменится/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Отменить пересчёт кардио/ }));
+    expect(screen.queryByText(/что изменится/i)).toBeNull();
+    expect(loadCardioCycles()[0].weeks).toEqual(c.weeks);
+  });
+
+  it('сценарий без изменений: сообщение без блока подтверждения (E4)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cc-ok' });
+    saveCardioCycle(c);
+    setCardioLink({ cycleId: 'cc-ok', sport: 'pl', linkedAt: 'x' });
+    render(<CardioLinkCard />);
+    fireEvent.click(screen.getByRole('button', { name: /Пересчитать под ACWR/ }));
+    expect(screen.getByText(/уже оптимально|изменений нет/)).toBeTruthy();
+    expect(screen.queryByText(/что изменится/i)).toBeNull();
+    expect(loadCardioCycles()[0].weeks).toEqual(c.weeks);
   });
 
   it('«Сегодня» учитывает startDate: цикл, начатый 2 недели назад, показывает неделю 3 (не 1)', () => {

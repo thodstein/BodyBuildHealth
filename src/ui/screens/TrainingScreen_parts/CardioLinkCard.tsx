@@ -11,6 +11,7 @@ import { getCardioLink, clearCardioLink, subscribeCardioLink, SPORT_LABELS } fro
 import {
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, adaptCardioToStrength,
   cardioSessionsForDate, cardioNextSession, cardioEquipmentLabel, legDaysFromBBPlan,
+  compareCardioCycles, formatCardioComparison,
   type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { cardioDayLoad, loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
@@ -38,6 +39,10 @@ export const CardioLinkCard: React.FC = () => {
   const [nextText, setNextText] = useState<string | null>(null);
   const [dayLoad, setDayLoad] = useState<ReturnType<typeof cardioDayLoad> | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  // E4: дифф-подтверждение перед пересчётом — расчёт показывается, применяется по кнопке.
+  const [pendingDiff, setPendingDiff] = useState<{
+    before: CardioCycle; after: CardioCycle; acwr: number | null; legDaysNote: string; diffText: string; unchanged: boolean;
+  } | null>(null);
 
   useEffect(() => {
     const un = subscribeCardioLink(l => setLink(l));
@@ -84,12 +89,28 @@ export const CardioLinkCard: React.FC = () => {
       }
     } catch { /* ignore */ }
     const adapted = adaptCardioToStrength(c, { acwr, legDaysPerWeek: legDays });
-    saveCardioCycle(adapted);
-    setActiveCardioCycle(adapted);
-    flashMsg(acwr != null
-      ? `✅ Кардио адаптировано под ACWR ${acwr.toFixed(2)}${legDaysNote}`
-      : `✅ Кардио пересчитано (ACWR нет — объём сохранён)${legDaysNote}`);
+    const cmp = compareCardioCycles(c, adapted);
+    const unchanged = cmp.diffs.length === 0;
+    setPendingDiff({
+      before: c, after: adapted, acwr, legDaysNote,
+      diffText: formatCardioComparison(cmp),
+      unchanged,
+    });
+    // Идентичные сценарии сохранять не нужно — сразу сообщаем.
+    if (unchanged) flashMsg(acwr != null
+      ? `✅ Кардио уже соответствует ACWR ${acwr.toFixed(2)} — изменений нет${legDaysNote}`
+      : '✅ Кардио уже оптимально (ACWR нет — объём сохранён)');
   }, [link]);
+
+  const applyRecalc = useCallback(() => {
+    if (!pendingDiff) return;
+    saveCardioCycle(pendingDiff.after);
+    setActiveCardioCycle(pendingDiff.after);
+    flashMsg(pendingDiff.acwr != null
+      ? `✅ Кардио адаптировано под ACWR ${pendingDiff.acwr.toFixed(2)}${pendingDiff.legDaysNote}`
+      : `✅ Кардио пересчитано (ACWR нет — объём сохранён)${pendingDiff.legDaysNote}`);
+    setPendingDiff(null);
+  }, [pendingDiff]);
 
   return (
     <div style={CARD}>
@@ -105,6 +126,16 @@ export const CardioLinkCard: React.FC = () => {
         )}
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
+      {pendingDiff && !pendingDiff.unchanged && (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontWeight: 700, color: '#93c5fd' }}>🔄 Пересчёт под ACWR{pendingDiff.acwr != null ? ` (${pendingDiff.acwr.toFixed(2)})` : ''}{pendingDiff.legDaysNote} — что изменится:</div>
+          <div style={{ color: 'rgba(255,255,255,0.75)' }} role="status">{pendingDiff.diffText}</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button style={BTN_PRIMARY} onClick={applyRecalc} aria-label="Применить пересчёт кардио">✅ Применить</button>
+            <button style={BTN} onClick={() => setPendingDiff(null)} aria-label="Отменить пересчёт кардио">✕ Отмена</button>
+          </div>
+        </div>
+      )}
       {todayText && (
         <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span>🔔 Сегодня: {todayText}</span>

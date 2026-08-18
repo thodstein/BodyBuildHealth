@@ -746,10 +746,69 @@ export function buildAnnualPlan(
     if (next.status === 'error') { failed += 1; errors.push({ blockKey: next.ref.blockKey, message: next.error ?? 'ошибка сборки' }); }
     return next;
   });
-  return {
+  const assembled = {
     plan: { ...synced, blocks, status: planStatusFromBlocks(blocks), updatedAt: nowIso() },
     built, skipped, failed, errors,
   };
+  // B7: авто-делод на стыках PL-блоков (идемпотентный пост-проход по готовым неделям).
+  return { ...assembled, plan: applyPLJunctionDeloads(assembled.plan) };
+}
+
+/** Тренировочные PL-фазы макро (не разгрузочные: transition/peak/competition). */
+const PL_TRAINING_PHASES = new Set(['endurance', 'strength']);
+
+/** Применить авто-делод к последней неделе блока (объём ×0.5, RIR +2, deload).
+ *  Не мутирует вход. Метка `[annual-junction-deload]` делает проход идемпотентным. */
+function applyJunctionDeloadToWeek(week: UserWeek): UserWeek {
+  const mark = '[annual-junction-deload]';
+  return {
+    ...week,
+    deload: true,
+    sessions: week.sessions.map(s => ({
+      ...s,
+      blocks: s.blocks.map(block => {
+        if (block.note?.includes(mark)) return block;
+        const targetCount = Math.max(1, Math.round(block.sets.length * 0.5));
+        const sets: UserSet[] = Array.from({ length: targetCount }, (_, i) => {
+          const src = block.sets[i] ?? block.sets[0];
+          if (!src) return { reps: 8, rir: 3 };
+          return { ...src, rir: clampRir((Number.isFinite(src.rir) ? src.rir : 2) + 2) };
+        });
+        return { ...block, sets, note: [block.note, mark].filter(Boolean).join(' · ') };
+      }),
+    })),
+  };
+}
+
+/**
+ * B7 (MACROCYCLE-ROADMAP): авто-делоды на стыках PL-блоков года.
+ * Когда подряд идут два тренировочных PL-блока (endurance/strength) и у предыдущего
+ * НЕТ собственной разгрузки (taper/transition/peak/competition), последняя неделя
+ * предыдущего блока помечается делодом (объём ×0.5, RIR +2) — разгрузка перед новой
+ * фазой (NSCA 2021: делод каждые 4-6 нед при смене тренировочного стимула).
+ * Не пересобирает блоки — только накладывает делод на готовые result.weeks;
+ * идемпотентен по метке недели. */
+export function applyPLJunctionDeloads(plan: AnnualTrainingPlan): AnnualTrainingPlan {
+  const blocks = plan.blocks.map((state, i) => {
+    if (state.ref.kind !== 'PL') return state;
+    const next = plan.blocks[i + 1];
+    if (!next || next.ref.kind !== 'PL') return state;
+    if (!PL_TRAINING_PHASES.has(state.ref.phase) || !PL_TRAINING_PHASES.has(next.ref.phase)) return state;
+    if (state.config.taper?.enabled) return state;
+    const weeks = state.result?.weeks;
+    if (!weeks || weeks.length === 0) return state;
+    const last = weeks[weeks.length - 1];
+    const already = last.sessions.some(s => s.blocks.some(b => b.note?.includes('[annual-junction-deload]')));
+    if (already) return state;
+    const deloadWeek = applyJunctionDeloadToWeek(last);
+    const warnings = state.result?.warnings ?? [];
+    const wMsg = `Авто-делод на стыке: последняя неделя блока «${next.ref.description ?? next.ref.phase}» — разгрузка перед сменой фазы.`;
+    const result = state.result
+      ? { ...state.result, weeks: [...weeks.slice(0, -1), deloadWeek], warnings: warnings.includes(wMsg) ? warnings : [...warnings, wMsg] }
+      : state.result;
+    return { ...state, result };
+  });
+  return { ...plan, blocks };
 }
 
 /* ─────────────────────── Правки блоков (конфиг/ручной roundtrip) ─────────── */

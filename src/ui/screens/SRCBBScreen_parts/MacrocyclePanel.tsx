@@ -30,7 +30,7 @@ import { getProfile } from '../../../core/profile-manager';
 import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines/pro/training-load.engine';
-import { loadCardioCycles, cardioCycleSummary } from '../../../engines/lms/cardio.engine';
+import { loadCardioCycles, cardioCycleSummary, compareCardioCycles, formatCardioComparison } from '../../../engines/lms/cardio.engine';
 import {
   annualPlanFromMacro, syncAnnualPlan, buildAnnualBlock, buildAnnualPlan,
   composeAnnualProgram, planStatusFromBlocks, setAnnualBlockConfig, setAnnualBlockKind,
@@ -2566,6 +2566,22 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         <span style={{ fontWeight: 700, flexShrink: 0, color: d.diff > 0 ? '#00e68a' : d.diff < 0 ? '#ef4444' : 'rgba(255,255,255,0.35)' }}>{d.diff > 0 ? `+${d.diff}` : d.diff}</span>
                       </div>
                     ))}
+                    {(() => {
+                      // E4: сравнение кардио-циклов двух сценариев (если оба привязаны и в библиотеке).
+                      const caId = (compareWith.data as { cardioCycleId?: string }).cardioCycleId;
+                      const cbId = (src as { cardioCycleId?: string }).cardioCycleId;
+                      if (!caId || !cbId) return null;
+                      const lib = loadCardioCycles();
+                      const ca = lib.find(x => x.id === caId);
+                      const cb = lib.find(x => x.id === cbId);
+                      if (!ca || !cb) return null;
+                      const cmp = compareCardioCycles(ca, cb);
+                      return (
+                        <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(249,115,22,0.9)', fontWeight: 600 }}>
+                          ❤️ Кардио: {ca.name} → {cb.name} · {formatCardioComparison(cmp)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
