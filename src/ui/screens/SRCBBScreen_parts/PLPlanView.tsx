@@ -350,17 +350,6 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                    const result = await openPLShare(link, { title: `ПЛ: ${title}`, text: digest, url });
                    onNote(result === 'shared' ? '📲 План передан через системное меню «Поделиться».' : '📲 Открыт Telegram с текстом плана.');
                  }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Telegram Mini App</button>
-                 <button onClick={async () => {
-                   const title = builtSrc.template.meta.title;
-                   const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(W)), `pl-plan-${selectedCycleId}.xlsx`);
-                   onNote(res === 'saved' ? '✅ Excel сохранён в выбранную папку.' : res === 'shared' ? '📤 Выберите «Сохранить в файлы» в системном меню.' : '📥 Excel: выберите «Сохранить файл» в открывшемся окне.');
-                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:8, border:'1px solid rgba(0,230,138,0.55)', background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>💾 Сохранить Excel</button>
-                 <button onClick={() => {
-                   const title = builtSrc.template.meta.title;
-                   const scope = `Весь план (${totalW} нед)`;
-                   const opened = printPLHtml(buildPLPrintHtml(title, scope, W), { title, text: plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead }) });
-                   onNote(opened ? '🖨 Откройте печать и выберите «Сохранить как PDF».' : '🖨 В просмотре нажмите «Печать / Сохранить PDF».');
-                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:8, border:'1px solid rgba(245,158,11,0.55)', background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🖨 Сохранить PDF</button>
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {
@@ -537,8 +526,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               {(goal === 'peak' || W.some(isTaperWeek) || W.some(isMeetWeek) || W.some(isMockWeek)) && (() => {
                 const hasDiary = e1rmSeries.length > 0;
                 const diaryLast = (lift: 'squat' | 'bench' | 'deadlift'): number | null => {
-                  const keywords: Record<typeof lift, string[]> = { squat: ['присед'], bench: ['жим лёжа', 'жим лежа'], deadlift: ['становая'] };
-                  const series = e1rmSeries.find(s => keywords[lift].some(k => s.label.toLowerCase().includes(k) || s.lift === lift));
+                  const series = e1rmSeries.find(s => s.lift === lift);
                   return series?.pts.at(-1)?.val ?? null;
                 };
                 const diaryVals = { squat: diaryLast('squat'), bench: diaryLast('bench'), deadlift: diaryLast('deadlift') };

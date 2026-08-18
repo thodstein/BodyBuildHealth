@@ -117,23 +117,6 @@ export async function saveFileToDevice(blob: Blob, filename: string): Promise<Fi
       // WebView может объявлять API, но запрещать picker. Используем следующий путь.
     }
   }
-  const nav = navigator as unknown as {
-    canShare?: (data: { files: File[] }) => boolean;
-    share?: (data: { files: File[]; title?: string }) => Promise<void>;
-  };
-  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-  if (typeof nav.canShare === 'function' && typeof nav.share === 'function') {
-    try {
-      if (nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: filename });
-        return 'shared';
-      }
-    } catch (e) {
-      const err = e as { name?: string };
-      if (err?.name === 'AbortError') return 'shared';
-      // иная ошибка (TMA/iframe без share) — переходим к классическому скачиванию
-    }
-  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -367,6 +350,10 @@ export function plShareLink(o: PLShareOpts): string {
 }
 
 export async function openPLShare(link: string, opts?: { title?: string; text?: string; url?: string }): Promise<'shared' | 'opened'> {
+  const tg = (window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (l: string) => void } } }).Telegram?.WebApp;
+  if (tg?.openTelegramLink) {
+    try { tg.openTelegramLink(link); return 'opened'; } catch { /* fallback ниже */ }
+  }
   const nav = navigator as Navigator & { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
   if (typeof nav.share === 'function' && opts) {
     try {
@@ -375,10 +362,6 @@ export async function openPLShare(link: string, opts?: { title?: string; text?: 
     } catch (e) {
       if ((e as { name?: string })?.name === 'AbortError') return 'shared';
     }
-  }
-  const tg = (window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (l: string) => void } } }).Telegram?.WebApp;
-  if (tg?.openTelegramLink) {
-    try { tg.openTelegramLink(link); return 'opened'; } catch { /* fallback ниже */ }
   }
   window.open(link, '_blank');
   return 'opened';

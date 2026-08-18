@@ -55,23 +55,23 @@ describe('saveFileToDevice — сохранение файла на устрой
     expect(close).toHaveBeenCalled();
   });
 
-  it('нативная системная панель (navigator.share с файлом), когда canShare поддерживает файлы', async () => {
+  it('не отправляет файл через share-sheet: открывает явное сохранение файла', async () => {
     const nav = navigator as unknown as Record<string, unknown>;
     const canShare = vi.fn(() => true);
     const share = vi.fn(async () => {});
     Object.defineProperty(nav, 'canShare', { value: canShare, configurable: true });
     Object.defineProperty(nav, 'share', { value: share, configurable: true });
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
 
     const res = await saveFileToDevice(new Blob(['x'], { type: 'text/plain' }), 'a.txt');
-    expect(res).toBe('shared');
-    expect(canShare).toHaveBeenCalled();
-    const data = share.mock.calls[0][0] as { files: File[]; title: string };
-    expect(data.files[0]).toBeInstanceOf(File);
-    expect(data.files[0].name).toBe('a.txt');
-    expect(data.title).toBe('a.txt');
+    expect(res).toBe('downloaded');
+    expect(canShare).not.toHaveBeenCalled();
+    expect(share).not.toHaveBeenCalled();
+    expect(document.getElementById('pl-file-save-overlay')?.textContent).toContain('Сохранить файл');
   });
 
-  it('отмена системной панели (AbortError) не падает и не пытается скачать', async () => {
+  it('не зависит от отмены share-sheet: сохраняет через явное окно', async () => {
     const nav = navigator as unknown as Record<string, unknown>;
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     Object.defineProperty(nav, 'canShare', { value: vi.fn(() => true), configurable: true });
@@ -83,10 +83,12 @@ describe('saveFileToDevice — сохранение файла на устрой
       }),
       configurable: true,
     });
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
 
     const res = await saveFileToDevice(new Blob(['x']), 'a.txt');
-    expect(res).toBe('shared');
-    expect(clickSpy).not.toHaveBeenCalled();
+    expect(res).toBe('downloaded');
+    expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
   it('фолбэк на <a download>, когда navigator.share недоступен (десктоп/старый браузер)', async () => {
@@ -157,6 +159,19 @@ describe('openPLShare — системная передача плана', () =>
     expect(share).toHaveBeenCalledWith({
       title: 'ПЛ: Тест', text: 'Неделя 1\nПрисед 3×3@160кг', url: 'https://app.ru#pl-plan-x',
     });
+  });
+
+  it('в Telegram открывает именно Telegram share URL, не navigator.share', async () => {
+    const openTelegramLink = vi.fn();
+    Object.defineProperty(window, 'Telegram', { value: { WebApp: { openTelegramLink } }, configurable: true });
+    const share = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    const result = await openPLShare('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01', {
+      title: 'ПЛ', text: 'План', url: 'https://t.me/BBHealthBot?startapp=pl-plan-cycle-01',
+    });
+    expect(result).toBe('opened');
+    expect(openTelegramLink).toHaveBeenCalledWith('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01');
+    expect(share).not.toHaveBeenCalled();
   });
 });
 
