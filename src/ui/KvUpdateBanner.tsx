@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { onKvSyncStatus, clearKvPendingUpdate, reloadKvView, getKvSyncState } from '../core/cloud-kv';
 
+/** Через сколько баннер «Новые данные» скрывается сам (пользователь ещё успеет нажать ✕/Обновить). */
+export const KV_BANNER_AUTO_HIDE_MS = 20_000;
+
 /**
  * Баннер «🔄 Новые данные с другого устройства» — появляется, когда фоновый синк
  * применил данные (профиль/анализы/курс/дневник) с телефона/ПК. Авто-перезагрузки нет:
- * пользователь нажимает «Обновить» (или ✕, чтобы отложить).
+ * пользователь нажимает «Обновить» (или ✕, чтобы отложить). Авто-скрытие через 20 сек.
  */
 export const KvUpdateBanner: React.FC = () => {
   const [pending, setPending] = useState(getKvSyncState().pendingUpdate);
@@ -13,6 +16,13 @@ export const KvUpdateBanner: React.FC = () => {
     const unsub = onKvSyncStatus(s => setPending(s.pendingUpdate));
     return unsub;
   }, []);
+
+  // авто-скрытие: данные уже записаны локально, не мешаем пользователю
+  useEffect(() => {
+    if (!pending) return;
+    const t = setTimeout(() => clearKvPendingUpdate(), KV_BANNER_AUTO_HIDE_MS);
+    return () => clearTimeout(t);
+  }, [pending]);
 
   if (!pending) return null;
 

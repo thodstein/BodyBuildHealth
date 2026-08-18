@@ -12,7 +12,9 @@
   (visibilitychange/focus) + уведомление о новых данных БЕЗ авто-перезагрузки: движок
   ставит `state.pendingUpdate` → `KvUpdateBanner.tsx` (глобальный, в App.tsx) показывает
   «🔄 Новые данные с другого устройства» с кнопкой «Обновить» (`reloadKvView`) и ✕
-  (`clearKvPendingUpdate`) — экран больше не перезагружается постоянно; свежие данные
+  (`clearKvPendingUpdate`), авто-скрытие через 20 с (`KV_BANNER_AUTO_HIDE_MS`) — экран
+  больше не перезагружается постоянно; в шапке кнопка `KvSyncButton.tsx` «🔄»
+  (`syncKvNow` = flush + pull, тост результата); свежие данные
   всегда при входе (initKvSync делает pull до рендера); push через перехват
   `localStorage.setItem/removeItem` (debounce 2.5 с) +
   keepalive-флаш на pagehide/beforeunload (бюджет 48КБ) + реконнект по `online`; чанки по
@@ -41,7 +43,8 @@
   clearKvPendingUpdate, skew-тесты: часы телефона спешат на 1ч —
   запись ПК побеждает; IndexedDB: телефон→ПК, ПК→телефон, локальная правка побеждает,
   удаление в обе стороны, tombstone без воскрешения, стабильная сигнатура при порядке
-  полей) + `kv-update-banner.test.tsx` 3/3. `src/test/setup.ts` — mock localStorage
+  полей) + `kv-update-banner.test.tsx` 4/4 (вкл. авто-скрытие) + `kv-sync-button.test.tsx`
+  2/2. `src/test/setup.ts` — mock localStorage
   дополнен стандартными `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
 - **ВАЖНО**: Supabase-проект из `.env` был удалён (NXDOMAIN), пользователь восстановил —
   проверил: DNS резолвится, ключ работает, таблиц нет кроме `labs`; SQL-миграцию применяет

@@ -215,6 +215,12 @@ export async function flushKvNow(): Promise<void> {
   await flush();
 }
 
+/** Принудительная синхронизация (кнопка в шапке): выгрузка локального + загрузка из облака. */
+export async function syncKvNow(): Promise<number> {
+  await flush();
+  return pullKvNow();
+}
+
 /** Best-effort выгрузка маленьких изменений (pagehide/beforeunload). */
 export function flushKvKeepAlive(): void {
   keepAliveFlush();

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { KvUpdateBanner } from '../KvUpdateBanner';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { KvUpdateBanner, KV_BANNER_AUTO_HIDE_MS } from '../KvUpdateBanner';
 import {
   initKvSync,
   pullKvNow,
@@ -79,4 +79,23 @@ describe('KvUpdateBanner', () => {
     fireEvent.click(screen.getByRole('button', { name: /Перезагрузить приложение/ }));
     expect(reload).toHaveBeenCalledTimes(1);
   });
+
+  it('авто-скрывается через KV_BANNER_AUTO_HIDE_MS', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    t.seed('he_profile_v2', '{"v":1}', 1000);
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    t.seed('he_profile_v2', '{"v":2}', 9000);
+    await pullKvNow();
+
+    render(<KvUpdateBanner />);
+    expect(screen.getByText(/Новые данные с другого устройства/)).toBeTruthy();
+
+    act(() => { vi.advanceTimersByTime(KV_BANNER_AUTO_HIDE_MS); });
+    expect(screen.queryByText(/Новые данные/)).toBeNull();
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
