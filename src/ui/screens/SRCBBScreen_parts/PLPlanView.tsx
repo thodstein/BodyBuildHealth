@@ -1144,7 +1144,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>3 · Выберите блок</div>
                           {blocks.map(b => <div key={b.id} style={{ width:'100%' }}>{stepBtn(expBlock === b.id, `${b.icon} ${b.label}`, `нед ${b.range} · ${b.weeks.length} нед`, () => setExpBlock(b.id), '#a78bfa', `Экспорт блок ${b.id}`)}</div>)}                          {blocks.length === 0 && <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Отдельных блоков нет — план однородный.</div>}
                         </>}
-                        {expFormat && expScope === 'week' && <>
+                         {expFormat && expScope === 'week' && <>
                           <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>3 · Выберите неделю</div>
                           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(72px, 1fr))', gap:4 }}>
                             {W.map(w => {
@@ -1155,14 +1155,23 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                 <div style={{ fontSize:8, color: PH_COLOR[ph2 as keyof typeof PH_COLOR] ?? 'rgba(255,255,255,0.4)' }}>{PH_RU[ph2 as keyof typeof PH_RU] ?? ph2}</div>
                               </button>;
                             })}
-                          </div>
-                        </>}
-                      </div>
-                      <div style={{ display:'flex', gap:6, padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
-                        <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.7)', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
-                        <button onClick={doExport} disabled={!ready} style={{ flex:1, padding:'10px 12px', borderRadius:8, fontSize:12, fontWeight:800, cursor:'pointer', border:'none', background: ready ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.1)', color: ready ? '#000' : 'rgba(255,255,255,0.35)' }}>
-                           {ready ? `${expFormat === 'xlsx' ? '💾 Сохранить Excel' : '🖨 Сохранить PDF'} · ${scopeLabel}` : 'Выберите формат и объём'}
-                        </button>
+                           </div>
+                         </>}
+                         {ready && (
+                           <button
+                             type="button"
+                             onClick={doExport}
+                             style={{ width:'100%', marginTop:6, padding:'14px 12px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(0,230,138,0.65)', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontSize:13, fontWeight:900, minHeight:50 }}
+                           >
+                             {expFormat === 'xlsx' ? '💾 Сохранить Excel на телефон' : '🖨 Сохранить PDF на телефон'} · {scopeLabel}
+                           </button>
+                         )}
+                       </div>
+                       <div style={{ display:'flex', gap:6, padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
+                         <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.7)', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
+                         <span style={{ flex:1, padding:'10px 12px', fontSize:11, color:'rgba(255,255,255,0.45)', textAlign:'center' }}>
+                           {ready ? 'Кнопка сохранения находится выше' : 'Выберите формат и объём'}
+                         </span>
                       </div>
                     </div>
                   </div>
