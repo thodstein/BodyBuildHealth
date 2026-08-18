@@ -260,6 +260,7 @@ export function printPLHtml(html: string, opts?: { title?: string; text?: string
 }
 
 const PRINT_OVERLAY_ID = 'pl-print-overlay';
+const PRINT_ROOT_ID = 'pl-print-root';
 
 const overlayBtn = (label: string, fg: string, bg: string): HTMLButtonElement => {
   const b = document.createElement('button');
@@ -304,13 +305,27 @@ export function showPrintOverlay(html: string, title: string, text?: string): vo
   iframe.sandbox = 'allow-same-origin allow-modals';
   iframe.srcdoc = html;
   printBtn.addEventListener('click', () => {
+    // Telegram WebView (Android) НЕ печатает из iframe — работает только
+    // window.print() главного окна. Вставляем план во временный скрытый
+    // контейнер, скрываем приложение на печати и вызываем системную печать.
     try {
-      const w = iframe.contentWindow;
-      if (w) {
-        w.focus();
-        // даём iframe дорисовать контент, затем вызываем системную печать
-        setTimeout(() => { try { w.print(); } catch { /* ignore */ } }, 120);
-      }
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const styles = Array.from(doc.querySelectorAll('style')).map(s => s.textContent || '').join('\n');
+      const bodyContent = (doc.body ? doc.body.innerHTML : '') || html;
+      const root = document.createElement('div');
+      root.id = PRINT_ROOT_ID;
+      root.setAttribute('style', 'display:none');
+      // Скопируем стили плана, ограничив их контейнером печати (иначе утекут в приложение).
+      const scoped = styles.replace(/([^{}@][^{}]*)\{/g, (_m: string, sel: string) =>
+        sel.split(',').map((x: string) => `#${PRINT_ROOT_ID} ${x.trim()}`).join(',') + '{');
+      const st = document.createElement('style');
+      st.textContent = scoped
+        + `\n@media print{body>*:not(#${PRINT_ROOT_ID}){display:none !important}#${PRINT_ROOT_ID}{display:block !important}}`;
+      root.innerHTML = bodyContent;
+      document.body.appendChild(st);
+      document.body.appendChild(root);
+      window.print();
+      setTimeout(() => { try { root.remove(); st.remove(); } catch { /* ignore */ } }, 3000);
     } catch { /* ignore */ }
   });
   copyBtn.addEventListener('click', () => {
