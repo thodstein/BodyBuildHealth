@@ -9,13 +9,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CardioConstructor } from '../CardioConstructor';
 import { getCardioLink, clearCardioLink } from '../../../../engines/lms/cardio-bridge';
 import { buildBbMacrocycle, serializeBbMacro, deserializeBbMacro } from '../../../../engines/lms/macrocycle.engine';
-import { loadCardioCycles } from '../../../../engines/lms/cardio.engine';
+import { loadCardioCycles, loadActiveCardioCycle } from '../../../../engines/lms/cardio.engine';
+import { buildBBContestPrepPlan, serializeBBContestPrepPlan, isoAddDays, isoToday } from '../../../../engines/bb/bb-contest-prep.engine';
 
 const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
 const LINK_KEY = 'he_cardio_link';
 const BB_MACRO_KEY = 'he_bb_macro';
 const WIZARD_KEY = 'he_cardio_wizard_state';
+const PROFILE_KEY = 'he_profile_v2';
 
 beforeEach(() => {
   try {
@@ -24,9 +26,28 @@ beforeEach(() => {
     localStorage.removeItem(LINK_KEY);
     localStorage.removeItem(BB_MACRO_KEY);
     localStorage.removeItem(WIZARD_KEY);
+    localStorage.removeItem(PROFILE_KEY);
     clearCardioLink();
   } catch { /* ignore */ }
 });
+
+/** Сид профиля с единым prep-планом ББ (goals.bbContestPrepPlan). */
+function seedPrepPlan(): void {
+  const plan = buildBBContestPrepPlan({
+    sex: 'male', category: 'mens_physique', weightKg: 80,
+    experienceLevel: 'intermediate', enhanced: false, prepCount: 0,
+    showDate: isoAddDays(isoToday(), 60), weeksOut: 2, trainingProtocol: 'bb',
+    carbLoadStrategy: 'moderate', waterStrategy: 'minimal', sodiumStrategy: 'constant',
+  }, { prepWeeks: 8, taperWeeks: 2 });
+  localStorage.setItem(PROFILE_KEY, JSON.stringify({
+    settings: {
+      goals: { bbContestPrepPlan: serializeBBContestPrepPlan(plan) },
+      personal: { weight: 80, sex: 'male' },
+      health: { chronicConditions: [] },
+      nutrition: {}, lifestyle: {}, training: {}, pharma: {}, labs: { status: 'none', summary: {} }, symptoms: { recent: {} },
+    },
+  }));
+}
 
 describe('CardioConstructor — SSR', () => {
   it('рендерит степпер из 5 шагов и навигацию', () => {
@@ -278,5 +299,25 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getByText(/Параметры в мастере изменены/)).toBeTruthy();
+  });
+
+  it('prep-план в профиле: кнопка «⚙️ Из prep-плана» видна', () => {
+    seedPrepPlan();
+    const html = renderToStaticMarkup(<CardioConstructor />);
+    expect(html).toContain('Из prep-плана');
+    expect(html).toContain('8 нед');
+  });
+
+  it('«⚙️ Из prep-плана»: кардио собрано из prep (goal bb_prep, пик-неделя видна)', () => {
+    seedPrepPlan();
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Собрать кардио из prep-плана/ }));
+    expect(screen.getAllByRole('status').some(s => (s.textContent || '').includes('Кардио построено из prep-плана ББ'))).toBe(true);
+    const active = loadActiveCardioCycle();
+    expect(active).toBeTruthy();
+    expect(active!.goal).toBe('bb_prep');
+    expect(active!.weeks.some(w => w.phase === 'peak')).toBe(true);
+    expect(active!.weeks.some(w => w.phase === 'taper')).toBe(true);
+    expect(screen.getByText(/🎭 Пик-неделя/)).toBeTruthy();
   });
 });

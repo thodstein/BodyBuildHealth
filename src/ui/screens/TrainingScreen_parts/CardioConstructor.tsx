@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  buildCardioCycle, cardioPlanToCycle, buildCardioPlan,
+  buildCardioCycle, buildCardioCycleFromPrep, cardioPlanToCycle, buildCardioPlan,
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
@@ -19,6 +19,7 @@ import {
   cardioProfileFactors, cardioNutritionNotes,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
+import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
   SPORT_LABELS, type CardioLinkSport,
@@ -450,6 +451,60 @@ export const CardioConstructor: React.FC = () => {
     } catch { return null; }
   }, []);
 
+  // Prep-план ББ из профиля (goals.bbContestPrepPlan → legacy bbPeakConfig → legacy поля).
+  const prepPlan = useMemo<BBContestPrepPlan | null>(() => {
+    try {
+      const s = getProfile()?.settings ?? {};
+      const goals = (s as { goals?: Record<string, unknown> }).goals ?? {};
+      return planFromStored(
+        typeof goals.bbContestPrepPlan === 'string' ? goals.bbContestPrepPlan : null,
+        typeof goals.bbPeakConfig === 'string' ? goals.bbPeakConfig : null,
+        goals as { peakWeek?: boolean; peakShowDay?: string; bbCategory?: string },
+        s.personal ?? null,
+      );
+    } catch { return null; }
+  }, []);
+
+  // Пик-неделя активного кардио-цикла (неделя + диапазон дат от startDate).
+  const peakWeekInfo = useMemo(() => {
+    if (!cycle) return null;
+    const pk = cycle.weeks.find(w => w.phase === 'peak');
+    if (!pk || !cycle.startDate) return null;
+    const start = new Date(cycle.startDate);
+    start.setDate(start.getDate() + (pk.week - 1) * 7);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    const f = (d: Date) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+    return { week: pk.week, range: `${f(start)}–${f(end)}` };
+  }, [cycle]);
+
+  // «⚙️ Из prep-плана»: кардио целиком из BB contest prep (объём — cardioMinutesPerWeek,
+  // фазы prep → base/build → taper → пик → post-show).
+  const fromPrepPlan = () => {
+    if (!prepPlan) { flashMsg('⚠ Prep-план не найден — соберите «🏁 Contest prep» в ББ-авто'); return; }
+    const c = buildCardioCycleFromPrep(prepPlan, {
+      daysAvailable,
+      level,
+      equipment,
+      lowImpact,
+      legDays,
+      age: Math.max(12, Math.min(90, Number(age) || 30)),
+      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+    });
+    if (!c) { flashMsg('⚠ Не удалось собрать кардио из prep-плана'); return; }
+    setGoal('bb_prep');
+    setTotalWeeks(c.totalWeeks);
+    setTaperEnabled(true);
+    setTaperWeeks(prepPlan.taper?.weeks ?? 2);
+    setPeakWeek(prepPlan.peakWeek?.enabled !== false);
+    if (prepPlan.preparation.startingWeightKg > 0) setBodyWeight(prepPlan.preparation.startingWeightKg);
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    setCycle(c);
+    reload();
+    flashMsg('⚙️ Кардио построено из prep-плана ББ: ' + c.name);
+  };
+
   // Авто-учёт дней ног из последнего сохранённого ББ-плана (5B).
   const autoLegDays = useMemo(() => {
     try {
@@ -662,6 +717,21 @@ export const CardioConstructor: React.FC = () => {
             </button>
           )}
           {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
+          {prepPlan && (
+            <button
+              onClick={fromPrepPlan}
+              title={`Собрать кардио из prep-плана ББ: шоу ${prepPlan.showDate}, подготовка ${prepPlan.preparation.weeks} нед, taper ${prepPlan.taper.weeks} нед`}
+              aria-label="Собрать кардио из prep-плана"
+              style={{ fontSize: 11, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.35)', borderRadius: 16, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              ⚙️ Из prep-плана ({prepPlan.preparation.weeks} нед)
+            </button>
+          )}
+          {peakWeekInfo && (
+            <div style={{ fontSize: 11, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 16, padding: '4px 10px' }} title="Пик-неделя кардио: только лёгкая активность, без HIIT">
+              🎭 Пик-неделя: нед {peakWeekInfo.week} ({peakWeekInfo.range})
+            </div>
+          )}
         </div>
       </div>
 

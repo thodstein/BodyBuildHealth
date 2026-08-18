@@ -1,0 +1,202 @@
+/**
+ * annual-training-cardio.engine.ts — кардио-слой годового плана (engine-only).
+ *
+ * Годовой план отвечает за КАЛЕНДАРЬ; каждый блок года получает свой кардио-цикл
+ * (CardioCycle), выровненный по неделям блока. UI не трогается — только чистые
+ * функции: сопоставление фаз макро с целями кардио, раскладка спец (год → блок),
+ * сборка циклов через buildCardioCycle из lms/cardio.engine.
+ */
+import type {
+  CardioCycle,
+  CardioCycleInput,
+  CardioEquipment,
+  CardioGoal,
+  CardioLevel,
+} from '../lms/cardio.engine';
+import { buildCardioCycle } from '../lms/cardio.engine';
+import type { AnnualBlockKind, AnnualTrainingPlan } from './annual-training.types';
+
+/** Кардио-спека блока годового плана (производное от фазы макро + конфига блока). */
+export interface AnnualCardioSpec {
+  blockKey: string;
+  blockIndex: number;
+  kind: AnnualBlockKind;
+  phase: string;
+  description: string;
+  /** Стартовая неделя блока в году (1-индекс). */
+  startWeek: number;
+  /** Длина блока (недель) — длина кардио-цикла. */
+  weeks: number;
+  goal: CardioGoal;
+  /** Длина taper-окна перед стартом блока (0 = без taper). */
+  taperWeeks: number;
+  /** Пик-неделя на последней неделе блока (только BB-prep). */
+  peakWeek: boolean;
+  /** Неделя «соревнования» внутри блока (последняя при taper/peak), 1-индекс. */
+  competitionWeek: number | null;
+}
+
+/**
+ * Цель кардио по фазе макро-блока:
+ *  - contest_prep → 'bb_prep' (дефицит + прогрессия, taper к старту);
+ *  - peak → 'pl_prep' (умеренный Zone 2/MISS, без утомления ЦНС);
+ *  - competition/transition → 'recovery' (лёгкая активность);
+ *  - taper → 'bb_taper' (плавное снижение по BB_CARDIO_TAPER_CURVE);
+ *  - hypertrophy/mass/strength/endurance и остальное → 'maintenance'.
+ */
+export function cardioGoalForAnnualPhase(phase: string, kind: AnnualBlockKind = 'BB'): CardioGoal {
+  const p = String(phase || '').toLowerCase();
+  switch (p) {
+    case 'contest_prep':
+    case 'prep':
+      return 'bb_prep';
+    case 'peak':
+      return 'pl_prep';
+    case 'competition':
+    case 'transition':
+      return 'recovery';
+    case 'taper':
+      return 'bb_taper';
+    default:
+      return 'maintenance';
+  }
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+/** Раскладка кардио-циклов по блокам годового плана (чистая, без сборки). */
+export function annualCardioSpecs(plan: AnnualTrainingPlan | null | undefined): AnnualCardioSpec[] {
+  if (!plan) return [];
+  return plan.blocks
+    .filter(b => b.status !== 'error')
+    .map(b => {
+      const ref = b.ref;
+      const cfg = b.config ?? {};
+      const goal = cardioGoalForAnnualPhase(ref.phase, ref.kind);
+      const wantsTaper = cfg.taper?.enabled === true || goal === 'bb_prep' || goal === 'pl_prep';
+      const taperWeeks = wantsTaper ? clamp(Math.round(cfg.taper?.weeks ?? (goal === 'bb_prep' ? 3 : 2)), 1, 4) : 0;
+      const peakWeek = goal === 'bb_prep' && cfg.peakWeek === true;
+      const weeks = Math.max(1, Math.round(ref.weeks || 1));
+      return {
+        blockKey: ref.blockKey,
+        blockIndex: ref.blockIndex,
+        kind: ref.kind,
+        phase: ref.phase,
+        description: ref.description ?? ref.blockKey,
+        startWeek: Math.max(1, Math.round(ref.startWeek || 1)),
+        weeks,
+        goal,
+        taperWeeks,
+        peakWeek,
+        competitionWeek: taperWeeks > 0 ? weeks : null,
+      };
+    });
+}
+
+/** Опции сборки кардио-циклов годового плана (общие для всех блоков). */
+export interface AnnualCardioBuildOptions {
+  /** Неделя 1 года = referenceIso (по умолчанию — сегодня). */
+  referenceIso?: string;
+  level?: CardioLevel;
+  equipment?: CardioEquipment[];
+  lowImpact?: boolean;
+  autoLowImpact?: boolean;
+  jointIssues?: boolean;
+  age?: number;
+  restingHr?: number;
+  sex?: 'male' | 'female';
+  sleepHours?: number;
+  stressLevel?: number;
+  hrvMs?: number;
+  enhanced?: boolean;
+  daysAvailable?: number;
+  recoveryLow?: boolean;
+  legDays?: number[];
+  bodyWeight?: number;
+}
+
+export interface AnnualCardioBuildOutcome {
+  /** Кардио-циклы по blockKey блока года. */
+  cycles: Record<string, CardioCycle>;
+  specs: AnnualCardioSpec[];
+  warnings: string[];
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+
+function todayLocalIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/** Собрать кардио-цикл на каждый блок годового плана (engine-only, без UI).
+ *  Цикл выровнен на недели блока: startDate = reference + (startWeek−1)×7,
+ *  старт (taper/пик) — на последней неделе блока. */
+export function buildAnnualCardioCycles(
+  plan: AnnualTrainingPlan | null | undefined,
+  opts: AnnualCardioBuildOptions = {},
+): AnnualCardioBuildOutcome {
+  const ref = opts.referenceIso ?? todayLocalIso();
+  const specs = annualCardioSpecs(plan);
+  const cycles: Record<string, CardioCycle> = {};
+  const warnings: string[] = [];
+
+  for (const s of specs) {
+    const startDate = addDaysIso(ref, (s.startWeek - 1) * 7);
+    const competitions = s.competitionWeek != null
+      ? [{ id: `annual-cardio-${s.blockKey}`, name: `Старт: ${s.description}`, week: s.competitionWeek, priority: 'B' as const }]
+      : undefined;
+    const input: CardioCycleInput = {
+      goal: s.goal,
+      totalWeeks: s.weeks,
+      startDate,
+      taperWeeks: s.taperWeeks,
+      taper: s.taperWeeks > 0,
+      peakWeek: s.peakWeek,
+      competitions,
+      bodyWeight: opts.bodyWeight,
+      daysAvailable: opts.daysAvailable,
+      recoveryLow: opts.recoveryLow,
+      level: opts.level,
+      equipment: opts.equipment,
+      lowImpact: opts.lowImpact,
+      autoLowImpact: opts.autoLowImpact,
+      jointIssues: opts.jointIssues,
+      age: opts.age,
+      restingHr: opts.restingHr,
+      sex: opts.sex,
+      sleepHours: opts.sleepHours,
+      stressLevel: opts.stressLevel,
+      hrvMs: opts.hrvMs,
+      enhanced: opts.enhanced,
+      legDays: opts.legDays,
+      id: `annual-cardio-${s.blockKey}`,
+      name: `Кардио · ${s.description}`,
+      source: 'auto',
+    };
+    const cycle = buildCardioCycle(input);
+    cycles[s.blockKey] = cycle;
+  }
+
+  if (specs.length === 0) warnings.push('В годовом плане нет блоков — кардио-циклы не собраны.');
+  if (plan?.blocks.some(b => b.status === 'stale')) {
+    warnings.push('Есть блоки со статусом stale — пересоберите их, кардио-раскладка может не совпадать с разметкой.');
+  }
+  return { cycles, specs, warnings };
+}
+
+/** Сводка кардио-слоя года (текст для rationale/печати). */
+export function annualCardioText(specs: AnnualCardioSpec[], cycles: Record<string, CardioCycle>): string[] {
+  return specs.map(s => {
+    const c = cycles[s.blockKey];
+    const taper = s.taperWeeks > 0 ? `, taper ${s.taperWeeks} нед${s.peakWeek ? ' + пик' : ''}` : '';
+    const minutes = c ? `${Math.round(c.weeks.reduce((acc, w) => acc + w.totalMinutes, 0) / Math.max(1, c.weeks.length))} мин/нед` : 'не собран';
+    return `Нед ${s.startWeek}-${s.startWeek + s.weeks - 1} [${s.description}]: ${s.goal}, ${minutes}${taper}.`;
+  });
+}
