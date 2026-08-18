@@ -20,6 +20,10 @@ import {
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
+import { buildAnnualCardioCycles, type AnnualCardioBuildOptions } from '../../../engines/annual-training/annual-training-cardio.engine';
+import {
+  loadAnnualTrainingPlan, saveAnnualCardioCycles, loadAnnualCardioCycles, removeAnnualCardioCycles,
+} from '../../../engines/annual-training/annual-training-storage';
 import {
   getCardioLink, setCardioLink, clearCardioLink, subscribeCardioLink,
   SPORT_LABELS, type CardioLinkSport,
@@ -261,6 +265,7 @@ export const CardioConstructor: React.FC = () => {
   const [flash, setFlash] = useState<string | null>(null);
   const [comparison, setComparison] = useState<string | null>(null);
   const [scenarios, setScenarios] = useState<CardioScenario[]>(() => loadCardioScenarios());
+  const [annualCardioMap, setAnnualCardioMap] = useState<Record<string, string>>(() => loadAnnualCardioCycles());
 
   const readMacroLink = useCallback(() => {
     try {
@@ -422,6 +427,53 @@ export const CardioConstructor: React.FC = () => {
     removeCardioCycle(c.id);
     if (cycle?.id === c.id) { setActiveCardioCycle(null); setCycle(null); }
     reload();
+  };
+
+  /** ❤️ Кардио по блокам года: buildAnnualCardioCycles → библиотека + маппинг. */
+  const buildAnnualCardio = () => {
+    const plan = loadAnnualTrainingPlan();
+    if (!plan) { flashMsg('⚠ Сначала постройте макроцикл (годовой план) в ПЛ/ББ-авто'); return; }
+    const opts: AnnualCardioBuildOptions = {
+      level,
+      equipment,
+      lowImpact,
+      autoLowImpact: lowImpact,
+      jointIssues: pf.jointIssues,
+      age: Math.max(12, Math.min(90, Number(age) || 30)),
+      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+      sex,
+      sleepHours: pf.sleepHours,
+      stressLevel: pf.stressLevel,
+      hrvMs: pf.hrvMs,
+      enhanced: pf.enhanced,
+      daysAvailable,
+      recoveryLow,
+      legDays,
+      bodyWeight,
+    };
+    const outcome = buildAnnualCardioCycles(plan, opts);
+    const map: Record<string, string> = {};
+    for (const [blockKey, c] of Object.entries(outcome.cycles)) {
+      saveCardioCycle(c);
+      map[blockKey] = c.id;
+    }
+    saveAnnualCardioCycles(map);
+    setAnnualCardioMap(map);
+    reload();
+    const blockCount = Object.keys(outcome.cycles).length;
+    const warn = outcome.warnings.length > 0 ? ` · ${outcome.warnings[0]}` : '';
+    flashMsg(blockCount > 0 ? `❤️ Кардио по блокам года: собрано ${blockCount} циклов${warn}` : `⚠ ${warn}`);
+  };
+
+  /** 🗑 Сбросить кардио-циклы года (маппинг + циклы из библиотеки). */
+  const clearAnnualCardio = () => {
+    const map = loadAnnualCardioCycles();
+    for (const id of Object.values(map)) removeCardioCycle(id);
+    removeAnnualCardioCycles();
+    setAnnualCardioMap({});
+    if (cycle && Object.values(map).includes(cycle.id)) { setActiveCardioCycle(null); setCycle(null); }
+    reload();
+    flashMsg('🗑 Кардио по блокам года сброшено');
   };
 
   const saveScenario = () => {
@@ -812,6 +864,8 @@ export const CardioConstructor: React.FC = () => {
         <CardioManageStep
           cycle={cycle} library={library} link={link} macroLink={macroLink} comparison={comparison}
           scenarios={scenarios}
+          annualCardioMap={annualCardioMap}
+          onBuildAnnualCardio={buildAnnualCardio} onClearAnnualCardio={clearAnnualCardio}
           onLinkTo={linkTo} onUnlink={unlink} onAttachMacro={attachMacro} onDetachMacro={detachMacro}
           onExport={downloadIcs} onPrint={printCycle} onDuplicate={duplicate} onActivate={activate}
           onCompare={compareWith} onRemove={removeCycle} onChanged={refreshActive}

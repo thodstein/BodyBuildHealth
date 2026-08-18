@@ -11,6 +11,8 @@ import { getCardioLink, clearCardioLink } from '../../../../engines/lms/cardio-b
 import { buildBbMacrocycle, serializeBbMacro, deserializeBbMacro } from '../../../../engines/lms/macrocycle.engine';
 import { loadCardioCycles, loadActiveCardioCycle } from '../../../../engines/lms/cardio.engine';
 import { buildBBContestPrepPlan, serializeBBContestPrepPlan, isoAddDays, isoToday } from '../../../../engines/bb/bb-contest-prep.engine';
+import { saveAnnualTrainingPlan } from '../../../../engines/annual-training/annual-training-storage';
+import { annualPlanFromMacro } from '../../../../engines/annual-training/block-builders.engine';
 
 const CYCLES_KEY = 'he_cardio_cycles';
 const ACTIVE_KEY = 'he_active_cardio_cycle';
@@ -18,6 +20,8 @@ const LINK_KEY = 'he_cardio_link';
 const BB_MACRO_KEY = 'he_bb_macro';
 const WIZARD_KEY = 'he_cardio_wizard_state';
 const PROFILE_KEY = 'he_profile_v2';
+const ANNUAL_PLAN_KEY = 'he_annual_training_plan_v1';
+const ANNUAL_CARDIO_KEY = 'he_annual_cardio_cycles';
 
 beforeEach(() => {
   try {
@@ -27,9 +31,17 @@ beforeEach(() => {
     localStorage.removeItem(BB_MACRO_KEY);
     localStorage.removeItem(WIZARD_KEY);
     localStorage.removeItem(PROFILE_KEY);
+    localStorage.removeItem(ANNUAL_PLAN_KEY);
+    localStorage.removeItem(ANNUAL_CARDIO_KEY);
     clearCardioLink();
   } catch { /* ignore */ }
 });
+
+/** Сид годового плана (ББ-макро 52 нед → план из блоков). */
+function seedAnnualPlan(): void {
+  const macro = buildBbMacrocycle({ level: 'intermediate', totalWeeks: 52 });
+  saveAnnualTrainingPlan(annualPlanFromMacro(macro));
+}
 
 /** Сид профиля с единым prep-планом ББ (goals.bbContestPrepPlan). */
 function seedPrepPlan(): void {
@@ -319,5 +331,47 @@ describe('CardioConstructor — CSR', () => {
     expect(active!.weeks.some(w => w.phase === 'peak')).toBe(true);
     expect(active!.weeks.some(w => w.phase === 'taper')).toBe(true);
     expect(screen.getByText(/🎭 Пик-неделя/)).toBeTruthy();
+  });
+
+  it('«❤️ Кардио по блокам года»: без годового плана → предупреждение', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
+    expect(screen.getAllByRole('status').some(s => (s.textContent || '').includes('Сначала постройте макроцикл'))).toBe(true);
+  });
+
+  it('«❤️ Кардио по блокам года»: циклы собраны по блокам и видны в списке', () => {
+    seedAnnualPlan();
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
+    expect(screen.getAllByRole('status').some(s => /Кардио по блокам года: собрано \d+ циклов/.test(s.textContent || ''))).toBe(true);
+    const cycles = loadCardioCycles();
+    const annual = cycles.filter(c => c.id.startsWith('annual-cardio-'));
+    expect(annual.length).toBeGreaterThan(0);
+    const map = JSON.parse(localStorage.getItem(ANNUAL_CARDIO_KEY) || '{}');
+    expect(Object.keys(map).length).toBe(annual.length);
+    expect(Object.values(map).every((v: string) => annual.some(c => c.id === v))).toBe(true);
+    expect(screen.getAllByText(/Кардио · /).length).toBeGreaterThan(0);
+  });
+
+  it('«🗑 Сбросить»: маппинг и циклы года удаляются', () => {
+    seedAnnualPlan();
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать кардио по блокам года/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сбросить/ }));
+    expect(loadCardioCycles().filter(c => c.id.startsWith('annual-cardio-')).length).toBe(0);
+    expect(localStorage.getItem(ANNUAL_CARDIO_KEY)).toBeNull();
+    expect(screen.getAllByRole('status').some(s => (s.textContent || '').includes('Кардио по блокам года сброшено'))).toBe(true);
   });
 });

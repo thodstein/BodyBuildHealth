@@ -85,6 +85,38 @@ export function migrateAnnualPlanFromMacroStorage(
   return null;
 }
 
+/* ─────────── Кардио-циклы года (blockKey → cycleId библиотеки кардио) ─────────── */
+
+export const ANNUAL_CARDIO_CYCLES_KEY = 'he_annual_cardio_cycles';
+
+/** Валидация маппинга кардио-циклов года (защита от битых данных). */
+export function isAnnualCardioMapShape(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(([k, v]) => typeof k === 'string' && k.length > 0 && typeof v === 'string' && v.length > 0);
+}
+
+/** Сохранить маппинг blockKey → cycleId собранных кардио-циклов года. */
+export function saveAnnualCardioCycles(map: Record<string, string>): Record<string, string> {
+  try { localStorage.setItem(ANNUAL_CARDIO_CYCLES_KEY, JSON.stringify(map)); } catch { /* quota */ }
+  return map;
+}
+
+/** Загрузить маппинг кардио-циклов года (пусто — нет/повреждён). */
+export function loadAnnualCardioCycles(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(ANNUAL_CARDIO_CYCLES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!isAnnualCardioMapShape(parsed)) return {};
+    return parsed;
+  } catch { return {}; }
+}
+
+/** Удалить маппинг кардио-циклов года (циклы остаются в библиотеке). */
+export function removeAnnualCardioCycles(): void {
+  try { localStorage.removeItem(ANNUAL_CARDIO_CYCLES_KEY); } catch { /* ignore */ }
+}
+
 /* ─────────── Снапшоты сборки года (сценарии: сохранить/сравнить/восстановить) ── */
 
 export const ANNUAL_SCENARIOS_KEY = 'he_annual_scenarios';

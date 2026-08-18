@@ -1,5 +1,33 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Кардио: сборка из ББ prep-плана + блок годового плана + UI (Aug 18 2026, pushed 0b61d030b)
+
+Этап 6 кардио-интеграции: кардио-цикл строится ИЗ единого ББ prep-плана (`goals.bbContestPrepPlan`),
+кардио участвует в годовом плане наравне с ПЛ/ББ, UI конструктора получает вход из prep.
+
+- **`cardio.engine.ts`** (аддитивно): `cardioPrepCheckIn` — чек-ин веса против prep-плана (темп,
+  дефицит, targetWeight, рекомендация, null без prep/цикла); `cardioWeightAdvice` — совет по весу
+  (только cut/recomp/bb_prep, плато |weekly|<0.25 → increase + «Zone 2»); `buildCardioCycleFromPrep`
+  — сборка цикла из prep: фазы base/build/contest_prep/taper/peak, totalWeeks = prep+taper+1,
+  taper по профилю prep, пик-неделя только recovery, `startDate = opts.startDate ?? p.startDate`;
+  `CardioPrepBuildOptions` (790). API качества: `cardioQualityReport` → `{score, findings}`,
+  finding `{level: 'ok'|'warn'|'info', text}`.
+- **NEW `annual-training-cardio.engine.ts`**: `buildAnnualCardioCycles` — циклы по BB-блокам годового
+  плана (кардио-профиль по фазе блока, taper перед соревнованием, id `annual-cardio-${blockKey}`,
+  priority 'B', заглушки-предупреждения, ссылки в годовом движке); `cardioPhaseForBlock`.
+- **CardioConstructor.tsx**: при `goals.bbContestPrepPlan` в шапке — кнопка «⚙️ Из prep-плана (N нед)»
+  (aria-label «Собрать кардио из prep-плана») → сборка через `buildCardioCycleFromPrep` +
+  синхронизация визарда (goal bb_prep, taper, пик, вес из prep) + активный цикл + flash; чип
+  «🎭 Пик-неделя: нед N (dd.mm–dd.mm)» от `cycle.startDate`.
+- Тесты: `cardio-prep-engine.test.ts` NEW 47, `cardio-prep-taper-goals.test.ts` 23 (мой файл,
+  исправлены 3 теста под API: лог плато + `level`/`findings`), `annual-training-cardio.test.ts`
+  NEW 11, `cardio-constructor.test.tsx` 24 (сид профиля `he_profile_v2` + 2 теста prep).
+  Область 311/311, полный прогон 6179/6182 (3 падения — чужой WIP MC-5 в MacrocyclePanel,
+  пред-существующее). tsc-фильтр cardio|annual — чисто.
+- Из плана `CARDIO-CYCLE-INTEGRATION-PLAN.md` остаются отложенными: интеграционные карточки в
+  PL/BB-авто и heatmap макроцикла (чужие WIP: SRCBBScreen.tsx, BbAutoConstructor.tsx,
+  MacrocyclePanel.tsx).
+
 ## Ручной конструктор: дизайн периодизации ↔ программа, заметки, быстрый ввод (Aug 18 2026, uncommitted)
 
 Связь макроцикла-дизайна с программой + заметки недели/сессии + быстрый ввод упражнений.

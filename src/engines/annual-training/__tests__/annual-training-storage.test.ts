@@ -8,6 +8,7 @@ import {
   isAnnualTrainingPlanShape,
   ANNUAL_SCENARIOS_KEY, saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario,
   restoreAnnualScenario, compareAnnualScenarios,
+  saveAnnualCardioCycles, loadAnnualCardioCycles, removeAnnualCardioCycles,
 } from '../annual-training-storage';
 import { annualPlanFromMacro, setAnnualBlockKind } from '../block-builders.engine';
 import { buildBbMacrocycle, serializeBbMacro } from '../../lms/macrocycle.engine';
@@ -155,5 +156,33 @@ describe('снапшоты сборки года (сценарии)', () => {
     expect(diffs[0].kindA).toBe('BB');
     expect(diffs[0].kindB).toBe('MANUAL');
     expect(summary).toContain('конструктор 1');
+  });
+});
+
+describe('кардио-циклы года (blockKey → cycleId)', () => {
+  const KEY = 'he_annual_cardio_cycles';
+
+  it('save/load: маппинг сохраняется и загружается', () => {
+    saveAnnualCardioCycles({ block1: 'cardio-a', block2: 'cardio-b' });
+    const loaded = loadAnnualCardioCycles();
+    expect(loaded).toEqual({ block1: 'cardio-a', block2: 'cardio-b' });
+    expect(localStorage.getItem(KEY)).toContain('cardio-a');
+  });
+
+  it('нет ключа / битый JSON / невалидная форма → {}', () => {
+    expect(loadAnnualCardioCycles()).toEqual({});
+    localStorage.setItem(KEY, '{broken');
+    expect(loadAnnualCardioCycles()).toEqual({});
+    localStorage.setItem(KEY, JSON.stringify({ a: 1 }));
+    expect(loadAnnualCardioCycles()).toEqual({});
+    localStorage.setItem(KEY, JSON.stringify(['cardio-x']));
+    expect(loadAnnualCardioCycles()).toEqual({});
+  });
+
+  it('removeAnnualCardioCycles очищает ключ', () => {
+    saveAnnualCardioCycles({ block1: 'cardio-a' });
+    removeAnnualCardioCycles();
+    expect(loadAnnualCardioCycles()).toEqual({});
+    expect(localStorage.getItem(KEY)).toBeNull();
   });
 });

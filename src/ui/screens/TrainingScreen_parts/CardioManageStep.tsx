@@ -30,6 +30,9 @@ export const CardioManageStep: React.FC<{
   link: CardioLink | null;
   macroLink: { kind: 'pl' | 'bb'; cycleId?: string } | null;
   comparison: string | null;
+  annualCardioMap?: Record<string, string>;
+  onBuildAnnualCardio?: () => void;
+  onClearAnnualCardio?: () => void;
   onLinkTo: (sport: CardioLinkSport) => void;
   onUnlink: () => void;
   onAttachMacro: (kind: 'pl' | 'bb') => void;
@@ -44,7 +47,7 @@ export const CardioManageStep: React.FC<{
   onCompare: (c: CardioCycle) => void;
   onRemove: (c: CardioCycle) => void;
   onChanged: () => void;
-}> = ({ cycle, library, scenarios, link, macroLink, comparison, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario }) => {
+}> = ({ cycle, library, scenarios, link, macroLink, comparison, annualCardioMap, onBuildAnnualCardio, onClearAnnualCardio, onLinkTo, onUnlink, onAttachMacro, onDetachMacro, onExport, onPrint, onDuplicate, onActivate, onCompare, onRemove, onChanged, onSaveScenario, onLoadScenario, onRemoveScenario }) => {
   const [copyFlash, setCopyFlash] = useState(false);
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
@@ -173,6 +176,49 @@ export const CardioManageStep: React.FC<{
             <button style={BTN} onClick={() => onAttachMacro('pl')}>🏆 К плану ПЛ</button>
             <button style={BTN} onClick={() => onAttachMacro('bb')}>💪 К плану ББ</button>
           </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="❤️ Кардио по блокам года">
+        {onBuildAnnualCardio && (
+          <div style={ROW}>
+            <button style={BTN} onClick={onBuildAnnualCardio} title="Собрать кардио-цикл на каждый блок годового плана (цель из фазы, taper/пик к старту) и сохранить в библиотеку">
+              ❤️ Собрать кардио по блокам года
+            </button>
+            {Object.keys(annualCardioMap ?? {}).length > 0 && onClearAnnualCardio && (
+              <button style={BTN_DANGER} onClick={onClearAnnualCardio} title="Удалить собранные кардио-циклы года из библиотеки и сбросить привязку">
+                🗑 Сбросить
+              </button>
+            )}
+          </div>
+        )}
+        {Object.keys(annualCardioMap ?? {}).length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+            {Object.entries(annualCardioMap!).map(([blockKey, cycleId]) => {
+              const c = library.find(x => x.id === cycleId);
+              if (!c) {
+                return (
+                  <div key={blockKey} style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                    ⚠ Блок {blockKey}: цикл {cycleId} не найден в библиотеке
+                  </div>
+                );
+              }
+              const cs = cardioCycleSummary(c);
+              return (
+                <div key={blockKey} style={ROW}>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{CARDIO_GOAL_LABELS[c.goal]} · {c.totalWeeks} нед</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          onBuildAnnualCardio && (
+            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+              Кардио-циклы года не собраны: постройте макроцикл (ПЛ/ББ-авто, «Годовой план»), затем соберите кардио по блокам — каждый блок получит цикл по фазе (prep/taper/пик у стартов).
+            </div>
+          )
         )}
       </SectionCard>
 
