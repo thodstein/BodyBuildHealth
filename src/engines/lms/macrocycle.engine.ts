@@ -633,6 +633,59 @@ export function resizeMacroBlock(macro: Macrocycle, blockIndex: number, weeks: n
   };
 }
 
+/**
+ * Разделить обычную PL-фазу на последовательные микроциклы.
+ * Длительность фазы задаётся суммой `weeks`; соседние фазы не перераспределяются.
+ */
+export function splitMacroPhaseIntoCycles(
+  macro: Macrocycle,
+  phase: MacroPhase,
+  cycleIds: string[],
+  weeks?: number[],
+): Macrocycle {
+  const ids = cycleIds.filter(Boolean).slice(0, 2);
+  if (ids.length < 2) return macro;
+  const phaseIndexes = macro.blocks.map((block, index) => block.phase === phase ? index : -1).filter(index => index >= 0);
+  if (phaseIndexes.length === 0) return macro;
+  const firstIndex = phaseIndexes[0];
+  const original = macro.blocks[phaseIndexes[0]];
+  const phaseTotal = phaseIndexes.reduce((sum, index) => sum + macro.blocks[index].weeks, 0);
+  const requested = ids.map((_, index) => Math.max(1, Math.round(weeks?.[index] ?? 0)));
+  const requestedTotal = requested.reduce((sum, value) => sum + value, 0);
+  const total = requestedTotal > 0 ? requestedTotal : Math.max(2, phaseTotal);
+  const firstWeeks = requestedTotal > 0 ? requested[0] : Math.max(1, Math.floor(total / 2));
+  const splitWeeks = [firstWeeks, Math.max(1, total - firstWeeks)];
+  const replacement = ids.map((cycleId, index) => ({
+    ...original,
+    cycleId,
+    weeks: splitWeeks[index],
+    description: getCycleById(cycleId)?.meta.title ?? original.description,
+    competitionId: phaseIndexes[index] != null ? macro.blocks[phaseIndexes[index]]?.competitionId : undefined,
+  }));  const nextBlocks = macro.blocks.filter((_, index) => !phaseIndexes.includes(index));
+  nextBlocks.splice(firstIndex, 0, ...replacement);
+  let offset = 1;
+  const rebased = nextBlocks.map(block => {
+    const next = { ...block, weekOffset: offset };
+    offset += next.weeks;
+    return next;
+  });
+  const competitions = macro.competitions?.map(competition => {
+    const block = rebased.find(candidate => candidate.competitionId === competition.id);
+    return block
+      ? { ...competition, week: Math.max(block.weekOffset, Math.min(competition.week, block.weekOffset + block.weeks - 1)) }
+      : competition;
+  });
+  const mainCompetition = competitions?.find(competition => competition.priority === 'A') ?? competitions?.[0];
+  return {
+    ...macro,
+    blocks: rebased,
+    totalWeeks: rebased.reduce((sum, block) => sum + block.weeks, 0),
+    competitionWeek: mainCompetition?.week ?? macro.competitionWeek,
+    competitions,
+    rationale: rebased.map(block => `${block.phase}: ${block.weeks} нед (с ${block.weekOffset}), ${block.kind}${block.cycleId ? ` (${block.cycleId})` : ''}`),
+  };
+}
+
 /** Сериализация для localStorage (компактная, без лишних полей). */
 export function serializeMacro(macro: Macrocycle): string {
   return JSON.stringify({

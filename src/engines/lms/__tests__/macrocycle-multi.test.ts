@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildMacrocycleMulti, buildMacrocycle, serializeMacro, deserializeMacro,
   rebalanceMacrocycle, resizeMacroBlock, resizeBbMacroBlock, buildBbMacrocycle,
+  splitMacroPhaseIntoCycles,
   type CompetitionEvent, type Macrocycle,
 } from '../macrocycle.engine';
 
@@ -301,6 +302,26 @@ describe('buildMacrocycleMulti — cycleId per competition', () => {
     const resized = resizeBbMacroBlock(macro, 0, macro.blocks[0].weeks + 2);
     expect(resized.totalWeeks).toBe(macro.totalWeeks + 2);
     expect(resized.blocks[1].weekOffset).toBe(resized.blocks[0].weekOffset + resized.blocks[0].weeks);
+  });
+
+  it('splitMacroPhaseIntoCycles: фаза делится на два блока с двумя циклами и суммой недель', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const strengthTotal = macro.blocks.filter(b => b.phase === 'strength').reduce((sum, b) => sum + b.weeks, 0);
+    const split = splitMacroPhaseIntoCycles(macro, 'strength', ['cycle-A', 'cycle-B'], [6, 4]);
+    const blocks = split.blocks.filter(block => block.phase === 'strength');
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].cycleId).toBe('cycle-A');
+    expect(blocks[1].cycleId).toBe('cycle-B');
+    expect(blocks[0].weeks + blocks[1].weeks).toBe(10);
+    expect(split.totalWeeks).toBe(macro.totalWeeks + (10 - strengthTotal));
+    expect(blocks[1].weekOffset).toBe(blocks[0].weekOffset + blocks[0].weeks);
+  });
+
+  it('splitMacroPhaseIntoCycles: сумма недель может отличаться от исходной фазы', () => {
+    const macro = buildMacrocycle({ level: 'intermediate', goal: 'powerlifting', totalWeeks: 20, competitionWeek: 16 });
+    const split = splitMacroPhaseIntoCycles(macro, 'strength', ['cycle-A', 'cycle-B'], [8, 8]);
+    expect(split.totalWeeks).toBe(macro.totalWeeks + (8 + 8 - macro.blocks.find(b => b.phase === 'strength')!.weeks));
+    expect(split.blocks.filter(b => b.phase === 'strength').reduce((sum, b) => sum + b.weeks, 0)).toBe(16);
   });
 });
 

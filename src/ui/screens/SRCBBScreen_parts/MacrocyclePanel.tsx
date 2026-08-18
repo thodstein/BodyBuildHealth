@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, resizeMacroBlock, macrocycleToActiveCycle,
+  buildMacrocycle, buildMacrocycleMulti, rebalanceMacrocycle, resizeMacroBlock, splitMacroPhaseIntoCycles, macrocycleToActiveCycle,
   serializeMacro, deserializeMacro, estimateCompetitionWeek,
   buildBbMacrocycle, rebalanceBbMacrocycle, resizeBbMacroBlock, serializeBbMacro, deserializeBbMacro,
   macroWeekStartDate, macroWeekEndDate, weeksUntilWeek, formatMacroDate,
@@ -476,7 +476,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const [selectedBlockIdx, setSelectedBlockIdx] = useState<number>(-1);
   const [editWeeks, setEditWeeks] = useState<Record<string, number>>({});
   const [editBlockWeeks, setEditBlockWeeks] = useState<number | null>(null);
-  // Явное сохранение: кратковременный флеш «Сохранено» (автосохранение уже есть).
+  // ✂️ Разбиение выбранной ПЛ-фазы на два цикла: [id, недели] для каждого.
+  const [splitCycles, setSplitCycles] = useState<Array<{ cycleId: string; weeks: number }>>([
+    { cycleId: '', weeks: 0 },
+    { cycleId: '', weeks: 0 },
+  ]);  // Явное сохранение: кратковременный флеш «Сохранено» (автосохранение уже есть).
   const [macroSavedFlash, setMacroSavedFlash] = useState(false);
   // Флеш «Сводка скопирована».
   const [copyFlash, setCopyFlash] = useState(false);
@@ -1766,6 +1770,49 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   Тапер и прикидки применяются автоматически при «✓ Применить макроцикл»: тапер к финалу peak-блока, meet-неделя (прикиды + разминка) на неделе соревнований, mock meet и пост-старт разгрузка. Раскладка/весовая цель — настройки над панелью; отдельный тапер-калькулятор — вкладка «🏁 Пик/Соревнования».
                 </div>
               )}
+              {!isBB && activeBlock && (() => {
+                const phaseBlocks = macro?.blocks.filter(b => b.phase === activeBlock.phase) ?? [];
+                const splitTotal = splitCycles.reduce((sum, slot) => sum + (slot.weeks || 0), 0);
+                const splitReady = splitCycles.filter(slot => slot.cycleId).length >= 2 && splitTotal > 0;
+                return (
+                  <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }} className="macrocycle-phase-split">
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>
+                      ✂️ Разбить фазу «{PHASE_LABEL_RU[activeBlock.phase as MacroPhase] ?? activeBlock.phase}» на 2 цикла
+                      {phaseBlocks.length > 1 ? ` · уже ${phaseBlocks.length} блок(а) в фазе` : ''}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      {splitCycles.map((slot, index) => {
+                        const filteredCycles = LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) === 'strength');
+                        return (
+                          <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <PopupSelect
+                              label={`Цикл ${index + 1}`}
+                              value={slot.cycleId}
+                              options={[{ id: '', label: '— цикл —', desc: '' }, ...filteredCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.level} · ${c.meta.sessionsPerWeek} д/нед · ${c.meta.weeks} нед` }))]}
+                              onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, cycleId: v } : p))}
+                            />
+                            <PopupNumber label={`Недель цикла ${index + 1}`} value={slot.weeks} min={1} max={52} suffix=" нед"
+                              onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, weeks: Number.isFinite(v) ? Math.max(1, Math.round(v)) : p.weeks } : p))} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6 }}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Итого: {splitTotal} нед · суммарно по фазе сейчас: {phaseBlocks.reduce((sum, b) => sum + b.weeks, 0)} нед</span>
+                      <button type="button" disabled={!splitReady} onClick={() => {
+                        if (!macro) return;
+                        const next = splitMacroPhaseIntoCycles(macro, activeBlock.phase as MacroPhase, splitCycles.map(s => s.cycleId), splitCycles.map(s => s.weeks || 1));
+                        setMacro(next);
+                        setTotalWeeks(next.totalWeeks);
+                        setSplitCycles([{ cycleId: '', weeks: 0 }, { cycleId: '', weeks: 0 }]);
+                        setAnnualStatusNote('✂️ Фаза разбита на 2 цикла — блоки помечены устаревшими, пересоберите год');
+                      }} style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10, opacity: splitReady ? 1 : 0.5, cursor: splitReady ? 'pointer' : 'not-allowed' }}>
+                        ✂️ Разбить фазу
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
               {isBB && activeBlock && (
                 <>
                   <button type="button" onClick={() => openBuilder(selectedBlockIdx)} style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 12px', minHeight: 44, marginTop: 6, width: '100%', borderColor: 'rgba(0,230,138,0.3)', color: '#00e68a' }}>
