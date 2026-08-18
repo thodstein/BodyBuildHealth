@@ -24,10 +24,10 @@ describe('ocr-assets: local path configuration', () => {
 
   it('getOcrAssetPaths returns local paths by default', () => {
     const p = getOcrAssetPaths('local');
-    expect(p.workerPath).toBe('/tesseract/worker.min.js');
-    expect(p.corePath).toBe('/tesseract/core');
-    expect(p.langPath).toBe('/tesseract/lang');
-    expect(p.pdfjsWorkerSrc).toBe('/pdfjs/pdf.worker.min.mjs');
+    expect(p.workerPath).toMatch(/(?:^|\/)tesseract\/worker\.min\.js$/);
+    expect(p.corePath).toMatch(/(?:^|\/)tesseract\/core$/);
+    expect(p.langPath).toMatch(/(?:^|\/)tesseract\/lang$/);
+    expect(p.pdfjsWorkerSrc).toMatch(/(?:^|\/)pdfjs\/pdf\.worker\.min\.mjs$/);
   });
 
   it('getOcrAssetPaths returns CDN paths when requested', () => {
@@ -58,6 +58,16 @@ describe('ocr-assets: local path configuration', () => {
     expect(ok).toBe(false);
   });
 
+  it('localAssetAvailable uses GET when Telegram WebView rejects HEAD', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error('HEAD is not supported'))
+      .mockResolvedValueOnce({ ok: true, status: 206 });
+    expect(await localAssetAvailable('/tesseract/worker.min.js')).toBe(true);
+    expect(fetchMock).toHaveBeenLastCalledWith('/tesseract/worker.min.js', {
+      method: 'GET', headers: { Range: 'bytes=0-0' }, cache: 'no-store',
+    });
+  });
+
   it('localAssetAvailable returns false on network error', async () => {
     fetchMock.mockRejectedValueOnce(new Error('network error'));
     const ok = await localAssetAvailable('/tesseract/worker.min.js');
@@ -68,9 +78,9 @@ describe('ocr-assets: local path configuration', () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200 });
     const opts = await resolveTesseractOptions();
     expect(opts.source).toBe('local');
-    expect(opts.workerPath).toBe('/tesseract/worker.min.js');
-    expect(opts.corePath).toBe('/tesseract/core');
-    expect(opts.langPath).toBe('/tesseract/lang');
+    expect(opts.workerPath).toMatch(/(?:^|\/)tesseract\/worker\.min\.js$/);
+    expect(opts.corePath).toMatch(/(?:^|\/)tesseract\/core$/);
+    expect(opts.langPath).toMatch(/(?:^|\/)tesseract\/lang$/);
   });
 
   it('resolveTesseractOptions falls back to CDN when local assets are unreachable', async () => {
@@ -91,7 +101,7 @@ describe('ocr-assets: local path configuration', () => {
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200 });
     const r = await resolvePdfjsWorkerSrc();
     expect(r.source).toBe('local');
-    expect(r.workerSrc).toBe('/pdfjs/pdf.worker.min.mjs');
+    expect(r.workerSrc).toMatch(/(?:^|\/)pdfjs\/pdf\.worker\.min\.mjs$/);
   });
 
   it('resolvePdfjsWorkerSrc falls back to CDN when local is unreachable', async () => {
@@ -105,7 +115,7 @@ describe('ocr-assets: local path configuration', () => {
     const fakePdfjsLib = { GlobalWorkerOptions: {} };
     const ok = configurePdfjsWorker(fakePdfjsLib, 'local');
     expect(ok).toBe(true);
-    expect(fakePdfjsLib.GlobalWorkerOptions.workerSrc).toBe('/pdfjs/pdf.worker.min.mjs');
+    expect(fakePdfjsLib.GlobalWorkerOptions.workerSrc).toMatch(/(?:^|\/)pdfjs\/pdf\.worker\.min\.mjs$/);
   });
 
   it('configurePdfjsWorker with CDN preference sets CDN workerSrc', () => {

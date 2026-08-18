@@ -80,6 +80,15 @@ describe('processUploadedFile: text input pipeline', () => {
     expect(Array.isArray(result.warnings)).toBe(true);
   });
 
+  it('accepts CSV lab reports through the text pipeline', async () => {
+    const csv = 'Показатель;Результат;Единицы\nГлюкоза;5,4;ммоль/л\nКреатинин;92;мкмоль/л';
+    const result = await processUploadedFile(new File([csv], 'labs.csv', { type: 'text/csv' }));
+
+    expect(result.source).toBe('text');
+    expect(result.labs.some(l => l.code === 'GLU' && l.value === 5.4)).toBe(true);
+    expect(result.labs.some(l => l.code === 'CREATININE' && l.value === 92)).toBe(true);
+  });
+
   it('handles comma decimal separators (Russian format)', async () => {
     const text = 'Глюкоза 5,4 ммоль/л 3,9-5,5\nКреатинин 92,5 мкмоль/л 62-106';
     const file = new File([text], 'labs.txt', { type: 'text/plain' });

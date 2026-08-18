@@ -910,7 +910,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
           {/* Import button — opens modal with file/camera/paste options */}
           <div style={{ marginBottom: 10 }}>
-            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
+            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.gif,.txt,.csv,text/plain,application/pdf,image/*" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />
             <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) handleFileUpload(f); }} />

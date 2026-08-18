@@ -7,10 +7,15 @@
 const TESSERACT_VERSION = '7.0.0';
 const TESSERACT_CORE_VERSION = '7.0.0';
 
-// In the dev server the app is served from "/", in production from "/" too
-// (Vite default). Using absolute paths keeps things consistent for both.
-const TESSERACT_BASE = '/tesseract';
-const PDFJS_BASE = '/pdfjs';
+// The app is built with `base: './'` and may be hosted below the domain root.
+// Absolute `/tesseract` paths then point at the wrong location and break OCR.
+function appAssetPath(path: string): string {
+  const base = import.meta.env.BASE_URL || '/';
+  const relative = `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  // Telegram Mini Apps can be opened from a nested URL. Resolve the relative
+  // asset against the actual document URL instead of the domain root.
+  try { return new URL(relative, document.baseURI).href; } catch { return relative; }
+}
 
 export interface OcrAssetPaths {
   workerPath: string;
@@ -33,11 +38,13 @@ export function getOcrAssetPaths(prefer: 'local' | 'cdn' = 'local'): OcrAssetPat
       pdfjsWorkerSrc: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${getPdfjsVersionForCdn()}/pdf.worker.min.mjs`,
     };
   }
+  const tesseractBase = appAssetPath('tesseract');
+  const pdfjsBase = appAssetPath('pdfjs');
   return {
-    workerPath: `${TESSERACT_BASE}/worker.min.js`,
-    corePath: `${TESSERACT_BASE}/core`,
-    langPath: `${TESSERACT_BASE}/lang`,
-    pdfjsWorkerSrc: `${PDFJS_BASE}/pdf.worker.min.mjs`,
+    workerPath: `${tesseractBase}/worker.min.js`,
+    corePath: `${tesseractBase}/core`,
+    langPath: `${tesseractBase}/lang`,
+    pdfjsWorkerSrc: `${pdfjsBase}/pdf.worker.min.mjs`,
   };
 }
 
@@ -72,11 +79,15 @@ export function configurePdfjsWorker(pdfjsLib: any, prefer: 'local' | 'cdn' = 'l
  */
 export async function localAssetAvailable(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
-    return res.ok;
+    const head = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    if (head.ok) return true;
   } catch {
-    return false;
+    // Some Telegram WebViews/proxies reject HEAD although GET works.
   }
+  try {
+    const get = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, cache: 'no-store' });
+    return get.ok;
+  } catch { return false; }
 }
 
 /**

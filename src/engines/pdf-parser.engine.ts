@@ -948,7 +948,7 @@ export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promi
   if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
     return parsePDF(arrayBuffer ?? file);
   }
-  if (file.type.startsWith('image/') || file.name.match(/\.(png|jpg|jpeg|webp)$/i)) {
+  if (file.type.startsWith('image/') || file.name.match(/\.(png|jpg|jpeg|webp|bmp|gif)$/i)) {
     const text = await extractTextFromImage(file);
     return parseLabText(text);
   }

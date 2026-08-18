@@ -401,7 +401,9 @@ export async function saveParsedLabs(labs: ParsedLabValue[], phase: string): Pro
     await db.init();
     for (const lab of labs) {
       const point: LabPoint = {
-        id: crypto.randomUUID(),
+        id: typeof globalThis.crypto?.randomUUID === 'function'
+          ? globalThis.crypto.randomUUID()
+          : `ocr-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         code: lab.code,
         name: lab.name,
         value: lab.value,
