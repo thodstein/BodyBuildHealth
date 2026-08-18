@@ -38,9 +38,10 @@ import {
   importProgramIntoAnnualBlock, weekForDate,
 } from '../../../engines/annual-training/block-builders.engine';
 import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-training-print';
+import { annualCardioSpecs, annualCardioText } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
   saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario, restoreAnnualScenario,
-  compareAnnualScenarios, annualPlanStorageBytes, type AnnualScenario,
+  compareAnnualScenarios, annualPlanStorageBytes, loadAnnualCardioCycles, type AnnualScenario,
 } from '../../../engines/annual-training/annual-training-storage';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -986,7 +987,18 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
     const win = window.open('', '_blank', 'width=820,height=920');
     if (!win) { setAnnualStatusNote('⚠ Блокировка всплывающих окон — разрешите окна для печати'); return; }
-    win.document.write(buildAnnualPrintHtml(plan));
+    // ❤️ Кардио-сводка года (Этап 4): если кардио-циклы собраны по блокам (he_annual_cardio_cycles).
+    const specs = annualCardioSpecs(plan);
+    const cardioMap = loadAnnualCardioCycles();
+    const lib = loadCardioCycles();
+    const cycles: Record<string, ReturnType<typeof loadCardioCycles>[number]> = {};
+    for (const s of specs) {
+      const cid = cardioMap[s.blockKey];
+      const c = cid ? lib.find(x => x.id === cid) : undefined;
+      if (c) cycles[s.blockKey] = c;
+    }
+    const cardioText = annualCardioText(specs, cycles);
+    win.document.write(buildAnnualPrintHtml(plan, undefined, cardioText));
     win.document.close();
     win.focus();
     win.print();

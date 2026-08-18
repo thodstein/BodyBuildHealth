@@ -1,20 +1,24 @@
 # ANNUAL-PLANNER-AUDIT.md — Критический аудит годового планировщика (Aug 18 2026)
 
-## Статус выполнения (Aug 19 2026 — Этапы 1-3 и 5 выполнены)
+## Статус выполнения (Aug 19 2026 — Этапы 1-3, 5 и кардио-печать выполнены)
 
 | Этап | Пункты | Статус |
 |------|--------|--------|
 | 1 (P0) | P0-1 компактное хранение (`toStoredPlan`: bbPlan/program BB не пишутся; 52-нед год 6.5 МБ → 1.6 МБ), quota-событие `he-annual-plan-quota-error` + флеш, размер-индикатор «🗄 План: N КБ», снапшоты тоже компактные, «🚀 В ББ-авто» пересобирает блок после reload | ✅ |
 | 2 (P1) | P1-1 композиция: несобранные блоки → скелеты (длина года = totalWeeks), warnings в notes + флеш экспорта; P1-2 пик-неделя BB не режется generic-тапером (warning «не применён»); P1-3 roundtrip: явные предупреждения о длине вместо тихой обрезки | ✅ |
 | 3 (P2) | P2-1 единый `weekForDate` (панель реэкспортирует `macroWeekForDate`); P2-2 удалён `phaseOfBlockKind`; P2-3 `bbKey` не зависит от isBB; P2-4 ICS `DTEND` = начало+1 день; P2-7 shape: kind + уникальные blockKey; P2-8 единый кламп 1-52 в `saveMacroEdit`; P2-10 `selectPLCycleForBlock(direction)` | ✅ |
-| 4 (Улучшения) | отложены (heatmap/интеграции — файлы других агентов; декомпозиция панели — отдельно) | отложено |
-| 5 (Тесты) | +19 новых: `annual-audit-fixes-2026-08.test.ts` (14: компакт/размер/quota/снапшот/shape, композиция bb+hybrid, peak+taper, roundtrip, weekForDate, direction, сериализация) + `macrocycle-panel-audit-fixes.test.tsx` (5: ICS DTEND, storageKey-изоляция, «В ББ-авто» после reload) | ✅ |
+| 4 (Улучшения) | **частично**: кардио-сводка в печать года (`buildAnnualPrintHtml(plan, title, cardioText?)` + панель собирает из `he_annual_cardio_cycles`, +тест XSS). Отложено: heatmap в PL/BB-авто и карточки интеграции (файлы других агентов), «Собрать stale» (избыточно — «Собрать весь год» уже пересобирает stale), декомпозиция панели (отдельный рефактор) | частично |
+| 5 (Тесты) | +20 новых: `annual-audit-fixes-2026-08.test.ts` (14) + `macrocycle-panel-audit-fixes.test.tsx` (5) + кардио-печать (1) | ✅ |
 
 Отложено сознательно: P2-5 (автосоздание плана — после компактного формата риск мал, а изменение
 ломает интеграции питания), P2-6 (stale-дифф — нужна миграция формата), P2-9 (кнопка «💾 Сохранить»
-— форс-запись, покрыта тестами), кардио-сводка в печать (нет cardio в контексте печати).
+— форс-запись, покрыта тестами).
 
-Проверено: tsc 0; область (annual-training + macrocycle-движки + SRCBBScreen_parts + мосты) **319/319**.
+Проверено: tsc 0 по моим файлам (в проекте — только чужой BbAutoConstructor WIP с незакрытыми тегами);
+область (annual-training + macrocycle-движки + SRCBBScreen_parts + мосты) **321/321**;
+полный прогон 6295/6299 — падения только чужие/пред-существующие (bb-macrocycle v7,
+usefulness-calc, stretch-session, athlete-context — чужой новый файл, bb-auto-smoke/ctx —
+Transform failed в чужом BbAutoConstructor).
 
 
 Полный анализ годового планировщика: движки (`src/engines/annual-training/`, `src/engines/lms/macrocycle.engine.ts`),

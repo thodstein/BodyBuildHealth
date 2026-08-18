@@ -97,8 +97,10 @@ function weekPreview(block: AnnualBlockState): string {
   return `<details style="margin:4px 0"><summary style="cursor:pointer;color:#0f766e;font-weight:600">Неделя ${w.week}: превью сессий</summary>${sessions}</details>`;
 }
 
-/** Полная HTML-сводка годового плана для печати (window.print). */
-export function buildAnnualPrintHtml(plan: AnnualTrainingPlan, title?: string): string {
+/** Полная HTML-сводка годового плана для печати (window.print).
+ *  cardioText (опционально) — строки сводки кардио-слоя года
+ *  (annualCardioText из annual-training-cardio.engine), если кардио собрано. */
+export function buildAnnualPrintHtml(plan: AnnualTrainingPlan, title?: string, cardioText?: string[]): string {
   const v = validateAnnualPlan(plan);
   const built = plan.blocks.filter(b => b.status === 'built').length;
   const stale = plan.blocks.filter(b => b.status === 'stale').length;
@@ -131,6 +133,9 @@ export function buildAnnualPrintHtml(plan: AnnualTrainingPlan, title?: string): 
     ${validation}
     <h2>Блоки года</h2>
     ${blocks}
+    ${cardioText && cardioText.length > 0 ? `
+    <h2>❤️ Кардио по блокам года</h2>
+    <div class="muted">${cardioText.map(escapeHtml).join('<br>')}</div>` : ''}
     <h2>Сводка</h2>
     <div class="muted">Недели покрываются блоками ${v.totalMismatch ? 'НЕ полностью' : 'полностью'} · собранные блоки не пересобираются без изменений; правка макро помечает блок «устарел».</div>
     </body></html>`;

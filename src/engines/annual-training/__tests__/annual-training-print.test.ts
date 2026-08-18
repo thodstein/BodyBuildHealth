@@ -99,4 +99,13 @@ describe('buildAnnualPrintHtml', () => {
     expect(html).toContain('ошибок: 1');
     expect(html).toContain('boom');
   });
+
+  it('cardioText (Этап 4): кардио-сводка в печати + XSS-экранирование', () => {
+    const plan = annualPlanFromMacro(makeMacro());
+    const html = buildAnnualPrintHtml(plan, 'Мой год', ['Нед 1–6 [Выносливость]: maintenance, 120 мин/нед.', '<b>не должен стать HTML</b>']);
+    expect(html).toContain('❤️ Кардио по блокам года');
+    expect(html).toContain('Нед 1–6 [Выносливость]: maintenance, 120 мин/нед.');
+    expect(html).not.toContain('<b>не должен стать HTML</b>');
+    expect(html).toContain('&lt;b&gt;');
+  });
 });
