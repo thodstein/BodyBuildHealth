@@ -29,7 +29,17 @@ export interface SavedBBPlan {
     equipment?: string[];
     specialization?: boolean;
     /** Расписание блоков специализации (сохранение/восстановление плана блоков). */
-    specBlocks?: { weekStart: number; weekEnd: number; targets: string[] }[];
+    specBlocks?: {
+      id?: string;
+      weekStart: number;
+      weekEnd: number;
+      targets: string[];
+      tradeoff?: {
+        mode: 'none' | 'reduce_direct_to_floor' | 'remove_direct_when_indirect_covers_floor';
+        donorMuscles: string[];
+        preserveIndirect: true;
+      };
+    }[];
     daysPerWeek?: number;
     source?: 'cycle' | 'program';
     programPath?: 'library' | 'cycle';

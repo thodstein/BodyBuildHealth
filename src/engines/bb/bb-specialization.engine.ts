@@ -193,21 +193,42 @@ export function isSpecializationFocus(
   return !!res.focus && canonicalMuscle(muscle) === res.focus;
 }
 
-/** Длина блока специализации по методике (Rapid Strength / Metal Strength /
- *  T-Nation: 6-10 недель, затем возврат к сбалансированному тренингу). */
-export const SPECIALIZATION_BLOCK_WEEKS = 10;
-export const SPECIALIZATION_MIN_BLOCK_WEEKS = 6;
+/** Длина блока специализации по методике (T-Nation: 3-6 недель;
+ *  дефолт 5 — классический 5-недельный специализированный блок). */
+export const SPECIALIZATION_BLOCK_WEEKS = 5;
+export const SPECIALIZATION_MIN_BLOCK_WEEKS = 3;
+export const SPECIALIZATION_MAX_BLOCK_WEEKS = 6;
+
+/** Режим перераспределения ресурса: цель специализации за счёт доноров. */
+export type VolumeTradeoffMode =
+  | 'none'
+  | 'reduce_direct_to_floor'
+  | 'remove_direct_when_indirect_covers_floor';
+
+/** Политика доноров блока: прямые упражнения донора снижаются/убираются,
+ *  косвенная нагрузка всегда сохраняется, effective volume не ниже MEV. */
+export interface VolumeTradeoffPolicy {
+  mode: VolumeTradeoffMode;
+  /** Мышцы-доноры (гранулярные или канонические). */
+  donorMuscles: string[];
+  /** Косвенную нагрузку донора не трогаем никогда. */
+  preserveIndirect: true;
+}
 
 /** Один блок плана: недели [weekStart..weekEnd] с целями специализации.
  *  targets: 1-2 цели (гранулярные зоны сохраняются); пустой массив =
  *  сбалансированный блок (возврат к MAV для всех). */
 export interface SpecializationBlock {
+  /** Стабильный id блока (для UI-редактора). */
+  id?: string;
   /** Первая неделя блока (1-индекс, включительно). */
   weekStart: number;
   /** Последняя неделя блока (1-индекс, включительно). */
   weekEnd: number;
   /** Цели блока (1-2 гранулярные или обычные цели); [] = баланс. */
   targets: string[];
+  /** Донорская политика блока (перераспределение ресурса). */
+  tradeoff?: VolumeTradeoffPolicy;
 }
 
 /** Расписание специализации на весь план: цепочка блоков без пропусков. */
@@ -224,7 +245,9 @@ export interface SpecializationSchedule {
 }
 
 /** Собрать расписание из явных блоков ИЛИ из legacy-параметров
- *  (focusGroup/weakPoints/specialization → один блок 6-10 нед + баланс). */
+ *  (focusGroup/weakPoints/specialization → один блок SPECIALIZATION_BLOCK_WEEKS
+ *  нед + баланс). Явные блоки нормализуются: кламп, сортировка, пропуски и
+ *  пересечения, дедуп целей и доноров, длина блока 3-6 нед. */
 export function buildSpecializationSchedule(
   focusGroup: string | undefined,
   weakPoints: string[] | undefined,
@@ -238,16 +261,30 @@ export function buildSpecializationSchedule(
   let blocks: SpecializationBlock[] = [];
   if (explicit && explicit.length > 0) {
     blocks = explicit
-      .map(b => ({
-        weekStart: Math.max(1, Math.min(safeTotalWeeks, Math.round(b.weekStart || 1))),
-        weekEnd: Math.max(1, Math.min(safeTotalWeeks, Math.round(b.weekEnd || safeTotalWeeks))),
-        targets: normalizeSpecializationTargets(b.targets || []),
-      }))
+      .map((b, idx) => {
+        const start = Math.max(1, Math.min(safeTotalWeeks, Math.round(b.weekStart || 1)));
+        const end = Math.max(start, Math.min(safeTotalWeeks, Math.round(b.weekEnd || start)));
+        const targets = normalizeSpecializationTargets(b.targets || []);
+        const tradeoff = targets.length > 0 && b.tradeoff && b.tradeoff.mode !== 'none' && b.tradeoff.donorMuscles.length > 0
+          ? {
+              mode: b.tradeoff.mode,
+              donorMuscles: dedupeExactMuscles(b.tradeoff.donorMuscles),
+              preserveIndirect: true as const,
+            }
+          : undefined;
+        return {
+          id: b.id || `spec-block-${idx + 1}`,
+          weekStart: start,
+          weekEnd: end,
+          targets,
+          ...(tradeoff ? { tradeoff } : {}),
+        };
+      })
       .filter(b => b.weekStart <= b.weekEnd)
       .sort((a, b) => a.weekStart - b.weekStart);
   } else if (base.active) {
     const end = Math.min(SPECIALIZATION_BLOCK_WEEKS, safeTotalWeeks);
-    blocks = [{ weekStart: 1, weekEnd: end, targets: base.targets }];
+    blocks = [{ id: 'spec-block-1', weekStart: 1, weekEnd: end, targets: base.targets }];
   }
   // Заполняем пропуски балансом и обрезаем пересечения: следующий блок
   // начинается после фактического конца предыдущего, а не поверх него.
@@ -256,19 +293,30 @@ export function buildSpecializationSchedule(
   for (const b of blocks) {
     const start = Math.max(cursor, b.weekStart);
     if (start > b.weekEnd) continue;
-    if (start > cursor) filled.push({ weekStart: cursor, weekEnd: start - 1, targets: [] });
+    if (start > cursor) filled.push({ id: `balance-${cursor}`, weekStart: cursor, weekEnd: start - 1, targets: [] });
     filled.push({ ...b, weekStart: start });
     cursor = start > cursor ? b.weekEnd + 1 : Math.max(cursor, b.weekEnd + 1);
   }
-  if (cursor <= safeTotalWeeks) filled.push({ weekStart: cursor, weekEnd: safeTotalWeeks, targets: [] });
+  if (cursor <= safeTotalWeeks) filled.push({ id: `balance-${cursor}`, weekStart: cursor, weekEnd: safeTotalWeeks, targets: [] });
   const primary = filled.find(b => b.targets.length > 0);
   return {
-    blocks: filled.length > 0 ? filled : [{ weekStart: 1, weekEnd: safeTotalWeeks, targets: [] }],
+    blocks: filled.length > 0 ? filled : [{ id: 'balance-1', weekStart: 1, weekEnd: safeTotalWeeks, targets: [] }],
     active: filled.some(b => b.targets.length > 0),
     primaryTargets: primary ? primary.targets : [],
     focus,
     weak: base.weak,
   };
+}
+
+/** Донорская политика недели по расписанию (null = нет tradeoff в этой неделе). */
+export function tradeoffForWeek(
+  schedule: SpecializationSchedule,
+  week: number,
+): VolumeTradeoffPolicy | null {
+  const block = schedule.blocks.find(b => week >= b.weekStart && week <= b.weekEnd);
+  return block && block.tradeoff && block.tradeoff.mode !== 'none'
+    ? block.tradeoff
+    : null;
 }
 
 /** Резолвер акцентов для конкретной недели плана по расписанию блоков.
@@ -287,9 +335,18 @@ export function specResForWeekSchedule(
   return { targets, focus: schedule.focus, weak: targets, active: targets.length > 0 };
 }
 
-/** Текст расписания для rationale: «нед 1-10 [chest, biceps] → нед 11-24 баланс». */
+/** Текст расписания для rationale: «нед 1-5 [chest, biceps] → нед 6-12 баланс». */
 export function specializationScheduleText(schedule: SpecializationSchedule): string {
   return schedule.blocks
-    .map(b => `нед ${b.weekStart}-${b.weekEnd}${b.targets.length > 0 ? ` [${b.targets.join(', ')}]` : ' баланс'}`)
+    .map(b => {
+      const base = `нед ${b.weekStart}-${b.weekEnd}${b.targets.length > 0 ? ` [${b.targets.join(', ')}]` : ' баланс'}`;
+      if (b.tradeoff && b.tradeoff.mode !== 'none' && b.tradeoff.donorMuscles.length > 0) {
+        const modeText = b.tradeoff.mode === 'remove_direct_when_indirect_covers_floor'
+          ? 'прямая работа убрана'
+          : 'прямая работа снижена';
+        return `${base} (доноры: ${b.tradeoff.donorMuscles.join(', ')} — ${modeText})`;
+      }
+      return base;
+    })
     .join(' → ');
 }

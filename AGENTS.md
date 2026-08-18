@@ -1,5 +1,36 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## BB-авто: многоблочная специализация + донорское перераспределение (Aug 18 2026, uncommitted)
+
+Задача: «цикл 12 недель — одна специализация 1-5, вторая 6-10» + «толщина спины за счёт
+рук на 5 недель». **Объёмная модель (MEV/MAV/MRV, уровень/стаж/PED/цель/капы) НЕ менялась**
+— донорский режим это слой перераспределения поверх рассчитанного плана.
+
+- **`bb-specialization.engine.ts`**: `VolumeTradeoffPolicy` (mode none/reduce_direct_to_floor/
+  remove_direct_when_indirect_covers_floor + donorMuscles + preserveIndirect), `SpecializationBlock`
+  += id/tradeoff; длина блока 3-6 нед, дефолт 5 (было 6-10); `tradeoffForWeek(schedule, week)`;
+  `specializationScheduleText` включает доноров.
+- **NEW `bb-specialization-registry.ts`**: реестр всех зон WEAK_GROUPS (key → canonical, label,
+  granular, patterns, donorRecommendations) — единый источник паттернов/доноров.
+- **NEW `bb-tradeoff.engine.ts`**: `applyTradeoffToPlan` — per-week: прямые изоляции донора
+  снимаются до effective floor = MEV (косвенная нагрузка сохраняется), освобождённые сеты
+  переносятся в паттерн-совпадающие упражнения цели в пределах adapted MRV, cap 5, session
+  caps, equipment; отчёт снято/перенесено/не использовано в rationale.
+- **bb-builder/cycle-to-plan**: tradeoff применяется после всех проходов, до finalize, во всех
+  трёх путях (generic/cycle adapt/program adapt); faithful не трогается.
+- **bb-finalize**: `tradeoffDonorsForWeek` — additive-проходы (arm allocation, arm heads, small
+  muscle, MEV feeders, fill, MEV-repair) НЕ возвращают объём донору в неделях tradeoff.
+- **UI (BbAutoConstructor)**: многоблочный редактор — список блоков (недели 3-6, цели 1-2,
+  режим доноров, доноры 1-2), «+ Добавить блок», удаление, итоговая строка «нед 1-5 [A] →
+  нед 6-10 [B] → нед 11-12 баланс»; миграция старых specBlocks/focusGroup/weakPoints.
+- Тесты: NEW `bb-tradeoff.test.ts` (8: нормализация политики, per-week доноры, remove/reduce
+  режимы, effective ≥ MEV, восстановление после блока, baseline без tradeoff неизменен,
+  многоблочное 12 нед 1-5/6-10/11-12); `bb-specialization-unified` обновлён под блок 5 нед.
+- Проверено: tsc 0 по моим файлам; целевые 65/65; bb+TrainingScreen_parts 1665/1667 (2 падения
+  — чужой manual-constructor WIP); полный прогон 6146/6154 — падения только чужие
+  (bb-macrocycle v7, stretch-session, cardio-prep, macrocycle-panel, manual-constructor,
+  pl-competition).
+
 ## BB-авто: травмы — щадящий режим, честный exclude, мобильность (Aug 18 2026, pushed 7efe9c96)
 
 Жалобы: «щадящий режим в выборе травм не выбирается — мышца нажимается один раз и

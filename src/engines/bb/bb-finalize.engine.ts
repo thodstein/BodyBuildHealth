@@ -17,7 +17,8 @@ import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyL
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { specResForWeekSchedule, type SpecializationSchedule } from './bb-specialization.engine';
+import { specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
+import { isMobilityRestricted } from './bb-mobility.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место). */
@@ -43,6 +44,16 @@ const WEAK_PATTERN_REQ: Record<string, RegExp> = {
   abs: /скручиван|crunch|подъём.*ног/i,
   lower_back: /гиперэкстенз|back.?extension/i,
 };
+
+/** Канонические мышцы-доноры недели по tradeoff-политике расписания.
+ *  Additive-проходы финализатора обязаны НЕ возвращать этим мышцам объём. */
+function tradeoffDonorsForWeek(options: BBFinalizeOptions, week: number): Set<string> {
+  const schedule = options.specializationSchedule;
+  if (!schedule) return new Set();
+  const policy = tradeoffForWeek(schedule, week);
+  if (!policy || policy.mode === 'none' || policy.donorMuscles.length === 0) return new Set();
+  return new Set(policy.donorMuscles.map(m => WEAK_TO_MUSCLE[m] || m));
+}
 
 /**
  * Специализация/слабые группы: гарантирует целевой паттерн для каждой слабой
@@ -401,11 +412,14 @@ function ensureBackBalance(session: any, week: any, options: BBFinalizeOptions):
 }
 
 /** Гарантирует direct arm-блок после indirect overlap и поздних cap-pass. */
-function allocateExperiencedArmSession(session: any, options: BBFinalizeOptions): void {
+function allocateExperiencedArmSession(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
   const tag = session.sessionTag || '';
   const targetMuscle = /Pull|Back|Upper|Arms/.test(tag) ? 'biceps' : /Push|Chest|Upper|Arms/.test(tag) ? 'triceps' : '';
   if (!targetMuscle) return;
+  // Донорская политика недели: не возвращать объём мышце-донору.
+  const donors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
+  if (donors.has(targetMuscle)) return;
   const existing = session.exercises.filter((e: any) => e.muscle === targetMuscle);
   const targetSets = (options.trainingYears ?? 0) >= 6 ? 6 : 5;
   let total = existing.reduce((sum: number, e: any) => sum + (e.sets || 0), 0);
@@ -807,11 +821,13 @@ function ensureRearDeltInPull(session: any, options: BBFinalizeOptions): void {
  * же мышцы, без изменения лимитов); при ≥6 сетов и дубле паттерна — дубль
  * заменяется на brachialis (hammer) / pushdown (lateral+medial головки).
  */
-function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
+function ensureArmHeadCoverage(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
+  const donors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
+  if (donors.has('biceps') && donors.has('triceps')) return;
   const tag = session.sessionTag || '';
   if (!/Upper|Pull|Push|Arms|Back/.test(tag) && tag !== '') return;
-  const arms = () => session.exercises.filter((e: any) => ['biceps', 'triceps'].includes(e.muscle) && !(e as any).warmupActivator);
+  const arms = () => session.exercises.filter((e: any) => ['biceps', 'triceps'].includes(e.muscle) && !(e as any).warmupActivator && !donors.has(e.muscle));
   const trimSets = (e: any, sets: number): void => {
     e.sets = sets;
     if (Array.isArray(e.workSets) && e.workSets.length > sets) e.workSets = e.workSets.slice(0, sets);
@@ -906,7 +922,7 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
   };
   // Biceps: растянутая позиция (incline curl).
   const biceps = session.exercises.filter((e: any) => e.muscle === 'biceps' && !(e as any).warmupActivator);
-  if (biceps.length > 0 && !biceps.some((e: any) => classifyArmExercise(e.name).pattern === 'biceps_lengthened')) {
+  if (!donors.has('biceps') && biceps.length > 0 && !biceps.some((e: any) => classifyArmExercise(e.name).pattern === 'biceps_lengthened')) {
     const slot = biceps.find((e: any) => classifyArmExercise(e.name).pattern === 'biceps_shortened' || classifyArmExercise(e.name).pattern === 'other');
     if (slot) {
       const candidate = findCatalog('biceps', /наклон.*скам|incline/i);
@@ -917,10 +933,10 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
       }
     }
   }
-  balanceHeads('biceps', 'biceps_lengthened', 'biceps_hammer', /молот|hammer/i, 'Brachialis (hammer): распределение объёма по головкам');
+  if (!donors.has('biceps')) balanceHeads('biceps', 'biceps_lengthened', 'biceps_hammer', /молот|hammer/i, 'Brachialis (hammer): распределение объёма по головкам');
   // Triceps: overhead (длинная головка).
   const triceps = session.exercises.filter((e: any) => e.muscle === 'triceps' && !(e as any).warmupActivator);
-  if (triceps.length > 0 && !triceps.some((e: any) => classifyArmExercise(e.name).pattern === 'triceps_overhead')) {
+  if (!donors.has('triceps') && triceps.length > 0 && !triceps.some((e: any) => classifyArmExercise(e.name).pattern === 'triceps_overhead')) {
     const slot = triceps.find((e: any) => classifyArmExercise(e.name).pattern === 'triceps_pushdown' || classifyArmExercise(e.name).pattern === 'triceps_compound' || classifyArmExercise(e.name).pattern === 'other');
     if (slot) {
       const candidate = findCatalog('triceps', /француз|french|из.?за.*голов|overhead/i);
@@ -931,7 +947,7 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
       }
     }
   }
-  balanceHeads('triceps', 'triceps_overhead', 'triceps_pushdown', /разгибан.*блок|pushdown|канат.*рукоят|трицепс.*блок/i, 'Lateral/medial головки трицепса (pushdown): распределение объёма по головкам');
+  if (!donors.has('triceps')) balanceHeads('triceps', 'triceps_overhead', 'triceps_pushdown', /разгибан.*блок|pushdown|канат.*рукоят|трицепс.*блок/i, 'Lateral/medial головки трицепса (pushdown): распределение объёма по головкам');
 }
 
 /**
@@ -942,13 +958,14 @@ function ensureArmHeadCoverage(session: any, options: BBFinalizeOptions): void {
  */
 function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
+  const donors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
   const tag = session.sessionTag || '';
   // BUG-FIX: проход не должен добавлять упражнения для мышц, исключённых
   // травмами (exclude=true) или в щадящем режиме (graded) — иначе «legs
   // exclude» возвращало икры/ягодицы, а щадящий режим раздувался до MEV.
   const excludedMuscles = new Set(options.excludedMuscles || []);
   const gradedMuscles = new Set(options.gradedMuscles || []);
-  const muscleExcluded = (m: string) => excludedMuscles.has(m) || gradedMuscles.has(m);
+  const muscleExcluded = (m: string) => excludedMuscles.has(m) || gradedMuscles.has(m) || donors.has(m);
   const weekCountOf = (m: string) => week.sessions.filter((s: any) => s.exercises.some((e: any) => e.muscle === m && !(e as any).warmupActivator)).length;
   const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
   const equipmentOk = (c: any) => {
@@ -1560,9 +1577,12 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
   for (const week of plan.weeks) {
     const phase = String((week as any).phase || '').toLowerCase();
     if (phase === 'deload' || week.sessions.some(session => session.exercises.some(exercise => /разгруз|deload/i.test(exercise.comment || '')))) continue;
+    const donors = tradeoffDonorsForWeek(options, week.week);
     const weekVolume = aggregateBBVolume(week.sessions);
     // Prioritize muscles by target-volume deficit (target vs effective), not just MEV.
-    const deficitByMuscle = muscles.map((muscle: string) => {
+    const deficitByMuscle = muscles
+      .filter(muscle => !donors.has(muscle))
+      .map((muscle: string) => {
       const landmarks = getVolumeLandmarks(options.level!, muscle);
       const effectiveSets = weekVolume[muscle]?.effectiveSets || 0;
       const target = plan.volumeTargets?.[muscle];
@@ -1886,11 +1906,11 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     for (const session of week.sessions) {
     allocateExperiencedBackSession(session, options);
     ensureBackBalance(session, week, options);
-    allocateExperiencedArmSession(session, options);
+    allocateExperiencedArmSession(session, week, options);
     allocateExperiencedLegSession(session, options);
     diversifyExperiencedChestSession(session, options);
     ensureRearDeltInPull(session, options);
-    ensureArmHeadCoverage(session, options);
+    ensureArmHeadCoverage(session, week, options);
     // Специализация/малые группы — только для генераторных планов (pattern.id):
     // произвольные/faithful входы сохраняют исходный набор упражнений.
     if ((next as any).pattern?.id) {
@@ -2025,6 +2045,7 @@ for (const week of next.weeks) {
       }
       const maxSessionSets = options.maxWorkingSets ?? 24;
       const raisedByMuscle = new Map<string, number>();
+      const donors = tradeoffDonorsForWeek(options, week.week);
       for (const s of week.sessions) {
         // Лимит сессии считает рабочие сеты (без warmup).
         const working = s.exercises.filter((x: any) => !(x as any).warmupActivator);
@@ -2035,6 +2056,8 @@ for (const week of next.weeks) {
         for (const x of working) sessDirect[x.muscle] = (sessDirect[x.muscle] || 0) + (x.sets || 0);
         for (const e of s.exercises) {
           if ((e as any).warmupActivator) continue;
+          // Донорская политика: не возвращать объём мышце-донору.
+          if (donors.has(e.muscle)) continue;
           // Repair поднимает только ИЗОЛЯЦИИ и тяги: push-compound (жимы/
           // приседы) создают косвенный объём на triceps/shoulders, выталкивая
           // их effective за кап. Руки (biceps/triceps/forearms) тоже исключены
@@ -2223,6 +2246,7 @@ for (const week of next.weeks) {
     const fillSets = (muscle: string) => ['calves', 'abs', 'traps', 'forearms'].includes(muscle) ? 3 : (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 4 : 3);
     for (const week of next.weeks) {
       if (isPrepControlled(week)) continue; // prep-недели не добираем
+      const donors = tradeoffDonorsForWeek(options, week.week);
       // Natural: малые группы (abs/traps) добираем ТОЛЬКО если их нет во всей
       // неделе — иначе fill дублирует пресс в каждой сессии (> MRV).
       const weekMuscles = new Set(week.sessions.flatMap(s => s.exercises.map((e: any) => e.muscle)));
@@ -2250,7 +2274,7 @@ for (const week of next.weeks) {
       for (const muscle of needMuscles) {
         // BUG-FIX: fill не должен добирать мышцы, исключённые травмами (exclude=true)
         // или находящиеся в щадящем режиме (graded — объём снижен намеренно).
-        if (excludedMusclesFinal.has(muscle) || gradedMusclesFinal.has(muscle)) continue;
+        if (excludedMusclesFinal.has(muscle) || gradedMusclesFinal.has(muscle) || donors.has(muscle)) continue;
         if (present.has(muscle)) continue;
         // Дубли малых групп по сессиям: abs до 2 источников (natural) / 3
         // (enhanced 1-3, MEV выше); traps/calves до 2 (обе Pull/Lower сессии).
@@ -2559,7 +2583,7 @@ for (const week of next.weeks) {
   // вернуть pushdown-изоляцию; замена — не добавление, лимиты не нарушаются).
   if (!options.preserveSource && (next as any).pattern?.id) {
     for (const week of next.weeks) for (const session of week.sessions) {
-      ensureArmHeadCoverage(session, options);
+      ensureArmHeadCoverage(session, week, options);
     }
   }
   // Разминочное упражнение на целевую группу — в самом конце, после всех

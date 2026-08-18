@@ -241,12 +241,12 @@ describe('cycle-путь: единая модель', () => {
   }, 30000);
 });
 
-describe('расписание блоков специализации (6-10 нед → баланс/другие цели)', () => {
-  it('legacy: один блок 10 нед + баланс в длинных планах', () => {
+describe('расписание блоков специализации (3-6 нед → баланс/другие цели)', () => {
+  it('legacy: один блок 5 нед + баланс в длинных планах', () => {
     const s = buildSpecializationSchedule(undefined, ['chest'], true, 16);
     expect(s.blocks).toEqual([
-      { weekStart: 1, weekEnd: 10, targets: ['chest'] },
-      { weekStart: 11, weekEnd: 16, targets: [] },
+      { id: 'spec-block-1', weekStart: 1, weekEnd: 5, targets: ['chest'] },
+      { id: 'balance-6', weekStart: 6, weekEnd: 16, targets: [] },
     ]);
     expect(s.active).toBe(true);
     expect(s.primaryTargets).toEqual(['chest']);
@@ -258,8 +258,8 @@ describe('расписание блоков специализации (6-10 н�
       { weekStart: 9, weekEnd: 16, targets: ['back'] },
     ]);
     expect(s.blocks).toEqual([
-      { weekStart: 1, weekEnd: 8, targets: ['chest', 'biceps'] },
-      { weekStart: 9, weekEnd: 16, targets: ['back'] },
+      { id: 'spec-block-1', weekStart: 1, weekEnd: 8, targets: ['chest', 'biceps'] },
+      { id: 'spec-block-2', weekStart: 9, weekEnd: 16, targets: ['back'] },
     ]);
   });
 
@@ -269,10 +269,10 @@ describe('расписание блоков специализации (6-10 н�
       { weekStart: 9, weekEnd: 99, targets: ['back_width'] },
     ]);
     expect(s.blocks).toEqual([
-      { weekStart: 1, weekEnd: 2, targets: [] },
-      { weekStart: 3, weekEnd: 6, targets: ['chest_upper', 'biceps'] },
-      { weekStart: 7, weekEnd: 8, targets: [] },
-      { weekStart: 9, weekEnd: 12, targets: ['back_width'] },
+      { id: 'balance-1', weekStart: 1, weekEnd: 2, targets: [] },
+      { id: 'spec-block-1', weekStart: 3, weekEnd: 6, targets: ['chest_upper', 'biceps'] },
+      { id: 'balance-7', weekStart: 7, weekEnd: 8, targets: [] },
+      { id: 'spec-block-2', weekStart: 9, weekEnd: 12, targets: ['back_width'] },
     ]);
   });
 
@@ -282,27 +282,27 @@ describe('расписание блоков специализации (6-10 н�
       { weekStart: 5, weekEnd: 12, targets: ['back'] },
     ]);
     expect(s.blocks).toEqual([
-      { weekStart: 1, weekEnd: 8, targets: ['chest'] },
-      { weekStart: 9, weekEnd: 12, targets: ['back'] },
+      { id: 'spec-block-1', weekStart: 1, weekEnd: 8, targets: ['chest'] },
+      { id: 'spec-block-2', weekStart: 9, weekEnd: 12, targets: ['back'] },
     ]);
   });
 
   it('specialization без слабых групп — расписание неактивно (полный баланс)', () => {
     const s = buildSpecializationSchedule(undefined, [], true, 12);
     expect(s.active).toBe(false);
-    expect(s.blocks).toEqual([{ weekStart: 1, weekEnd: 12, targets: [] }]);
+    expect(s.blocks).toEqual([{ id: 'balance-1', weekStart: 1, weekEnd: 12, targets: [] }]);
   });
 
   it('specResForWeekSchedule: цели в блоке, баланс вне блока', () => {
     const s = buildSpecializationSchedule(undefined, ['chest'], true, 16);
-    expect(specResForWeekSchedule(s, 10).targets).toEqual(['chest']);
-    expect(specResForWeekSchedule(s, 11).active).toBe(false);
-    expect(specResForWeekSchedule(s, 11).targets).toEqual([]);
+    expect(specResForWeekSchedule(s, 5).targets).toEqual(['chest']);
+    expect(specResForWeekSchedule(s, 6).active).toBe(false);
+    expect(specResForWeekSchedule(s, 6).targets).toEqual([]);
   });
 
   it('specializationScheduleText: читаемое описание блоков', () => {
     const s = buildSpecializationSchedule(undefined, ['chest'], true, 16);
-    expect(specializationScheduleText(s)).toBe('нед 1-10 [chest] → нед 11-16 баланс');
+    expect(specializationScheduleText(s)).toBe('нед 1-5 [chest] → нед 6-16 баланс');
   });
 
   it('generic 12 нед: блок 1 [chest] → блок 2 [back] — объём переключается по неделям', () => {

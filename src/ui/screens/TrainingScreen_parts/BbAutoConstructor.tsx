@@ -282,39 +282,75 @@ export const BbAutoConstructor: React.FC = () => {
   }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
-  // Единая модель акцентов: 1-2 отстающие мышцы (специализация). focusGroup и
-  // отдельный режим специализации больше не выбираются в UI — движок получает
-  // specialization: true + weakPoints: targets (без стэкинга 1.2×1.3).
-  const [specTargets, setSpecTargets] = useState<string[]>(() => normalizeSpecializationTargets((prof.weakPoints || []).slice(0, 2)));
-  // 📅 Планирование блоков специализации (для планов > 10 нед): блок 1 →
-  // баланс / те же мышцы / другие мышцы. Методика: блок 6-10 нед.
-  const [specBlockWeeks, setSpecBlockWeeks] = useState<number>(10);
-  const [specNextMode, setSpecNextMode] = useState<'balance' | 'same' | 'new'>('balance');
-  const [specNextTargets, setSpecNextTargets] = useState<string[]>([]);
-  // Явные блоки для движка (пусто = один блок по умолчанию + баланс).
+  // 📅 Многоблочная специализация: список блоков (3-6 нед каждый), у каждого
+  // блока цели 1-2, режим доноров и мышцы-доноры. Остаток плана — баланс.
+  interface UISpecBlock {
+    id: string;
+    weeks: number;
+    targets: string[];
+    tradeoffMode: 'none' | 'reduce_direct_to_floor' | 'remove_direct_when_indirect_covers_floor';
+    donors: string[];
+  }
+  const [specBlocks, setSpecBlocks] = useState<UISpecBlock[]>(() => {
+    const initial = normalizeSpecializationTargets((prof.weakPoints || []).slice(0, 2));
+    return initial.length > 0
+      ? [{ id: 'spec-block-1', weeks: 5, targets: initial, tradeoffMode: 'none' as const, donors: [] }]
+      : [];
+  });
+  // Цели первого блока — зеркало для движка/сплит-селектора (weakPoints).
+  const specTargets = specBlocks[0]?.targets ?? [];
+  // Явные блоки для движка: недели рассчитываются подряд из длительностей.
   const buildSpecBlocks = useMemo(() => {
-    if (specTargets.length === 0) return undefined;
-    const b1End = Math.min(Math.max(6, Math.min(10, specBlockWeeks)), bbWeeks);
-    const blocks: { weekStart: number; weekEnd: number; targets: string[] }[] = [
-      { weekStart: 1, weekEnd: b1End, targets: specTargets.slice(0, 2) },
-    ];
-    if (b1End < bbWeeks) {
-      if (specNextMode === 'same') blocks.push({ weekStart: b1End + 1, weekEnd: bbWeeks, targets: specTargets.slice(0, 2) });
-      else if (specNextMode === 'new' && specNextTargets.length > 0) blocks.push({ weekStart: b1End + 1, weekEnd: bbWeeks, targets: specNextTargets.slice(0, 2) });
+    if (specBlocks.length === 0) return undefined;
+    const blocks: { id: string; weekStart: number; weekEnd: number; targets: string[]; tradeoff?: { mode: UISpecBlock['tradeoffMode']; donorMuscles: string[]; preserveIndirect: true } }[] = [];
+    let cursor = 1;
+    for (const b of specBlocks) {
+      if (cursor > bbWeeks) break;
+      const weeks = Math.max(3, Math.min(6, Math.round(b.weeks || 5)));
+      const end = Math.min(bbWeeks, cursor + weeks - 1);
+      blocks.push({
+        id: b.id,
+        weekStart: cursor,
+        weekEnd: end,
+        targets: normalizeSpecializationTargets(b.targets),
+        ...(b.tradeoffMode !== 'none' && b.donors.length > 0 && b.targets.length > 0
+          ? { tradeoff: { mode: b.tradeoffMode, donorMuscles: normalizeSpecializationTargets(b.donors), preserveIndirect: true as const } }
+          : {}),
+      });
+      cursor = end + 1;
     }
-    return blocks;
-  }, [specTargets, specBlockWeeks, specNextMode, specNextTargets, bbWeeks]);
+    return blocks.length > 0 ? blocks : undefined;
+  }, [specBlocks, bbWeeks]);
   const specSchedulePreview = useMemo(() => {
-    if (specTargets.length === 0) return '';
-    const b1End = Math.min(Math.max(6, Math.min(10, specBlockWeeks)), bbWeeks);
-    const parts: string[] = [`нед 1-${b1End} [${specTargets.slice(0, 2).join(', ')}]`];
-    if (b1End < bbWeeks) {
-      if (specNextMode === 'same') parts.push(`нед ${b1End + 1}-${bbWeeks} [${specTargets.slice(0, 2).join(', ')}]`);
-      else if (specNextMode === 'new' && specNextTargets.length > 0) parts.push(`нед ${b1End + 1}-${bbWeeks} [${specNextTargets.slice(0, 2).join(', ')}]`);
-      else parts.push(`нед ${b1End + 1}-${bbWeeks} баланс`);
+    if (specBlocks.length === 0) return '';
+    const parts: string[] = [];
+    let cursor = 1;
+    for (const b of specBlocks) {
+      if (cursor > bbWeeks) break;
+      const weeks = Math.max(3, Math.min(6, Math.round(b.weeks || 5)));
+      const end = Math.min(bbWeeks, cursor + weeks - 1);
+      if (b.targets.length > 0) {
+        parts.push(`нед ${cursor}-${end} [${b.targets.slice(0, 2).join(', ')}]${b.tradeoffMode !== 'none' && b.donors.length > 0 ? ` (доноры: ${b.donors.join(', ')})` : ''}`);
+      } else {
+        parts.push(`нед ${cursor}-${end} баланс`);
+      }
+      cursor = end + 1;
     }
+    if (cursor <= bbWeeks) parts.push(`нед ${cursor}-${bbWeeks} баланс`);
     return parts.join(' → ');
-  }, [specTargets, specBlockWeeks, specNextMode, specNextTargets, bbWeeks]);
+  }, [specBlocks, bbWeeks]);
+  const addSpecBlock = () => {
+    const used = specBlocks.reduce((sum, b) => sum + Math.max(3, Math.min(6, Math.round(b.weeks || 5))), 0);
+    const remain = bbWeeks - used;
+    if (remain < 3) { flash('Недостаточно недель: остаток меньше 3 — это баланс/переход'); return; }
+    setSpecBlocks(prev => [...prev, { id: `spec-block-${prev.length + 1}`, weeks: Math.min(5, remain), targets: [], tradeoffMode: 'none', donors: [] }]);
+  };
+  const updateSpecBlock = (id: string, patch: Partial<UISpecBlock>) => {
+    setSpecBlocks(prev => prev.map(b => (b.id === id ? { ...b, ...patch } : b)));
+  };
+  const removeSpecBlock = (id: string) => {
+    setSpecBlocks(prev => prev.filter(b => b.id !== id));
+  };
   const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(
     ((prof as any).trainingFocus || 'hypertrophy') as 'strength' | 'hypertrophy' | 'endurance',
   );
@@ -948,8 +984,8 @@ export const BbAutoConstructor: React.FC = () => {
   }, [specTargets, allLandmarks]);
   // Чип недоступен: достигнут лимит 2 целей ИЛИ конфликт региона
   // (shoulders + delt_mid нельзя; delt_mid + delt_rear можно).
-  const specChipDisabled = (id: string, on: boolean) =>
-    !!on ? false : specTargets.length >= 2 || specTargets.some(t => isRegionConflict(t, id));
+  const specChipDisabled = (targets: string[], id: string, on: boolean) =>
+    !!on ? false : targets.length >= 2 || targets.some(t => isRegionConflict(t, id));
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
 
   const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
@@ -1542,10 +1578,25 @@ export const BbAutoConstructor: React.FC = () => {
     if (v.params.weeks) setBbWeeks(v.params.weeks);
     if (v.params.volumeGoal) setBbVolGoal(v.params.volumeGoal);
     if (Array.isArray(v.params.peds)) setPeds(v.params.peds as PED[]);
-    if (Array.isArray(v.params.weakPoints)) setSpecTargets(v.params.weakPoints);
-    if (v.params.focusGroup != null && v.params.focusGroup !== '') {
-      // Миграция старых вариантов: focusGroup → первая отстающая мышца.
-      setSpecTargets(prev => prev.length > 0 ? prev : [v.params.focusGroup as string]);
+    // Миграция выбора специализации: specBlocks (новый формат) → слабые
+    // точки/фокус (старый формат) → первый блок с целями.
+    const legacyTargets = normalizeSpecializationTargets([
+      ...(Array.isArray(v.params.weakPoints) ? v.params.weakPoints : []),
+      ...(v.params.focusGroup && v.params.focusGroup !== '' ? [v.params.focusGroup as string] : []),
+    ]);
+    if (Array.isArray(v.params.specBlocks) && v.params.specBlocks.length > 0) {
+      const blocks = v.params.specBlocks
+        .filter((b: any) => Array.isArray(b.targets) && b.targets.length > 0)
+        .map((b: any, idx: number) => ({
+          id: `spec-block-${idx + 1}`,
+          weeks: Math.max(3, Math.min(6, Math.round((b.weekEnd ?? b.weeks ?? 5) - (b.weekStart ?? (idx > 0 ? (v.params.specBlocks?.[idx - 1]?.weekEnd ?? 1) + 1 : 1)) + 1))),
+          targets: normalizeSpecializationTargets(b.targets),
+          tradeoffMode: (b.tradeoff && b.tradeoff.mode && b.tradeoff.mode !== 'none' ? b.tradeoff.mode : 'none') as any,
+          donors: b.tradeoff && Array.isArray(b.tradeoff.donorMuscles) ? normalizeSpecializationTargets(b.tradeoff.donorMuscles) : [],
+        }));
+      if (blocks.length > 0) setSpecBlocks(blocks);
+    } else if (legacyTargets.length > 0) {
+      setSpecBlocks([{ id: 'spec-block-1', weeks: 5, targets: legacyTargets, tradeoffMode: 'none', donors: [] }]);
     }
     if (v.params.loadStrategy) setLoadStrategy(v.params.loadStrategy as LoadStrategy);
     if (v.params.deloadType) setDeloadType(v.params.deloadType as DeloadType);
@@ -1553,20 +1604,9 @@ export const BbAutoConstructor: React.FC = () => {
     if (v.params.methodology) setBbMethodology(v.params.methodology as SessionMethodology);
     if (Array.isArray(v.params.equipment)) setBbEquipment(v.params.equipment);
     if (v.params.specialization != null) {
-      // Миграция: старый флаг специализации → выбор отстающих мышц.
-      if (v.params.specialization && v.params.weakPoints?.length) setSpecTargets(v.params.weakPoints.slice(0, 2));
-    }
-    if (Array.isArray(v.params.specBlocks) && v.params.specBlocks.length > 0) {
-      const b1 = v.params.specBlocks[0];
-      const b2 = v.params.specBlocks[1];
-      if (b1?.weekEnd) setSpecBlockWeeks(Math.max(6, Math.min(10, b1.weekEnd)));
-      if (b2) {
-        const same = JSON.stringify(b2.targets || []) === JSON.stringify(b1?.targets || []);
-        if (same) setSpecNextMode('same');
-        else if ((b2.targets || []).length > 0) { setSpecNextMode('new'); setSpecNextTargets(normalizeSpecializationTargets(b2.targets.slice(0, 2))); }
-        else setSpecNextMode('balance');
-      } else {
-        setSpecNextMode('balance');
+      // Миграция: старый флаг специализации без specBlocks → блок 1 с целями.
+      if (v.params.specialization && legacyTargets.length > 0) {
+        setSpecBlocks([{ id: 'spec-block-1', weeks: 5, targets: legacyTargets, tradeoffMode: 'none', donors: [] }]);
       }
     }
     if (v.params.pedDoses) setPedDoses({ ...v.params.pedDoses });
@@ -1783,80 +1823,90 @@ export const BbAutoConstructor: React.FC = () => {
     );
   };
 
-  // 📅 Планирование блоков специализации (для планов > 10 нед).
-  // Методика: блок 6-10 нед → на выбор: баланс / те же мышцы / другие мышцы.
-  const renderSpecPlanner = () => {
-    if (specTargets.length === 0 || bbWeeks <= 10) return null;
-    const remainder = Math.max(0, bbWeeks - specBlockWeeks);
+  /** Единственная точка выбора специализации. Она живёт на шаге 1 независимо
+   *  от источника программы; в шаге 2 выбор повторно не показывается. */
+  const renderSpecializationSelection = () => {
+    const blockWeekRange = (idx: number, weeks: number): string => {
+      const start = specBlocks.slice(0, idx).reduce((sum, b) => sum + Math.max(3, Math.min(6, Math.round(b.weeks || 5))), 1);
+      const end = Math.min(bbWeeks, start + Math.max(3, Math.min(6, Math.round(weeks || 5))) - 1);
+      return `${start}-${end}`;
+    };
     return (
-      <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.18)' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:4 }}>📅 Планирование блоков (специализация 6-10 нед)</div>
-        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-          <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Блок 1:</span>
-          <PopupNumber label="" value={specBlockWeeks} min={6} max={10} suffix=" нед" onChange={v => setSpecBlockWeeks(Math.max(6, Math.min(10, Math.round(v))))} />
-          {remainder > 0 && <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>→ остаток {remainder} нед:</span>}
-        </div>
-        {remainder > 0 && (
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
-            {([['balance', '↩ Баланс'], ['same', '🔁 Продолжить те же'], ['new', '🎯 Другие мышцы']] as const).map(([id, label]) => (
-              <button key={id} onClick={() => setSpecNextMode(id)}
-                style={{ padding:'4px 10px', borderRadius:999, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:32,
-                  border: specNextMode === id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
-                  background: specNextMode === id ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
-                  color: specNextMode === id ? '#ec4899' : 'rgba(255,255,255,0.6)' }}>{label}</button>
-            ))}
-          </div>
-        )}
-        {remainder > 0 && specNextMode === 'new' && (
-          <div style={{ marginTop:6 }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:4 }}>🎯 Мышцы блока 2 (1-2):</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
+        {specBlocks.map((b, idx) => (
+          <div key={b.id} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:6 }}>
+              <span style={{ fontSize:10, fontWeight:800, color:'#fbbf24' }}>Блок {idx + 1} · нед {blockWeekRange(idx, b.weeks)}</span>
+              <PopupNumber label="" value={b.weeks} min={3} max={6} suffix=" нед" onChange={v => updateSpecBlock(b.id, { weeks: Math.max(3, Math.min(6, Math.round(v))) })} />
+              <button onClick={() => removeSpecBlock(b.id)} disabled={specBlocks.length <= 1} style={{ marginLeft:'auto', padding:'3px 8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:specBlocks.length<=1?'default':'pointer', border:'1px solid rgba(239,68,68,0.35)', background:'rgba(239,68,68,0.08)', color:'#f87171', opacity:specBlocks.length<=1?0.4:1 }}>✕ Удалить</button>
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
               {WEAK_GROUPS.map(([id, l]) => {
-                const on = specNextTargets.includes(id);
-                const disabled = !on && (specNextTargets.length >= 2 || specNextTargets.some(t => isRegionConflict(t, id)));
-                return <button key={id} disabled={disabled} onClick={() => setSpecNextTargets(t => normalizeSpecializationTargets(on ? t.filter(x => x !== id) : [...t, id]))}
-                  style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:32,
-                    background: on ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: on ? '1px solid rgba(236,72,153,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                    color: on ? '#ec4899' : disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.6)',
-                    opacity: disabled ? 0.5 : 1 }}>{on ? '✓ ' : ''}{l}</button>;
+                const on = b.targets.includes(id);
+                const disabled = specChipDisabled(b.targets, id, on);
+                return (
+                  <button key={id} disabled={disabled} onClick={() => updateSpecBlock(b.id, { targets: normalizeSpecializationTargets(on ? b.targets.filter(x => x !== id) : [...b.targets, id]) })}
+                    style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:32,
+                      background:on?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.04)',
+                      border:on?'1px solid rgba(245,158,11,0.4)':'1px solid rgba(255,255,255,0.08)',
+                      color:on?'#fbbf24':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.75)', opacity:disabled?0.5:1 }}>
+                    {on ? '✓ ' : ''}{l}
+                  </button>
+                );
               })}
             </div>
+            {b.targets.length > 0 && (
+              <>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+                  {([['none', 'Обычная специализация'], ['reduce_direct_to_floor', 'Снизить прямую работу доноров'], ['remove_direct_when_indirect_covers_floor', 'Убрать прямую работу, если хватает indirect']] as const).map(([mode, label]) => (
+                    <button key={mode} onClick={() => updateSpecBlock(b.id, { tradeoffMode: mode })}
+                      style={{ padding:'4px 8px', borderRadius:999, fontSize:9, fontWeight:700, cursor:'pointer', minHeight:30,
+                        border: b.tradeoffMode === mode ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
+                        background: b.tradeoffMode === mode ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
+                        color: b.tradeoffMode === mode ? '#ec4899' : 'rgba(255,255,255,0.6)' }}>{label}</button>
+                  ))}
+                </div>
+                {b.tradeoffMode !== 'none' && (
+                  <div style={{ marginBottom:6 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#ec4899', marginBottom:4 }}>👤 Доноры (1-2, косвенная нагрузка сохраняется):</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {WEAK_GROUPS.map(([id, l]) => {
+                        const on = b.donors.includes(id);
+                        const sameAsTarget = b.targets.some(t => canonicalMuscle(t) === canonicalMuscle(id));
+                        const disabled = !on && (b.donors.length >= 2 || sameAsTarget || b.donors.some(t => isRegionConflict(t, id)));
+                        return (
+                          <button key={id} disabled={disabled} onClick={() => updateSpecBlock(b.id, { donors: normalizeSpecializationTargets(on ? b.donors.filter(x => x !== id) : [...b.donors, id]) })}
+                            style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:9, fontWeight:700, minHeight:30,
+                              background:on?'rgba(236,72,153,0.15)':'rgba(255,255,255,0.03)',
+                              border:on?'1px solid rgba(236,72,153,0.4)':'1px solid rgba(255,255,255,0.08)',
+                              color:on?'#ec4899':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.6)', opacity:disabled?0.5:1 }}>
+                            {on ? '✓ ' : ''}{l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginTop:4, fontSize:9, color:'rgba(255,255,255,0.4)', lineHeight:1.4 }}>
+                      Косвенная нагрузка донора (тяги → бицепс, жимы → трицепс) всегда сохраняется; effective объём не опускается ниже MEV.
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+        <button onClick={addSpecBlock} style={{ width:'100%', padding:'6px 10px', borderRadius:10, fontSize:10, fontWeight:700, cursor:'pointer', border:'1px dashed rgba(236,72,153,0.4)', background:'rgba(236,72,153,0.04)', color:'#ec4899' }}>
+          + Добавить блок специализации (3-6 нед)
+        </button>
+        {specSchedulePreview && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.45)', lineHeight:1.5 }}>Итог: {specSchedulePreview}</div>}
+        {specTargets.length > 0 && (
+          <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.5 }}>
+            Базовый ориентир блока 1: {specVolumeSummary}. Фактический план дополнительно учитывает уровень, стаж, цель, PED, восстановление, питание, лабораторную коррекцию и фазу.
           </div>
         )}
-        {specSchedulePreview && <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.45)', lineHeight:1.5 }}>Итог: {specSchedulePreview}</div>}
       </div>
     );
   };
-
-  /** Единственная точка выбора специализации. Она живёт на шаге 1 независимо
-   *  от источника программы; в шаге 2 выбор повторно не показывается. */
-  const renderSpecializationSelection = () => (
-    <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.05)', border:'1px solid rgba(245,158,11,0.18)' }}>
-      <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>🎯 Отстающие мышцы (специализация, 1-2)</div>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-        {WEAK_GROUPS.map(([id, l]) => {
-          const on = specTargets.includes(id);
-          const disabled = specChipDisabled(id, on);
-          return (
-            <button key={id} disabled={disabled} onClick={() => setSpecTargets(t => normalizeSpecializationTargets(on ? t.filter(x => x !== id) : [...t, id]))}
-              style={{ padding:'5px 10px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:10, fontWeight:700, minHeight:38,
-                background:on?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.04)',
-                border:on?'1px solid rgba(245,158,11,0.4)':'1px solid rgba(255,255,255,0.06)',
-                color:on?'#fbbf24':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.75)', opacity:disabled?0.5:1 }}>
-              {on ? '✓ ' : ''}{l}
-            </button>
-          );
-        })}
-      </div>
-      {specTargets.length > 0 && (
-        <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.5 }}>
-          Базовый ориентир: {specVolumeSummary}. Фактический план дополнительно учитывает уровень, стаж, цель, PED, восстановление, питание, лабораторную коррекцию и фазу; выбранные зоны получают приоритет и частоту 2-4×/нед.
-        </div>
-      )}
-      {renderSpecPlanner()}
-    </div>
-  );
 
   const renderParams = () => (
     <div>

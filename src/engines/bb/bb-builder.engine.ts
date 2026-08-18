@@ -51,7 +51,8 @@ import type { BBPlanReport } from './bb-report.engine';
 import { applyDUPOverlay, type DUPConfig } from './bb-dup.engine';
 import type { BBPlanValidationResult } from './bb-validator.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationResolution, type SpecializationBlock } from './bb-specialization.engine';
+import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 
 // P7: приоритет equipment по фазе (формирует пропорцию compound/isolation/cable/machine из PHASE_CONFIGS)
 export const PHASE_EQUIPMENT_PREF: Record<string, string[]> = {
@@ -3127,6 +3128,28 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
     if (cautionMuscles.length > 0) {
       rationale.push(`⚠ Per-muscle ACWR caution: ${cautionMuscles.map(([m, v]) => `${m}=${v.ratio}`).join(', ')} — контролировать объём.`);
+    }
+  }
+  // 🔁 Донорское перераспределение специализации (цель за счёт доноров).
+  // Слой ПОВЕРХ рассчитанного объёма: базовые коэффициенты не меняются.
+  if (specSchedule.active) {
+    const tradeoffReports = applyTradeoffToPlan(
+      finalPlan,
+      w => tradeoffForWeek(specSchedule, w),
+      w => specResForWeekSchedule(specSchedule, w).targets,
+      {
+        level,
+        mrvByMuscle,
+        workMax,
+        equipment: eqList,
+        maxExercisesPerSession: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10,
+        maxWorkingSetsPerSession: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24,
+      },
+    );
+    for (const report of tradeoffReports) {
+      if (report.removedSets > 0 || report.transferredSets > 0) {
+        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
+      }
     }
   }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, effectiveMrvMult);

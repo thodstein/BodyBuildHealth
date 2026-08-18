@@ -28,7 +28,8 @@ import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-
 import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
-import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, isSpecializationWeak, isSpecializationFocus, buildSpecializationSchedule, specResForWeekSchedule, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
+import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
+import { applyTradeoffToPlan } from './bb-tradeoff.engine';
 
 /**
  * Вычислить ACWR из реальных sRPE-сессий пользователя (отдельная функция для cycle/program mode).
@@ -1177,6 +1178,33 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const pedMrvMult = pedAdapt.combinedMrvMultiplier ?? 1;
   // P0-4 (audit 2026-08): применяем eccentricMult к primary-упражнениям
   finalPlan = applyEccentricOverloadToPlan(finalPlan, input.eccentricMult);
+  // 🔁 Донорское перераспределение специализации (adapt): слой поверх
+  // рассчитанного объёма, базовые коэффициенты не меняются.
+  if (mode === 'adapt' && specSchedule.active) {
+    const tradeoffMrvByMuscle: Record<string, number> = {};
+    for (const [m, lm] of Object.entries(allLandmarks)) {
+      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * mrvMult);
+    }
+    const capLevel = String(level);
+    const tradeoffReports = applyTradeoffToPlan(
+      finalPlan,
+      w => tradeoffForWeek(specSchedule, w),
+      w => specResForWeekSchedule(specSchedule, w).targets,
+      {
+        level,
+        mrvByMuscle: tradeoffMrvByMuscle,
+        workMax,
+        equipment,
+        maxExercisesPerSession: capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10,
+        maxWorkingSetsPerSession: capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24,
+      },
+    );
+    for (const report of tradeoffReports) {
+      if (report.removedSets > 0 || report.transferredSets > 0) {
+        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
+      }
+    }
+  }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, level, pedMrvMult);
 
   // muscleFrequency: вычислить из дней недели 1 — сколько раз каждая мышца тренируется
@@ -1956,6 +1984,33 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // Volume-landmarks
   // P0-4 (audit 2026-08): применяем eccentricMult к primary-упражнениям
   finalPlan = applyEccentricOverloadToPlan(finalPlan, opts.eccentricMult);
+  // 🔁 Донорское перераспределение специализации (adapt): слой поверх
+  // рассчитанного объёма, базовые коэффициенты не меняются.
+  if (mode === 'adapt' && specSchedule.active) {
+    const tradeoffMrvByMuscle: Record<string, number> = {};
+    for (const [m, lm] of Object.entries(allLandmarks)) {
+      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * mrvMult);
+    }
+    const capLevel = String(opts.level ?? levelForLandmarks);
+    const tradeoffReports = applyTradeoffToPlan(
+      finalPlan,
+      w => tradeoffForWeek(specSchedule, w),
+      w => specResForWeekSchedule(specSchedule, w).targets,
+      {
+        level: levelForLandmarks,
+        mrvByMuscle: tradeoffMrvByMuscle,
+        workMax,
+        equipment: eqList,
+        maxExercisesPerSession: capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 18 : capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 14 : 10,
+        maxWorkingSetsPerSession: capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 60 : capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 40 : 24,
+      },
+    );
+    for (const report of tradeoffReports) {
+      if (report.removedSets > 0 || report.transferredSets > 0) {
+        rationale.push(`🔁 Донорское перераспределение (нед ${report.week}): доноры [${report.donors.join(', ')}] — снято ${report.removedSets} сетов, перенесено ${report.transferredSets}, не использовано ${report.unusedSets}${report.notes.length ? ` (${report.notes.join('; ')})` : ''}.`);
+      }
+    }
+  }
   const volumeLandmarks = getBBVolumeLandmarks(finalPlan, levelForLandmarks, pedMrvMult);
   return finalizeBBPlan({ ...finalPlan, volumeLandmarks, muscleFrequency }, {
     reorder: mode !== 'faithful',
