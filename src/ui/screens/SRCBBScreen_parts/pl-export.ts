@@ -299,10 +299,19 @@ export function showPrintOverlay(html: string, title: string, text?: string): vo
   hint.textContent = 'На телефоне: «Печать» → «Сохранить как PDF» или «Сохранить в Файлы».';
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;min-height:0;';
-  iframe.sandbox = 'allow-same-origin';
+  // ВАЖНО: без allow-modals Chrome (и WebView Telegram) блокирует print() в
+  // sandbox-iframe — кнопка печати «молча» не срабатывала.
+  iframe.sandbox = 'allow-same-origin allow-modals';
   iframe.srcdoc = html;
   printBtn.addEventListener('click', () => {
-    try { iframe.contentWindow?.print(); } catch { /* ignore */ }
+    try {
+      const w = iframe.contentWindow;
+      if (w) {
+        w.focus();
+        // даём iframe дорисовать контент, затем вызываем системную печать
+        setTimeout(() => { try { w.print(); } catch { /* ignore */ } }, 120);
+      }
+    } catch { /* ignore */ }
   });
   copyBtn.addEventListener('click', () => {
     const t = text || htmlToText(html);
