@@ -129,7 +129,7 @@ describe('PLPlanView — цепочка экспорта', () => {
     fireEvent.click(screen.getByText('📤 Экспорт'));
     fireEvent.click(screen.getByText('📊 Excel (.xlsx)'));
     fireEvent.click(screen.getByText('📋 Весь план'));
-    fireEvent.click(screen.getByText(/Экспорт: Excel · Весь план/));
+    fireEvent.click(screen.getByText(/Сохранить Excel · Весь план/));
     expect(dlSpy).toHaveBeenCalledTimes(1);
     const [wb, filename] = dlSpy.mock.calls[0];
     expect(filename).toContain('cycle-01');
@@ -142,7 +142,7 @@ describe('PLPlanView — цепочка экспорта', () => {
     fireEvent.click(screen.getByText('🖨 PDF'));
     fireEvent.click(screen.getByText('🧩 Отдельный блок на выбор'));
     fireEvent.click(screen.getByLabelText('Экспорт блок taper'));
-    fireEvent.click(screen.getByText(/Экспорт: PDF · Блок/));
+    fireEvent.click(screen.getByText(/Сохранить PDF · Блок/));
     expect(printSpy).toHaveBeenCalledTimes(1);
     const [html] = printSpy.mock.calls[0];
     expect(html).toContain('Тестовый цикл');
@@ -156,7 +156,7 @@ describe('PLPlanView — цепочка экспорта', () => {
     fireEvent.click(screen.getByText('📊 Excel (.xlsx)'));
     fireEvent.click(screen.getByText('📅 Одна неделя на выбор'));
     fireEvent.click(screen.getByLabelText('Экспорт неделя 1'));
-    fireEvent.click(screen.getByText(/Экспорт: Excel · Неделя 1/));
+    fireEvent.click(screen.getByText(/Сохранить Excel · Неделя 1/));
     const [wb] = dlSpy.mock.calls[0];
     const rows = XLSX.utils.sheet_to_json(wb.Sheets['План']) as { Неделя: number }[];
     expect(rows.length).toBe(3);
@@ -168,18 +168,18 @@ describe('PLPlanView — цепочка экспорта', () => {
     fireEvent.click(screen.getByText('📤 Экспорт'));
     fireEvent.click(screen.getByText('📊 Excel (.xlsx)'));
     fireEvent.click(screen.getByText('📦 Всё вместе'));
-    fireEvent.click(screen.getByText(/Экспорт: Excel · Всё вместе/));
+    fireEvent.click(screen.getByText(/Сохранить Excel · Всё вместе/));
     const [wb] = dlSpy.mock.calls[0];
     expect(wb.Sheets['Сводка']).toBeTruthy();
   });
 
-  it('📲 Поделиться в ТГ: openPLShare вызывается со ссылкой t.me/share + #pl-plan-', () => {
+  it('📲 Поделиться в ТГ: openPLShare вызывается со ссылкой Telegram Mini App', () => {
     render(<PLPlanView api={api()} />);
     fireEvent.click(screen.getByText('📲 Поделиться в ТГ'));
     expect(shareSpy).toHaveBeenCalledTimes(1);
     const [link] = shareSpy.mock.calls[0];
     expect(link).toContain('https://t.me/share/url?url=');
-    expect(decodeURIComponent(link)).toContain('#pl-plan-cycle-01');
+    expect(decodeURIComponent(link)).toContain('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01');
     expect(decodeURIComponent(link)).toContain('Тестовый цикл');
   });
 

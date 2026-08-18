@@ -138,11 +138,47 @@ export async function saveFileToDevice(blob: Blob, filename: string): Promise<Fi
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  a.setAttribute('aria-label', `Сохранить файл ${filename}`);
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => { URL.revokeObjectURL(url); }, 500);
+  // В мобильном WebView атрибут download может быть проигнорирован. Оставляем
+  // пользователю явную кнопку, которую можно нажать после разрешения загрузки.
+  showFileSaveOverlay(url, filename, () => URL.revokeObjectURL(url));
   return 'downloaded';
+}
+
+const FILE_SAVE_OVERLAY_ID = 'pl-file-save-overlay';
+
+function showFileSaveOverlay(url: string, filename: string, cleanup: () => void): void {
+  document.getElementById(FILE_SAVE_OVERLAY_ID)?.remove();
+  const root = document.createElement('div');
+  root.id = FILE_SAVE_OVERLAY_ID;
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-label', 'Сохранение файла');
+  root.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:20px;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;';
+  const card = document.createElement('div');
+  card.style.cssText = 'width:min(420px,100%);background:#18181b;color:#fff;border:1px solid rgba(0,230,138,.35);border-radius:14px;padding:18px;box-sizing:border-box;';
+  const title = document.createElement('div');
+  title.textContent = `💾 Сохранить ${filename}`;
+  title.style.cssText = 'font-weight:800;font-size:15px;margin-bottom:8px;';
+  const hint = document.createElement('div');
+  hint.textContent = 'Если файл не сохранился автоматически, нажмите кнопку ниже.';
+  hint.style.cssText = 'color:rgba(255,255,255,.6);font-size:12px;line-height:1.4;margin-bottom:14px;';
+  const save = document.createElement('a');
+  save.href = url;
+  save.download = filename;
+  save.textContent = '💾 Сохранить файл';
+  save.setAttribute('aria-label', `Сохранить файл ${filename}`);
+  save.style.cssText = 'display:block;text-align:center;padding:12px;border-radius:10px;background:#00e68a;color:#000;font-weight:800;text-decoration:none;min-height:44px;box-sizing:border-box;';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.textContent = 'Закрыть';
+  close.style.cssText = 'display:block;width:100%;margin-top:8px;padding:10px;border:1px solid rgba(255,255,255,.15);border-radius:10px;background:transparent;color:#fff;min-height:44px;';
+  close.onclick = () => { root.remove(); cleanup(); };
+  card.append(title, hint, save, close);
+  root.append(card);
+  document.body.append(root);
 }
 
 export async function downloadPLExcel(wb: XLSX.WorkBook, filename: string): Promise<FileSaveResult> {
@@ -278,7 +314,7 @@ export function showPrintOverlay(html: string, title: string, text?: string): vo
 // ── Telegram share ──
 export interface PLShareOpts {
   title: string; weeks: number; pmSquat: number; pmBench: number; pmDead: number;
-  cycleId: string; baseUrl: string; plan?: LMSPlanWeek[]; includeUrl?: boolean;
+  cycleId: string; baseUrl: string; plan?: LMSPlanWeek[]; includeUrl?: boolean; telegramUrl?: string;
 }
 
 const DIGEST_MAX = 1800;
@@ -313,8 +349,14 @@ export function plShareDigest(o: { title: string; weeks: LMSPlanWeek[]; pmSquat:
   return lines.join('\n');
 }
 
+/** Deep-link Telegram Mini App. `startapp` is read from initDataUnsafe on launch. */
+export function plTelegramAppUrl(cycleId: string, botUsername = 'BBHealthBot'): string {
+  const bot = botUsername.replace(/^@/, '').trim();
+  return `https://t.me/${encodeURIComponent(bot)}?startapp=${encodeURIComponent(`pl-plan-${cycleId}`)}`;
+}
+
 export function plShareLink(o: PLShareOpts): string {
-  const url = `${o.baseUrl}#pl-plan-${encodeURIComponent(o.cycleId)}`;
+  const url = o.telegramUrl || `${o.baseUrl}#pl-plan-${encodeURIComponent(o.cycleId)}`;
   const digest = plShareDigest({ title: o.title, weeks: o.plan ?? [], totalWeeks: o.weeks, pmSquat: o.pmSquat, pmBench: o.pmBench, pmDead: o.pmDead });
   const text = o.includeUrl === false
     ? digest

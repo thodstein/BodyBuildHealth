@@ -32,7 +32,7 @@ import type { BridgeSession } from '../../../engines/training-integration.engine
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
-import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, plShareDigest, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
+import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
 const ACCENT = '#00e68a';
@@ -344,9 +344,9 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
                  <button onClick={async () => {
                    const title = builtSrc.template.meta.title;
-                   const url = `${window.location.origin}${window.location.pathname}#pl-plan-${encodeURIComponent(selectedCycleId)}`;
+                   const url = plTelegramAppUrl(selectedCycleId);
                    const digest = plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead });
-                   const link = plShareLink({ title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, plan: W });
+                   const link = plShareLink({ title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, telegramUrl: url, plan: W });
                    const result = await openPLShare(link, { title: `ПЛ: ${title}`, text: digest, url });
                    onNote(result === 'shared' ? '📲 План передан через системное меню «Поделиться».' : '📲 Открыт Telegram с текстом плана.');
                  }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
@@ -584,12 +584,12 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
 <button
-                      disabled={!hasDiary}
                       onClick={() => {
+                          if (!hasDiary) { onNote('⚠ В дневнике нет записей 1ПМ (присед/жим лёжа/становая) — кнопка применится, когда появятся записи. Пока попытки от ПМ по циклу.'); return; }
                           calibratePmFromDiary('squat'); calibratePmFromDiary('bench'); calibratePmFromDiary('deadlift');
                           onNote('📈 ПМ0 обновлены из дневника — пересоберите план: попытки считаются от ПМ по циклу (прогноз финальной недели).');
                         }}
-                        style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: hasDiary ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', color: hasDiary ? '#00e68a' : 'rgba(255,255,255,0.3)', background: hasDiary ? 'rgba(0,230,138,0.08)' : 'transparent' }}
+                        style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: '1px solid rgba(0,230,138,0.35)', color: hasDiary ? '#00e68a' : 'rgba(0,230,138,0.75)', background: hasDiary ? 'rgba(0,230,138,0.08)' : 'rgba(0,230,138,0.04)' }}
                         title="Заполнить ПМ0 из последних 1ПМ дневника тренировок (как в полях ПМ) — план пересоберите, попытки пересчитаются от прогноза цикла"
                       >📈 Из дневника{diaryApplied ? ` (присед ${diaryVals.squat ?? '—'} · жим ${diaryVals.bench ?? '—'} · тяга ${diaryVals.deadlift ?? '—'})` : ''}</button>
                     <button
@@ -1162,7 +1162,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       <div style={{ display:'flex', gap:6, padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
                         <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.7)', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
                         <button onClick={doExport} disabled={!ready} style={{ flex:1, padding:'10px 12px', borderRadius:8, fontSize:12, fontWeight:800, cursor:'pointer', border:'none', background: ready ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.1)', color: ready ? '#000' : 'rgba(255,255,255,0.35)' }}>
-                          {ready ? `📥 Экспорт: ${expFormat === 'xlsx' ? 'Excel' : 'PDF'} · ${scopeLabel}` : 'Выберите формат и объём'}
+                           {ready ? `${expFormat === 'xlsx' ? '💾 Сохранить Excel' : '🖨 Сохранить PDF'} · ${scopeLabel}` : 'Выберите формат и объём'}
                         </button>
                       </div>
                     </div>

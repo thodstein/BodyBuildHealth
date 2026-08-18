@@ -158,15 +158,16 @@ export default function App() {
     go(target.tab, target.subTab ?? null);
   }, []);
 
-  // Deep-link: #pl-plan-<cycleId> (из «Поделиться в ТГ» в ПЛ-авто) → открыть
-  // тренировочный блок на вкладке ПЛ-планировщика. Маркер в sessionStorage
-  // читает SRCBBScreen и выбирает нужный цикл (план хранится локально).
+  // Deep-link: #pl-plan-<cycleId> или Telegram startapp=pl-plan-<cycleId>.
+  // Маркер в sessionStorage читает SRCBBScreen и выбирает нужный цикл.
   useEffect(() => {
     const applyHash = () => {
       try {
-        const m = window.location.hash.match(/^#pl-plan-(.+)$/);
-        if (!m) return;
-        const cycleId = decodeURIComponent(m[1]);
+        const hash = window.location.hash.match(/^#pl-plan-(.+)$/);
+        const tgParam = (window as any).Telegram?.WebApp?.initDataUnsafe?.start_param;
+        const param = typeof tgParam === 'string' && tgParam ? tgParam : hash?.[1];
+        if (!param) return;
+        const cycleId = decodeURIComponent(param.replace(/^pl-plan-/, ''));
         try { sessionStorage.setItem('he_pl_deeplink_cycle', cycleId); } catch { /* ignore */ }
         go('training', `pl-plan:${cycleId}`);
       } catch (e) {

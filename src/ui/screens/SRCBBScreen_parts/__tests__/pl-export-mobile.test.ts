@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { LMSPlanWeek } from '../../../../engines/lms/lms-builder.engine';
-import { saveFileToDevice, plShareDigest, plShareLink, printPLHtml, openPLShare } from '../pl-export';
+import { saveFileToDevice, plShareDigest, plShareLink, plTelegramAppUrl, printPLHtml, openPLShare } from '../pl-export';
 
 const mkEx = (name: string, pct: number, sets: number) => ({
   name, group: 'Грудь', coef: 1, mnosz: 1, pm: 200, rir: 2,
@@ -37,6 +37,7 @@ afterEach(() => {
   clearNavShare();
   Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
   document.getElementById('pl-print-overlay')?.remove();
+  document.getElementById('pl-file-save-overlay')?.remove();
 });
 
 describe('saveFileToDevice — сохранение файла на устройство', () => {
@@ -95,10 +96,15 @@ describe('saveFileToDevice — сохранение файла на устрой
     const res = await saveFileToDevice(new Blob(['x']), 'a.txt');
     expect(res).toBe('downloaded');
     expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('pl-file-save-overlay')?.textContent).toContain('Сохранить файл');
   });
 });
 
 describe('plShareDigest / plShareLink — план в сообщении', () => {
+  it('строит Telegram Mini App deep-link с startapp', () => {
+    expect(plTelegramAppUrl('cycle-01', '@BBHealthBot')).toBe('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01');
+  });
+
   it('digest: заголовок, прикиды и недели с упражнениями/весами', () => {
     const d = plShareDigest({ title: 'Тестовый цикл', weeks: weeks(2), pmSquat: 180, pmBench: 120, pmDead: 220 });
     expect(d).toContain('Тестовый цикл');
@@ -122,7 +128,7 @@ describe('plShareDigest / plShareLink — план в сообщении', () =>
     });
     const decoded = decodeURIComponent(link);
     expect(decoded).toContain('https://t.me/share/url?url=');
-    expect(decoded).toContain('#pl-plan-cycle-01');
+    expect(decoded).toContain('https://app.ru#pl-plan-cycle-01');
     expect(decoded).toContain('Неделя 5');
     expect(decoded).toContain('ещё 3 нед');
     expect(decoded).toContain('Открыть план в приложении');
