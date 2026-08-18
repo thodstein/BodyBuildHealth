@@ -513,6 +513,16 @@ async function recognizeOcrCanvas(Tesseract: any, canvas: HTMLCanvasElement): Pr
   }
 }
 
+async function createRussianOcrWorker(Tesseract: any) {
+  const { resolveTesseractOptions } = await import('./ocr-assets');
+  const opts = await resolveTesseractOptions();
+  return Tesseract.createWorker('rus+eng', 1, {
+    workerPath: opts.workerPath,
+    corePath: opts.corePath,
+    langPath: opts.langPath,
+  });
+}
+
 function groupByRows(items: TextItem[], yTolerance = 5): TextItem[][] {
   if (items.length === 0) return [];
   const sorted = [...items].sort((a, b) => {
@@ -920,22 +930,29 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
-    const MAX_PAGE_PX = 8000000;
+    const MAX_PAGE_PX = 1800000;
     const texts: string[] = [];
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const vp = page.getViewport({ scale: 1 });
-      const srcPx = vp.width * vp.height * 4; // 2x scale → 4x pixels
-      const effectiveScale = srcPx > MAX_PAGE_PX ? Math.sqrt(MAX_PAGE_PX / (vp.width * vp.height)) : 2;
-      const viewport = page.getViewport({ scale: effectiveScale });
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(viewport.width);
-      canvas.height = Math.ceil(viewport.height);
-      const context = canvas.getContext('2d');
-      if (!context) continue;
-      await page.render({ canvas, canvasContext: context, viewport }).promise;
-      const text = await recognizeOcrCanvas(Tesseract, canvas);
-      if (text) texts.push(text);
+    const worker = await createRussianOcrWorker(Tesseract);
+    try {
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const vp = page.getViewport({ scale: 1 });
+        const effectiveScale = Math.min(2, Math.sqrt(MAX_PAGE_PX / Math.max(1, vp.width * vp.height)));
+        const viewport = page.getViewport({ scale: effectiveScale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        const context = canvas.getContext('2d');
+        if (!context) continue;
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        const enhanced = enhanceOcrCanvas(canvas);
+        const { data } = await worker.recognize(enhanced);
+        if (data.text?.trim()) texts.push(data.text);
+        canvas.width = 1;
+        canvas.height = 1;
+      }
+    } finally {
+      await worker.terminate();
     }
     return texts.join('\n');
   } catch (err: any) {
@@ -974,20 +991,24 @@ async function extractTextFromImage(file: File): Promise<string> {
   }
   try {
     if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap not supported in this browser');
-    // Resize BEFORE OCR — mobile photos (12MP+) crash tabs with Tesseract WASM.
-    const MAX_DIM = 1800;
+    // Telegram WebView may ignore resize options passed to createImageBitmap.
+    // Always enforce the limit again from the decoded bitmap dimensions before
+    // allocating a canvas; otherwise a 12-48 MP photo can kill the WebView.
+    const MAX_DIM = 1400;
+    const MAX_PIXELS = 1_800_000;
     const bitmap = await createImageBitmap(file, {
       resizeWidth: MAX_DIM,
       resizeHeight: MAX_DIM,
       resizeQuality: 'high',
     });
     const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    const scale = Math.min(1, MAX_DIM / Math.max(bitmap.width, bitmap.height), Math.sqrt(MAX_PIXELS / (bitmap.width * bitmap.height)));
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     const context = canvas.getContext('2d');
     if (!context) { bitmap.close(); errors.push('Canvas 2D context unavailable'); }
     else {
-      context.drawImage(bitmap, 0, 0);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
       bitmap.close();
       const enhanced = enhanceOcrCanvas(canvas);
       // Lab forms in this app are predominantly Russian. English-first OCR can
@@ -1008,17 +1029,6 @@ async function extractTextFromImage(file: File): Promise<string> {
         errors.push(`rus+eng OCR failed: ${ruError?.message || String(ruError)}`);
       }
       if (ocrText.trim()) return ocrText;
-      try {
-        const engWorker = await Tesseract.createWorker('eng', 1, workerOptions);
-        try {
-          const { data } = await engWorker.recognize(enhanced);
-          if (data.text?.trim()) return data.text;
-        } finally {
-          await engWorker.terminate();
-        }
-      } catch (engError: any) {
-        errors.push(`English OCR failed: ${engError?.message || String(engError)}`);
-      }
       errors.push('OCR completed but produced no text (image may be blank)');
     }
   } catch (imageProcessingError: any) {
@@ -1032,13 +1042,17 @@ async function extractTextFromImage(file: File): Promise<string> {
         img.onerror = () => reject(new Error('Image failed to load'));
         img.src = objectUrl;
       });
-      const MAX_DIM = 1600;
+      const MAX_DIM = 1200;
+      const MAX_PIXELS = 1_200_000;
       let w = img.width, h = img.height;
       if (w > MAX_DIM || h > MAX_DIM) {
         const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
         w = Math.ceil(w * ratio);
         h = Math.ceil(h * ratio);
       }
+      const pixelScale = Math.min(1, Math.sqrt(MAX_PIXELS / Math.max(1, w * h)));
+      w = Math.max(1, Math.round(w * pixelScale));
+      h = Math.max(1, Math.round(h * pixelScale));
       const c = document.createElement('canvas');
       c.width = w;
       c.height = h;
