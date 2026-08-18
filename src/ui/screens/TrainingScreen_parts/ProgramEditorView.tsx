@@ -225,24 +225,6 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   }, [estep, program.meta.id]);
   const estepIdx = editorSteps.indexOf(estep);
   const isLastEditorStep = estepIdx >= editorSteps.length - 1;
-  const goNextStep = useCallback(() => {
-    if (isLastEditorStep) onNext?.();
-    else setEstep(editorSteps[estepIdx + 1]);
-  }, [onNext, editorSteps, estepIdx, isLastEditorStep]);
-  const goPrevStep = useCallback(() => {
-    if (estepIdx > 0) setEstep(editorSteps[estepIdx - 1]);
-  }, [editorSteps, estepIdx]);
-  // Клавиатурная навигация по внутренним шагам (←/→); не перехватывает ввод в полях
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-      if (e.key === 'ArrowRight') { e.preventDefault(); goNextStep(); }
-      else if (e.key === 'ArrowLeft' && estepIdx > 0) { e.preventDefault(); goPrevStep(); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [goNextStep, goPrevStep, estepIdx]);
   // При переключении внутреннего шага — скролл контента наверх (липкая шапка остаётся сверху)
   const editorRootRef = useRef<HTMLDivElement | null>(null);
   const scrollEditorTop = useCallback(() => {
@@ -254,22 +236,46 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       else if (typeof root.scrollIntoView === 'function') root.scrollIntoView({ block: 'start', behavior: 'smooth' });
     } catch { /* jsdom и т.п. — scroll API может отсутствовать */ }
   }, []);
+  const goNextStep = useCallback(() => {
+    if (isLastEditorStep) onNext?.();
+    else { setEstep(editorSteps[estepIdx + 1]); scrollEditorTop(); }
+  }, [onNext, editorSteps, estepIdx, isLastEditorStep, scrollEditorTop]);
+  const goPrevStep = useCallback(() => {
+    if (estepIdx > 0) { setEstep(editorSteps[estepIdx - 1]); scrollEditorTop(); }
+  }, [editorSteps, estepIdx, scrollEditorTop]);
+  // Клавиатурная навигация по внутренним шагам (←/→); не перехватывает ввод в полях
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); goNextStep(); }
+      else if (e.key === 'ArrowLeft' && estepIdx > 0) { e.preventDefault(); goPrevStep(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goNextStep, goPrevStep, estepIdx]);
   // Детерминированная фиксация шапки: sticky может не сработать из-за
   // overflow:hidden на main/внутренней обёртке и transform-анимаций предков,
   // поэтому при уходе верха редактора за экран переключаем шапку в position:fixed
   // с замером левого края/ширины (document-capture scroll + window + ResizeObserver).
+  // Гистерезис: пин при r.top <= 0, снятие только при r.top >= 4 — без дребезга
+  // на границе (неприлинтованная шапка не «прыгает»).
   const editorHeaderRef = useRef<HTMLDivElement | null>(null);
   const [headerPinned, setHeaderPinned] = useState(false);
   const [headerPad, setHeaderPad] = useState(0);
   const [headerRect, setHeaderRect] = useState<{ left: number; width: number } | null>(null);
   useEffect(() => {
     let ro: ResizeObserver | null = null;
+    const pinnedRef = { current: false };
     const measure = () => {
       const root = editorRootRef.current;
       const header = editorHeaderRef.current;
       if (!root || !header) return;
       const r = root.getBoundingClientRect();
-      if (r.top < 0) {
+      const wantPin = pinnedRef.current ? r.top <= 4 : r.top <= 0;
+      if (wantPin === pinnedRef.current) return;
+      pinnedRef.current = wantPin;
+      if (wantPin) {
         setHeaderPinned(true);
         setHeaderPad(header.offsetHeight);
         setHeaderRect({ left: r.left, width: r.width });
@@ -656,7 +662,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 return (
       <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: headerPinned ? headerPad : undefined }}>
        {/* Липкая панель действий — компактная, всегда наверху */}
-        <div ref={editorHeaderRef} style={headerPinned && headerRect
+        <div className="editor-topbar-shell" ref={editorHeaderRef} style={headerPinned && headerRect
           ? { position: 'fixed', top: 0, left: headerRect.left, width: headerRect.width, zIndex: 60, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }
           : { position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
         <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -667,11 +673,6 @@ return (
           </span>
           {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            {onNext && (
-              <button style={{ ...BTN, padding: '10px 16px', fontSize: 12, minHeight: 40 }} onClick={goNextStep}>
-                Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
-              </button>
-            )}
             <button style={{ ...BTN, padding: '8px 14px', fontSize: 11, minHeight: 40 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
               {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
             </button>
@@ -680,11 +681,6 @@ return (
         </div>
         {showMore && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
-            {estepIdx > 0 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40 }} onClick={goPrevStep}>
-                ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
-              </button>
-            )}
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
             {(dir === 'bb' || dir === 'pl') && (
               <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, minHeight: 40 }}>
@@ -1385,6 +1381,20 @@ return (
           </div>
         </div>
       )}
+    {/* Липкая нижняя навигация шагов — «← Назад» и «Далее →» всегда под рукой */}
+      <div className="editor-bottomnav" style={{ position: 'sticky', bottom: 0, zIndex: 40, display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 -6px 18px rgba(0,0,0,0.35)' }}>
+        {estepIdx > 0 && (
+          <button style={{ ...BTN_GHOST, padding: '10px 16px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep} title="Предыдущий шаг">
+            ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        {onNext && (
+          <button style={{ ...BTN, padding: '10px 20px', fontSize: 12, minHeight: 44 }} onClick={goNextStep} title="Следующий шаг">
+            Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
+          </button>
+        )}
+      </div>
     </div>
   );
 };

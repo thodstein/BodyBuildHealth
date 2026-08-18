@@ -52,8 +52,7 @@ describe('Ручной конструктор — последовательны
     expect(screen.getByText('Недели и упражнения')).toBeTruthy();
     // Пройденный шаг «Параметры» получает галочку
     expect(screen.getByText('✓ 🎛 Параметры')).toBeTruthy();
-    // На втором шаге «← Назад: Параметры» — в «⋯ Ещё», возвращает на первый шаг
-    fireEvent.click(screen.getByText('⋯ Ещё'));
+    // На втором шаге «← Назад: Параметры» — в нижней панели навигации, возвращает на первый шаг
     expect(screen.getByText('← Назад: Параметры')).toBeTruthy();
     fireEvent.click(screen.getByText('← Назад: Параметры'));
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
@@ -99,8 +98,7 @@ describe('Ручной конструктор — последовательны
     fireEvent.click(screen.getByText('Далее: Параметры →'));
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
     expect(screen.getByText('шаг 2 из 6')).toBeTruthy();
-    // «← Назад: Профиль» — в «⋯ Ещё», возвращает на первый шаг
-    fireEvent.click(screen.getByText('⋯ Ещё'));
+    // «← Назад: Профиль» — в нижней панели навигации, возвращает на первый шаг
     expect(screen.getByText('← Назад: Профиль')).toBeTruthy();
     fireEvent.click(screen.getByText('← Назад: Профиль'));
     expect(screen.getByText('Далее: Параметры →')).toBeTruthy();

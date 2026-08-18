@@ -460,6 +460,17 @@
   border-color: var(--constructor-border) !important;
   box-shadow: var(--glass-shadow) !important;
 }
+/* Липкие панели редактора ручного конструктора: верхняя (actions) и нижняя
+   (навигация шагов «← Назад / Далее →»). Позиционирование/фон заданы inline,
+   здесь — структурные правила и стекло. */
+.manual-constructor--editor .editor-topbar-shell,
+.manual-constructor--editor .editor-bottomnav {
+  flex-shrink: 0;
+}
+.manual-constructor--editor .editor-bottomnav {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
 .manual-constructor input,
 .manual-constructor select,
 .manual-constructor textarea {
@@ -576,6 +587,10 @@
   }
   .manual-constructor { padding-bottom: calc(var(--bottom-nav-h, 64px) + 12px); }
   .manual-constructor__sticky-header { position: sticky; top: 0; max-width: 100%; overflow-x: auto; }
+  .manual-constructor--editor .editor-bottomnav {
+    bottom: calc(var(--bottom-nav-h, 64px) + 8px) !important;
+  }
+  .manual-constructor--editor .editor-bottomnav > button { flex: 1; }
   .manual-constructor--editor { gap: 8px !important; }
   .manual-constructor--editor .editor-topbar { align-items: stretch !important; }
   .manual-constructor--editor .editor-topbar-hide-mobile { display: none !important; }
