@@ -8,6 +8,7 @@
  */
 import React, { useState } from 'react';
 import { getCycleById, LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
+import { detectLift } from '../../../engines/lms/lms-to-pl';
 import { originalCycleWeeks, getPLWeakPointRecommendations, computeMeetAttemptsFromPmRow, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../../engines/rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../../../engines/periodization/phase-bridge';
@@ -537,18 +538,23 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 // недели уже учитывает пройденный цикл (прогрессия PM0→пик), а не
                 // «дневниковые» поля pmSquat/pmBench/pmDead (PM0 из профиля/калибровки).
                 const meetWk = W.find(w => w.meetAttempts && w.meetAttempts.lifts.length > 0) ?? W[W.length - 1];
-                const cyclePm = (re: RegExp, fallback: number): number => {
-                  const row = meetWk?.pmRow ?? {};
-                  const key = Object.keys(row).find(k => re.test(k.toLowerCase().replace('ё', 'е')));
-                  const v = key ? row[key] : NaN;
-                  return Number.isFinite(v) && v > 0 ? v : fallback;
+                // ПМ ПО ЦИКЛУ: ищем в pmRow финальной недели ключи трёх лифтов.
+                // Матчинг — каноническим detectLift (как e1rmSeries из дневника),
+                // чтобы имена каталога («Жим штанги лёжа») гарантированно находились.
+                const cycleRow = meetWk?.pmRow ?? {};
+                const cycleKeyFor = (lift: 'squat' | 'bench' | 'dead'): string | undefined =>
+                  Object.keys(cycleRow).find(k => detectLift(k, '') === lift);
+                const cycleVal = (lift: 'squat' | 'bench' | 'dead'): number => {
+                  const k = cycleKeyFor(lift);
+                  const v = k ? cycleRow[k] : NaN;
+                  return Number.isFinite(v) && v > 0 ? v : 0;
                 };
                 const basePm = {
-                  squat: cyclePm(/присед|сквот/, pmSquat),
-                  bench: cyclePm(/жим.*леж|леж.*жим/, pmBench),
-                  deadlift: cyclePm(/станов/, pmDead),
+                  squat: cycleVal('squat') || pmSquat,
+                  bench: cycleVal('bench') || pmBench,
+                  deadlift: cycleVal('dead') || pmDead,
                 };
-                const cyclePmApplied = !!(meetWk?.pmRow && (basePm.squat !== pmSquat || basePm.bench !== pmBench || basePm.deadlift !== pmDead));
+                const cyclePmApplied = !!cycleKeyFor('squat') || !!cycleKeyFor('bench') || !!cycleKeyFor('dead');
                 const arBtn = (m: AutoRegMode, label: string) => {
                   const active = autoRegMode === m;
                   return (

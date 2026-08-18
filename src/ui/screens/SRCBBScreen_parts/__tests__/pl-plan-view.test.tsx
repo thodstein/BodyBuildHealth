@@ -125,12 +125,13 @@ describe('PLPlanView', () => {
     expect(noted).toContain('присед 200 · жим 140 · тяга 220');
   });
 
-  it('кнопка «📊 Из цикла» неактивна, когда ПМ по циклу совпадает с PM0-полями', () => {
+  it('кнопка «📊 Из цикла» активна, когда pmRow финальной недели содержит лифты (даже если PM0 совпадают)', () => {
     const a = api();
     a.srcWeek = 8;
     a.pmSquat = 200; a.pmBench = 140; a.pmDead = 220;
     render(<PLPlanView api={a} />);
-    expect((screen.getByText(/📊 Из цикла/) as HTMLButtonElement).disabled).toBe(true);
+    // pmRow = { 'Присед': 200, 'Жим лежа': 140 } → цикл содержит лифты → кнопка активна
+    expect((screen.getByText(/📊 Из цикла/) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('карточка попыток: серия из дневника видна в бейдже «📈 Из дневника» (жим «Жим штанги лёжа» из каталога)', () => {
@@ -166,5 +167,28 @@ describe('PLPlanView', () => {
     expect(btn.disabled).toBe(false);
     fireEvent.click(btn);
     expect(noted).toContain('нет записей 1ПМ');
+  });
+
+  it('прикиды и «📊 Из цикла» работают с каноническими именами каталога («Жим штанги лёжа» в pmRow)', () => {
+    const a = api();
+    a.srcWeek = 8;
+    // pmRow с именами каталога: раньше regex «жим.*леж» мог не матчить, и прикиды
+    // падали на дневниковые поля; теперь матчинг через detectLift.
+    a.builtSrc = {
+      ...plan(),
+      weeks: [
+        ...plan().weeks.slice(0, 3),
+        { week: 8, pmRow: { 'Присед со штангой': 200, 'Жим штанги лёжа': 140, 'Становая тяга': 240 }, days: [mkDay(true)], taperWeek: true, sourcePhase: 'peak', meetAttempts: { strategy: 'balanced', lifts: [{ name: 'Присед', opener: 185, second: 192.5, third: 202.5, target: 202.5, warmup: [{ pct: 0.4, weight: 75, reps: 5 }] }] } },
+      ],
+    } as never;
+    let applied: { squat: number; bench: number; deadlift: number } | null = null;
+    a.applyPmFromCycle = pm => { applied = pm; };
+    render(<PLPlanView api={a} />);
+    // база попыток — из pmRow цикла (200/140/240), а не из дневниковых PM0-полей (180/120/220)
+    expect(screen.getByText(/рекоменд.: 175\/185\/200/)).toBeTruthy();
+    const btn = screen.getByText(/📊 Из цикла/);
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(btn);
+    expect(applied).toEqual({ squat: 200, bench: 140, deadlift: 240 });
   });
 });
