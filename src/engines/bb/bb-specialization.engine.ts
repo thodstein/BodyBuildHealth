@@ -78,6 +78,23 @@ export function normalizeSpecializationTargets(targets: string[]): string[] {
   return out;
 }
 
+/** Композитные доноры раскрываются в атомарные мышцы (ноги = 4 мышцы). */
+export const COMPOSITE_DONOR_EXPANSION: Record<string, string[]> = {
+  legs: ['quads', 'hamstrings', 'glutes', 'calves'],
+  arms: ['biceps', 'triceps', 'forearms'],
+  core: ['abs'],
+};
+
+/** Раскрыть список доноров: композиты → атомарные мышцы, дедуп. */
+export function expandDonorMuscles(donors: string[]): string[] {
+  const out: string[] = [];
+  for (const d of dedupeExactMuscles(donors)) {
+    const parts = COMPOSITE_DONOR_EXPANSION[d] || [d];
+    for (const p of parts) if (!out.includes(p)) out.push(p);
+  }
+  return out;
+}
+
 export interface SpecializationResolution {
   /** Цели специализации (топ-2 из слабых, порядок ввода). ГРАНУЛЯРНЫЕ:
    *  delt_mid/delt_rear/chest_upper — разные зоны одной мышцы. */

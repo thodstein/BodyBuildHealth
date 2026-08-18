@@ -7,6 +7,7 @@ import {
 import { buildBBPlan } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
 import { getVolumeLandmarks } from '../../volume-landmarks.engine';
+import { rankBBSplits } from '../bb-selector.engine';
 
 /**
  * Донорское перераспределение специализации (цель за счёт доноров):
@@ -138,6 +139,20 @@ describe('generic: донорское перераспределение', () =>
     expect(lm).toBeTruthy();
     expect(effectiveSets(donor, 1, 'biceps')).toBeGreaterThanOrEqual(lm!.mev);
   }, 30000);
+
+  it('композитный донор legs реально режет primary leg compounds до floor', () => {
+    const base = buildBBPlan({ ...baseInput });
+    const donor = buildBBPlan({
+      ...baseInput,
+      specializationSchedule: [{
+        weekStart: 1, weekEnd: 5, targets: ['back_thickness'],
+        tradeoff: { mode: 'reduce_direct_to_floor', donorMuscles: ['legs'], preserveIndirect: true },
+      }],
+    });
+    expect(directSets(donor, 1, 'quads')).toBeLessThan(directSets(base, 1, 'quads'));
+    expect(effectiveSets(donor, 1, 'quads')).toBeGreaterThanOrEqual(8);
+    expect(directSets(donor, 1, 'hamstrings')).toBeLessThan(directSets(base, 1, 'hamstrings'));
+  }, 30000);
 });
 
 describe('многоблочное расписание (12 нед: 1-5 A, 6-10 B, 11-12 баланс)', () => {
@@ -177,4 +192,18 @@ describe('многоблочное расписание (12 нед: 1-5 A, 6-10 
     // В блоке 2 бицепс больше не донор — объём восстановлен.
     expect(directSets(plan, 8, 'biceps')).toBeGreaterThan(directSets(plan, 1, 'biceps'));
   }, 30000);
+});
+
+describe('selector: специализация учитывает доноров', () => {
+  it('не рекомендует FullBody/PPL для специализации за счёт legs', () => {
+    const ranked = rankBBSplits({
+      level: 'intermediate', goal: 'mass', daysPerWeek: 4,
+      weakPoints: ['back_thickness'], donorMuscles: ['legs'], specialization: true,
+    });
+    expect(ranked[0]?.pattern.id).not.toMatch(/^fullbody_/i);
+    const ppl = ranked.find(r => r.pattern.id === 'ppl_6');
+    expect(ppl).toBeDefined();
+    expect(ranked[0].score).toBeGreaterThan(ppl!.score);
+    expect(ppl!.rationale.some(r => r.includes('доноры ног'))).toBe(true);
+  });
 });

@@ -17,7 +17,7 @@ import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyL
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
-import { specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
+import { expandDonorMuscles, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место). */
@@ -51,7 +51,7 @@ function tradeoffDonorsForWeek(options: BBFinalizeOptions, week: number): Set<st
   if (!schedule) return new Set();
   const policy = tradeoffForWeek(schedule, week);
   if (!policy || policy.mode === 'none' || policy.donorMuscles.length === 0) return new Set();
-  return new Set(policy.donorMuscles.map(m => WEAK_TO_MUSCLE[m] || m));
+  return new Set(expandDonorMuscles(policy.donorMuscles).map(m => WEAK_TO_MUSCLE[m] || m));
 }
 
 /**

@@ -31,7 +31,7 @@ import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
-import { canonicalMuscle, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
+import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -157,6 +157,28 @@ function isWeakMuscle(muscle: string, weakPoints: string[]): boolean {
   if (weakPoints.includes(muscle)) return true;
   const PARENT: Record<string, string> = { delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders' };
   return weakPoints.includes(PARENT[muscle] ?? '');
+}
+
+const DONOR_GROUPS: readonly (readonly [string, string])[] = [
+  ['legs', 'Ноги (квадры+хамсы+ягодицы+икры)'],
+  ['arms', 'Руки (бицепс+трицепс+предплечья)'],
+  ['core', 'Кор'],
+  ...WEAK_GROUPS,
+];
+
+function normalizeDonorTargets(donors: string[], targets: string[] = []): string[] {
+  const targetCanonical = targets.map(canonicalMuscle);
+  const out: string[] = [];
+  const expandedOut: string[] = [];
+  for (const donor of donors) {
+    if (!donor || out.includes(donor) || out.length >= 2) continue;
+    const expanded = expandDonorMuscles([donor]);
+    if (expanded.some(m => targetCanonical.includes(canonicalMuscle(m)))) continue;
+    if (expanded.some(m => expandedOut.includes(canonicalMuscle(m)))) continue;
+    out.push(donor);
+    expandedOut.push(...expanded.map(canonicalMuscle));
+  }
+  return out;
 }
 
 
@@ -314,7 +336,7 @@ export const BbAutoConstructor: React.FC = () => {
         weekEnd: end,
         targets: normalizeSpecializationTargets(b.targets),
         ...(b.tradeoffMode !== 'none' && b.donors.length > 0 && b.targets.length > 0
-          ? { tradeoff: { mode: b.tradeoffMode, donorMuscles: normalizeSpecializationTargets(b.donors), preserveIndirect: true as const } }
+          ? { tradeoff: { mode: b.tradeoffMode, donorMuscles: normalizeDonorTargets(b.donors, b.targets), preserveIndirect: true as const } }
           : {}),
       });
       cursor = end + 1;
@@ -952,7 +974,9 @@ export const BbAutoConstructor: React.FC = () => {
     weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     sex: linked.profile?.settings?.personal?.sex,
     focusGroup: undefined,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, linked.profile?.settings?.personal?.sex]);
+    donorMuscles: specBlocks.flatMap(b => b.donors),
+    specialization: specTargets.length > 0,
+  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets.length, linked.profile?.settings?.personal?.sex]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
@@ -1883,12 +1907,16 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ marginBottom:6 }}>
                     <div style={{ fontSize:9, fontWeight:700, color:'#ec4899', marginBottom:4 }}>👤 Доноры (1-2, косвенная нагрузка сохраняется):</div>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-                      {WEAK_GROUPS.map(([id, l]) => {
+                      {DONOR_GROUPS.map(([id, l]) => {
                         const on = b.donors.includes(id);
-                        const sameAsTarget = b.targets.some(t => canonicalMuscle(t) === canonicalMuscle(id));
-                        const disabled = !on && (b.donors.length >= 2 || sameAsTarget || b.donors.some(t => isRegionConflict(t, id)));
+                        const expanded = expandDonorMuscles([id]);
+                        const targetCanonical = b.targets.map(canonicalMuscle);
+                        const existingDonors = expandDonorMuscles(b.donors);
+                        const sameAsTarget = expanded.some(m => targetCanonical.includes(canonicalMuscle(m)));
+                        const overlapsDonor = expanded.some(m => existingDonors.includes(canonicalMuscle(m)) && !on);
+                        const disabled = !on && (b.donors.length >= 2 || sameAsTarget || overlapsDonor);
                         return (
-                          <button key={id} disabled={disabled} onClick={() => updateSpecBlock(b.id, { donors: normalizeSpecializationTargets(on ? b.donors.filter(x => x !== id) : [...b.donors, id]) })}
+                          <button key={id} disabled={disabled} onClick={() => updateSpecBlock(b.id, { donors: normalizeDonorTargets(on ? b.donors.filter(x => x !== id) : [...b.donors, id], b.targets) })}
                             style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:9, fontWeight:700, minHeight:30,
                               background:on?'rgba(236,72,153,0.15)':'rgba(255,255,255,0.03)',
                               border:on?'1px solid rgba(236,72,153,0.4)':'1px solid rgba(255,255,255,0.08)',

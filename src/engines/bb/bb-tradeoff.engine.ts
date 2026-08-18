@@ -13,7 +13,7 @@
 
 import type { BBPlan, BBWeek, BBExercise } from './bb-builder.engine';
 import { aggregateBBVolume } from './bb-volume.engine';
-import { canonicalMuscle, type VolumeTradeoffPolicy } from './bb-specialization.engine';
+import { canonicalMuscle, expandDonorMuscles, type VolumeTradeoffPolicy } from './bb-specialization.engine';
 import { matchesAnyZonePattern } from './bb-specialization-registry';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -67,10 +67,8 @@ function trimDonorIsolations(
   for (const session of week.sessions) {
     for (const ex of session.exercises as BBExercise[]) {
       if ((ex as any).warmupActivator) continue;
-      if (ex.role === 'primary') continue;
       const m = canonicalMuscle(ex.muscle);
       if (!donorCanonical.has(m)) continue;
-      if (!isIsolationName(ex.exerciseName || ex.name || '')) continue;
       const floor = adaptedMev(m);
       const indirect = effectiveNow(m) - directNow(m);
       const targetDirect = mode === 'remove_direct_when_indirect_covers_floor' && indirect >= floor
@@ -184,7 +182,7 @@ export function applyTradeoffToWeek(
   policy: VolumeTradeoffPolicy,
   opts: TradeoffApplyOptions,
 ): TradeoffWeekReport {
-  const donorCanonical = new Set(policy.donorMuscles.map(canonicalMuscle));
+  const donorCanonical = new Set(expandDonorMuscles(policy.donorMuscles).map(canonicalMuscle));
   const targetCanonical = new Set(targets.map(canonicalMuscle));
   const removedSets = trimDonorIsolations(week, donorCanonical, policy.mode, opts);
   const { transferred, notes } = addToRecipient(week, targetCanonical, targets, opts, removedSets);

@@ -20,6 +20,11 @@ export interface BBSelectorInput {
   sex?: 'male' | 'female';
   /** D1: Focus group — даёт бонус сплитам с приоритетом этой мышцы. */
   focusGroup?: string;
+  /** Доноры specialization tradeoff: leg-heavy/arms-heavy splits получают
+   *  штраф, чтобы рекомендация не возвращала ресурс выбранного донора. */
+  donorMuscles?: string[];
+  /** Активна специализация: FullBody не является автоматическим default. */
+  specialization?: boolean;
 }
 
 export interface BBRankedPattern {
@@ -116,6 +121,31 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       });
       const wpAvg = wpFreq.reduce((a,b)=>a+b,0)/wpFreq.length;
       if (wpAvg >= 2) score += 10;
+    }
+
+    // Донорская специализация влияет на ВЫБОР сплита, но не меняет
+    // volume-landmarks. Донор legs не должен получать leg-heavy рекомендацию.
+    const donorAtomic = new Set((input.donorMuscles || []).flatMap(d => {
+      if (d === 'legs') return ['quads', 'hamstrings', 'glutes', 'calves'];
+      if (d === 'arms') return ['biceps', 'triceps', 'forearms'];
+      if (d === 'core') return ['abs'];
+      return [WEAK_TO_MUSCLE[d] || d];
+    }));
+    const legDonor = ['quads', 'hamstrings', 'glutes', 'calves'].some(m => donorAtomic.has(m));
+    const armDonor = ['biceps', 'triceps', 'forearms'].some(m => donorAtomic.has(m));
+    const legSessions = p.schedule.filter(d => d.kind === 'тренировка' && /Legs|Lower/i.test(d.sessionTag || '')).length;
+    const armSessions = p.schedule.filter(d => d.kind === 'тренировка' && /Arms/i.test(d.sessionTag || '')).length;
+    if (legDonor && legSessions > 0) {
+      score -= legSessions * 8;
+      rationale.push(`доноры ног: снижена рекомендация leg-heavy (${legSessions} ножных сессий)`);
+    }
+    if (armDonor && armSessions > 0) {
+      score -= armSessions * 5;
+      rationale.push(`доноры рук: снижена рекомендация отдельного Arms-дня`);
+    }
+    if (input.specialization && /^fullbody_/i.test(p.id)) {
+      score -= 10;
+      rationale.push('специализация: FullBody не выбран автоматически, приоритет специализированным сессиям');
     }
 
     // D1: Female glute focus — бонус для female_glute_5 сплита.
