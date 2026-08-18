@@ -36,6 +36,11 @@ afterEach(() => {
   vi.restoreAllMocks();
   clearNavShare();
   Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
+  // Сброс URL-хелперов (некоторые тесты мокают их с writable, но не configurable)
+  try {
+    Object.defineProperty(URL, 'createObjectURL', { value: undefined, configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: undefined, configurable: true });
+  } catch { /* ignore */ }
   document.getElementById('pl-print-overlay')?.remove();
   document.getElementById('pl-file-save-overlay')?.remove();
 });
@@ -55,42 +60,6 @@ describe('saveFileToDevice — сохранение файла на устрой
     expect(close).toHaveBeenCalled();
   });
 
-  it('не отправляет файл через share-sheet: открывает явное сохранение файла', async () => {
-    const nav = navigator as unknown as Record<string, unknown>;
-    const canShare = vi.fn(() => true);
-    const share = vi.fn(async () => {});
-    Object.defineProperty(nav, 'canShare', { value: canShare, configurable: true });
-    Object.defineProperty(nav, 'share', { value: share, configurable: true });
-    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), configurable: true });
-    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
-
-    const res = await saveFileToDevice(new Blob(['x'], { type: 'text/plain' }), 'a.txt');
-    expect(res).toBe('downloaded');
-    expect(canShare).not.toHaveBeenCalled();
-    expect(share).not.toHaveBeenCalled();
-    expect(document.getElementById('pl-file-save-overlay')?.textContent).toContain('Сохранить файл');
-  });
-
-  it('не зависит от отмены share-sheet: сохраняет через явное окно', async () => {
-    const nav = navigator as unknown as Record<string, unknown>;
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    Object.defineProperty(nav, 'canShare', { value: vi.fn(() => true), configurable: true });
-    Object.defineProperty(nav, 'share', {
-      value: vi.fn(async () => {
-        const e = new Error('abort');
-        (e as { name?: string }).name = 'AbortError';
-        throw e;
-      }),
-      configurable: true,
-    });
-    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), configurable: true });
-    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
-
-    const res = await saveFileToDevice(new Blob(['x']), 'a.txt');
-    expect(res).toBe('downloaded');
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-  });
-
   it('фолбэк на <a download>, когда navigator.share недоступен (десктоп/старый браузер)', async () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), writable: true });
@@ -99,6 +68,26 @@ describe('saveFileToDevice — сохранение файла на устрой
     expect(res).toBe('downloaded');
     expect(clickSpy).toHaveBeenCalledTimes(1);
     expect(document.getElementById('pl-file-save-overlay')?.textContent).toContain('Сохранить файл');
+  });
+
+  it('нативная передача файла (share) открывает «Сохранить в Файлы»', async () => {
+    const nav = navigator as unknown as Record<string, unknown>;
+    const canShare = vi.fn(() => true);
+    const share = vi.fn(async () => {});
+    Object.defineProperty(nav, 'canShare', { value: canShare, configurable: true });
+    Object.defineProperty(nav, 'share', { value: share, configurable: true });
+    Object.defineProperty(URL, 'createObjectURL', { value: vi.fn(() => 'blob:test'), configurable: true });
+    Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const res = await saveFileToDevice(new Blob(['x'], { type: 'text/plain' }), 'plan.txt');
+    expect(res).toBe('shared');
+    expect(canShare).toHaveBeenCalled();
+    expect(share).toHaveBeenCalled();
+    const data = share.mock.calls[0][0] as { files: File[]; title: string };
+    expect(data.files[0]).toBeInstanceOf(File);
+    expect(data.files[0].name).toBe('plan.txt');
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 });
 

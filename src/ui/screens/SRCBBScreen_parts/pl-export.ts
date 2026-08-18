@@ -117,6 +117,25 @@ export async function saveFileToDevice(blob: Blob, filename: string): Promise<Fi
       // WebView может объявлять API, но запрещать picker. Используем следующий путь.
     }
   }
+  // Нативный share файла: в Telegram WebView и мобильных браузерах открывает
+  // системную панель с «Сохранить в Файлы» / «Отправить» (a.download там блокируется).
+  const nav = navigator as unknown as {
+    canShare?: (data: { files: File[] }) => boolean;
+    share?: (data: { files: File[]; title?: string }) => Promise<void>;
+  };
+  if (typeof nav.canShare === 'function' && typeof nav.share === 'function') {
+    try {
+      const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+      if (nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: filename });
+        return 'shared';
+      }
+    } catch (e) {
+      const err = e as { name?: string };
+      if (err?.name === 'AbortError') return 'shared';
+      // иная ошибка (WebView без share) — переходим к классическому скачиванию
+    }
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -127,13 +146,13 @@ export async function saveFileToDevice(blob: Blob, filename: string): Promise<Fi
   a.remove();
   // В мобильном WebView атрибут download может быть проигнорирован. Оставляем
   // пользователю явную кнопку, которую можно нажать после разрешения загрузки.
-  showFileSaveOverlay(url, filename, () => URL.revokeObjectURL(url));
+  showFileSaveOverlay(url, filename, blob, () => URL.revokeObjectURL(url));
   return 'downloaded';
 }
 
 const FILE_SAVE_OVERLAY_ID = 'pl-file-save-overlay';
 
-function showFileSaveOverlay(url: string, filename: string, cleanup: () => void): void {
+function showFileSaveOverlay(url: string, filename: string, blob: Blob, cleanup: () => void): void {
   document.getElementById(FILE_SAVE_OVERLAY_ID)?.remove();
   const root = document.createElement('div');
   root.id = FILE_SAVE_OVERLAY_ID;
@@ -154,6 +173,20 @@ function showFileSaveOverlay(url: string, filename: string, cleanup: () => void)
   save.textContent = '💾 Сохранить файл';
   save.setAttribute('aria-label', `Сохранить файл ${filename}`);
   save.style.cssText = 'display:block;text-align:center;padding:12px;border-radius:10px;background:#00e68a;color:#000;font-weight:800;text-decoration:none;min-height:44px;box-sizing:border-box;';
+  save.onclick = (e) => {
+    e.preventDefault();
+    try {
+      const nav = navigator as unknown as { share?: (data: { files: File[]; title?: string }) => Promise<void> };
+      const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+      if (typeof nav.share === 'function') {
+        nav.share({ files: [file], title: filename }).then(() => root.remove()).catch(() => {
+          try { window.open(url, '_blank'); } catch { /* no-op */ }
+        });
+        return;
+      }
+    } catch { /* no-op */ }
+    try { window.open(url, '_blank'); } catch { /* no-op */ }
+  };
   const close = document.createElement('button');
   close.type = 'button';
   close.textContent = 'Закрыть';

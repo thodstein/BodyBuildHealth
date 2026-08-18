@@ -178,9 +178,7 @@ describe('PLPlanView — цепочка экспорта', () => {
     fireEvent.click(screen.getByText('📲 Telegram Mini App'));
     expect(shareSpy).toHaveBeenCalledTimes(1);
     const [link] = shareSpy.mock.calls[0];
-    expect(link).toContain('https://t.me/share/url?url=');
-    expect(decodeURIComponent(link)).toContain('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01');
-    expect(decodeURIComponent(link)).toContain('Тестовый цикл');
+    expect(link).toBe('https://t.me/BBHealthBot?startapp=pl-plan-cycle-01');
   });
 
   it('кнопка экспорта не активна, пока цепочка не пройдена', () => {

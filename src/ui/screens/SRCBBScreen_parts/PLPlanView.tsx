@@ -346,8 +346,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                    const title = builtSrc.template.meta.title;
                    const url = plTelegramAppUrl(selectedCycleId);
                    const digest = plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead });
-                   const link = plShareLink({ title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, telegramUrl: url, plan: W });
-                   const result = await openPLShare(link, { title: `ПЛ: ${title}`, text: digest, url });
+                   const result = await openPLShare(url, { title: `ПЛ: ${title}`, text: digest, url });
                    onNote(result === 'shared' ? '📲 План передан через системное меню «Поделиться».' : '📲 Открыт Telegram с текстом плана.');
                  }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Telegram Mini App</button>
               </div>
