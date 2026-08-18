@@ -464,6 +464,21 @@ function enhanceOcrCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   return canvas;
 }
 
+function enhanceOcrCanvasInPlace(canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  if (!context) return canvas;
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.35 + 128));
+    const value = gray < 170 ? contrast : 255;
+    data[i] = value; data[i + 1] = value; data[i + 2] = value;
+  }
+  context.putImageData(image, 0, 0);
+  return canvas;
+}
+
 function detectWatermarkText(text: string): string[] {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const watermarks: string[] = [];
@@ -931,8 +946,15 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
       // worker URL is needed here. This avoids Telegram WebView worker errors.
     }
     const arrayBuffer = fileOrBuffer instanceof ArrayBuffer ? fileOrBuffer : await fileOrBuffer.arrayBuffer();
+    if (arrayBuffer.byteLength > 12 * 1024 * 1024) {
+      throw new Error('Сканированный PDF больше 12 МБ. Сожмите файл или загрузите страницы по одной.');
+    }
     const pdf = await openPdfDocument(pdfjsLib, arrayBuffer, true);
-    const MAX_PAGE_PX = 1800000;
+    const MAX_PAGE_PX = 1000000;
+    const MAX_SCAN_PAGES = 8;
+    if (pdf.numPages > MAX_SCAN_PAGES) {
+      throw new Error(`В сканированном PDF ${pdf.numPages} страниц. Максимум для Telegram Mini App: ${MAX_SCAN_PAGES}.`);
+    }
     const texts: string[] = [];
     const worker = await createRussianOcrWorker(Tesseract);
     try {
@@ -947,14 +969,20 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
         const context = canvas.getContext('2d');
         if (!context) continue;
         await page.render({ canvas, canvasContext: context, viewport }).promise;
-        const enhanced = enhanceOcrCanvas(canvas);
-        const { data } = await worker.recognize(enhanced);
-        if (data.text?.trim()) texts.push(data.text);
-        canvas.width = 1;
-        canvas.height = 1;
+        const enhanced = enhanceOcrCanvasInPlace(canvas);
+        try {
+          const { data } = await worker.recognize(enhanced);
+          if (data.text?.trim()) texts.push(data.text);
+        } finally {
+          page.cleanup?.();
+          canvas.width = 1;
+          canvas.height = 1;
+        }
       }
     } finally {
       await worker.terminate();
+      await pdf.cleanup?.();
+      await pdf.destroy?.();
     }
     return texts.join('\n');
   } catch (err: any) {
