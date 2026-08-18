@@ -19,11 +19,6 @@ import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';
 
-/** Имя — изоляция (по каноническому списку финализатора). */
-function isIsolationName(name: string): boolean {
-  return /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(name);
-}
-
 export interface TradeoffApplyOptions {
   level: string;
   mrvByMuscle: Record<string, number>;
@@ -43,7 +38,8 @@ export interface TradeoffWeekReport {
   notes: string[];
 }
 
-/** Убрать прямые изоляции донора, сохраняя effective ≥ адаптированный MEV.
+/** Убрать прямую работу донора, включая primary compounds, сохраняя
+ *  effective ≥ адаптированный MEV.
  *  Floor масштабируется тем же соотношением, что и MRV-кап (PED, стаж,
  *  recovery, nutrition, lab, spec-факторы) — без новых коэффициентов. */
 function trimDonorIsolations(
@@ -116,9 +112,12 @@ function addToRecipient(
       if (!targetCanonical.has(m)) continue;
       if (!matchesAnyZonePattern(ex.exerciseName || ex.name || '', targets)) continue;
       const cap = opts.mrvByMuscle[m] ?? getVolumeLandmarks(opts.level, m)?.mrv ?? 16;
-      const eff = volume()[m]?.effectiveSets ?? 0;
-      const workingSets = session.exercises.filter(e => !(e as any).warmupActivator).reduce((a, e) => a + (e.sets || 0), 0);
-      while (transferred < budget && (ex.sets ?? 0) < 5 && eff + 1 <= cap && workingSets + 1 <= opts.maxWorkingSetsPerSession) {
+      while (transferred < budget && (ex.sets ?? 0) < 5) {
+        // Пересчитываем после КАЖДОГО добавленного сета: stale eff раньше
+        // позволял пройти несколько сетов по одной и той же проверке MRV.
+        const eff = volume()[m]?.effectiveSets ?? 0;
+        const workingSets = session.exercises.filter(e => !(e as any).warmupActivator).reduce((a, e) => a + (e.sets || 0), 0);
+        if (eff + 1 > cap || workingSets + 1 > opts.maxWorkingSetsPerSession) break;
         ex.sets += 1;
         const template = (ex.workSets && ex.workSets[ex.workSets.length - 1]) || { reps: 10, rir: 2, weight: 0, restSeconds: 90 };
         ex.workSets = [...(ex.workSets || []), { ...template }];
