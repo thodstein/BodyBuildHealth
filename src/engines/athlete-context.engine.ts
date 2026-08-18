@@ -105,3 +105,38 @@ export function athletePolicySummary(context?: Partial<AthleteContext> | null): 
   const label = hints.mode === 'female_context' ? '♀ Женский контекст' : 'Стандартный контекст';
   return [label, 'MRV/RIR/кaps: без скрытого изменения', ...hints.notes].join(' · ');
 }
+
+export interface RedsRiskInput {
+  /** Темп снижения веса, %/нед (среднее за 7-14 дней). */
+  weightTrendPctPerWeek?: number;
+  bodyFatPct?: number;
+  sleepHours?: number;
+  cycleIrregular?: boolean;
+  calorieDeficitActive?: boolean;
+}
+
+/**
+ * RED-S сигналы для женского контекста. Только предупреждения и рекомендация
+ * медицинской оценки — никаких автоматических изменений тренировочного плана.
+ */
+export function redsRiskSignals(context?: Partial<AthleteContext> | null, opts: RedsRiskInput = {}): string[] {
+  const c = normalizeAthleteContext(context);
+  if (c.athleteMode !== 'female_context') return [];
+  const warnings: string[] = [];
+  const deficit = opts.calorieDeficitActive === true;
+  const rate = opts.weightTrendPctPerWeek;
+
+  if (deficit && rate != null && rate > 0.5) {
+    warnings.push(`⚠ RED-S: темп снижения ${rate.toFixed(1)}%/нед выше безопасного 0.5% — риск низкой энергетической доступности (IOC REDs).`);
+  }
+  if (deficit && opts.bodyFatPct != null && opts.bodyFatPct < 14) {
+    warnings.push(`⚠ RED-S: % жира ${opts.bodyFatPct}% на дефиците — риск нарушений цикла и костного здоровья; нужен врач/спортдиетолог.`);
+  }
+  if (opts.sleepHours != null && opts.sleepHours < 6) {
+    warnings.push('⚠ Восстановление: сон < 6 ч — снизьте объём/интенсивность и проверьте энергетическую доступность.');
+  }
+  if (opts.cycleIrregular) {
+    warnings.push('⚠ Нарушения цикла (аменорея/олигоменорея) — возможный признак RED-S: мед-консультация и пересмотр дефицита.');
+  }
+  return warnings;
+}

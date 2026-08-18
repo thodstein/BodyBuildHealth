@@ -269,6 +269,8 @@ export interface ProgramMeta {
   /** Связь с дизайном периодизации (периодизационный дизайнер): id + имя + хэш содержимого.
    *  Хэш меняется при правке дизайна — по нему UI определяет «дизайн изменён» (stale). */
   designRef?: { id: string; name: string; hash: string };
+  /** Явный контекст спортсмена, с которым собрана программа (прозрачно). */
+  athleteMode?: 'standard' | 'female_context';
 }
 
 export interface UserProgram {

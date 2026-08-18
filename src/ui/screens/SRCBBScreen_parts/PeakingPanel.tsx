@@ -70,13 +70,18 @@ const MENTAL_ROUTINES: { step: string; duration: string; when: string }[] = [
   { step: 'Старт: команда судьи → техника + мощность', duration: 'весь подход', when: 'на выполнении' },
 ];
 
-function weightClass(bw: number, fed: string): { name: string; min: number; max: number } {
-  const classes: Record<string, { name: string; min: number; max: number }[]> = {
+function weightClass(bw: number, fed: string, sex: 'male' | 'female' = 'male'): { name: string; min: number; max: number } {
+  const MALE: Record<string, { name: string; min: number; max: number }[]> = {
     ipf: [{name:'до 59кг',min:0,max:59},{name:'до 66кг',min:59,max:66},{name:'до 74кг',min:66,max:74},{name:'до 83кг',min:74,max:83},{name:'до 93кг',min:83,max:93},{name:'до 105кг',min:93,max:105},{name:'до 120кг',min:105,max:120},{name:'свыше 120кг',min:120,max:999}],
     fpr: [{name:'до 53кг',min:0,max:53},{name:'до 59кг',min:53,max:59},{name:'до 66кг',min:59,max:66},{name:'до 74кг',min:66,max:74},{name:'до 83кг',min:74,max:83},{name:'до 93кг',min:83,max:93},{name:'до 105кг',min:93,max:105},{name:'до 120кг',min:105,max:120},{name:'свыше 120кг',min:120,max:999}],
     wpc: [{name:'до 56кг',min:0,max:56},{name:'до 67.5кг',min:56,max:67.5},{name:'до 75кг',min:67.5,max:75},{name:'до 82.5кг',min:75,max:82.5},{name:'до 90кг',min:82.5,max:90},{name:'до 100кг',min:90,max:100},{name:'до 110кг',min:100,max:110},{name:'до 125кг',min:110,max:125},{name:'свыше 125кг',min:125,max:999}],
   };
-  const list = classes[fed] || classes.ipf;
+  const FEMALE: Record<string, { name: string; min: number; max: number }[]> = {
+    ipf: [{name:'до 43кг',min:0,max:43},{name:'до 47кг',min:43,max:47},{name:'до 52кг',min:47,max:52},{name:'до 57кг',min:52,max:57},{name:'до 63кг',min:57,max:63},{name:'до 69кг',min:63,max:69},{name:'до 76кг',min:69,max:76},{name:'до 84кг',min:76,max:84},{name:'свыше 84кг',min:84,max:999}],
+    fpr: [{name:'до 43кг',min:0,max:43},{name:'до 47кг',min:43,max:47},{name:'до 52кг',min:47,max:52},{name:'до 57кг',min:52,max:57},{name:'до 63кг',min:57,max:63},{name:'до 69кг',min:63,max:69},{name:'до 76кг',min:69,max:76},{name:'до 84кг',min:76,max:84},{name:'свыше 84кг',min:84,max:999}],
+    wpc: [{name:'до 44кг',min:0,max:44},{name:'до 48кг',min:44,max:48},{name:'до 52кг',min:48,max:52},{name:'до 56кг',min:52,max:56},{name:'до 60кг',min:56,max:60},{name:'до 67.5кг',min:60,max:67.5},{name:'до 75кг',min:67.5,max:75},{name:'до 82.5кг',min:75,max:82.5},{name:'до 90кг',min:82.5,max:90},{name:'до 100кг',min:90,max:100},{name:'до 110кг',min:100,max:110},{name:'свыше 110кг',min:110,max:999}],
+  };
+  const list = (sex === 'female' ? FEMALE[fed] || FEMALE.ipf : MALE[fed] || MALE.ipf);
   return list.find(c => bw <= c.max) || list[list.length - 1];
 }
 
@@ -143,7 +148,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     }
   };
 
-  const cls = useMemo(() => weightClass(bw, fed), [bw, fed]);
+  const cls = useMemo(() => weightClass(bw, fed, (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })()), [bw, fed]);
   // Канон (lms-taper.engine): единая кривая тапера — режим × длительность.
   const taper = useMemo(() => buildPLTaperCurve({ taperWeeks: weeks, mode: taperMode, fatigue: Math.max(0, Math.min(100, Math.round(fatigue / 5))) }), [weeks, taperMode, fatigue]);
   // Прикиды — канон (competition-attempts.meetAttemptsFor), стратегия на выбор.

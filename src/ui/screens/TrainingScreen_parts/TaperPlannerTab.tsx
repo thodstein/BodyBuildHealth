@@ -10,12 +10,13 @@ import {
   type AttemptStrategy, type Lift, type TaperPlan,
 } from '../../../engines/pro/taper.engine';
 import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
-import { buildBBContestPrep, isoToday, isoAddDays, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
+import { buildBBContestPrep, isoToday, isoAddDays, normalizeContestCategory, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
 import {
-  selectWeightClass, generateCompetitionTimeline,
+  selectWeightClassForSex, generateCompetitionTimeline,
   getRecoveryProtocols, getMentalRoutines, recommendWeightCut,
 } from '../../../engines/gym-competition.engine';
 import { applyToPlanner } from './planner-bridge';
+import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
@@ -85,7 +86,10 @@ export const TaperPlannerTab: React.FC = () => {
     return Math.max(0, Math.round(d / 86400000));
   }, [meetDate]);
 
-  const cls = useMemo(() => selectWeightClass(bw, fed), [bw, fed]);
+  const cls = useMemo(() => {
+    const sex: 'male' | 'female' = (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })();
+    return selectWeightClassForSex(sex, bw, fed);
+  }, [bw, fed]);
   const timeline = useMemo(() => generateCompetitionTimeline(weighIn, start), [weighIn, start]);
   const recovery = useMemo(() => getRecoveryProtocols(), []);
   const mental = useMemo(() => getMentalRoutines(), []);
@@ -95,10 +99,14 @@ export const TaperPlannerTab: React.FC = () => {
   const bb: BBPeakingOutput | null = useMemo(() => {
     if (kind !== 'bb') return null;
     try {
+      const profile = (() => { try { return (getProfile().settings as any) || {}; } catch { return {}; } })();
+      const bbSex: 'male' | 'female' = profile?.personal?.sex === 'female' ? 'female' : 'male';
+      const bbCategory = String(profile?.goals?.bbCategory || (bbSex === 'female' ? 'bikini' : 'mens_physique'));
+      const bbWeight = Number(profile?.personal?.weight) > 0 ? Number(profile.personal.weight) : 80;
       const cfg: BBContestPrepConfig = {
-        sex: 'male',
-        category: 'mens_physique',
-        weightKg: 80,
+        sex: bbSex,
+        category: normalizeContestCategory(bbCategory, bbSex),
+        weightKg: bbWeight,
         experienceLevel: 'intermediate',
         enhanced: false,
         prepCount: 0,

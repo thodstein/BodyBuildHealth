@@ -347,12 +347,19 @@ PED-логика остаётся общей и дозозависимой:
 - Соревнования PL: `IPF_WEIGHT_CLASSES_WOMEN`/`GENERAL_WEIGHT_CLASSES_WOMEN` + `selectWeightClassForSex` (аддитивно, `selectWeightClass` поведение не изменено).
 - Тесты: `athlete-context.test.ts` (5), `bb-athlete-context.test.ts` (4: объём/состав не меняются, legacy без полей, PED+контекст валиден), `pl-athlete-context.test.ts` (3: недели идентичны), `bb-plans-migration.test.ts` +1 (athleteMode legacy/female).
 
-### Осталось на будущие раунды (вне объёма текущей реализации)
+### Раунд 2 (Aug 18 2026, pushed c393ccbdc → следующий коммит)
 
-- Полноценные federation-таблицы во всех UI соревнований (PeakingPanel/PLCompetitionTab/TaperPlannerTab) и их синхронизация с профилем.
-- RED-S/железо/костные сигналы в питании и contest prep (движок bb-contest-prep уже содержит женские floors).
+- **Соревновательный UI sex-aware**: PeakingPanel — локальные весовые категории разбиты на мужские/женские (IPF/FPR/WPC), пол берётся из профиля; TaperPlannerTab — `selectWeightClass` → `selectWeightClassForSex(sex, bw, fed)` и BB-ветка больше не хардкодит `male/mens_physique/80кг` (пол, вес и категория из профиля через `normalizeContestCategory`).
+- **Мета и экспорт**: `ProgramMeta.athleteMode` + `createFromBuild` пишет контекст из плана (`params.athleteMode ?? plan.athleteMode ?? 'standard'`); BB PDF (🖨) добавляет «· ♀ Женский контекст» в заголовок; BB CSV (📥) добавляет колонку «Контекст».
+- **RED-S**: `redsRiskSignals(context, {weightTrendPctPerWeek, bodyFatPct, sleepHours, cycleIrregular, calorieDeficitActive})` в athlete-context.engine — только предупреждения, без авто-изменений; UI-подсказка в карточке режима BB («темп ≤ 0.5%/нед»).
+- Тесты: `athlete-context.test.ts` +5 (RED-S), `female-weight-classes.test.ts` 6. Проверено: tsc 0; целевые 32/32; user-program + pl-export + taper 21/21; bb-auto-smoke 5/5.
+
+### Осталось на будущие раунды
+
 - Беременность/postpartum как отдельный адаптационный путь с медицинским review (сейчас — только warning через reproductiveContext).
-- Прокидка athleteMode в saved UserProgram meta и в PDF/CSV-экспорты.
+- Синхронизация пола в ProMetricsPanel/RelativeStrengthCalcTab с профилем (локальные селекторы остаются ручными).
+- RED-S/железо/костные сигналы в питании (движок bb-contest-prep уже содержит женские floors).
+- Печать PL (PLPlanView → buildPLPrintHtml) — файл в зоне параллельных правок, не тронут.
 
 ## 15. Источники
 - Refalo et al., 2025, sex differences in hypertrophy: https://doi.org/10.7717/peerj.19042

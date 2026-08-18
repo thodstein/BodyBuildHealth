@@ -3,6 +3,7 @@ import {
   athletePolicyHints,
   athletePolicySummary,
   normalizeAthleteContext,
+  redsRiskSignals,
 } from '../athlete-context.engine';
 
 describe('athlete context policy', () => {
@@ -44,5 +45,32 @@ describe('athlete context policy', () => {
   it('produces an exportable transparent summary', () => {
     expect(athletePolicySummary({ sex: 'female', athleteMode: 'female_context' }))
       .toContain('Женский контекст');
+  });
+});
+
+describe('RED-S risk signals (female_context only)', () => {
+  const female = { sex: 'female' as const, athleteMode: 'female_context' as const };
+
+  it('flags unsafe weight-loss rate on deficit', () => {
+    const w = redsRiskSignals(female, { calorieDeficitActive: true, weightTrendPctPerWeek: 0.7 });
+    expect(w.some(x => x.includes('RED-S'))).toBe(true);
+  });
+
+  it('safe rate produces no RED-S warning', () => {
+    expect(redsRiskSignals(female, { calorieDeficitActive: true, weightTrendPctPerWeek: 0.4 })).toEqual([]);
+  });
+
+  it('low body fat + deficit flags bone/cycle risk', () => {
+    const w = redsRiskSignals(female, { calorieDeficitActive: true, bodyFatPct: 12 });
+    expect(w.some(x => x.includes('% жира 12%'))).toBe(true);
+  });
+
+  it('irregular cycle always warns', () => {
+    const w = redsRiskSignals(female, { cycleIrregular: true });
+    expect(w.some(x => x.includes('Нарушения цикла'))).toBe(true);
+  });
+
+  it('standard/male context yields no RED-S signals', () => {
+    expect(redsRiskSignals({ sex: 'male', athleteMode: 'standard' }, { calorieDeficitActive: true, weightTrendPctPerWeek: 0.8 })).toEqual([]);
   });
 });

@@ -1776,7 +1776,8 @@ export const BbAutoConstructor: React.FC = () => {
       return `<h2 style="margin:16px 0 6px">Неделя ${wk.week} (${esc(wk.phase || '')}${wk.deload ? ' — DELOAD' : ''})${peakNote}</h2>${prepNote}${sessionsHtml}`;
     }).join('');
     const rationaleHtml = (plan.rationale || []).map(r => `<div style="font-size:10px;color:#666;margin:2px 0">${esc(r)}</div>`).join('');
-    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}<script>window.print()</script></body></html>`);
+    const modeNote = plan.athleteMode === 'female_context' ? ' · ♀ Женский контекст' : '';
+    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед${modeNote}</h1>${rationaleHtml}${weeksHtml}<script>window.print()</script></body></html>`);
     w.document.close();
   };
 
@@ -1784,7 +1785,8 @@ export const BbAutoConstructor: React.FC = () => {
   const handleExportCSV = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема'].join(',')];
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема', 'Контекст'].join(',')];
+    const contextValue = plan.athleteMode === 'female_context' ? 'female_context' : 'standard';
     for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
@@ -1806,6 +1808,7 @@ export const BbAutoConstructor: React.FC = () => {
               esc(ex.executionProfile?.mistakes.join('; ') || ''),
               esc(ex.comment || ''),
               esc(feat),
+              contextValue,
             ].join(','));
           }
         }
@@ -1993,6 +1996,11 @@ export const BbAutoConstructor: React.FC = () => {
           Основная модель объёма, RIR и капы сохраняются. Режим добавляет прозрачный контекст (пол, категории, safety-подсказки) и действует только на следующую сборку.
           {profileSex === 'female' && athleteMode === 'standard' && <span style={{ color:'rgba(236,72,153,0.8)' }}> В профиле указан женский пол — можно включить контекст.</span>}
         </div>
+        {athleteMode === 'female_context' && (
+          <div style={{ marginTop:6, fontSize:10, color:'#f59e0b', lineHeight:1.5 }}>
+            🛡 При сушке держите темп ≤ 0.5%/нед и следите за энергетической доступностью — риск RED-S (нарушения цикла, кости).
+          </div>
+        )}
       </div>
 
       {/* Plan mode: cycle vs generic split */}
