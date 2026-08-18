@@ -7,8 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { ProfileHero } from './ProfileHero';
 import { ProfileUserTab } from './ProfileUserTab';
 import { ProfileDiariesTab } from './ProfileDiariesTab';
+import { ProfileReportsTab } from './ProfileReportsTab';
 import { ProfileSettingsTab } from './ProfileSettingsTab';
-import { ReportsScreen } from '../ReportsScreen';
 import { useProfileRefresh, getSnapshotsCount, undoLastSnapshot } from '../../../core/profile-manager';
 import { onAnyProfileChange } from '../../../core/profile-events';
 import { colors } from './ui';
@@ -61,14 +61,14 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
 
   // P1-fix (Aug 5 2026): при переходе из App — открываем конкретную вкладку дневника
   useEffect(() => {
-    if (initialSubTab && (
-      ['diaries', 'reports', 'archive', 'custom-report', 'sleep', 'bp', 'weight', 'injection'].includes(initialSubTab)
-      || initialSubTab.endsWith('-reports')
-    )) {
-      setTab('diaries');
-    }
-    if (initialSubTab === 'reports' || initialSubTab === 'custom-report') {
+    if (initialSubTab === 'reports' || initialSubTab === 'custom-report' || initialSubTab === 'archive') {
       setTab('reports');
+    } else if (
+      initialSubTab &&
+      (['diaries', 'sleep', 'bp', 'weight', 'injection', 'measurements', 'cardio'].includes(initialSubTab) ||
+        initialSubTab.endsWith('-reports'))
+    ) {
+      setTab('diaries');
     }
   }, [initialSubTab]);
 
@@ -144,10 +144,13 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
           {tab === 'diaries' && <ProfileErrorBoundary tabName="Дневники"><ProfileDiariesTab
             onNavigate={onNavigate}
-            initialView={initialSubTab === 'reports' || initialSubTab === 'custom-report' ? 'reports' : initialSubTab === 'archive' ? 'archive' : 'diary'}
+            initialView={initialSubTab === 'sleep' || initialSubTab === 'bp' || initialSubTab === 'weight' || initialSubTab === 'measurements' ? (initialSubTab as 'sleep' | 'bp' | 'weight' | 'measurements') : 'diary'}
           /></ProfileErrorBoundary>}
          {tab === 'settings' && <ProfileErrorBoundary tabName="Настройки"><ProfileSettingsTab onNavigate={onNavigate} /></ProfileErrorBoundary>}
-         {tab === 'reports' && <ProfileErrorBoundary tabName="Отчёты"><ReportsScreen /></ProfileErrorBoundary>}
+         {tab === 'reports' && <ProfileErrorBoundary tabName="Отчёты"><ProfileReportsTab
+            onNavigate={onNavigate}
+            initialView={initialSubTab === 'archive' ? 'archive' : initialSubTab === 'custom-report' ? 'comprehensive' : initialSubTab === 'reports' ? 'blocks' : undefined}
+          /></ProfileErrorBoundary>}
       </div>
     </div>
   );

@@ -11,14 +11,22 @@ import { InteractionCheckerTab } from './InteractionCheckerTab';
 import { MapperTab } from './MapperTab';
 import { DiagnosticsTab } from './DiagnosticsTab';
 import { PharmaPeptideCalc } from './PharmaPeptideCalc';
+import { PharmaReportsTab } from './PharmaReportsTab';
 
-type PharmaPage = 'main' | 'course' | 'calculators' | 'info';
+type PharmaPage = 'main' | 'course' | 'calculators' | 'info' | 'reports';
 type SubTab = 'catalog' | 'pkpd' | 'dosage' | 'peptides' | 'mapper' | 'diagnostics' | 'interactions';
 
 export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const [page, setPage] = useState<PharmaPage>('main');
   const [subTab, setSubTab] = useState<SubTab>('catalog');
   const linked = useDataLink();
+
+  // Прямой переход из Профиля/других блоков: «Мой курс» → страница курса,
+  // «Фарма-отчёт» → страница отчёта (а не hero).
+  useEffect(() => {
+    if (initialSubTab === 'course') setPage('course');
+    else if (initialSubTab === 'reports') setPage('reports');
+  }, [initialSubTab]);
 
   useEffect(() => {
     try {
@@ -43,6 +51,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
   if (page === 'main') {
     const cards = [
       { key:'course' as const, icon:'📋', title:'Курс', desc:'Управление курсом, препараты, дозировки, фазы', color:'#8b5cf6' },
+      { key:'reports' as const, icon:'📄', title:'Фарма-отчёт', desc:'Состав, валидация, взаимодействия, риск', color:'#f59e0b' },
       { key:'calculators' as const, icon:'⚙️', title:'Калькуляторы', desc:'PK/PD · Дозировки · Пептиды · Маппер · Диагностика', color:'#3b82f6' },
       { key:'info' as const, icon:'📖', title:'Общая информация', desc:'Каталог веществ и проверка взаимодействий', color:'#22c55e' },
     ];
@@ -125,6 +134,12 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     background:'var(--accent)', color:'#000', border:'1px solid var(--accent)',
   }}>📋 Курс</button>
 )}
+{page === 'reports' && (
+  <button style={{
+    padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'default', flexShrink:0,
+    background:'var(--accent)', color:'#000', border:'1px solid var(--accent)',
+  }}>📄 Фарма-отчёт</button>
+)}
 {page === 'calculators' && (['pkpd','dosage','peptides','mapper','diagnostics'] as const).map(t => (
   <button key={t} onClick={() => setSubTab(t)} style={{
     padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',
@@ -145,6 +160,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
         ))}
       </div>
       {page === 'course' && <PharmaCourseScreen />}
+      {page === 'reports' && <PharmaReportsTab />}
       {page === 'calculators' && subTab === 'pkpd' && <PKPDSimulationTab />}
       {page === 'calculators' && subTab === 'dosage' && <DosageCalculatorTab />}
       {page === 'calculators' && subTab === 'peptides' && <PharmaPeptideCalc />}

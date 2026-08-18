@@ -605,8 +605,8 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
 
 export const ProfileDiariesTab: React.FC<{
   onNavigate?: (screen: string) => void;
-  initialView?: 'diary' | 'reports' | 'archive';
-}> = ({ onNavigate, initialView }) => {
+  initialView?: string;
+}> = ({ onNavigate }) => {
   const profile = useProfileRefresh();
   const pharmaPhase = (profile.settings as any)?.pharma?.phase as
     'baseline' | 'course' | 'bridge' | 'pct' | 'post_pct' | 'fertility' | undefined;
@@ -628,14 +628,7 @@ export const ProfileDiariesTab: React.FC<{
     const diffMs = now.getTime() - start.getTime();
     return Math.max(1, Math.floor(diffMs / (7 * 86400000)) + 1);
   })();
-  const [view, setView] = useState<'diary' | 'reports' | 'archive'>(initialView || 'diary');
   const [activeDiary, setActiveDiary] = useState<DiaryKey | null>(null);
-  useEffect(() => {
-    if (initialView) setView(initialView);
-  }, [initialView]);
-  useEffect(() => {
-    if (view !== 'diary') setActiveDiary(null);
-  }, [view]);
 
   useEffect(() => {
     if (!activeDiary) return;
@@ -720,6 +713,7 @@ export const ProfileDiariesTab: React.FC<{
     else if (key === 'bp') setAddBPOpen(true);
     else if (key === 'weight' || key === 'measurements') setAddBodyMeasurementsOpen(true);
     else if (key === 'injection') setAddInjectionOpen(true);
+    else if (key === 'cardio') setActiveDiary('cardio');
     else if (
       key === 'health' ||
       key === 'symptoms' ||
@@ -1065,228 +1059,21 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
     reader.readAsText(file);
   };
 
-  const reportSources = [
-    {
-      current: 'he_training_report_current',
-      label: '🏋️ Тренер-отчёт',
-      target: 'training-analytics',
-      archiveKeys: ['he_training_reports'],
-      color: colors.blue,
-      desc: 'Анализ силы, прогрессии, объёма, восстановления',
-    },
-    {
-      current: 'he_nutrition_report_current',
-      label: '🍽 Отчёт по питанию',
-      target: 'nutrition-reports',
-      archiveKeys: ['he_nutrition_report_archive'],
-      color: colors.green,
-      desc: 'КБЖУ за день/неделю/месяц, микронутриенты',
-    },
-    {
-      current: 'he_labs_report_current',
-      label: '🩺 Врач-отчёт',
-      target: 'labs-reports',
-      archiveKeys: ['he_lab_reports'],
-      color: colors.danger,
-      desc: 'Анализы: отклонения, динамика по фазам',
-    },
-    {
-      current: 'he_support_reports',
-      label: '🛡 Отчёт поддержки',
-      target: 'support-reports',
-      archiveKeys: ['he_support_reports_archive', 'he_support_reports'],
-      color: colors.purple,
-      desc: 'Стек, фазы, перекрёстные риски, совместимость',
-    },
-    {
-      current: 'he_pharma_report_current',
-      label: '💊 Фарма-отчёт',
-      target: 'pharma-reports',
-      archiveKeys: ['he_pharma_reports'],
-      color: colors.warning,
-      desc: 'Оценка курса: баланс, безопасность, длительность',
-    },
-    {
-      current: 'he_risk_report_current',
-      label: '⚠️ Отчёт по рискам',
-      target: 'risk-reports',
-      archiveKeys: ['he_risk_reports'],
-      color: '#f97316',
-      desc: 'Риск по системам органов, динамика',
-    },
-    {
-      current: 'he_profile_reports',
-      label: '📊 Кастомный отчёт',
-      target: 'custom-report',
-      archiveKeys: ['he_profile_reports'],
-      color: colors.orange,
-      desc: 'Сводный отчёт по разделам профиля',
-    },
-  ];
-  const readReportEntries = (src: (typeof reportSources)[number]) => {
-    const list: any[] = [];
-    try {
-      const current = localStorage.getItem(src.current);
-      const parsed = current ? JSON.parse(current) : null;
-      if (Array.isArray(parsed)) list.push(...parsed);
-      else if (parsed) list.push(parsed);
-    } catch {}
-    for (const key of src.archiveKeys) {
-      try {
-        const arch = localStorage.getItem(key);
-        const parsed = arch ? JSON.parse(arch) : null;
-        if (Array.isArray(parsed)) list.push(...parsed);
-        else if (parsed) list.push(parsed);
-      } catch {}
-    }
-    return list;
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label="Разделы дневников">
-        {(
-          [
-            ['diary', '📓 Дневники'],
-            ['reports', '📊 Отчёты'],
-            ['archive', '🗄 Архив отчётов'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setView(key)}
-            role="tab"
-            aria-selected={view === key}
-            style={{
-              padding: '7px 12px',
-              borderRadius: 8,
-              cursor: 'pointer',
-              fontSize: 11,
-              fontWeight: 700,
-              border: `1px solid ${view === key ? colors.primary : colors.border}`,
-              background: view === key ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)',
-              color: view === key ? colors.primary : colors.textMuted,
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {view === 'reports' && (
-        <AccordionSection
-          title="📊 Отчёты блоков"
-          subtitle="Последние отчёты из модулей приложения"
-          icon="📊"
-          color={colors.teal}
-          defaultOpen
-        >
-          <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {reportSources.map((src) => {
-              const list = readReportEntries(src);
-              const last = list[0];
-              return (
-                <button
-                  key={src.target}
-                  onClick={() => onNavigate?.(src.target)}
-                  role="listitem"
-                  aria-label={`Открыть ${src.label}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    minHeight: 60,
-                    background: `${src.color}10`,
-                    border: `1px solid ${src.color}44`,
-                    color: colors.text,
-                    transition: 'transform 0.15s, box-shadow 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      background: `${src.color}26`,
-                      fontSize: 20,
-                    }}
-                  >
-                    {src.label.split(' ')[0]}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: src.color }}>
-                      {src.label.replace(/^[^\s]+\s/, '')}
-                    </div>
-                    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{src.desc}</div>
-                    <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 3, opacity: 0.8 }}>
-                      {list.length === 0
-                        ? 'Нет отчётов'
-                        : `${list.length} ${list.length === 1 ? 'отчёт' : list.length < 5 ? 'отчёта' : 'отчётов'}${last?.date ? ` · последний ${new Date(last.date).toLocaleDateString('ru-RU')}` : ''}`}
-                    </div>
-                  </div>
-                  <span style={{ color: src.color, fontSize: 18, opacity: 0.7 }}>→</span>
-                </button>
-              );
-            })}
-          </div>
-        </AccordionSection>
-      )}
-
-      {view === 'archive' && (
-        <AccordionSection
-          title="🗄 Архив отчётов"
-          subtitle="Сохранённые отчёты всех блоков"
-          icon="🗄"
-          color={colors.orange}
-          defaultOpen
-        >
-          {reportSources.every((src) => readReportEntries(src).length === 0) ? (
-            <div style={{ color: colors.textMuted, fontSize: 12, padding: 12 }}>Архив отчётов пуст.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {reportSources
-                .flatMap((src) =>
-                  readReportEntries(src).map((rep: any, i: number) => ({ src, rep, key: `${src.target}-${i}` })),
-                )
-                .map(({ src, rep, key }) => (
-                  <div
-                    key={key}
-                    style={{
-                      padding: 10,
-                      borderRadius: 8,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${colors.border}`,
-                    }}
-                  >
-                    <div style={{ color: src.color, fontWeight: 700, fontSize: 12 }}>{src.label}</div>
-                    <div style={{ color: colors.textMuted, fontSize: 10, marginTop: 3 }}>
-                      {rep.date ? new Date(rep.date).toLocaleString('ru-RU') : 'Архивный отчёт'}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </AccordionSection>
-      )}
-
-      {view !== 'diary' ? null : (
+      {activeDiary === 'sleep' ? (
+        <SleepDiary open onClose={() => setActiveDiary(null)} diaryKey="sleep" goals={goals} onDataChange={refresh} />
+      ) : activeDiary === 'bp' ? (
+        <BPDiary open onClose={() => setActiveDiary(null)} diaryKey="bp" goals={goals} onDataChange={refresh} />
+      ) : activeDiary === 'weight' || activeDiary === 'measurements' ? (
+        <WeightDiary open onClose={() => setActiveDiary(null)} goals={goals} onDataChange={refresh} diaryKey="weight" />
+      ) : activeDiary === 'injection' ? (
+        <InjectionDiary open onClose={() => setActiveDiary(null)} diaryKey="injection" goals={goals} onDataChange={refresh} />
+      ) : activeDiary === 'health' ? (
+        <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="health" onDataChange={refresh} onNavigate={onNavigate} />
+      ) : activeDiary === 'cardio' ? (
+        <CardioDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="cardio" onDataChange={refresh} onNavigate={onNavigate} />
+      ) : (
         <>
           {/* Виджет «Сегодня заполнено» */}
           {(() => {
@@ -1708,6 +1495,7 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                       else if (d.key === 'bp') setAddBPOpen(true);
                       else if (d.key === 'weight' || d.key === 'measurements') setAddBodyMeasurementsOpen(true);
                       else if (d.key === 'injection') setAddInjectionOpen(true);
+                      else if (d.key === 'cardio') setActiveDiary('cardio');
                       else if (
                         d.key === 'symptoms' ||
                         d.key === 'pain' ||
@@ -1887,25 +1675,6 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
           >
             <QuickLinkRow links={QUICK_DIARY_LINKS} ariaLabel="Дневники в других блоках" onNavigate={onNavigate} />
           </AccordionSection>
-
-          {activeDiary === 'sleep' && (
-            <SleepDiary open onClose={() => setActiveDiary(null)} diaryKey="sleep" goals={goals} onDataChange={refresh} />
-          )}
-          {activeDiary === 'bp' && (
-            <BPDiary open onClose={() => setActiveDiary(null)} diaryKey="bp" goals={goals} onDataChange={refresh} />
-          )}
-          {(activeDiary === 'weight' || activeDiary === 'measurements') && (
-            <WeightDiary open onClose={() => setActiveDiary(null)} goals={goals} onDataChange={refresh} diaryKey="weight" />
-          )}
-          {activeDiary === 'injection' && (
-            <InjectionDiary open onClose={() => setActiveDiary(null)} diaryKey="injection" goals={goals} onDataChange={refresh} />
-          )}
-            {activeDiary === 'health' && (
-              <HealthDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="health" onDataChange={refresh} onNavigate={onNavigate} />
-            )}
-            {activeDiary === 'cardio' && (
-              <CardioDiary open onClose={() => setActiveDiary(null)} goals={goals} diaryKey="cardio" onDataChange={refresh} onNavigate={onNavigate} />
-            )}
 
           {/* ── Модальные окна для быстрого добавления из карточек дневников ── */}
           <AddSleepModal

@@ -197,7 +197,7 @@ export default function App() {
       case 'support': return <SupportScreen key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;
       case 'training': return <TrainingScreen key={key} initialSubTab={subTab || undefined} />;
       case 'labs': return <InfoErrorBoundary label="Лаборатория"><LabsScreen key={key} initialSubTab={subTab || undefined} /></InfoErrorBoundary>;
-      case 'risks': return <RiskScreen key={key} />;
+      case 'risks': return <RiskScreen key={key} initialSubTab={subTab || undefined} />;
       case 'nutrition': return <NutritionScreen key={key} initialSubTab={subTab || undefined} />;
       case 'marketplace': return <MarketplaceScreen key={key} />;
       case 'profile': return <ProfileScreen_v2 key={key} onNavigate={handleNavigate} initialSubTab={subTab || undefined} />;

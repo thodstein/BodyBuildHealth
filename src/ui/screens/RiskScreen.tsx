@@ -63,7 +63,7 @@ const RiskDisclaimer: React.FC = () => (
   </div>
 );
 
-export const RiskScreen: React.FC = () => {
+export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
   const labAnalysis = linked.labAnalysis;
   const readinessData = linked.readiness;
@@ -80,11 +80,19 @@ export const RiskScreen: React.FC = () => {
     } catch {}
   }, []);
 
-  // Force subTab when mainTab changes
+  // Force subTab when mainTab changes (но не переопределяем явный переход «Отчёты по рискам»)
   useEffect(() => {
-    if (mainTab === 'info') setSubTab('info');
+    if (mainTab === 'info' && subTab !== 'reports') setSubTab('info');
     else if (mainTab === 'clinical' || (mainTab === 'calculations' && calcPage === 'clinical')) setSubTab('clinical');
   }, [mainTab]);
+
+  // Глубокий переход «Отчёт по рискам» из Профиля → открываем страницу отчётов, а не hero.
+  useEffect(() => {
+    if (initialSubTab === 'reports') {
+      setMainTab('info');
+      setSubTab('reports');
+    }
+  }, [initialSubTab]);
   const [calcPage, setCalcPage] = useState<'hero' | 'basic' | 'montecarlo' | 'mdss' | 'clinical'>('hero');
   const [basicPage, setBasicPage] = useState<'main' | 'dynamics' | 'mechanisms' | 'key_risks' | 'history'>('main');
   const [mcPage, setMcPage] = useState<'main' | 'organs' | 'dynamics' | 'sensitivity' | 'pk'>('main');
