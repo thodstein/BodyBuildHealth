@@ -20,6 +20,7 @@ import { SectionCard, GroupHeading, SectionNav, ROW, LABEL, BTN, BTN_PRIMARY, BT
 const GOAL_COLOR: Record<string, string> = {
   health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
   maintenance: '#8b5cf6', recovery: '#71717a',
+  bb_prep: '#ec4899', pl_prep: '#06b6d4', bb_taper: '#ef4444',
 };
 
 export const CardioManageStep: React.FC<{

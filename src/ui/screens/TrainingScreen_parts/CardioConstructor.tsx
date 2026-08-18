@@ -357,7 +357,7 @@ export const CardioConstructor: React.FC = () => {
   };
 
   const migrateFromPlan = () => {
-    const plan = buildCardioPlan({ goal: goal === 'mass' ? 'mass' : goal === 'cut' ? 'cut' : goal === 'recovery' ? 'recovery' : 'maintenance' });
+    const plan = buildCardioPlan({ goal });
     const c = cardioPlanToCycle(plan, goal);
     saveCardioCycle(c);
     setActiveCardioCycle(c);

@@ -57,7 +57,7 @@ export interface CardioPlan {
 
 // ─── CardioCycle (многонедельный цикл) ───
 
-export type CardioGoal = 'health' | 'mass' | 'cut' | 'recomp' | 'maintenance' | 'recovery';
+export type CardioGoal = 'health' | 'mass' | 'cut' | 'recomp' | 'maintenance' | 'recovery' | 'bb_prep' | 'pl_prep' | 'bb_taper';
 
 export type CardioPhase =
   | 'base'
@@ -201,10 +201,12 @@ export function cardioNutritionNotes(
   const bw = profile.personal?.weight ?? 80;
   const s = cardioCycleSummary(cycle);
   notes.push(`🔥 Расход кардио: ${s.avgKcalPerWeek} ккал/нед (~${Math.max(1, Math.round(s.avgKcalPerWeek / 9))} г жира/нед при дефиците).`);
-  if (cycle.goal === 'cut' || cycle.goal === 'recomp') {
-    notes.push(`🥩 Белок при сушке: ≥2.2 г/кг = ${Math.round(bw * 2.2)} г/сут — сохранит мышцы на фоне дефицита + кардио.`);
+  if (cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') {
+    notes.push(`🥩 Белок при сушке/подготовке ББ: ≥2.2 г/кг = ${Math.round(bw * 2.2)} г/сут — сохранит мышцы на фоне дефицита + кардио.`);
   } else if (cycle.goal === 'mass') {
     notes.push(`🥩 Белок при массонаборе: 1.8-2.0 г/кг = ${Math.round(bw * 1.9)} г/сут.`);
+  } else if (cycle.goal === 'pl_prep' || cycle.goal === 'bb_taper') {
+    notes.push(`🥩 Белок при подготовке/тапере: 2.0-2.2 г/кг = ${Math.round(bw * 2.1)} г/сут — поддержание мышц и веса.`);
   } else {
     notes.push(`🥩 Белок: 1.6-2.0 г/кг = ${Math.round(bw * 1.8)} г/сут.`);
   }
@@ -239,6 +241,9 @@ export const CARDIO_PRESETS: CardioPreset[] = [
   { id: 'base-12', name: 'База · 12 нед', desc: 'Zone 2 3-4×, наращивание объёма', icon: '🌱', goal: 'health', totalWeeks: 12, daysAvailable: 4, recoveryLow: false },
   { id: 'mass-12', name: 'Масса · 12 нед', desc: 'Только восстановление 1-2×', icon: '🏗', goal: 'mass', totalWeeks: 12, daysAvailable: 2, recoveryLow: false },
   { id: 'recovery-4', name: 'Восстановление · 4 нед', desc: 'Лёгкий кровоток после тяжёлого блока', icon: '💤', goal: 'recovery', totalWeeks: 4, daysAvailable: 3, recoveryLow: true },
+  { id: 'bb-prep-12', name: 'Подготовка ББ · 12 нед', desc: 'Прогрессия Zone 2 + MISS/HIIT на дефиците', icon: '🏁', goal: 'bb_prep', totalWeeks: 12, daysAvailable: 4, recoveryLow: false },
+  { id: 'pl-prep-8', name: 'Подготовка ПЛ · 8 нед', desc: 'Умеренный Zone 2 + MISS без утомления ЦНС', icon: '🏋️', goal: 'pl_prep', totalWeeks: 8, daysAvailable: 3, recoveryLow: false },
+  { id: 'bb-taper-4', name: 'Тапер ББ · 4 нед', desc: 'Плавное снижение объёма к шоу (0.85→0.4)', icon: '📉', goal: 'bb_taper', totalWeeks: 4, daysAvailable: 3, recoveryLow: true },
 ];
 
 // ─── Константы ───
@@ -267,6 +272,9 @@ export const CARDIO_GOAL_LABELS: Record<CardioGoal, string> = {
   recomp: 'Рекомпозиция',
   maintenance: 'Поддержание',
   recovery: 'Восстановление',
+  bb_prep: 'Подготовка ББ',
+  pl_prep: 'Подготовка ПЛ',
+  bb_taper: 'Тапер ББ',
 };
 
 export const CARDIO_PHASE_LABELS: Record<CardioPhase, string> = {
@@ -340,7 +348,7 @@ export function capSessionsToDays(sessions: CardioSession[], daysAvailable: numb
 // ─── Базовый недельный генератор (T7, обратно-совместим) ───
 
 export interface CardioInput {
-  goal: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'recovery';
+  goal: CardioGoal;
   bodyWeight?: number;
   daysAvailable?: number;     // сколько дней можно дать кардио (поверх трени)
   recoveryLow?: boolean;
@@ -353,16 +361,24 @@ export function buildCardioPlan(input: CardioInput): CardioPlan {
   const add = (type: CardioType, dur: number, freq: number, purpose: string) => {
     sessions.push(mkSession(type, dur, freq, purpose, bw));
   };
-  if (input.goal === 'cut') {
+  if (input.goal === 'cut' || input.goal === 'bb_prep') {
     add('zone2', 45, 3, 'Липолиз, сохранение мышц, восстановление между трени');
     add('hiit', 15, 1, 'Метаболический стимул, EPOC, ЖСС без большого объёма');
-    rationale.push('Сушка: zone2 3×45мин (липолиз без нагрузки на восстановление) + 1 HIIT 15мин (EPOC).');
-  } else if (input.goal === 'recomp' || input.goal === 'maintenance') {
+    rationale.push('Сушка/подготовка ББ: zone2 3×45мин (липолиз без нагрузки на восстановление) + 1 HIIT 15мин (EPOC).');
+  } else if (input.goal === 'recomp' || input.goal === 'maintenance' || input.goal === 'pl_prep') {
     add('zone2', 30, 2, 'Здоровье ССС, восстановление');
-    rationale.push('Поддержание/рекомпозиция: умеренное zone2 для ССС и восстановления.');
+    if (input.goal === 'pl_prep') {
+      add('miss', 20, 1, 'MISS (Z3 темпо): аэробная выносливость без утомления ЦНС');
+      rationale.push('Подготовка ПЛ: умеренное zone2 + MISS — форма без утомления к старту.');
+    } else {
+      rationale.push('Поддержание/рекомпозиция: умеренное zone2 для ССС и восстановления.');
+    }
   } else if (input.goal === 'mass') {
     add('recovery', 20, 1, 'Активное восстановление, не мешает массонабору');
     rationale.push('Массонабор: минимум кардио — только восстановление, чтобы не конкурировать с ростом.');
+  } else if (input.goal === 'bb_taper') {
+    add('zone2', 20, 2, 'Тапер ББ: лёгкий объём, привычка движения, без утомления');
+    rationale.push('Тапер ББ: лёгкое zone2 2×20 — плавное снижение нагрузки к шоу.');
   } else {
     add('recovery', 30, 3, 'Активное восстановление, мобильность');
     rationale.push('Восстановление: лёгкое кардио для кровотока и мобильности.');
@@ -440,8 +456,9 @@ interface RampProfile {
 function profileForGoal(goal: CardioGoal): RampProfile {
   switch (goal) {
     case 'cut':
+    case 'bb_prep':
       return {
-        base: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Вход в аэробную базу, щадящий старт сушки' }],
+        base: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Вход в аэробную базу, щадящий старт сушки/подготовки' }],
         build: [
           { type: 'zone2', dur: 40, freq: 3, purpose: 'Рост липолитического объёма, восстановление' },
           { type: 'miss', dur: 20, freq: 1, purpose: 'MISS (Z3 темпо/фартлек): аэробная выносливость без ударной нагрузки', alt: true },
@@ -453,6 +470,25 @@ function profileForGoal(goal: CardioGoal): RampProfile {
         ],
         deloadMult: 0.6,
         taperMult: 0.6,
+      };
+    case 'pl_prep':
+      return {
+        base: [{ type: 'zone2', dur: 20, freq: 2, purpose: 'Лёгкая аэробная база без утомления (подготовка ПЛ)' }],
+        build: [
+          { type: 'zone2', dur: 25, freq: 3, purpose: 'Умеренный объём, поддержание выносливости' },
+          { type: 'miss', dur: 20, freq: 1, purpose: 'MISS (Z3 темпо): аэробная выносливость', alt: true },
+        ],
+        maintenance: [{ type: 'zone2', dur: 30, freq: 3, purpose: 'Поддержание аэробной базы к старту' }],
+        deloadMult: 0.6,
+        taperMult: 0.6,
+      };
+    case 'bb_taper':
+      return {
+        base: [{ type: 'zone2', dur: 30, freq: 2, purpose: 'Вход в тапер: лёгкий объём без утомления' }],
+        build: [{ type: 'zone2', dur: 25, freq: 2, purpose: 'Снижение объёма, сохранение привычки движения' }],
+        maintenance: [{ type: 'recovery', dur: 20, freq: 2, purpose: 'Лёгкая активность, кровоток' }],
+        deloadMult: 0.6,
+        taperMult: 0.4,
       };
     case 'mass':
       return {
@@ -586,17 +622,20 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
 
   for (let w = 1; w <= totalWeeks; w++) {
     const phase = cardioPhaseForWeek(w, totalWeeks, competitions, phaseSplit, taperWeeks, peakWeek, taperEnabled);
-    const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && phase !== 'transition' && phase !== 'taper' && phase !== 'peak';
-    // Объём недели: непрерывная прогрессия рабочих недель (cut/recomp/health/maintenance)
-    // + плавная taper-кривая к старту. mass/recovery и делоды — без прогрессии.
+    const deload = !competitions.some(c => Math.abs(c.week - w) <= 2) && w % DELOAD_INTERVAL === 0 && input.goal !== 'bb_taper' && phase !== 'transition' && phase !== 'taper' && phase !== 'peak';
+    // Объём недели: непрерывная прогрессия рабочих недель (cut/recomp/health/
+    // maintenance/prep) + плавная taper-кривая к старту. mass/recovery, делоды
+    // и bb_taper (4 нед снижения 0.85→0.4, Bosquet 2005) — без прогрессии.
     let volumeMult = 1;
-    if (phase === 'taper') {
+    if (input.goal === 'bb_taper') {
+      volumeMult = Math.max(0.4, 0.85 - 0.15 * (w - 1)); // 1→0.85, 2→0.7, 3→0.55, 4→0.4
+    } else if (phase === 'taper') {
       const nextComp = competitions.find(c => c.week > w);
       const dist = nextComp ? nextComp.week - w : taperWeeks; // 1..taperWeeks
       volumeMult = 0.4 + 0.15 * Math.max(0, dist - 1); // 1→0.4, 2→0.55, 3→0.7, 4→0.85
     } else if (phase === 'transition') {
       volumeMult = profile.taperMult;
-    } else if (!deload && phase !== 'peak' && ['cut', 'recomp', 'health', 'maintenance'].includes(input.goal)) {
+    } else if (!deload && phase !== 'peak' && ['cut', 'recomp', 'health', 'maintenance', 'bb_prep', 'pl_prep'].includes(input.goal)) {
       volumeMult = Math.min(1.3, 1 + 0.04 * (w - 1));
     }
     let { sessions, rationale } = buildWeekSessions(profile, phase, w, bw, recoveryLow, volumeMult);
@@ -814,8 +853,8 @@ export function cardioWeightAdvice(
   cycle: CardioCycle,
   referenceIso?: string,
 ): CardioWeightAdvice {
-  if (cycle.goal !== 'cut' && cycle.goal !== 'recomp') {
-    return { action: 'keep', reason: 'Совет по весу актуален для сушки/рекомпозиции.' };
+  if (cycle.goal !== 'cut' && cycle.goal !== 'recomp' && cycle.goal !== 'bb_prep') {
+    return { action: 'keep', reason: 'Совет по весу актуален для сушки/рекомпозиции/подготовки ББ.' };
   }
   const sorted = [...weightLog].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? -1 : 1));
   if (sorted.length < 2) return { action: 'keep', reason: 'Недостаточно замеров веса для анализа.' };
@@ -1717,7 +1756,7 @@ export function autoTuneCardioCycle(
         const after = `${z2.type.toUpperCase()} ×${sessions.find(s => s.type === z2.type)!.weeklyFrequency}`;
         cw(`Выполнено ${Math.round(pct * 100)}% → частота −1`, before, after);
       }
-    } else if (pct >= 1.1 && avgRpe > 0 && avgRpe < 6 && (cycle.goal === 'cut' || cycle.goal === 'recomp')) {
+    } else if (pct >= 1.1 && avgRpe > 0 && avgRpe < 6 && (cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep')) {
       const before = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
       sessions = sessions.map(s => recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * 1.1)) }, bw));
       const after = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
@@ -1794,10 +1833,10 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
 
   // 1. Объём под цель
   const avg = s.avgMinutesPerWeek;
-  if (cycle.goal === 'cut') {
-    if (avg < 90) add('warn', `Сушка: ${avg} мин/нед — маловато для липолиза (ориентир 90-210).`, 15);
-    else if (avg > 210) add('warn', `Сушка: ${avg} мин/нед — высокий объём, следите за восстановлением.`, 10);
-    else add('ok', `Объём ${avg} мин/нед соответствует сушке.`, 0);
+  if (cycle.goal === 'cut' || cycle.goal === 'bb_prep') {
+    if (avg < 90) add('warn', `${cycle.goal === 'bb_prep' ? 'Подготовка ББ' : 'Сушка'}: ${avg} мин/нед — маловато для липолиза (ориентир 90-210).`, 15);
+    else if (avg > 210) add('warn', `${cycle.goal === 'bb_prep' ? 'Подготовка ББ' : 'Сушка'}: ${avg} мин/нед — высокий объём, следите за восстановлением.`, 10);
+    else add('ok', `Объём ${avg} мин/нед соответствует ${cycle.goal === 'bb_prep' ? 'подготовке ББ' : 'сушке'}.`, 0);
   } else if (cycle.goal === 'mass') {
     if (avg > 60) add('warn', `Массонабор: ${avg} мин/нед может конкурировать с ростом (ориентир ≤60).`, 15);
     else add('ok', `Объём ${avg} мин/нед не мешает массонабору.`, 0);
@@ -1806,12 +1845,19 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
     else add('ok', `Объём ${avg} мин/нед закрывает базовую рекомендацию.`, 0);
   } else if (cycle.goal === 'recovery') {
     if (avg > 150) add('warn', `Восстановление: ${avg} мин/нед — много для разгрузочного режима.`, 10);
+  } else if (cycle.goal === 'pl_prep') {
+    if (avg < 40) add('warn', `Подготовка ПЛ: ${avg} мин/нед — мало для аэробной поддержки (ориентир 60-150).`, 10);
+    else if (avg > 150) add('warn', `Подготовка ПЛ: ${avg} мин/нед — может утомлять перед стартом (ориентир 60-150).`, 10);
+    else add('ok', `Объём ${avg} мин/нед поддерживает форму без утомления.`, 0);
+  } else if (cycle.goal === 'bb_taper') {
+    if (avg > 150) add('warn', `Тапер ББ: ${avg} мин/нед — много для разгрузочных недель (ориентир 30-120, объём ↓).`, 10);
+    else add('ok', `Тапер ББ: объём снижается к шоу — корректно.`, 0);
   }
 
-  // 2. Прогрессия объёма (вторая половина > первой) для cut/health/recomp
+  // 2. Прогрессия объёма (вторая половина > первой) для cut/health/recomp/prep
   //    Сравниваем только рабочие недели (без taper/peak/transition/делодов —
   //    они по определению снижают объём в конце).
-  if (['cut', 'health', 'recomp'].includes(cycle.goal) && cycle.totalWeeks >= 6) {
+  if (['cut', 'health', 'recomp', 'bb_prep', 'pl_prep'].includes(cycle.goal) && cycle.totalWeeks >= 6) {
     const work = cycle.weeks.filter(w => !w.taper && !w.deload && w.phase !== 'transition' && w.phase !== 'peak');
     if (work.length >= 4) {
       const half = Math.floor(work.length / 2);
@@ -1823,14 +1869,14 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
   }
 
   // 3. Делоды
-  if (cycle.totalWeeks >= 8 && ['cut', 'health', 'recomp'].includes(cycle.goal)) {
+  if (cycle.totalWeeks >= 8 && ['cut', 'health', 'recomp', 'bb_prep'].includes(cycle.goal)) {
     if (!cycle.weeks.some(w => w.deload)) add('warn', 'В длинном цикле нет делод-недель.', 10);
     else add('ok', 'Делод-недели присутствуют.', 0);
   }
 
-  // 4. HIIT для сушки
-  if (cycle.goal === 'cut') {
-    if (s.hiitWeeks === 0) add('info', 'HIIT отсутствует — для сушки можно добавить 1×15 мин (при достаточном восстановлении).', 0);
+  // 4. HIIT для сушки/подготовки ББ
+  if (cycle.goal === 'cut' || cycle.goal === 'bb_prep') {
+    if (s.hiitWeeks === 0) add('info', 'HIIT отсутствует — для сушки/подготовки можно добавить 1×15 мин (при достаточном восстановлении).', 0);
     else add('ok', `HIIT на ${s.hiitWeeks} неделях — метаболический стимул есть.`, 0);
   }
 
@@ -1933,7 +1979,7 @@ export function cardioPlanVariants(input: CardioCycleInput): CardioVariantInfo[]
 export function explainCardioChoice(input: CardioCycleInput, cycle: CardioCycle): string[] {
   const lines: string[] = [];
   const goal = CARDIO_GOAL_LABELS[input.goal].toLowerCase();
-  lines.push(`Цель «${goal}» определяет профиль: ${input.goal === 'cut' ? 'прогрессия Zone 2 (2×30 → 3×45) + HIIT 1×15, делоды каждые 4 нед' : input.goal === 'health' ? 'Zone 2 3-4×25-40 мин — база для здоровья ССС' : input.goal === 'mass' ? 'минимум кардио (только восстановление 1×20), чтобы не конкурировать с ростом' : input.goal === 'recovery' ? 'лёгкое кардио 2-3×25-30 для кровотока и мобильности' : input.goal === 'recomp' || input.goal === 'maintenance' ? 'умеренное Zone 2 2×25-30 для поддержания' : ''}.`);
+  lines.push(`Цель «${goal}» определяет профиль: ${input.goal === 'cut' ? 'прогрессия Zone 2 (2×30 → 3×45) + HIIT 1×15, делоды каждые 4 нед' : input.goal === 'bb_prep' ? 'прогрессия Zone 2 (2×30 → 3×45) + MISS/HIIT на дефиците, делоды каждые 4 нед (подготовка ББ)' : input.goal === 'pl_prep' ? 'умеренный Zone 2 2-3×20-30 + MISS, без HIIT — не утомлять ЦНС к старту (подготовка ПЛ)' : input.goal === 'bb_taper' ? 'лёгкое Zone 2/recovery с плавным снижением объёма 0.85→0.4 за 4 нед (тапер ББ, Bosquet 2005)' : input.goal === 'health' ? 'Zone 2 3-4×25-40 мин — база для здоровья ССС' : input.goal === 'mass' ? 'минимум кардио (только восстановление 1×20), чтобы не конкурировать с ростом' : input.goal === 'recovery' ? 'лёгкое кардио 2-3×25-30 для кровотока и мобильности' : input.goal === 'recomp' || input.goal === 'maintenance' ? 'умеренное Zone 2 2×25-30 для поддержания' : ''}.`);
   const level = input.level ?? 'intermediate';
   lines.push(`Уровень «${CARDIO_LEVEL_LABELS[level].toLowerCase()}»: объём сессий ×${CARDIO_LEVEL_MULT[level]}.`);
   lines.push(`Доступно ${input.daysAvailable ?? 7} дн/нед — сессии распределены по ${Math.min(input.daysAvailable ?? 7, 7)} дням.`);
@@ -1980,8 +2026,8 @@ export function improveCardioCycle(cycle: CardioCycle, opts: { daysAvailable?: n
   const s = cardioCycleSummary(cycle);
   const weeks = cycle.weeks.map(w => {
     let sessions = w.sessions;
-    // 1. HIIT для cut/recomp
-    if ((cycle.goal === 'cut' || cycle.goal === 'recomp') && s.hiitWeeks === 0 && !recoveryLow && daysAvailable >= 3) {
+    // 1. HIIT для cut/recomp/подготовки ББ
+    if ((cycle.goal === 'cut' || cycle.goal === 'recomp' || cycle.goal === 'bb_prep') && s.hiitWeeks === 0 && !recoveryLow && daysAvailable >= 3) {
       if ((w.phase === 'build' || w.phase === 'maintenance') && !w.deload && !w.taper && !w.sessions.some(x => x.type === 'hiit')) {
         sessions = [...sessions, mkSession('hiit', 15, 1, 'HIIT добавлен авто-улучшением (EPOC, ЖСС)', 80)];
         changes.push({ week: w.week, label: 'HIIT 15×1 добавлен', from: 'нет', to: 'HIIT 15×1' });
@@ -2131,11 +2177,11 @@ export function cardioFitnessForecast(cycle: CardioCycle): CardioFitnessForecast
   const age = cycle.config?.age;
   const ageFactor = age != null && age > 45 ? 0.85 : 1;
   const intensityFactor = s.hiitWeeks > 0 ? 1.05 : 1;
-  const goalFactor = cycle.goal === 'mass' || cycle.goal === 'recovery' ? 0.15 : 1;
+  const goalFactor = cycle.goal === 'mass' || cycle.goal === 'recovery' || cycle.goal === 'bb_taper' ? 0.15 : 1;
   const gain = ratePerWeek * effectiveWeeks * volumeFactor * ageFactor * intensityFactor * goalFactor;
   const vo2GainPct = Math.round(gain * 1000) / 10;
-  const note = cycle.goal === 'mass' || cycle.goal === 'recovery'
-    ? 'Цикл не направлен на рост аэробной формы (масса/восстановление) — адаптация минимальна.'
+  const note = cycle.goal === 'mass' || cycle.goal === 'recovery' || cycle.goal === 'bb_taper'
+    ? 'Цикл не направлен на рост аэробной формы (масса/восстановление/тапер) — адаптация минимальна.'
     : `Модель: ${effectiveWeeks} рабочих нед · ${Math.round(minutes)} мин/нед · уровень ${CARDIO_LEVEL_LABELS[level].toLowerCase()}${cycle.config?.age != null && cycle.config.age > 45 ? ' · возраст >45 (адаптация ×0.85)' : ''}${s.hiitWeeks > 0 ? ' · с HIIT (×1.05)' : ''}.`;
   return { vo2GainPct, effectiveWeeks, note };
 }

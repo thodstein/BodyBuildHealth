@@ -473,12 +473,12 @@ describe('phaseSplit — ручная структура фаз', () => {
 });
 
 describe('CARDIO_PRESETS — быстрые старты', () => {
-  it('5 пресетов с валидными параметрами', () => {
-    expect(CARDIO_PRESETS).toHaveLength(5);
+  it('8 пресетов с валидными параметрами', () => {
+    expect(CARDIO_PRESETS).toHaveLength(8);
     for (const p of CARDIO_PRESETS) {
       expect(p.totalWeeks).toBeGreaterThan(0);
       expect(p.daysAvailable).toBeGreaterThanOrEqual(0);
-      expect(['health', 'mass', 'cut', 'recomp', 'maintenance', 'recovery']).toContain(p.goal);
+      expect(['health', 'mass', 'cut', 'recomp', 'maintenance', 'recovery', 'bb_prep', 'pl_prep', 'bb_taper']).toContain(p.goal);
       const c = buildCardioCycle({ goal: p.goal, totalWeeks: p.totalWeeks, daysAvailable: p.daysAvailable, recoveryLow: p.recoveryLow });
       expect(c.weeks).toHaveLength(p.totalWeeks);
     }

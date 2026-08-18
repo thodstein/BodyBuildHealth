@@ -129,7 +129,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
       </div>
       {(() => {
-        if (!cycle || (cycle.goal !== 'cut' && cycle.goal !== 'recomp')) return null;
+        if (!cycle || (cycle.goal !== 'cut' && cycle.goal !== 'recomp' && cycle.goal !== 'bb_prep')) return null;
         try {
           const w = getWeightLog();
           if (!Array.isArray(w) || w.length === 0) return null;

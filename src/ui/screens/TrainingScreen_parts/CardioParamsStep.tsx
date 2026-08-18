@@ -36,6 +36,9 @@ const GOAL_DESC: Record<CardioGoal, string> = {
   recomp: 'Умеренное Zone 2 2×25-30, здоровье без вреда для набора',
   maintenance: 'Стабильное Zone 2 2×30, поддержание ССС',
   recovery: 'Лёгкое кардио 2-3× для кровотока и мобильности',
+  bb_prep: 'Прогрессия Zone 2 + MISS/HIIT на дефиците — подготовка ББ к шоу',
+  pl_prep: 'Умеренный Zone 2 + MISS, без HIIT — не утомлять ЦНС к старту',
+  bb_taper: '4 нед плавного снижения объёма (0.85→0.4) — тапер ББ к шоу',
 };
 
 export interface PhaseSplitState { auto: boolean; base: number; build: number; maintenance: number }
