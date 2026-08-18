@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createCanvas } from '@napi-rs/canvas';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const MAX_PAGES = 8;
@@ -7,9 +9,11 @@ const MAX_PAGE_PIXELS = 4_000_000;
 
 async function recognizePdf(buffer: Buffer): Promise<string> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  // Vercel's function bundler does not automatically include PDF.js' worker.
-  // Disable worker mode explicitly and provide the flag before getDocument.
-  (pdfjs as any).GlobalWorkerOptions.workerSrc = '';
+  // PDF.js v6 still starts its fake worker in Node unless a real worker file
+  // is provided. Keep the worker as a static dependency in the serverless
+  // function instead of relying on the browser public asset.
+  const workerPath = join(dirname(fileURLToPath(import.meta.url)), '../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = workerPath;
   const { createWorker } = await import('tesseract.js');
   const pdf = await pdfjs.getDocument({
     data: new Uint8Array(buffer),
