@@ -424,6 +424,20 @@ function detectProviderFromText(text: string): string | null {
 
 interface TextItem { str: string; x: number; y: number; width: number; height: number; }
 
+function installWebViewPolyfills(): void {
+  const PromiseCtor = Promise as typeof Promise & {
+    withResolvers?: <T>() => { promise: Promise<T>; resolve: (value: T | PromiseLike<T>) => void; reject: (reason?: unknown) => void };
+  };
+  if (!PromiseCtor.withResolvers) {
+    PromiseCtor.withResolvers = <T>() => {
+      let resolve!: (value: T | PromiseLike<T>) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+      return { promise, resolve, reject };
+    };
+  }
+}
+
 async function openPdfDocument(pdfjsLib: any, data: ArrayBuffer, disableWorker = false): Promise<any> {
   const pdfData = new Uint8Array(data);
   // In SSR/Node test runners there is no browser Worker implementation. PDF.js
@@ -868,6 +882,7 @@ export function parseLabText(rawText: string): ParsedLabResult {
 
 export async function parsePDF(fileOrBuffer: File | ArrayBuffer): Promise<ParsedLabResult> {
   try {
+    installWebViewPolyfills();
     // The modern PDF.js bundle accesses DOMMatrix during module evaluation.
     // That crashes in WebViews/SSR-like runtimes before the fallback can run.
     // The legacy bundle keeps the same browser API and is compatible with
@@ -933,6 +948,7 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
   let pdfjsLib: any;
   let Tesseract: any;
   try {
+    installWebViewPolyfills();
     pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
     Tesseract = await import('tesseract.js') as any;
   } catch (initError: any) {
