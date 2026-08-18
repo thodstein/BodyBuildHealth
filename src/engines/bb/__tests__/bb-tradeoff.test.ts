@@ -315,3 +315,56 @@ describe('program adapt: специализация и доноры', () => {
     expect(plan.rationale.some(r => r.includes('Специализация'))).toBe(true);
   }, 30000);
 });
+
+describe('program adapt: floor донора масштабируется полным множителем', () => {
+  const makeProgram = (): any => {
+    const weeks: any[] = [];
+    for (let i = 0; i < 5; i++) {
+      weeks.push({
+        week: i + 1, phase: 'accumulation', volumeMultiplier: 1, intensityMultiplier: 1, deload: false,
+        days: [
+          { day: 1, name: 'Chest', focus: 'chest', warmup: '', exercises: [
+            { name: 'Жим штанги лёжа', sets: 4, reps: '8', rir: 2 },
+            { name: 'Жим узким хватом', sets: 3, reps: '10', rir: 2 },
+          ] },
+          { day: 2, name: 'Arms', focus: 'arms', warmup: '', exercises: [
+            { name: 'Сгибание рук со штангой', sets: 3, reps: '12', rir: 2 },
+            { name: 'Разгибание рук на блоке', sets: 4, reps: '12', rir: 2 },
+          ] },
+        ],
+      });
+    }
+    return {
+      name: 'Floor test', author: 'test', type: 'bodybuilding', goal: 'bodybuilding',
+      direction: 'bodybuilding', level: 'intermediate', durationWeeks: 5, daysPerWeek: 2,
+      sessionTimeMin: '60', description: '', targetAudience: '', equipmentNeeded: [],
+      weeks, progressionModel: '', deloadProtocol: '', customization: [], warnings: [], expectedResults: '',
+    };
+  };
+
+  const build = (labMrvMultiplier: number) => programToBBPlan(makeProgram(), {
+    workMax: { ...WM, legs: 140 },
+    level: 'intermediate',
+    mode: 'adapt',
+    labMrvMultiplier,
+    weakPoints: ['back_thickness'],
+    specialization: true,
+    specializationSchedule: [{
+      weekStart: 1, weekEnd: 5, targets: ['back_thickness'],
+      tradeoff: { mode: 'remove_direct_when_indirect_covers_floor', donorMuscles: ['triceps'], preserveIndirect: true },
+    }],
+  } as any);
+
+  it('labMrvMultiplier 1.5 поднимает floor донора — трицепс режется МЕНЬШЕ, чем при 1.0', () => {
+    const base = build(1.0);
+    const boosted = build(1.5);
+    // Трицепс в программе: жим узким ×3 (direct) + разгибание на блоке ×4 (direct) = 7 direct;
+    // indirect от жима лёжа ~1.8.
+    // Floor при 1.0: MEV 4 (×1.0) → targetDirect ≈ 2; при 1.5: MEV 4 × 1.5 = 6 → targetDirect ≈ 4.
+    const directBase = directSets(base as any, 1, 'triceps');
+    const directBoosted = directSets(boosted as any, 1, 'triceps');
+    expect(directBoosted).toBeGreaterThan(directBase);
+    expect(directBoosted).toBeGreaterThanOrEqual(4);
+    expect(directBase).toBeLessThanOrEqual(3);
+  }, 30000);
+});

@@ -2000,8 +2000,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // рассчитанного объёма, базовые коэффициенты не меняются.
   if (mode === 'adapt' && specSchedule.active) {
     const tradeoffMrvByMuscle: Record<string, number> = {};
+    // Пара с finalizeBBPlan (mrvMultiplier: pedMrvMult — ПОЛНЫЙ множитель):
+    // floor донора и капы переноса масштабируются тем же effective
+    // (PED × recovery × nutrition × lab), иначе recovery/lab занижали
+    // floor донора в program-пути (mrvMult здесь — только PED).
     for (const [m, lm] of Object.entries(allLandmarks)) {
-      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * mrvMult);
+      tradeoffMrvByMuscle[m] = Math.round((lm as any).mrv * pedMrvMult);
     }
     const capLevel = String(opts.level ?? levelForLandmarks);
     const tradeoffReports = applyTradeoffToPlan(
