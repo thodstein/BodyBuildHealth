@@ -95,9 +95,11 @@ describe('PLPlanView', () => {
     // off: база из pmRow 200 (balanced) → присед 185/192.5/205
     expect(screen.getAllByText('185').length).toBeGreaterThan(0);
     expect(screen.queryByText('166.5')).toBeNull();
-    fireEvent.click(screen.getByText('🤖 Авто'));
+    fireEvent.click(screen.getAllByText('🤖 Авто')[0]);
     // auto ×0.9: 185×0.9 = 166.5 (round 0.1)
     expect(screen.getAllByText('166.5').length).toBeGreaterThan(0);
     expect(screen.queryByText('185')).toBeNull();
+    // карточка «Попытки на соревнования» тоже масштабируется и показывает hint множителя
+    expect(screen.getByText(/попытки ×0\.90/)).toBeTruthy();
   });
 });

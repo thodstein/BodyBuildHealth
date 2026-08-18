@@ -523,12 +523,38 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 };
                 const diaryVals = { squat: diaryLast('squat'), bench: diaryLast('bench'), deadlift: diaryLast('deadlift') };
                 const diaryApplied = Object.values(diaryVals).some(v => v != null);
+                const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
+                // Попытки тоже масштабируются множителем режима на лету (паритет с карточкой прикидов).
+                const scale = (w: number) => Math.round(w * arMult * 10) / 10;
+                const arBtn = (m: AutoRegMode, label: string) => {
+                  const active = autoRegMode === m;
+                  return (
+                    <button
+                      onClick={() => setAutoRegMode(m)}
+                      title={m === 'auto' ? 'Формульная авторегуляция: вес × топ-сет множитель, объём, RIR' : m === 'diary' ? 'Корректировка весов из последней сессии дневника' : 'Плановые веса без корректировок'}
+                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.6)' }}>
+                      {label}
+                    </button>
+                  );
+                };
                 return (
-                <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}`} icon="🏁" accent="#f59e0b">
+                <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon="🏁" accent="#f59e0b">
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                    {arBtn('diary', '📓 Авто-дневник')}
+                    {arBtn('auto', '🤖 Авто')}
+                    {arBtn('off', 'ВЫКЛ')}
+                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : 'rgba(255,255,255,0.4)' }}>
+                      {autoRegMode === 'auto'
+                        ? (arMult !== 1 ? `попытки ×${arMult.toFixed(2)}` : 'множитель 1.00')
+                        : autoRegMode === 'diary'
+                          ? 'дневник правит веса тренировок (попытки по плану)'
+                          : 'попытки по плану'}
+                    </span>
+                  </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                     {([['Присед', pmSquat], ['Жим', pmBench], ['Становая', pmDead]] as const).map(([name, value]) => {
                       const a = competitionAttempts(value);
-                      return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {a.openerRange[0]}–{a.openerRange[1]} кг</div><div>2: {a.secondRange[0]}–{a.secondRange[1]} кг</div><div>3: {a.thirdRange[0]}–{a.thirdRange[1]} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {a.opener}/{a.second}/{a.third}</div></div>;
+                      return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {scale(a.openerRange[0])}–{scale(a.openerRange[1])} кг</div><div>2: {scale(a.secondRange[0])}–{scale(a.secondRange[1])} кг</div><div>3: {scale(a.thirdRange[0])}–{scale(a.thirdRange[1])} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {scale(a.opener)}/{scale(a.second)}/{scale(a.third)}</div></div>;
                     })}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
