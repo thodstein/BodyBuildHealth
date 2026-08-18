@@ -32,7 +32,7 @@ import type { BridgeSession } from '../../../engines/training-integration.engine
 import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
-import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
+import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareLink, plShareDigest, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
 const ACCENT = '#00e68a';
@@ -340,7 +340,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 {editMode && <button onClick={() => setSrcEdits({})} disabled={Object.keys(srcEdits).length===0} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11, opacity: Object.keys(srcEdits).length===0?0.4:1 }}>↺ Сбросить</button>}
                 {editMode && <span style={{ ...SMALL }}>правка недели 1 применяется к «Выполнение»</span>}
                 <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
-                <button onClick={() => { const link = plShareLink({ title: builtSrc.template.meta.title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.href.split('#')[0] }); openPLShare(link); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
+                <button onClick={() => { const link = plShareLink({ title: builtSrc.template.meta.title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, plan: W }); openPLShare(link); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {
@@ -1002,7 +1002,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   { label: 'УОИ', value: builtSrc.cycleMetrics.uoi.toFixed(2) },
                   { label: 'Сессий', value: String(builtSrc.cycleMetrics.sessions) },
                 ] : undefined;
-                const doExport = () => {
+                const doExport = async () => {
                   if (!ready) return;
                   const sel: LMSBuildOutput['weeks'] = expScope === 'all' || expScope === 'full'
                     ? W
@@ -1010,14 +1010,21 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       ? (blocks.find(b => b.id === expBlock)?.weeks ?? W)
                       : W.filter(w => w.week === expWeek);
                   const title = builtSrc.template.meta.title;
-                  if (expFormat === 'xlsx') {
-                    downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);
-                    onNote(`📥 Excel сохранён: ${scopeLabel} (${sel.length} нед).`);
-                  } else {
-                    printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }));
-                    onNote(`🖨 PDF: окно печати — ${scopeLabel}.`);
-                  }
                   setExpOpen(false);
+                  if (expFormat === 'xlsx') {
+                    const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);
+                    onNote(res === 'shared'
+                      ? `📤 Excel: открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
+                      : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
+                  } else {
+                    const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }), {
+                      title,
+                      text: plShareDigest({ title, weeks: sel, pmSquat, pmBench, pmDead }),
+                    });
+                    onNote(opened
+                      ? `🖨 PDF: окно печати — ${scopeLabel}.`
+                      : `🖨 PDF: просмотр открыт — «Печать» → сохранить как PDF (${scopeLabel}).`);
+                  }
                 };
                 const stepBtn = (on: boolean, label: string, sub: string, onClick: () => void, color: string, ariaLabel?: string) => (
                   <button onClick={onClick} aria-label={ariaLabel} style={{ padding:'10px 12px', borderRadius:10, textAlign:'left', cursor:'pointer', border: on ? '1px solid ' + color : '1px solid rgba(255,255,255,0.12)', background: on ? color + '22' : 'rgba(255,255,255,0.03)', color:'#fff' }}>

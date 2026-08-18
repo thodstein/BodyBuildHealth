@@ -259,6 +259,21 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
   }, [selectedCycleId]);
   useEffect(() => { initExercisePMs(selectedCycleId); }, [selectedCycleId]);
+  // Deep-link из шаринга «Поделиться в ТГ»: маркер ставит App.tsx (hash #pl-plan-<cycleId>).
+  // Выбираем цикл на вкладке ПЛ; если план в сессии от другого цикла — сбрасываем его.
+  useEffect(() => {
+    try {
+      const cid = sessionStorage.getItem('he_pl_deeplink_cycle');
+      if (!cid) return;
+      sessionStorage.removeItem('he_pl_deeplink_cycle');
+      if (!getCycleById(cid)) return;
+      setSelectedCycleId(cid);
+      setMainTab('pl');
+      setSubView('plan');
+      if (_plSaved?.selectedCycleId !== cid) setBuiltSrc(null);
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);

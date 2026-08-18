@@ -211,6 +211,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       setZone('diary'); setPage('tabs'); setTab('reports');
     } else if (initialSubTab === 'analytics') {
       setZone('diary'); setPage('tabs'); setTab('analytics');
+    } else if (initialSubTab && initialSubTab.startsWith('pl-plan:')) {
+      // Deep-link из «Поделиться в ТГ»: открыть ПЛ-авто (маркер цикла читает SRCBBScreen).
+      switchPlanningTrack('pl'); setPage('tabs');
     } else if (initialSubTab && diaryTabs.has(initialSubTab as TrainingTab)) {
       setZone('diary'); setPage('tabs'); setTab(initialSubTab as TrainingTab);
     }

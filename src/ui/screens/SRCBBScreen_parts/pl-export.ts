@@ -87,16 +87,46 @@ export function buildPLExcelWorkbook(title: string, rows: PLExportRow[], summary
   return wb;
 }
 
-export function downloadPLExcel(wb: XLSX.WorkBook, filename: string): void {
-  const data = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-  const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+export type FileSaveResult = 'shared' | 'downloaded';
+
+/** Сохранение файла на устройство.
+ * Приоритет — нативная системная панель (navigator.share с файлом): работает в
+ * мобильном PWA и Telegram WebView («Сохранить в Файлы», отправить в чат и т.п.),
+ * где классическое <a download> и window.open заблокированы. Фолбэк — скачивание
+ * ссылкой (десктоп/браузер). */
+export async function saveFileToDevice(blob: Blob, filename: string): Promise<FileSaveResult> {
+  const nav = navigator as unknown as {
+    canShare?: (data: { files: File[] }) => boolean;
+    share?: (data: { files: File[]; title?: string }) => Promise<void>;
+  };
+  const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+  if (typeof nav.canShare === 'function' && typeof nav.share === 'function') {
+    try {
+      if (nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: filename });
+        return 'shared';
+      }
+    } catch (e) {
+      const err = e as { name?: string };
+      if (err?.name === 'AbortError') return 'shared';
+      // иная ошибка (TMA/iframe без share) — переходим к классическому скачиванию
+    }
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
+  a.remove();
+  setTimeout(() => { URL.revokeObjectURL(url); }, 500);
+  return 'downloaded';
+}
+
+export async function downloadPLExcel(wb: XLSX.WorkBook, filename: string): Promise<FileSaveResult> {
+  const data = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  return saveFileToDevice(blob, filename);
 }
 
 // ── PDF (окно печати) ──
@@ -134,23 +164,137 @@ export function buildPLPrintHtml(
 <body><h1>${safeTitle}</h1><h2>${safeScope} · ${date}</h2>${weekBlocks}${summaryHtml}</body></html>`;
 }
 
-export function printPLHtml(html: string): void {
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  setTimeout(() => { try { w.print(); } catch { /* ignore */ } }, 250);
+/** Печать/PDF. В обычном браузере — окно печати (десктоп). В WebView/Telegram
+ * window.open заблокирован (null) — открываем встроенный просмотр с кнопкой
+ * «Печать» и копированием текста. Возвращает true, если окно печати открыто. */
+export function printPLHtml(html: string, opts?: { title?: string; text?: string }): boolean {
+  let w: Window | null = null;
+  try { w = window.open('', '_blank'); } catch { w = null; }
+  if (!w) {
+    showPrintOverlay(html, opts?.title ?? 'План ПЛ', opts?.text);
+    return false;
+  }
+  try {
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { try { w.print(); } catch { /* ignore */ } }, 250);
+  } catch {
+    showPrintOverlay(html, opts?.title ?? 'План ПЛ', opts?.text);
+    return false;
+  }
+  return true;
+}
+
+const PRINT_OVERLAY_ID = 'pl-print-overlay';
+
+const overlayBtn = (label: string, fg: string, bg: string): HTMLButtonElement => {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.type = 'button';
+  b.style.cssText = `padding:10px 14px;border-radius:10px;border:1px solid ${fg}55;background:${bg};color:${fg};font-size:12px;font-weight:700;cursor:pointer;min-height:44px;`;
+  return b;
+};
+
+function htmlToText(html: string): string {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Встроенный просмотр для печати/сохранения PDF, когда новое окно недоступно
+ * (Telegram WebView / мобильный PWA). DOM-оверлей: iframe с планом, кнопки
+ * «Печать / Сохранить PDF», «Копировать», «Закрыть». */
+export function showPrintOverlay(html: string, title: string, text?: string): void {
+  try { document.getElementById(PRINT_OVERLAY_ID)?.remove(); } catch { /* ignore */ }
+  const root = document.createElement('div');
+  root.id = PRINT_OVERLAY_ID;
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-label', 'Просмотр плана для печати');
+  root.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0.96);display:flex;flex-direction:column;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;';
+  const bar = document.createElement('div');
+  bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;flex:0 0 auto;flex-wrap:wrap;';
+  const titleEl = document.createElement('span');
+  titleEl.style.cssText = 'flex:1 1 auto;min-width:120px;color:#fff;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+  titleEl.textContent = `🖨 ${title}`;
+  const printBtn = overlayBtn('🖨 Печать / Сохранить PDF', '#000', 'linear-gradient(135deg,#00e68a,#00c853)');
+  const copyBtn = overlayBtn('📋 Копировать план', '#fff', 'rgba(255,255,255,0.08)');
+  const closeBtn = overlayBtn('✕ Закрыть', '#ef4444', 'transparent');
+  bar.append(titleEl, printBtn, copyBtn, closeBtn);
+  const hint = document.createElement('div');
+  hint.style.cssText = 'padding:0 12px 8px;color:rgba(255,255,255,0.5);font-size:11px;flex:0 0 auto;';
+  hint.textContent = 'На телефоне: «Печать» → «Сохранить как PDF» или «Сохранить в Файлы».';
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;min-height:0;';
+  iframe.sandbox = 'allow-same-origin';
+  iframe.srcdoc = html;
+  printBtn.addEventListener('click', () => {
+    try { iframe.contentWindow?.print(); } catch { /* ignore */ }
+  });
+  copyBtn.addEventListener('click', () => {
+    const t = text || htmlToText(html);
+    const done = () => {
+      copyBtn.textContent = '✓ Скопировано';
+      setTimeout(() => { copyBtn.textContent = '📋 Копировать план'; }, 1600);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(t).then(done).catch(() => { copyBtn.textContent = '⚠ Не удалось'; });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = t;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch { /* ignore */ }
+      ta.remove();
+    }
+  });
+  closeBtn.addEventListener('click', () => root.remove());
+  root.addEventListener('click', (e) => { if (e.target === root) root.remove(); });
+  root.append(bar, hint, iframe);
+  document.body.appendChild(root);
 }
 
 // ── Telegram share ──
 export interface PLShareOpts {
   title: string; weeks: number; pmSquat: number; pmBench: number; pmDead: number;
-  cycleId: string; baseUrl: string;
+  cycleId: string; baseUrl: string; plan?: LMSPlanWeek[];
+}
+
+const DIGEST_MAX = 1800;
+
+/** Компактное текстовое описание плана — видно в сообщении даже без открытия
+ * приложения (раньше ссылка вела просто на главный экран веб-версии). */
+export function plShareDigest(o: { title: string; weeks: LMSPlanWeek[]; pmSquat: number; pmBench: number; pmDead: number; totalWeeks?: number }): string {
+  const total = o.weeks.length > 0 ? o.weeks.length : o.totalWeeks ?? 0;
+  const lines: string[] = [];
+  lines.push(`🏋️ ПЛ-цикл «${o.title}» — ${total} нед.`);
+  lines.push(`Присед ${o.pmSquat} / Жим ${o.pmBench} / Тяга ${o.pmDead} кг.`);
+  const shown = o.weeks.slice(0, 5);
+  for (const w of shown) {
+    const dayLines: string[] = [];
+    (w.days ?? []).forEach((d, di) => {
+      const ex = (d.exercises ?? []).map(e => {
+        const sets = (e.workSets ?? []).map(ws => `${ws.sets}×${ws.reps}@${ws.weight}кг`).join(' + ');
+        return sets ? `${e.name} ${sets}` : e.name;
+      }).join(' · ');
+      if (ex) dayLines.push(`  День ${di + 1}: ${ex}`);
+    });
+    const block = [`Неделя ${w.week}:`, ...dayLines].join('\n');
+    if ((lines.join('\n') + '\n' + block).length > DIGEST_MAX) {
+      lines.push(`… ещё ${total - (w.week - 1)} нед. Полный план — в приложении.`);
+      break;
+    }
+    lines.push(block);
+  }
+  if (shown.length > 0 && total > shown[shown.length - 1].week) {
+    lines.push(`… ещё ${total - shown[shown.length - 1].week} нед. Полный план — в приложении.`);
+  }
+  return lines.join('\n');
 }
 
 export function plShareLink(o: PLShareOpts): string {
   const url = `${o.baseUrl}#pl-plan-${encodeURIComponent(o.cycleId)}`;
-  const text = `ПЛ-цикл «${o.title}» — ${o.weeks} нед. Присед ${o.pmSquat} / Жим ${o.pmBench} / Тяга ${o.pmDead} кг. План в приложении: `;
+  const digest = plShareDigest({ title: o.title, weeks: o.plan ?? [], totalWeeks: o.weeks, pmSquat: o.pmSquat, pmBench: o.pmBench, pmDead: o.pmDead });
+  const text = `${digest}\n\nОткрыть план в приложении: `;
   return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
 }
 
