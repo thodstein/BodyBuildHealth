@@ -1766,6 +1766,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           applyRecommendation: applyTaperRecommendation,
           diarySessions,
         },
+        autoRegMode,
+        setAutoRegMode: (mode: AutoRegMode) => setAutoRegMode(mode),
       }} />}
       {subView === 'peak_bb' && <PeakingPanel defaultKind="bb" />}
       {subView === 'methods' && (<>

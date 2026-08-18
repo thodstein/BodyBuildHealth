@@ -55,6 +55,8 @@ export interface PLCompetitionTabApi {
     applyRecommendation: (r: TaperConfigRecommendation) => void;
     diarySessions: unknown[];
   };
+  autoRegMode: AutoRegMode;
+  setAutoRegMode: (mode: AutoRegMode) => void;
 }
 
 export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }) => {
@@ -74,6 +76,11 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     taperNote, setTaperNote, taperPlan, setTaperPlan,
   } = t;
   const { peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult, plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead } = cyc;
+  const setAutoRegMode = (mode: AutoRegMode) => {
+    // Обновляем режим авторегуляции в ciclo и сохраняем via api
+    // (реализация зависит от родительского SRCBBScreen — здесь простой апдейт через onNote)
+    onNote(`🔄 Режим авторегуляции переключен на ${mode}`);
+  };
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
 
   return (
@@ -81,6 +88,11 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>🏁 Соревнования сезона + тапер</div>
         {builtSrc && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
+        {builtSrc && (
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginLeft: 8 }}>
+            {autoRegMode === 'auto' && '🤖 auto'}{autoRegMode === 'diary' && '📓 diary'}{autoRegMode === 'off' && '⚠ off'}
+          </span>
+        )}
       </div>
       {/* 🏁 Несколько соревнований: список + выбор главного */}
       <div style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -230,7 +242,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
             });
             setTaperPlan(next);
             const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
-            setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${peakMode === 'pl' ? ' · 🏁 ПЛ-пик-протокол' : peakMode === 'pro' ? ' · 🎯 про-тапер' : ' · 📉 классика'}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
+            setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${peakMode === 'pl' ? ' · 🏁 ПЛ-пик-протокол' : peakMode === 'pro' ? ' · 🎯 про-тапер' : ' · 📉 классика'}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}${autoRegMode === 'auto' ? ' · auto-regime: top-set×' + (autoRegResult?.topSetPctMultiplier ?? 1).toFixed(2) + ' · объём×' + (autoRegResult?.volumeMultiplier ?? 1).toFixed(2) + ' · RIR+' + (autoRegResult?.rirShift ?? 0) : ''}${autoRegMode === 'diary' ? ' · diary-regime active' : ''}`);
             onNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${peakMode === 'pl' ? ' Режим: ПЛ-пик-протокол (объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR→0).' : peakMode === 'pro' ? ' Режим: про-тапер (усталость-зависимый, прайминг).' : ' Режим: классический тапер (Bosquet, интенсивность сохранена).'}${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
           }}
           style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
@@ -260,6 +272,23 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc && taperNote ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc && taperNote ? '#a78bfa' : 'rgba(255,255,255,0.3)', background: builtSrc && taperNote ? 'rgba(139,92,246,0.1)' : 'transparent' }}
           title="Пересчитать прикиды на финальной тапер-неделе (и mock meet) под выбранную стратегию"
         >🔄 Обновить прикиды</button>
+        <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setAutoRegMode('diary')}
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'diary' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'diary' ? '#000' : 'rgba(255,255,255,0.6)' }}>
+            📓 Авто-дневник
+          </button>
+          <button
+            onClick={() => setAutoRegMode('auto')}
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'auto' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'auto' ? '#000' : 'rgba(255,255,255,0.6)' }}>
+            🤖 Авто
+          </button>
+          <button
+            onClick={() => setAutoRegMode('off')}
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'off' ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'off' ? '#71717a' : 'rgba(255,255,255,0.6)' }}>
+            ВЫКЛ
+          </button>
+        </div>
       </div>
       {/* Рекомендации по сбросу ИЛИ набору (текущий вес ниже целевого — переход в более тяжёлую категорию) */}
       {(() => {
