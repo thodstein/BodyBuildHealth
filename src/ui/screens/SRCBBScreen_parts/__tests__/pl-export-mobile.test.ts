@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { LMSPlanWeek } from '../../../../engines/lms/lms-builder.engine';
-import { saveFileToDevice, plShareDigest, plShareLink, printPLHtml } from '../pl-export';
+import { saveFileToDevice, plShareDigest, plShareLink, printPLHtml, openPLShare } from '../pl-export';
 
 const mkEx = (name: string, pct: number, sets: number) => ({
   name, group: 'Грудь', coef: 1, mnosz: 1, pm: 200, rir: 2,
@@ -35,10 +35,25 @@ const clearNavShare = () => {
 afterEach(() => {
   vi.restoreAllMocks();
   clearNavShare();
+  Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true });
   document.getElementById('pl-print-overlay')?.remove();
 });
 
 describe('saveFileToDevice — сохранение файла на устройство', () => {
+  it('записывает файл через системный picker, если браузер его поддерживает', async () => {
+    const write = vi.fn(async () => {});
+    const close = vi.fn(async () => {});
+    const createWritable = vi.fn(async () => ({ write, close }));
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      value: vi.fn(async () => ({ createWritable })), configurable: true,
+    });
+
+    const res = await saveFileToDevice(new Blob(['x'], { type: 'text/plain' }), 'plan.txt');
+    expect(res).toBe('saved');
+    expect(write).toHaveBeenCalledWith(expect.any(Blob));
+    expect(close).toHaveBeenCalled();
+  });
+
   it('нативная системная панель (navigator.share с файлом), когда canShare поддерживает файлы', async () => {
     const nav = navigator as unknown as Record<string, unknown>;
     const canShare = vi.fn(() => true);
@@ -122,6 +137,20 @@ describe('plShareDigest / plShareLink — план в сообщении', () =>
     expect(decoded).toContain('#pl-plan-cycle-01');
     expect(decoded).toContain('Тестовый цикл');
     expect(decoded).toContain('Присед 180');
+  });
+});
+
+describe('openPLShare — системная передача плана', () => {
+  it('передаёт текст плана, а не только URL приложения', async () => {
+    const share = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    const result = await openPLShare('https://t.me/share/url?text=fallback', {
+      title: 'ПЛ: Тест', text: 'Неделя 1\nПрисед 3×3@160кг', url: 'https://app.ru#pl-plan-x',
+    });
+    expect(result).toBe('shared');
+    expect(share).toHaveBeenCalledWith({
+      title: 'ПЛ: Тест', text: 'Неделя 1\nПрисед 3×3@160кг', url: 'https://app.ru#pl-plan-x',
+    });
   });
 });
 

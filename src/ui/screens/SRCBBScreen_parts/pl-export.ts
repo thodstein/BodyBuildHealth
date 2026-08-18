@@ -87,7 +87,7 @@ export function buildPLExcelWorkbook(title: string, rows: PLExportRow[], summary
   return wb;
 }
 
-export type FileSaveResult = 'shared' | 'downloaded';
+export type FileSaveResult = 'saved' | 'shared' | 'downloaded';
 
 /** Сохранение файла на устройство.
  * Приоритет — нативная системная панель (navigator.share с файлом): работает в
@@ -95,6 +95,28 @@ export type FileSaveResult = 'shared' | 'downloaded';
  * где классическое <a download> и window.open заблокированы. Фолбэк — скачивание
  * ссылкой (десктоп/браузер). */
 export async function saveFileToDevice(blob: Blob, filename: string): Promise<FileSaveResult> {
+  // На поддерживаемых мобильных браузерах это единственный способ гарантировать
+  // запись именно в «Файлы/Загрузки», а не просто открыть share-sheet.
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (opts: { suggestedName: string; types?: unknown[] }) => Promise<{
+      createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }>;
+    }>;
+  }).showSaveFilePicker;
+  if (typeof picker === 'function') {
+    try {
+      const handle = await picker({
+        suggestedName: filename,
+        types: [{ description: 'Файл экспорта', accept: { [blob.type || 'application/octet-stream']: [`.${filename.split('.').pop() || 'bin'}`] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return 'saved';
+    } catch (e) {
+      if ((e as { name?: string })?.name === 'AbortError') return 'saved';
+      // WebView может объявлять API, но запрещать picker. Используем следующий путь.
+    }
+  }
   const nav = navigator as unknown as {
     canShare?: (data: { files: File[] }) => boolean;
     share?: (data: { files: File[]; title?: string }) => Promise<void>;
@@ -256,7 +278,7 @@ export function showPrintOverlay(html: string, title: string, text?: string): vo
 // ── Telegram share ──
 export interface PLShareOpts {
   title: string; weeks: number; pmSquat: number; pmBench: number; pmDead: number;
-  cycleId: string; baseUrl: string; plan?: LMSPlanWeek[];
+  cycleId: string; baseUrl: string; plan?: LMSPlanWeek[]; includeUrl?: boolean;
 }
 
 const DIGEST_MAX = 1800;
@@ -294,14 +316,28 @@ export function plShareDigest(o: { title: string; weeks: LMSPlanWeek[]; pmSquat:
 export function plShareLink(o: PLShareOpts): string {
   const url = `${o.baseUrl}#pl-plan-${encodeURIComponent(o.cycleId)}`;
   const digest = plShareDigest({ title: o.title, weeks: o.plan ?? [], totalWeeks: o.weeks, pmSquat: o.pmSquat, pmBench: o.pmBench, pmDead: o.pmDead });
-  const text = `${digest}\n\nОткрыть план в приложении: `;
-  return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  const text = o.includeUrl === false
+    ? digest
+    : `${digest}\n\nОткрыть план в приложении: `;
+  return o.includeUrl === false
+    ? `https://t.me/share/url?text=${encodeURIComponent(text)}`
+    : `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
 }
 
-export function openPLShare(link: string): void {
+export async function openPLShare(link: string, opts?: { title?: string; text?: string; url?: string }): Promise<'shared' | 'opened'> {
+  const nav = navigator as Navigator & { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
+  if (typeof nav.share === 'function' && opts) {
+    try {
+      await nav.share({ title: opts.title, text: opts.text, url: opts.url });
+      return 'shared';
+    } catch (e) {
+      if ((e as { name?: string })?.name === 'AbortError') return 'shared';
+    }
+  }
   const tg = (window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (l: string) => void } } }).Telegram?.WebApp;
   if (tg?.openTelegramLink) {
-    try { tg.openTelegramLink(link); return; } catch { /* fallback ниже */ }
+    try { tg.openTelegramLink(link); return 'opened'; } catch { /* fallback ниже */ }
   }
   window.open(link, '_blank');
+  return 'opened';
 }

@@ -342,7 +342,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 {editMode && <button onClick={() => setSrcEdits({})} disabled={Object.keys(srcEdits).length===0} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11, opacity: Object.keys(srcEdits).length===0?0.4:1 }}>↺ Сбросить</button>}
                 {editMode && <span style={{ ...SMALL }}>правка недели 1 применяется к «Выполнение»</span>}
                 <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
-                <button onClick={() => { const link = plShareLink({ title: builtSrc.template.meta.title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, plan: W }); openPLShare(link); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
+                 <button onClick={async () => {
+                   const title = builtSrc.template.meta.title;
+                   const url = `${window.location.origin}${window.location.pathname}#pl-plan-${encodeURIComponent(selectedCycleId)}`;
+                   const digest = plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead });
+                   const link = plShareLink({ title, weeks: totalW, pmSquat, pmBench, pmDead, cycleId: selectedCycleId, baseUrl: window.location.origin + window.location.pathname, plan: W });
+                   const result = await openPLShare(link, { title: `ПЛ: ${title}`, text: digest, url });
+                   onNote(result === 'shared' ? '📲 План передан через системное меню «Поделиться».' : '📲 Открыт Telegram с текстом плана.');
+                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Поделиться в ТГ</button>
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {
@@ -1093,9 +1100,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   setExpOpen(false);
                   if (expFormat === 'xlsx') {
                     const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);
-                    onNote(res === 'shared'
-                      ? `📤 Excel: открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
-                      : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
+                     onNote(res === 'saved'
+                       ? `✅ Excel сохранён в выбранную папку (${scopeLabel}, ${sel.length} нед.).`
+                       : res === 'shared'
+                       ? `📤 Excel: открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
+                       : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
                   } else {
                     const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }), {
                       title,
