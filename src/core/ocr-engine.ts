@@ -264,6 +264,29 @@ function isUsefulRawLine(raw: string | undefined): boolean {
   return line.length >= 3 && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(line);
 }
 
+function isMobileClient(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+}
+
+async function serverOcrScannedPdf(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+  }
+  const response = await fetch('./api/ocr-scanned-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: btoa(binary) }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `Server OCR HTTP ${response.status}`);
+  return typeof payload.text === 'string' ? payload.text : '';
+}
+
 /**
  * Process an uploaded file (PDF, image, or text) for lab analysis or nutrition data.
  * Returns parsed labs and meals ready for auto-input.
@@ -284,6 +307,16 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
     source = 'pdf';
     try {
       const arrayBuffer = await file.arrayBuffer();
+      if (isMobileClient()) {
+        const ocrText = await serverOcrScannedPdf(file);
+        rawText = ocrText;
+        const parsedAll = parseLabTextAllWays(rawText, 'server-tesseract');
+        labs = finalizeLabCandidates(parsedAll.labs);
+        warnings.push('PDF обработан на сервере для Telegram Mobile.');
+        warnings.push(...parsedAll.warnings);
+        confidence = labs.length > 0 ? 0.85 : 0.3;
+        return { text: rawText, labs, meals, source, confidence, warnings };
+      }
       let result;
       try {
         result = await parseLabFile(file, arrayBuffer);

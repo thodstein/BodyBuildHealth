@@ -3,6 +3,27 @@
   "buildCommand": "npm run vercel-build",
   "installCommand": "npm ci",
   "outputDirectory": "dist",
+  "functions": {
+    "api/ocr-scanned-pdf.ts": { "maxDuration": 300, "memory": 3009 }
+  },
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/tesseract/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/pdfjs/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/tesseract/(.*)", "destination": "/tesseract/$1" },
