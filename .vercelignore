@@ -8,6 +8,7 @@ _tools
 _tmp*
 tmp_scripts
 test_dir
-scripts
+scripts/*
+!scripts/sync-ocr-assets.mjs
 supabase
 *.md
