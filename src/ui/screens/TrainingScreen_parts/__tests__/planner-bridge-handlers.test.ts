@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createBlank } from '../../../../engines/user-program/program-store';
+import { linkDesignToProgram, designFingerprint } from '../../../../engines/periodization/designer-to-program';
 import {
   applyBridgePayloadDispatch,
   completeAnnualBlockImport, getPendingAnnualBlock, ANNUAL_BLOCK_PENDING_KEY, CARDIO_KCAL_NOTE_KEY,
@@ -332,5 +333,42 @@ describe('planner bridge � cardio handler (���� ���� � ��
     expect(applyBridgePayloadDispatch(payload('cardio', {}), ctx)).toBe(true);
     expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('не найден'));
     expect(localStorage.getItem(CARDIO_KCAL_NOTE_KEY)).toBeNull();
+  });
+
+  it('design: переразметка существующих bb-недель + meta.designRef', () => {
+    const update = vi.fn();
+    const ctx = context('bb', update);
+    seedBlock(ctx);
+    const design = {
+      id: 'design-1', name: 'Мой макроцикл', totalWeeks: 8, sport: 'bodybuilding', goal: 'hypertrophy',
+      createdAt: '2026-08-18', updatedAt: '2026-08-18',
+      blocks: [
+        { id: 'b1', phaseKey: 'accumulation_hypertrophy', startWeek: 1, endWeek: 4, notes: '' },
+        { id: 'b2', phaseKey: 'peaking', startWeek: 5, endWeek: 8, notes: '' },
+      ],
+    } as any;
+    expect(applyBridgePayloadDispatch(payload('design', { design, fillExercises: false }), ctx)).toBe(true);
+    const patch = update.mock.calls[0][0];
+    expect(patch.bb.weeks).toBeDefined();
+    expect(patch.bb.weeks[0].phase).toBe('accumulation');
+    expect(patch.bb.weeks[0].deload).toBe(false);
+    expect(patch.meta.designRef).toEqual(linkDesignToProgram(ctx.program, design).meta.designRef);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('привязан'));
+  });
+
+  it('design: новая программа из дизайна получает designRef', () => {
+    const ctx = context('bb');
+    (ctx.program as any).bb = undefined;
+    const design = {
+      id: 'design-2', name: 'Год', totalWeeks: 52, sport: 'bodybuilding', goal: 'hypertrophy',
+      createdAt: '2026-08-18', updatedAt: '2026-08-18',
+      blocks: [
+        { id: 'b1', phaseKey: 'accumulation_hypertrophy', startWeek: 1, endWeek: 52, notes: '' },
+      ],
+    } as any;
+    expect(applyBridgePayloadDispatch(payload('design', { design, fillExercises: false }), ctx)).toBe(true);
+    const created = ctx.onChange.mock.calls[0][0];
+    expect(created.meta.title).toBe('Год (дизайн)');
+    expect(created.meta.designRef).toEqual({ id: 'design-2', name: 'Год', hash: designFingerprint(design) });
   });
 });

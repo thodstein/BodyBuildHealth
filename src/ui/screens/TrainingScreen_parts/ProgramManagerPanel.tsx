@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
+import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
@@ -92,6 +93,24 @@ const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
   { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },
 ];
+
+/** P2: относительное время обновления программы («3 дн назад») вместо голой даты. */
+function timeAgo(iso?: string): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = Date.now() - t;
+  if (diff < 60000) return 'только что';
+  const min = Math.floor(diff / 60000);
+  if (min < 60) return `${min} мин назад`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} ч назад`;
+  const d = Math.floor(h / 24);
+  if (d < 31) return `${d} дн назад`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo} мес назад`;
+  return `${Math.floor(mo / 12)} г назад`;
+}
 
 const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6' };
 const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid' };
@@ -253,6 +272,31 @@ export const ProgramManagerPanel: React.FC = () => {
   const [wizardLevel, setWizardLevel] = useState('intermediate');
   const [wizardDays, setWizardDays] = useState(4);
   const [wizardWeeks, setWizardWeeks] = useState(8);
+  // P0-2: заготовка со структурой из SPLIT_PATTERNS — вместо пустой программы.
+  // Дни недели и фокусы берутся из расписания сплита (тяж/памп), блоки пустые — заполняются вручную.
+  const buildBBSkeleton = (days: number, weeks: number): UserWeek[] => {
+    const pattern =
+      SPLIT_PATTERNS.find(pp => pp.sessionsPerRotation === days && pp.schedule.some(d => d.kind === 'тренировка'))
+      ?? [...SPLIT_PATTERNS].sort((a, b) => Math.abs(a.sessionsPerRotation - days) - Math.abs(b.sessionsPerRotation - days))[0]
+      ?? SPLIT_PATTERNS[0];
+    if (!pattern) return [];
+    const sessions: UserSession[] = pattern.schedule
+      .map((d, di) => ({ d, di }))
+      .filter(x => x.d.kind === 'тренировка')
+      .map((x, si) => ({
+        id: newId('ses'),
+        name: 'День ' + (si + 1),
+        dayOfWeek: x.di,
+        focus: x.d.sessionTag ?? '',
+        blocks: [],
+      }));
+    return Array.from({ length: weeks }, (_, wi) => ({
+      week: wi + 1,
+      phase: 'accumulation' as const,
+      deload: false,
+      sessions: sessions.map(s => ({ ...s, id: newId('ses') })),
+    }));
+  };
   const startCreate = (dir: 'bb' | 'pl' | 'hybrid') => {
     // Быстрые CTA и визард используют один auto-fill путь. Это не даёт
     // стандартному режиму терять trainingFocus и recovery-метрики профиля.
@@ -268,9 +312,16 @@ export const ProgramManagerPanel: React.FC = () => {
       const focusFromProfile = prof.trainingFocus;
       p.meta.trainingFocus = focusFromProfile || (p.meta.goal === 'strength_mass' ? 'strength' : 'hypertrophy');
     }
-    setPendingAutoFill(true);
+    if (dir === 'bb' && p.bb) {
+      // P0-2: стартуем со структурой сплита, авто-сборка не перетирает заготовку
+      p.bb.weeks = buildBBSkeleton(p.meta.daysPerWeek, p.meta.weeks);
+      setPendingAutoFill(false);
+      flash('🆕 Новая программа: дни из сплита, заполните упражнения');
+    } else {
+      setPendingAutoFill(true);
+      flash('🆕 Создаём программу из профиля…');
+    }
     setEditing(p);
-    flash('🆕 Создаём программу из профиля…');
   };
   const finishWizard = (autoFill = false) => {
     const p = createBlank(wizardDir);
@@ -295,8 +346,10 @@ export const ProgramManagerPanel: React.FC = () => {
     if (p.bb?.weeks) {
       p.bb.weeks.forEach((w, wi) => {
         lines.push(`## Неделя ${w.week} (${w.phase}${w.deload ? ', делод' : ''})`);
+        if (w.note) lines.push(`  > Заметка недели: ${w.note}`);
         w.sessions.forEach((s, si) => {
           lines.push(`\n### День ${s.dayOfWeek || si + 1}: ${s.name} (${s.focus})`);
+          if (s.note) lines.push(`  > Заметка: ${s.note}`);
           s.blocks.forEach((b) => {
             const setsStr = b.sets.map((set) => {
               const r = set.reps === 'AMRAP' ? 'AMRAP' : `${set.reps}×`;
@@ -317,8 +370,10 @@ export const ProgramManagerPanel: React.FC = () => {
       lines.push(`ББ-недель: ${p.hybrid.bbWeeks?.length ?? 0}`);
       for (const w of p.hybrid.bbWeeks ?? []) {
         lines.push(`\n## Неделя ${w.week} (${w.phase}${w.deload ? ', делод' : ''})`);
+        if (w.note) lines.push(`  > Заметка недели: ${w.note}`);
         for (const s of w.sessions ?? []) {
           lines.push(`\n### ${s.name}`);
+          if (s.note) lines.push(`  > Заметка: ${s.note}`);
           for (const b of s.blocks ?? []) lines.push(`  - ${b.exerciseName} (${GROUP_RU[b.muscle] || b.muscle}) — ${b.sets.map(set => `${set.reps}×${set.weight ? ` @${set.weight}кг` : ''}`).join(', ')}`);
         }
       }
@@ -890,7 +945,7 @@ export const ProgramManagerPanel: React.FC = () => {
                   <span style={chip}>🎯 {goalLabel}</span>
                   <span style={chip}>📶 {levelLabel}</span>
                   <span style={chip}>🗓 {p.meta.daysPerWeek}д × {p.meta.weeks}н</span>
-                  {p.meta.updatedAt && <span style={chip}>📅 {new Date(p.meta.updatedAt).toLocaleDateString('ru-RU')}</span>}
+                  {p.meta.updatedAt && <span style={chip}>🕒 {timeAgo(p.meta.updatedAt)}</span>}
                   {(() => {
                     const issues = validateProgram(p);
                     const errs = issues.filter(i => i.level === 'error').length;

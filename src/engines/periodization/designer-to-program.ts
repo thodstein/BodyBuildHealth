@@ -13,7 +13,7 @@
  *    берутся как источник sessions, а phase/deload переразмечаются из дизайн-блоков.
  */
 import type { MacrocycleDesign, DesignerPhaseBlock, PhaseKey } from '../periodization-designer.engine';
-import type { UserWeek, UserSession } from '../user-program/user-program.types';
+import type { UserWeek, UserSession, UserProgram, Phase, PLWeek } from '../user-program/user-program.types';
 import { newId } from '../user-program/user-program.types';
 import { designerPhaseToUserPhase, isDeloadLikePhaseKey } from './phase-bridge';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
@@ -171,17 +171,17 @@ function buildFilledWeeks(total: number, opts: DesignerToUserWeeksOptions): User
 }
 
 /**
- * Применить фазы дизайн-блоков к СУЩЕСТВУЮЩИМ неделям UserProgram.
+ * Применить фазы дизайн-блоков к СУЩЕСТВУЮЩИМ неделям.
  * Переразмечает phase/deload, сохраняя все упражнения/блоки/сеты.
- * Недели вне блоков получают accumulation/deload=false.
+ * Недели вне блоков не трогаются.
  *
- * @param weeks — существующие UserWeek[] программы (длина = totalWeeks)
+ * @param weeks — существующие недели программы (длина = totalWeeks)
  * @param design — дизайн макроцикла
  */
-export function applyDesignPhasesToWeeks(
-  weeks: UserWeek[],
+export function rephaseWeeks<T extends { week: number; phase: Phase; deload: boolean }>(
+  weeks: T[],
   design: MacrocycleDesign,
-): UserWeek[] {
+): T[] {
   const blocks = [...design.blocks].sort((a, b) => a.startWeek - b.startWeek);
   return weeks.map(w => {
     const block = findBlockForWeek(blocks, w.week);
@@ -195,6 +195,95 @@ export function applyDesignPhasesToWeeks(
       deload: isDeloadLikePhaseKey(block.phaseKey),
     };
   });
+}
+
+/**
+ * Применить фазы дизайн-блоков к СУЩЕСТВУЮЩИМ неделям UserProgram (BB-ветка).
+ * Переразмечает phase/deload, сохраняя все упражнения/блоки/сеты.
+ * Недели вне блоков получают accumulation/deload=false.
+ *
+ * @param weeks — существующие UserWeek[] программы (длина = totalWeeks)
+ * @param design — дизайн макроцикла
+ */
+export function applyDesignPhasesToWeeks(
+  weeks: UserWeek[],
+  design: MacrocycleDesign,
+): UserWeek[] {
+  return rephaseWeeks(weeks, design);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Связь «программа ↔ дизайн периодизации» (P0-1):
+ *  - designFingerprint — хэш содержимого дизайна (сортировка блоков + notes);
+ *  - linkDesignToProgram / unlinkDesignFromProgram — мета-связь в ProgramMeta.designRef;
+ *  - reapplyDesignToProgram — переразметка фаз недель из актуального дизайна;
+ *  - isProgramDesignStale — «дизайн изменён после привязки» (UI-бейдж).
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** FNV-1a хэш содержимого дизайна. Меняется при любой правке блоков/заметок. */
+export function designFingerprint(design: MacrocycleDesign): string {
+  const parts = [...design.blocks]
+    .sort((a, b) => a.startWeek - b.startWeek || a.endWeek - b.endWeek || (a.id < b.id ? -1 : 1))
+    .map(b => `${b.id}|${b.phaseKey}|${b.startWeek}|${b.endWeek}|${b.notes || ''}`);
+  const s = `v1:${design.totalWeeks}:${parts.join(';')}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16);
+}
+
+/** Привязать программу к дизайну периодизации (ставит meta.designRef). */
+export function linkDesignToProgram(program: UserProgram, design: MacrocycleDesign): UserProgram {
+  return {
+    ...program,
+    meta: {
+      ...program.meta,
+      designRef: { id: design.id, name: design.name, hash: designFingerprint(design) },
+    },
+  };
+}
+
+/** Отвязать программу от дизайна периодизации. */
+export function unlinkDesignFromProgram(program: UserProgram): UserProgram {
+  if (!program.meta.designRef) return program;
+  const meta = { ...program.meta };
+  delete meta.designRef;
+  return { ...program, meta };
+}
+
+/** Дизайн изменён после привязки (хэш содержимого не совпадает). */
+export function isProgramDesignStale(program: UserProgram, design: MacrocycleDesign): boolean {
+  const ref = program.meta.designRef;
+  if (!ref) return false;
+  return ref.hash !== designFingerprint(design);
+}
+
+/**
+ * Переразметить фазы недель программы из актуального дизайна (все 3 ветки).
+ * Сохраняет упражнения; при отсутствии designRef — no-op.
+ * Обновляет meta.designRef.hash на актуальный.
+ */
+export function reapplyDesignToProgram(program: UserProgram, design: MacrocycleDesign): UserProgram {
+  if (!program.meta.designRef) return program;
+  let next: UserProgram = program;
+  if (program.bb?.weeks) {
+    next = { ...next, bb: { ...next.bb!, weeks: rephaseWeeks(next.bb!.weeks, design) } };
+  }
+  if (program.pl?.customWeeks) {
+    next = { ...next, pl: { ...next.pl!, customWeeks: rephaseWeeks(next.pl!.customWeeks as PLWeek[], design) } };
+  }
+  if (program.hybrid?.bbWeeks) {
+    next = { ...next, hybrid: { ...next.hybrid!, bbWeeks: rephaseWeeks(next.hybrid!.bbWeeks, design) } };
+  }
+  return {
+    ...next,
+    meta: {
+      ...next.meta,
+      designRef: { id: design.id, name: design.name, hash: designFingerprint(design) },
+    },
+  };
 }
 
 /**

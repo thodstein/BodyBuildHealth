@@ -1,5 +1,46 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Ручной конструктор: дизайн периодизации ↔ программа, заметки, быстрый ввод (Aug 18 2026, uncommitted)
+
+Связь макроцикла-дизайна с программой + заметки недели/сессии + быстрый ввод упражнений.
+Механики движков ББ/ПЛ не менялись.
+
+- **`designer-to-program.ts`**: `designFingerprint` (FNV-1a от `v1:{totalWeeks}:{сортированные блоки}`,
+  порядок блоков не влияет), `linkDesignToProgram`/`unlinkDesignFromProgram` (meta.designRef
+  {id,name,hash}), `isProgramDesignStale` (hash ≠ актуальному), `reapplyDesignToProgram`
+  (переразметка фаз bb.weeks / pl.customWeeks / hybrid.bbWeeks, упражнения сохраняются,
+  hash обновляется), `rephaseWeeks` — обобщённый (применение фаз дизайна к неделям).
+- **`user-program.types.ts`**: `UserSession.note?`, `UserWeek.note?`, `ProgramMeta.designRef?`.
+- **ProgramEditorView (шаг «Недели»)**: карточка «🎨 Дизайн периодизации» — привязка из списка
+  сохранённых дизайнов (`he_macrocycle_designs`), бейдж «⚠ дизайн изменён» при stale, «↻
+  Переразметить фазы», «✕ Отвязать», вариант «дизайн удалён». Печать (🖨 PDF): заметки недели
+  (после заголовка недели) и сессии (после таблицы дня) в bb и hybrid ветках (PL — нет поля note).
+- **ProgramEditorComponents**: 💬-кнопка в шапке недели (BBEditor) и в шапке сессии (SessionList)
+  → textarea заметки (сохранение через updateWeek/updateSession); BlockList — пустое состояние
+  заменено на чипы групп мышц (GROUP_RU) → `suggestExercisesForGroup` (6 упр., профиль:
+  уровень/оборудование/слабые/травмы/axial/избранное/исключённые) → «+» добавляет блок
+  {compound→primary / accessory, sets: [{reps:10, rir:2}]}.
+- **ProgramManagerPanel**: «🆕 Создать новую» для ББ строит СКЕЛЕТ недель из SPLIT_PATTERNS
+  (`buildBBSkeleton`, без авто-сборки — autoFillBBDraft заменяет bb целиком), pl/hybrid — как
+  раньше (авто-сборка); список программ — относительное время «🕒 N мин назад» (`timeAgo`);
+  текстовый экспорт включает «> Заметка недели/Заметка:» (bb + hybrid).
+- **PeriodizationDesignerTab**: строка «🔗 К программе:» (select из `loadUserPrograms` +
+  «🔗 Привязать») → `linkDesignToProgram` + `saveUserProgram`.
+- **planner-bridge-handlers `designHandler`**: оба пути (переразметка существующих bb-недель и
+  новая программа из дизайна) теперь тоже проставляют `meta.designRef` через
+  `linkDesignToProgram` (раньше привязка была только из карточек редактора/дизайнера);
+  +2 теста в `planner-bridge-handlers.test.ts` (переразметка + designRef, новая программа + hash) — 25/25.
+- **ВНИМАНИЕ (worktree)**: чужой коммит fb3a4cc88 (липкая нижняя панель «Далее/← Назад» +
+  тесты) перестроил ProgramEditorView ПОСЛЕ моей базы — восстановил HEAD-версию и перенёс свои
+  правки (карточка дизайна/печать/aria-label) поверх; другие мои файлы базы не конфликтовали.
+- Тесты: NEW `designer-program-link.test.ts` (17: fingerprint-детерминизм/независимость от порядка/
+  чувствительность к правкам, link/unlink, stale, reapply для bb/pl/hybrid); `manual-constructor-steps`
+  +1 (P0-1: seed дизайна в `he_macrocycle_designs` → «2 Редактор»→«Недели» → 🔗 Привязать →
+  имя дизайна + «↻ Переразметить фазы» → ✕ Отвязать).
+- Проверено: tsc 0 по моим файлам (остальные ошибки — чужой WIP: bb-finalize duplicate import,
+  SRCBBScreen setEdited*, MacrocyclePanel onEditMicrocycle); TrainingScreen_parts 418/418;
+  periodization+manual-constructor 86/86; manual-constructor-steps 9/9.
+
 ## BB-авто: многоблочная специализация + донорское перераспределение (Aug 18 2026, uncommitted)
 
 Задача: «цикл 12 недель — одна специализация 1-5, вторая 6-10» + «толщина спины за счёт

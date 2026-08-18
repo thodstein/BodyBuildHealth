@@ -11,7 +11,7 @@ import type { TrainingProfile } from './training-profile';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { cloneFromCycle, cloneFromLibrary, createBlank } from '../../../engines/user-program/program-store';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
-import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
+import { designerToUserWeeks, applyDesignPhasesToWeeks, linkDesignToProgram } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
@@ -376,11 +376,12 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
     if (dir === 'bb' && p.bb) {
       const existingWeeks = p.bb.weeks;
       const remapped = applyDesignPhasesToWeeks(existingWeeks, design);
-      update({ bb: { ...p.bb, weeks: remapped } });
+      const linked = linkDesignToProgram(p, design);
+      update({ bb: { ...p.bb, weeks: remapped }, meta: linked.meta });
       // MC-10 FIX: detailed toast with stats
       const phaseCounts = design.blocks.reduce((acc, b) => { acc[b.phaseKey] = (acc[b.phaseKey] || 0) + 1; return acc; }, {} as Record<string, number>);
       const phaseSummary = Object.entries(phaseCounts).map(([phase, count]) => `${DESIGNER_PHASE_VISUAL[phase as keyof typeof DESIGNER_PHASE_VISUAL]?.label || phase}: ${count}`).join(', ');
-      showToast(`🔗 Фазы дизайнера применены: ${design.totalWeeks} нед, ${design.blocks.length} блоков (${phaseSummary})`);
+      showToast(`🔗 Фазы дизайнера применены: ${design.totalWeeks} нед, ${design.blocks.length} блоков (${phaseSummary}) · 🎨 привязан`);
     } else {
       const weeks = designerToUserWeeks(design, {
         fillExercises,
@@ -401,7 +402,7 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
         meta: { ...blank.meta, title: design.name + ' (дизайн)', weeks: design.totalWeeks, goal: design.sport === 'powerlifting' ? 'powerlifting' : 'hypertrophy' },
         bb: { ...blank.bb!, weeks },
       };
-      onChange(newProg);
+      onChange(linkDesignToProgram(newProg, design));
       // MC-10 FIX: detailed toast with stats
       const phaseCounts = design.blocks.reduce((acc, b) => { acc[b.phaseKey] = (acc[b.phaseKey] || 0) + 1; return acc; }, {} as Record<string, number>);
       const phaseSummary = Object.entries(phaseCounts).map(([phase, count]) => `${DESIGNER_PHASE_VISUAL[phase as keyof typeof DESIGNER_PHASE_VISUAL]?.label || phase}: ${count}`).join(', ');

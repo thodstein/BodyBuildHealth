@@ -95,6 +95,7 @@ export function normalizeProgramDayOfWeek(value: number, fallback = 0): number {
 const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => void; level: string }> = ({ body, onChange, level }) => {
   const [volWeekIdx, setVolWeekIdx] = useState<number | null>(null);
   const [expandedWeekIdx, setExpandedWeekIdx] = useState(0);
+  const [noteWeekIdx, setNoteWeekIdx] = useState<number | null>(null);
   const { confirm } = useConfirmDialog();
   React.useEffect(() => {
     setExpandedWeekIdx(current => body.weeks.length === 0 ? -1 : Math.min(Math.max(current, 0), body.weeks.length - 1));
@@ -318,11 +319,23 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               title="Показать бюджет объёма по мышцам для этой недели"
              >{volWeekIdx === wi ? 'Скрыть объём' : 'Объём'}</button>
              <button aria-label={`Копировать неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Создать копию недели">Копировать</button>
+             <button aria-label={`Заметка недели ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: noteWeekIdx === wi ? ACCENT : DIM_STRONG, borderColor: noteWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }} onClick={() => setNoteWeekIdx(noteWeekIdx === wi ? null : wi)} title="Заметка к неделе (для тренера, попадает в экспорт/PDF)">💬</button>
              {wi < body.weeks.length - 1 && (
                <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами со следующей неделей">Ниже</button>
              )}
              <button aria-label={`Удалить неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>Удалить</button>
           </div>
+          {noteWeekIdx === wi && (
+            <div style={{ marginBottom: 8 }}>
+              <textarea
+                value={w.note ?? ''}
+                onChange={e => updateWeek(wi, { note: e.target.value })}
+                placeholder="Заметка к неделе (для тренера) — попадёт в экспорт и PDF"
+                rows={2}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44 }}
+              />
+            </div>
+          )}
           {expandedWeekIdx === wi && volWeekIdx === wi && (
             <div style={{ marginBottom: 8 }}>
               {volMetrics
@@ -392,6 +405,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
 
 const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
   const { confirm } = useConfirmDialog();
+  const [noteOpenIdx, setNoteOpenIdx] = useState<number | null>(null);
   const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfWeek: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
   // Быстрый день из шаблона — с готовыми упражнениями из каталога
   const addSessionFromTemplate = (tmpl: typeof DAY_TEMPLATES[0]) => {
@@ -459,6 +473,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
               </div>
             </div>
             <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
+              <button aria-label={`Заметка тренировки ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44, color: noteOpenIdx === si ? ACCENT : DIM_STRONG, borderColor: noteOpenIdx === si ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }} onClick={() => setNoteOpenIdx(noteOpenIdx === si ? null : si)} title="Заметка к тренировке (для тренера, попадает в экспорт/PDF)">💬</button>
               <button aria-label={`Клонировать тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать тренировку">⧉</button>
               <button aria-label={`Удалить тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
             </div>
@@ -470,6 +485,15 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
             </select>
             <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
           </div>
+          {noteOpenIdx === si && (
+            <textarea
+              value={s.note ?? ''}
+              onChange={e => updateSession(si, { note: e.target.value })}
+              placeholder="Заметка к тренировке (для тренера) — попадёт в экспорт и PDF"
+              rows={2}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44, marginBottom: 6 }}
+            />
+          )}
           <BlockList blocks={s.blocks} phase={phase} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
         );
@@ -492,6 +516,37 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
   const { confirm } = useConfirmDialog();
   const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
+  // P0-3: быстрый старт — группа мышц → упражнения из движка подбора
+  const [quickGroup, setQuickGroup] = useState<string | null>(null);
+  const quickExercises = useMemo(() => {
+    if (!quickGroup) return [] as Array<{ id: string; name: string; group?: string; type?: string }>;
+    try {
+      const prof = loadTrainingProfile();
+      return suggestExercisesForGroup(
+        quickGroup,
+        prof.level || 'intermediate',
+        6,
+        prof.equipment ?? [],
+        prof.weakPoints ?? [],
+        (prof.injuries ?? []).filter(i => i.exclude).map(i => i.muscle),
+        prof.avoidAxialLoad ?? false,
+        prof.favoriteExercises ?? [],
+        prof.excludedExercises ?? [],
+      ).map(ex => ({ id: ex.id, name: ex.name, group: ex.group, type: ex.type }));
+    } catch {
+      return [];
+    }
+  }, [quickGroup]);
+  const addQuickBlock = (ex: { name: string; group?: string; type?: string }) => {
+    onChange([...blocks, {
+      id: newId('blk'),
+      type: ex.type === 'compound' ? 'compound' : 'accessory',
+      exerciseName: ex.name,
+      muscle: ex.group || quickGroup || '',
+      role: ex.type === 'compound' ? 'primary' : 'accessory',
+      sets: [{ reps: 10, rir: 2 }],
+    }]);
+  };
   // F2.2: clipboard для копирования блоков между сессиями/неделями.
   // P2-4: sessionStorage instead of localStorage — clipboard clears on tab close, not persisted across sessions.
   const COPY_KEY = 'he_bb_block_clipboard';
@@ -662,7 +717,32 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
       {blocks.length === 0 && (
         <div className="editor-empty-exercises">
           <div className="editor-empty-exercises__title">Шаг 3: добавьте первое упражнение</div>
-          <div className="editor-empty-exercises__text">Выберите упражнение через каталог ниже, затем настройте подходы и RIR.</div>
+          <div className="editor-empty-exercises__text">Выберите группу мышц и упражнение — или используйте каталог ниже, чтобы настроить подходы и RIR.</div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, justifyContent: 'center' }}>
+            {Object.keys(GROUP_RU).map(g => (
+              <button
+                key={g}
+                onClick={() => setQuickGroup(quickGroup === g ? null : g)}
+                aria-label={`Быстрое добавление: ${GROUP_RU[g]}`}
+                style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', minHeight: 44, background: quickGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${quickGroup === g ? 'rgba(0,230,138,0.5)' : 'rgba(255,255,255,0.1)'}`, color: quickGroup === g ? '#00e68a' : '#fff', fontWeight: 700 }}>
+                {GROUP_RU[g]}
+              </button>
+            ))}
+          </div>
+          {quickGroup && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, justifyContent: 'center' }}>
+              {quickExercises.length === 0 && <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>Не нашлось упражнений — добавьте вручную через каталог ниже.</span>}
+              {quickExercises.map(ex => (
+                <button
+                  key={ex.id}
+                  onClick={() => addQuickBlock(ex)}
+                  title={`Добавить «${ex.name}» (3×10, RIR 2)`}
+                  style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', minHeight: 44, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontWeight: 700 }}>
+                  + {ex.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {blocks.length > 0 && <div className="editor-exercise-list-heading"><span>УПРАЖНЕНИЯ</span><span>{blocks.length} шт.</span></div>}

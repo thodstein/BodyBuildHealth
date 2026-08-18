@@ -23,6 +23,9 @@ import {
 import { applyToPlanner } from './planner-bridge';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 import { useConfirmDialog } from './ConfirmDialog';
+import { linkDesignToProgram } from '../../../engines/periodization/designer-to-program';
+import { loadUserPrograms, saveUserProgram } from '../../../engines/user-program/program-store';
+import type { UserProgram } from '../../../engines/user-program/user-program.types';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -45,8 +48,13 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [touchActive, setTouchActive] = useState(false);
   const { confirm } = useConfirmDialog();
+  // P0-1: «Привязать к программе» — список сохранённых программ ручного конструктора
+  const [programs, setPrograms] = useState<UserProgram[]>([]);
+  const [linkProgramId, setLinkProgramId] = useState('');
+  const [linkMsg, setLinkMsg] = useState('');
 
   useEffect(() => {
+    try { setPrograms(loadUserPrograms()); } catch { setPrograms([]); }
     const list = loadDesigns();
     setDesigns(list);
     if (list.length > 0 && !currentId) setCurrentId(list[0].id);
@@ -184,6 +192,19 @@ export const PeriodizationDesignerTab: React.FC = () => {
     commitDesign(updated);
   }, [current, commitDesign]);
 
+  const handleLinkToProgram = useCallback(() => {
+    if (!current || !linkProgramId) return;
+    const prog = programs.find(p => p.meta.id === linkProgramId);
+    if (!prog) { setLinkMsg('⚠ Программа не найдена — сначала сохраните её в ручном конструкторе'); return; }
+    const linked = linkDesignToProgram(prog, current);
+    try {
+      saveUserProgram(linked, 'Привязка дизайна периодизации');
+      setLinkMsg(`🔗 Привязано к «${linked.meta.title}» — в редакторе появится карточка дизайна (шаг «Недели»)`);
+    } catch {
+      setLinkMsg('⚠ Не удалось сохранить программу');
+    }
+  }, [current, linkProgramId, programs]);
+
   const editBlock = useMemo(() => {
     if (!editBlockId || !current) return null;
     return current.blocks.find(b => b.id === editBlockId) || null;
@@ -270,6 +291,22 @@ export const PeriodizationDesignerTab: React.FC = () => {
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <button onClick={handleDuplicate} style={{ ...btn, fontSize: 10 }}>📋 Дублировать</button>
+            </div>
+            {/* P0-1: привязка дизайна к программе ручного конструктора */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, color: DIM }}>🔗 К программе:</span>
+              <select value={linkProgramId} onChange={e => setLinkProgramId(e.target.value)}
+                style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer', maxWidth: 240 }}>
+                <option value="">— выберите программу —</option>
+                {programs.map(p => (
+                  <option key={p.meta.id} value={p.meta.id}>{p.meta.title} ({p.meta.direction})</option>
+                ))}
+              </select>
+              <button onClick={handleLinkToProgram} disabled={!linkProgramId}
+                style={{ ...btn, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, opacity: linkProgramId ? 1 : 0.4 }}>
+                🔗 Привязать
+              </button>
+              {linkMsg && <span style={{ fontSize: 10, color: DIM }}>{linkMsg}</span>}
             </div>
           </div>
 

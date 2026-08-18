@@ -141,4 +141,37 @@ describe('Ручной конструктор — последовательны
     fireEvent.keyDown(editor!, { key: 'ArrowLeft' });
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
   });
+
+  it('P0-1: шаг «Недели» — привязка дизайна периодизации: 🔗 Привязать → связь видна → ✕ Отвязать', async () => {
+    localStorage.setItem('he_macrocycle_designs', JSON.stringify([
+      {
+        id: 'design-1', name: 'Мой макроцикл', totalWeeks: 8,
+        blocks: [
+          { id: 'b1', phaseKey: 'accumulation_hypertrophy', startWeek: 1, endWeek: 4, notes: '' },
+          { id: 'b2', phaseKey: 'peaking', startWeek: 5, endWeek: 8, notes: '' },
+        ],
+        sport: 'bodybuilding', goal: 'hypertrophy',
+        createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]));
+    render(<ProgramManagerPanelWithProvider />);
+    fireEvent.click(screen.getAllByText('ББ')[0]);
+    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 20000 });
+    fireEvent.click(screen.getByText('Далее: Недели →'));
+    // карточка связи видна в режиме выбора
+    expect(screen.getByText('🎨 Привязать дизайн периодизации:')).toBeTruthy();
+    // выбираем дизайн и привязываем
+    fireEvent.change(screen.getByLabelText('Дизайн периодизации'), { target: { value: 'design-1' } });
+    fireEvent.click(screen.getByText('🔗 Привязать'));
+    // связанный дизайн показан, без бейджа stale
+    expect(screen.getByText(/Дизайн периодизации:/)).toBeTruthy();
+    expect(screen.getByText('↻ Переразметить фазы')).toBeTruthy();
+    expect(screen.queryByText(/⚠ дизайн изменён/)).toBeNull();
+    // переразметка фаз не ломает редактор
+    fireEvent.click(screen.getByText('↻ Переразметить фазы'));
+    expect(screen.getByText(/Дизайн периодизации:/)).toBeTruthy();
+    // отвязка возвращает режим выбора
+    fireEvent.click(screen.getByText('✕ Отвязать'));
+    expect(screen.getByText('🎨 Привязать дизайн периодизации:')).toBeTruthy();
+  });
 });

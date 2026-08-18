@@ -30,9 +30,10 @@ import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './p
 import { applyBridgePayloadDispatch, type BridgeCtx } from './planner-bridge-handlers';
 import { autoFillDraftDispatch, type AutoFillCtx } from './auto-fill-draft';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
-import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
+import { designerToUserWeeks, applyDesignPhasesToWeeks, linkDesignToProgram, isProgramDesignStale, reapplyDesignToProgram, unlinkDesignFromProgram } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
 import { deserializeMacro, deserializeBbMacro } from '../../../engines/lms/macrocycle.engine';
+import { loadDesigns } from '../../../engines/periodization-designer.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
@@ -136,6 +137,35 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
   const showToast = (m: string, variant?: import('./EditorToast').ToastVariant) => showToastRaw(m, variant);
+
+  // P0-1: связь «программа ↔ дизайн периодизации» — список сохранённых дизайнов для карточки в шаге «Недели»
+  const [designLinkId, setDesignLinkId] = useState('');
+  const savedDesigns = useMemo(() => {
+    try {
+      const list = loadDesigns();
+      return program.meta.designRef ? list.filter(d => d.id === program.meta.designRef!.id) : list;
+    } catch { return []; }
+  }, [program.meta.designRef]);
+  const linkedDesign = useMemo(() => {
+    if (!program.meta.designRef) return null;
+    try { return loadDesigns().find(d => d.id === program.meta.designRef!.id) || null; } catch { return null; }
+  }, [program.meta.designRef]);
+  const handleLinkDesign = useCallback((design: MacrocycleDesign) => {
+    const linked = linkDesignToProgram(program, design);
+    updateMeta({ designRef: linked.meta.designRef });
+    showToast(`🎨 Дизайн «${design.name}» привязан — фазы недель отмечены`);
+  }, [program, updateMeta, showToast]);
+  const handleUnlinkDesign = useCallback(() => {
+    const linked = unlinkDesignFromProgram(program);
+    updateMeta({ designRef: linked.meta.designRef });
+    setDesignLinkId('');
+    showToast('✕ Связь с дизайном удалена');
+  }, [program, updateMeta, showToast]);
+  const handleReapplyDesign = useCallback((design: MacrocycleDesign) => {
+    const reapplied = reapplyDesignToProgram(program, design);
+    update({ bb: reapplied.bb, pl: reapplied.pl, hybrid: reapplied.hybrid, meta: reapplied.meta });
+    showToast('↻ Фазы недель переразмечены из дизайна');
+  }, [program, update, showToast]);
 
   // P1-1: planner-bridge — приём рекомендаций из калькуляторов (split/pri/weakpoints/pm/tempo/rir/mrv/deload/volume/peak/methodology/program)
   const [bridgeApply, setBridgeApply] = useState<PlannerApply | null>(null);
@@ -595,6 +625,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (program.bb?.weeks) {
       for (const w of program.bb.weeks) {
         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#00e68a20'};color:${w.deload?'#f59e0b':'#00e68a'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
+        if (w.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#f0fdf4;border-left:3px solid #00e68a;font-size:11px;color:#166534;white-space:pre-wrap">🗓 Неделя: ${escapeHtml(w.note)}</p>`);
         for (const s of w.sessions) {
            html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
           for (const b of s.blocks) {
@@ -605,6 +636,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
              html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(setsStr)}</td><td>${escapeHtml(rir)}</td><td>${escapeHtml(wt)} кг</td></tr>`);
           }
           html.push('</tbody></table>');
+          if (s.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#f0fdf4;border-left:3px solid #00e68a;font-size:11px;color:#166534;white-space:pre-wrap">💬 ${escapeHtml(s.note)}</p>`);
         }
       }
      } else if (program.pl) {
@@ -639,18 +671,20 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
      } else if (program.hybrid) {
        html.push(`<h2>Hybrid: ПЛ + ББ</h2>`);
        html.push(`<div class="meta">ПЛ-цикл: ${escapeHtml(program.hybrid.plRef?.sourceCycleId || 'не выбран')} · ББ-недель: ${program.hybrid.bbWeeks?.length ?? 0}</div>`);
-       for (const w of program.hybrid.bbWeeks ?? []) {
-         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload ? '#f59e0b20' : '#3b82f620'};color:${w.deload ? '#f59e0b' : '#3b82f6'}">${escapeHtml(w.phase)}${w.deload ? ' · делод' : ''}</span></h2>`);
-         for (const s of w.sessions ?? []) {
-           html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
-           for (const b of s.blocks ?? []) {
-             if (!b.exerciseName) continue;
-             const sets = b.sets ?? [];
-             html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(sets.map(st => `${st.reps}×`).join(', '))}</td><td>${escapeHtml(sets[0]?.rir ?? '-')}</td><td>${escapeHtml(sets[0]?.weight ?? 0)} кг</td></tr>`);
-           }
-           html.push('</tbody></table>');
-         }
-       }
+for (const w of program.hybrid.bbWeeks ?? []) {
+        html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload ? '#f59e0b20' : '#3b82f620'};color:${w.deload ? '#f59e0b' : '#3b82f6'}">${escapeHtml(w.phase)}${w.deload ? ' · делод' : ''}</span></h2>`);
+        if (w.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#eff6ff;border-left:3px solid #3b82f6;font-size:11px;color:#1e40af;white-space:pre-wrap">🗓 Неделя: ${escapeHtml(w.note)}</p>`);
+        for (const s of w.sessions ?? []) {
+          html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
+          for (const b of s.blocks ?? []) {
+            if (!b.exerciseName) continue;
+            const sets = b.sets ?? [];
+            html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(sets.map(st => `${st.reps}×`).join(', '))}</td><td>${escapeHtml(sets[0]?.rir ?? '-')}</td><td>${escapeHtml(sets[0]?.weight ?? 0)} кг</td></tr>`);
+          }
+          html.push('</tbody></table>');
+          if (s.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#eff6ff;border-left:3px solid #3b82f6;font-size:11px;color:#1e40af;white-space:pre-wrap">💬 ${escapeHtml(s.note)}</p>`);
+        }
+      }
        if (program.hybrid.notes) html.push(`<p>${escapeHtml(program.hybrid.notes)}</p>`);
      }
     html.push('</body></html>');
@@ -1021,6 +1055,48 @@ return (
       {/* Шаг «🗓 Недели»: расписание, таблица плана, редактор недель/сессий, статистика */}
       {estep === 'weeks' && (
       <>
+      {/* P0-1: карточка связи с дизайном периодизации */}
+      {(program.meta.designRef || savedDesigns.length > 0) && (
+        <div className="constructor-surface" style={{ ...CARD, padding: 12, borderLeft: `3px solid ${program.meta.designRef ? (linkedDesign && isProgramDesignStale(program, linkedDesign) ? '#f59e0b' : ACCENT) : '#3b82f6'}` }}>
+          {program.meta.designRef && !linkedDesign && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: DIM_STRONG }}>
+                📁 Дизайн «{program.meta.designRef.name}» удалён — связь устарела.
+              </span>
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={handleUnlinkDesign}>✕ Отвязать</button>
+            </div>
+          )}
+          {program.meta.designRef && linkedDesign && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: DIM_STRONG }}>
+                🎨 Дизайн периодизации: <b style={{ color: ACCENT }}>{linkedDesign.name}</b>
+                {isProgramDesignStale(program, linkedDesign) && (
+                  <span style={{ color: '#f59e0b', fontWeight: 700 }}> · ⚠ дизайн изменён</span>
+                )}
+              </span>
+              <button style={{ ...BTN, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => handleReapplyDesign(linkedDesign)}>↻ Переразметить фазы</button>
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={handleUnlinkDesign}>✕ Отвязать</button>
+            </div>
+          )}
+          {!program.meta.designRef && savedDesigns.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: DIM_STRONG }}>🎨 Привязать дизайн периодизации:</span>
+              <select aria-label="Дизайн периодизации" value={designLinkId} onChange={e => setDesignLinkId(e.target.value)} style={{ ...IN, padding: '6px 8px', fontSize: 11, minHeight: 44, maxWidth: 260 }}>
+                <option value="">— выберите дизайн —</option>
+                {savedDesigns.map(d => (
+                  <option key={d.id} value={d.id}>{d.name} ({d.blocks.length} блоков)</option>
+                ))}
+              </select>
+              <button style={{ ...BTN, padding: '6px 10px', fontSize: 11, minHeight: 44, opacity: designLinkId ? 1 : 0.4 }}
+                disabled={!designLinkId}
+                onClick={() => {
+                  const d = savedDesigns.find(x => x.id === designLinkId);
+                  if (d) handleLinkDesign(d);
+                }}>🔗 Привязать</button>
+            </div>
+          )}
+        </div>
+      )}
       {(() => {
         const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
         const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;

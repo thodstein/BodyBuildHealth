@@ -98,6 +98,8 @@ export interface UserSession {
   warmup?: string;
   cooldown?: string;
   estimatedMin?: number;
+  /** Заметка к тренировке (для тренера, отображается в редакторе/экспорте/PDF). */
+  note?: string;
 }
 
 export interface UserWeek {
@@ -106,6 +108,8 @@ export interface UserWeek {
   deload: boolean;
   /** Сессии недели. Пустой массив → рендерится из microcycleTemplate (скелет сплита). */
   sessions: UserSession[];
+  /** Заметка к неделе (для тренера, отображается в редакторе/экспорте/PDF). */
+  note?: string;
 }
 
 /* ───────────────────────── Бюджет объёма по мышцам ───────────────────────── */
@@ -262,6 +266,9 @@ export interface ProgramMeta {
   notes?: string;
   /** Training focus (Schoenfeld 2021, Roberts 2022): 'strength' | 'hypertrophy' | 'endurance'. */
   trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
+  /** Связь с дизайном периодизации (периодизационный дизайнер): id + имя + хэш содержимого.
+   *  Хэш меняется при правке дизайна — по нему UI определяет «дизайн изменён» (stale). */
+  designRef?: { id: string; name: string; hash: string };
 }
 
 export interface UserProgram {
