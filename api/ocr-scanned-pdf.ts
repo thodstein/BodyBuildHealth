@@ -14,7 +14,7 @@ async function recognizePdf(buffer: Buffer): Promise<string> {
   const worker = await createWorker('rus+eng');
   try {
     await worker.setParameters({
-      tessedit_pageseg_mode: 3 as any,
+      tessedit_pageseg_mode: '3' as any,
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
     });
