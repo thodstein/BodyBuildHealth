@@ -363,9 +363,14 @@ PED-логика остаётся общей и дозозависимой:
 - Тесты: `athlete-context.test.ts` +3 (advisory) = 13; NEW `bb-contest-prep-female-reds.test.ts` 3. Проверено: tsc 0; contest-prep 187/187; целевые 16/16.
 - ВНИМАНИЕ (параллельная работа): чужой агент локально затёр правки раунда 2 в `program-store.ts`/`PeakingPanel.tsx`/`TaperPlannerTab.tsx` (worktree = без них). На origin/main мои коммиты раунда 2 целы (проверено `git grep origin/main`). Эти 3 файла — активная зона других агентов, не перезаписываю.
 
+### Раунд 4 (Aug 19 2026, uncommitted)
+
+- **Репродуктивный контекст в BB-конструкторе**: `REPRODUCTIVE_CONTEXT_OPTIONS` (7 чипов, русские лейблы) в athlete-context.engine; в карточке режима BB — чипы «Естественный цикл/КОК/Беременность/Послеродовой/Перименопауза/Менопауза» (видимы при `female_context`, не меняют план), включены в `athleteContext.reproductiveContext`; при pregnancy/postpartum — красный блок medical review через `athleteContextAdvisory`.
+- Тесты: `athlete-context.test.ts` +1 (опции) = 14; NEW `bb-auto-reproductive-context.test.tsx` 2 (SSR карточки режима + отсутствие undefined/NaN). Проверено: tsc 0; целевые 21/21.
+
 ### Осталось на будущие раунды
 
-- Беременность/postpartum как отдельный адаптационный путь с медицинским review (advisory готов, интеграция в конструкторы — отдельный этап).
+- Беременность/postpartum как отдельный адаптационный путь с медицинским review (advisory + UI-блок в BB готовы; PL-конструктор и питание — отдельные этапы).
 - RED-S/железо/костные сигналы в питании (движок bb-contest-prep уже содержит женские floors).
 - Прокидка athleteMode в вызовы `buildPLPrintHtml` из PLPlanView (файл в чужой зоне).
 

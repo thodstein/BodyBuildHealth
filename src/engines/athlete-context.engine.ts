@@ -17,6 +17,17 @@ export type ReproductiveContext =
   | 'perimenopause'
   | 'menopause';
 
+/** Опции для UI-чипов (label на русском). */
+export const REPRODUCTIVE_CONTEXT_OPTIONS: { id: ReproductiveContext; label: string }[] = [
+  { id: 'unknown', label: 'Не указано' },
+  { id: 'cycle', label: 'Естественный цикл' },
+  { id: 'contraception', label: 'Контрацепция (КОК)' },
+  { id: 'pregnancy', label: 'Беременность' },
+  { id: 'postpartum', label: 'Послеродовой период' },
+  { id: 'perimenopause', label: 'Перименопауза' },
+  { id: 'menopause', label: 'Менопауза' },
+];
+
 export interface AthletePedExperience {
   totalYears?: number;
   coursesCount?: number;

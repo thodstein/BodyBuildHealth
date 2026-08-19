@@ -38,8 +38,12 @@ import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-l
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply } from './planner-bridge';
+import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
+import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
+import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
-import type { AthleteMode, AthleteContext, AthleteSex } from '../../../engines/athlete-context.engine';
+import type { AthleteMode, AthleteContext, AthleteSex, ReproductiveContext } from '../../../engines/athlete-context.engine';
+import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory } from '../../../engines/athlete-context.engine';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -283,6 +287,20 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   return parts.join(' · ');
 }
 
+/** п.18: строка карточки «📍 Текущий блок года» для даты (null — нет плана/активного блока). */
+export function annualActiveBlockLine(plan: AnnualTrainingPlan | null, iso: string): string | null {
+  if (!plan) return null;
+  const w = weekForDate(iso);
+  const active = w != null ? activeBlockForWeek(plan, w) : null;
+  if (!active) return null;
+  const statusIcon = active.status === 'built' ? '✅' : active.status === 'stale' ? '⚠' : active.status === 'error' ? '❌' : '·';
+  const statusLabel = active.status === 'built' ? 'собран' : active.status === 'stale' ? 'устарел' : active.status === 'error' ? 'ошибка' : 'не собран';
+  const kindLabel = active.ref.kind === 'PL' ? 'ПЛ' : active.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
+  const prepNote = active.ref.kind === 'BB' && active.ref.phase === 'contest_prep' && active.status === 'built'
+    ? ' · 🏁 contest prep — настройте пик в «🏁 Contest prep»' : '';
+  return `📍 Текущий блок года: нед ${w} · ${active.ref.phase} (${active.ref.startWeek}–${active.ref.startWeek + active.ref.weeks - 1}) · ${kindLabel} ${statusIcon} ${statusLabel}${prepNote}`;
+}
+
 
 export const BbAutoConstructor: React.FC = () => {
   const linked = useDataLink();
@@ -295,6 +313,14 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbGoal, setBbGoal] = useState<string>(prof.goal === 'bulk' ? 'mass' : prof.goal || 'mass');
   const [bbDays, setBbDays] = useState<number>(prof.daysPerWeek || 4);
   const [bbWeeks, setBbWeeks] = useState<number>(8);
+  // п.18: карточка «📍 Текущий блок года» — живой план + слушатель обновлений.
+  const [annualPlan, setAnnualPlan] = useState(() => loadAnnualTrainingPlan());
+  useEffect(() => {
+    setAnnualPlan(loadAnnualTrainingPlan());
+    const onUpd = () => setAnnualPlan(loadAnnualTrainingPlan());
+    window.addEventListener('he-annual-training-plan-updated', onUpd);
+    return () => window.removeEventListener('he-annual-training-plan-updated', onUpd);
+  }, []);
   // Стаж + любимые/нелюбимые упражнения (синхронизируются с профилем тренированности).
   const [bbTrainingYears, setBbTrainingYears] = useState<number>(prof.trainingYears || 3);
   const [bbFavEx, setBbFavEx] = useState<string[]>(prof.favoriteExercises || []);
@@ -309,14 +335,16 @@ export const BbAutoConstructor: React.FC = () => {
   // MRV/RIR/caps и PED/recovery pipeline не меняются автоматически.
   const profileSex = linked.profile?.settings?.personal?.sex;
   const [athleteMode, setAthleteMode] = useState<'standard' | 'female_context'>('standard');
+  const [reproductiveContext, setReproductiveContext] = useState<ReproductiveContext>('unknown');
   const athleteContext: AthleteContext | undefined = useMemo(() => {
     if (athleteMode !== 'female_context') return undefined;
     return {
       sex: (profileSex === 'female' ? 'female' : 'male') as AthleteSex,
       athleteMode,
       trainingYears: bbTrainingYears > 0 ? bbTrainingYears : undefined,
+      ...(reproductiveContext !== 'unknown' ? { reproductiveContext } : {}),
     };
-  }, [athleteMode, profileSex, bbTrainingYears]);
+  }, [athleteMode, profileSex, bbTrainingYears, reproductiveContext]);
   // 📅 Многоблочная специализация: список блоков (3-6 нед каждый), у каждого
   // блока цели 1-2, режим доноров и мышцы-доноры. Остаток плана — баланс.
   interface UISpecBlock {
@@ -2000,6 +2028,26 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ marginTop:6, fontSize:10, color:'#f59e0b', lineHeight:1.5 }}>
             🛡 При сушке держите темп ≤ 0.5%/нед и следите за энергетической доступностью — риск RED-S (нарушения цикла, кости).
           </div>
+        )}
+        {athleteMode === 'female_context' && (
+          <>
+            <div style={{ marginTop:8, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>Репродуктивный контекст (не меняет план):</div>
+            <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:4 }}>
+              {REPRODUCTIVE_CONTEXT_OPTIONS.map(o => (
+                <button key={o.id} onClick={() => setReproductiveContext(o.id)} style={{
+                  padding:'4px 9px', borderRadius:14, cursor:'pointer', fontWeight:600, fontSize:10,
+                  border: reproductiveContext === o.id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.12)',
+                  background: reproductiveContext === o.id ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.03)',
+                  color: reproductiveContext === o.id ? '#ec4899' : 'rgba(255,255,255,0.7)',
+                }}>{o.label}</button>
+              ))}
+            </div>
+            {athleteContextAdvisory({ sex: profileSex === 'female' ? 'female' : 'male', athleteMode, reproductiveContext }).level === 'review' && (
+              <div style={{ marginTop:6, fontSize:10, color:'#ef4444', lineHeight:1.5, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', padding:'6px 8px', borderRadius:8 }}>
+                {athleteContextAdvisory({ sex: profileSex === 'female' ? 'female' : 'male', athleteMode, reproductiveContext }).reasons.join(' ')}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -4841,6 +4889,16 @@ export const BbAutoConstructor: React.FC = () => {
              // BB macro blocks have no LMS cycleId. Keep the annual macrocycle
              // intact instead of switching to an unrelated BB cycle path.
            }} />
+          {(() => {
+            const line = annualActiveBlockLine(annualPlan, isoToday());
+            if (!line) return null;
+            return (
+              <div style={{ marginTop: 8, padding: '7px 9px', borderRadius: 10, fontSize: 11, lineHeight: 1.5,
+                background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.25)', color: 'rgba(255,255,255,0.8)' }}>
+                {line}
+              </div>
+            );
+          })()}
           <div style={{ marginTop: 8 }}><CardioLinkCard /></div>
         </div>
       )}

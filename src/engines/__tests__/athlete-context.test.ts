@@ -5,6 +5,7 @@ import {
   athletePolicySummary,
   normalizeAthleteContext,
   redsRiskSignals,
+  REPRODUCTIVE_CONTEXT_OPTIONS,
 } from '../athlete-context.engine';
 
 describe('athlete context policy', () => {
@@ -91,5 +92,16 @@ describe('medical advisory (pregnancy/postpartum)', () => {
   it('standard and plain female context are ok', () => {
     expect(athleteContextAdvisory({ sex: 'male', athleteMode: 'standard' }).level).toBe('ok');
     expect(athleteContextAdvisory({ sex: 'female', athleteMode: 'female_context', reproductiveContext: 'cycle' }).level).toBe('ok');
+  });
+});
+
+describe('reproductive context options', () => {
+  it('provides UI options incl. pregnancy/postpartum', () => {
+    const ids = REPRODUCTIVE_CONTEXT_OPTIONS.map(o => o.id);
+    expect(ids).toContain('pregnancy');
+    expect(ids).toContain('postpartum');
+    expect(ids).toContain('menopause');
+    expect(REPRODUCTIVE_CONTEXT_OPTIONS.length).toBeGreaterThanOrEqual(7);
+    for (const o of REPRODUCTIVE_CONTEXT_OPTIONS) expect(o.label.length).toBeGreaterThan(0);
   });
 });
