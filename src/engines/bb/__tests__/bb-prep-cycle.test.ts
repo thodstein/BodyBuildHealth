@@ -4,7 +4,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
-  accentToContestSpec, prepCutProjection, buildPrepSeason, type PrepCycleConfig, type PrepSeasonConfig,
+  accentToContestSpec, prepCutProjection, buildPrepSeason, posingPlanForCategory,
+  savePosingCheckin, getPosingCheckins, posingWeekStats,
+  type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
 import { DEFAULT_WORKMAX } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
@@ -306,5 +308,37 @@ describe('bb-prep-cycle: сезон (несколько стартов)', () => 
     // второй: gap ~4 нед → prep = 4 - 2 taper - 1 = 1 нед
     expect(r.summary[1].prepWeeks).toBeLessThanOrEqual(1);
     expect(r.warnings.some(w => /усечен/.test(w))).toBe(true);
+  });
+});
+
+describe('bb-prep-cycle: позирование к шоу (P3.1)', () => {
+  it('профиль поз для каждой категории', () => {
+    for (const c of (['mens_physique', 'bikini', 'figure', 'wellness', 'mens_bb', 'womens_bb'] as BBContestCategory[])) {
+      const p = posingPlanForCategory(c);
+      expect(p.poses.length).toBeGreaterThan(0);
+      expect(p.minutesPerDay).toBeGreaterThan(0);
+    }
+    expect(posingPlanForCategory('bikini').poses).toContain('Задняя стойка');
+    expect(posingPlanForCategory('mens_physique').poses).toContain('Передняя стойка');
+  });
+
+  it('чек-ин сохраняется и заменяется за ту же дату', () => {
+    localStorage.setItem('he_prep_posing_v1', '[]');
+    savePosingCheckin({ date: isoToday(), minutes: 25 });
+    savePosingCheckin({ date: isoToday(), minutes: 30 }); // заменяет
+    const list = getPosingCheckins();
+    expect(list.length).toBe(1);
+    expect(list[0].minutes).toBe(30);
+  });
+
+  it('week-статистика за 7 дней', () => {
+    localStorage.setItem('he_prep_posing_v1', '[]');
+    savePosingCheckin({ date: isoAddDays(isoToday(), 0), minutes: 30 });
+    savePosingCheckin({ date: isoAddDays(isoToday(), -1), minutes: 20 });
+    savePosingCheckin({ date: isoAddDays(isoToday(), -9), minutes: 99 }); // вне окна
+    const s = posingWeekStats(getPosingCheckins(), 7);
+    expect(s.days).toBe(2);
+    expect(s.totalMin).toBe(50);
+    expect(s.avgMin).toBe(25);
   });
 });

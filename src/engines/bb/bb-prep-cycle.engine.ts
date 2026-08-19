@@ -24,7 +24,7 @@ import {
 import type { Injury } from '../manual-plan-builder';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
-  isoToday, isoDiffDays,
+  isoToday, isoDiffDays, isoAddDays,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
   type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy,
@@ -564,4 +564,70 @@ export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
   }
 
   return { cycles, summary, warnings };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Позирование к шоу (P3.1): обязательные позы по категории + дневной чек-ин
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PosingProfile {
+  category: BBContestCategory;
+  /** Обязательные позы для категории. */
+  poses: string[];
+  /** Рекомендуемые минуты ежедневного позирования. */
+  minutesPerDay: number;
+  note: string;
+}
+
+const BASE_BB_POSES = ['Передний двойной бицепс', 'Передняя широчайшая', 'Боковой грудной', 'Задний двойной бицепс', 'Задняя широчайшая', 'Боковой трицепс', 'Пресс и бедро', 'Мост Геркулеса'];
+const BASE_FEMALE_POSES = ['Передний двойной бицепс', 'Передняя широчайшая', 'Боковой', 'Задний двойной бицепс', 'Задняя', 'Пресс и бедро'];
+
+export const POSING_PROFILES: Record<BBContestCategory, PosingProfile> = {
+  mens_bb:        { category: 'mens_bb', poses: BASE_BB_POSES, minutesPerDay: 30, note: 'Полный набор обязательных поз, зернистость и сепарация — позы держать по 3-5 сек.' },
+  bb_212:         { category: 'bb_212', poses: BASE_BB_POSES, minutesPerDay: 30, note: 'Полный набор поз; следить за шириной спины при вакууме.' },
+  classic_physique: { category: 'classic_physique', poses: [...BASE_BB_POSES, 'Вакуум'], minutesPerDay: 25, note: 'Классика: добавить вакуум и удержание классических линий.' },
+  mens_physique:  { category: 'mens_physique', poses: ['Передняя стойка', 'Задняя стойка (руки на бёдрах)', 'Четверть поворота'], minutesPerDay: 20, note: 'Позирование в шортах: стойки на расслабленных руках, акцент V-taper.' },
+  bikini:         { category: 'bikini', poses: ['Передняя стойка', 'Боковая стойка', 'Задняя стойка'], minutesPerDay: 15, note: 'Плавные повороты и стойки fitness-модели, мягкая подача.' },
+  figure:         { category: 'figure', poses: BASE_FEMALE_POSES, minutesPerDay: 20, note: 'Мышечная сепарация верха — чёткие двойные бицепсы и широчайшие.' },
+  wellness:       { category: 'wellness', poses: ['Передняя стойка', 'Задний двойной бицепс', 'Задняя стойка', 'Боковая стойка'], minutesPerDay: 18, note: 'Акцент на нижнюю часть тела (ягодицы/бёдра) при мягкой подаче верха.' },
+  womens_physique:{ category: 'womens_physique', poses: BASE_FEMALE_POSES, minutesPerDay: 25, note: 'Выраженная мышечность, полный набор женских поз.' },
+  womens_bb:      { category: 'womens_bb', poses: BASE_BB_POSES, minutesPerDay: 30, note: 'Полный набор поз, максимум массы и зернистости.' },
+};
+
+export function posingPlanForCategory(category: BBContestCategory): PosingProfile {
+  return POSING_PROFILES[category] ?? POSING_PROFILES.mens_physique;
+}
+
+/** Дневной чек-ин позирования. */
+export interface PosingCheckin {
+  date: string;
+  minutes: number;
+  note?: string;
+}
+
+const POSING_KEY = 'he_prep_posing_v1';
+
+export function getPosingCheckins(): PosingCheckin[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(POSING_KEY) || '[]');
+    return Array.isArray(raw)
+      ? raw.filter((e: unknown) => e && typeof (e as PosingCheckin).date === 'string' && (e as PosingCheckin).date)
+      : [];
+  } catch { return []; }
+}
+
+/** Сохранить/заменить чек-ин за дату. */
+export function savePosingCheckin(entry: PosingCheckin): PosingCheckin[] {
+  const list = getPosingCheckins().filter(e => e.date !== entry.date);
+  const next = [...list, { date: entry.date, minutes: Math.max(0, Math.round(Number(entry.minutes) || 0)), note: entry.note || undefined }];
+  try { localStorage.setItem(POSING_KEY, JSON.stringify(next)); } catch { /* silent */ }
+  return next;
+}
+
+/** Сводка позирования за последние N дней. */
+export function posingWeekStats(checkins: PosingCheckin[], days = 7): { totalMin: number; days: number; avgMin: number } {
+  const cutoff = isoAddDays(isoToday(), -(days - 1));
+  const recent = checkins.filter(e => e.date >= cutoff);
+  const totalMin = recent.reduce((a, e) => a + (e.minutes || 0), 0);
+  return { totalMin, days: recent.length, avgMin: recent.length ? Math.round(totalMin / recent.length) : 0 };
 }

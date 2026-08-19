@@ -84,7 +84,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -349,6 +349,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepBodyFat, setPrepBodyFat] = useState<number | undefined>(undefined);
   const [prepResult, setPrepResult] = useState<PrepCycleResult | null>(null);
   const [prepSeason, setPrepSeason] = useState<ReturnType<typeof buildPrepSeason> | null>(null);
+  const [posingMin, setPosingMin] = useState<number>(0);
+  const [posingList, setPosingList] = useState<ReturnType<typeof getPosingCheckins>>(() => getPosingCheckins());
   const [pcBusy, setPcBusy] = useState<boolean>(false);
   const [prepComps, setPrepComps] = useState<ContestEventEntry[]>([]);
   const [prepMainId, setPrepMainId] = useState<string>('');
@@ -5360,6 +5362,30 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                 );
               } catch { return null; }
+            })()}
+
+            {/* 🎭 Позирование */}
+            {(() => {
+              const pp = posingPlanForCategory(prepCat);
+              const todayDone = posingList.find(e => e.date === isoToday());
+              const stats = posingWeekStats(posingList, 7);
+              return (
+                <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                  <div style={{ fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎭 Позирование · {pp.minutesPerDay} мин/день · {stats.days ? `за 7д: ${stats.totalMin} мин (сред. ${stats.avgMin})` : 'за 7д: нет отметок'}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>{pp.poses.join(' · ')}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>{pp.note}</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input type="number" min={0} max={120} value={posingMin || ''} onChange={e => setPosingMin(e.target.value ? Number(e.target.value) : 0)} placeholder="мин" style={{ width: 70, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }} />
+                    <button style={BTN_GHOST} onClick={() => {
+                      const next = savePosingCheckin({ date: isoToday(), minutes: posingMin || pp.minutesPerDay });
+                      setPosingList(next);
+                      setPosingMin(0);
+                      flash(`🎭 Позирование отмечено${todayDone ? ' (обновлено)' : ''}`);
+                    }}>{todayDone ? '✏️ Обновить отметку' : '✅ Отметить сегодня'}</button>
+                    {todayDone && <span style={{ color: '#4ade80' }}>сегодня: {todayDone.minutes} мин ✓</span>}
+                  </div>
+                </div>
+              );
             })()}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
