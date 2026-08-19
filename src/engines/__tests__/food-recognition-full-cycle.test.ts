@@ -107,13 +107,13 @@ describe('E2E: полный цикл распознавания еды', () => {
   it('фото проходит через серверный OCR endpoint и затем пищевой парсер', async () => {
     const serverText = 'Завтрак\nКуриная грудка 200 г 330 ккал Б:40 Ж:10 У:0';
     const fetchMock = vi.fn().mockImplementation(async (url: string) => ({
-      ok: url === './api/ocr-image',
-      json: async () => url === './api/ocr-image' ? { ok: true, text: serverText } : {},
+      ok: url === './api/ocr-scanned-pdf',
+      json: async () => url === './api/ocr-scanned-pdf' ? { ok: true, text: serverText } : {},
     }));
     vi.stubGlobal('fetch', fetchMock);
     try {
       const result = await processUploadedFile(new File(['image'], 'fatsecret.png', { type: 'image/png' }));
-      expect(fetchMock).toHaveBeenCalledWith('./api/ocr-image', expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledWith('./api/ocr-scanned-pdf', expect.objectContaining({ method: 'POST' }));
       expect(result.meals.flatMap(meal => meal.items).some(item => item.foodId === 'chicken_breast')).toBe(true);
       expect(result.warnings).toContain('Фото обработано на сервере OCR.');
     } finally {
