@@ -2379,6 +2379,24 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.peakWeek ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.12)', color: b.config.peakWeek ? '#f59e0b' : 'rgba(255,255,255,0.65)' }}>
                           🎭 Пик-неделя{b.config.peakWeek ? ' ✓' : ''}
                         </button>
+                        <button type="button" aria-pressed={!!b.config.prep} aria-label="Prep-цикл"
+                          onClick={() => {
+                            if (b.config.prep) { applyAnnualConfig(b.ref.blockKey, { prep: undefined }); return; }
+                            let cat = 'mens_physique', accent: string[] = [], minimal: string[] = [], minMode = 'reduce_direct_to_floor';
+                            try {
+                              const stored = JSON.parse(localStorage.getItem('he_prep_cycle_v1') || '{}');
+                              if (stored?.cat) cat = String(stored.cat);
+                              if (Array.isArray(stored?.accent)) accent = stored.accent;
+                              if (Array.isArray(stored?.minimal)) minimal = stored.minimal;
+                              if (stored?.minMode) minMode = String(stored.minMode);
+                            } catch { /* silent */ }
+                            const showDate = isoAddDays(isoToday(), b.ref.weeks * 7);
+                            applyAnnualConfig(b.ref.blockKey, { prep: { category: cat, showDate, accentMuscles: accent, minimalMuscles: minimal, minimalMode: minMode, taperWeeks: 3 } });
+                            setAnnualStatusNote('🏁 Prep-цикл для блока включён (акценты/минимум из сохранённого Prep-цикла, дата = конец блока). Соберите блок.');
+                          }}
+                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.prep ? 'rgba(236,72,153,0.5)' : 'rgba(255,255,255,0.12)', color: b.config.prep ? '#ec4899' : 'rgba(255,255,255,0.65)' }}>
+                          🏁 Prep-цикл{b.config.prep ? ' ✓' : ''}
+                        </button>
                       </div>
                     )}
                     {b.ref.kind === 'MANUAL' && (
