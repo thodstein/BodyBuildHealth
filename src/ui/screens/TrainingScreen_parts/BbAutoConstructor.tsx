@@ -43,7 +43,7 @@ import { activeBlockForWeek, weekForDate } from '../../../engines/annual-trainin
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
 import type { AthleteMode, AthleteContext, AthleteSex, ReproductiveContext } from '../../../engines/athlete-context.engine';
-import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory } from '../../../engines/athlete-context.engine';
+import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory, redsRiskSignals } from '../../../engines/athlete-context.engine';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -4578,6 +4578,20 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                 </div>
               );
+            })()}
+
+            {/* RED-S: женский контекст + подготовка (реальные данные плана) */}
+            {athleteMode === 'female_context' && prepPlan && (() => {
+              const reds = redsRiskSignals(athleteContext, {
+                calorieDeficitActive: true,
+                weightTrendPctPerWeek: prepPlan.preparation.targetRatePctPerWeek,
+                bodyFatPct: linked.profile.settings.personal.bodyFat,
+              });
+              return reds.length ? (
+                <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  {reds.map(r => <div key={r} style={{ fontSize: 10, color: '#f59e0b', lineHeight: 1.5 }}>{r}</div>)}
+                </div>
+              ) : null;
             })()}
 
             {/* ⚖️ Адаптация подготовки по весу */}

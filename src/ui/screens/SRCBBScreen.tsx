@@ -31,7 +31,8 @@ import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from '.
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
-import type { AthleteMode, AthleteContext } from '../../engines/athlete-context.engine';
+import type { AthleteMode, AthleteContext, ReproductiveContext } from '../../engines/athlete-context.engine';
+import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory } from '../../engines/athlete-context.engine';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
@@ -134,8 +135,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const plSex: 'male' | 'female' = (() => {
     try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; }
   })();
+  const [plReproductiveContext, setPlReproductiveContext] = useState<ReproductiveContext>(_plSaved?.plReproductiveContext === 'pregnancy' || _plSaved?.plReproductiveContext === 'postpartum' ? _plSaved.plReproductiveContext : 'unknown');
   const plAthleteContext: AthleteContext | undefined = plAthleteMode === 'female_context'
-    ? { sex: plSex, athleteMode: plAthleteMode, competitionFederation: 'ipf' }
+    ? { sex: plSex, athleteMode: plAthleteMode, competitionFederation: 'ipf', ...(plReproductiveContext !== 'unknown' ? { reproductiveContext: plReproductiveContext } : {}) }
     : undefined;
   const [goal, setGoal] = useState<string>(_plSaved?.plGoal || 'strength');
   const [dir, setDir] = useState<string>(_plSaved?.plDir || 'powerlifting');
@@ -1270,6 +1272,26 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             </div>
             {builtSrc?.athleteMode === 'female_context' && (
               <div style={{ marginTop: 6, fontSize: 10, fontWeight: 700, color: '#ec4899' }}>♀ Женский контекст применён к текущему плану.</div>
+            )}
+            {plAthleteMode === 'female_context' && (
+              <>
+                <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Репродуктивный контекст (не меняет план):</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
+                  {REPRODUCTIVE_CONTEXT_OPTIONS.map(o => (
+                    <button key={o.id} onClick={() => setPlReproductiveContext(o.id)} style={{
+                      padding: '4px 9px', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 10,
+                      border: plReproductiveContext === o.id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.12)',
+                      background: plReproductiveContext === o.id ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.03)',
+                      color: plReproductiveContext === o.id ? '#ec4899' : 'rgba(255,255,255,0.7)',
+                    }}>{o.label}</button>
+                  ))}
+                </div>
+                {athleteContextAdvisory({ sex: plSex, athleteMode: plAthleteMode, reproductiveContext: plReproductiveContext }).level === 'review' && (
+                  <div style={{ marginTop: 6, fontSize: 10, color: '#ef4444', lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: '6px 8px', borderRadius: 8 }}>
+                    {athleteContextAdvisory({ sex: plSex, athleteMode: plAthleteMode, reproductiveContext: plReproductiveContext }).reasons.join(' ')}
+                  </div>
+                )}
+              </>
             )}
           </div>
            {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}

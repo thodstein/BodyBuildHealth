@@ -368,10 +368,15 @@ PED-логика остаётся общей и дозозависимой:
 - **Репродуктивный контекст в BB-конструкторе**: `REPRODUCTIVE_CONTEXT_OPTIONS` (7 чипов, русские лейблы) в athlete-context.engine; в карточке режима BB — чипы «Естественный цикл/КОК/Беременность/Послеродовой/Перименопауза/Менопауза» (видимы при `female_context`, не меняют план), включены в `athleteContext.reproductiveContext`; при pregnancy/postpartum — красный блок medical review через `athleteContextAdvisory`.
 - Тесты: `athlete-context.test.ts` +1 (опции) = 14; NEW `bb-auto-reproductive-context.test.tsx` 2 (SSR карточки режима + отсутствие undefined/NaN). Проверено: tsc 0; целевые 21/21.
 
+### Раунд 5 (Aug 19 2026, uncommitted)
+
+- **PL-конструктор: репродуктивный контекст + medical advisory**: SRCBBScreen — чипы `REPRODUCTIVE_CONTEXT_OPTIONS` в PL-тумблере (при `female_context`), значение в `plAthleteContext.reproductiveContext` + сохраняется в `he_pl_session.plReproductiveContext`; при pregnancy/postpartum — красный review-блок `athleteContextAdvisory`.
+- **RED-S с реальными данными в contest-шаге BB**: блок `redsRiskSignals` в шаге «🏁 Contest prep» при `female_context` + собранном `prepPlan` — темп из `prepPlan.preparation.targetRatePctPerWeek`, % жира из профиля.
+- Проверено: целевые тесты 38/38 (в т.ч. bb-auto-smoke 5/5, bb-auto-reproductive 2/2, athlete-context 14). tsc по моим файлам чист (ошибки только в чужом MacrocyclePanel WIP).
+
 ### Осталось на будущие раунды
 
-- Беременность/postpartum как отдельный адаптационный путь с медицинским review (advisory + UI-блок в BB готовы; PL-конструктор и питание — отдельные этапы).
-- RED-S/железо/костные сигналы в питании (движок bb-contest-prep уже содержит женские floors).
+- RED-S/железо/костные сигналы в питании (IndividualPlan — активная чужая зона; bb-contest-prep уже содержит женские floors).
 - Прокидка athleteMode в вызовы `buildPLPrintHtml` из PLPlanView (файл в чужой зоне).
 
 ## 15. Источники
