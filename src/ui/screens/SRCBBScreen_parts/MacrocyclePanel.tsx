@@ -1903,33 +1903,35 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                           onChange={v => { if (!macro) return; persistCycles(resizeMacroBlock(macro, index, v), '✅ Длина блока изменена'); }} />
                       </div>
                     ))}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                    <div style={{ marginTop: 4 }}>
                       {phaseBlocks.length === 1 ? (
                         <>
-                          {splitCycles.map((slot, index) => (
-                            <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
-                              <PopupSelect label={`Новый цикл ${index + 1}`} value={slot.cycleId} options={cycleOptions}
-                                onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, cycleId: v } : p))} />
-                              <PopupNumber label={`Недель ${index + 1} (0 = поровну)`} value={slot.weeks} min={0} max={52} suffix=" нед"
-                                onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, weeks: Number.isFinite(v) ? Math.max(0, Math.round(v)) : p.weeks } : p))} />
-                            </div>
-                          ))}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6 }}>
+                            {splitCycles.map((slot, index) => (
+                              <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <PopupSelect label={`Новый цикл ${index + 1}`} value={slot.cycleId} options={cycleOptions}
+                                  onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, cycleId: v } : p))} />
+                                <PopupNumber label={`Недель ${index + 1} (0 = поровну)`} value={slot.weeks} min={0} max={52} suffix=" нед"
+                                  onChange={v => setSplitCycles(prev => prev.map((p, i) => i === index ? { ...p, weeks: Number.isFinite(v) ? Math.max(0, Math.round(v)) : p.weeks } : p))} />
+                              </div>
+                            ))}
+                          </div>
                           <button type="button" disabled={!splitReady} onClick={() => {
                             if (!macro) return;
                             const next = splitMacroPhaseIntoCycles(macro, activeBlock.phase as MacroPhase, splitCycles.map(s => s.cycleId), splitCycles.map(s => s.weeks || 0));
                             setSplitCycles([{ cycleId: '', weeks: 0 }, { cycleId: '', weeks: 0 }]);
                             persistCycles(next, '✂️ Фаза разбита на 2 цикла и сохранена');
-                          }} style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10, opacity: splitReady ? 1 : 0.5, cursor: splitReady ? 'pointer' : 'not-allowed' }}>
+                          }} style={{ ...BTN_GHOST, width: '100%', minHeight: 44, fontSize: 10, marginTop: 6, opacity: splitReady ? 1 : 0.5, cursor: splitReady ? 'pointer' : 'not-allowed' }}>
                             ✂️ Разбить и сохранить
                           </button>
                         </>
                       ) : (
                         <button type="button" onClick={() => { if (!macro) return; persistCycles(mergeMacroPhase(macro, activeBlock.phase as MacroPhase), '↔ Фаза сведена в один цикл и сохранена'); }}
-                          style={{ ...BTN_GHOST, minHeight: 44, fontSize: 10 }}>
+                          style={{ ...BTN_GHOST, width: '100%', minHeight: 44, fontSize: 10 }}>
                           ↔ Свести в один цикл
                         </button>
                       )}
-                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Изменения сохраняются сразу</span>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4, textAlign: 'center' }}>Изменения сохраняются сразу</div>
                     </div>
                   </div>
                 );
@@ -2372,11 +2374,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                              { id: 'maintenance', label: 'Поддержание', desc: '' },
                              { id: 'strength_mass', label: 'Сила + масса', desc: '' }]}
                           onChange={v => applyAnnualConfig(b.ref.blockKey, { goal: v || undefined })} />
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', minHeight: 32 }}>
-                          <input type="checkbox" checked={!!b.config.peakWeek} style={{ width: 16, height: 16, accentColor: '#f59e0b' }}
-                            onChange={e => applyAnnualConfig(b.ref.blockKey, { peakWeek: e.target.checked, peakConfig: e.target.checked ? b.config.peakConfig : undefined })} />
-                          🎭 Пик-неделя
-                        </label>
+                        <button type="button" aria-pressed={!!b.config.peakWeek} aria-label="Пик-неделя"
+                          onClick={() => applyAnnualConfig(b.ref.blockKey, { peakWeek: !b.config.peakWeek, peakConfig: !b.config.peakWeek ? b.config.peakConfig : undefined })}
+                          style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 10px', minHeight: 32, borderColor: b.config.peakWeek ? 'rgba(245,158,11,0.45)' : 'rgba(255,255,255,0.12)', color: b.config.peakWeek ? '#f59e0b' : 'rgba(255,255,255,0.65)' }}>
+                          🎭 Пик-неделя{b.config.peakWeek ? ' ✓' : ''}
+                        </button>
                       </div>
                     )}
                     {b.ref.kind === 'MANUAL' && (
@@ -2497,6 +2499,61 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         </div>
                       )}
                     </div>
+                    {(() => {
+                      // 📉 Отображение taper/пик-недель блока (как в ББ-авто «Недели taper»).
+                      const weeks = b.result?.weeks;
+                      if (!weeks || weeks.length === 0) return null;
+                      const rows = weeks.filter(w => {
+                        const hasTaper = w.sessions.some(s => s.blocks.some(bl =>
+                          bl.note?.includes('[annual-taper:') || bl.note?.includes('[annual-pl-taper:')));
+                        const isPeak = (w as { phase?: string }).phase === 'peaking';
+                        return hasTaper || isPeak || w.deload;
+                      });
+                      if (rows.length === 0) return null;
+                      return (
+                        <div style={{ marginTop: 6 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: '#f472b6', marginBottom: 4 }}>📉 Недели taper (тренировочный цикл в плане)</div>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', minWidth: 420 }}>
+                              <thead>
+                                <tr style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'left' }}>
+                                  <th style={{ padding: '4px 6px' }}>Нед</th>
+                                  <th style={{ padding: '4px 6px' }}>Фаза</th>
+                                  <th style={{ padding: '4px 6px', textAlign: 'right' }}>Сетов</th>
+                                  <th style={{ padding: '4px 6px', textAlign: 'right' }}>RIR</th>
+                                  <th style={{ padding: '4px 6px' }}>Нагрузка</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {rows.map(w => {
+                                  const totalSets = w.sessions.reduce((a, s) => a + s.blocks.reduce((bb, blk) => bb + blk.sets.length, 0), 0);
+                                  const rirs = w.sessions.flatMap(s => s.blocks.flatMap(blk => blk.sets.map(st => Number(st.rir)))).filter(Number.isFinite);
+                                  const rirMin = rirs.length ? Math.min(...rirs) : 3;
+                                  const firstBlock = w.sessions[0]?.blocks?.[0];
+                                  const isPeak = (w as { phase?: string }).phase === 'peaking';
+                                  const phaseLabel = isPeak ? '🎭 Пик-неделя' : w.deload ? '📉 Делод' : '📉 Тапер';
+                                  const phaseColor = isPeak ? '#ec4899' : '#f472b6';
+                                  return (
+                                    <tr key={w.week} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                      <td style={{ padding: '4px 6px', fontWeight: 700 }}>{w.week}</td>
+                                      <td style={{ padding: '4px 6px', color: phaseColor, fontWeight: 700 }}>{phaseLabel}</td>
+                                      <td style={{ padding: '4px 6px', textAlign: 'right' }}>{totalSets}</td>
+                                      <td style={{ padding: '4px 6px', textAlign: 'right' }}>{rirMin}–4</td>
+                                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.55)' }}>
+                                        {firstBlock ? `${firstBlock.exerciseName}${firstBlock.sets?.[0]?.weight ? ` · ${firstBlock.sets[0].weight} кг` : ''}` : 'памп/отдых'}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
+                            Объём снижается, веса сохраняются, RIR 2–4, без отказа и новых упражнений. Изменения настроек выше пересобирают эти недели.
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {otherBlocks.length > 0 && (
                       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
                         <PopupSelect label="⧉ Копировать настройки из блока…" value=""
@@ -2519,24 +2576,72 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
             </div>
           )}
 
-          {/* 📖 Обоснование (rationale) — русский текст в акцентной карточке */}
-          {(isBB ? bbMacro : macro) && (
-            <div className="macrocycle-rationale" style={{ marginTop: 12, padding: 10, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.18)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                <span style={{ fontSize: 14 }}>📖</span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', textTransform: 'uppercase', letterSpacing: 0.3 }}>Обоснование плана</span>
-              </div>
-              {(isBB ? bbMacro!.rationale : macro!.rationale).map((r, i) => (
-                <div key={i} style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.6, padding: '2px 0 2px 14px', position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 2, top: 4, color: '#00e68a', fontSize: 10 }}>▸</span>
-                  {r}
+          {/* 📖 Обоснование (rationale) — тренерская карточка на русском */}
+          {(isBB ? bbMacro : macro) && (() => {
+            const src = isBB ? (bbMacro as unknown as { blocks: Array<{ phase: string; weeks: number; weekOffset: number; description?: string; cycleId?: string }>; totalWeeks: number; trainingFocus?: string; rationale: string[] }) : (macro as unknown as { blocks: Array<{ phase: string; weeks: number; weekOffset: number; description?: string; cycleId?: string }>; totalWeeks: number; rationale: string[] });
+            const rationale = src.rationale ?? [];
+            const coachByPhase: Record<string, string> = {
+              endurance: 'базовая выносливость и техника: нарабатываем объём, укрепляем связки и суставы, готовим тело к более тяжёлой работе',
+              strength: 'силовой блок: растим рабочие веса и адаптируем нервную систему к максимальным усилиям',
+              peak: 'пик формы: концентрируемся на готовности к старту, снижаем утомление, сохраняем интенсивность',
+              competition: 'старт: выход на пик к дате соревнования, контроль веса и психологическая настройка',
+              transition: 'восстановление: снимаем объём, даём организму перестроиться и не допускаем перетренированности',
+              hypertrophy: 'гипертрофия: объёмная работа в целевом диапазоне повторов для роста мышечной массы',
+              contest_prep: 'сушка: дефицит калорий при сохранении мышечной ткани, подготовка к сцене',
+            };
+            return (
+              <div className="macrocycle-rationale" style={{ marginTop: 12, padding: 12, borderRadius: 14, background: 'linear-gradient(180deg, rgba(0,230,138,0.09), rgba(0,230,138,0.02))', border: '1px solid rgba(0,230,138,0.25)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>📖</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', textTransform: 'uppercase', letterSpacing: 0.4 }}>Обоснование плана</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Тренерская логика года — почему он устроен именно так</div>
+                  </div>
                 </div>
-              ))}
-              {(isBB ? bbMacro!.rationale : macro!.rationale).length === 0 && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Обоснование появится после построения макроцикла.</div>
-              )}
-            </div>
-          )}
+                <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>
+                    🎯 Периодизация на {src.totalWeeks} нед{isBB ? ` · фокус: ${(src as { trainingFocus?: string }).trainingFocus ?? 'гипертрофия'}` : ''}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.55, marginTop: 3 }}>
+                    Год — это последовательность фаз, где каждая готовит фундамент для следующей. Тренировочный
+                    стимул меняется, а разгрузочные периоды защищают от перетренированности и накопления усталости —
+                    так прогресс становится устойчивым, а не «взрывным и с откатом».
+                  </div>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>🗓 Фазы и их роль</div>
+                  {src.blocks.map((b, i) => {
+                    const phase = b.phase as string;
+                    const label = isBB ? (BB_PHASE_LABEL_RU[phase as BBMacroPhase] ?? phase) : (PHASE_LABEL_RU[phase as MacroPhase] ?? phase);
+                    const color = isBB ? (BB_PHASE_COLOR[phase as BBMacroPhase] ?? '#888') : (PHASE_COLOR[phase as MacroPhase] ?? '#888');
+                    const icon = isBB ? (BB_PHASE_ICON[phase as BBMacroPhase] ?? '') : (PHASE_ICON[phase as MacroPhase] ?? '');
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ fontSize: 13, width: 18, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 10.5, fontWeight: 700, color }}>
+                            {label} · нед {b.weekOffset}–{b.weekOffset + b.weeks - 1}{b.cycleId ? ' · цикл' : ''}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{coachByPhase[phase] ?? 'период плана'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>✅ Что учтено в расчёте</div>
+                  {rationale.length > 0 ? rationale.map((r, i) => (
+                    <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55, padding: '2px 0 2px 14px', position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 2, top: 4, color: '#00e68a', fontSize: 10 }}>▸</span>
+                      {r}
+                    </div>
+                  )) : (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>Обоснование появится после построения макроцикла.</div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ❤️ Кардио: привязанный CardioCycle (ссылка в macrocycle.cardioCycleId) */}
           {(isBB ? bbMacro : macro) && (() => {

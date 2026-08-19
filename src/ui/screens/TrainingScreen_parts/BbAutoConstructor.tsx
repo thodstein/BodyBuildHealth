@@ -4882,10 +4882,6 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={H}>🗓 Годовое планирование ББ</div>
               <div style={SMALL}>Постройте макроцикл и начните работу по нему — или стройте план с нуля, как раньше.</div>
             </div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button style={BTN_GHOST} onClick={() => { setStep('params'); flash('Строим с нуля — без годового плана'); }}>🆕 Строить с нуля</button>
-              <button style={BTN_GHOST} onClick={() => setStep('params')}>← К параметрам</button>
-            </div>
           </div>
           <MacrocyclePanel level={bbLevel} goal="bodybuilding" onLevelChange={setBbLevel} onGoalChange={() => undefined} storageKey="he_bb_macro" onApplyMacrocycle={source => {
             if (!('trainingFocus' in source)) {
