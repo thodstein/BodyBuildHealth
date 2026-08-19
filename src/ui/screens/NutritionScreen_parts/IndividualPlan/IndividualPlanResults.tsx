@@ -13,6 +13,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
+import { buildDayReportPrintHtml, printDayReport } from "./planner-day-print";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -2198,7 +2199,10 @@ export const IndividualPlanResults: React.FC = () => {
                 {/* Combined daily report */}
                 {calcDailyReport && calcResults.length > 1 && (
                   <div style={{ marginTop:8, borderRadius:10, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6 }}>📈 Совокупный анализ ({calcResults.length} приёма)</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                      <span>📈 Совокупный анализ ({calcResults.length} приёма)</span>
+                      <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
+                    </div>
                     {/* Overall grade */}
                     {(() => {
                       const avgScore = calcResults.reduce((s: number, r: any) => s + r.score.compositeScore, 0) / calcResults.length;
@@ -2235,8 +2239,8 @@ export const IndividualPlanResults: React.FC = () => {
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.electrolyteRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.electrolyteRisk ? '#ef4444' : '#22c55e' }}>
                         💧 K/Mg: {calcDailyReport.potassiumMg}/{calcDailyReport.magnesiumMg}мг {calcDailyReport.electrolyteRisk ? '⚠️' : '✅'}
                       </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.cortisolRisk ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.cortisolRisk ? '#f59e0b' : '#22c55e' }}>
-                        🧠 Кортизол: {calcDailyReport.cortisolRisk ? '⚠️ Риск' : '✅ Норма'}
+                      <div title="Мало быстрых углеводов в post-workout приёме (< 0.5 г/кг) — риск кортизола" style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.cortisolRisk ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.cortisolRisk ? '#f59e0b' : '#22c55e' }}>
+                        🧠 Кортизол: {calcDailyReport.cortisolRisk ? '⚠️ Риск (мало быстрых угл. post-WO)' : '✅ Норма'}
                       </div>
                       <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.insulinRicohet ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.insulinRicohet ? '#ef4444' : '#22c55e' }}>
                         💉 Инсулин: {calcDailyReport.insulinRicohet ? '🚨 Рикшет' : '✅ Норма'}
