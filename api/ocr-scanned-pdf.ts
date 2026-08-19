@@ -7,6 +7,10 @@ const MAX_BYTES = 12 * 1024 * 1024;
 const MAX_PAGES = 8;
 const MAX_PAGE_PIXELS = 4_000_000;
 
+export const config = {
+  api: { bodyParser: { sizeLimit: '16mb' } },
+};
+
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
   const worker = await createWorker('rus+eng');

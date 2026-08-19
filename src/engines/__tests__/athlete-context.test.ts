@@ -6,6 +6,7 @@ import {
   normalizeAthleteContext,
   redsRiskSignals,
   REPRODUCTIVE_CONTEXT_OPTIONS,
+  reproductiveContextHint,
 } from '../athlete-context.engine';
 
 describe('athlete context policy', () => {
@@ -96,12 +97,21 @@ describe('medical advisory (pregnancy/postpartum)', () => {
 });
 
 describe('reproductive context options', () => {
-  it('provides UI options incl. pregnancy/postpartum', () => {
+  it('provides UI options incl. pregnancy/postpartum with hints', () => {
     const ids = REPRODUCTIVE_CONTEXT_OPTIONS.map(o => o.id);
     expect(ids).toContain('pregnancy');
     expect(ids).toContain('postpartum');
     expect(ids).toContain('menopause');
     expect(REPRODUCTIVE_CONTEXT_OPTIONS.length).toBeGreaterThanOrEqual(7);
-    for (const o of REPRODUCTIVE_CONTEXT_OPTIONS) expect(o.label.length).toBeGreaterThan(0);
+    for (const o of REPRODUCTIVE_CONTEXT_OPTIONS) {
+      expect(o.label.length).toBeGreaterThan(0);
+      expect(o.hint.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('reproductiveContextHint returns a meaningful explanation', () => {
+    expect(reproductiveContextHint('menopause')).toContain('эстроген');
+    expect(reproductiveContextHint('pregnancy')).toContain('медицин');
+    expect(reproductiveContextHint('unknown')).toContain('общий');
   });
 });

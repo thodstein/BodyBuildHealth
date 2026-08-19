@@ -43,7 +43,7 @@ import { activeBlockForWeek, weekForDate } from '../../../engines/annual-trainin
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
 import type { AthleteMode, AthleteContext, AthleteSex, ReproductiveContext } from '../../../engines/athlete-context.engine';
-import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory, redsRiskSignals } from '../../../engines/athlete-context.engine';
+import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory, redsRiskSignals, reproductiveContextHint } from '../../../engines/athlete-context.engine';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -2034,7 +2034,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ marginTop:8, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>Репродуктивный контекст (не меняет план):</div>
             <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:4 }}>
               {REPRODUCTIVE_CONTEXT_OPTIONS.map(o => (
-                <button key={o.id} onClick={() => setReproductiveContext(o.id)} style={{
+                <button key={o.id} title={o.hint} onClick={() => setReproductiveContext(o.id)} style={{
                   padding:'4px 9px', borderRadius:14, cursor:'pointer', fontWeight:600, fontSize:10,
                   border: reproductiveContext === o.id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.12)',
                   background: reproductiveContext === o.id ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.03)',
@@ -2042,6 +2042,11 @@ export const BbAutoConstructor: React.FC = () => {
                 }}>{o.label}</button>
               ))}
             </div>
+            {reproductiveContext !== 'unknown' && (
+              <div style={{ marginTop:5, fontSize:10, color:'rgba(255,255,255,0.6)', lineHeight:1.5, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)', padding:'5px 8px', borderRadius:8 }}>
+                {reproductiveContextHint(reproductiveContext)}
+              </div>
+            )}
             {athleteContextAdvisory({ sex: profileSex === 'female' ? 'female' : 'male', athleteMode, reproductiveContext }).level === 'review' && (
               <div style={{ marginTop:6, fontSize:10, color:'#ef4444', lineHeight:1.5, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', padding:'6px 8px', borderRadius:8 }}>
                 {athleteContextAdvisory({ sex: profileSex === 'female' ? 'female' : 'male', athleteMode, reproductiveContext }).reasons.join(' ')}

@@ -71,7 +71,9 @@ async function prepareImageForServer(file: File): Promise<Blob> {
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const compressed = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
-    return compressed && compressed.size < file.size ? compressed : file;
+    // Keep the JSON/base64 request below Vercel's body limit. A 12 MB binary
+    // becomes roughly 16 MB after base64 encoding plus JSON overhead.
+    return compressed && (compressed.size < file.size || file.size > 9 * 1024 * 1024) ? compressed : file;
   } catch {
     return file;
   }

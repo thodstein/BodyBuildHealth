@@ -32,7 +32,7 @@ import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import type { AthleteMode, AthleteContext, ReproductiveContext } from '../../engines/athlete-context.engine';
-import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory } from '../../engines/athlete-context.engine';
+import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory, reproductiveContextHint } from '../../engines/athlete-context.engine';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
@@ -1278,7 +1278,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Репродуктивный контекст (не меняет план):</div>
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
                   {REPRODUCTIVE_CONTEXT_OPTIONS.map(o => (
-                    <button key={o.id} onClick={() => setPlReproductiveContext(o.id)} style={{
+                    <button key={o.id} title={o.hint} onClick={() => setPlReproductiveContext(o.id)} style={{
                       padding: '4px 9px', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 10,
                       border: plReproductiveContext === o.id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.12)',
                       background: plReproductiveContext === o.id ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.03)',
@@ -1286,6 +1286,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                     }}>{o.label}</button>
                   ))}
                 </div>
+                {plReproductiveContext !== 'unknown' && (
+                  <div style={{ marginTop: 5, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.15)', padding: '5px 8px', borderRadius: 8 }}>
+                    {reproductiveContextHint(plReproductiveContext)}
+                  </div>
+                )}
                 {athleteContextAdvisory({ sex: plSex, athleteMode: plAthleteMode, reproductiveContext: plReproductiveContext }).level === 'review' && (
                   <div style={{ marginTop: 6, fontSize: 10, color: '#ef4444', lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: '6px 8px', borderRadius: 8 }}>
                     {athleteContextAdvisory({ sex: plSex, athleteMode: plAthleteMode, reproductiveContext: plReproductiveContext }).reasons.join(' ')}

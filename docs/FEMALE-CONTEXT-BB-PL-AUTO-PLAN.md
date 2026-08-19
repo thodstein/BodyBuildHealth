@@ -381,6 +381,12 @@ PED-логика остаётся общей и дозозависимой:
 - Тесты: `bb-contest-prep-female-reds.test.ts` +3 (prepNutritionSignals) = 6. Проверено: tsc 0; contest-prep + pl-export 205/205.
 - Пуш НЕ выполнялся (по указанию пользователя).
 
+### Раунд 7 (Aug 19 2026) — пояснения репродуктивного контекста
+
+- `REPRODUCTIVE_CONTEXT_OPTIONS` += `hint` (на что влияет выбор: cycle/КОК — без авто-периодизации, pregnancy/postpartum — medical review, менопауза — кости/белок/восстановление) + `reproductiveContextHint(id)`; в `athletePolicyHints` добавлены контекст-специфичные notes.
+- UI (BbAutoConstructor + SRCBBScreen): title-подсказка на чипах и блок с пояснением выбранного контекста под чипами.
+- Тесты: `athlete-context.test.ts` обновлён (hint у всех опций + reproductiveContextHint). Проверено: tsc 0; целевые 22/22.
+
 ### Осталось на будущие раунды
 
 - Нет активных пунктов (оба закрытых пункта выполнены; IndividualPlan-питание — при необходимости отдельным этапом вне этой задачи).

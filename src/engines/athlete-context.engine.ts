@@ -17,16 +17,28 @@ export type ReproductiveContext =
   | 'perimenopause'
   | 'menopause';
 
-/** Опции для UI-чипов (label на русском). */
-export const REPRODUCTIVE_CONTEXT_OPTIONS: { id: ReproductiveContext; label: string }[] = [
-  { id: 'unknown', label: 'Не указано' },
-  { id: 'cycle', label: 'Естественный цикл' },
-  { id: 'contraception', label: 'Контрацепция (КОК)' },
-  { id: 'pregnancy', label: 'Беременность' },
-  { id: 'postpartum', label: 'Послеродовой период' },
-  { id: 'perimenopause', label: 'Перименопауза' },
-  { id: 'menopause', label: 'Менопауза' },
+/** Опции для UI-чипов (label + hint: что даёт и на что влияет выбор). */
+export interface ReproductiveContextOption {
+  id: ReproductiveContext;
+  label: string;
+  /** Краткое пояснение: зачем выбирать и на что влияет. */
+  hint: string;
+}
+
+export const REPRODUCTIVE_CONTEXT_OPTIONS: ReproductiveContextOption[] = [
+  { id: 'unknown', label: 'Не указано', hint: 'Без учёта репродуктивного статуса — только общий женский контекст.' },
+  { id: 'cycle', label: 'Естественный цикл', hint: 'План не перестраивается по фазам автоматически; отслеживайте сон, RPE, восстановление и симптомы (безопасно в лютеиновую фазу анализировать вес по средним за 7 дней).' },
+  { id: 'contraception', label: 'Контрацепция (КОК)', hint: 'КОК сглаживают гормональные колебания: авто-периодизация по фазам не нужна; ориентир — индивидуальная реакция на тренировки.' },
+  { id: 'pregnancy', label: 'Беременность', hint: 'Требует медицинского review (ACOG 2020): интенсивная подготовка, дефицит и пиковые протоколы не применяются без врача.' },
+  { id: 'postpartum', label: 'Послеродовой период', hint: 'Возврат к интенсивному объёму и дефициту — только после медицинского разрешения; важно тазовое дно и постепенность.' },
+  { id: 'perimenopause', label: 'Перименопауза', hint: 'Гормональные колебания и снижение эстрогена: следите за восстановлением, костным здоровьем и достатком белка/кальция.' },
+  { id: 'menopause', label: 'Менопауза', hint: 'Снижение эстрогена: акцент на силовую нагрузку для костей, достаточный белок (1.4–2.2 г/кг) и восстановление.' },
 ];
+
+/** Подсказка выбранной опции (для UI). */
+export function reproductiveContextHint(id: ReproductiveContext): string {
+  return REPRODUCTIVE_CONTEXT_OPTIONS.find(o => o.id === id)?.hint ?? '';
+}
 
 export interface AthletePedExperience {
   totalYears?: number;
@@ -104,6 +116,18 @@ export function athletePolicyHints(context?: Partial<AthleteContext> | null): At
     }
     if (c.reproductiveContext === 'perimenopause' || c.reproductiveContext === 'menopause') {
       notes.push('Учитывайте индивидуальное восстановление, костное здоровье и достаточность белка/энергии.');
+    }
+    if (c.reproductiveContext === 'menopause') {
+      notes.push('Менопауза: приоритет — силовая нагрузка для костной плотности, белок 1.4–2.2 г/кг, кальций.');
+    }
+    if (c.reproductiveContext === 'perimenopause') {
+      notes.push('Перименопауза: гормональные колебания — ориентируйтесь на восстановление, а не на календарь.');
+    }
+    if (c.reproductiveContext === 'cycle') {
+      notes.push('Естественный цикл: возможна индивидуальная вариативность — ведите свой отклик, а не фиксированный протокол по фазам.');
+    }
+    if (c.reproductiveContext === 'contraception') {
+      notes.push('КОК: гормональный фон стабильнее — фазовые корректировки не нужны.');
     }
     warnings.push('При дефиците, нарушениях цикла, стресс-повреждениях или признаках RED-S нужен врач/спортдиетолог.');
   }
