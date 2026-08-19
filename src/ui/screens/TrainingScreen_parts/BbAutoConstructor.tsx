@@ -84,7 +84,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, recommendMinimalMode, type PrepCycleConfig, type PrepCycleResult } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, recommendMinimalMode, prepCutProjection, type PrepCycleConfig, type PrepCycleResult } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -5232,6 +5232,24 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
               <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>MRV-капы и целевой объём рассчитаны с учётом уровня, стажа, PED, восстановления, питания и лаборатории.</div>
             </div>
+
+            {/* 📉 Прогноз сушки к шоу */}
+            {(() => {
+              const proj = prepCutProjection(prepResult.prepPlan, profileWeight, prepBodyFat);
+              const ok = proj.canReachByShow;
+              return (
+                <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                  <div style={{ fontWeight: 800, color: ok ? '#4ade80' : '#fbbf24', marginBottom: 4 }}>
+                    📉 Сушка к шоу · цель ~{proj.targetBodyFatPct}% · темп {proj.weeklyRateKg} кг/нед
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.8)' }}>
+                    {proj.targetWeightKg != null && <>Целевой вес ~{proj.targetWeightKg} кг · </>}
+                    до шоу {proj.weeksToShow} нед · прогноз веса на шоу ~{proj.projectedShowWeightKg} кг.
+                  </div>
+                  <div style={{ color: ok ? 'rgba(255,255,255,0.7)' : '#fbbf24', marginTop: 2 }}>{proj.note}</div>
+                </div>
+              );
+            })()}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
               <button style={{ ...BTN, flex: '1 1 140px', background: 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff' }} onClick={handleSavePrepCycle}>💾 Сохранить в профиль</button>

@@ -4,10 +4,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
-  accentToContestSpec, type PrepCycleConfig,
+  accentToContestSpec, prepCutProjection, type PrepCycleConfig,
 } from '../bb-prep-cycle.engine';
 import { DEFAULT_WORKMAX } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
+import { isoToday, isoAddDays } from '../bb-contest-prep.engine';
 import type { BBContestCategory } from '../bb-contest-prep.engine';
 
 const EQ = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'];
@@ -235,5 +236,30 @@ describe('bb-prep-cycle: несколько соревнований', () => {
     // тапер/пик отсчитываются от главного старта
     const peak = r.prepPlan.phases.find(p => p.key === 'peak_week');
     expect(peak?.weekStart).toBe(r.prepWeeks + r.taperWeeks + 1);
+  });
+});
+
+describe('bb-prep-cycle: прогноз сушки к шоу', () => {
+  it('считает целевую сухость категории и темп', () => {
+    const r = buildPrepCycle(base({ showDate: isoAddDays(isoToday(), 42), weightKg: 90 }));
+    const p = prepCutProjection(r.prepPlan, 90, 20);
+    expect(p.targetBodyFatPct).toBe(6); // mens_physique
+    expect(p.targetWeightKg).toBeCloseTo(76.6, 0); // lean 72 / 0.94
+    expect(p.weeklyRateKg).toBeCloseTo(0.45, 1); // 0.5%/нед от 90
+    expect(p.canReachByShow).toBe(false); // ~30 нед > 6 нед до шоу
+  });
+
+  it('при близкой сухости — цель достижима к шоу', () => {
+    const r = buildPrepCycle(base({ showDate: isoAddDays(isoToday(), 42), weightKg: 90 }));
+    const p = prepCutProjection(r.prepPlan, 90, 7); // уже почти у цели
+    expect(p.targetWeightKg).toBeCloseTo(89.0, 0);
+    expect(p.canReachByShow).toBe(true);
+  });
+
+  it('без %жира — нет цели, но есть прогноз веса на шоу', () => {
+    const r = buildPrepCycle(base({ showDate: isoAddDays(isoToday(), 14), weightKg: 80 }));
+    const p = prepCutProjection(r.prepPlan, 80);
+    expect(p.targetWeightKg).toBeNull();
+    expect(p.projectedShowWeightKg).toBeLessThan(80);
   });
 });

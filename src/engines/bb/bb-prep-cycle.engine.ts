@@ -24,6 +24,7 @@ import {
 import type { Injury } from '../manual-plan-builder';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
+  isoToday, isoDiffDays,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
   type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy,
@@ -359,4 +360,72 @@ function prepStartDateRaw(showDate: string, weeksBack: number): string {
   const [y, m, d] = showDate.split('-').map(Number);
   const dt = new Date(y, m - 1, d - 7 * weeksBack);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Прогноз сушки к дате шоу (контроль подготовки, P3.2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepCutProjection {
+  currentWeightKg: number;
+  targetBodyFatPct: number;
+  currentBodyFatPct: number | null;
+  /** Целевой вес для достижения %жира категории (null без текущего %жира). */
+  targetWeightKg: number | null;
+  /** Реалистичная потеря кг/нед по темпу плана. */
+  weeklyRateKg: number;
+  weeksToShow: number;
+  /** Недель до целевого веса при текущем темпе (null без %жира). */
+  weeksToTarget: number | null;
+  canReachByShow: boolean;
+  /** Прогнозируемый вес на день шоу при текущем темпе. */
+  projectedShowWeightKg: number | null;
+  note: string;
+}
+
+/** Прогноз сушки: до целевого %жира категории и до дня шоу (не подгоняет план). */
+export function prepCutProjection(
+  prepPlan: BBContestPrepPlan,
+  currentWeightKg: number,
+  currentBodyFatPct?: number,
+): PrepCutProjection {
+  const profile = CATEGORY_PROFILES[prepPlan.category] ?? CATEGORY_PROFILES.mens_physique;
+  const targetBf = profile.targetBodyFatPct;
+  const w = Number.isFinite(currentWeightKg) && currentWeightKg > 30 ? currentWeightKg : prepPlan.preparation.startingWeightKg || 80;
+  const ratePct = clamp(prepPlan.preparation.targetRatePctPerWeek || 0.5, 0.1, 1.5);
+  const rateKg = (ratePct / 100) * w;
+  const weeksToShow = Math.max(0, Math.round(isoDiffDays(isoToday(), prepPlan.showDate) / 7));
+
+  const hasBf = currentBodyFatPct != null && Number.isFinite(currentBodyFatPct) && currentBodyFatPct > 2;
+  let targetWeight: number | null = null;
+  let weeksToTarget: number | null = null;
+  if (hasBf) {
+    const lean = w * (1 - (currentBodyFatPct as number) / 100);
+    targetWeight = Math.max(30, Math.round((lean / (1 - targetBf / 100)) * 10) / 10);
+    weeksToTarget = rateKg > 0 ? Math.max(0, Math.round((w - targetWeight) / rateKg)) : null;
+  }
+  const canReach = weeksToTarget == null || weeksToTarget <= weeksToShow;
+  const projectedShowWeight = weeksToShow >= 0 ? Math.max(30, Math.round((w - rateKg * weeksToShow) * 10) / 10) : w;
+
+  let note: string;
+  if (!hasBf) {
+    note = 'Укажите текущий %жира, чтобы оценить целевую сухость категории и темп к шоу.';
+  } else if (weeksToTarget != null && weeksToTarget <= weeksToShow) {
+    note = `Цель ~${targetWeight} кг (${targetBf}%) достижима за ~${weeksToTarget} нед — укладываетесь в ${weeksToShow} нед до шоу. Держите темп ~${rateKg.toFixed(1)} кг/нед.`;
+  } else {
+    note = `До цели (~${targetWeight} кг) нужно ~${weeksToTarget} нед при темпе ${rateKg.toFixed(1)} кг/нед — к шоу (${weeksToShow} нед) не успеете. Увеличьте дефицит умеренно или скорректируйте цель/дату.`;
+  }
+
+  return {
+    currentWeightKg: w,
+    targetBodyFatPct: targetBf,
+    currentBodyFatPct: hasBf ? currentBodyFatPct : null,
+    targetWeightKg: targetWeight,
+    weeklyRateKg: Math.round(rateKg * 10) / 10,
+    weeksToShow,
+    weeksToTarget,
+    canReachByShow: canReach,
+    projectedShowWeightKg: projectedShowWeight,
+    note,
+  };
 }
