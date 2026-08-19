@@ -369,7 +369,7 @@ function extractRefRange(text: string): { low?: number; high?: number } {
         if (rangeMatch && rangeMatch[0] === m[0]) {
           const low = parseFloat(m[1].replace(',', '.'));
           const high = parseFloat(m[2].replace(',', '.'));
-          if (!isNaN(low) && !isNaN(high) && low < high && low > 0 && high < 100000) {
+           if (!isNaN(low) && !isNaN(high) && low < high && low >= 0 && high < 100000) {
             return { low, high };
           }
         }
@@ -377,7 +377,7 @@ function extractRefRange(text: string): { low?: number; high?: number } {
       }
       const low = parseFloat(m[1].replace(',', '.'));
       const high = parseFloat(m[2].replace(',', '.'));
-      if (!isNaN(low) && !isNaN(high) && low < high && low > 0 && high < 100000) {
+       if (!isNaN(low) && !isNaN(high) && low < high && low >= 0 && high < 100000) {
         return { low, high };
       }
     }
@@ -1038,14 +1038,19 @@ export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promi
     return parsePDF(arrayBuffer ?? file);
   }
   if (file.type.startsWith('image/') || file.name.match(/\.(png|jpg|jpeg|webp|bmp|gif)$/i)) {
-    const text = await extractTextFromImage(file);
+    const text = await ocrImageText(file);
     return parseLabText(text);
   }
   const text = await file.text();
   return parseLabText(text);
 }
 
-async function extractTextFromImage(file: File): Promise<string> {
+/**
+ * OCR an image without applying the laboratory parser. Consumers such as the
+ * nutrition diary need the original OCR layout (food rows and macro columns),
+ * not the normalized laboratory text.
+ */
+export async function ocrImageText(file: File): Promise<string> {
   let Tesseract: any;
   let workerOptions: { workerPath: string; corePath: string; langPath: string };
   const errors: string[] = [];

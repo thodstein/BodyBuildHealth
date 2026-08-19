@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseLabResults } from '../biomarker-regex-engine';
 import { parseLabText } from '../pdf-parser.engine';
 import { normalizeLabMeasurement, resolveLabMarker, normalizedRatio } from '../../core/labs-mapping';
+import { parseLabReference, parseLabText as parseProviderText } from '../../core/lab-auto-parser';
 
 describe('Russian laboratory OCR parsing', () => {
   const text = `ИНВИТРО
@@ -9,6 +10,19 @@ describe('Russian laboratory OCR parsing', () => {
 АСТ 28 Е/л 0-40
 Креатинин 92 мкмоль/л 62-106
 Гематокрит 49,2 % 40-52`;
+
+  it('parses common laboratory reference bound formats', () => {
+    expect(parseLabReference('0-41')).toMatchObject({ low: 0, high: 41 });
+    expect(parseLabReference('<41')).toMatchObject({ high: 41 });
+    expect(parseLabReference('>1.0')).toMatchObject({ low: 1 });
+    expect(parseLabReference('от 0 до 5.5')).toMatchObject({ low: 0, high: 5.5 });
+  });
+
+  it('prefers a duplicate row that contains laboratory references', () => {
+    const result = parseProviderText('Глюкоза 5,4 ммоль/л\nГлюкоза 5,4 ммоль/л 3,9-5,5');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ value: 5.4, refLow: 3.9, refHigh: 5.5 });
+  });
 
   it('parses Russian provider rows with decimal comma', () => {
     const result = parseLabText(text);
