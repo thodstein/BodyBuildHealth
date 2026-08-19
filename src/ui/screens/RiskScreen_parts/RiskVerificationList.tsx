@@ -27,7 +27,23 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
   const [copied, setCopied] = useState(false);
 
   const report = useMemo(() => buildVerificationReport(labMap || {}), [labMap]);
-  const verifiedSystems = report.systems.filter(s => s.verification >= 0.5).length;
+
+  // Верификация из движка ТЗ (risk-engine-tz-spec) — те же числа, что в карточках
+  // «Индекс риска · верифицировано анализами», чтобы вкладка и карточка совпадали.
+  // Fallback на собственный расчёт — когда результата нет (вкладка работает и без курса).
+  const engineOverall = useMemo(() => {
+    if (!result || typeof result.overallVerification !== 'number') return null;
+    return result.overallVerification;
+  }, [result]);
+  const verifById = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const o of result?.organs || []) {
+      if (typeof o.verification === 'number') m[o.id] = o.verification;
+    }
+    return m;
+  }, [result]);
+  const sysVerif = (sysId: string) => verifById[sysId] ?? report.systems.find(s => s.id === sysId)?.verification ?? 0;
+  const verifiedSystems = report.systems.filter(s => sysVerif(s.id) >= 0.5).length;
 
   const organById = useMemo(() => {
     const m: Record<string, { raw: number; after: number }> = {};
@@ -75,7 +91,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
     } catch {}
   };
 
-  const overallPct = Math.round(report.overall * 100);
+  const overallPct = Math.round((engineOverall ?? report.overall) * 100);
 
   return (
     <div style={{ padding: '4px 0 80px' }}>
@@ -118,6 +134,7 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
       {/* SYSTEMS */}
       {report.systems.map(sys => {
         const organ = organById[sys.id];
+        const verif = sysVerif(sys.id);
         return (
           <div key={sys.id} style={CARD}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -130,13 +147,13 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
                     риск {organ.raw}% → {organ.after}%
                   </span>
                 )}
-                <span style={{ fontSize: 10, fontWeight: 700, color: sys.verification >= 0.5 ? '#4ade80' : '#fbbf24' }}>
-                  {Math.round(sys.verification * 100)}% · {sys.presentCount}/{sys.total}
+                <span style={{ fontSize: 10, fontWeight: 700, color: verif >= 0.5 ? '#4ade80' : '#fbbf24' }}>
+                  {Math.round(verif * 100)}% · {sys.presentCount}/{sys.total}
                 </span>
               </div>
             </div>
             <div style={{ height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 3, marginBottom: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round(sys.verification * 100)}%`, background: sys.verification >= 0.5 ? '#4ade80' : '#fbbf24', borderRadius: 3 }} />
+              <div style={{ height: '100%', width: `${Math.round(verif * 100)}%`, background: verif >= 0.5 ? '#4ade80' : '#fbbf24', borderRadius: 3 }} />
             </div>
 
             {sys.floorHits.length > 0 && (

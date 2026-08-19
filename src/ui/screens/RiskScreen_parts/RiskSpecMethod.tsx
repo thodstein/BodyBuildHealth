@@ -246,7 +246,9 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
   if (subTab === 'analyses') {
     return (
       <div>
-        <RiskVerificationList labMap={labMap} result={result} />
+        {/* Тот же набор анализов, что у движка (снапшот калькулятора приоритетнее) — иначе
+            цифры верификации во вкладке расходятся с карточкой «верифицировано анализами» */}
+        <RiskVerificationList labMap={buildInputs?.labValues || labMap} result={result} />
       </div>
     );
   }

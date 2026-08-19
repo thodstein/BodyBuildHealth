@@ -449,9 +449,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   }, [hasLabs, currentLabs, linked.course]);
 
   // ── Механизм-ориентированная модель (ТЗ) — данные из фазы ──
-  const tzSpecResult = useMemo<TzSpecResult | null>(() => {
-    if (!hasLabs) return null;
-    // лаб. значения: code → number
+  // лаб. значения: code → number (единый источник для движка и вкладки верификации,
+  // чтобы «верифицировано анализами» в карточке и во вкладке считались от ОДНОГО набора)
+  const tzLabValues = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
     for (const l of currentLabs) {
       const c = l.code?.toUpperCase();
@@ -461,6 +461,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     if (m['EGFR'] !== undefined) m['eGFR'] = m['EGFR'];
     if (m['CREATININE'] !== undefined) m['CREAT'] = m['CREATININE'];
     if (m['BILIRUBIN'] !== undefined) m['BIL'] = m['BILIRUBIN'];
+    return m;
+  }, [currentLabs]);
+
+  const tzSpecResult = useMemo<TzSpecResult | null>(() => {
+    if (!hasLabs) return null;
+    const m = tzLabValues;
     // покрытие T4
     const t4 = ['LDL','HDL','TG','HCT','HGB','ALT','AST','GGT','ALP','BIL','BILIRUBIN','EGFR','UACR','K','NA','GLU','HBA1C','LH','FSH','TT','E2','PRL'];
     const p = t4.filter(c => m[c] !== undefined || m[c.toUpperCase()] !== undefined).length;
@@ -480,7 +486,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     let sup: string[] = [];
     try { const sr = JSON.parse(localStorage.getItem('he_support_risk')||'null'); if(sr?.subs) sup = sr.subs.map((id:string)=>id.toLowerCase()); } catch {}
     return calculateTzSpecRisk({ drugClass:dc, drugName:fd?.substanceId||'custom', dose:Math.max(50,Math.round(totalDose)), duration:dur, form:oral?'oral':'inject', combinations:Math.max(1,course.length), labCoverage:cov, labValues:m, supportSubstances:sup });
-  }, [hasLabs, currentLabs, linked.course]);
+  }, [hasLabs, tzLabValues, linked.course]);
 
   const toggleGlobalNoLabs = useCallback(() => {
     const next = !globalNoLabs;
@@ -1661,11 +1667,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         const indexEntries = Object.entries(labIndexDetails).map(([key, detail]) => ({
           key, label: detail.label, value: Math.round(detail.value * 100),
         }));
-        const verifLabMap: Record<string, number> = {};
-        for (const l of currentLabs) {
-          const c = (l.code || '').toUpperCase();
-          if (c && typeof l.value === 'number' && isFinite(l.value)) verifLabMap[c] = l.value;
-        }
+        const verifLabMap: Record<string, number> = tzLabValues;
         return (
           <div>
             <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none', alignItems: 'center' }}>
