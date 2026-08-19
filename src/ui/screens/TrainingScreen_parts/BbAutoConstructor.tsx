@@ -5251,6 +5251,35 @@ export const BbAutoConstructor: React.FC = () => {
               );
             })()}
 
+            {/* 📈 Выполнение подготовки по дневнику */}
+            {(() => {
+              try {
+                const compliance = prepTrainingCompliance(
+                  prepResult.prepPlan,
+                  prepResult.bbPlan.weeks.map((w: any) => ({
+                    week: (w as any).week,
+                    contestPhase: (w as any).contestPhase,
+                    plannedSets: (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0),
+                  })),
+                  loadSessions().map(s => ({ date: s.date, totalSets: s.totalSets })),
+                );
+                const past = compliance.weeks.filter(w => w.status !== 'upcoming');
+                if (compliance.completedWeeks === 0) return null;
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                    <div style={{ fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>📈 Выполнение подготовки: {Math.round(compliance.overallPct * 100)}% · завершено {compliance.completedWeeks} из {compliance.elapsedWeeks} нед</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                      {compliance.weeks.map((cw, i) => {
+                        const color = cw.status === 'upcoming' ? 'rgba(255,255,255,0.3)' : cw.status === 'done' ? '#4ade80' : cw.status === 'partial' ? '#fbbf24' : '#f87171';
+                        return <span key={i} title={`нед ${cw.week}: факт ${cw.actualSets}/${cw.plannedSets} сетов (${cw.dateStart}–${cw.dateEnd})`} style={{ padding: '2px 6px', borderRadius: 6, fontSize: 8, background: `${color}22`, border: `1px solid ${color}55`, color }}>н{cw.week} {cw.status === 'upcoming' ? '⏳' : `${Math.round(cw.pct * 100)}%`}</span>;
+                      })}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.65)' }}>{compliance.recommendation}</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
               <button style={{ ...BTN, flex: '1 1 140px', background: 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff' }} onClick={handleSavePrepCycle}>💾 Сохранить в профиль</button>
               <button style={{ ...BTN_GHOST, flex: '1 1 140px' }} onClick={handleOpenPrepPlan}>🗓 Открыть как план</button>
