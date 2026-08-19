@@ -63,3 +63,53 @@ export function printDayReport(html: string): void {
     // печать недоступна — игнорируем
   }
 }
+
+export interface WeekDayReportRow {
+  date: string;
+  report: DailyDietReport;
+}
+
+/** Недельная печатная сводка: строка на день + средние за неделю + общее число флагов. */
+export function buildWeekReportPrintHtml(days: WeekDayReportRow[]): string {
+  const rows = days.filter(d => d && d.report);
+  const flagCount = (r: DailyDietReport) => {
+    let n = 0;
+    if (r.giLoadWarning) n++;
+    if (r.ammoniaRisk) n++;
+    if (r.electrolyteRisk) n++;
+    if (r.insulinRicohet) n++;
+    if (r.cortisolRisk) n++;
+    if (r.homaIr !== null && r.homaIr > 2.5) n++;
+    if (!r.mtorTriggered) n++;
+    return n;
+  };
+
+  const kcalAvg = rows.length ? Math.round(rows.reduce((s, d) => s + d.report.totalKcal, 0) / rows.length) : 0;
+  const diaasAvg = rows.length ? (rows.reduce((s, d) => s + d.report.diaas, 0) / rows.length).toFixed(2) : '—';
+  const giAvg = rows.length ? Math.round(rows.reduce((s, d) => s + d.report.giLoad, 0) / rows.length) : 0;
+  const totalFlags = rows.reduce((s, d) => s + flagCount(d.report), 0);
+  const defTotal = rows.reduce((s, d) => s + d.report.microDeficits.length, 0);
+
+  const dayRows = rows.map(d => {
+    const r = d.report;
+    const flags = flagCount(r);
+    const color = flags === 0 ? '#22c55e' : flags <= 2 ? '#f59e0b' : '#ef4444';
+    return `<tr>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px">${esc(d.date)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px">${Math.round(r.totalKcal)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px">${r.diaas.toFixed(2)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px">${Math.round(r.giLoad)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px">${r.microDeficits.length}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;color:${color};font-weight:700">${flags}</td>
+    </tr>`;
+  }).join('');
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Недельный отчёт питания</title>
+<style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:18px;border-bottom:2px solid #8b5cf6;padding-bottom:8px}table{border-collapse:collapse;width:100%;margin-top:12px}th{font-size:11px;text-align:left}</style></head>
+<body>
+<h1>📅 Недельный отчёт питания</h1>
+<div style="font-size:13px;margin:10px 0">Дней: <b>${rows.length}</b> · Средние: <b>${kcalAvg}</b> ккал/день, DIAAS <b>${diaasAvg}</b>, GL <b>${giAvg}</b> · Всего флагов: <b>${totalFlags}</b> · Микро-дефицитов (сумма): <b>${defTotal}</b></div>
+${rows.length === 0 ? '<p style="font-size:12px;color:#888">Нет данных за неделю.</p>' : `<table><tr><th>Дата</th><th>Ккал</th><th>DIAAS</th><th>GL</th><th>Дефициты</th><th>Флаги</th></tr>${dayRows}</table>`}
+</body></html>`;
+}
+
