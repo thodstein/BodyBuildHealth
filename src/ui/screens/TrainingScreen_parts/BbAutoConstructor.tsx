@@ -5290,6 +5290,23 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>MRV-капы и целевой объём рассчитаны с учётом уровня, стажа, PED, восстановления, питания и лаборатории.</div>
             </div>
 
+            {/* 📉 План объёма подготовки (каскад) — долгий режим, а не только тапер */}
+            {prepResult.volumePlan && (
+              <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>📉 Объём подготовки (каскад на весь цикл, не только тапер)</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                  {prepResult.volumePlan.phases.map((ph, i) => (
+                    <span key={i} style={{ padding: '3px 8px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#93c5fd' }}>
+                      нед {Math.max(1, Math.ceil(ph.fromPct * prepResult.prepWeeks))}–{Math.min(prepResult.prepWeeks, Math.ceil(ph.toPct * prepResult.prepWeeks))} · ×{ph.volumeMult.toFixed(2)} · RIR {ph.rir[0]}-{ph.rir[1]}
+                    </span>
+                  ))}
+                  <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24' }}>→ тапер ×0.6 → пик</span>
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.6)' }}>{prepResult.volumePlan.note}</div>
+                <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Объём снижается по фазам подготовки; вес (интенсивность) сохраняется, RIR плавно растёт. Тапер — финальный спуск к пику.</div>
+              </div>
+            )}
+
             {/* 📉 Прогноз сушки к шоу */}
             {(() => {
               const proj = prepCutProjection(prepResult.prepPlan, profileWeight, prepBodyFat);

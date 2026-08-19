@@ -111,6 +111,7 @@ export interface PrepCycleResult {
   prepWeeks: number;
   taperWeeks: number;
   phases: BBContestPrepPlan['phases'];
+  volumePlan: PrepVolumePlan;
   warnings: string[];
   rationale: string[];
 }
@@ -323,12 +324,17 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     source: 'bb_auto',
   });
 
-  const bbPlanPrep = applyContestPrepToBBPlan(bbPlan, prepCfg, {
+  // Тренировочная подготовка: спланированный каскад объёма на ВЕСЬ цикл (не только тапер).
+  // applyContestPrepToBBPlan ставит подготовку на плоский объём (prepVolumeMult=1.0),
+  // затем applyPrepVolumeCascade накладывает фазовый спуск × атлет-множители (PED/стаж/
+  // уровень/восстановление) + дефицит-мод по категории. Тапер ×0.6 остаётся финальным спуском.
+  const volumePlan = prepVolumePlan(cfg, prepWeeks);
+  const bbPlanPrep = applyPrepVolumeCascade(
+    applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+    cfg,
     prepWeeks,
-    taperWeeks,
-    prepVolumeMult: cfg.prepVolumeMult,
-    force: true,
-  });
+    volumePlan,
+  );
 
   const warnings = [...v.warnings];
   if (prepWeeks < 4) {
@@ -346,13 +352,196 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     prepWeeks,
     taperWeeks,
     phases: prepPlan.phases,
+    volumePlan,
     warnings,
     rationale: [
       `🏁 Prep-цикл: категория ${CATEGORY_PROFILES[cfg.category].label} (${cfg.sex}), ${totalWeeks} нед (подготовка ${prepWeeks} + тапер ${taperWeeks} + пик-неделя), шоу ${cfg.showDate}.`,
       `⭐ Акцент: ${accent.length ? accent.join(', ') : 'без акцента'} · минимальная нагрузка: ${minimal.length ? minimal.join(', ') : 'не задана'} (${PREP_MINIMAL_MODE_LABELS[mode]}).`,
       `📐 Сплит: ${patternId} · тренировочный фокус: ${profile.trainingFocus}.`,
+      `📉 Объём подготовки (каскад): ${volumePlan.phases.map(p => `×${p.volumeMult.toFixed(2)} [нед ${Math.max(1, Math.ceil(p.fromPct * prepWeeks))}–${Math.min(prepWeeks, Math.ceil(p.toPct * prepWeeks))}]`).join(' → ')} · ${volumePlan.note}.`,
     ],
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// План объёма тренировок подготовки (В1+В2): каскад + дефицит-мод + атлет-множители.
+// Это «долгий режим»: объём планомерно снижается по prep-неделям (а не только
+// финальный тапер). Интенсивность (вес) сохраняется, RIR плавно растёт.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepVolumePhase {
+  /** Доля prep-блока (0..1). */
+  fromPct: number;
+  toPct: number;
+  /** Множитель объёма (сетов) подфазы (уже с учётом дефицит/атлет/восстановление). */
+  volumeMult: number;
+  rir: [number, number];
+}
+
+export interface PrepVolumePlan {
+  phases: PrepVolumePhase[];
+  /** Множитель дефицита по категории/%жира. */
+  deficitMult: number;
+  /** Множитель атлета (PED/стаж/уровень). */
+  athleteMult: number;
+  /** Множитель восстановления (HRV/сон/стресс). */
+  recoveryMult: number;
+  note: string;
+}
+
+/** Дефицит-мод по категории и текущему %жира (В2): чем суше/дальше — тем меньше объём. */
+export function prepDeficitMult(cfg: Pick<PrepCycleConfig, 'category' | 'bodyFatPct'>): number {
+  const profile = CATEGORY_PROFILES[cfg.category];
+  if (!profile) return 0.93;
+  const gap = cfg.bodyFatPct != null && profile.targetBodyFatPct != null ? cfg.bodyFatPct - profile.targetBodyFatPct : 0;
+  if (profile.light) return 0.98;                       // bikini/wellness — мягкая сушка
+  if (cfg.bodyFatPct == null) return 0.93;              // не знаем %жира — умеренно
+  if (gap <= 2) return 0.96;                            // близко к цели
+  if (gap <= 5) return 0.92;                            // средний дефицит
+  return 0.87;                                          // агрессивный дефицит
+}
+
+/** Множитель атлета (PED/стаж/уровень): кто восстанавливается лучше — держит больше объёма. */
+export function prepAthleteMult(cfg: Pick<PrepCycleConfig, 'enhanced' | 'trainingYears' | 'level'>): number {
+  let m = 1.0;
+  const years = Number.isFinite(cfg.trainingYears) ? (cfg.trainingYears as number) : 0;
+  if (cfg.enhanced) m *= 1.12;                          // курс — больше объёма под дефицитом
+  if (cfg.level === 'enhanced' || cfg.level === 'advanced' || years >= 5) m *= 1.06;
+  if (cfg.level === 'beginner' || years < 2) m *= 0.9;  // новичок — консервативнее
+  return clamp(m, 0.8, 1.3);
+}
+
+/** Множитель восстановления (низкая готовность → меньше объёма подготовки). */
+export function prepRecoveryMult(cfg: Pick<PrepCycleConfig, 'hrvMs' | 'sleepHours' | 'stressLevel' | 'bodyFat'>): number {
+  let m = 1.0;
+  if (cfg.hrvMs != null && cfg.hrvMs < 50) m *= 0.96;
+  if (cfg.sleepHours != null && cfg.sleepHours < 6) m *= 0.96;
+  if (cfg.stressLevel != null && cfg.stressLevel >= 7) m *= 0.96;
+  if (cfg.bodyFat != null && cfg.bodyFat > 25) m *= 0.97;
+  return clamp(m, 0.85, 1.1);
+}
+
+/** План объёма подготовки (каскад × дефицит × атлет × восстановление). */
+export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVolumePlan {
+  const deficitMult = prepDeficitMult(cfg);
+  const athleteMult = prepAthleteMult(cfg);
+  const recoveryMult = prepRecoveryMult(cfg);
+  const global = clamp(deficitMult * athleteMult * recoveryMult, 0.75, 1.15);
+  const base: Array<Omit<PrepVolumePhase, 'volumeMult'> & { base: number }> = [
+    { fromPct: 0, toPct: 0.4, base: 1.0, rir: [1, 2] },      // начало — поддерживающий
+    { fromPct: 0.4, toPct: 0.8, base: 0.88, rir: [2, 2] },   // середина — умеренный
+    { fromPct: 0.8, toPct: 1.0, base: 0.76, rir: [2, 3] },   // финал подготовки — снижен
+  ];
+  const phases: PrepVolumePhase[] = base.map(p => ({
+    fromPct: p.fromPct,
+    toPct: p.toPct,
+    volumeMult: clamp(p.base * global, 0.6, 1.0),
+    rir: p.rir,
+  }));
+  const note = `дефицит ×${deficitMult.toFixed(2)} · атлет (PED/стаж) ×${athleteMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)} (всего ×${global.toFixed(2)})`;
+  return { phases, deficitMult, athleteMult, recoveryMult, note };
+}
+
+/** Подфаза плана для недели (1-index) prep-блока. */
+export function prepVolumePhaseForWeek(plan: PrepVolumePlan, week: number, prepWeeks: number): PrepVolumePhase | null {
+  if (prepWeeks <= 0) return null;
+  const pct = (week - 0.5) / prepWeeks;
+  return plan.phases.find(p => pct >= p.fromPct && pct < p.toPct)
+    ?? plan.phases[plan.phases.length - 1]
+    ?? null;
+}
+
+/** Наложить каскад объёма подготовки на готовый план (prep + final_preparation недели),
+ *  затем нормализовать тапер-недели, чтобы объём монотонно нисходил к пик-неделе
+ *  (base buildBBPlan сам рамп-апит финальные недели — иначе тапер был бы выше prep-финала). */
+export function applyPrepVolumeCascade(
+  plan: BBPlanWithPrep,
+  cfg: PrepCycleConfig,
+  prepWeeks: number,
+  volumePlan?: PrepVolumePlan,
+): BBPlanWithPrep {
+  if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
+  const vp = volumePlan ?? prepVolumePlan(cfg, prepWeeks);
+  const weeks: any[] = (plan.weeks as any[]).map((wk, idx) => {
+    const phaseKey = wk.contestPhase;
+    if (phaseKey !== 'preparation' && phaseKey !== 'final_preparation') return wk;
+    const pv = prepVolumePhaseForWeek(vp, idx + 1, prepWeeks);
+    if (!pv) return wk;
+    const mult = pv.volumeMult;
+    const rir = pv.rir;
+    const sessions = (wk.sessions || []).map((s: any) => ({
+      ...s,
+      exercises: (s.exercises || []).map((e: any) => {
+        const baseSets = (e as any)._baseSets ?? e.sets ?? 0;
+        const newSets = Math.max(2, Math.round(baseSets * mult));
+        const source = e.workSets || [];
+        const workSets = source.slice(0, newSets).map((ws: any) => ({ ...ws, rir }));
+        return {
+          ...e,
+          sets: newSets,
+          rir: clamp(rir[0], 1, 4),
+          workSets: newSets >= workSets.length ? workSets : workSets.slice(0, newSets),
+          comment: `${e.comment || ''} 📉 Подготовка: объём ×${Math.round(mult * 100)}% (фаза), RIR ${rir[0]}-${rir[1]}, вес сохраняется.`,
+        };
+      }),
+    }));
+    return {
+      ...wk,
+      sessions,
+      prepProtocol: `Подготовка (нед ${idx + 1}/${prepWeeks}): объём ×${Math.round(mult * 100)}%, RIR ${rir[0]}-${rir[1]}, вес сохраняется.`,
+    };
+  });
+
+  // Нормализация тапера: якорь = средний объём финала подготовки × нисходящий фактор,
+  // чтобы тапер гарантированно был ниже prep-финала (монотонная кривая к пику).
+  const prepWk = weeks.filter((w: any) => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation');
+  const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+  if (prepWk.length > 0) {
+    const lateCount = Math.max(1, Math.floor(prepWk.length * 0.2));
+    const lateAvg = prepWk.slice(-lateCount).reduce((a, w) => a + setsOf(w), 0) / lateCount;
+    const taperIdx = weeks.map((w, i) => [w, i] as const).filter(([w]) => w.contestPhase === 'taper').map(([, i]) => i);
+    const n = taperIdx.length;
+    taperIdx.forEach((idx, k) => {
+      // последняя тапер-неделя (перед пиком) — самая низкая
+      const factor = clamp(0.92 - 0.1 * (n - 1 - k), 0.55, 1.0);
+      weeks[idx] = scaleWeekToTarget(weeks[idx], lateAvg * factor);
+    });
+  }
+
+  return { ...plan, weeks } as BBPlanWithPrep;
+}
+
+/** Пропорционально привести суммарные сеты недели к целевому значению (мин 2 сета/упражнение),
+ *  при нехватке — отбрасывая хвостовые accessory-упражнения (тапер/подготовка снижают плотность). */
+function scaleWeekToTarget(week: any, target: number): any {
+  const sessions: any[] = (week.sessions || []).map((s: any) => ({ ...s, exercises: (s.exercises || []).map((e: any) => ({ ...e })) }));
+  let total = sessions.reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+  if (total <= 0 || target <= 0) return week;
+  // 1) пропорционально снизить сеты (мин 2)
+  const ratio = target / total;
+  for (const s of sessions) {
+    s.exercises = (s.exercises || []).map((e: any) => {
+      const sets = Math.max(2, Math.round((e.sets || 0) * ratio));
+      return { ...e, sets, workSets: (e.workSets || []).slice(0, sets), comment: `${e.comment || ''} 📉 Тапер (по подготовке): объём ~${Math.round(ratio * 100)}%.` };
+    });
+  }
+  total = sessions.reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+  // 2) если всё ещё выше цели — отбрасываем accessory с конца, пока не влезет
+  let guard = 0;
+  while (total > target && guard < 400) {
+    guard++;
+    let dropSi = -1, dropEi = -1;
+    for (let si = sessions.length - 1; si >= 0 && dropSi < 0; si--) {
+      const exs = sessions[si].exercises || [];
+      for (let ei = exs.length - 1; ei >= 0; ei--) {
+        if (exs[ei].role === 'accessory') { dropSi = si; dropEi = ei; break; }
+      }
+    }
+    if (dropSi < 0 || dropEi < 0) break;
+    total -= sessions[dropSi].exercises[dropEi].sets || 0;
+    sessions[dropSi].exercises.splice(dropEi, 1);
+  }
+  return { ...week, sessions };
 }
 
 /** Дата старта подготовки (ISO) от showDate минус N недель. */

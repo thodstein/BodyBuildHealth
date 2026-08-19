@@ -6,6 +6,7 @@ import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
   accentToContestSpec, prepCutProjection, buildPrepSeason, posingPlanForCategory,
   savePosingCheckin, getPosingCheckins, posingWeekStats,
+  prepVolumePlan, prepDeficitMult, prepAthleteMult, prepRecoveryMult, prepVolumePhaseForWeek,
   type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
 import { DEFAULT_WORKMAX } from '../bb-builder.engine';
@@ -340,5 +341,45 @@ describe('bb-prep-cycle: позирование к шоу (P3.1)', () => {
     expect(s.days).toBe(2);
     expect(s.totalMin).toBe(50);
     expect(s.avgMin).toBe(25);
+  });
+});
+
+describe('bb-prep-cycle: план объёма подготовки (В1+В2, а не только тапер)', () => {
+  it('каскад объёма подготовки нисходящий, дефицит-мод по категории', () => {
+    const light = prepVolumePlan(base({ category: 'bikini', sex: 'female', weightKg: 60 }), 8);
+    const heavy = prepVolumePlan(base({ category: 'mens_bb', weightKg: 100, bodyFatPct: 18 }), 8);
+    // фазы нисходят
+    expect(light.phases[0].volumeMult).toBeGreaterThan(light.phases[1].volumeMult);
+    expect(light.phases[1].volumeMult).toBeGreaterThanOrEqual(light.phases[2].volumeMult);
+    // лёгкая сушка сохраняет больше объёма, чем агрессивная
+    expect(prepDeficitMult(base({ category: 'bikini', sex: 'female' }))).toBeGreaterThan(prepDeficitMult(base({ category: 'mens_bb', bodyFatPct: 18 })));
+  });
+
+  it('атлет-множители: курс/стаж держат больше объёма, новичок меньше', () => {
+    expect(prepAthleteMult(base({ enhanced: true, trainingYears: 5 }))).toBeGreaterThan(prepAthleteMult(base({ enhanced: false, trainingYears: 5 })));
+    expect(prepAthleteMult(base({ level: 'beginner', trainingYears: 1 }))).toBeLessThan(prepAthleteMult(base({ level: 'intermediate', trainingYears: 4 })));
+    expect(prepRecoveryMult(base({ hrvMs: 40, sleepHours: 5, stressLevel: 8 }))).toBeLessThan(prepRecoveryMult(base({})));
+  });
+
+  it('фаза недели prep-блока соответствует позиции', () => {
+    const vp = prepVolumePlan(base(), 8);
+    expect(prepVolumePhaseForWeek(vp, 1, 8)?.volumeMult).toBe(vp.phases[0].volumeMult);
+    expect(prepVolumePhaseForWeek(vp, 8, 8)?.volumeMult).toBe(vp.phases[vp.phases.length - 1].volumeMult);
+  });
+
+  it('объём подготовки в плане реально нисходит от начала к таперу', () => {
+    const r = buildPrepCycle(base({ weeks: 12, taperWeeks: 3 })); // prep 8
+    const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    const weeks = r.bbPlan.weeks as any[];
+    const prep = weeks.filter((w: any) => w.contestPhase === 'preparation');
+    expect(prep.length).toBeGreaterThanOrEqual(4);
+    const avg = (arr: any[]) => arr.reduce((a, w) => a + setsOf(w), 0) / arr.length;
+    const early = avg(prep.slice(0, Math.floor(prep.length / 2)));
+    const late = avg(prep.slice(Math.floor(prep.length / 2)));
+    // начало подготовки заметно объёмнее финала подготовки
+    expect(early).toBeGreaterThan(late);
+    // тапер ниже среднего финала подготовки
+    const taper = weeks.find((w: any) => w.contestPhase === 'taper');
+    expect(taper && setsOf(taper)).toBeLessThan(late);
   });
 });
