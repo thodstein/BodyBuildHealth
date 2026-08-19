@@ -218,3 +218,22 @@ describe('bb-prep-cycle: минимальная нагрузка реально 
     if (val) expect(val.valid).not.toBe(false);
   });
 });
+
+describe('bb-prep-cycle: несколько соревнований', () => {
+  it('дата главного старта (A) якорит пик-неделю вместо showDate', () => {
+    const r = buildPrepCycle(base({
+      showDate: '2027-03-01',
+      competitions: [
+        { id: 'c1', name: 'Контрольный', date: '2027-04-01', priority: 'B' },
+        { id: 'c2', name: 'Главный', date: '2027-06-01', priority: 'A' },
+      ],
+      mainCompetitionId: 'c2',
+    }));
+    expect(r.prepPlan.showDate).toBe('2027-06-01');
+    const show = r.prepPlan.phases.find(p => p.key === 'show_day');
+    expect(show?.dateStart).toBe('2027-06-01');
+    // тапер/пик отсчитываются от главного старта
+    const peak = r.prepPlan.phases.find(p => p.key === 'peak_week');
+    expect(peak?.weekStart).toBe(r.prepWeeks + r.taperWeeks + 1);
+  });
+});

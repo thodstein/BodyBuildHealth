@@ -82,7 +82,7 @@ import {
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
-  type PrepPhaseKey,
+  type PrepPhaseKey, type ContestEventEntry,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildPrepCycle, recommendMinimalMode, type PrepCycleConfig, type PrepCycleResult } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
@@ -349,6 +349,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepBodyFat, setPrepBodyFat] = useState<number | undefined>(undefined);
   const [prepResult, setPrepResult] = useState<PrepCycleResult | null>(null);
   const [pcBusy, setPcBusy] = useState<boolean>(false);
+  const [prepComps, setPrepComps] = useState<ContestEventEntry[]>([]);
+  const [prepMainId, setPrepMainId] = useState<string>('');
+  const [prepCompDraft, setPrepCompDraft] = useState<{ name: string; date: string; priority: 'A' | 'B' | 'C' }>({ name: '', date: '', priority: 'B' });
   // При смене категории — пресет акцента/минимума/сплита (если пользователь не настроил вручную).
   useEffect(() => {
     const p = PREP_SPLIT_PROFILES[prepCat];
@@ -365,9 +368,10 @@ export const BbAutoConstructor: React.FC = () => {
       localStorage.setItem('he_prep_cycle_v1', JSON.stringify({
         cat: prepCat, weeks: pcWeeks, taper: prepTaper, showDate: pcShowDate,
         accent: prepAccent, minimal: prepMinimal, minMode: prepMinMode, split: prepSplit, bodyFat: prepBodyFat ?? null,
+        comps: prepComps, mainId: prepMainId,
       }));
     } catch { /* silent */ }
-  }, [prepMode, prepCat, pcWeeks, prepTaper, pcShowDate, prepAccent, prepMinimal, prepMinMode, prepSplit, prepBodyFat]);
+  }, [prepMode, prepCat, pcWeeks, prepTaper, pcShowDate, prepAccent, prepMinimal, prepMinMode, prepSplit, prepBodyFat, prepComps, prepMainId]);
 
   // п.18: карточка «📍 Текущий блок года» — живой план + слушатель обновлений.
   const [annualPlan, setAnnualPlan] = useState(() => loadAnnualTrainingPlan());
@@ -4912,6 +4916,8 @@ export const BbAutoConstructor: React.FC = () => {
     weeks: pcWeeks,
     taperWeeks: prepTaper,
     showDate: pcShowDate,
+    competitions: prepComps.length ? prepComps : undefined,
+    mainCompetitionId: prepMainId || undefined,
     level: bbLevel,
     trainingYears: bbTrainingYears,
     equipment: bbEquipment,
@@ -4937,12 +4943,37 @@ export const BbAutoConstructor: React.FC = () => {
     try {
       const res = buildPrepCycle(buildPrepCycleCfg());
       setPrepResult(res);
+      // Синхронизируем общий prep-контекст (печать/.ics/JSON/адаптация по весу работают на prepPlan).
+      setPrepPlan(res.prepPlan);
+      setPrepShowDate(res.prepPlan.showDate);
+      setPrepWeeks(res.prepPlan.preparation.weeks);
+      setPrepTaperWeeks(res.prepPlan.taper.weeks);
+      setPeakWeekCategory(res.prepPlan.category);
+      setPrepWaterMode(res.prepPlan.peakWeek.waterMode);
+      setPrepSodiumMode(res.prepPlan.peakWeek.sodiumMode);
+      setPrepCarbMode(res.prepPlan.peakWeek.carbMode);
+      setBuiltPlan(res.bbPlan);
+      setPrepApplied(true);
       setPrepStep('result');
     } catch (e) {
       flash(`⚠ ${(e as Error)?.message ?? 'Не удалось собрать prep-цикл'}`);
     }
     setPcBusy(false);
   };
+
+  // ⚠ Stale-механика: параметры изменились после сборки → результат устарел.
+  const prepStale = useMemo(() => {
+    if (!prepResult) return false;
+    const cfg = prepResult.config;
+    return cfg.weeks !== pcWeeks
+      || cfg.taperWeeks !== prepTaper
+      || cfg.showDate !== pcShowDate
+      || cfg.category !== prepCat
+      || JSON.stringify(cfg.accentMuscles) !== JSON.stringify(prepAccent)
+      || JSON.stringify(cfg.minimalMuscles) !== JSON.stringify(prepMinimal)
+      || cfg.minimalMode !== prepMinMode
+      || cfg.splitPatternId !== (prepSplit || undefined);
+  }, [prepResult, pcWeeks, prepTaper, pcShowDate, prepCat, prepAccent, prepMinimal, prepMinMode, prepSplit]);
 
   const handleSavePrepCycle = () => {
     if (!prepResult) return;
@@ -5024,6 +5055,33 @@ export const BbAutoConstructor: React.FC = () => {
             <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Дата соревнования (якорь фаз и тапера)</label>
             <input type="date" value={pcShowDate} onChange={e => e.target.value && setPcShowDate(e.target.value)} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
 
+            {/* Доп. соревнования сезона (A/B/C) — пик-неделя строится под главный */}
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Доп. старты сезона (необязательно):</div>
+            {prepComps.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <span style={{ fontWeight: 700, color: c.priority === 'A' ? '#fbbf24' : c.priority === 'B' ? '#60a5fa' : 'rgba(255,255,255,0.6)' }}>[{c.priority}]</span>
+                <span style={{ flex: 1 }}>{c.name}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)' }}>{c.date}</span>
+                <button onClick={() => setPrepMainId(c.id)} style={{ ...chipBtn('', prepMainId === c.id), padding: '2px 6px', minHeight: 24, fontSize: 9 }}>★ главный</button>
+                <button onClick={() => { setPrepComps(prev => prev.filter(x => x.id !== c.id)); if (prepMainId === c.id) setPrepMainId(''); }} style={{ ...chipBtn('', false), padding: '2px 6px', minHeight: 24, fontSize: 9, color: '#f87171' }}>✕</button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input value={prepCompDraft.name} placeholder="Название" onChange={e => setPrepCompDraft(d => ({ ...d, name: e.target.value }))} style={{ flex: 1, minWidth: 90, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }} />
+              <input type="date" value={prepCompDraft.date} onChange={e => setPrepCompDraft(d => ({ ...d, date: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }} />
+              <select value={prepCompDraft.priority} onChange={e => setPrepCompDraft(d => ({ ...d, priority: e.target.value as 'A' | 'B' | 'C' }))} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10 }}>
+                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+              </select>
+              <button onClick={() => {
+                const name = prepCompDraft.name.trim();
+                const date = prepCompDraft.date;
+                if (!name || !date) { flash('Укажите название и дату старта'); return; }
+                setPrepComps(prev => [...prev, { id: `comp_${Date.now().toString(36)}`, name, date, priority: prepCompDraft.priority }]);
+                setPrepCompDraft({ name: '', date: '', priority: 'B' });
+                setPrepResult(null);
+              }} style={BTN_GHOST}>➕ Добавить</button>
+            </div>
+
             <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Текущий % жира (для оценки готовности; необязательно)</label>
             <input type="number" min={3} max={60} value={prepBodyFat ?? ''} onChange={e => setPrepBodyFat(e.target.value ? Number(e.target.value) : undefined)} placeholder="напр. 14" style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
 
@@ -5095,6 +5153,7 @@ export const BbAutoConstructor: React.FC = () => {
         {prepStep === 'nutrition' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 800 }}>🍽 Prep-питание и тапер</div>
+            {prepStale && <div style={{ fontSize: 10, color: '#f87171', padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>⚠ Параметры изменены после сборки — результат будет пересобран.</div>}
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
               Prep-цикл строит единый план подготовки (дефицит по категории), тапер последних {prepTaper} нед и пик-неделю под дату {pcShowDate}.
               Он будет применён в планировщике питания автоматически (вкладка «🏁 Тапер ББ» и дневные цели).
@@ -5110,6 +5169,11 @@ export const BbAutoConstructor: React.FC = () => {
         {prepStep === 'result' && prepResult && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 800 }}>📋 Готово — Prep-цикл</div>
+            {prepStale && (
+              <div style={{ fontSize: 10, color: '#f87171', padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                ⚠ Параметры изменены после сборки — результат устарел. Вернитесь и нажмите «🏁 Собрать prep-цикл» заново.
+              </div>
+            )}
             {prepResult.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#fbbf24', padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>{w}</div>)}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -5132,19 +5196,52 @@ export const BbAutoConstructor: React.FC = () => {
               <div>🗓 Шоу: {prepResult.prepPlan.showDate} · недель в плане: {prepResult.bbPlan.weeks.length}</div>
             </div>
 
-            <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2 }}>По неделям:</div>
+            <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2 }}>По неделям (фаза · дата):</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {prepResult.bbPlan.weeks.map((w: any, i) => {
                 const phaseKey = (w.contestPhase ?? 'preparation') as PrepPhaseKey;
                 const ph = PREP_PHASE_LABELS[phaseKey] || String(w.contestPhase);
                 const color = PREP_PHASE_COLORS[phaseKey] || '#888';
-                return <span key={i} title={`нед ${w.week}`} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, background: `${color}18`, border: `1px solid ${color}44`, color }}>н{w.week} {ph}</span>;
+                const phase = prepResult.prepPlan.phases.find(p => (w.week ?? 0) >= p.weekStart && (w.week ?? 0) <= p.weekEnd);
+                const dStr = phase?.dateEnd ? isoAddDays(phase.dateEnd, -7 * (phase.weekEnd - (w.week ?? 0))).slice(5) : '';
+                return <span key={i} title={`нед ${w.week}`} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, background: `${color}18`, border: `1px solid ${color}44`, color }}>н{w.week} {ph}{dStr ? ` ${dStr}` : ''}</span>;
               })}
             </div>
 
+            {/* ⚖️ Адаптация по весу */}
+            {weightAdvice && weightAdvice.status !== 'no_data' && (
+              <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>⚖️ Адаптация по весу: {weightAdvice.status}</div>
+                <div style={{ color: 'rgba(255,255,255,0.8)' }}>{weightAdvice.recommendation}</div>
+                {weightAdvice.adjustCalories !== 0 && <button style={{ ...BTN_GHOST, marginTop: 6, marginRight: 6 }} onClick={() => handleApplyWeightAdjustment(weightAdvice.adjustCalories, 0)}>{weightAdvice.adjustCalories > 0 ? '+' : ''}{weightAdvice.adjustCalories} ккал</button>}
+                {weightAdvice.adjustCardioMin !== 0 && <button style={{ ...BTN_GHOST, marginTop: 6 }} onClick={() => handleApplyWeightAdjustment(0, weightAdvice.adjustCardioMin)}>{weightAdvice.adjustCardioMin > 0 ? '+' : ''}{weightAdvice.adjustCardioMin} мин кардио/нед</button>}
+              </div>
+            )}
+
+            {/* Что учтено в объёме */}
+            <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontWeight: 800, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>🧮 Что учтено в объёме</div>
+              <div style={{ color: 'rgba(255,255,255,0.6)' }}>
+                Цель: {prepResult.config.enhanced ? 'поддержание массы (PED)' : prepResult.config.experienceLevel} · стаж {prepResult.config.trainingYears ?? '—'} г · {prepResult.config.enhanced ? 'курс' : 'натурал'}
+                {prepResult.config.bodyFat != null ? ` · %жира ${prepResult.config.bodyFat}` : ''}
+                {prepResult.config.hrvMs != null ? ` · HRV ${prepResult.config.hrvMs}` : ''}
+                {prepResult.config.sleepHours != null ? ` · сон ${prepResult.config.sleepHours}ч` : ''}
+                {prepResult.config.stressLevel != null ? ` · стресс ${prepResult.config.stressLevel}` : ''}
+                {prepResult.config.labMrvMultiplier != null ? ` · лаб ×${prepResult.config.labMrvMultiplier}` : ''}
+                {prepResult.config.pedDoses ? ' · дозы PED' : ''}
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>MRV-капы и целевой объём рассчитаны с учётом уровня, стажа, PED, восстановления, питания и лаборатории.</div>
+            </div>
+
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
-              <button style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff' }} onClick={handleSavePrepCycle}>💾 Сохранить в профиль</button>
-              <button style={{ ...BTN_GHOST, flex: 1 }} onClick={handleOpenPrepPlan}>🗓 Открыть как план</button>
+              <button style={{ ...BTN, flex: '1 1 140px', background: 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff' }} onClick={handleSavePrepCycle}>💾 Сохранить в профиль</button>
+              <button style={{ ...BTN_GHOST, flex: '1 1 140px' }} onClick={handleOpenPrepPlan}>🗓 Открыть как план</button>
+              <button style={{ ...BTN_GHOST, flex: '1 1 140px', borderColor: '#22c55e', color: '#22c55e' }} onClick={() => handleSaveVariant()}>💾 Вариант</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <button style={BTN_GHOST} onClick={handlePrintPrepSummary}>🖨 Сводка prep (PDF)</button>
+              <button style={BTN_GHOST} onClick={handleExportPrepIcs}>📅 Фазы (.ics)</button>
+              <button style={BTN_GHOST} onClick={handleExportPrepJson}>📥 JSON тренеру</button>
             </div>
             <button style={{ ...BTN_GHOST, width: '100%' }} onClick={() => setPrepStep('params')}>← Редактировать параметры</button>
           </div>
