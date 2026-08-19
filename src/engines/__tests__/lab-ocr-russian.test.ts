@@ -292,6 +292,11 @@ MPV 10,5 фл 7-12`);
     expect(ft4?.refHigh).toBe(19);
   });
 
+  it('normalizes fractional hematocrit and alternate hormone units', () => {
+    expect(normalizeLabMeasurement('HCT', 0.45, '%').value).toBe(45);
+    expect(normalizeLabMeasurement('TT', 18, 'нмоль/л').value).toBe(519.1);
+  });
+
   it('keeps parsing after a corrupted/empty line', () => {
     const result = parseLabText('АЛТ 35 Е/л 0-41\n\nКреатинин 92 мкмоль/л 62-106\n   \nГлюкоза 5,4 ммоль/л 3,9-5,5');
     expect(result.values.map(v => v.code)).toEqual(expect.arrayContaining(['ALT', 'CREAT', 'GLU']));

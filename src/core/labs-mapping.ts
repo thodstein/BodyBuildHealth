@@ -165,9 +165,14 @@ function unitKey(unit: string): string {
     .replace(/д/g, 'd')
     .replace(/ё/g, 'е')
     .replace(/[\s.]/g, '')
-    .replace(/литр|л(?![a-z])/g, 'l')
     .replace(/мкмоль/g, 'umol')
     .replace(/пмоль/g, 'pmol')
+    .replace(/ммоль\/моль/g, 'mmol/mol')
+    .replace(/нмоль/g, 'nmol')
+    .replace(/ммоль/g, 'mmol')
+    .replace(/мкме/g, 'uiu')
+    .replace(/мке?д/g, 'uiu')
+    .replace(/ме\/л/g, 'miu/l')
     .replace(/мкед/g, 'miu')
     .replace(/мед/g, 'miu')
     .replace(/мме?д/g, 'miu')
@@ -177,6 +182,7 @@ function unitKey(unit: string): string {
     .replace(/пг/g, 'pg')
     .replace(/мкг/g, 'ug')
     .replace(/мл/g, 'ml')
+    .replace(/литр|л(?![a-z])/g, 'l')
     .replace(/ед/g, 'u')
     .replace(/г/g, 'g');
 }
@@ -190,6 +196,13 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
   const target = unitKey(info.prefUnit);
   let factor = 1;
 
+  // Some Russian reports print hematocrit as a fraction (0.45) while the
+  // canonical profile stores percent (45%). This conversion is only applied
+  // when the source is explicitly fractional or unitless.
+  if (canonical === 'HCT' && value >= 0 && value <= 1 && (!from || from === 'fraction' || from === '%')) {
+    return { value: round(value * 100), unit: info.prefUnit };
+  }
+
   if (from && from === target) return { value: round(value), unit: info.prefUnit };
   switch (canonical) {
     case 'CREATININE': if (from.includes('mg/dl')) factor = 88.42; break;
@@ -199,9 +212,15 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
     case 'BIL': case 'DBIL': if (from.includes('mg/dl')) factor = 17.104; break;
     case 'E2': if (from.includes('pmol') || /пмоль|pmol/i.test(unit)) factor = 1 / 3.671; break;
     case 'PRL': if (from.includes('miu') || from.includes('uiu')) factor = 1 / 21.2; break;
-    case 'TT': if (from.includes('nmol')) factor = 28.84; break;
-    case 'FT': if (from.includes('pmol')) factor = 1 / 10; break;
+    case 'TT':
+      if (from.includes('nmol')) factor = 28.84;
+      else if (from.includes('ng/ml')) factor = 100;
+      break;
+    case 'FT':
+      if (from.includes('pmol') || from.includes('nmol')) factor = 1 / 10;
+      break;
     case 'VITD': if (from.includes('nmol')) factor = 1 / 2.496; break;
+    case 'HbA1c': if (from.includes('mmol/mol')) factor = 1 / 10.929; break;
     case 'HGB': if (from.includes('g/dl')) factor = 10; break;
     case 'CHOL': case 'HDL': case 'LDL': if (from.includes('mg/dl')) factor = 1 / 38.67; break;
     case 'TG': if (from.includes('mg/dl')) factor = 1 / 88.57; break;
