@@ -33,7 +33,7 @@ import { getBBCategory, type BBCategory, getPeakWeekDay, getCategoryDeficitMod, 
 import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
 import { annualPlanPhaseForDate } from "../../../../engines/annual-training/block-builders.engine";
 import { loadAnnualTrainingPlan } from "../../../../engines/annual-training/annual-training-storage";
-import type { AnnualTrainingPlan } from "../../../../engines/annual-training/annual-training.types";
+import type { AnnualTrainingPlan, AnnualBlockState } from "../../../../engines/annual-training/annual-training.types";
 import {
   GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
@@ -236,6 +236,8 @@ export interface PlanCtx {
   generateDrugCompatReport: () => void;
   generateFullNutritionReport: () => void;
   renderMealList: (dayData: any, editable?: boolean, dayIdx?: number) => React.ReactNode;
+  /** п.18: активный блок года для сегодня ({ week, block } | null) — карточка «📍 текущий блок года». */
+  annualPhase: { week: number; block: AnnualBlockState } | null;
   cyclePhase: string; setCyclePhase: (v: any) => void;
   bbCategory: BBCategory; setBBCategory: (v: any) => void;
   peakWeekEnabled: boolean; setPeakWeekEnabled: (v: boolean) => void;
@@ -262,7 +264,7 @@ export interface PlanCtx {
 }
 
 const _DEFAULT_CALC_TARGETS = { kcal: 2500, protein: 160, fats: 70, carbs: 300, bmr: 0, tdee: 0, adjustment: 0 };
-const _DEFAULT_CTX: any = { calcTargets: _DEFAULT_CALC_TARGETS, profileTargets: _DEFAULT_CALC_TARGETS, effectiveKcal: 2500, effectiveP: 160, effectiveF: 70, effectiveC: 300, weight: 80, height: 180, age: 30, sex: 'male' as const };
+const _DEFAULT_CTX: any = { calcTargets: _DEFAULT_CALC_TARGETS, profileTargets: _DEFAULT_CALC_TARGETS, effectiveKcal: 2500, effectiveP: 160, effectiveF: 70, effectiveC: 300, weight: 80, height: 180, age: 30, sex: 'male' as const, annualPhase: null };
 const PlanContext = createContext<PlanCtx>(_DEFAULT_CTX as PlanCtx);
 export const usePlanCtx = (): PlanCtx => useContext(PlanContext);
 
@@ -442,6 +444,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     window.addEventListener('he-annual-training-plan-updated', onAnnualUpdated);
     return () => window.removeEventListener('he-annual-training-plan-updated', onAnnualUpdated);
   }, []);
+  // п.18: активный блок года для сегодня (карточка «📍 текущий блок года» в UI плана).
+  const annualPhase = useMemo(
+    () => (annualPlan ? annualPlanPhaseForDate(annualPlan, isoToday()) : null),
+    [annualPlan],
+  );
   const applyBBPeakToPlan = (cfg: BBContestPrepConfig | null) => {
     setBBPrepConfig(cfg);
     try {
@@ -2903,7 +2910,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // P1-7: renderMealList вынесен в MealListRender.tsx (267 строк → 1 строка)
   const ctx = useMemo<Omit<PlanCtx, 'renderMealList'>>(() => ({
-    profile, s, courseEntries,
+    profile, s, courseEntries, annualPhase,
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
     cravingMode, setCravingMode, cravingDays, setCravingDays,
@@ -3001,6 +3008,6 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, renderMealList }), [ctx, plannerMode, renderMealList]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, renderMealList, annualPhase }), [ctx, plannerMode, renderMealList, annualPhase]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };

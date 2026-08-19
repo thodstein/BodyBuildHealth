@@ -41,7 +41,7 @@ import { buildAnnualPrintHtml } from '../../../engines/annual-training/annual-tr
 import { annualCardioSpecs, annualCardioText, annualCardioWeekMinutes } from '../../../engines/annual-training/annual-training-cardio.engine';
 import {
   saveAnnualScenario, loadAnnualScenarios, removeAnnualScenario, restoreAnnualScenario,
-  compareAnnualScenarios, annualPlanStorageBytes, loadAnnualCardioCycles, type AnnualScenario,
+  compareAnnualScenarios, annualPlanStorageBytes, loadAnnualCardioCycles, type AnnualScenario, type AnnualScenarioDiff,
 } from '../../../engines/annual-training/annual-training-storage';
 import type { AnnualTrainingPlan, AnnualBlockConfig, AnnualBlockKind } from '../../../engines/annual-training/annual-training.types';
 import { loadAnnualTrainingPlan, saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -1007,6 +1007,8 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   // 📸 Снапшоты сборки года: сохранить/сравнить/восстановить.
   const [scenarioList, setScenarioList] = useState<AnnualScenario[]>(loadAnnualScenarios);
   const [scenarioNote, setScenarioNote] = useState<string | null>(null);
+  // п.19: полный список диффов сравнения сценариев (по блокам + поля конфига).
+  const [scenarioCompare, setScenarioCompare] = useState<{ label: string; diffs: AnnualScenarioDiff[] } | null>(null);
   const snapshotAnnual = () => {
     const plan = annualPlan;
     if (!plan) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
@@ -1018,6 +1020,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     const other = loadAnnualScenarios().find(s => s.id === id);
     if (!current || !other) { setScenarioNote('⚠ Снапшот не найден'); return; }
     const { summary, diffs } = compareAnnualScenarios({ id, label: '', ts: 0, plan: current }, other);
+    setScenarioCompare({ label: other.label, diffs });
     const first = diffs[0];
     setScenarioNote(`⇄ ${other.label}: ${summary}${first ? ` · нед ${first.startWeek}: ${first.kindA ?? '—'}→${first.kindB ?? '—'} ${first.statusA ?? '—'}→${first.statusB ?? '—'}` : ''}`);
   };
@@ -1044,7 +1047,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     setAnnualStatusNote(`⧉ Настройки скопированы в блок «${next.blocks[selectedBlockIdx].ref.description ?? next.blocks[selectedBlockIdx].ref.phase}» — пересоберите`);
   };
 
-  const runAnnualBuild = (mode: 'all' | 'block' | 'export' | 'editor') => {
+  const runAnnualBuild = (mode: 'all' | 'stale' | 'block' | 'export' | 'editor') => {
     const src = currentMacroSource();
     if (!src) { setAnnualStatusNote('⚠ Сначала постройте макроцикл'); return; }
     try {
@@ -1115,13 +1118,19 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
         }
         return;
       }
+      // п.21: «Собрать stale» — пересборка только устаревших/несобранных/ошибочных,
+      // готовые built не пересобираются (дефолтное поведение buildAnnualPlan).
+      const staleBefore = mode === 'stale' ? plan.blocks.filter(b => b.status === 'stale').length : 0;
+      const unbuiltBefore = mode === 'stale' ? plan.blocks.filter(b => b.status === 'unbuilt' || b.status === 'error').length : 0;
       const outcome = buildAnnualPlan(plan, src, { daysPerWeek: 4, level: effLevel });
       plan = saveAnnualTrainingPlan(outcome.plan);
       setAnnualPlan(plan);
       const parts = [`собрано +${outcome.built}`];
       if (outcome.skipped) parts.push(`готовых пропущено ${outcome.skipped}`);
       if (outcome.failed) parts.push(`ошибок ${outcome.failed}`);
-      setAnnualStatusNote(`📦 Годовой план: ${parts.join(' · ')}${outcome.failed ? ` (первая: ${outcome.errors[0]?.message})` : ''}`);
+      setAnnualStatusNote(mode === 'stale'
+        ? `📦 Stale-блоки пересобраны: ${parts.join(' · ')}${staleBefore || unbuiltBefore ? ` (устарело ${staleBefore} · не собрано ${unbuiltBefore})` : ''}`
+        : `📦 Годовой план: ${parts.join(' · ')}${outcome.failed ? ` (первая: ${outcome.errors[0]?.message})` : ''}`);
     } catch (e) {
       setAnnualStatusNote(`⚠ Сборка года: ${(e as Error).message}`);
     }
@@ -2089,6 +2098,10 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   title="Собрать выбранный блок его конструктором">
                   ⚙️ Собрать блок
                 </button>
+                <button type="button" onClick={() => runAnnualBuild('stale')} style={{ ...BTN_GHOST, width: '100%', fontSize: 11, padding: '9px 10px', minHeight: 44, border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24' }}
+                  title="Пересобрать только устаревшие/несобранные блоки, готовые не трогать">
+                  📦 Собрать stale
+                </button>
                 <button type="button" onClick={() => runAnnualBuild('export')} style={{ ...BTN_GHOST, width: '100%', fontSize: 11, padding: '9px 10px', minHeight: 44 }}
                   title="Объединить собранные блоки в одну программу и передать в ручной конструктор">
                   📥 В ручной режим
@@ -2211,6 +2224,26 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     </div>
                   ))}
                   {scenarioNote && <div style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{scenarioNote}</div>}
+                  {scenarioCompare && (
+                    <div style={{ marginTop: 4, padding: 6, borderRadius: 8, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }} className="macrocycle-scenario-compare-detail">
+                      <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', marginBottom: 3 }}>⇄ {scenarioCompare.label} — блоки:</div>
+                      {scenarioCompare.diffs.length === 0 && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>идентичны — изменений нет</div>}
+                      {scenarioCompare.diffs.map(d => (
+                        <div key={d.blockKey} style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>
+                          <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>Нед {d.startWeek}:</span> {d.phase}
+                          {d.kindA && d.kindB && <span> · {d.kindA}→{d.kindB}</span>}
+                          {d.statusA && d.statusB && <span> · {d.statusA}→{d.statusB}</span>}
+                          {d.configChanged && d.configFields && d.configFields.length > 0 && (
+                            <div style={{ marginLeft: 10, color: 'rgba(251,191,36,0.9)' }}>
+                              {d.configFields.map(f => (
+                                <div key={f.field}>⚙ {f.label}: {f.a} → {f.b}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {/* ⚙️ Настройки выбранного блока (конструктор/цикл/сплит/taper/пик) */}

@@ -78,6 +78,7 @@ export const IndividualPlanResults: React.FC = () => {
     workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
     v2Phase, v2Pharma, v2Labs, histamineSensitive,
     plannerMode,
+    annualPhase,
     setErrorMsg,
     setPlanTab,
   } = usePlanCtx();
@@ -571,6 +572,21 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && dayPlan && (dayPlan as any).categoryNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
       )}
+      {/* п.18: карточка «📍 Текущий блок года» — активный блок годового плана на сегодня */}
+      {generated && annualPhase && (() => {
+        const b = annualPhase.block;
+        const statusIcon = b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
+        const statusLabel = b.status === 'built' ? 'собран' : b.status === 'stale' ? 'устарел' : b.status === 'error' ? 'ошибка' : 'не собран';
+        const kindLabel = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
+        const prepNote = b.ref.kind === 'BB' && b.ref.phase === 'contest_prep'
+          ? ' · 🏁 contest prep — фаза сушки: питание по prep-плану' : '';
+        return (
+          <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.25)', fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}
+            title={`Блок ${b.ref.phase} (нед ${b.ref.startWeek}–${b.ref.startWeek + b.ref.weeks - 1})`}>
+            📍 Текущий блок года: нед {annualPhase.week} · {b.ref.phase} ({b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1}) · {kindLabel} {statusIcon} {statusLabel}{prepNote}
+          </div>
+        );
+      })()}
       {/* #4 Peak-week protocol */}
       {generated && dayPlan && (dayPlan as any).peakWeekNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', fontSize:9, color:'#fbbf24', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).peakWeekNote}</div>

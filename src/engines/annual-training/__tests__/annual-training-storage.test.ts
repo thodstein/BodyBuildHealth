@@ -10,7 +10,7 @@ import {
   restoreAnnualScenario, compareAnnualScenarios,
   saveAnnualCardioCycles, loadAnnualCardioCycles, removeAnnualCardioCycles,
 } from '../annual-training-storage';
-import { annualPlanFromMacro, setAnnualBlockKind } from '../block-builders.engine';
+import { annualPlanFromMacro, setAnnualBlockKind, setAnnualBlockConfig } from '../block-builders.engine';
 import { buildBbMacrocycle, serializeBbMacro, buildMacrocycle } from '../../lms/macrocycle.engine';
 import type { AnnualTrainingPlan } from '../annual-training.types';
 
@@ -173,6 +173,38 @@ describe('снапшоты сборки года (сценарии)', () => {
     expect(diffs[0].kindA).toBe('BB');
     expect(diffs[0].kindB).toBe('MANUAL');
     expect(summary).toContain('конструктор 1');
+  });
+
+  it('compare: изменение поля конфига → детальный configFields (п.19)', () => {
+    const plan = basePlan();
+    const a = saveAnnualScenario(plan, 'A');
+    const withTaper = setAnnualBlockConfig(plan, plan.blocks[0].ref.blockKey, { taper: { enabled: true, weeks: 2 } });
+    const b = saveAnnualScenario(withTaper, 'B');
+    const { diffs } = compareAnnualScenarios(a[0], b[0]);
+    const d = diffs.find(x => x.configChanged);
+    expect(d).toBeTruthy();
+    expect(d!.configFields?.some(f => f.field === 'taper')).toBe(true);
+    const taperField = d!.configFields!.find(f => f.field === 'taper')!;
+    expect(taperField.a).toBe('—');
+    expect(taperField.b).toContain('enabled');
+  });
+
+  it('compare: смена splitPattern → configFields содержит «сплит» (п.19)', () => {
+    const plan = basePlan();
+    const a = saveAnnualScenario(plan, 'A');
+    const changed = setAnnualBlockConfig(plan, plan.blocks[0].ref.blockKey, { splitPattern: 'ppl_6' });
+    const b = saveAnnualScenario(changed, 'B');
+    const { diffs } = compareAnnualScenarios(a[0], b[0]);
+    const d = diffs.find(x => x.configChanged);
+    expect(d?.configFields?.some(f => f.field === 'splitPattern' && f.label === 'сплит')).toBe(true);
+  });
+
+  it('compare: одинаковый конфиг не даёт configFields (п.19)', () => {
+    const plan = basePlan();
+    const a = saveAnnualScenario(plan, 'A');
+    const b = saveAnnualScenario(plan, 'B');
+    const { diffs } = compareAnnualScenarios(a[0], b[0]);
+    expect(diffs).toHaveLength(0);
   });
 });
 

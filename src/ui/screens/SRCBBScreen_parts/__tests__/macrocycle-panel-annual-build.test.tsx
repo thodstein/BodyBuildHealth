@@ -89,6 +89,24 @@ describe('MacrocyclePanel — сборка года по конструктор�
     expect(screen.getAllByText(/изменился — пересоберите/).length).toBeGreaterThan(0);
   });
 
+  it('📦 Собрать stale: пересобирает только устаревшие, готовые не трогает (п.21)', async () => {
+    await buildPlMacroAndOpen();
+    fireEvent.click(screen.getByText('📦 Собрать весь год'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.status).toBe('built'), { timeout: 30000 });
+    // Смена недели соревнования → layout меняется → все блоки stale.
+    fireEvent.click(screen.getByText('Неделя главного соревнования'));
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '30' } });
+    fireEvent.click(screen.getByText('OK'));
+    fireEvent.click(screen.getByText('Построить макроцикл'));
+    await waitFor(() => expect(loadAnnualTrainingPlan()?.blocks.some(b => b.status === 'stale')).toBe(true), { timeout: 30000 });
+    expect(screen.getByText('📦 Собрать stale')).toBeTruthy();
+    fireEvent.click(screen.getByText('📦 Собрать stale'));
+    await waitFor(() => expect(screen.getByText(/Stale-блоки пересобраны/)).toBeTruthy(), { timeout: 30000 });
+    const plan = loadAnnualTrainingPlan();
+    expect(plan!.blocks.every(b => b.status === 'built')).toBe(true);
+  });
+
   it('десериализация макро с cycleId: PL-блоки получают цикл по умолчанию', async () => {
     const macro = buildPlMacroFixture();
     localStorage.setItem('he_pl_macro', serializeMacro(macro));

@@ -6,7 +6,7 @@
  * (конфиг конструктора + результат сборки). Макро-разметка остаётся в старых
  * ключах — план ссылается на неё через macroRef (сериализованный снимок).
  */
-import type { AnnualTrainingPlan, AnnualBlockState, AnnualBlockKind } from './annual-training.types';
+import type { AnnualTrainingPlan, AnnualBlockState, AnnualBlockKind, AnnualBlockConfig } from './annual-training.types';
 import { annualPlanFromMacro, stableHash } from './block-builders.engine';
 import { deserializeMacro, deserializeBbMacro } from '../lms/macrocycle.engine';
 
@@ -220,6 +220,14 @@ export function restoreAnnualScenario(id: string): AnnualTrainingPlan | null {
   return JSON.parse(JSON.stringify(sc.plan)) as AnnualTrainingPlan;
 }
 
+/** Изменённое поле конфига блока (человекочитаемо). */
+export interface ConfigFieldDiff {
+  field: string;
+  label: string;
+  a: string;
+  b: string;
+}
+
 /** Дифф блока между двумя снапшотами (по blockKey — тот же layout). */
 export interface AnnualScenarioDiff {
   blockKey: string;
@@ -231,6 +239,47 @@ export interface AnnualScenarioDiff {
   statusB?: string;
   configChanged: boolean;
   resultChanged: boolean;
+  /** Поля конфига, которые изменились (пусто, если configChanged === false). */
+  configFields?: ConfigFieldDiff[];
+}
+
+/** Поля AnnualBlockConfig с человекочитаемыми лейблами (для диффа конфига). */
+const CONFIG_FIELD_LABELS: [keyof AnnualBlockConfig, string][] = [
+  ['cycleId', 'цикл'],
+  ['daysPerWeek', 'дней/нед'],
+  ['splitPattern', 'сплит'],
+  ['goal', 'цель'],
+  ['level', 'уровень'],
+  ['trainingFocus', 'фокус'],
+  ['weakPoints', 'слабые мышцы'],
+  ['equipment', 'оборудование'],
+  ['focusGroup', 'фокус-группа'],
+  ['specialization', 'специализация'],
+  ['athleteMode', 'режим'],
+  ['taper', 'тапер'],
+  ['peakWeek', 'пик-неделя'],
+  ['peakConfig', 'конфиг пика'],
+  ['templateFromBlockKey', 'шаблон'],
+];
+
+function valToStr(v: unknown): string {
+  if (v === undefined || v === null) return '—';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+/** Детальный дифф конфига по полям (для changed-конфига). */
+function diffConfigFields(a: AnnualBlockConfig, b: AnnualBlockConfig): ConfigFieldDiff[] {
+  const out: ConfigFieldDiff[] = [];
+  for (const [field, label] of CONFIG_FIELD_LABELS) {
+    const va = a[field];
+    const vb = b[field];
+    if (canonicalJson(va) !== canonicalJson(vb)) {
+      out.push({ field: field as string, label, a: valToStr(va), b: valToStr(vb) });
+    }
+  }
+  return out;
 }
 
 function diffBlock(a: AnnualBlockState | undefined, b: AnnualBlockState | undefined): AnnualScenarioDiff | null {
@@ -245,6 +294,7 @@ function diffBlock(a: AnnualBlockState | undefined, b: AnnualBlockState | undefi
     base.kindA = a.ref.kind; base.kindB = b.ref.kind;
     base.statusA = a.status; base.statusB = b.status;
     base.configChanged = canonicalJson(a.config) !== canonicalJson(b.config);
+    if (base.configChanged) base.configFields = diffConfigFields(a.config, b.config);
     base.resultChanged = (a.result?.configHash ?? '') !== (b.result?.configHash ?? '')
       || (a.status === 'built') !== (b.status === 'built');
     if (!base.configChanged && !base.resultChanged && a.ref.kind === b.ref.kind && a.status === b.status) return null;
