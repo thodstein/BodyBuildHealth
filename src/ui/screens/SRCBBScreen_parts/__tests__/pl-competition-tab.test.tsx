@@ -77,4 +77,11 @@ describe('PLCompetitionTab', () => {
     expect(offBtn.style.background).toBe('rgb(113, 113, 122)');
     expect(offBtn.style.color).toBe('rgb(0, 0, 0)');
   });
+
+  it('кнопка «Тапер по сезону» рендерится с числом стартов и disabled без плана', () => {
+    render(<PLCompetitionTab api={api()} />);
+    const btn = screen.getByText(/Тапер по сезону/);
+    expect(btn).toBeTruthy();
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+  });
 });

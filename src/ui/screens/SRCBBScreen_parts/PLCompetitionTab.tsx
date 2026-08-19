@@ -10,6 +10,8 @@ import React from 'react';
 import { recommendWeightCut } from '../../../engines/gym-competition.engine';
 import { appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import { buildPLPeakBlockLayout } from '../../../engines/lms/lms-peak-block.engine';
+import { buildPLSeasonPeaks } from '../../../engines/lms/lms-macro-taper.engine';
+import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
 import { MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 import { LAST_HEAVY_DAYS } from '../../../engines/pro/taper.engine';
 import type { PED } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -112,6 +114,40 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       w.focus();
       w.print();
     } catch (e) { onNote('⚠ Ошибка печати тапер-плана: ' + (e as Error).message); }
+  };
+  // C2: тапер по ВСЕМУ сезону — продлевает план до дальнего старта, под каждое
+  // соревнование ставит пик-блок (вход в пик + mock + глубокий тапер + соревнования [+ пост]).
+  const handleBuildSeasonPeaks = () => {
+    if (!builtSrc) return;
+    try {
+      const meets = meetList
+        .filter(m => Number.isFinite(m.weeksToStart) && m.weeksToStart >= 1)
+        .map(m => ({ id: m.id, name: m.name, weeksToStart: m.weeksToStart }));
+      if (meets.length === 0) { onNote('⚠ Добавьте соревнования в сезон — сезон пуст.'); return; }
+      const res = buildPLSeasonPeaks(builtSrc.weeks, meets, {
+        mode: peakMode,
+        weightGoal: taperWeightGoal === 'auto' ? undefined : taperWeightGoal,
+        strategy: attemptStrategy,
+        mockMeet: mockMeetOn,
+        meetWeek: true,
+        postMeet: postMeetOn,
+        windowWeeks: weeksToMeet,
+      });
+      if (res.weeks.length === 0) { onNote('⚠ Не удалось построить сезон — нет базового плана.'); return; }
+      const sessions = res.weeks.flatMap(wk => wk.days.map(d => d.exercises.map(ex => ({
+        name: ex.name, group: ex.group, coef: ex.coef, mnosz: ex.mnosz, pm: ex.pm,
+        sets: ex.workSets.map(s => ({ weight: s.weight, reps: s.reps, sets: s.sets })),
+      } as SRExercise))));
+      const season: LMSBuildOutput = {
+        ...builtSrc,
+        weeks: res.weeks,
+        cycleMetrics: calcCycleMetrics(sessions),
+        progressionRationale: builtSrc.progressionRationale + ' 🏁 ' + res.notes.join(' '),
+      };
+      setBuiltSrc(season);
+      setTaperNote(`📅 Сезон: ${meets.length} старт(ов) → ${season.weeks.length} нед`);
+      onNote('📅 Тапер по всему сезону построен: ' + res.notes.join(' '));
+    } catch (e) { onNote('⚠ Ошибка построения сезона: ' + (e as Error).message); }
   };
 
   return (
@@ -401,6 +437,12 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
           title={builtSrc ? `Построить пик-блок на окно ${weeksToMeet} нед до старта: вход в пик + mock + глубокий тапер (${taperWeeksToAdd} нед) + соревнования${postMeetOn ? ' + пост-старт' : ''}${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
         >🗓 Пик-блок на окно ({weeksToMeet} нед){pedAuto && peds.length > 0 ? ' · 💉' : ''}</button>
+        <button
+          disabled={!builtSrc}
+          onClick={handleBuildSeasonPeaks}
+          style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(52,211,153,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#34d399' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(52,211,153,0.08)' : 'transparent' }}
+          title="Построить тапер по ВСЕМУ сезону: продлить план до дальнего старта, под каждое соревнование поставить пик-блок (вход в пик + mock + глубокий тапер + соревнования [+ пост])"
+        >📅 Тапер по сезону ({meetList.length} старт)</button>
         <button
           disabled={!builtSrc}
           onClick={() => {
