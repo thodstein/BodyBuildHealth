@@ -12,12 +12,7 @@ import {
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
-
-const INPUT: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12, width: 80,
-};
+import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, NumberInput } from './CardioUI';
 
 export const CARDIO_AUTO_TUNE_KEY = 'he_cardio_auto_tune';
 export const CARDIO_AUTO_APPLY_KEY = 'he_cardio_auto_apply';
@@ -191,9 +186,39 @@ export const CardioAutoTunePanel: React.FC<{
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={ROW}>
           <span style={LABEL}>🎯 Пульс-зоны {lthr ? '(LTHR)' : '(Karvonen)'}</span>
-          <input value={age} onChange={e => setAge(e.target.value)} placeholder="Возраст" inputMode="numeric" style={INPUT} aria-label="Возраст" />
-          <input value={restHr} onChange={e => setRestHr(e.target.value)} placeholder="ЧСС покоя" inputMode="numeric" style={INPUT} aria-label="ЧСС покоя" />
-          <input value={lthr} onChange={e => setLthr(e.target.value)} placeholder="LTHR (тест 30′)" inputMode="numeric" style={INPUT} aria-label="LTHR" title="Пороговый пульс из 30-минутного теста — зоны по Friel 2017" />
+          <NumberInput
+            value={age}
+            onChange={setAge}
+            min={12}
+            max={90}
+            step={1}
+            placeholder="30"
+            ariaLabel="Возраст"
+            width={80}
+            suffix="лет"
+          />
+          <NumberInput
+            value={restHr}
+            onChange={setRestHr}
+            min={30}
+            max={120}
+            step={1}
+            placeholder="60"
+            ariaLabel="ЧСС покоя"
+            width={90}
+            suffix="уд/мин"
+          />
+          <NumberInput
+            value={lthr}
+            onChange={setLthr}
+            min={80}
+            max={220}
+            step={1}
+            placeholder="160"
+            ariaLabel="LTHR (пороговый пульс)"
+            width={100}
+            suffix="уд/мин"
+          />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {zones.map(z => (
@@ -207,8 +232,28 @@ export const CardioAutoTunePanel: React.FC<{
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={ROW}>
           <span style={LABEL}>🏃 VDOT (тест: км за минуты)</span>
-          <input value={vdotKm} onChange={e => setVdotKm(e.target.value)} placeholder="Км" inputMode="decimal" style={INPUT} aria-label="Дистанция теста км" />
-          <input value={vdotMin} onChange={e => setVdotMin(e.target.value)} placeholder="Мин" inputMode="numeric" style={INPUT} aria-label="Время теста мин" />
+          <NumberInput
+            value={vdotKm}
+            onChange={setVdotKm}
+            min={0.1}
+            max={100}
+            step={0.1}
+            placeholder="5"
+            ariaLabel="Дистанция теста км"
+            width={70}
+            suffix="км"
+          />
+          <NumberInput
+            value={vdotMin}
+            onChange={setVdotMin}
+            min={1}
+            max={120}
+            step={1}
+            placeholder="20"
+            ariaLabel="Время теста мин"
+            width={70}
+            suffix="мин"
+          />
         </div>
         {vdot && (
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>

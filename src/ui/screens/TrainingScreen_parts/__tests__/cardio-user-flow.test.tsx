@@ -53,9 +53,9 @@ describe('CardioConstructor — сценарий пользователя', () =
     seedProfile({});
     render(<CardioConstructor />);
     expect(screen.getByRole('button', { name: /Пол: женский/ })).toBeTruthy();
-    expect(screen.getByLabelText('Вес')).toHaveValue(70);
-    expect(screen.getByLabelText('Возраст')).toHaveValue(35);
-    expect(screen.getByLabelText('ЧСС покоя')).toHaveValue(62);
+    expect(screen.getByLabelText('Вес')).toHaveValue('70');
+    expect(screen.getByLabelText('Возраст')).toHaveValue('35');
+    expect(screen.getByLabelText('ЧСС покоя')).toHaveValue('62');
   });
 
   it('сборка цикла показывает расписание недель с фазами сразу', () => {
@@ -76,17 +76,17 @@ describe('CardioConstructor — сценарий пользователя', () =
     const age = screen.getByLabelText('Возраст');
     fireEvent.change(age, { target: { value: '99' } });
     fireEvent.click(screen.getByRole('button', { name: /Из профиля/ }));
-    expect(screen.getByLabelText('Возраст')).toHaveValue(35);
-    expect(screen.getByLabelText('Вес')).toHaveValue(70);
-    expect(screen.getByLabelText('ЧСС покоя')).toHaveValue(62);
+    expect(screen.getByLabelText('Возраст')).toHaveValue('35');
+    expect(screen.getByLabelText('Вес')).toHaveValue('70');
+    expect(screen.getByLabelText('ЧСС покоя')).toHaveValue('62');
   });
 
   it('профиль с другим полом/весом: пол-сегмент и вес соответствуют', () => {
     seedProfile({ 'settings.personal.sex': 'male', 'settings.personal.weight': 88, 'settings.personal.age': 41 });
     render(<CardioConstructor />);
     expect(screen.getByRole('button', { name: /Пол: мужской/ })).toBeTruthy();
-    expect(screen.getByLabelText('Вес')).toHaveValue(88);
-    expect(screen.getByLabelText('Возраст')).toHaveValue(41);
+    expect(screen.getByLabelText('Вес')).toHaveValue('88');
+    expect(screen.getByLabelText('Возраст')).toHaveValue('41');
   });
 
   it('графа пользователя: карточка с параметрами и кнопками синхронизации', () => {

@@ -14,7 +14,7 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR } from './CardioUI';
+import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR, Stepper } from './CardioUI';
 
 const VARIANT_BTN: React.CSSProperties = {
   flex: '1 1 100px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
@@ -365,11 +365,17 @@ export const CardioPreviewStep: React.FC<{
       <div style={CARD} id="sec-weeks">
         <div style={ROW}>
           <span style={LABEL}>🗓 Неделя по дням</span>
-          <button style={BTN} onClick={() => setWeekNo(Math.max(1, weekNo - 1))} aria-label="Предыдущая неделя">−</button>
-          <span style={{ fontSize: 13, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{Math.min(cycle.totalWeeks, Math.max(1, weekNo))}</span>
-          <button style={BTN} onClick={() => setWeekNo(Math.min(cycle.totalWeeks, weekNo + 1))} aria-label="Следующая неделя">+</button>
+          <Stepper
+            value={Math.min(cycle.totalWeeks, Math.max(1, weekNo))}
+            min={1}
+            max={cycle.totalWeeks}
+            step={1}
+            onChange={setWeekNo}
+            ariaPrefix="Неделя"
+            suffix={`из ${cycle.totalWeeks}`}
+            width={50}
+          />
           <button style={BTN} onClick={goCurrentWeek} title="Перейти к текущей неделе цикла" aria-label="К текущей неделе">📍</button>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>из {cycle.totalWeeks}</span>
         </div>
         <div className="cardio-day-grid" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {DAY_LABELS_RU.map((d, i) => {

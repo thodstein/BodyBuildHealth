@@ -69,42 +69,6 @@ export const StatTile: React.FC<{ label: string; value: string; color?: string }
   </div>
 );
 
-export const Stepper: React.FC<{
-  label?: string;
-  value: number;
-  min?: number;
-  max?: number;
-  onChange: (n: number) => void;
-  ariaPrefix?: string;
-  suffix?: string;
-  width?: number;
-}> = ({ label, value, min, max, onChange, ariaPrefix, suffix, width }) => (
-  <div style={ROW}>
-    {label && <span style={LABEL}>{label}</span>}
-    <button style={BTN_SMALL} onClick={() => onChange(Math.max(min ?? -Infinity, value - 1))} aria-label={`${ariaPrefix ?? ''} меньше`}>−</button>
-    <span style={{ fontSize: 14, fontWeight: 800, minWidth: width ?? 26, textAlign: 'center' }}>{value}</span>
-    <button style={BTN_SMALL} onClick={() => onChange(Math.min(max ?? Infinity, value + 1))} aria-label={`${ariaPrefix ?? ''} больше`}>+</button>
-    {suffix && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{suffix}</span>}
-  </div>
-);
-
-export const ChipToggle: React.FC<{
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  ariaLabel?: string;
-  disabled?: boolean;
-}> = ({ active, onClick, children, ariaLabel, disabled }) => (
-  <button
-    style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.4 : 1 }}
-    onClick={onClick}
-    disabled={disabled}
-    aria-label={ariaLabel}
-  >
-    {children}
-  </button>
-);
-
 export const NoteList: React.FC<{ items: string[]; color?: string }> = ({ items, color }) => (
   <div style={{ fontSize: 10, color: color ?? 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
     {items.map((it, i) => <div key={i}>• {it}</div>)}
@@ -144,4 +108,209 @@ export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string 
     {desc && <span style={HINT}>{desc}</span>}
     <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '2px 0 2px' }} />
   </div>
+);
+
+// ─── Универсальные компоненты ввода ───
+
+export interface NumberInputProps {
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  placeholder?: string;
+  ariaLabel?: string;
+  disabled?: boolean;
+  suffix?: string;
+  width?: number;
+  error?: string;
+}
+
+export const NumberInput: React.FC<NumberInputProps> = ({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  placeholder,
+  ariaLabel,
+  disabled,
+  suffix,
+  width,
+  error,
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // Allow empty, negative (during typing), and decimal points
+    if (raw === '' || raw === '-' || raw === '.') {
+      onChange(raw);
+      return;
+    }
+    const num = parseFloat(raw);
+    if (!isNaN(num)) {
+      onChange(raw);
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '' || raw === '-' || raw === '.') {
+      onChange(String(min ?? 0));
+      return;
+    }
+    const num = parseFloat(raw);
+    if (!isNaN(num)) {
+      let clamped = num;
+      if (min !== undefined) clamped = Math.max(min, clamped);
+      if (max !== undefined) clamped = Math.min(max, clamped);
+      if (step !== undefined && step > 0) {
+        const remainder = clamped % step;
+        if (remainder !== 0) {
+          clamped = Math.round(clamped / step) * step;
+        }
+      }
+      onChange(String(clamped));
+    } else {
+      onChange(String(min ?? 0));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const raw = e.currentTarget.value;
+      const num = parseFloat(raw) || 0;
+      const delta = e.key === 'ArrowUp' ? step : -step;
+      let next = num + delta;
+      if (min !== undefined) next = Math.max(min, next);
+      if (max !== undefined) next = Math.min(max, next);
+      onChange(String(next));
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+      {label && <span style={LABEL}>{label}</span>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={value}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          aria-label={ariaLabel}
+          disabled={disabled}
+          style={{
+            ...INPUT,
+            width: width ?? 100,
+            borderColor: error ? '#ef4444' : 'rgba(255,255,255,0.12)',
+            background: error ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.05)',
+          }}
+        />
+        {suffix && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{suffix}</span>}
+      </div>
+      {error && <span style={{ fontSize: 10, color: '#f87171' }}>⚠ {error}</span>}
+    </div>
+  );
+};
+
+export interface SelectInputProps {
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  ariaLabel?: string;
+  disabled?: boolean;
+  width?: number;
+}
+
+export const SelectInput: React.FC<SelectInputProps> = ({
+  label,
+  value,
+  onChange,
+  options,
+  ariaLabel,
+  disabled,
+  width,
+}) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+    {label && <span style={LABEL}>{label}</span>}
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      style={{
+        ...INPUT,
+        width: width ?? 160,
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        color: '#fff',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      {options.map(opt => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+  </div>
+);
+
+// Улучшенный Stepper с поддержкой клавиатуры и доступностью
+export const Stepper: React.FC<{
+  label?: string;
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (n: number) => void;
+  ariaPrefix?: string;
+  suffix?: string;
+  width?: number;
+  disabled?: boolean;
+}> = ({ label, value, min, max, step = 1, onChange, ariaPrefix, suffix, width, disabled }) => (
+  <div style={ROW}>
+    {label && <span style={LABEL}>{label}</span>}
+    <button
+      style={{ ...BTN_SMALL, opacity: disabled || (min !== undefined && value <= min) ? 0.4 : 1 }}
+      onClick={() => onChange(Math.max(min ?? -Infinity, value - step))}
+      disabled={disabled || (min !== undefined && value <= min)}
+      aria-label={`${ariaPrefix ?? ''} уменьшить`}
+    >
+      −
+    </button>
+    <span style={{ fontSize: 14, fontWeight: 800, minWidth: width ?? 26, textAlign: 'center' }}>{value}</span>
+    <button
+      style={{ ...BTN_SMALL, opacity: disabled || (max !== undefined && value >= max) ? 0.4 : 1 }}
+      onClick={() => onChange(Math.min(max ?? Infinity, value + step))}
+      disabled={disabled || (max !== undefined && value >= max)}
+      aria-label={`${ariaPrefix ?? ''} увеличить`}
+    >
+      +
+    </button>
+    {suffix && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{suffix}</span>}
+  </div>
+);
+
+// ChipToggle с поддержкой disabled
+export const ChipToggle: React.FC<{
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  ariaLabel?: string;
+  disabled?: boolean;
+}> = ({ active, onClick, children, ariaLabel, disabled }) => (
+  <button
+    style={{ ...(active ? CHIP_ACTIVE : CHIP), opacity: disabled ? 0.4 : 1 }}
+    onClick={onClick}
+    disabled={disabled}
+    aria-label={ariaLabel}
+    aria-pressed={active}
+  >
+    {children}
+  </button>
 );

@@ -122,7 +122,7 @@ describe('CardioConstructor — CSR', () => {
 
   it('шаг «Старты»: taper-режим настраивается на шаге «Параметры» (статус виден в стартах)', () => {
     render(<CardioConstructor />);
-    fireEvent.click(screen.getByRole('button', { name: /Больше taper/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Недель taper увеличить/ }));
     fireEvent.click(screen.getByRole('button', { name: /Пик-неделя старта/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getByText(/Соревнования и старты/)).toBeTruthy();
@@ -135,7 +135,7 @@ describe('CardioConstructor — CSR', () => {
     expect(screen.getByText(/Taper: выкл/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.change(screen.getByPlaceholderText(/Название/), { target: { value: 'Старт' } });
-    fireEvent.change(screen.getByPlaceholderText(/Неделя/), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText(/Неделя старта/), { target: { value: '4' } });
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
@@ -307,7 +307,7 @@ describe('CardioConstructor — CSR', () => {
     // Назад на шаг 2 и добавляем старт.
     fireEvent.click(screen.getByRole('button', { name: /Назад/ }));
     fireEvent.change(screen.getByPlaceholderText(/Название/), { target: { value: 'Старт' } });
-    fireEvent.change(screen.getByPlaceholderText(/Неделя/), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText(/Неделя старта/), { target: { value: '8' } });
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getByText(/Параметры в мастере изменены/)).toBeTruthy();

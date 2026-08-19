@@ -15,6 +15,7 @@ import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/car
 import {
   ROW, LABEL, HINT, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR,
   SectionCard, StatTile, GroupHeading, SectionNav, InfoBanner,
+  NumberInput, SelectInput, Stepper,
 } from './CardioUI';
 
 const GOAL_CARD: React.CSSProperties = {
@@ -174,8 +175,6 @@ export const CardioParamsStep: React.FC<{
     { id: 'sec-preview', label: '👁 Итог' },
   ];
 
-  const numInput = (w: number): React.CSSProperties => ({ ...INPUT, width: w });
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <SectionNav items={NAV} />
@@ -189,28 +188,62 @@ export const CardioParamsStep: React.FC<{
           <button style={{ ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.5)', color: '#00e68a' }} onClick={onSaveProfile} title="Сохранить возраст/вес/пол/ЧСС покоя в профиль" aria-label="В профиль">💾 В профиль</button>
         </div>
       }>
-        <div style={ROW}>
-          <span style={LABEL}>Возраст</span>
-          <input type="number" value={age} onChange={e => setAge(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="Возраст" />
-          <span style={{ ...LABEL, marginLeft: 12 }}>Вес (кг)</span>
-          <input type="number" value={bodyWeight} onChange={e => setBodyWeight(Math.max(30, Math.min(300, Number(e.target.value) || 80)))} inputMode="numeric" style={numInput(70)} aria-label="Вес" />
-          <span style={{ ...LABEL, marginLeft: 12 }}>ЧСС покоя</span>
-          <input type="number" value={restingHr} onChange={e => setRestingHr(e.target.value)} inputMode="numeric" style={numInput(70)} aria-label="ЧСС покоя" />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <NumberInput
+            label="Возраст"
+            value={age}
+            onChange={setAge}
+            min={12}
+            max={90}
+            step={1}
+            placeholder="30"
+            ariaLabel="Возраст"
+            width={90}
+            suffix="лет"
+          />
+          <NumberInput
+            label="Вес (кг)"
+            value={String(bodyWeight)}
+            onChange={v => setBodyWeight(Math.max(30, Math.min(300, Number(v) || 80)))}
+            min={30}
+            max={300}
+            step={0.5}
+            placeholder="80"
+            ariaLabel="Вес"
+            width={100}
+            suffix="кг"
+          />
+          <NumberInput
+            label="ЧСС покоя"
+            value={restingHr}
+            onChange={setRestingHr}
+            min={30}
+            max={120}
+            step={1}
+            placeholder="60"
+            ariaLabel="ЧСС покоя"
+            width={100}
+            suffix="уд/мин"
+          />
         </div>
-        <div style={ROW}>
-          <span style={LABEL}>Пол</span>
-          <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
-          <button style={sex === 'female' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('female')} aria-label="Пол: женский">♀ Женский</button>
-          <span style={{ ...LABEL, marginLeft: 12 }}>Уровень</span>
-          {(Object.keys(CARDIO_LEVEL_LABELS) as CardioLevel[]).map(l => (
-            <button key={l} style={level === l ? CHIP_ACTIVE : CHIP} onClick={() => setLevel(l)}>{CARDIO_LEVEL_LABELS[l]}</button>
-          ))}
-        </div>
-        <div style={ROW}>
-          <span style={LABEL}>Восстановление</span>
-          <button style={recoveryLow ? CHIP_ACTIVE : CHIP} onClick={() => setRecoveryLow(!recoveryLow)}>
-            {recoveryLow ? '🧘 Низкое (HIIT убран)' : '🟢 В норме'}
-          </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+          <div style={ROW}>
+            <span style={LABEL}>Пол</span>
+            <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
+            <button style={sex === 'female' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('female')} aria-label="Пол: женский">♀ Женский</button>
+          </div>
+          <div style={ROW}>
+            <span style={LABEL}>Уровень</span>
+            {(Object.keys(CARDIO_LEVEL_LABELS) as CardioLevel[]).map(l => (
+              <button key={l} style={level === l ? CHIP_ACTIVE : CHIP} onClick={() => setLevel(l)}>{CARDIO_LEVEL_LABELS[l]}</button>
+            ))}
+          </div>
+          <div style={ROW}>
+            <span style={LABEL}>Восстановление</span>
+            <button style={recoveryLow ? CHIP_ACTIVE : CHIP} onClick={() => setRecoveryLow(!recoveryLow)}>
+              {recoveryLow ? '🧘 Низкое (HIIT убран)' : '🟢 В норме'}
+            </button>
+          </div>
         </div>
         <div style={HINT}>Пол и ЧСС покоя уточняют пульс-зоны (Karvonen): женщины — ЧССмакс 226−возраст. Уровень: новичок ×0.8, продвинутый ×1.15.</div>
       </SectionCard>
@@ -244,17 +277,29 @@ export const CardioParamsStep: React.FC<{
       {/* ── 4. Горизонт ── */}
       <GroupHeading icon="⏱" text="Горизонт" desc="Длительность цикла и доступные дни в неделю." />
       <SectionCard id="sec-horizon" title="⏱ Горизонт">
-        <div style={ROW}>
-          <span style={LABEL}>Недель</span>
-          <button style={BTN_SMALL} onClick={() => setTotalWeeks(Math.max(1, totalWeeks - 1))} aria-label="Меньше недель">−</button>
-          <span style={{ fontSize: 14, fontWeight: 800, minWidth: 34, textAlign: 'center' }}>{totalWeeks}</span>
-          <button style={BTN_SMALL} onClick={() => setTotalWeeks(Math.min(52, totalWeeks + 1))} aria-label="Больше недель">+</button>
-        </div>
-        <div style={ROW}>
-          <span style={LABEL}>Дней в неделю</span>
-          <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.max(0, daysAvailable - 1))} aria-label="Меньше дней">−</button>
-          <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{daysAvailable}</span>
-          <button style={BTN_SMALL} onClick={() => setDaysAvailable(Math.min(7, daysAvailable + 1))} aria-label="Больше дней">+</button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <Stepper
+            label="Недель"
+            value={totalWeeks}
+            min={1}
+            max={52}
+            step={1}
+            onChange={setTotalWeeks}
+            ariaPrefix="Недель"
+            suffix="нед"
+            width={50}
+          />
+          <Stepper
+            label="Дней в неделю"
+            value={daysAvailable}
+            min={0}
+            max={7}
+            step={1}
+            onChange={setDaysAvailable}
+            ariaPrefix="Дней"
+            suffix="дн"
+            width={50}
+          />
         </div>
         <div style={HINT}>Вес влияет на оценку расхода калорий кардио-сессий (задается в параметрах пользователя).</div>
       </SectionCard>
@@ -332,23 +377,35 @@ export const CardioParamsStep: React.FC<{
           </button>
         </div>
         {taperEnabled && (
-          <div style={ROW}>
-            <span style={LABEL}>Недель taper</span>
-            <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.max(1, taperWeeks - 1))} aria-label="Меньше taper">−</button>
-            <span style={{ fontSize: 14, fontWeight: 800, minWidth: 24, textAlign: 'center' }}>{taperWeeks}</span>
-            <button style={BTN_SMALL} onClick={() => setTaperWeeks(Math.min(4, taperWeeks + 1))} aria-label="Больше taper">+</button>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нед</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+            <Stepper
+              label="Недель taper"
+              value={taperWeeks}
+              min={1}
+              max={4}
+              step={1}
+              onChange={setTaperWeeks}
+              ariaPrefix="Недель taper"
+              suffix="нед"
+              width={50}
+            />
           </div>
         )}
         {!phaseSplit.auto && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
             {(['base', 'build', 'maintenance'] as const).map(k => (
               <div key={k} style={ROW}>
                 <span style={{ ...LABEL, minWidth: 120 }}>{k === 'base' ? '🌱 База' : k === 'build' ? '📈 Наращивание' : '🧘 Поддержание'}</span>
-                <button style={BTN_SMALL} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.max(0, phaseSplit[k] - 1) })} aria-label={`Меньше ${k}`}>−</button>
-                <span style={{ fontSize: 14, fontWeight: 800, minWidth: 26, textAlign: 'center' }}>{phaseSplit[k]}</span>
-                <button style={BTN_SMALL} onClick={() => setPhaseSplit({ ...phaseSplit, [k]: Math.min(Math.max(1, totalWeeks - 2), phaseSplit[k] + 1) })} aria-label={`Больше ${k}`}>+</button>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нед</span>
+                <Stepper
+                  value={phaseSplit[k]}
+                  min={0}
+                  max={Math.max(1, totalWeeks - 2)}
+                  step={1}
+                  onChange={v => setPhaseSplit({ ...phaseSplit, [k]: v })}
+                  ariaPrefix={k}
+                  suffix="нед"
+                  width={50}
+                />
               </div>
             ))}
             <div style={HINT}>Итого распределено: {phaseSplit.base + phaseSplit.build + phaseSplit.maintenance} нед (сверх — поддерживающие; taper/пик задаются стартами).</div>

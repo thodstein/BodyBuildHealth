@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
-import { SectionCard, GroupHeading, ROW, LABEL, HINT, BTN_PRIMARY, BTN_DANGER, INPUT, InfoBanner } from './CardioUI';
+import { SectionCard, GroupHeading, ROW, LABEL, HINT, BTN_PRIMARY, BTN_DANGER, NumberInput, InfoBanner } from './CardioUI';
 
 export interface CompDraft { name: string; week: string }
 
@@ -54,8 +54,23 @@ export const CardioCompsStep: React.FC<{
           </div>
         ))}
         <div style={ROW}>
-          <input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="Название (например, Шоу)" style={{ ...INPUT, flex: 1, minWidth: 130 }} />
-          <input value={draft.week} onChange={e => setDraft({ ...draft, week: e.target.value })} placeholder="Неделя" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Неделя старта" />
+          <input
+            value={draft.name}
+            onChange={e => setDraft({ ...draft, name: e.target.value })}
+            placeholder="Название (например, Шоу)"
+            style={{ flex: 1, minWidth: 130, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12 }}
+          />
+          <NumberInput
+            value={draft.week}
+            onChange={v => setDraft({ ...draft, week: v })}
+            min={1}
+            max={totalWeeks}
+            step={1}
+            placeholder="1"
+            ariaLabel="Неделя старта"
+            width={90}
+            suffix="нед"
+          />
           <button style={BTN_PRIMARY} onClick={add}>+ Добавить старт</button>
         </div>
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}
