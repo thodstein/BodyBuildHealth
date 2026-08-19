@@ -428,13 +428,33 @@ export const FieldRow: React.FC<{ children: React.ReactNode; cols?: number; gap?
 
 /* ── Popup value editor ── */
 
+const PVE_KEYFRAMES = `
+@keyframes pve-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pve-sheet-in { from { transform: translateY(72px); opacity: 0.3; } to { transform: translateY(0); opacity: 1; } }
+@keyframes pve-row-in { from { transform: translateX(12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes pve-value-pop { 0% { transform: scale(1.14); } 100% { transform: scale(1); } }
+`;
+
+const PVE_STYLE_ID = 'pve-keyframes';
+
+(() => {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(PVE_STYLE_ID)) return;
+  const el = document.createElement('style');
+  el.id = PVE_STYLE_ID;
+  el.textContent = PVE_KEYFRAMES;
+  document.head.appendChild(el);
+})();
+
+const normText = (s: string) => s.toLowerCase().replace(/ё/g, 'е').trim();
+
 export const PopupValueEditor: React.FC<{
   label: string;
   value: string | number | undefined | null;
   unit?: string;
   placeholder?: string;
   type?: 'number' | 'text' | 'select';
-  options?: { id: string; label: string }[];
+  options?: { id: string; label: string; desc?: string }[];
   min?: number;
   max?: number;
   step?: number;
@@ -444,6 +464,7 @@ export const PopupValueEditor: React.FC<{
 }> = ({ label, value, unit, placeholder, type = 'text', options, min, max, step = 1, onChange, children, color }) => {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState<string>('');
+  const [query, setQuery] = useState('');
   const c = color || colors.primary;
 
   const hasValue = value !== undefined && value !== null && value !== '' && value !== 0;
@@ -461,17 +482,23 @@ export const PopupValueEditor: React.FC<{
 
   const openPopup = useCallback(() => {
     setLocal(value !== undefined && value !== null && value !== 0 ? String(value) : '');
+    setQuery('');
     setOpen(true);
   }, [value]);
 
-  // Escape закрывает попап; обработчик живёт на window, пока попап открыт.
+  // Escape закрывает попап + блокировка скролла body, пока попап открыт.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); }
     };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKey, true);
+    };
   }, [open]);
 
   const commit = () => {
@@ -494,6 +521,35 @@ export const PopupValueEditor: React.FC<{
     setOpen(false);
   };
 
+  const filtered = (type === 'select' && options && query.trim())
+    ? options.filter(o =>
+        normText(o.label).includes(normText(query)) ||
+        (o.desc ? normText(o.desc).includes(normText(query)) : false)
+      )
+    : (options || []);
+
+  const sliderVal = (() => {
+    const n = parseFloat(local);
+    return !Number.isFinite(n) ? (min ?? 0) : Math.max(min ?? 0, Math.min(max ?? 300, n));
+  })();
+  const sliderPct = (max ?? 300) > (min ?? 0)
+    ? Math.round(((sliderVal - (min ?? 0)) / ((max ?? 300) - (min ?? 0))) * 100)
+    : 0;
+
+  const stepBy = (dir: 1 | -1) => {
+    const n = parseFloat(local);
+    const base = Number.isFinite(n) ? n : (min ?? 0);
+    let v = Math.round((base + dir * step) * 100) / 100;
+    if (min !== undefined) v = Math.max(min, v);
+    if (max !== undefined) v = Math.min(max, v);
+    setLocal(String(v));
+  };
+
+  const liveNumber = (() => {
+    const n = parseFloat(local);
+    return Number.isFinite(n) ? n : undefined;
+  })();
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <button
@@ -501,11 +557,12 @@ export const PopupValueEditor: React.FC<{
         onClick={openPopup}
         aria-label={`${label}: ${displayValue()}`}
         style={{
+          position: 'relative',
           background: 'rgba(255,255,255,0.05)',
           borderRadius: 12,
           border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
           boxShadow: hasValue ? `0 2px 14px ${c}14` : 'none',
-          padding: '10px 12px',
+          padding: '10px 34px 10px 12px',
           cursor: 'pointer',
           display: 'flex',
           flexDirection: 'column',
@@ -537,8 +594,15 @@ export const PopupValueEditor: React.FC<{
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%',
         }}>
           {displayValue()}
-          {hasValue && <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.55, fontWeight: 600 }}>✎</span>}
         </span>
+        <span aria-hidden="true" style={{
+          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: hasValue ? `${c}22` : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${hasValue ? `${c}44` : colors.border}`,
+          color: hasValue ? c : colors.textSubtle, fontSize: 9,
+        }}>✎</span>
       </button>
 
       {open && ReactDOM.createPortal(
@@ -548,104 +612,299 @@ export const PopupValueEditor: React.FC<{
           aria-label={label}
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            animation: 'pve-overlay-in 0.18s ease',
           }}
           onClick={() => setOpen(false)}
         >
           <div
+            role="presentation"
             style={{
-              ...glassCard,
-              width: 'min(360px, 90vw)',
-              padding: 0,
+              width: 'min(420px, 100vw)',
+              maxHeight: '82vh',
+              display: 'flex', flexDirection: 'column',
+              background: 'linear-gradient(180deg, #202026, #16161a)',
+              border: `1px solid ${c}2e`, borderBottom: 'none',
+              borderRadius: '22px 22px 0 0',
+              boxShadow: '0 -12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+              animation: 'pve-sheet-in 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
               overflow: 'hidden',
-              border: `1px solid ${c}44`,
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div aria-hidden="true" style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${c}22 70%, transparent)` }} />
-            <div style={{ padding: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <span aria-hidden="true" style={{
-                  width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `${c}22`, border: `1px solid ${c}44`, fontSize: 14,
-                }}>✎</span>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: c, letterSpacing: -0.2 }}>{label}</div>
-                  <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 1 }}>
-                    {type === 'select' ? 'Выберите значение' : 'Введите значение'}
-                  </div>
-                </div>
-              </div>
-
-              {type === 'select' && options ? (
-                <select
-                  value={local}
-                  onChange={e => setLocal(e.target.value)}
-                  style={{ ...selectStyle, marginBottom: 16 }}
-                  autoFocus
-                >
-                  {placeholder && <option value="">{placeholder}</option>}
-                  {options.map(o => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
-                  ))}
-                </select>
-              ) : type === 'number' ? (
-                <input
-                  type="number"
-                  value={local}
-                  onChange={e => setLocal(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
-                  min={min}
-                  max={max}
-                  step={step}
-                  placeholder={placeholder}
-                  autoFocus
-                  style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
-                  inputMode="decimal"
-                />
-              ) : (
-                <input
-                  type="text"
-                  value={local}
-                  onChange={e => setLocal(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
-                  placeholder={placeholder}
-                  autoFocus
-                  style={{ ...inputStyle, marginBottom: 16, fontSize: 18, padding: '12px 14px' }}
-                />
-              )}
-
-              {unit && type === 'number' && (
-                <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 16 }}>
-                  Единица измерения: {unit}
-                  {min !== undefined && max !== undefined && ` · Диапазон: ${min}–${max}`}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
-                <span style={{ fontSize: 10, color: colors.textSubtle, marginRight: 'auto' }}>
-                  Enter — сохранить · Esc — отмена
-                </span>
-                <button
-                  onClick={() => setOpen(false)}
-                  style={{
-                    ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
-                    cursor: 'pointer', minHeight: 36, padding: '8px 16px',
-                  }}
-                >Отмена</button>
-                <button
-                  onClick={commit}
-                  style={{
-                    ...inputBase, background: c, border: `1px solid ${c}`,
-                    color: '#000', cursor: 'pointer', fontWeight: 700,
-                    minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 10px ${c}44`,
-                  }}
-                >Сохранить</button>
-              </div>
+            <div aria-hidden="true" style={{ height: 3, background: `linear-gradient(90deg, ${c}, ${c}26 70%, transparent)` }} />
+            <div aria-hidden="true" style={{ display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.16)' }} />
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 6px' }}>
+              <span aria-hidden="true" style={{
+                width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: `linear-gradient(135deg, ${c}2e, ${c}14)`,
+                border: `1px solid ${c}44`, fontSize: 15, color: c,
+              }}>{type === 'select' ? '✓' : type === 'number' ? '#' : '✎'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: colors.text, letterSpacing: -0.2 }}>{label}</div>
+                <div style={{ fontSize: 10, color: colors.textSubtle, marginTop: 1 }}>
+                  {type === 'select'
+                    ? 'Выберите значение'
+                    : type === 'number'
+                      ? (min !== undefined && max !== undefined ? `Диапазон ${min}–${max}${unit ? ' ' + unit : ''}` : 'Введите число')
+                      : 'Введите значение'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Закрыть"
+                style={{
+                  width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
+                  color: colors.textMuted, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >✕</button>
+            </div>
+
+            {type === 'select' && options ? (
+              <div style={{ padding: '6px 16px 16px', overflowY: 'auto' }}>
+                {options.length > 5 && (
+                  <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <span aria-hidden="true" style={{
+                      position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 12, color: colors.textSubtle, pointerEvents: 'none',
+                    }}>⌕</span>
+                    <input
+                      value={query}
+                      onChange={e => setQuery(e.target.value)}
+                      placeholder="Поиск…"
+                      aria-label={`Поиск в ${label}`}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '8px 30px 8px 28px', borderRadius: 10,
+                        border: `1px solid ${colors.border}`,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: colors.text, fontSize: 13, outline: 'none', minHeight: 36,
+                      }}
+                    />
+                    {query && (
+                      <button
+                        type="button"
+                        onClick={() => setQuery('')}
+                        aria-label="Очистить поиск"
+                        style={{
+                          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                          width: 20, height: 20, borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.08)', border: 'none',
+                          color: colors.textMuted, fontSize: 9, cursor: 'pointer',
+                        }}
+                      >✕</button>
+                    )}
+                  </div>
+                )}
+                {filtered.map((o, i) => {
+                  const sel = String(value) === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => { onChange(o.id); setOpen(false); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+                        padding: '10px 12px', borderRadius: 12, cursor: 'pointer', marginBottom: 6,
+                        background: sel ? `linear-gradient(135deg, ${c}22, ${c}0d)` : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${sel ? `${c}55` : colors.border}`,
+                        boxShadow: sel ? `0 2px 12px ${c}1f` : 'none',
+                        transition: 'all 0.15s', color: colors.text, minHeight: 46,
+                        animation: 'pve-row-in 0.22s ease both',
+                        animationDelay: `${Math.min(i * 18, 216)}ms`,
+                      }}
+                    >
+                      <span aria-hidden="true" style={{
+                        width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        border: `2px solid ${sel ? c : 'rgba(255,255,255,0.22)'}`,
+                        background: sel ? c : 'transparent',
+                        boxShadow: sel ? `0 0 0 4px ${c}22` : 'none',
+                        transition: 'all 0.15s',
+                      }}>
+                        {sel && <span style={{ color: '#000', fontSize: 10, fontWeight: 900 }}>✓</span>}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{
+                          display: 'block', fontSize: 13, fontWeight: sel ? 800 : 500,
+                          color: sel ? c : colors.text,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>{o.label}</span>
+                        {o.desc && (
+                          <span style={{
+                            display: 'block', fontSize: 10, color: colors.textSubtle,
+                            marginTop: 1, lineHeight: 1.4, fontWeight: 400,
+                          }}>{o.desc}</span>
+                        )}
+                      </span>
+                      {sel && (
+                        <span style={{
+                          fontSize: 10, color: c, fontWeight: 700, flexShrink: 0,
+                          background: `${c}1a`, border: `1px solid ${c}33`,
+                          padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap',
+                        }}>текущее</span>
+                      )}
+                    </button>
+                  );
+                })}
+                {filtered.length === 0 && (
+                  <div style={{ padding: '20px 12px', textAlign: 'center', fontSize: 12, color: colors.textSubtle }}>
+                    Ничего не найдено
+                  </div>
+                )}
+              </div>
+            ) : type === 'number' ? (
+              <div style={{ padding: '6px 16px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px 0 10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => stepBy(-1)}
+                    aria-label="Уменьшить"
+                    style={{
+                      width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
+                      color: colors.text, fontSize: 18, cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >−</button>
+                  <div key={liveNumber ?? 'empty'} style={{
+                    minWidth: 140, textAlign: 'center', fontSize: 34, fontWeight: 900,
+                    color: c, letterSpacing: -1, lineHeight: 1.1,
+                    animation: 'pve-value-pop 0.18s ease',
+                  }}>
+                    {liveNumber ?? '—'}
+                    {unit && <span style={{ fontSize: 15, fontWeight: 700, color: colors.textMuted, marginLeft: 5 }}>{unit}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => stepBy(1)}
+                    aria-label="Увеличить"
+                    style={{
+                      width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`,
+                      color: colors.text, fontSize: 18, cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >+</button>
+                </div>
+                <input
+                  type="range"
+                  min={min ?? 0}
+                  max={max ?? 300}
+                  step={step}
+                  value={sliderVal}
+                  onChange={e => setLocal(e.target.value)}
+                  aria-label={label}
+                  style={{
+                    width: '100%', height: 6, borderRadius: 3, cursor: 'pointer', margin: '0 0 8px',
+                    outline: 'none', appearance: 'none', WebkitAppearance: 'none',
+                    background: `linear-gradient(to right, ${c} 0%, ${c} ${sliderPct}%, rgba(255,255,255,0.1) ${sliderPct}%, rgba(255,255,255,0.1) 100%)`,
+                  }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: colors.textSubtle, marginBottom: 12 }}>
+                  <span>{min ?? 0}</span>
+                  <span>{max ?? 300}</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    value={local}
+                    onChange={e => setLocal(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+                    min={min}
+                    max={max}
+                    step={step}
+                    placeholder={placeholder}
+                    autoFocus
+                    style={{ ...inputStyle, marginBottom: 12, fontSize: 18, padding: '12px 42px 12px 14px' }}
+                    inputMode="decimal"
+                  />
+                  {unit && (
+                    <span aria-hidden="true" style={{
+                      position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 12, color: colors.textSubtle, pointerEvents: 'none',
+                    }}>{unit}</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: colors.textSubtle, marginRight: 'auto' }}>
+                    Enter — сохранить · Esc — отмена
+                  </span>
+                  <button
+                    onClick={() => setOpen(false)}
+                    style={{
+                      ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
+                      cursor: 'pointer', minHeight: 36, padding: '8px 16px',
+                    }}
+                  >Отмена</button>
+                  <button
+                    onClick={commit}
+                    style={{
+                      ...inputBase, background: `linear-gradient(135deg, ${c}, ${c}bb)`,
+                      border: `1px solid ${c}`,
+                      color: '#000', cursor: 'pointer', fontWeight: 700,
+                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${c}3d`,
+                    }}
+                  >Сохранить</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '6px 16px 16px' }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={local}
+                    onChange={e => setLocal(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+                    placeholder={placeholder}
+                    autoFocus
+                    style={{ ...inputStyle, marginBottom: 12, fontSize: 16, padding: '12px 34px 12px 14px' }}
+                  />
+                  {local && (
+                    <button
+                      type="button"
+                      onClick={() => setLocal('')}
+                      aria-label="Очистить"
+                      style={{
+                        position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                        width: 22, height: 22, borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.08)', border: 'none',
+                        color: colors.textMuted, fontSize: 10, cursor: 'pointer',
+                      }}
+                    >✕</button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <span style={{ fontSize: 10, color: colors.textSubtle, marginRight: 'auto' }}>
+                    Enter — сохранить · Esc — отмена
+                  </span>
+                  <button
+                    onClick={() => setOpen(false)}
+                    style={{
+                      ...inputBase, background: 'transparent', border: `1px solid ${colors.border}`,
+                      cursor: 'pointer', minHeight: 36, padding: '8px 16px',
+                    }}
+                  >Отмена</button>
+                  <button
+                    onClick={commit}
+                    style={{
+                      ...inputBase, background: `linear-gradient(135deg, ${c}, ${c}bb)`,
+                      border: `1px solid ${c}`,
+                      color: '#000', cursor: 'pointer', fontWeight: 700,
+                      minHeight: 36, padding: '8px 16px', boxShadow: `0 2px 12px ${c}3d`,
+                    }}
+                  >Сохранить</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       , document.body)}

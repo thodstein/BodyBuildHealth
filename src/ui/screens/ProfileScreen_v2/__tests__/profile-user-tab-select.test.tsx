@@ -59,13 +59,12 @@ describe('PopupValueEditor — выбор значений (портал)', () =
     // Попап рендерится ПРЯМО в body (не внутри карточки с backdrop-filter/overflow:hidden)
     expect(dialog.parentElement).toBe(document.body);
 
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: 'advanced' } });
-    fireEvent.click(screen.getByRole('button', { name: /Сохранить/ }));
+    // Современный селект — список опций-кнопок; клик по опции применяет значение сразу
+    fireEvent.click(screen.getByRole('button', { name: /Продвинутый/ }));
 
     // Значение отобразилось на карточке поля
     expect(screen.getByRole('button', { name: /Уровень: Продвинутый/ })).toBeTruthy();
-    // Попап закрыт после сохранения
+    // Попап закрыт после выбора
     expect(screen.queryByRole('dialog', { name: 'Уровень' })).toBeNull();
 
     await flushDebounce();
@@ -154,9 +153,7 @@ describe('Попапы — отображение пустых/заполнен�
     expect(screen.getByRole('button', { name: /Monte Carlo прогонов: —/ })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Monte Carlo прогонов: —/ }));
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: '5000' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(screen.getByRole('button', { name: '5000' }));
 
     expect(screen.getByRole('button', { name: /Monte Carlo прогонов: 5000/ })).toBeTruthy();
     const p = JSON.parse(localStorage.getItem('he_profile_v2') || '{}');
