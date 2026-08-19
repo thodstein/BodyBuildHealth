@@ -464,6 +464,7 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
 }
 
 export function parseNutritionScreenshot(text: string): ParsedMeal[] {
+  if (typeof text !== 'string' || !text.trim()) return [];
   const lines = reconstructFoodRows(text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2));
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
@@ -580,6 +581,7 @@ function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | nul
 }
 
 export function parseFatSecretText(text: string): ParsedMeal[] {
+  if (typeof text !== 'string' || !text.trim()) return [];
   const lines = reconstructFoodRows(text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1));
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
@@ -714,6 +716,7 @@ function attachVerticalTableIfEmpty(meals: ParsedMeal[], text: string): ParsedMe
 
 /** Parse OCR/export text through both formats and keep the most complete result. */
 export function parseNutritionText(text: string): ParsedMeal[] {
+  if (typeof text !== 'string' || !text.trim()) return [];
   const screenshotMeals = parseNutritionScreenshot(text);
   const exportMeals = parseFatSecretText(text);
   const merged = [...screenshotMeals, ...exportMeals];

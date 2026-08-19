@@ -107,6 +107,12 @@ describe('E2E: полный цикл распознавания еды', () => {
   // 1. Парсинг текста
   // ================================================================
   describe('1. Парсинг текста', () => {
+    it('безопасно обрабатывает пустой OCR-результат', () => {
+      expect(parseNutritionText(undefined as unknown as string)).toEqual([]);
+      expect(parseNutritionScreenshot(null as unknown as string)).toEqual([]);
+      expect(parseFatSecretText('')).toEqual([]);
+    });
+
     it('распознаёт курицу + гречку из скриншота', () => {
       const text = `Курица 200 г 330 ккал Б:40 Ж:10 У:0
 Гречка 150 г 510 ккал Б:18 Ж:4 У:100`;

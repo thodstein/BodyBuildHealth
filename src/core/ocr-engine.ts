@@ -299,9 +299,15 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   let source: 'pdf' | 'image' | 'text' = 'text';
   let confidence = 0.5;
 
-  const isPDF = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-  const isImage = file.type.startsWith('image/') || /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(file.name);
-  const isText = file.type.includes('text') || /\.(txt|csv)$/i.test(file.name);
+  const fileType = typeof file?.type === 'string' ? file.type : '';
+  const fileName = typeof file?.name === 'string' ? file.name : '';
+  const isPDF = fileType === 'application/pdf' || /\.pdf$/i.test(fileName);
+  const isImage = fileType.startsWith('image/') || /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(fileName);
+  const isText = fileType.includes('text') || /\.(txt|csv)$/i.test(fileName);
+
+  if (!file) {
+    return { text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Файл изображения не выбран или недоступен.'] };
+  }
 
   if (isPDF) {
     source = 'pdf';
@@ -372,20 +378,33 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   } else if (isImage) {
     source = 'image';
     try {
+      // Keep the original OCR text. parseLabFile() normalizes text for lab
+      // tables and can fail on a valid food screenshot before nutrition gets
+      // a chance to parse it.
       const imageResult = await parseLabFile(file);
-      rawText = imageResult.rawText || '';
-      const originalText = imageResult.originalText || rawText;
-      
+      rawText = imageResult.rawText || imageResult.originalText || '';
+
       if (rawText.trim().length > 2) {
-        const parsedAll = parseLabTextAllWays(rawText, 'tesseract.js');
+        let parsedAll: ReturnType<typeof parseLabTextAllWays> = { labs: [], provider: 'unknown', warnings: [] };
+        try {
+          parsedAll = parseLabTextAllWays(rawText, 'tesseract.js');
+        } catch (labParseError: any) {
+          warnings.push(`Лабораторный парсер пропущен: ${labParseError?.message || String(labParseError)}`);
+        }
         labs = finalizeLabCandidates(parsedAll.labs);
         const providerName = parsedAll.provider;
         if (providerName !== 'unknown') warnings.push(`Распознан бланк: ${providerName}`);
 
         warnings.push(...parsedAll.warnings);
 
-        // Also try nutrition parsing on original OCR text to preserve table alignment
-        meals = parseNutritionText(originalText);
+        // Nutrition receives the original OCR layout. This supports
+        // FatSecret/MyFitnessPal screenshots independently of lab recognition.
+        try {
+          meals = parseNutritionText(rawText);
+        } catch (nutritionError: any) {
+          warnings.push(`Ошибка разбора питания: ${nutritionError?.message || String(nutritionError)}`);
+          meals = [];
+        }
 
         confidence = (labs.length > 0 || meals.length > 0) ? 0.75 : 0.3;
         if (labs.length === 0 && meals.length === 0) {
