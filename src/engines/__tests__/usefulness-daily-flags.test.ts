@@ -63,3 +63,31 @@ describe('analyzeDailyDiet — флаги флагов (P1-6)', () => {
     expect(r.homaIr).toBeCloseTo(10 * 5.5 / 22.5, 1);
   });
 });
+
+describe('analyzeDailyDiet — профильные микро-таргеты (P1-4)', () => {
+  it('женщина: добавляются железо и кальций', () => {
+    const p = getDefaultProfile();
+    p.sex = 'female';
+    p.lbm = 50;
+    p.weightKg = 60;
+    const r = analyzeDailyDiet(meal('rice_white', 200), p);
+    expect(r.microDeficits).toContain('Железо');
+    expect(r.microDeficits).toContain('Кальций');
+  });
+
+  it('мужчина без PED: железо/кальций не выставляются', () => {
+    const p = getDefaultProfile();
+    const r = analyzeDailyDiet(meal('rice_white', 200), p);
+    expect(r.microDeficits).not.toContain('Железо');
+    expect(r.microDeficits).not.toContain('Кальций');
+  });
+
+  it('курсовой профиль (PED): повышается Mg-таргет и добавляется калий', () => {
+    const p = getDefaultProfile();
+    p.pharma.AAS_INJECTABLE = true;
+    const r = analyzeDailyDiet(meal('rice_white', 200), p);
+    expect(r.microDeficits).toContain('Магний'); // таргет 420 (курсовой) — рис не добирает
+    expect(r.microDeficits).toContain('Калий');
+  });
+});
+

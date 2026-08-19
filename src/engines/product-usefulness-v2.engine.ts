@@ -793,12 +793,27 @@ export function analyzeDailyDiet(
   const omegaThreshold = profile.pharma.OMEGA3_SUPPLEMENT ? 8 : 5;
   const omegaWarning = omegaRatio > omegaThreshold ? `Омега-6/Омега-3: ${omegaRatio.toFixed(1)}:1 (норма <${omegaThreshold}:1)` : null;
 
-  // Micro deficits (simplified)
+  // Micro deficits (P1-4: профильные таргеты — пол/фаза/PED)
   const microDeficits: string[] = [];
+  const noSupp = !profile.pharma.VIT_MIN_SUPPLEMENT;
+  const isFemale = profile.sex === 'female';
+  const onPED = profile.pharma.AAS_INJECTABLE || profile.pharma.AAS_ORAL || profile.pharma.HGH;
   const zincTotal = sumF(f => getMicro(f, 'Zn'));
-  if (zincTotal < 8 && !profile.pharma.VIT_MIN_SUPPLEMENT) microDeficits.push('Цинк');
+  if (zincTotal < 8 && noSupp) microDeficits.push('Цинк');
   const magTotal = sumF(f => getMicro(f, 'Mg'));
-  if (magTotal < 300 && !profile.pharma.VIT_MIN_SUPPLEMENT) microDeficits.push('Магний');
+  // на андрогенной нагрузке потребность Mg выше (420 против 300)
+  const magTarget = onPED ? 420 : 300;
+  if (magTotal < magTarget && noSupp) microDeficits.push('Магний');
+  if (onPED && noSupp) {
+    const kTotal = sumF(f => getMicro(f, 'K'));
+    if (kTotal < 4000) microDeficits.push('Калий');
+  }
+  if (isFemale && noSupp) {
+    const feTotal = sumF(f => getMicro(f, 'Fe'));
+    if (feTotal < 18) microDeficits.push('Железо');
+    const caTotal = sumF(f => getMicro(f, 'Ca'));
+    if (caTotal < 1000) microDeficits.push('Кальций');
+  }
 
   // HOMA-IR
   const l = profile.labs;
