@@ -212,6 +212,8 @@ export const IndividualPlanSettings: React.FC = () => {
   };
 
   if (plannerMode === 'minimal') {
+    // Быстрый режим: только 3 ключевые цели (масса / сушка / поддержание)
+    const MINIMAL_GOALS = GOALS.filter(g => g.id === 'mass' || g.id === 'cutting' || g.id === 'maintenance');
     return (
       <>
         <GlassCard title="⚡ Быстрый КБЖУ" icon="⚡" color="#f59e0b">
@@ -228,12 +230,23 @@ export const IndividualPlanSettings: React.FC = () => {
             <PopupNumber label="Приёмов пищи" value={mealsCount} min={3} max={8} onChange={setMealsCount} />
           </div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
-            {GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
+            {MINIMAL_GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
             <div style={{ padding:7, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#00e68a' }}>{effectiveKcal}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>ккал</div></div>
             <div style={{ padding:7, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#3b82f6' }}>Б {effectiveP} / Ж {effectiveF} / У {effectiveC}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>граммы в день</div></div>
           </div>
+          <div style={{ marginBottom:7 }}>
+            <button onClick={() => switchKbjuMode(kbjuMode === 'manual' ? 'auto' : 'manual')} style={{ padding:'7px 10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700, background: kbjuMode === 'manual' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)', border: kbjuMode === 'manual' ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)', color: kbjuMode === 'manual' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>✏️ Ручное КБЖУ: {kbjuMode === 'manual' ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          </div>
+          {kbjuMode === 'manual' && (
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
+              <PopupNumber label="Ккал" value={manualKcal ?? effectiveKcal} min={500} max={8000} step={50} suffix="ккал" onChange={v => setManualKcal(v)} />
+              <PopupNumber label="Белки" value={manualP ?? effectiveP} min={0} max={500} step={5} suffix="г" onChange={v => setManualP(v)} />
+              <PopupNumber label="Жиры" value={manualF ?? effectiveF} min={0} max={300} step={5} suffix="г" onChange={v => setManualF(v)} />
+              <PopupNumber label="Углеводы" value={manualC ?? effectiveC} min={0} max={1200} step={5} suffix="г" onChange={v => setManualC(v)} />
+            </div>
+          )}
           {errorMsg && <div style={{ fontSize:9, color:'#ef4444', padding:'5px 8px', marginBottom:6, background:'rgba(239,68,68,0.06)', borderRadius:6 }}>⚠️ {errorMsg}</div>}
           <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
         </GlassCard>
@@ -543,7 +556,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         </GlassCard>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Диетические паузы" icon="🔄" color="#a78bfa">
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
           {[['none','⏹️ Нет','Без пауз'],['refeed','🍝 Рефид','1 день повыш. угл.'],['flex_80_20','📊 80/20','20% гибкость'],['periodization_2_1','⏳ 2+1','2 нед деф. + 1 нед'],['diet_5_2','📅 5/2','5 дней норм + 2 облегч.']].map(([id,label,desc]) => (
@@ -623,7 +636,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         </div>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
           {PHASES.map(p => (
@@ -1132,7 +1145,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Скользящие графики" icon="📊" color="#00e68a">
         {(() => {
           // D-22: nutrMult already folded into effective* — do NOT multiply again.
@@ -1183,7 +1196,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Определяет качество продуктов: низкий = базовые продукты, средний = сбалансированный, максимум = топ по рейтингу <span style={{ color:'#f59e0b', fontWeight:700 }}>bb_quality_score</span>, усиленный = только элитные.
@@ -1213,7 +1226,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Разнообразие рациона" icon="🎲" color="#8b5cf6">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Минимум — одни и те же продукты каждый день (проще готовить и закупать). Максимум — полная ротация для разнообразия нутриентов.
@@ -1240,7 +1253,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5. Используется для коррекции калоража без смены цели.
@@ -1299,7 +1312,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       )}
 
         {/* Work Schedule — MOVED FROM INSIDE Циклирование */}
-      {true && (
+        {plannerMode === 'pro' && (
         <GlassCard title="💼 Работа" icon="💼" color="#60a5fa">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1443,7 +1456,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="🌙 Вечерний режим" icon="🌙" color="#6366f1">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
           Автоматически включается при выборе «Отёки» или «Диабет». Снижает количество углеводов в вечернем приёме пищи, перенося их на обед.
@@ -1478,6 +1491,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
+      {plannerMode === 'pro' && (
             <GlassCard title="🏭 Подбор продуктов" icon="🏭" color="#06b6d4">
         {/* Адаптация по дневнику + строгая вариативность */}
         <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.18)' }}>
@@ -1532,7 +1546,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           })}
         </div>
       </GlassCard>
-      {true && (
+      )}
+      {plannerMode === 'pro' && (
       <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
         {/* P2.1: 3 categories, 12 presets */}
         {([
@@ -1776,7 +1791,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </>;
       })()}
 
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="Циклирование" icon="🔄" color="#3b82f6">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {[
@@ -2421,7 +2436,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
 
 
       {/* B1 — SpecialMealPopup */}
-      {true && (
+      {plannerMode === 'pro' && (
       <GlassCard title="➕ Спецприём" icon="🍽️" color="#f97316">
         <button onClick={() => {
           setSpecialMealType('cheat_meal');

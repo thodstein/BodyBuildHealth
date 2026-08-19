@@ -991,6 +991,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem('he_planner_pharma', JSON.stringify(v2Pharma)); } catch {} }, [v2Pharma]);
   useEffect(() => { try { localStorage.setItem('he_planner_histamine', histamineSensitive ? 'true' : 'false'); } catch {} }, [histamineSensitive]);
   useEffect(() => { try { localStorage.setItem('he_planner_mode', plannerMode); } catch {} }, [plannerMode]);
+  // Быстрый режим: только 3 цели (масса/сушка/поддержание) — нормализуем цель при входе,
+  // чтобы выбранная ранее цель (сила/реабилитация и т.п.) не давала расчёт вне интерфейса.
+  useEffect(() => {
+    if (plannerMode === 'minimal' && goal !== 'mass' && goal !== 'cutting' && goal !== 'maintenance') {
+      setGoal('maintenance');
+      setGoalUserSet(true);
+    }
+  }, [plannerMode, goal]);
    useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
    // FIX save-buttons: пользовательские рецепты читались из he_user_recipes, но НИКОГДА
    // не сохранялись — созданный рецепт пропадал при перезагрузке.

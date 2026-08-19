@@ -8,6 +8,7 @@ import { MealComposer } from "./MealComposer";
 import { OrganLoadCalculator } from "./OrganLoadCalculator";
 import { PeakWeekTab } from "./PeakWeekTab";
 import { usePlanCtx } from "./IndividualPlanContext";
+import type { PlannerMode } from "./types";
 
 type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload' | 'peak';
 
@@ -48,19 +49,31 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
   { key: 'peak', label: 'Тапер ББ', icon: '🏁' },
 ];
 
+// Вкладки по режиму: pro — все; simple — только базовые (без Отчёта/Нагрузки/Тапера);
+// minimal — только Настройки. Скрытые вкладки убирают лишнюю информацию и «раздутый» интерфейс.
+const isTabAllowed = (key: PlanTab, mode: PlannerMode): boolean => {
+  if (mode === 'pro') return true;
+  if (mode === 'simple') return key === 'settings' || key === 'plan' || key === 'composer';
+  return key === 'settings';
+};
+
 const IndividualPlanInner: React.FC = () => {
-  const { planTab, setPlanTab } = usePlanCtx();
+  const { planTab, setPlanTab, plannerMode } = usePlanCtx();
   const tab = planTab as PlanTab;
   const setTab = (t: PlanTab) => setPlanTab(t);
   const [disclaimerDismissed, setDisclaimerDismissed] = useState(() => { try { return localStorage.getItem('he_disclaimer_dismissed') === 'true'; } catch { return false; } });
+
+  const visibleTabs = TAB_META.filter(t => isTabAllowed(t.key, plannerMode));
+  // Если активная вкладка скрыта в текущем режиме — рендерим Настройки
+  const activeTab: PlanTab = visibleTabs.some(t => t.key === tab) ? tab : 'settings';
 
   return (
     <>
       {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); try { localStorage.setItem('he_disclaimer_dismissed', 'true'); } catch {} }} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
         <div style={{ display:'flex', gap:6, padding:'6px 2px', overflowX:'auto', scrollbarWidth:'none' }}>
-          {TAB_META.map(t => {
-            const active = tab === t.key;
+          {visibleTabs.map(t => {
+            const active = activeTab === t.key;
             return (
               <button key={t.key} onClick={() => setTab(t.key)} style={{
                 flexShrink:0, padding:'8px 13px', borderRadius:999, cursor:'pointer', minHeight: 36,
@@ -77,12 +90,12 @@ const IndividualPlanInner: React.FC = () => {
             );
           })}
         </div>
-        {tab === 'settings' && <IndividualPlanSettings />}
-        {tab === 'plan' && <IndividualPlanResults />}
-        {tab === 'composer' && <MealComposer />}
-        {tab === 'report' && <ReportTab />}
-        {tab === 'organload' && <OrganLoadCalculator />}
-        {tab === 'peak' && <PeakWeekTab />}
+        {activeTab === 'settings' && <IndividualPlanSettings />}
+        {activeTab === 'plan' && <IndividualPlanResults />}
+        {activeTab === 'composer' && <MealComposer />}
+        {activeTab === 'report' && <ReportTab />}
+        {activeTab === 'organload' && <OrganLoadCalculator />}
+        {activeTab === 'peak' && <PeakWeekTab />}
       </div>
     </>
   );
