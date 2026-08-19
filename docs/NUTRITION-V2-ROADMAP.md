@@ -83,6 +83,8 @@ tsc 0, vite build OK.
    (7 тестов): ammoniaRisk, electrolyteRisk, microDeficits (Zn/Mg), glutathioneWarning,
    antinutrientWarning, histamineWarning, homaIr.
 7. **Дублирование DIGEST/DIET_PROFILE** (разные значения veg_fruit 0.78 vs 0.85) — одна константа.
+   ✅ Устранено в P0-1: `DIET_PROFILE`/`REF_PATTERN` удалены из `kbju-food-match`; канонический
+   `DIGEST` (с доп. категориями) остаётся один в V2-движке.
 
 ### P2 — UX/консистентность
 8. Отчёт дня в печати (скор + флаги + покрытие).
