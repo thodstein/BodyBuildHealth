@@ -131,6 +131,14 @@ let reloadFn: () => void = () => {
 let installed = false;
 const origSetItem = typeof localStorage !== 'undefined' ? localStorage.setItem.bind(localStorage) : null;
 const origRemoveItem = typeof localStorage !== 'undefined' ? localStorage.removeItem.bind(localStorage) : null;
+const origGetItem = typeof localStorage !== 'undefined' ? localStorage.getItem.bind(localStorage) : null;
+
+/** Признак «пишем сами из pull()» — такие записи не считаются локальной правкой. */
+let applyingRemote = false;
+
+/** Признак «идёт сетевой pull» — правки, сделанные в это время, не должны затираться. */
+let pulling = false;
+const dirtyDuringPull = new Set<string>();
 
 /* ------------------------------------------------------------------ */
 /* Публичное API                                                       */
@@ -251,6 +259,9 @@ export function _resetKvForTests(): void {
   idbEnabled = false;
   idbMeta = new Map();
   state = { status: 'off' };
+  applyingRemote = false;
+  pulling = false;
+  dirtyDuringPull.clear();
   reloadFn = () => { try { if (typeof location !== 'undefined') location.reload(); } catch { /* no-op */ } };
   if (flushTimer != null) { clearTimeout(flushTimer); flushTimer = null; }
   if (metaTimer != null) { clearTimeout(metaTimer); metaTimer = null; }
@@ -358,15 +369,28 @@ function markRemoved(k: string): void {
 }
 
 function installHook(): void {
-  if (installed || typeof localStorage === 'undefined' || !origSetItem || !origRemoveItem) return;
+  if (installed || typeof localStorage === 'undefined' || !origSetItem || !origRemoveItem || !origGetItem) return;
   installed = true;
   localStorage.setItem = (k, v) => {
+    if (applyingRemote) {
+      // запись из pull() — не локальная правка
+      origSetItem(k, v);
+      return;
+    }
+    let prev: string | null = null;
+    try { prev = origGetItem(k); } catch { /* no-op */ }
     origSetItem(k, v);
+    // значение не изменилось (перезапись теми же данными) — не считаем правкой,
+    // иначе пустой flush с «свежим» временем затирал бы правки другого устройства
+    if (prev === v) return;
     markDirty(k);
+    // правка сделана, пока шёл сетевой pull — её нет в снимке облака, нельзя затирать
+    if (pulling) dirtyDuringPull.add(k);
   };
   localStorage.removeItem = (k) => {
     origRemoveItem(k);
     markRemoved(k);
+    if (pulling) dirtyDuringPull.add(k);
   };
 }
 
@@ -548,7 +572,7 @@ async function pullIdb(byKey: Map<string, KvRow[]>): Promise<number> {
           metaChanged = true;
         }
       }
-      // localSig !== prev.sig → локальная правка: победит pushIdb
+      // prev отсутствует или localSig !== prev.sig → локальная версия побеждает (pushIdb)
     }
   }
   // удаления в облаке: локально не менялось → применяем
@@ -614,6 +638,7 @@ async function flush(): Promise<void> {
 async function pull(opts?: { reload?: boolean }): Promise<number> {
   if (!transport || !token) return 0;
   const rows: KvRow[] = [];
+  pulling = true;
   try {
     // onServerNow калибрует skewMs ДО обработки строк (часы сервера — источник правды)
     await transport.pull(
@@ -622,8 +647,12 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
       serverNow => { skewMs = serverNow - Date.now(); },
     );
   } catch (e) {
+    pulling = false;
+    dirtyDuringPull.clear();
     setState({ status: 'error', error: (e as Error)?.message || 'pull failed' });
     return 0;
+  } finally {
+    pulling = false;
   }
   const byKey = new Map<string, KvRow[]>();
   for (const r of rows) {
@@ -632,32 +661,40 @@ async function pull(opts?: { reload?: boolean }): Promise<number> {
     byKey.set(r.key, list);
   }
   let applied = 0;
-  for (const [k, keyRows] of byKey) {
-    if (k.startsWith(IDB_KV_PREFIX)) continue; // IndexedDB-записи обрабатывает pullIdb
-    const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
-    if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) {
-      // неполная/битая запись в облаке: если локально данные есть — локальные новее,
-      // выгружаем их (залечиваем облако)
-      let hasLocal = false;
-      try { hasLocal = localStorage.getItem(k) != null; } catch { hasLocal = false; }
-      if (hasLocal) {
-        if (!mtimes.has(k)) mtimes.set(k, serverNowMs());
+  applyingRemote = true;
+  try {
+    for (const [k, keyRows] of byKey) {
+      if (k.startsWith(IDB_KV_PREFIX)) continue; // IndexedDB-записи обрабатывает pullIdb
+      const count = keyRows.find(r => r.chunk_index === 0)?.chunk_count;
+      if (!count || keyRows.filter(r => r.chunk_index < count).length !== count) {
+        // неполная/битая запись в облаке: если локально данные есть — локальные новее,
+        // выгружаем их (залечиваем облако)
+        let hasLocal = false;
+        try { hasLocal = localStorage.getItem(k) != null; } catch { hasLocal = false; }
+        if (hasLocal) {
+          if (!mtimes.has(k)) mtimes.set(k, serverNowMs());
+          dirty.add(k);
+        }
+        continue;
+      }
+      const chunks = keyRows.filter(r => r.chunk_index < count);
+      const value = joinChunks(chunks);
+      const remoteTs = Math.max(...keyRows.map(r => Date.parse(r.updated_at) || 0));
+      const localMtime = mtimes.get(k) || 0;
+      // локальная правка сделана ПОКА шёл сетевой pull — её нет в снимке облака → локальная
+      const winner = dirtyDuringPull.has(k) ? 'local' : pickConflict(localMtime, remoteTs);
+      if (winner === 'remote') {
+        localStorage.setItem(k, value);
+        mtimes.set(k, remoteTs);
+        dirty.delete(k);
+        applied++;
+      } else if (winner === 'local') {
         dirty.add(k);
       }
-      continue;
     }
-    const chunks = keyRows.filter(r => r.chunk_index < count);
-    const value = joinChunks(chunks);
-    const remoteTs = Math.max(...keyRows.map(r => Date.parse(r.updated_at) || 0));
-    const winner = pickConflict(mtimes.get(k) || 0, remoteTs);
-    if (winner === 'remote') {
-      localStorage.setItem(k, value);
-      mtimes.set(k, remoteTs);
-      dirty.delete(k);
-      applied++;
-    } else if (winner === 'local') {
-      dirty.add(k);
-    }
+  } finally {
+    applyingRemote = false;
+    dirtyDuringPull.clear();
   }
   reconcileLocalKeys(byKey);
   writeMetaNow();

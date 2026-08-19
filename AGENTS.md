@@ -31,19 +31,25 @@
   менялась с последней синхронизации, локальная правка побеждает и выгружается; локальное
   удаление помечается tombstone (`deleted`) и НЕ воскрешается pull'ом, выгрузка удаления
   делает pushIdb; pushIdb вызывается в конце pull() (каждые 30с/при входе/focus).
+  **Защита от «отскока» данных**: (1) перехват setItem не считает правкой запись ТЕХ ЖЕ
+  данных (иначе пустой авто-save на одном устройстве затирал правку другого «свежим»
+  временем); (2) правка, сделанная ПОКА шёл сетевой pull (`dirtyDuringPull`), всегда
+  побеждает снимок облака; (3) в остальных случаях — LWW по серверному времени (окно
+  500 мс = 'none', никто не побеждает).
   Исключения: `he_session_v2`, `he_crypto_key`, `he_last_active`, `he_sync_*`, `he_draft_*`,
   `he_nav_*`, `he_admin_*`.
 - **`auth-module.ts`**: `initKvSync(user.id)` после входа в TG-пути (до onLogin — pull
   применяется до рендера). Вне Telegram (PWA/браузер) синк выключен by design.
 - **`supabase/migrations/20260818_user_kv.sql`** (NEW): таблица + RLS по
   `current_setting('request.headers')::jsonb->>'x-user-token'` + grants anon/authenticated.
-- **Тесты**: `cloud-kv.test.ts` 38/38 (чанки/суррогатные пары, исключения, LWW-конфликты,
+- **Тесты**: `cloud-kv.test.ts` 41/41 (чанки/суррогатные пары, исключения, LWW-конфликты,
   токен, pull/push/remove, залечивание неполной записи, рестарт без повторного push,
   keepalive-бюджет, фоновый pull → pendingUpdate без авто-reload + reloadKvView/
   clearKvPendingUpdate, skew-тесты: часы телефона спешат на 1ч —
   запись ПК побеждает; IndexedDB: телефон→ПК, ПК→телефон, локальная правка побеждает,
   удаление в обе стороны, tombstone без воскрешения, стабильная сигнатура при порядке
-  полей) + `kv-update-banner.test.tsx` 4/4 (вкл. авто-скрытие) + `kv-sync-button.test.tsx`
+  полей; «отскок»: пустая перезапись не пушится, правка во время pull не затирается)
+  + `kv-update-banner.test.tsx` 4/4 (вкл. авто-скрытие) + `kv-sync-button.test.tsx`
   2/2. `src/test/setup.ts` — mock localStorage
   дополнен стандартными `length`/`key()` (ранее отсутствовали — ломало перечисление ключей).
 - **ВАЖНО**: Supabase-проект из `.env` был удалён (NXDOMAIN), пользователь восстановил —

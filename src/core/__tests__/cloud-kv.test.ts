@@ -544,3 +544,65 @@ describe('синхронизация IndexedDB (анализы/курс/днев
     expect(t.replaceCalls.filter(k => k === 'idb:workout_log:w1')).toHaveLength(1);
   });
 });
+
+describe('защита от «отскока» данных назад', () => {
+  class GatedTransport extends FakeTransport {
+    gate?: Promise<void>;
+    async pull(_token: string, onRows: (rows: KvRow[]) => void, onServerNow?: (ms: number) => void): Promise<void> {
+      if (onServerNow) onServerNow(Date.now());
+      if (this.gate) await this.gate;
+      onRows([...this.cloud.values()].flat());
+    }
+  }
+
+  it('перезапись ключа теми же данными не провоцирует push с новой меткой времени', async () => {
+    const t = new FakeTransport();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    localStorage.setItem('he_profile_v2', '{"v":"base"}');
+    await flushKvNow();
+    const pushesBefore = t.replaceCalls.filter(k => k === 'he_profile_v2').length;
+
+    // типичный auto-save на старте: записывают то же значение
+    localStorage.setItem('he_profile_v2', '{"v":"base"}');
+    await flushKvNow();
+    expect(t.replaceCalls.filter(k => k === 'he_profile_v2').length).toBe(pushesBefore);
+  });
+
+  it('локальная правка во время сетевого pull не затирается «чужой» будущей версией', async () => {
+    const t = new GatedTransport();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    localStorage.setItem('he_profile_v2', '{"v":"base"}');
+    await flushKvNow();
+
+    // «другое устройство» записало в облако версию с более поздней меткой времени
+    t.seed('he_profile_v2', '{"v":"remote-stale"}', Date.now() + 60_000);
+
+    // запускаем pull, который «завис» на сетевом запросе
+    let resolveGate!: () => void;
+    t.gate = new Promise<void>(r => { resolveGate = r; });
+    const pullPromise = pullKvNow();
+
+    // пока pull в полёте, пользователь правит ключ
+    localStorage.setItem('he_profile_v2', '{"v":"my-edit"}');
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"v":"my-edit"}');
+
+    resolveGate();
+    await pullPromise;
+    // правка не отскакивает назад к «чужой» версии
+    expect(localStorage.getItem('he_profile_v2')).toBe('{"v":"my-edit"}');
+  });
+
+  it('правка, сделанная до pull, побеждает только если её время новее (LWW сохранён)', async () => {
+    vi.useFakeTimers();
+    const t = new FakeTransport();
+    await initKvSync('tg_123', { transport: t, token: 'tk_test', flushDelayMs: 20 });
+    localStorage.setItem('he_weight_log', '[{"w":80}]');
+    await flushKvNow(); // локальная правка зафиксирована в момент T0
+    vi.setSystemTime(Date.now() + 60_000); // время уходит вперёд
+    // облако получило более новую версию от другого устройства
+    t.seed('he_weight_log', '[{"w":82}]', Date.now() + 60_000);
+    const applied = await pullKvNow();
+    expect(applied).toBe(1);
+    expect(localStorage.getItem('he_weight_log')).toBe('[{"w":82}]');
+  });
+});
