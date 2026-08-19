@@ -238,6 +238,11 @@ MPV 10,5 фл 7-12`);
     expect(kdl.values.map(v => v.code)).toEqual(expect.arrayContaining(['HGB', 'WBC']));
   });
 
+  it('replaces an incomplete provider candidate with a richer generic candidate', () => {
+    const result = parseLabText('ИНВИТРО\nГлюкоза 5,4 ммоль/л 3,9-5,5');
+    expect(result.values.find(v => v.code === 'GLU')).toMatchObject({ value: 5.4, refLow: 3.9, refHigh: 5.5 });
+  });
+
   it('parses non-numeric reference markers like < and > bounds', () => {
     const result = parseLabText('D-димер < 0,5 мкг/л\nБилирубин прямой < 5 мкмоль/л');
     // Longest-match: "Билирубин прямой" → BILD (билирубин прямой), не BIL (общий)

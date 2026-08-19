@@ -850,7 +850,8 @@ export function parseLabText(rawText: string): ParsedLabResult {
   // contain mixed rows where only part of the table was split correctly.
   for (const line of lines) {
     const result = tryParseLabFromLine(line);
-    if (!result || values.some(v => v.code === result.code)) continue;
+    if (!result) continue;
+    if (values.some(v => v.code === result.code)) continue;
     values.push({
       ...result,
       isAbnormal: result.refHigh !== undefined ? result.value > result.refHigh : result.refLow !== undefined ? result.value < result.refLow : undefined,
