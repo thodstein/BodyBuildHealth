@@ -16,16 +16,17 @@ const cardBtn = (active?: boolean): React.CSSProperties => ({
 });
 
 const overlay: React.CSSProperties = {
-  position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'rgba(5,5,8,0.72)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
   animation: 'fadeSlideIn 0.18s ease',
+  padding: '12px',
 };
 
 const sheet: React.CSSProperties = {
-  width: '100%', maxWidth: 380, maxHeight: '80vh', overflowY: 'auto', borderRadius: '20px 20px 0 0',
+  width: '100%', maxWidth: 380, maxHeight: '80vh', overflowY: 'auto', borderRadius: '20px',
   background: 'linear-gradient(180deg, #1e1e22, #141417)',
-  border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
-  boxShadow: '0 -10px 44px rgba(0,0,0,0.55)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  boxShadow: '0 18px 54px rgba(0,0,0,0.55)',
   animation: 'fadeSlideIn 0.22s ease',
   paddingBottom: 16,
 };

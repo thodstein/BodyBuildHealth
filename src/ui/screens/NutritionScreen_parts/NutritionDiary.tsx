@@ -615,9 +615,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
       {/* Edit modal */}
       {editItem && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'rgba(0,0,0,0.7)' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', padding: '12px' }}
           onClick={() => setEditItem(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, padding: '16px 20px 28px', borderRadius: '20px 20px 0 0', background: '#18181b', boxShadow: '0 -4px 30px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, padding: '16px 20px 28px', borderRadius: '20px', background: '#18181b', boxShadow: '0 18px 54px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)', margin: '0 auto 16px' }} />
             <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 2, letterSpacing: -0.3 }}>✎ {editItem.item.name}</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Изменить количество</div>

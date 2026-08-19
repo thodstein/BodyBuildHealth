@@ -24,15 +24,16 @@ const iconStyle: React.CSSProperties = { fontSize: 16, lineHeight: 1 };
 
 const popupOverlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,
-  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'rgba(0,0,0,0.7)',
+  padding: '12px',
 };
 
 const popupSheet: React.CSSProperties = {
   width: '100%', maxWidth: 400,
-  padding: '14px 20px 28px', borderRadius: '20px 20px 0 0',
-  background: '#18181b', boxShadow: '0 -4px 30px rgba(0,0,0,0.4)',
-  border: '1px solid rgba(255,255,255,0.06)', borderBottom: 'none',
+  padding: '14px 20px 28px', borderRadius: '20px',
+  background: '#18181b', boxShadow: '0 18px 54px rgba(0,0,0,0.5)',
+  border: '1px solid rgba(255,255,255,0.08)',
   maxHeight: '75vh', overflowY: 'auto', boxSizing: 'border-box',
 };
 
