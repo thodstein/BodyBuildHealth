@@ -11,19 +11,36 @@ export const PeriWorkoutCard: React.FC = () => {
   const linked = useDataLink();
   const bw = linked.profile?.settings?.weight || 80;
   const goal = linked.profile?.settings?.primaryGoal || 'strength';
+  const training = linked.profile?.settings?.training;
+  const pharma = linked.profile?.settings?.pharma;
   const [overrideVol, setOverrideVol] = useState<number>(0);
   const [overrideDur, setOverrideDur] = useState<number>(0);
 
   const last = useMemo(() => loadSessions()[0], []);
+  const inferredIntensity = (last?.avgIntensity || 0) >= 8 ? 'high' : (last?.avgIntensity || 0) > 0 && (last?.avgIntensity || 0) <= 6 ? 'low' : (training?.minutesPerSession || 60) >= 90 ? 'high' : 'medium';
+  const [intensity, setIntensity] = useState<'low' | 'medium' | 'high'>(inferredIntensity);
   const sessionVolume = overrideVol || last?.totalVolume || 0;
   const durationMin = overrideDur || last?.durationMin || 0;
 
-  const plan = useMemo(() => computePeriWorkoutNutrition({ sessionVolume, durationMin, bodyWeight: bw, goal }), [sessionVolume, durationMin, bw, goal]);
+  const plan = useMemo(() => computePeriWorkoutNutrition({
+    sessionVolume, durationMin, bodyWeight: bw, goal, intensity,
+    ped: { hasInsulin: pharma?.hasInsulin, hasGH: pharma?.hasGH, hasIGF: pharma?.hasIGF, insulinIU: pharma?.insulinIU, ghIU: pharma?.ghIU },
+  }), [sessionVolume, durationMin, bw, goal, intensity, pharma?.hasInsulin, pharma?.hasGH, pharma?.hasIGF, pharma?.insulinIU, pharma?.ghIU]);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🥤 Пери-воркаутное питание</div>
       <div style={{ ...SMALL, marginBottom: 10 }}>Рекомендации по углеводам/белку/жидкости до/во время/после тренировки — на основе последней сессии из блока Тренировки и массы тела ({bw} кг).</div>
+
+      <div style={{ ...CARD, borderColor: 'rgba(245,158,11,0.25)' }}>
+        <label style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>📊 Интенсивность тренировки</label>
+        <select value={intensity} onChange={e => setIntensity(e.target.value as 'low' | 'medium' | 'high')} style={{ width: '100%', marginTop: 6, background: '#202023', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: 8, fontSize: 12 }}>
+          <option value="low">Низкая · восстановительная</option>
+          <option value="medium">Средняя · рабочая</option>
+          <option value="high">Высокая · тяжёлая/длинная</option>
+        </select>
+        <div style={{ ...SMALL, marginTop: 5 }}>Авто: по avg RPE последней сессии и длительности; можно уточнить вручную.</div>
+      </div>
 
       {last ? (
         <div style={{ ...CARD, borderColor: 'rgba(59,130,246,0.25)' }}>
@@ -67,6 +84,10 @@ export const PeriWorkoutCard: React.FC = () => {
           <div style={{ ...CARD, borderColor: 'rgba(96,165,250,0.2)' }}>
             <div style={{ fontSize: 11, color: '#60a5fa', fontWeight: 700 }}>💧 Жидкость за сессию: ~{plan.fluidTotalMl} мл</div>
           </div>
+          {plan.safetyWarnings.length > 0 && <div style={{ ...CARD, borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
+            <div style={{ fontSize: 11, color: '#f87171', fontWeight: 700, marginBottom: 4 }}>⚠️ PED-контекст</div>
+            {plan.safetyWarnings.map((warning, i) => <div key={i} style={{ ...SMALL, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>{warning}</div>)}
+          </div>}
           <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Обоснование</div>
             {plan.rationale.map((t, i) => <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: 2 }}>{t}</div>)}
