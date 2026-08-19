@@ -5113,9 +5113,16 @@ export const BbAutoConstructor: React.FC = () => {
             {prepResult.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: '#fbbf24', padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>{w}</div>)}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {prepResult.phases.map(p => (
-                <span key={p.key} style={{ padding: '4px 9px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: `${p.color}22`, border: `1px solid ${p.color}55`, color: p.color }}>{p.label} · нед {p.weekStart}-{p.weekEnd}</span>
-              ))}
+              {prepResult.phases.map(p => {
+                const dateStr = p.dateStart && p.dateEnd
+                  ? (p.key === 'show_day' ? ` 📅 ${p.dateStart}` : ` 📅 ${p.dateStart.slice(5)}–${p.dateEnd.slice(5)}`)
+                  : '';
+                return (
+                  <span key={p.key} title={`${p.note ?? ''}`} style={{ padding: '4px 9px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: `${p.color}22`, border: `1px solid ${p.color}55`, color: p.color }}>
+                    {p.label} · нед {p.weekStart}-{p.weekEnd}{dateStr}
+                  </span>
+                );
+              })}
             </div>
 
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
