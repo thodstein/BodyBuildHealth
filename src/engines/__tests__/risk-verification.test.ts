@@ -110,7 +110,7 @@ describe('markerStatus / статусы', () => {
     expect(statusLabel(0)).toBe('норма');
     expect(statusLabel(3)).toBe('критический');
     expect(thresholdText(ldl)).toBe('≥2.6 · ≥3.4 · ≥4.9');
-    expect(thresholdText(k)).toBe('≤3.5 · ≤3.0 · ≤2.5');
+    expect(thresholdText(k)).toBe('≤3.5 · ≤3 · ≤2.5');
   });
 });
 
