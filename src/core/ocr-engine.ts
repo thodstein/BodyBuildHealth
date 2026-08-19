@@ -39,6 +39,21 @@ async function readFileAsText(file: File | Blob): Promise<string> {
   });
 }
 
+async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
+  if (typeof (file as any).arrayBuffer === 'function') {
+    try { return await (file as any).arrayBuffer(); } catch { /* use FileReader */ }
+  }
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (reader.result instanceof ArrayBuffer) resolve(reader.result);
+      else reject(new Error('FileReader returned an invalid buffer'));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 export interface OCRResult {
   text: string;
   labs: ParsedLabValue[];
@@ -271,13 +286,30 @@ function isMobileClient(): boolean {
 }
 
 async function serverOcrScannedPdf(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const bytes = new Uint8Array(await readFileAsArrayBuffer(file));
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
   const response = await fetch('./api/ocr-scanned-pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: btoa(binary) }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `Server OCR HTTP ${response.status}`);
+  return typeof payload.text === 'string' ? payload.text : '';
+}
+
+async function serverOcrImage(file: File): Promise<string> {
+  const bytes = new Uint8Array(await readFileAsArrayBuffer(file));
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+  }
+  const response = await fetch('./api/ocr-image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data: btoa(binary) }),
@@ -378,11 +410,14 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   } else if (isImage) {
     source = 'image';
     try {
-      // Keep the original OCR text. parseLabFile() normalizes text for lab
-      // tables and can fail on a valid food screenshot before nutrition gets
-      // a chance to parse it.
-      const imageResult = await parseLabFile(file);
-      rawText = imageResult.rawText || imageResult.originalText || '';
+      try {
+        rawText = await serverOcrImage(file);
+        warnings.push('Фото обработано на сервере OCR.');
+      } catch (serverError: any) {
+        warnings.push(`Серверный OCR недоступен, использую локальный: ${serverError?.message || String(serverError)}`);
+        const imageResult = await parseLabFile(file);
+        rawText = imageResult.rawText || imageResult.originalText || '';
+      }
 
       if (rawText.trim().length > 2) {
         let parsedAll: ReturnType<typeof parseLabTextAllWays> = { labs: [], provider: 'unknown', warnings: [] };
