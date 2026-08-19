@@ -596,4 +596,43 @@ export function buildTaperCoachPrintHtml(verdict: TaperCoachVerdict, ctx?: Taper
   return lines.join('\n');
 }
 
+/**
+ * Печать ТАПЕР-ПЛАНА (пик-блока) — PDF через window.print (XSS-экранирование).
+ * Показывает только хвост блока (вход в пик / mock / тапер / соревнования / пост):
+ * неделя, даты, объём (сетов), средняя интенсивность (% ПМ), прикиды.
+ */
+export function buildPLTaperPrintHtml(plan: LMSBuildOutput): string {
+  const esc = escHtml;
+  const tail = (plan?.weeks ?? []).filter(w => w.taperWeek || w.mockMeet || w.meetWeek || w.postMeet);
+  const lines: string[] = [];
+  lines.push('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Тапер-план (ПЛ)</title>');
+  lines.push('<style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;max-width:820px;margin:0 auto;padding:20px}h1{font-size:18px;color:#b45309}table{border-collapse:collapse;width:100%;margin-top:10px}td,th{border:1px solid #ddd;padding:5px 8px;text-align:left;font-size:11px;vertical-align:top}th{background:#f6e7cf}.flag{font-weight:700;white-space:nowrap}.warn{color:#b45309;font-weight:700}.date{color:#666;font-size:10px}.att{font-size:10px;color:#333}</style></head><body>');
+  lines.push('<h1>🏁 Тапер-план (пик-блок ПЛ)</h1>');
+  lines.push(`<div style="font-size:11px;margin-bottom:6px">Цикл: <b>${esc(plan?.template?.meta?.title ?? '—')}</b> · недель блока: <b>${tail.length}</b></div>`);
+  if (tail.length === 0) {
+    lines.push('<p style="color:#b45309">Тапер-блок не сгенерирован.</p>');
+  } else {
+    lines.push('<table><tr><th>Нед</th><th>Тип</th><th>Даты</th><th>Сетов</th><th>Инт. %</th><th>Прикиды</th><th>Заметка</th></tr>');
+    for (const w of tail) {
+      let sets = 0, pctSum = 0, pctN = 0;
+      for (const d of w.days) for (const e of d.exercises) for (const ws of e.workSets) {
+        const s = ws.sets ?? 0; sets += s; pctSum += (ws.pct ?? 0) * s; pctN += s;
+      }
+      const avgPct = pctN > 0 ? Math.round((pctSum / pctN) * 100) : 0;
+      let flag = '';
+      if (w.meetWeek) flag = '🏁 Соревнования';
+      else if (w.mockMeet) flag = '🎯 Mock meet';
+      else if (w.postMeet) flag = '🔄 Пост-старт';
+      else if (w.taperWeek) flag = '📉 Тапер/вход';
+      const date = w.weekStart && w.weekEnd ? `${w.weekStart} – ${w.weekEnd}` : '';
+      const att = (w.meetAttempts?.lifts ?? [])
+        .map(l => `${esc(l.name)}: ${l.opener}/${l.second}/${l.third}`).join(' · ');
+      lines.push(`<tr><td>${w.week}</td><td class="flag">${flag}</td><td class="date">${esc(date)}</td><td>${sets}</td><td>${avgPct}%</td><td class="att">${esc(att)}</td><td>${esc(w.taperNote ?? '')}</td></tr>`);
+    }
+    lines.push('</table>');
+  }
+  lines.push('</body></html>');
+  return lines.join('\n');
+}
+
 export { buildPLTaperCurve };

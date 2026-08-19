@@ -34,7 +34,7 @@ describe('PLCompetitionTab', () => {
     expect(screen.getByText(/Стратегия прикидов/)).toBeTruthy();
     expect(screen.getByText(/Подобрать тапер автоматически/)).toBeTruthy();
     expect(screen.getAllByText(/Сгенерировать тапер-план/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Добавить тапер к плану/)).toBeTruthy();
+    expect(screen.getAllByText(/Пик-блок на окно/).length).toBeGreaterThan(0);
   });
 
   it('бейдж готовности старта в сезоне (weeksToStart=8 → 🧠 75%)', () => {

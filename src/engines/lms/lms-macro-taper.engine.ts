@@ -14,6 +14,7 @@
  *  - неделя ПОСЛЕ старта → пост-соревновательное восстановление (объём ×0.5, RIR +3).
  */
 import { buildPLTaperCurve, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
+import { buildPLPeakBlockLayout } from './lms-peak-block.engine';
 import { computeMeetAttemptsFromPmRow, type LMSPlanWeek } from './lms-builder.engine';
 import { workWeight } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise } from './lms-metrics.engine';
@@ -33,6 +34,10 @@ export interface MacroTaperOpts {
   postMeet?: boolean;
   /** Число тапер-недель перед соревнованием (по умолчанию 2). */
   taperWeeksPerBlock?: number;
+  /** ОКНО до старта (weeksToMeet) — кривая блока = вход в пик + глубокий тапер
+   *  (lms-peak-block.engine). Если задано, taperWeeksPerBlock = недели глубокого
+   *  тапера внутри окна. Иначе — только taperWeeksPerBlock глубокого тапера. */
+  windowWeeks?: number;
 }
 
 export interface MacroTaperResult {
@@ -183,6 +188,18 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
   const weightGoal: TaperWeightGoal = opts?.weightGoal ?? 'maintain';
   const strategy: MeetStrategy = opts?.strategy ?? 'balanced';
   const taperWeeks = Math.max(1, Math.min(3, opts?.taperWeeksPerBlock ?? 2));
+  // A1: если задано окно до старта — кривая блока = вход в пик + глубокий тапер
+  // (lms-peak-block.engine). Иначе — только taperWeeks глубокого тапера (legacy).
+  const layout = opts?.windowWeeks != null ? buildPLPeakBlockLayout({
+    windowWeeks: opts.windowWeeks,
+    taperWeeks,
+    mode,
+    weightGoal,
+    mockMeet: opts?.mockMeet,
+    meetWeek: true,
+    postMeet: opts?.postMeet,
+  }) : null;
+  const curve = layout ? layout.curve : buildPLTaperCurve({ taperWeeks, mode, weightGoal });
   if (!Array.isArray(weeks) || weeks.length === 0) return { weeks, notes };
 
   const out = weeks.map(w => ({ ...w }));
@@ -200,10 +217,11 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
     notes.push(`🏁 Соревнование (нед ${meet.week}): прикиды ${strategy}, аксессуары ×0.5.`);
 
     // ── 2. Тапер к предыдущим неделям peak-блока (непрерывный диапазон фазы peak) ──
-    const curve = buildPLTaperCurve({ taperWeeks, mode, weightGoal });
     const peakIdx: number[] = [];
     for (let p = ci - 1; p >= 0 && out[p].macroPhase === 'peak'; p--) peakIdx.unshift(p);
-    const applyCount = Math.min(taperWeeks, peakIdx.length);
+    // Применяем ВСЮ кривую (ramp + taper) к доступным peak-неделям; если peak-недель
+    // меньше — берём последние applyCount точек (финал всегда самый глубокий).
+    const applyCount = Math.min(curve.length, peakIdx.length);
     for (let t = 0; t < applyCount; t++) {
       const idx = peakIdx[peakIdx.length - applyCount + t];
       if (alreadyMarked(out[idx])) continue;
@@ -234,4 +252,82 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
   }
 
   return { weeks: out, notes };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C2 — ТАПЕР ПО ВСЕМУ СЕЗОНУ (несколько соревнований).
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PLSeasonMeet {
+  id: string;
+  name: string;
+  /** Недель до старта (1-52, от начала сезона). */
+  weeksToStart: number;
+}
+
+export interface PLSeasonPeaksOpts extends Omit<MacroTaperOpts, 'taperWeeksPerBlock'> {
+  /** Окно пик-блока для каждого старта (weeksToMeet). По умолчанию — weeksToStart старта. */
+  windowWeeks?: number;
+}
+
+export interface PLSeasonPeaksResult {
+  weeks: LMSPlanWeek[];
+  notes: string[];
+}
+
+/**
+ * Полный план на сезон: базовые недели цикла продлеваются до самого дальнего
+ * старта, под каждое соревнование ставится пик-блок (окно → вход в пик + mock +
+ * глубокий тапер + соревнования [+ пост]), сдвоенные блоки защищены от наложения.
+ */
+export function buildPLSeasonPeaks(
+  baseWeeks: LMSPlanWeek[],
+  meets: PLSeasonMeet[],
+  opts?: PLSeasonPeaksOpts,
+): PLSeasonPeaksResult {
+  const sorted = (meets ?? [])
+    .filter(m => Number.isFinite(m.weeksToStart) && m.weeksToStart >= 1)
+    .sort((a, b) => a.weeksToStart - b.weeksToStart);
+  if (sorted.length === 0) return { weeks: baseWeeks ?? [], notes: ['⚠ Сезон пуст — пик-блоки не построены.'] };
+  const base = baseWeeks ?? [];
+  if (base.length === 0) return { weeks: [], notes: ['⚠ Нет базового плана — сезон не построен.'] };
+
+  const postW = opts?.postMeet ? 1 : 0;
+  const maxWeek = Math.max(...sorted.map(m => m.weeksToStart));
+  const total = maxWeek + 1 + postW;
+
+  // Продлеваем базовые недели до длины сезона (повтор последней как наполнитель).
+  const out: LMSPlanWeek[] = [];
+  for (let i = 0; i < total; i++) {
+    const src = base[i] ?? base[base.length - 1];
+    const wk: LMSPlanWeek = { ...src, week: i + 1, macroPhase: undefined };
+    delete (wk as { meetAttempts?: unknown }).meetAttempts;
+    out.push(wk);
+  }
+
+  // Отмечаем недели соревнований и их peak-окна.
+  for (const m of sorted) {
+    const compIdx = m.weeksToStart - 1;
+    out[compIdx] = { ...out[compIdx], macroPhase: 'competition' };
+    const win = Math.max(1, opts?.windowWeeks ?? m.weeksToStart);
+    for (let w = 1; w <= win; w++) {
+      const idx = compIdx - w;
+      if (idx >= 0 && out[idx].macroPhase !== 'competition') out[idx] = { ...out[idx], macroPhase: 'peak' };
+    }
+  }
+
+  const res = applyMacroTaperToPLWeeks(out, {
+    mode: opts?.mode,
+    weightGoal: opts?.weightGoal,
+    strategy: opts?.strategy,
+    mockMeet: opts?.mockMeet,
+    postMeet: opts?.postMeet,
+    windowWeeks: opts?.windowWeeks,
+  });
+
+  const notes = [
+    `📅 Сезон: ${sorted.map(m => `«${m.name}» нед ${m.weeksToStart}`).join(' · ')} → план на ${total} нед.`,
+    ...res.notes,
+  ];
+  return { weeks: res.weeks, notes };
 }

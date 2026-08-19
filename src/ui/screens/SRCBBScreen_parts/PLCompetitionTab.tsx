@@ -9,6 +9,7 @@
 import React from 'react';
 import { recommendWeightCut } from '../../../engines/gym-competition.engine';
 import { appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
+import { buildPLPeakBlockLayout } from '../../../engines/lms/lms-peak-block.engine';
 import { MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 import { LAST_HEAVY_DAYS } from '../../../engines/pro/taper.engine';
 import type { PED } from '../../../engines/bb/bb-ped-adaptation.engine';
@@ -17,6 +18,7 @@ import type { AutoRegOutput } from '../../../engines/pro/autoregulation-pro.engi
 import { saveCompetitionPlan } from '../TrainingScreen_parts/CompetitionPlansView';
 import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
+import { buildPLTaperPrintHtml } from '../../../engines/lms/lms-taper-coach.engine';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
@@ -81,7 +83,36 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     api.setAutoRegMode(mode);
     onNote(`🔄 Режим авторегуляции: ${mode === 'auto' ? '🤖 Авто' : mode === 'diary' ? '📓 Авто-дневник' : 'ВЫКЛ'}`);
   };
+  // A1: предпросмотр пик-блока по окну до старта (weeksToMeet) — блок = вход в пик +
+  // mock + глубокий тапер + соревнования (+ пост после окна). Показывает, что окно реально работает.
+  const peakPreview = React.useMemo(() => buildPLPeakBlockLayout({
+    windowWeeks: weeksToMeet,
+    taperWeeks: taperWeeksToAdd,
+    mode: peakMode,
+    weightGoal: taperWeightGoal === 'auto' ? undefined : taperWeightGoal,
+    mockMeet: mockMeetOn,
+    meetWeek: meetWeekOn,
+    postMeet: postMeetOn,
+  }), [weeksToMeet, taperWeeksToAdd, peakMode, taperWeightGoal, mockMeetOn, meetWeekOn, postMeetOn]);
+  // C1: дата старта (ISO) — реверс от неё календарной разметки недель блока.
+  const meetRef = (() => {
+    try { return new Date(Date.now() + Math.max(0, weeksToMeet) * 7 * 86400000).toISOString().slice(0, 10); }
+    catch { return undefined; }
+  })();
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
+  // C4: печать тапер-плана (PDF через window.print).
+  const handlePrintTaperPlan = () => {
+    if (!taperPlan) return;
+    try {
+      const html = buildPLTaperPrintHtml(taperPlan);
+      const w = window.open('', '_blank', 'width=900,height=700');
+      if (!w) { onNote('⚠ Всплывающее окно заблокировано — разрешите попапы для печати тапер-плана.'); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      w.print();
+    } catch (e) { onNote('⚠ Ошибка печати тапер-плана: ' + (e as Error).message); }
+  };
 
   return (
     <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
@@ -171,8 +202,18 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6 }}>
         <PopupNumber label="Вес сейчас" value={bw} min={40} max={250} suffix=" кг" onChange={v => setBw(v)} />
         <PopupNumber label="Целевой вес (категория)" value={targetBw} min={40} max={250} suffix=" кг" onChange={v => setTargetBw(v)} />
-        <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={26} suffix=" нед" onChange={v => setWeeksToMeet(v)} />
-        <PopupNumber label="Тапер-недель к циклу" value={taperWeeksToAdd} min={1} max={4} suffix="" hint="Сколько недель снижения объёма добавить в конец активного плана" onChange={v => setTaperWeeksToAdd(v)} />
+        <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={26} suffix=" нед" hint="Окно пик-блока: на эти недели строится полный блок — вход в пик + mock + тапер + соревнования (+ пост). Раньше окно было информационным, теперь реально задаёт длину блока." onChange={v => setWeeksToMeet(v)} />
+        <PopupNumber label="Тапер-недель к циклу" value={taperWeeksToAdd} min={1} max={4} suffix="" hint="Сколько недель ГЛУБОКОГО снижения объёма внутри окна до старта" onChange={v => setTaperWeeksToAdd(v)} />
+      </div>
+      {/* A1: предпросмотр пик-блока по окну до старта */}
+      <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: peakPreview.warnings.length ? 'rgba(239,68,68,0.06)' : 'rgba(52,211,153,0.06)', border: `1px solid ${peakPreview.warnings.length ? 'rgba(239,68,68,0.3)' : 'rgba(52,211,153,0.25)'}` }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: peakPreview.warnings.length ? '#f87171' : '#34d399', marginBottom: 2 }}>🗓 {peakPreview.summary}</div>
+        {peakPreview.warnings.map((w, i) => (
+          <div key={i} style={{ fontSize: 10, color: '#fbbf24', lineHeight: 1.4 }}>⚠ {w}</div>
+        ))}
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.4 }}>
+          «Недель до старта» = окно пик-блока: вход в пик (объём плавно ↓) → mock meet → глубокий тапер → соревнования{postMeetOn ? ' → пост-старт' : ''}. Блок строится кнопкой «🗓 Пик-блок на окно» ниже.
+        </div>
       </div>
       <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 6 }}>
         <PopupSelect
@@ -239,6 +280,8 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               meetData,
               peakMode,
               peakLayout,
+              windowWeeks: weeksToMeet,
+              reference: meetRef,
             });
             setTaperPlan(next);
             const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
@@ -248,6 +291,12 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
           title="Сгенерировать тапер-план в ОТДЕЛЬНУЮ карточку (не встраивая в weeks цикла) — под разницу ПМ: факт после цикла / план федерации"
         >📋 Сгенерировать тапер-план</button>
+        <button
+          disabled={!taperPlan}
+          onClick={handlePrintTaperPlan}
+          style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: taperPlan ? '1px solid rgba(52,211,153,0.4)' : '1px solid rgba(255,255,255,0.08)', color: taperPlan ? '#34d399' : 'rgba(255,255,255,0.3)', background: taperPlan ? 'rgba(52,211,153,0.1)' : 'transparent' }}
+          title="Печать тапер-плана (PDF) — таблицы недель блока с датами, объёмом, интенсивностью, RIR и прикидами"
+        >🖨 Тапер-план (PDF)</button>
         <button
           style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: mockMeetOn ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: mockMeetOn ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: mockMeetOn ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
           title="Имитация соревнований за 10-14 дней до старта: неделя перед тапером с прикидами-синглами (опенер RIR2 → вторая RIR1 → третья RIR0)"
@@ -341,15 +390,17 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
               peakMode,
               peakLayout,
+              windowWeeks: weeksToMeet,
+              reference: meetRef,
             });
             setBuiltSrc(next);
             const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
             setTaperNote(`+${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''} · 🏁 пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
-            onNote(`📉 Тапер применён к активному циклу: +${taperWeeksToAdd} нед(и) — ${peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, RIR +3.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
+            onNote(`📉 Пик-блок применён к активному циклу по окну ${weeksToMeet} нед: ${peakPreview.summary}${peakPreview.warnings.length ? ' ⚠ ' + peakPreview.warnings.join(' ⚠ ') : ''} — ${peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, RIR +3.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
           }}
           style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
-          title={builtSrc ? `Добавить ${taperWeeksToAdd} тапер-недели в конец плана${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
-        >📉 Добавить тапер к плану ({taperWeeksToAdd} нед){pedAuto && peds.length > 0 ? ' · 💉' : ''}</button>
+          title={builtSrc ? `Построить пик-блок на окно ${weeksToMeet} нед до старта: вход в пик + mock + глубокий тапер (${taperWeeksToAdd} нед) + соревнования${postMeetOn ? ' + пост-старт' : ''}${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
+        >🗓 Пик-блок на окно ({weeksToMeet} нед){pedAuto && peds.length > 0 ? ' · 💉' : ''}</button>
         <button
           disabled={!builtSrc}
           onClick={() => {

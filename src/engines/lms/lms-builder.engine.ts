@@ -26,6 +26,7 @@ import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
+import { buildPLPeakBlockLayout, type PLPeakBlockLayout } from './lms-peak-block.engine';
 import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export interface LMSBuildInput {
@@ -82,6 +83,12 @@ export interface LMSBuildInput {
   nutrition?: { calorieSurplus?: number; proteinPerKg?: number };
   /** Exact source mode: preserve source sets, reps, order and frequency. */
   faithful?: boolean;
+  /** Режим авто-тапера при сборке (канон lms-taper.engine). По умолчанию 'classic'.
+   *  Раньше авто-тапер был захардкожен classic/2 — не подстраивался под выбранную
+   *  модель из таба соревнований. Теперь сборка уважает выбранный peakMode. */
+  peakMode?: TaperMode;
+  /** Число авто-тапер-недель при сборке (по умолчанию 2). */
+  taperWeeks?: number;
   /** Явный контекст спортсмена; не меняет силовой pipeline автоматически. */
   athleteMode?: AthleteMode;
   athleteContext?: AthleteContext;
@@ -133,6 +140,10 @@ export interface LMSPlanWeek {
   meetAttempts?: MeetAttemptsInfo;
   /** Пометка недели тапера/прикидов (напр. «план федерации выше факта — прикиды от потолка»). */
   taperNote?: string;
+  /** Дата начала недели (ISO) — календарная разметка (реверс от даты старта). */
+  weekStart?: string;
+  /** Дата конца недели (ISO). */
+  weekEnd?: string;
 }
 
 export interface LMSBuildOutput {
@@ -1403,11 +1414,12 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   // P1: Авто-taper к финальным 2 неделям (peaking phase) — снижение объёма, интенсивность сохранена.
   // Применяется только для auto-прогрессирующих циклов (не faithful) и при отсутствии ACWR-deload.
+  // B1: уважает выбранную модель (peakMode) и число недель (taperWeeks) вместо хардкода classic/2.
   const taperedWeeks = (!faithful && !hasExplicitWeeks && totalWeeks >= 4 && !acwrDeload)
-    ? applyPLTaper(weeks, totalWeeks)
+    ? applyPLTaper(weeks, totalWeeks, { taperWeeks: input.taperWeeks, mode: input.peakMode })
     : weeks;
 
-  const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные 2 нед — объём ×0.65/0.45, интенсивность сохранена (Bosquet 2005).' : '';
+  const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные недели — объём ↓, интенсивность сохранена (Bosquet 2005).' : '';
 
   const contextNote = input.athleteMode === 'female_context' && input.athleteContext?.sex === 'female'
     ? ` ♀ Женский контекст: базовая модель объёма/RIR и капы сохранены (без скрытых изменений).`
@@ -1448,17 +1460,27 @@ export function computeMeetAttemptsFromPmRow(pmRow: Record<string, number>, stra
 }
 
 /**
- * PL Taper: снижение объёма (сетов) к финальным 2 неделям цикла (peaking phase).
+ * PL Taper: снижение объёма (сетов) к финальным неделям цикла (peaking phase).
  * Интенсивность (вес) сохраняется — снижается только объём (Bosquet 2005, Bosquet et al.).
- * Неделя N-1: объём ×0.65; неделя N: объём ×0.45. RIR растёт на 1-2.
+ * Кривая — канон buildPLTaperCurve (классика ×0.65/×0.45, или выбранная модель).
+ * B1: уважает taperWeeks/mode вместо хардкода classic/2.
  */
-function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
+function applyPLTaper(
+  weeks: LMSPlanWeek[],
+  totalWeeks: number,
+  opts?: { taperWeeks?: number; mode?: TaperMode },
+): LMSPlanWeek[] {
   if (weeks.length < 4) return weeks;
   const lastIdx = weeks.length - 1;
-  const prevIdx = lastIdx - 1;
-  if (prevIdx < 0) return weeks;
-  // Канон (lms-taper.engine): классика Bosquet — объём ×0.65/×0.45, RIR +1/+2.
-  const curve = buildPLTaperCurve({ taperWeeks: 2, mode: 'classic' });
+  // Канон (lms-taper.engine): классика Bosquet — объём ×0.65/×0.45, RIR +1/+2
+  // (или выбранная модель — pl/pro/wf, число недель из opts).
+  const curve = buildPLTaperCurve({
+    taperWeeks: opts?.taperWeeks ?? 2,
+    mode: opts?.mode ?? 'classic',
+  });
+  // Сколько финальных недель режем: последние N точек кривой (финал — самый глубокий).
+  const n = Math.min(curve.length, Math.max(1, weeks.length - 1));
+  const startIdx = weeks.length - n;
 
   const weekVolume = (wk: LMSPlanWeek): number => {
     let v = 0;
@@ -1466,7 +1488,7 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
     return v;
   };
   const refVolume = (() => {
-    for (let i = prevIdx - 1; i >= 0; i--) {
+    for (let i = startIdx - 1; i >= 0; i--) {
       const phase = mesocyclePhaseForWeek(weeks[i].week, totalWeeks);
       if (phase === 'deload') continue;
       const vol = weekVolume(weeks[i]);
@@ -1476,14 +1498,15 @@ function applyPLTaper(weeks: LMSPlanWeek[], totalWeeks: number): LMSPlanWeek[] {
   })();
 
    return weeks.map((wk, idx) => {
-     if (idx !== prevIdx && idx !== lastIdx) return wk;
-      // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
-      // PL-3 FIX: also skip deload weeks
-       const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
-       if (phase === 'deload') return wk;
-      if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
-     const volumeMult = curve[idx === prevIdx ? 0 : 1].volumePct;
-     const rirAdd = curve[idx === prevIdx ? 0 : 1].rirShift;
+     if (idx < startIdx) return wk;
+     // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
+     // PL-3 FIX: also skip deload weeks
+     const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
+     if (phase === 'deload') return wk;
+     if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
+     const pt = curve[idx - startIdx];
+     const volumeMult = pt.volumePct;
+     const rirAdd = pt.rirShift;
      const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
      const currentSets = Math.max(1, weekVolume(wk));
      const setScale = targetSets / currentSets;
@@ -1585,24 +1608,70 @@ export function appendPLTaperWeeks(
     /** Прайминг-синглы 60/70% в неделе соревнований (за 1-2 дня до старта):
      *  активация ЦНС без утомления. По умолчанию вкл. */
     priming?: boolean;
+    /** ОКНО до старта (weeksToMeet) — пик-блок строится на всё окно:
+     *  ramp (вход в пик) → mock → taper → meet (+ post после окна). Если задано,
+     *  `taperWeeks` = число недель ГЛУБОКОГО тапера внутри окна, остальное окно
+     *  заполняется входом в пик (lms-peak-block.engine). Иначе — legacy: только
+     *  taperWeeks глубокого тапера. */
+    windowWeeks?: number;
+    /** Дата старта (ISO) — календарная разметка недель блока (реверс от неё). */
+    reference?: string;
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
-  const last = plan.weeks[plan.weeks.length - 1];
+
+  // ── B2: Защита от двойного тапера. ──
+  // Если хвост плана уже размечен тапером (авто-тапер сборки или предыдущее
+  // применение appendPLTaperWeeks), срезаем его и строим свежий блок от последней
+  // НЕ-тапер недели. Иначе дописывание поверх давало бы ДВА тапер-блока подряд.
+  const trimmed = (() => {
+    const arr = plan.weeks;
+    let end = arr.length;
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const w = arr[i];
+      if (w.taperWeek || w.meetWeek || w.mockMeet || w.postMeet) end = i; else break;
+    }
+    return { weeks: arr.slice(0, end), removed: arr.length - end };
+  })();
+  const basePlanWeeks = trimmed.weeks;
+  const replacedTail = trimmed.removed > 0;
+  if (basePlanWeeks.length === 0) return plan;
+
+  const last = basePlanWeeks[basePlanWeeks.length - 1];
   const nextWeekNum = last.week + 1;
-  const lastPhase = mesocyclePhaseForWeek(last.week, plan.weeks.length);
+  const lastPhase = mesocyclePhaseForWeek(last.week, basePlanWeeks.length);
   // База тапер-недель: последняя НЕ-deload неделя (иначе делод станет основой
   // тапера — разгрузка поверх разгрузки, объём некуда снижать).
   const baseWeek = (() => {
     if (lastPhase !== 'deload') return last;
-    for (let i = plan.weeks.length - 2; i >= 0; i--) {
-      const wk = plan.weeks[i];
-      if (mesocyclePhaseForWeek(wk.week, plan.weeks.length) !== 'deload') return wk;
+    for (let i = basePlanWeeks.length - 2; i >= 0; i--) {
+      const wk = basePlanWeeks[i];
+      if (mesocyclePhaseForWeek(wk.week, basePlanWeeks.length) !== 'deload') return wk;
     }
     return last;
   })();
-  // Канон: единая кривая тапера (lms-taper.engine) — режим × весовая цель.
-  const taperCurvePoints = buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal });
+
+  // ── A1: Окно до старта → раскладка пик-блока (lms-peak-block.engine). ──
+  // Если задан windowWeeks — блок = ramp (вход в пик) + mock + taper + meet (+ post).
+  // taperWeeks (параметр) тогда = недели ГЛУБОКОГО тапера внутри окна.
+  const layout: PLPeakBlockLayout | null = opts?.windowWeeks != null
+    ? buildPLPeakBlockLayout({
+        windowWeeks: opts.windowWeeks,
+        taperWeeks,
+        mode: opts?.peakMode,
+        weightGoal: opts?.weightGoal,
+        mockMeet: !!opts?.mockMeet,
+        meetWeek: !!opts?.meetWeek,
+        postMeet: !!opts?.postMeet,
+      })
+    : null;
+  const taperCurvePoints = layout
+    ? layout.curve
+    : buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal });
+  const taperWeeksEff = layout ? layout.taperWeeks : taperWeeks;
+  const rampWeeksEff = layout ? layout.rampWeeks : 0;
+  const blockWarnings = layout ? layout.warnings : [];
+  const replacedTailNote = replacedTail ? ` (заменён предыдущий тапер-блок: ${trimmed.removed} нед)` : '';
 
   // ── PED-адаптация по аналогии с buildLMSPlan (строки 697-762) ──
   const activePeds = (opts?.peds ?? []).filter(ped => {
@@ -1650,9 +1719,9 @@ export function appendPLTaperWeeks(
 
   const refVolume = (() => {
     // Эталон объёма: последняя НЕ-deload неделя (иначе делод станет базой тапера).
-    for (let i = plan.weeks.length - 1; i >= 0; i--) {
-      const wk = plan.weeks[i];
-      if (mesocyclePhaseForWeek(wk.week, plan.weeks.length) === 'deload') continue;
+    for (let i = basePlanWeeks.length - 1; i >= 0; i--) {
+      const wk = basePlanWeeks[i];
+      if (mesocyclePhaseForWeek(wk.week, basePlanWeeks.length) === 'deload') continue;
       let v = 0;
       for (const d of wk.days) for (const e of d.exercises) for (const ws of e.workSets) v += ws.sets;
       if (v > 0) return v;
@@ -1694,7 +1763,7 @@ export function appendPLTaperWeeks(
     return { row, capped };
   };
 
-  const buildTaperWeek = (idx: number, pt: TaperCurvePoint): LMSPlanWeek => {
+  const buildTaperWeek = (idx: number, pt: TaperCurvePoint, isFinalTaper: boolean): LMSPlanWeek => {
     // Прогрессия ПМ продолжается по курсу (как buildLMSPlan:757-762): +k за неделю,
     // НО если задан ФАКТИЧЕСКИЙ ПМ после цикла (реально поднятый) — тапер строится
     // от него (разница ПМ: факт вместо прогноза), прогрессия в тапере = 0.
@@ -1706,7 +1775,7 @@ export function appendPLTaperWeeks(
         ? Math.round(actual * 10) / 10
         : Math.round(pm * pmGrowth * 10) / 10;
     }
-    const isFinal = idx === taperWeeks - 1;
+    const isFinal = isFinalTaper;
     // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
     // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
     const protocolFinal = isFinal && pt.warmupOnly === true;
@@ -1761,7 +1830,7 @@ export function appendPLTaperWeeks(
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
     const week: LMSPlanWeek = {
-      week: nextWeekNum + offsetBefore + idx,
+      week: nextWeekNum + idx,
       pmRow,
       days,
       sourcePhase: 'peak' as MesocyclePhase,
@@ -1774,7 +1843,7 @@ export function appendPLTaperWeeks(
     // от ПМ финальной тапер-недели (или планируемого ПМ федерации — если задан).
     // Тренировочная нагрузка остаётся разгрузочной (×0.45, RIR+2); прикиды — план соревнований.
     // peakLayout='light' — только разминка без прикидов (контрольный старт).
-    if (idx === taperWeeks - 1 && opts?.peakLayout !== 'light') {
+    if (isFinalTaper && opts?.peakLayout !== 'light') {
       const { row, capped } = resolveAttemptRow(week.pmRow);
       const attempts = computeMeetAttemptsFromPmRow(row, peakStrategy);
       if (attempts) {
@@ -1872,23 +1941,26 @@ export function appendPLTaperWeeks(
   const mockStrategy = opts?.mockMeet?.strategy ?? opts?.peakExit?.strategy ?? 'balanced';
   const meetStrategy = opts?.meetWeek?.strategy ?? opts?.peakExit?.strategy ?? 'balanced';
   const peakStrategy = opts?.peakExit?.strategy ?? 'balanced';
-  const offsetBefore = mockMeetOn ? 1 : 0;
   const extra: LMSPlanWeek[] = [];
+  let cur = 0;
   if (mockMeetOn) {
-    const wk = buildAttemptsWeek(0, 'mock');
-    if (wk) extra.push(wk);
+    const wk = buildAttemptsWeek(cur, 'mock');
+    if (wk) { extra.push(wk); cur++; }
   }
   // Раскладка пика — канон (lms-taper.engine): 'classic' — разгрузка Bosquet;
   // 'pl' — 3-нед протокол Библиотеки (при taperWeeks < 3 — последние N недель
   // протокола, финал всегда соревновательный 100% с прикидами);
   // 'pro' — усталость-зависимая кривая с праймингом.
+  // При окне (windowWeeks) кривая включает ramp (вход в пик) + глубокий тапер.
   const taperMode: TaperMode = opts?.peakMode ?? 'classic';
-  for (let i = 0; i < taperWeeks; i++) {
-    extra.push(buildTaperWeek(i, taperCurvePoints[i]));
+  const lastCurveIdx = cur + taperCurvePoints.length - 1;
+  for (let i = 0; i < taperCurvePoints.length; i++) {
+    extra.push(buildTaperWeek(cur, taperCurvePoints[i], cur === lastCurveIdx));
+    cur++;
   }
   if (meetWeekOn) {
-    const wk = buildAttemptsWeek(extra.length, 'meet');
-    if (wk) extra.push(wk);
+    const wk = buildAttemptsWeek(cur, 'meet');
+    if (wk) { extra.push(wk); cur++; }
   }
   // Пост-соревновательная неделя (post-meet): лёгкий объём, высокий RIR —
   // возврат к тренировкам после прикидок без перегруза.
@@ -1909,7 +1981,7 @@ export function appendPLTaperWeeks(
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
     extra.push({
-      week: nextWeekNum + extra.length,
+      week: nextWeekNum + cur,
       pmRow,
       days,
       sourcePhase: 'deload' as MesocyclePhase,
@@ -1918,6 +1990,33 @@ export function appendPLTaperWeeks(
       postMeet: true,
       taperNote: `Восстановление после соревнований: объём ×${volMult}, RIR +3 — полная разгрузка, возврат к базовому объёму со следующей недели.`,
     });
+    cur++;
+  }
+
+  // ── C1: Календарная разметка недель блока (реверс от даты старта). ──
+  if (opts?.reference && extra.length > 0) {
+    const isoAdd = (iso: string, days: number) => {
+      const dt = new Date(iso + 'T00:00:00Z');
+      if (Number.isNaN(dt.getTime())) return null;
+      dt.setUTCDate(dt.getUTCDate() + days);
+      return dt.toISOString().slice(0, 10);
+    };
+    const ref = opts.reference;
+    // Последняя неделя блока (пост, если есть; иначе финальный тапер/соревнования)
+    // заканчивается на ref+7 (пост) или ref (старт). Дальше — по 7 дней назад.
+    const lastEnd = opts?.postMeet ? isoAdd(ref, 7) : ref;
+    const ends: (string | null)[] = new Array(extra.length);
+    ends[extra.length - 1] = lastEnd;
+    for (let i = extra.length - 2; i >= 0; i--) {
+      const next = ends[i + 1];
+      ends[i] = next ? isoAdd(next, -7) : null;
+    }
+    for (let i = 0; i < extra.length; i++) {
+      const end = ends[i];
+      if (!end) continue;
+      const start = isoAdd(end, -6);
+      if (start) extra[i] = { ...extra[i], weekStart: start, weekEnd: end };
+    }
   }
 
   // ── Авторегуляция («АВТО»): масштабирование применяется ко ВСЕМ добавленным
@@ -1955,7 +2054,7 @@ export function appendPLTaperWeeks(
     }
   }
 
-  const weeks = [...plan.weeks, ...extra];
+  const weeks = [...basePlanWeeks, ...extra];
   const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({
     name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
     sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
@@ -1997,6 +2096,10 @@ export function appendPLTaperWeeks(
     ? ` 🔄 Пост-соревновательная неделя: ${postMeetWk.week} — объём ×${opts?.postMeet?.volumeMult ?? 0.5}, RIR +3 (восстановление после старта).`
     : '';
   const taperCurveSummary = summarizeTaperCurve(taperCurvePoints);
+  const blockTotal = extra.length;
+  const windowNote = layout
+    ? ` 🗓 Пик-блок по окну до старта (${layout.windowWeeks} нед): ${layout.summary}.${rampWeeksEff > 0 ? ` Вход в пик ${rampWeeksEff} нед — объём плавно ↓, интенсивность сохранена.` : ''}`
+    : '';
 
   // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
   // и PED-множителя — иначе peakWeek/статусы остаются от исходного плана.
@@ -2011,7 +2114,10 @@ export function appendPLTaperWeeks(
     cycleMetrics,
     plVolumeLandmarks,
     progressionRationale: plan.progressionRationale +
-      ` 📉 Тапер к действующему циклу: +${taperWeeks} нед(и) — ${taperCurveSummary} (${taperMode === 'pl' ? 'ПЛ-пик-протокол' : taperMode === 'pro' ? 'про-тапер по усталости' : 'Bosquet 2005'}).` +
+      ` 📉 Тапер к действующему циклу: +${blockTotal} нед(и) — ${taperCurveSummary} (${taperMode === 'pl' ? 'ПЛ-пик-протокол' : taperMode === 'pro' ? 'про-тапер по усталости' : 'Bosquet 2005'}).` +
+      windowNote +
+      (blockWarnings.length > 0 ? ' ⚠ ' + blockWarnings.join(' ⚠ ') : '') +
+      replacedTailNote +
       weightGoalNote +
       peakLayoutNote +
       mockNote +
