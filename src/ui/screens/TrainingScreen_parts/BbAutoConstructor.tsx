@@ -4981,7 +4981,7 @@ export const BbAutoConstructor: React.FC = () => {
       const cfg = configFromPlan(prepResult.prepPlan);
       savePrepToProfile(prepResult.prepPlan, cfg);
       window.dispatchEvent(new CustomEvent('he-bb-contest-prep-updated', { detail: { prepPlanId: prepResult.prepPlan.id } }));
-      flash('✅ Prep-цикл сохранён в профиль');
+      flash('✅ Prep-цикл сохранён. Питание/тапер/пик-неделя применены в планировщике питания (вкладка «🏁 Тапер ББ» и дневные цели)');
     } catch { flash('⚠ Не удалось сохранить prep-цикл'); }
   };
 
