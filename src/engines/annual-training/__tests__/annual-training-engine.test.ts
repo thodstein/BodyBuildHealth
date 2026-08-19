@@ -217,6 +217,24 @@ describe('сборка блоков', () => {
     expect(setsOf(modulated[0])).toBeLessThan(setsOf(base[0]));
   });
 
+  it('P2.1: contest_prep-блок через Prep-цикл (config.prep), опт-ин', () => {
+    const macro = makePLMacro();
+    const plan = annualPlanFromMacro(macro);
+    const bb = plan.blocks[1];
+    const built = buildAnnualBlock({
+      ...bb,
+      config: { ...bb.config, prep: { category: 'mens_physique', showDate: '2027-06-01', accentMuscles: ['shoulders', 'back'], minimalMuscles: ['quads'], taperWeeks: 2 } },
+    }, plan, macro, DEFAULT_OPTS);
+    expect(built.result!.peakApplied).toBe(true);
+    expect(built.result!.taperApplied).toBe(true);
+    expect(built.result!.weeks.length).toBe(bb.ref.weeks);
+    expect(built.result!.bbPlan).toBeDefined();
+    const bbp = built.result!.bbPlan as any;
+    expect(Array.isArray(bbp.weeks)).toBe(true);
+    expect(bbp.weeks.some((w: any) => w.contestPhase === 'peak_week')).toBe(true);
+    expect(bbp.weeks.some((w: any) => w.contestPhase === 'taper')).toBe(true);
+  });
+
   it('syncAnnualPlan: свежая разметка побеждает для competitionId (той же блокKey)', () => {
     const macro = makePLMacro();
     const plan = annualPlanFromMacro(macro);

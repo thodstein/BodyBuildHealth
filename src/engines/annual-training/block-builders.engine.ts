@@ -35,6 +35,7 @@ import { makeEmptySessionsForWeek } from '../periodization/designer-to-program';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import type { BBPlan } from '../bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, type BBContestPrepConfig } from '../bb/bb-contest-prep.engine';
+import { buildPrepCycle } from '../bb/bb-prep-cycle.engine';
 import { buildPLTaperCurve, type TaperMode, type TaperWeightGoal } from '../lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { cycleTemplateToFullProgram } from '../bb/cycle-to-plan';
@@ -545,6 +546,55 @@ function skeletonWeeks(total: number, daysPerWeek: number): UserWeek[] {
   }));
 }
 
+/** Сборка BB-блока через Prep-цикл (P2.1): акценты/минимум/тапер к дате шоу. */
+function buildBBBlockViaPrep(
+  state: AnnualBlockState,
+  opts: AnnualBuildOptions,
+  baseWarnings: string[],
+): AnnualBlockBuildResult {
+  const p = state.config.prep!;
+  const totalWeeks = Math.min(state.ref.weeks, 26);
+  const taperWeeks = Math.min(4, Math.max(1, Math.round(p.taperWeeks ?? 3)));
+  const level = state.config.level ?? opts.level ?? 'intermediate';
+  const prepCycle = buildPrepCycle({
+    category: p.category as any,
+    sex: (opts.sex ?? 'male') as 'male' | 'female',
+    accentMuscles: p.accentMuscles ?? [],
+    minimalMuscles: p.minimalMuscles ?? [],
+    minimalMode: (p.minimalMode as any) ?? 'reduce_direct_to_floor',
+    splitPatternId: state.config.splitPattern,
+    weeks: totalWeeks,
+    taperWeeks,
+    showDate: p.showDate,
+    level,
+    equipment: state.config.equipment ?? opts.equipment ?? [],
+    workMax: opts.workMax,
+    bodyFat: opts.bodyFat,
+    leanMass: opts.leanMass,
+    hrvMs: opts.hrvMs,
+    sleepHours: opts.sleepHours,
+    stressLevel: opts.stressLevel,
+    enhanced: false,
+    weightKg: 80,
+    experienceLevel: (level === 'advanced' || level === 'enhanced' ? 'advanced' : level === 'beginner' ? 'beginner' : 'intermediate') as any,
+  });
+  const plan = prepCycle.bbPlan;
+  const goal = state.config.goal ?? 'maintenance';
+  const prog = createFromBuild(plan, { title: `Блок: ${state.ref.description ?? state.ref.phase} (${state.ref.weeks} нед)`, goal, level });
+  const weeks = loopWeeksToLength(prog.bb?.weeks ?? [], state.ref.weeks);
+  return {
+    blockKey: state.ref.blockKey,
+    kind: 'BB',
+    weeks,
+    program: prog,
+    bbPlan: plan,
+    warnings: [...baseWarnings, ...prepCycle.warnings],
+    taperApplied: true,
+    peakApplied: true,
+    configHash: configHashOf(state.config, state.ref),
+  };
+}
+
 /** Сборка BB-блока: autodraftBBPlan → пик-неделя (опц.) → фаза блока → taper. */
 function buildBBBlock(
   state: AnnualBlockState,
@@ -552,6 +602,10 @@ function buildBBBlock(
   opts: AnnualBuildOptions,
 ): AnnualBlockBuildResult {
   const warnings: string[] = [];
+  // ═══ P2.1: contest_prep-блок через Prep-цикл (опт-ин, config.prep) ═══
+  if (state.config.prep?.category && state.config.prep.showDate) {
+    return buildBBBlockViaPrep(state, opts, warnings);
+  }
   const days = state.config.daysPerWeek ?? opts.daysPerWeek ?? 4;
   const buildWeeks = Math.max(1, Math.min(state.ref.weeks, 16));
   const level = state.config.level ?? opts.level ?? 'intermediate';

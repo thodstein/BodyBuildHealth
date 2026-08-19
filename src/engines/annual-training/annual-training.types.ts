@@ -66,6 +66,22 @@ export interface AnnualBlockConfig {
   focusGroup?: string;
   /** BB: режим специализации (слабые на MAV+10%). */
   specialization?: boolean;
+  /** BB contest_prep-блок: собрать через Prep-цикл (акценты/минимум/тапер к дате).
+   *  При задании — buildBBBlock использует buildPrepCycle вместо generic autodraft. */
+  prep?: {
+    /** Категория соревнования (id BBContestCategory). */
+    category: string;
+    /** Дата шоу (ISO yyyy-mm-dd) — якорь тапера/пик-недели. */
+    showDate: string;
+    /** Мышцы с акцентом (1-2). */
+    accentMuscles?: string[];
+    /** Мышцы на минимальную нагрузку. */
+    minimalMuscles?: string[];
+    /** Режим минимальной нагрузки (PrepMinimalMode). */
+    minimalMode?: string;
+    /** Тапер, недель (1-4). */
+    taperWeeks?: number;
+  };
   /** Явный контекст спортсмена для сборки блока (BB). */
   athleteMode?: 'standard' | 'female_context';
   /** Тапер внутри блока (финальные недели блока, Bosquet 2005 / канон lms-taper.engine). */
