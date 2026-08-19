@@ -79,7 +79,9 @@ tsc 0, vite build OK.
    женский набор (Fe 18, Ca 1000, D), PED-набор (K/Na/Mg/Cr), prep-набор.
 5. **Скор дня**: analyzeDailyDiet не агрегирует скоры приёмов → UI-прогресс качества дня.
 6. **Пробел в тестах**: гистамин, антинутриенты, глютатион, электролиты, ammoniaRisk,
-   HOMA-IR — matrix-тесты на каждый флаг.
+   HOMA-IR — matrix-тесты на каждый флаг. ✅ Добавлен `usefulness-daily-flags.test.ts`
+   (7 тестов): ammoniaRisk, electrolyteRisk, microDeficits (Zn/Mg), glutathioneWarning,
+   antinutrientWarning, histamineWarning, homaIr.
 7. **Дублирование DIGEST/DIET_PROFILE** (разные значения veg_fruit 0.78 vs 0.85) — одна константа.
 
 ### P2 — UX/консистентность
