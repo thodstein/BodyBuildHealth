@@ -623,7 +623,8 @@ export function buildPLTaperPrintHtml(plan: LMSBuildOutput): string {
       if (w.meetWeek) flag = '🏁 Соревнования';
       else if (w.mockMeet) flag = '🎯 Mock meet';
       else if (w.postMeet) flag = '🔄 Пост-старт';
-      else if (w.taperWeek) flag = '📉 Тапер/вход';
+      else if (w.rampWeek) flag = '📈 Вход в пик';
+      else if (w.taperWeek) flag = '📉 Тапер';
       const date = w.weekStart && w.weekEnd ? `${w.weekStart} – ${w.weekEnd}` : '';
       const att = (w.meetAttempts?.lifts ?? [])
         .map(l => `${esc(l.name)}: ${l.opener}/${l.second}/${l.third}`).join(' · ');
@@ -633,6 +634,73 @@ export function buildPLTaperPrintHtml(plan: LMSBuildOutput): string {
   }
   lines.push('</body></html>');
   return lines.join('\n');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// P2-5 — СГОНКА ВЕСА К КАТЕГОРИИ: пик-неделя (вода/натрий/карбы) для ПЛ.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PLPeakDayCut {
+  /** День перед стартом: 1 = за 7 дней, 7 = день старта. */
+  day: number;
+  label: string;
+  waterMl: string;
+  sodiumMg: string;
+  carbsG: string;
+  note: string;
+}
+
+export interface PLPeakWeekCutProtocol {
+  /** Требуется ли сгонка (diff > 0). */
+  needed: boolean;
+  /** Сколько нужно согнать, кг. */
+  toCutKg: number;
+  /** Что реально даёт пик-неделя (вода/гликоген), кг. */
+  peakWeekCapKg: number;
+  days: PLPeakDayCut[];
+  summary: string;
+  warnings: string[];
+}
+
+const PW = (label: string, waterMl: string, sodiumMg: string, carbsG: string, note: string): PLPeakDayCut =>
+  ({ day: 0, label, waterMl, sodiumMg, carbsG, note });
+
+/**
+ * Консервативный 7-дневный протокол сгонки к категории (вода/натрий/карбы).
+ * Пик-неделя даёт ~1-2% массы (вода+гликоген). Если нужно согнать больше —
+ * предупреждение: нужна более ранняя сгонка (питание/вода за 2-4 недели).
+ */
+export function buildPLPeakWeekCutProtocol(
+  currentWeight: number,
+  targetWeight: number,
+): PLPeakWeekCutProtocol {
+  const toCutKg = Math.max(0, (currentWeight || 0) - (targetWeight || 0));
+  const capPct = 0.02; // пик-неделя = до 2% массы (вода+гликоген)
+  const capKg = (currentWeight || 80) * capPct;
+  const warnings: string[] = [];
+  if (toCutKg > capKg) {
+    warnings.push(`Нужно согнать ${toCutKg.toFixed(1)} кг, но пик-неделя даёт ~${capKg.toFixed(1)} кг (вода+гликоген). Остальное — только ранней сгонкой (калории/вода за 2-4 недели) или не получится.`);
+  }
+  if (toCutKg > 0 && toCutKg < 0.3) {
+    warnings.push('Дифферент меньше 0.3 кг — манипуляция водой может не понадобиться; достаточно лёгкой сушки натрия в день старта.');
+  }
+
+  const base: PLPeakDayCut[] = [
+    PW('За 7 дней', '6 л', '4 г', '4 г/кг', 'Водная загрузка, натрий на базу, карбы на базу.'),
+    PW('За 6 дней', '6 л', '3.5 г', '4 г/кг', 'Водная загрузка продолжается.'),
+    PW('За 5 дней', '5 л', '3 г', '3 г/кг', 'Натрий ↓, карбы ↓ — начало деплеции.'),
+    PW('За 4 дня', '4 л', '2.5 г', '2.5 г/кг', 'Вода ↓, натрий ↓, карбы ↓.'),
+    PW('За 3 дня', '3 л', '2 г', '1.5 г/кг', 'Деплеция карбов; тренировка лёгкая.'),
+    PW('За 2 дня', '2 л', '1.5 г', '1 г/кг', 'Максимальная деплеция; лёгкая нагрузка.'),
+    PW('День старта', 'по жажде', '0.5 г', 'загрузка к старту', 'Малыми глотками; натрий минимальный; карбы к взвешиванию.'),
+  ].map((p, i) => ({ ...p, day: i + 1 }));
+
+  const needed = toCutKg > 0;
+  const summary = needed
+    ? `Сгонка ${toCutKg.toFixed(1)} кг к категории (пик-неделя ≈${capKg.toFixed(1)} кг вода+гликоген): вода ↓ 6→2 л, натрий ↓ 4→0.5 г, карбы ↓ 4→1 г/кг, взвешивание утром старта.`
+    : 'Вес уже в категории — манипуляция водой/натрием не требуется (опционально лёгкий протокол).';
+
+  return { needed, toCutKg, peakWeekCapKg: capKg, days: base, summary, warnings };
 }
 
 export { buildPLTaperCurve };

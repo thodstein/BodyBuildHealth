@@ -82,4 +82,21 @@ describe('buildPLPeakBlockLayout', () => {
     expect(buildPLPeakBlockLayout({ windowWeeks: 0, taperWeeks: 2 }).windowWeeks).toBe(1);
     expect(buildPLPeakBlockLayout({ windowWeeks: 99, taperWeeks: 2 }).windowWeeks).toBe(52);
   });
+
+  it('wholeWindowAsTaper: весь окно = непрерывный тапер (без входа в пик)', () => {
+    const l = buildPLPeakBlockLayout({ windowWeeks: 8, taperWeeks: 2, wholeWindowAsTaper: true, mockMeet: true, meetWeek: true });
+    // доступно = 8 - 1(mock) - 1(meet) = 6 → весь тапер, ramp 0
+    expect(l.rampWeeks).toBe(0);
+    expect(l.taperWeeks).toBe(6);
+    expect(l.curve.length).toBe(6);
+    expect(l.curve[0].label).not.toContain('Вход в пик');
+    // Кривая плавно падает к финалу.
+    expect(l.curve[l.curve.length - 1].volumePct).toBeLessThan(l.curve[0].volumePct);
+  });
+
+  it('wholeWindowAsTaper для classic на 8 нед: кривая длинная (более 4 точек)', () => {
+    const l = buildPLPeakBlockLayout({ windowWeeks: 8, taperWeeks: 2, wholeWindowAsTaper: true });
+    expect(l.taperWeeks).toBe(8);
+    expect(l.curve.length).toBe(8);
+  });
 });

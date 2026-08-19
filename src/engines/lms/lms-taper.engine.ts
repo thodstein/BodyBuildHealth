@@ -105,6 +105,14 @@ export function weightGoalVolumeMult(goal: TaperWeightGoal | undefined): number 
   return goal === 'lose' ? 0.9 : 1;
 }
 
+/** Прибавить дни к ISO-дате (UTC, безопасно): вернёт null при битой дате. */
+export function isoAddDays(iso: string, days: number): string | null {
+  const d = new Date(iso + 'T00:00:00Z');
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 /** Длительность тапера по усталости (дедуп: единая точка — pro/taper.engine). */
@@ -119,7 +127,9 @@ export function taperWeeksByFatigue(fatigue?: number): number | null {
  */
 export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
   const { taperWeeks, mode = 'classic', weightGoal = 'maintain', fatigue, peakIntensityPct = 0.92 } = opts;
-  const n = Math.max(1, Math.min(4, Math.round(taperWeeks)));
+  // classic допускает длинные плавные кривые (вход в пик «весь окно = тапер»);
+  // pl/pro/wf — фиксированные протоколы (не растягиваются сверх своей длины).
+  const n = Math.max(1, Math.min(mode === 'classic' ? 12 : 4, Math.round(taperWeeks)));
   const wGoalMult = weightGoalVolumeMult(weightGoal);
   const weightNote = weightGoal === 'lose' ? ' · сгонка: объём ×0.9' : weightGoal === 'gain' ? ' · набор: полный объём' : '';
 

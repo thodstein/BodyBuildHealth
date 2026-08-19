@@ -20,7 +20,7 @@ import type { AutoRegOutput } from '../../../engines/pro/autoregulation-pro.engi
 import { saveCompetitionPlan } from '../TrainingScreen_parts/CompetitionPlansView';
 import type { PeakWeekLayout, TaperMode, TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import type { TaperCoachCtx, TaperConfigRecommendation } from '../../../engines/lms/lms-taper-coach.engine';
-import { buildPLTaperPrintHtml } from '../../../engines/lms/lms-taper-coach.engine';
+import { buildPLTaperPrintHtml, buildPLPeakWeekCutProtocol } from '../../../engines/lms/lms-taper-coach.engine';
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
@@ -97,10 +97,15 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     postMeet: postMeetOn,
   }), [weeksToMeet, taperWeeksToAdd, peakMode, taperWeightGoal, mockMeetOn, meetWeekOn, postMeetOn]);
   // C1: дата старта (ISO) — реверс от неё календарной разметки недель блока.
-  const meetRef = (() => {
+  // P2-6: реальная дата старта (ISO) — реверс календарной разметки от неё.
+  const derivedMeetDate = (() => {
     try { return new Date(Date.now() + Math.max(0, weeksToMeet) * 7 * 86400000).toISOString().slice(0, 10); }
     catch { return undefined; }
   })();
+  const [meetDateInput, setMeetDateInput] = React.useState<string>(derivedMeetDate ?? '');
+  const meetRef = meetDateInput || derivedMeetDate;
+  // P2-5: протокол сгонки к категории на пик-неделю (вода/натрий/карбы).
+  const peakCut = React.useMemo(() => buildPLPeakWeekCutProtocol(bw, targetBw), [bw, targetBw]);
   const fedRu: Record<string, string> = { ipf: 'IPF', fpr: 'FPR', wpc: 'WPC', other: 'Другая' };
   // C4: печать тапер-плана (PDF через window.print).
   const handlePrintTaperPlan = () => {
@@ -129,9 +134,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         weightGoal: taperWeightGoal === 'auto' ? undefined : taperWeightGoal,
         strategy: attemptStrategy,
         mockMeet: mockMeetOn,
-        meetWeek: true,
         postMeet: postMeetOn,
         windowWeeks: weeksToMeet,
+        seasonStart: meetDateInput || undefined,
       });
       if (res.weeks.length === 0) { onNote('⚠ Не удалось построить сезон — нет базового плана.'); return; }
       const sessions = res.weeks.flatMap(wk => wk.days.map(d => d.exercises.map(ex => ({
@@ -240,6 +245,20 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         <PopupNumber label="Целевой вес (категория)" value={targetBw} min={40} max={250} suffix=" кг" onChange={v => setTargetBw(v)} />
         <PopupNumber label="Недель до старта" value={weeksToMeet} min={1} max={26} suffix=" нед" hint="Окно пик-блока: на эти недели строится полный блок — вход в пик + mock + тапер + соревнования (+ пост). Раньше окно было информационным, теперь реально задаёт длину блока." onChange={v => setWeeksToMeet(v)} />
         <PopupNumber label="Тапер-недель к циклу" value={taperWeeksToAdd} min={1} max={4} suffix="" hint="Сколько недель ГЛУБОКОГО снижения объёма внутри окна до старта" onChange={v => setTaperWeeksToAdd(v)} />
+      </div>
+      {/* P2-6: реальная дата старта (реверс календарной разметки) */}
+      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>📅 Дата старта:</label>
+        <input
+          type="date"
+          value={meetDateInput}
+          onChange={e => setMeetDateInput(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: 12, minHeight: 34, boxSizing: 'border-box' }}
+          title="Реальная дата соревнования — от неё строится календарная разметка недель пик-блока"
+        />
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>
+          {meetDateInput ? `неделя старта заканчивается ${meetRef}` : 'не задана — по умолчанию через ' + weeksToMeet + ' нед от сегодня'}
+        </span>
       </div>
       {/* A1: предпросмотр пик-блока по окну до старта */}
       <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: peakPreview.warnings.length ? 'rgba(239,68,68,0.06)' : 'rgba(52,211,153,0.06)', border: `1px solid ${peakPreview.warnings.length ? 'rgba(239,68,68,0.3)' : 'rgba(52,211,153,0.25)'}` }}>
@@ -404,6 +423,42 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           </div>
         );
       })()}
+      {/* P2-5: сгонка к категории на пик-неделе (вода/натрий/карбы по дням) */}
+      {peakCut.needed && (
+        <ExpandableCard
+          icon="💧"
+          title={`💧 Сгонка на пик-неделе · ${peakCut.toCutKg.toFixed(1)} кг (вода/натрий/карбы)`}
+          short={`Вода 6→2 л · Натрий 4→0.5 г · Карбы 4→1 г/кг · взвешивание утром старта${peakCut.warnings.length ? ' · ⚠ см. детали' : ''}`}
+          full={
+            <div>
+              {peakCut.warnings.map((w, i) => (
+                <div key={i} style={{ fontSize: 10, color: '#fbbf24', lineHeight: 1.4, marginBottom: 4 }}>⚠ {w}</div>
+              ))}
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 6 }}>{peakCut.summary}</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+                    <th style={{ textAlign: 'left', padding: '4px 6px' }}>День</th>
+                    <th style={{ textAlign: 'left', padding: '4px 6px' }}>Вода</th>
+                    <th style={{ textAlign: 'left', padding: '4px 6px' }}>Натрий</th>
+                    <th style={{ textAlign: 'left', padding: '4px 6px' }}>Карбы</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {peakCut.days.map(d => (
+                    <tr key={d.day} style={{ fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <td style={{ padding: '4px 6px', fontWeight: 700, color: d.day === 7 ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}>{d.label}</td>
+                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.7)' }}>{d.waterMl}</td>
+                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.7)' }}>{d.sodiumMg}</td>
+                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.7)' }}>{d.carbsG}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+        />
+      )}
       {/* Действия: тапер к активному циклу + авто-новый цикл */}
       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
         <button
@@ -535,6 +590,35 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 {peakWk && taperWeeks.includes(peakWk) && null}
                 {meetWk && <span style={{ padding: '4px 9px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: 'rgba(234,179,8,0.14)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)' }}>🏁 Соревнования — нед {meetWk.week}</span>}
               </div>
+              {/* P2-7: гент-таймлайн пик-блока (недели по типам + даты) */}
+              {(() => {
+                const tail = taperPlan.weeks.filter(w => w.taperWeek || w.mockMeet || w.meetWeek || w.postMeet || w.rampWeek);
+                if (tail.length === 0) return null;
+                const colorOf = (w: { meetWeek?: boolean; mockMeet?: boolean; postMeet?: boolean; rampWeek?: boolean }) =>
+                  w.meetWeek ? '#eab308' : w.mockMeet ? '#a78bfa' : w.postMeet ? '#34d399' : w.rampWeek ? '#60a5fa' : '#f59e0b';
+                const labelOf = (w: typeof tail[number]) =>
+                  w.meetWeek ? '🏁' : w.mockMeet ? '🎯' : w.postMeet ? '🔄' : w.rampWeek ? '📈' : '📉';
+                return (
+                  <div style={{ marginTop: 8, marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🗺 Пик-блок ({tail.length} нед)</div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {tail.map(w => {
+                        const c = colorOf(w);
+                        const date = w.weekStart && w.weekEnd ? `${w.weekStart} – ${w.weekEnd}` : '';
+                        return (
+                          <div key={w.week} title={`Нед ${w.week}${date ? ' · ' + date : ''}`} style={{ flex: '1 1 60px', minWidth: 56, padding: '6px 8px', borderRadius: 8, textAlign: 'center', background: c + '1a', border: `1px solid ${c}55`, fontSize: 11, fontWeight: 700, color: c }}>
+                            <div>{labelOf(w)}</div>
+                            <div style={{ fontSize: 9, fontWeight: 400, color: 'rgba(255,255,255,0.5)' }}>нед {w.week}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>
+                      <span>📈 Вход в пик</span><span>🎯 Mock</span><span>📉 Тапер</span><span>🏁 Соревнования</span><span>🔄 Пост</span>
+                    </div>
+                  </div>
+                );
+              })()}
               {/* 📋 Сезон: все соревнования — прикиды по их данным (главное ⭐ + контрольные) */}
               {meetList.length > 1 && (
                 <div style={{ marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.15)' }}>

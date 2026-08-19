@@ -14,7 +14,7 @@
  *  - неделя ПОСЛЕ старта → пост-соревновательное восстановление (объём ×0.5, RIR +3).
  */
 import { buildPLTaperCurve, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
-import { buildPLPeakBlockLayout } from './lms-peak-block.engine';
+import { buildPLPeakBlockLayout, dateWeeksForward } from './lms-peak-block.engine';
 import { computeMeetAttemptsFromPmRow, type LMSPlanWeek } from './lms-builder.engine';
 import { workWeight } from './lms-progression.engine';
 import { calcSessionMetrics, type SRExercise } from './lms-metrics.engine';
@@ -38,6 +38,8 @@ export interface MacroTaperOpts {
    *  (lms-peak-block.engine). Если задано, taperWeeksPerBlock = недели глубокого
    *  тапера внутри окна. Иначе — только taperWeeksPerBlock глубокого тапера. */
   windowWeeks?: number;
+  /** Весь окно = непрерывный тапер (без отдельного «входа в пик»). */
+  wholeWindowAsTaper?: boolean;
 }
 
 export interface MacroTaperResult {
@@ -198,6 +200,7 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
     mockMeet: opts?.mockMeet,
     meetWeek: true,
     postMeet: opts?.postMeet,
+    wholeWindowAsTaper: opts?.wholeWindowAsTaper,
   }) : null;
   const curve = layout ? layout.curve : buildPLTaperCurve({ taperWeeks, mode, weightGoal });
   if (!Array.isArray(weeks) || weeks.length === 0) return { weeks, notes };
@@ -268,6 +271,8 @@ export interface PLSeasonMeet {
 export interface PLSeasonPeaksOpts extends Omit<MacroTaperOpts, 'taperWeeksPerBlock'> {
   /** Окно пик-блока для каждого старта (weeksToMeet). По умолчанию — weeksToStart старта. */
   windowWeeks?: number;
+  /** Дата начала сезона (ISO) — календарная разметка всех недель плана вперёд. */
+  seasonStart?: string;
 }
 
 export interface PLSeasonPeaksResult {
@@ -323,11 +328,15 @@ export function buildPLSeasonPeaks(
     mockMeet: opts?.mockMeet,
     postMeet: opts?.postMeet,
     windowWeeks: opts?.windowWeeks,
+    wholeWindowAsTaper: opts?.wholeWindowAsTaper,
   });
+
+  // P2-6: календарная разметка вперёд от начала сезона.
+  const weeks = opts?.seasonStart ? dateWeeksForward(res.weeks, opts.seasonStart) : res.weeks;
 
   const notes = [
     `📅 Сезон: ${sorted.map(m => `«${m.name}» нед ${m.weeksToStart}`).join(' · ')} → план на ${total} нед.`,
     ...res.notes,
   ];
-  return { weeks: res.weeks, notes };
+  return { weeks, notes };
 }

@@ -26,7 +26,7 @@ import { resolveCatalogId } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
-import { buildPLPeakBlockLayout, type PLPeakBlockLayout } from './lms-peak-block.engine';
+import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
 import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export interface LMSBuildInput {
@@ -144,6 +144,9 @@ export interface LMSPlanWeek {
   weekStart?: string;
   /** Дата конца недели (ISO). */
   weekEnd?: string;
+  /** Неделя «входа в пик» (ramp) — плавное снижение объёма ПЕРЕД mock/тапером
+   *  (часть пик-блока по окну, но НЕ глубокий тапер). */
+  rampWeek?: boolean;
 }
 
 export interface LMSBuildOutput {
@@ -1616,6 +1619,8 @@ export function appendPLTaperWeeks(
     windowWeeks?: number;
     /** Дата старта (ISO) — календарная разметка недель блока (реверс от неё). */
     reference?: string;
+    /** Весь окно = непрерывный тапер (без отдельного «входа в пик»). */
+    wholeWindowAsTaper?: boolean;
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1663,6 +1668,7 @@ export function appendPLTaperWeeks(
         mockMeet: !!opts?.mockMeet,
         meetWeek: !!opts?.meetWeek,
         postMeet: !!opts?.postMeet,
+        wholeWindowAsTaper: opts?.wholeWindowAsTaper,
       })
     : null;
   const taperCurvePoints = layout
@@ -1943,19 +1949,27 @@ export function appendPLTaperWeeks(
   const peakStrategy = opts?.peakExit?.strategy ?? 'balanced';
   const extra: LMSPlanWeek[] = [];
   let cur = 0;
-  if (mockMeetOn) {
+  // Порядок блока: ramp (вход в пик) → mock (за 10-14 дней до старта) → taper →
+  // meet (день старта) → post (после окна). Legacy (без окна): mock → taper → meet → post.
+  const rampLen = layout ? rampWeeksEff : 0;
+  const pushMock = () => {
     const wk = buildAttemptsWeek(cur, 'mock');
     if (wk) { extra.push(wk); cur++; }
-  }
+  };
+  if (mockMeetOn && !layout) pushMock();
   // Раскладка пика — канон (lms-taper.engine): 'classic' — разгрузка Bosquet;
   // 'pl' — 3-нед протокол Библиотеки (при taperWeeks < 3 — последние N недель
   // протокола, финал всегда соревновательный 100% с прикидами);
   // 'pro' — усталость-зависимая кривая с праймингом.
-  // При окне (windowWeeks) кривая включает ramp (вход в пик) + глубокий тапер.
+  // При окне (windowWeeks) кривая = ramp (вход в пик) + глубокий тапер; mock
+  // вставляется между ними (за 10-14 дней до старта), а не в начало блока.
   const taperMode: TaperMode = opts?.peakMode ?? 'classic';
-  const lastCurveIdx = cur + taperCurvePoints.length - 1;
   for (let i = 0; i < taperCurvePoints.length; i++) {
-    extra.push(buildTaperWeek(cur, taperCurvePoints[i], cur === lastCurveIdx));
+    if (layout && mockMeetOn && i === rampLen) pushMock();
+    const isRamp = layout && i < rampLen;
+    const week = buildTaperWeek(cur, taperCurvePoints[i], i === taperCurvePoints.length - 1);
+    if (isRamp) week.rampWeek = true;
+    extra.push(week);
     cur++;
   }
   if (meetWeekOn) {
@@ -1995,27 +2009,9 @@ export function appendPLTaperWeeks(
 
   // ── C1: Календарная разметка недель блока (реверс от даты старта). ──
   if (opts?.reference && extra.length > 0) {
-    const isoAdd = (iso: string, days: number) => {
-      const dt = new Date(iso + 'T00:00:00Z');
-      if (Number.isNaN(dt.getTime())) return null;
-      dt.setUTCDate(dt.getUTCDate() + days);
-      return dt.toISOString().slice(0, 10);
-    };
-    const ref = opts.reference;
-    // Последняя неделя блока (пост, если есть; иначе финальный тапер/соревнования)
-    // заканчивается на ref+7 (пост) или ref (старт). Дальше — по 7 дней назад.
-    const lastEnd = opts?.postMeet ? isoAdd(ref, 7) : ref;
-    const ends: (string | null)[] = new Array(extra.length);
-    ends[extra.length - 1] = lastEnd;
-    for (let i = extra.length - 2; i >= 0; i--) {
-      const next = ends[i + 1];
-      ends[i] = next ? isoAdd(next, -7) : null;
-    }
+    const dated = dateWeeksBackward(extra, opts.reference, !!opts?.postMeet);
     for (let i = 0; i < extra.length; i++) {
-      const end = ends[i];
-      if (!end) continue;
-      const start = isoAdd(end, -6);
-      if (start) extra[i] = { ...extra[i], weekStart: start, weekEnd: end };
+      if (dated[i] && (dated[i].weekStart || dated[i].weekEnd)) extra[i] = { ...extra[i], weekStart: dated[i].weekStart, weekEnd: dated[i].weekEnd };
     }
   }
 

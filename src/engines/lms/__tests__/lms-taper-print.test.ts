@@ -56,4 +56,13 @@ describe('buildPLTaperPrintHtml', () => {
     const html = buildPLTaperPrintHtml(next);
     expect(html).toContain('2026-12-05');
   });
+
+  it('недели входа в пик (ramp) помечаются «Вход в пик», а не «Тапер»', () => {
+    const plan = buildBase(6);
+    const next = appendPLTaperWeeks(plan, 2, { windowWeeks: 6, mockMeet: true, meetWeek: true });
+    const html = buildPLTaperPrintHtml(next);
+    expect(html).toContain('📈 Вход в пик');
+    expect(html).toContain('📉 Тапер');
+    expect(html).toContain('🎯 Mock meet');
+  });
 });

@@ -41,13 +41,15 @@ describe('appendPLTaperWeeks: окно до старта (A1)', () => {
     expect(next.progressionRationale).toContain('длиннее окна');
   });
 
-  it('mock meet стоит ПЕРЕД входом в пик (первая неделя блока)', () => {
+  it('пик-блок по окну: вход в пик → mock (за 10-14 дней) → тапер → соревнования (mock НЕ в начале)', () => {
     const plan = buildBase(6);
     const next = appendPLTaperWeeks(plan, 2, { windowWeeks: 6, mockMeet: true, meetWeek: true });
     const tail = next.weeks.slice(plan.weeks.length);
-    expect(tail[0].mockMeet).toBe(true);
-    expect(tail.some(w => w.meetWeek)).toBe(true);
-    expect(tail[tail.length - 1].meetWeek).toBe(true);
+    // окно 6 = ramp(2) + mock(1) + taper(2) + соревнования(1)
+    expect(tail[0].rampWeek).toBe(true);          // вход в пик первым
+    expect(tail[0].mockMeet).toBeUndefined();
+    expect(tail[2].mockMeet).toBe(true);          // mock после входа в пик
+    expect(tail[tail.length - 1].meetWeek).toBe(true); // соревнования последним
   });
 });
 

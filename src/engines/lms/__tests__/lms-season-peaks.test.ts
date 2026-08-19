@@ -69,4 +69,18 @@ describe('buildPLSeasonPeaks', () => {
     // Неделя старта 8 должна остаться 8-й.
     expect(meet!.week).toBe(8);
   });
+
+  it('seasonStart: календарная разметка недель вперёд от начала сезона', () => {
+    const plan = buildBase(4);
+    const res = buildPLSeasonPeaks(plan.weeks, [
+      { id: 'm1', name: 'Старт', weeksToStart: 3 },
+    ], { meetWeek: true, windowWeeks: 3, seasonStart: '2026-01-05' });
+    const w1 = res.weeks[0];
+    expect(w1.weekStart).toBe('2026-01-05');
+    expect(w1.weekEnd).toBe('2026-01-11');
+    const meet = res.weeks.find(w => w.meetWeek)!;
+    // Неделя 3 = старт: [2026-01-19, 2026-01-25].
+    expect(meet.weekStart).toBe('2026-01-19');
+    expect(meet.weekEnd).toBe('2026-01-25');
+  });
 });

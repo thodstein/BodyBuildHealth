@@ -19,6 +19,7 @@
  */
 import {
   buildPLTaperCurve,
+  isoAddDays,
   weightGoalVolumeMult,
   type TaperCurvePoint,
   type TaperMode,
@@ -40,6 +41,10 @@ export interface PLPeakBlockLayoutOpts {
   meetWeek?: boolean;
   /** Пост-соревновательная неделя ПОСЛЕ окна. */
   postMeet?: boolean;
+  /** Весь окно = непрерывный тапер (без отдельного «входа в пик»): глубокая
+   *  плавная кривая разгрузки на все доступные недели окна. Для classic тянется
+   *  до 12 нед; pl/pro/wf остаются в пределах своего протокола. */
+  wholeWindowAsTaper?: boolean;
 }
 
 export interface PLPeakBlockLayout {
@@ -101,7 +106,18 @@ export function buildPLPeakBlockLayout(opts: PLPeakBlockLayoutOpts): PLPeakBlock
     warnings.push(`Тапер (${taperWeeks} нед) длиннее окна до старта (${windowWeeks} нед) с учётом mock/соревнований — глубокий тапер урезан до ${available} нед.`);
     taperWeeks = available;
   }
-  const rampWeeks = available - taperWeeks;
+  // P2-4: «весь окно = тапер» — без входа в пик, вся доступная длина — кривая тапера.
+  let rampWeeks = available - taperWeeks;
+  if (opts.wholeWindowAsTaper) {
+    rampWeeks = 0;
+    taperWeeks = available;
+    // Для не-classic протоколов (pl/pro/wf) кривая не растягивается — оставляем
+    // только протокол (финал), вход отключаем без предупреждения.
+    if (mode !== 'classic' && taperWeeks > 4) {
+      taperWeeks = 4;
+      rampWeeks = Math.max(0, available - taperWeeks);
+    }
+  }
 
   const rampCurve = buildRampCurve(rampWeeks, weightGoal);
   const taperCurve = buildPLTaperCurve({ taperWeeks, mode, weightGoal });
@@ -128,4 +144,50 @@ export function buildPLPeakBlockLayout(opts: PLPeakBlockLayoutOpts): PLPeakBlock
   };
 }
 
-export { buildPLTaperCurve, weightGoalVolumeMult };
+export { buildPLTaperCurve, weightGoalVolumeMult, isoAddDays };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Календарная разметка недель пик-блока (P2-6) — единые хелперы для всех путей.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Даты недель ОТ даты старта НАЗАД (appendPLTaperWeeks):
+ * последняя неделя блока заканчивается на meetIso (+7 если есть пост-неделя),
+ * каждая предыдущая — на 7 дней раньше.
+ */
+export function dateWeeksBackward<T extends { weekStart?: string; weekEnd?: string }>(
+  weeks: T[],
+  meetIso: string,
+  postOn?: boolean,
+): T[] {
+  if (!weeks || weeks.length === 0) return weeks;
+  const lastEnd = postOn ? isoAddDays(meetIso, 7) : meetIso;
+  const ends: (string | null)[] = new Array(weeks.length);
+  ends[weeks.length - 1] = lastEnd;
+  for (let i = weeks.length - 2; i >= 0; i--) {
+    const next = ends[i + 1];
+    ends[i] = next ? isoAddDays(next, -7) : null;
+  }
+  return weeks.map((w, i) => {
+    const end = ends[i];
+    if (!end) return w;
+    const start = isoAddDays(end, -6);
+    return start ? { ...w, weekStart: start, weekEnd: end } : w;
+  });
+}
+
+/**
+ * Даты недель ВПЕРЁД от начала сезона (buildPLSeasonPeaks): неделя i (1-based)
+ * занимает [start+(i-1)*7, start+i*7-1].
+ */
+export function dateWeeksForward<T extends { week: number; weekStart?: string; weekEnd?: string }>(
+  weeks: T[],
+  startIso: string,
+): T[] {
+  if (!weeks || weeks.length === 0) return weeks;
+  return weeks.map(w => {
+    const start = isoAddDays(startIso, (w.week - 1) * 7);
+    const end = isoAddDays(startIso, (w.week - 1) * 7 + 6);
+    return start && end ? { ...w, weekStart: start, weekEnd: end } : w;
+  });
+}
