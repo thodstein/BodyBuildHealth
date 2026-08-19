@@ -7,6 +7,7 @@ import { useDataLink } from '../../../core/data-link';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { resolvePedAlias } from '../../../data/ped-alias-map';
 import { TZRisk3DModel } from './TZRisk3DModel';
+import { RiskVerificationList } from './RiskVerificationList';
 
 const ACCENT = '#00e68a';
 
@@ -240,6 +241,15 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     }
     return data;
   }, [course, courseSummary, result, dCov, forceNoLabs, labMap, supportIds]);
+
+  // ── Анализы (верификация) — не зависит от курса ──
+  if (subTab === 'analyses') {
+    return (
+      <div>
+        <RiskVerificationList labMap={labMap} result={result} />
+      </div>
+    );
+  }
 
   // ── 3D sub-tab ──
   if (subTab === 'tz_3d') {

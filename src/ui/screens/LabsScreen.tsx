@@ -27,6 +27,7 @@ import { normalizedRatio } from '../../core/labs-mapping';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, downloadCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
+import { RiskVerificationList } from './RiskScreen_parts/RiskVerificationList';
 
 const NO_LABS_KEY = 'he_force_no_labs';
 const NO_LABS_SYSTEMS_KEY = 'he_no_labs_systems';
@@ -213,6 +214,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [riskSections, setRiskSections] = useState<Record<string, boolean>>({
     pharma: true, indices: true, systems: true, markers: true, tz: true, requiredLabs: false, normalizeDrugs: false,
   });
+  const [risksView, setRisksView] = useState<'risks' | 'verification'>('risks');
   const [addError, setAddError] = useState('');
   const [labReportGenerated, setLabReportGenerated] = useState(false);
   useEffect(() => { try { if (localStorage.getItem('he_labs_report_current')) setLabReportGenerated(true); } catch {} }, []);
@@ -1659,8 +1661,30 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         const indexEntries = Object.entries(labIndexDetails).map(([key, detail]) => ({
           key, label: detail.label, value: Math.round(detail.value * 100),
         }));
+        const verifLabMap: Record<string, number> = {};
+        for (const l of currentLabs) {
+          const c = (l.code || '').toUpperCase();
+          if (c && typeof l.value === 'number' && isFinite(l.value)) verifLabMap[c] = l.value;
+        }
         return (
           <div>
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none', alignItems: 'center' }}>
+              {(['risks', 'verification'] as const).map(v => (
+                <button key={v} onClick={() => setRisksView(v)} style={{
+                  padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                  whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+                  background: risksView === v ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color: risksView === v ? '#000' : 'var(--text-dim)',
+                  border: `1px solid ${risksView === v ? 'var(--accent)' : 'var(--border)'}`,
+                }}>
+                  {v === 'risks' ? '⚠️ Риски и индексы' : '🔬 Верификация рисков'}
+                </button>
+              ))}
+            </div>
+            {risksView === 'verification' ? (
+              <RiskVerificationList labMap={verifLabMap} result={tzSpecResult} />
+            ) : (
+            <div>
             <div style={{ fontSize: 16, fontWeight: 700, padding: '10px 0' }}>⚠️ Риски и индексы здоровья</div>
 
             {/* Labs Score Card (TZ Pipeline) */}
@@ -2013,6 +2037,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   </div>
                 ))}
               </div>)}</div>
+            </div>
+            )}
           </div>
         );
       })()}

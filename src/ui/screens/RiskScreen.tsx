@@ -604,6 +604,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     key_risks: '🔑 Ключевые',
     history: '📜 История и пороги',
     tz_3d: '🧊 3D модель',
+    analyses: '🔬 Анализы',
   };
 
   const SYSTEM_ICONS_V2: Record<string, string> = {
@@ -1007,7 +1008,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               : calcPage === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
               : calcPage === 'mdss' ? ['mdss'] as const
               : ['overview'] as const)
-            : mainTab === 'tz_spec' ? ['overview', 'tz_3d'] as const
+            : mainTab === 'tz_spec' ? ['overview', 'tz_3d', 'analyses'] as const
             : mainTab === 'clinical' ? CLINICAL_SUBTABS as readonly string[]
             : ['info', 'reports'] as readonly string[]
           ).map(t => (
