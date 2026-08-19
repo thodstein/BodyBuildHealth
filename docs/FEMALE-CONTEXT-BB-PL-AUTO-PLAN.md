@@ -374,10 +374,16 @@ PED-логика остаётся общей и дозозависимой:
 - **RED-S с реальными данными в contest-шаге BB**: блок `redsRiskSignals` в шаге «🏁 Contest prep» при `female_context` + собранном `prepPlan` — темп из `prepPlan.preparation.targetRatePctPerWeek`, % жира из профиля.
 - Проверено: целевые тесты 38/38 (в т.ч. bb-auto-smoke 5/5, bb-auto-reproductive 2/2, athlete-context 14). tsc по моим файлам чист (ошибки только в чужом MacrocyclePanel WIP).
 
+### Раунд 6 (Aug 19 2026, uncommitted)
+
+- **Печать PL**: PLPlanView передаёт `athleteMode: builtSrc.athleteMode` в `buildPLPrintHtml` — «· ♀ Женский контекст» появляется в PDF-шапке, когда план собран в женском контексте.
+- **RED-S/железо в питании (prep)**: `prepNutritionSignals(plan)` в bb-contest-prep.engine — для female: темп > 0.5%/нед → RED-S, плюс железо/кальций/цикл примечания; блок «♀ Питание и RED-S» добавлен в печать prep (`buildContestPrepPrintHtml`).
+- Тесты: `bb-contest-prep-female-reds.test.ts` +3 (prepNutritionSignals) = 6. Проверено: tsc 0; contest-prep + pl-export 205/205.
+- Пуш НЕ выполнялся (по указанию пользователя).
+
 ### Осталось на будущие раунды
 
-- RED-S/железо/костные сигналы в питании (IndividualPlan — активная чужая зона; bb-contest-prep уже содержит женские floors).
-- Прокидка athleteMode в вызовы `buildPLPrintHtml` из PLPlanView (файл в чужой зоне).
+- Нет активных пунктов (оба закрытых пункта выполнены; IndividualPlan-питание — при необходимости отдельным этапом вне этой задачи).
 
 ## 15. Источники
 - Refalo et al., 2025, sex differences in hypertrophy: https://doi.org/10.7717/peerj.19042

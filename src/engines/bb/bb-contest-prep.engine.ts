@@ -2358,8 +2358,21 @@ function escHtml(s: string): string {
 }
 
 /** Полная HTML-сводка contest prep для печати (фазы/тапер/пик-неделя/шоу-день/post-show). */
-export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance }): string {
-  const profile = CATEGORY_PROFILES[plan.category];
+/** RED-S/железо-сигналы для женской подготовки (только предупреждения, без авто-изменений). */
+export function prepNutritionSignals(plan: BBContestPrepPlan): string[] {
+  if (plan.sex !== 'female') return [];
+  const signals: string[] = [];
+  const rate = plan.preparation.targetRatePctPerWeek;
+  if (rate > 0.5) {
+    signals.push(`RED-S: темп ${rate}%/нед выше безопасного 0.5% — риск низкой энергетической доступности; рекомендуемый темп 0.4–0.5%/нед (IOC REDs).`);
+  }
+  signals.push('Железо: дефицит типичен на женской сушке — красное мясо/печень/шпинат, контроль ферритина.');
+  signals.push('Кальций: 1000–1200 мг/день — защита костей при низком % жира.');
+  signals.push('Цикл: лютеиновая фаза — задержка воды +0.5–1 кг; анализ по среднему за 7 дней, не паниковать.');
+  return signals;
+}
+
+export function buildContestPrepPrintHtml(plan: BBContestPrepPlan, extra?: { compliance?: PrepTrainingCompliance }): string {  const profile = CATEGORY_PROFILES[plan.category];
   const post = buildPostShowPlan(plan);
   const peakWeek = buildPeakWeek(configFromPlan(plan));
   const timeline = buildShowTimeline(configFromPlan(plan));
@@ -2414,6 +2427,7 @@ ${extra.compliance.weeks.map(c => `<tr><td>${c.week}</td><td>${escHtml(c.phase ?
 </table>
 <div class="muted">Итого: ${Math.round(extra.compliance.overallPct * 100)}% от плана · завершено недель ${extra.compliance.completedWeeks}/${extra.compliance.elapsedWeeks}. ${escHtml(extra.compliance.recommendation)}</div>` : ''}
 
+${plan.sex === 'female' ? `<h2>♀ Питание и RED-S (женская подготовка)</h2><ul>${rows(prepNutritionSignals(plan))}</ul>` : ''}
 ${plan.safety.warnings.length > 0 ? `<h2>⚠️ Предупреждения</h2><ul>${rows(plan.safety.warnings)}</ul>` : ''}
 ${plan.safety.requiresReview ? `<div class="warn">🩺 Требуется профессиональное сопровождение: ${escHtml(plan.safety.contraindications.join(', '))}. Агрессивные режимы отключены.</div>` : ''}
 ${(plan.adjustments?.length ?? 0) > 0 ? `<h2>📝 История корректировок</h2><table><tr><th>Дата</th><th>Причина</th><th>Ккал</th><th>Кардио</th><th>Источник</th></tr>${(plan.adjustments ?? []).map(a => `<tr><td>${escHtml(a.date)}</td><td>${escHtml(a.reason)}</td><td>${a.caloriesDelta > 0 ? '+' : ''}${a.caloriesDelta}</td><td>${a.cardioDelta > 0 ? '+' : ''}${a.cardioDelta}</td><td>${escHtml(a.source)}</td></tr>`).join('')}</table>` : ''}

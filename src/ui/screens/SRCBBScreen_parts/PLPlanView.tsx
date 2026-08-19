@@ -1112,7 +1112,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       ? `🌐 Файл открыт в браузере телефона — там появится загрузка (${scopeLabel}, ${sel.length} нед.).`
                       : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
                   } else {
-                    const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }), {
+                    const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary, athleteMode: builtSrc.athleteMode }), {
                       title,
                       text: plShareDigest({ title, weeks: sel, pmSquat, pmBench, pmDead }),
                     });
