@@ -2,10 +2,16 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createCanvas } from '@napi-rs/canvas';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const MAX_PAGES = 8;
 const MAX_PAGE_PIXELS = 4_000_000;
+const require = createRequire(import.meta.url);
+
+function localRussianLangPath(): string {
+  return require('@tesseract.js-data/rus').langPath;
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16mb' } },
@@ -13,7 +19,7 @@ export const config = {
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker('rus+eng');
+  const worker = await createWorker('rus', 1, { langPath: localRussianLangPath(), gzip: true } as any);
   try {
     await worker.setParameters({ tessedit_pageseg_mode: '3' as any, preserve_interword_spaces: '1', user_defined_dpi: '300' });
     const result = await worker.recognize(buffer);
@@ -55,7 +61,7 @@ async function recognizePdf(buffer: Buffer): Promise<string> {
   } as any).promise;
   if (pdf.numPages > MAX_PAGES) throw new Error(`PDF содержит ${pdf.numPages} страниц, максимум ${MAX_PAGES}`);
 
-  const worker = await createWorker('rus+eng');
+  const worker = await createWorker('rus', 1, { langPath: localRussianLangPath(), gzip: true } as any);
   try {
     await worker.setParameters({
       tessedit_pageseg_mode: '3' as any,
