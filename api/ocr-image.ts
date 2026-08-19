@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const MAX_BYTES = 12 * 1024 * 1024;
+const OCR_TIMEOUT_MS = 50_000;
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
@@ -11,7 +12,10 @@ async function recognizeImage(buffer: Buffer): Promise<string> {
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
     });
-    const result = await worker.recognize(buffer);
+    const result = await Promise.race([
+      worker.recognize(buffer),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`OCR timeout after ${OCR_TIMEOUT_MS} ms`)), OCR_TIMEOUT_MS)),
+    ]);
     return result.data.text || '';
   } finally {
     await worker.terminate();

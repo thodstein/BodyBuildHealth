@@ -309,11 +309,22 @@ async function serverOcrImage(file: File): Promise<string> {
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
-  const response = await fetch('./api/ocr-image', {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45_000);
+  let response: Response;
+  try {
+    response = await fetch('./api/ocr-image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data: btoa(binary) }),
-  });
+      signal: controller.signal,
+    });
+  } catch (error: any) {
+    if (error?.name === 'AbortError') throw new Error('Серверный OCR превысил лимит 45 секунд. Попробуйте более компактный скриншот.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.ok) throw new Error(payload.error || `Server OCR HTTP ${response.status}`);
   return typeof payload.text === 'string' ? payload.text : '';
@@ -414,9 +425,10 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
         rawText = await serverOcrImage(file);
         warnings.push('Фото обработано на сервере OCR.');
       } catch (serverError: any) {
-        warnings.push(`Серверный OCR недоступен, использую локальный: ${serverError?.message || String(serverError)}`);
-        const imageResult = await parseLabFile(file);
-        rawText = imageResult.rawText || imageResult.originalText || '';
+        warnings.push(`Серверный OCR не завершился: ${serverError?.message || String(serverError)}`);
+        return {
+          text: '', labs: [], meals: [], source, confidence: 0, warnings,
+        };
       }
 
       if (rawText.trim().length > 2) {
