@@ -338,32 +338,16 @@ const PrescriptionTab: React.FC = () => {
       {showGenerator && (
         <div style={{ ...CARD, marginBottom: 12, border: '1px solid rgba(0,230,138,0.15)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-            <div>
-              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Группа мышц</div>
-              <select value={genGroup} onChange={e => setGenGroup(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
-                {['chest', 'back', 'legs', 'shoulders', 'arms', 'core'].map(g => <option key={g} value={g}>{GROUP_RU[g]}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Цель</div>
-              <select value={genGoal} onChange={e => setGenGoal(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
-                <option value="bulk">Масса</option><option value="strength">Сила</option><option value="cut">Сушка</option>
-                <option value="maintenance">Поддержание</option><option value="recomp">Рекомп</option>
-                <option value="hypertrophy">Гипертрофия</option><option value="power">Взрывная</option>
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Уровень</div>
-              <select value={genLevel} onChange={e => setGenLevel(e.target.value)} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
-                <option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Опытный</option><option value="enhanced">На курсе</option>
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Кол-во</div>
-              <select value={genCount} onChange={e => setGenCount(parseInt(e.target.value))} style={{ width: '100%', padding: '5px', borderRadius: 6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11 }}>
-                {[3, 5, 8, 10].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
+            <PopupSelect label="Группа мышц" value={genGroup} options={['chest', 'back', 'legs', 'shoulders', 'arms', 'core'].map(g => ({ id: g, label: GROUP_RU[g], desc: '' }))} hint="Группа" onChange={v => setGenGroup(v)} />
+            <PopupSelect label="Цель" value={genGoal} options={[
+              { id: 'bulk', label: 'Масса' }, { id: 'strength', label: 'Сила' }, { id: 'cut', label: 'Сушка' },
+              { id: 'maintenance', label: 'Поддержание' }, { id: 'recomp', label: 'Рекомп' },
+              { id: 'hypertrophy', label: 'Гипертрофия' }, { id: 'power', label: 'Взрывная' },
+            ]} onChange={v => setGenGoal(v)} />
+            <PopupSelect label="Уровень" value={genLevel} options={[
+              { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' }, { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'На курсе' },
+            ]} onChange={v => setGenLevel(v)} />
+            <PopupSelect label="Кол-во" value={String(genCount)} options={[3, 5, 8, 10].map(n => ({ id: String(n), label: `${n}`, desc: '' }))} hint="Кол-во" onChange={v => setGenCount(parseInt(v))} />
           </div>
           {genResult && genResult.length > 0 ? (
             <div>

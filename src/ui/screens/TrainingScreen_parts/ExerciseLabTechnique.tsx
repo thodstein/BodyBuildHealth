@@ -174,13 +174,12 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Уровень:</span>
           {(['all', 'beginner', 'intermediate', 'advanced'] as const).map(d => <button key={d} onClick={() => setFilterDiff(d)} style={filterBtn(filterDiff === d)}>{d === 'all' ? 'Все' : d === 'beginner' ? 'Новичок' : d === 'advanced' ? 'Продв.' : 'Средний'}</button>)}
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Оборуд.:</span>
-          <select value={filterEquip} onChange={e => setFilterEquip(e.target.value)} style={{ padding: '3px 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: DIM, fontSize: 10 }}>
-            {equipmentOptions.map(eq => <option key={eq} value={eq}>{eq === 'all' ? 'Всё' : EQUIP_RU[eq] || eq}</option>)}
-          </select>
+          <PopupSelect label="Оборудование" value={filterEquip} options={equipmentOptions.map(eq => ({ id: eq, label: eq === 'all' ? 'Всё' : EQUIP_RU[eq] || eq, desc: '' }))} hint="Оборуд." onChange={v => setFilterEquip(v)} />
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 8, marginRight: 2 }}>Щадящий:</span>
-          <select value={filterJoint} onChange={e => setFilterJoint(e.target.value)} style={{ padding: '3px 8px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.3)', color: DIM, fontSize: 10 }}>
-            <option value="all">Все</option><option value="spine">Позвоночник</option><option value="knee">Колени</option><option value="shoulder">Плечи</option><option value="elbow">Локти</option><option value="hip">Таз</option>
-          </select>
+          <PopupSelect label="Щадящая нагрузка" value={filterJoint} options={[
+            { id: 'all', label: 'Все', desc: '' }, { id: 'spine', label: 'Позвоночник', desc: '' }, { id: 'knee', label: 'Колени', desc: '' },
+            { id: 'shoulder', label: 'Плечи', desc: '' }, { id: 'elbow', label: 'Локти', desc: '' }, { id: 'hip', label: 'Таз', desc: '' },
+          ]} hint="Щадящий" onChange={v => setFilterJoint(v)} />
         </div>
       )}
 

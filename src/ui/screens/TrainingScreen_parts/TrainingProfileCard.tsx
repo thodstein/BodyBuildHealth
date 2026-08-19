@@ -10,6 +10,9 @@ const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 10, margin: '6px 0 4px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.3 };
 
+const INJ_GROUPS: [string, string][] = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']];
+const INJ_GROUP_OPTIONS = INJ_GROUPS.map(([id, label]) => ({ id, label }));
+
 export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (patch: Partial<TrainingProfile>) => void; compact?: boolean }> = ({ profile, update, compact }) => {
   const toggleArr = (key: 'weakPoints' | 'equipment', id: string) => {
     const arr = profile[key];
@@ -90,16 +93,13 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       </div>
       <div style={LABEL}>🩹 Травмы / ограничения</div>
       {(() => {
-        const INJ_GROUPS: [string, string][] = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']];
         return (
           <div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 6 }}>Указанные группы исключаются из генерации плана на активный период.</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: 6, marginBottom: 8, alignItems: 'end' }}>
               <div>
                 <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Группа</label>
-                <select value={injMuscle} onChange={e => setInjMuscle(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }}>
-                  {INJ_GROUPS.map(([g, l]) => <option key={g} value={g}>{l}</option>)}
-                </select>
+                <PopupSelect label="Группа травмы" value={injMuscle} onChange={v => setInjMuscle(v)} options={INJ_GROUP_OPTIONS} />
               </div>
               <div>
                 <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>С</label>

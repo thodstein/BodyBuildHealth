@@ -13,6 +13,7 @@ import type { LMSPlanExercise, LMSWorkSet } from '../../../engines/lms/lms-build
 import type { UserProgram, HybridProgramBody } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { CARD, ACCENT, IN, SMALL, DIM, DIM_STRONG, BTN } from './training-ui';
+import { EditorPopupSelect } from './EditorPopup';
 
 const LIFT_LABEL: Record<string, string> = { squat: '🦵 Присед', bench: '💪 Жим', deadlift: '🏋 Тяга', other: '⚙ Другое' };
 const LIFT_COLOR: Record<string, string> = { squat: '#f59e0b', bench: '#00e68a', deadlift: '#a78bfa', other: '#60a5fa' };
@@ -104,9 +105,13 @@ export const HybridPlanPanel: React.FC<{
       <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4 }}>
           ПЛ-цикл (источник силы)
-          <select style={IN} value={cycleId} onChange={e => { setCycleId(e.target.value); const c = LMS_CYCLES.find(x => x.meta.id === e.target.value); if (c) setWeeks(c.meta.weeks); }}>
-            {plCycles.map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} · {c.meta.sessionsPerWeek}д/нед · {c.meta.weeks}нед · {c.meta.level}</option>)}
-          </select>
+          <EditorPopupSelect
+            value={cycleId}
+            options={plCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} · ${c.meta.sessionsPerWeek}д/нед · ${c.meta.weeks}нед · ${c.meta.level}` }))}
+            onChange={v => { setCycleId(v); const c = LMS_CYCLES.find(x => x.meta.id === v); if (c) setWeeks(c.meta.weeks); }}
+            ariaLabel="ПЛ-цикл (источник силы)"
+            title="ПЛ-цикл (источник силы)"
+          />
         </label>
         <div style={{ display: 'flex', gap: 6 }}>
           {([['Присед', squat, setSquat], ['Жим', bench, setBench], ['Тяга', dead, setDead]] as const).map(([lbl, v, set]) => (
@@ -115,7 +120,18 @@ export const HybridPlanPanel: React.FC<{
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Недель<input type="number" style={IN} value={weeks} min={1} max={16} onChange={e => setWeeks(parseInt(e.target.value) || 1)} /></label>
-          <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Уровень<select style={IN} value={level} onChange={e => setLevel(e.target.value)}><option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Опытный</option><option value="enhanced">Enhanced</option></select></label>
+          <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>Уровень
+          <EditorPopupSelect
+            value={level}
+            options={[
+              { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
+              { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },
+            ]}
+            onChange={setLevel}
+            ariaLabel="Уровень подготовки"
+            title="Уровень подготовки"
+          />
+        </label>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={{ ...BTN, flex: 1 }} onClick={build}>🔧 Собрать powerbuilder-план</button>

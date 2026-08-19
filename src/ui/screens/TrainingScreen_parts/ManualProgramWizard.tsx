@@ -1,6 +1,7 @@
 import React from 'react';
 import { BTN, BTN_GHOST, CARD, DIM, IN, SMALL } from './training-ui';
 import { TrainingModal } from './TrainingModal';
+import { EditorPopupSelect } from './EditorPopup';
 
 export type WizardDirection = 'bb' | 'pl' | 'hybrid';
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -55,14 +56,29 @@ export const ManualProgramWizard: React.FC<Props> = ({
       {step === 2 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 2 из 4: какая цель?</div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>{direction === 'pl' ? 'Для ПЛ цель фиксирована: развитие соревновательных движений.' : 'Цель влияет на фазы, объём и рекомендации программы.'}</div>
-        <select style={IN} value={goal} onChange={e => onGoal(e.target.value)} disabled={direction === 'pl'}>
-          <option value="hypertrophy">💪 Мышечная масса</option><option value="cut">✂️ Сушка</option><option value="recomp">🔁 Рекомпозиция</option><option value="maintenance">⚖ Поддержание</option><option value="strength_mass">🎯 Сила + Масса</option><option value="athletic">🏅 Атлетизм</option>
-        </select>
+        <EditorPopupSelect
+          value={goal}
+          options={[
+            { id: 'hypertrophy', label: '💪 Мышечная масса' }, { id: 'cut', label: '✂️ Сушка' },
+            { id: 'recomp', label: '🔁 Рекомпозиция' }, { id: 'maintenance', label: '⚖ Поддержание' },
+            { id: 'strength_mass', label: '🎯 Сила + Масса' }, { id: 'athletic', label: '🏅 Атлетизм' },
+          ]}
+          onChange={onGoal}
+          disabled={direction === 'pl'}
+          ariaLabel="Цель программы"
+          title="Цель программы"
+        />
       </div>}
       {step === 3 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 3 из 4: сколько и как часто?</div>
         <div style={{ fontSize: 10, color: DIM }}>Дни/нед = количество тренировок в каждой неделе. Упражнения и названия дней добавляются позже в редакторе.</div>
-        <select style={IN} value={level} onChange={e => onLevel(e.target.value)}>{LEVELS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+        <EditorPopupSelect
+          value={level}
+          options={LEVELS.map(([id, label]) => ({ id, label }))}
+          onChange={onLevel}
+          ariaLabel="Уровень подготовки"
+          title="Уровень подготовки"
+        />
         <div style={{ display: 'flex', gap: 6 }}>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед<input type="number" style={IN} min={2} max={6} value={days} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onDays(Math.max(2, Math.min(6, Math.round(v)))); }} aria-label="Дней в неделю" inputMode="numeric" /></label>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель<input type="number" style={IN} min={4} max={24} value={weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onWeeks(Math.max(4, Math.min(24, Math.round(v)))); }} aria-label="Недель в программе" inputMode="numeric" /></label>

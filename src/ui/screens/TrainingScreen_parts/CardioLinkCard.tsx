@@ -5,6 +5,11 @@
  * факт дня и нагрузку (сила+кардио), позволяет открыть кардио-конструктор,
  * пересчитать цикл под текущий ACWR (adaptCardioToStrength) и отключить.
  * Сам кардио-цикл хранится отдельно — копия не создаётся.
+ *
+ * Проп `onOpenCardio?: () => void`: если передан, кнопки «▶ Старт» и
+ * «🛠 Открыть кардио-конструктор» вызывают его вместо переключения внешнего
+ * трека (используется ручным конструктором, где кардио-конструктор открыт
+ * в модале внутри редактора). Без пропа — прежнее поведение (внешний трек).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { getCardioLink, clearCardioLink, subscribeCardioLink, SPORT_LABELS } from '../../../engines/lms/cardio-bridge';
@@ -32,7 +37,8 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export const CardioLinkCard: React.FC = () => {
+export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpenCardio }) => {
+  const openCardio = onOpenCardio ?? openCardioConstructor;
   const [link, setLink] = useState(getCardioLink());
   const [cycleName, setCycleName] = useState<string | null>(null);
   const [todayText, setTodayText] = useState<string | null>(null);
@@ -139,7 +145,7 @@ export const CardioLinkCard: React.FC = () => {
       {todayText && (
         <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span>🔔 Сегодня: {todayText}</span>
-          <button style={{ ...BTN_PRIMARY, minHeight: 26, padding: '3px 8px', fontSize: 10 }} onClick={openCardioConstructor} aria-label="Начать сессию в дневнике">▶ Старт</button>
+          <button style={{ ...BTN_PRIMARY, minHeight: 26, padding: '3px 8px', fontSize: 10 }} onClick={openCardio} aria-label="Начать сессию в дневнике">▶ Старт</button>
         </div>
       )}
       {nextText && (
@@ -153,7 +159,7 @@ export const CardioLinkCard: React.FC = () => {
         </div>
       )}
       <div style={ROW}>
-        <button style={BTN} onClick={openCardioConstructor}>🛠 Открыть кардио-конструктор</button>
+        <button style={BTN} onClick={openCardio}>🛠 Открыть кардио-конструктор</button>
         {link && (
           <>
             <button style={BTN} onClick={recalc} title="Адаптировать кардио-цикл под текущий ACWR (без изменения силового плана)">🔄 Пересчитать под ACWR</button>

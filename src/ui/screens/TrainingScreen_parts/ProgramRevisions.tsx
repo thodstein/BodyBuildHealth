@@ -7,8 +7,9 @@
  */
 import React, { useMemo, useState } from 'react';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
-import { CARD, DIM, DIM_STRONG, ACCENT, BTN_GHOST } from './training-ui';
+import { CARD, DIM, DIM_STRONG, ACCENT } from './training-ui';
 import { loadUserPrograms } from '../../../engines/user-program/program-store';
+import { EditorPopupSelect } from './EditorPopup';
 
 interface StoredRevision {
   id: string;
@@ -44,6 +45,12 @@ export const ProgramRevisionsDiff: React.FC<{
   const [rightId, setRightId] = useState<string>('');
 
   const revisions = useMemo(() => getStoredProgramRevisions(program.meta.id), [program.meta.id]);
+
+  const revOptions = useMemo(() => revisions.map(r => ({
+    id: r.id,
+    label: `${new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — ${r.note}`,
+    desc: new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }),
+  })), [revisions]);
 
   if (revisions.length < 2) {
     return (
@@ -96,15 +103,11 @@ export const ProgramRevisionsDiff: React.FC<{
     <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #94a3b8' }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>📜 Сравнение ревизий</div>
       <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-        <select value={leftId} onChange={e => setLeftId(e.target.value)} style={{ flex: 1, minWidth: 120, padding: '4px 6px', fontSize: 10, background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}>
-          <option value="">— исходная (auto) —</option>
-          {revisions.map(r => <option key={r.id} value={r.id}>{new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {r.note}</option>)}
-        </select>
+        <EditorPopupSelect value={leftId} options={[{ id: '', label: '— исходная (auto) —' }, ...revOptions]}
+          onChange={setLeftId} ariaLabel="Левая ревизия" buttonStyle={{ flex: 1, minWidth: 120, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }} />
         <span style={{ alignSelf: 'center', color: DIM }}>→</span>
-        <select value={rightId} onChange={e => setRightId(e.target.value)} style={{ flex: 1, minWidth: 120, padding: '4px 6px', fontSize: 10, background: 'var(--bg-secondary)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }}>
-          <option value="">— новая (auto) —</option>
-          {revisions.map(r => <option key={r.id} value={r.id}>{new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} — {r.note}</option>)}
-        </select>
+        <EditorPopupSelect value={rightId} options={[{ id: '', label: '— новая (auto) —' }, ...revOptions]}
+          onChange={setRightId} ariaLabel="Правая ревизия" buttonStyle={{ flex: 1, minWidth: 120, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }} />
       </div>
       {diff && diff.length > 0 ? (
         <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 10 }}>

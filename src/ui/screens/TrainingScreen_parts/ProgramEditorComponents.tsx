@@ -8,7 +8,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { SET_TEMPLATES, GROUP_RU } from './program-types';
+import { SET_TEMPLATES, GROUP_RU, ALL_GROUPS } from './program-types';
 import { ACCENT, ACCENT_LINE, BTN, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
 import { createBlank, getReferencedCycle, userWeekToBBPlan } from '../../../engines/user-program/program-store';
@@ -30,6 +30,7 @@ import { findSubstitutions } from '../../../engines/exercise-substitution.engine
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { ExerciseLabPicker } from './ExerciseLabPicker';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
+import { EditorPopupSelect, EditorPopupNumber } from './EditorPopup';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
@@ -316,10 +317,14 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         <div className="editor-week-bulk-actions">
           <span>Навигация по неделям:</span>
           <label className="editor-week-jump">Перейти к
-            <select value={expandedWeekIdx < 0 ? '' : expandedWeekIdx} onChange={event => setExpandedWeekIdx(Number(event.target.value))} aria-label="Перейти к неделе">
-              <option value="">Выбрать</option>
-              {body.weeks.map((week, index) => <option key={week.week} value={index}>Неделя {week.week}</option>)}
-            </select>
+            <EditorPopupSelect
+              value={expandedWeekIdx < 0 ? '' : String(expandedWeekIdx)}
+              options={[{ id: '', label: 'Выбрать' }, ...body.weeks.map((week, index) => ({ id: String(index), label: `Неделя ${week.week}` }))]}
+              onChange={v => setExpandedWeekIdx(v === '' ? -1 : Number(v))}
+              ariaLabel="Перейти к неделе"
+              title="Неделя для редактирования"
+              placeholder="Выбрать"
+            />
           </label>
           <button type="button" onClick={() => setExpandedWeekIdx(current => Math.max(0, current - 1))} disabled={expandedWeekIdx <= 0}>← Предыдущая</button>
           <button type="button" onClick={() => setExpandedWeekIdx(current => Math.min(body.weeks.length - 1, Math.max(0, current + 1)))} disabled={expandedWeekIdx < 0 || expandedWeekIdx >= body.weeks.length - 1}>Следующая →</button>
@@ -425,9 +430,15 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             </label>
             <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }} title="Быстро создать нужное количество тренировок в этой неделе">
               Тренировок
-              <select style={{ ...IN, padding: '3px 5px', fontSize: 10, minHeight: 44 }} value={w.sessions.length} onChange={e => resizeWeek(wi, Number(e.target.value))} aria-label={`Количество тренировок в неделе ${w.week}`}>
-                {[1, 2, 3, 4, 5, 6, 7].map(count => <option key={count} value={count}>{count}</option>)}
-              </select>
+              <EditorPopupNumber
+                value={w.sessions.length}
+                min={1}
+                max={7}
+                onChange={v => resizeWeek(wi, v)}
+                ariaLabel={`Количество тренировок в неделе ${w.week}`}
+                title="Тренировок в неделе"
+                format={v => `${v}`}
+              />
             </label>
             <button
               style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44,
@@ -919,14 +930,31 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
               }
             }}
           >☰</span>
-          <select style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 auto', minHeight: 44 }} value={b.type} onChange={e => updateBlock(bi, { type: e.target.value as UserBlock['type'], role: e.target.value === 'compound' ? 'primary' : 'accessory' })}>
-            <option value="compound">Базовое</option>
-            <option value="accessory">Доп.</option>
-            <option value="isolation">Изоляция</option>
-            <option value="finisher">Финишь</option>
-          </select>
+          <EditorPopupSelect
+            value={b.type}
+            options={[
+              { id: 'compound', label: 'Базовое', desc: 'Многосуставное, основной стимул' },
+              { id: 'accessory', label: 'Доп.', desc: 'Вспомогательное движение' },
+              { id: 'isolation', label: 'Изоляция', desc: 'Одна мышца, добивка' },
+              { id: 'finisher', label: 'Финишь', desc: 'Короткая добивка в конце' },
+            ]}
+            onChange={v => updateBlock(bi, { type: v as UserBlock['type'], role: v === 'compound' ? 'primary' : 'accessory' })}
+            ariaLabel="Тип упражнения"
+            title="Тип упражнения"
+          />
           <ExerciseLabPicker value={b.exerciseName} muscle={b.muscle} onSelect={ex => updateBlock(bi, { exerciseName: ex.name, muscle: ex.group || b.muscle, type: (ex.type === 'compound' ? 'compound' : ex.type === 'isolation' ? 'isolation' : 'accessory') as UserBlock['type'], role: ex.type === 'compound' ? 'primary' : 'accessory' })} />
-          <input style={{ ...IN, padding: '6px 10px', fontSize: 11, width: 80, minHeight: 44 }} value={b.muscle} onChange={e => updateBlock(bi, { muscle: e.target.value })} placeholder="Мышца" list="muscle-list" />
+          <EditorPopupSelect
+            value={b.muscle ?? ''}
+            options={[
+              ...ALL_GROUPS.map(g => ({ id: g, label: GROUP_RU[g] ?? g })),
+              ...(b.muscle && !ALL_GROUPS.includes(b.muscle) ? [{ id: b.muscle, label: b.muscle }] : []),
+            ]}
+            onChange={v => updateBlock(bi, { muscle: v })}
+            ariaLabel="Мышца упражнения"
+            title="Мышца (группа)"
+            placeholder="Мышца"
+            buttonStyle={{ width: 90, minWidth: 90 }}
+          />
            <button
              className="bb-block-expand"
              type="button"
@@ -1388,10 +1416,14 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
         <div className="editor-week-bulk-actions">
           <span>Навигация по неделям:</span>
           <label className="editor-week-jump">Перейти к
-            <select value={expandedWeek == null ? '' : expandedWeek} onChange={event => setExpandedWeek(event.target.value === '' ? null : Number(event.target.value))} aria-label="Перейти к неделе PL">
-              <option value="">Выбрать</option>
-              {weeks.map((week, index) => <option key={week.week} value={index}>Неделя {week.week}</option>)}
-            </select>
+            <EditorPopupSelect
+              value={expandedWeek == null ? '' : String(expandedWeek)}
+              options={[{ id: '', label: 'Выбрать' }, ...weeks.map((week, index) => ({ id: String(index), label: `Неделя ${week.week}` }))]}
+              onChange={v => setExpandedWeek(v === '' ? null : Number(v))}
+              ariaLabel="Перейти к неделе PL"
+              title="Неделя для редактирования"
+              placeholder="Выбрать"
+            />
           </label>
           <button type="button" onClick={() => setExpandedWeek(current => current == null ? 0 : Math.max(0, current - 1))} disabled={expandedWeek == null || expandedWeek <= 0}>← Предыдущая</button>
           <button type="button" onClick={() => setExpandedWeek(current => current == null ? 0 : Math.min(weeks.length - 1, current + 1))} disabled={expandedWeek == null || expandedWeek >= weeks.length - 1}>Следующая →</button>
@@ -1499,10 +1531,26 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                             muscle={ex.muscle ?? ''}
                             onSelect={selected => updateExercise(wi, di, ei, { name: selected.name, muscle: selected.group || ex.muscle, lift: ex.lift })}
                           />
-                          <select style={{ ...IN, padding: '4px 6px', fontSize: 11, minHeight: 44, flex: '0 0 100px' }} value={ex.lift} onChange={e => updateExercise(wi, di, ei, { lift: e.target.value as PLExercise['lift'] })}>
-                            {LIFT_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                          </select>
-                          <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: '0 0 90px', minHeight: 44 }} value={ex.muscle ?? ''} onChange={e => updateExercise(wi, di, ei, { muscle: e.target.value })} placeholder="мышца" list="muscle-list" />
+                          <EditorPopupSelect
+                            value={ex.lift}
+                            options={LIFT_OPTS.map(o => ({ id: o.id, label: o.label }))}
+                            onChange={v => updateExercise(wi, di, ei, { lift: v as PLExercise['lift'] })}
+                            ariaLabel="Дисциплина упражнения"
+                            title="Дисциплина (лифт)"
+                            buttonStyle={{ flex: '0 0 100px' }}
+                          />
+                          <EditorPopupSelect
+                            value={ex.muscle ?? ''}
+                            options={[
+                              ...ALL_GROUPS.map(g => ({ id: g, label: GROUP_RU[g] ?? g })),
+                              ...(ex.muscle && !ALL_GROUPS.includes(ex.muscle) ? [{ id: ex.muscle, label: ex.muscle }] : []),
+                            ]}
+                            onChange={v => updateExercise(wi, di, ei, { muscle: v })}
+                            ariaLabel="Мышца упражнения"
+                            title="Мышца (группа)"
+                            placeholder="Мышца"
+                            buttonStyle={{ flex: '0 0 110px' }}
+                          />
                           <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
                         </div>
                         <PLSetEditor sets={ex.sets} lift={ex.lift} workMax={body.workMax} onChange={(sets) => updateExercise(wi, di, ei, { sets })} />
@@ -1667,15 +1715,23 @@ const BBConstraintsPanel: React.FC<{
       </div>
       <div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Прогрессия весов</div>
-        <select style={IN} value={progression.loadStrategy || 'double_progression'} onChange={e => onChangeProgression({ ...progression, loadStrategy: e.target.value as LoadStrategy })}>
-          {LOAD_STRATEGY_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
+        <EditorPopupSelect
+          value={progression.loadStrategy || 'double_progression'}
+          options={LOAD_STRATEGY_OPTS.map(o => ({ id: o.id, label: o.label }))}
+          onChange={v => onChangeProgression({ ...progression, loadStrategy: v as LoadStrategy })}
+          ariaLabel="Прогрессия весов"
+          title="Стратегия прогрессии"
+        />
       </div>
       <div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Протокол делода</div>
-        <select style={IN} value={progression.deloadProtocol || 'pump'} onChange={e => onChangeProgression({ ...progression, deloadProtocol: e.target.value as DeloadProtocol })}>
-          {DELOAD_PROTOCOL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-        </select>
+        <EditorPopupSelect
+          value={progression.deloadProtocol || 'pump'}
+          options={DELOAD_PROTOCOL_OPTS.map(o => ({ id: o.id, label: o.label }))}
+          onChange={v => onChangeProgression({ ...progression, deloadProtocol: v as DeloadProtocol })}
+          ariaLabel="Протокол делода"
+          title="Протокол разгрузки"
+        />
       </div>
       <div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Интенсив-техники</div>

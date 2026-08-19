@@ -71,6 +71,7 @@ import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL } from './training-ui';
+import { EditorPopupSelect } from './EditorPopup';
 import { GROUP_RU } from './program-types';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { distributePhases, PHASE_CONFIGS } from './phase-periodization';
@@ -908,17 +909,27 @@ export const ProgramManagerPanel: React.FC = () => {
             onChange={e => setSearch(e.target.value)}
             style={{ ...IN, flex: 2, minWidth: 100, fontSize: 11, padding: '6px 8px' }}
           />
-          <select value={filterDir} onChange={e => setFilterDir(e.target.value as 'all' | 'bb' | 'pl' | 'hybrid')} style={{ ...IN, flex: 1, minWidth: 70, fontSize: 11, padding: '6px 4px' }}>
-            <option value="all">Все</option>
-            <option value="bb">ББ</option>
-            <option value="pl">ПЛ</option>
-            <option value="hybrid">⚡</option>
-          </select>
-          <select value={sortBy} onChange={e => setSortBy(e.target.value as 'updated' | 'title' | 'days')} style={{ ...IN, flex: 1, minWidth: 70, fontSize: 11, padding: '6px 4px' }}>
-            <option value="updated">По дате</option>
-            <option value="title">По имени</option>
-            <option value="days">По дням</option>
-          </select>
+          <EditorPopupSelect
+            value={filterDir}
+            options={[
+              { id: 'all', label: 'Все' }, { id: 'bb', label: 'ББ' },
+              { id: 'pl', label: 'ПЛ' }, { id: 'hybrid', label: '⚡ Powerbuilder' },
+            ]}
+            onChange={v => setFilterDir(v as 'all' | 'bb' | 'pl' | 'hybrid')}
+            ariaLabel="Фильтр по типу"
+            title="Фильтр по типу программы"
+            buttonStyle={{ flex: 1, minWidth: 70 }}
+          />
+          <EditorPopupSelect
+            value={sortBy}
+            options={[
+              { id: 'updated', label: 'По дате' }, { id: 'title', label: 'По имени' }, { id: 'days', label: 'По дням' },
+            ]}
+            onChange={v => setSortBy(v as 'updated' | 'title' | 'days')}
+            ariaLabel="Сортировка"
+            title="Сортировка программ"
+            buttonStyle={{ flex: 1, minWidth: 70 }}
+          />
         </div>
         {programs.length === 0 && (
           <div style={{ padding: '24px 12px', textAlign: 'center' }}>

@@ -22,6 +22,8 @@ import { ProgramNotes, ProgramStrengthScore } from './ProgramExtras';
 import { ProgramRevisionsDiff } from './ProgramRevisions';
 import { StrengthDiaryPanel } from './StrengthDiaryPanel';
 import { CardioLinkCard } from './CardioLinkCard';
+import { CardioConstructor } from './CardioConstructor';
+import { EditorPopupSelect } from './EditorPopup';
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
@@ -201,6 +203,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
 
   // Библиотека внутри редактора
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | 'macro' | null>(null);
+  // Кардио внутри редактора: 'card' — интеграционная карточка, 'constructor' — конструктор в модале
+  const [cardioView, setCardioView] = useState<'card' | 'constructor' | null>(null);
   // ⭐ Избранные программы (he_program_fav)
   const [progFavs, setProgFavs] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_program_fav') || '[]'); } catch { return []; }
@@ -690,7 +694,7 @@ return (
                 title="Справочник тренировочных методик"
               >📚 Методики</button>
             )}
-            <CardioLinkCard />
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={() => setCardioView('card')} title="Кардио: подключённый цикл, «Сегодня», пересчёт под ACWR и конструктор">❤️ Кардио</button>
           </div>
         )}
         </div>
@@ -990,6 +994,23 @@ return (
         </TrainingModal>
       )}
 
+      {/* ❤️ Кардио внутри редактора: интеграционная карточка + конструктор в модале
+          (внешний трек planning-track-open больше не используется в ручном конструкторе) */}
+      {cardioView && (
+        <TrainingModal title={cardioView === 'card' ? '❤️ Кардио — интеграция с силовым планом' : '❤️ Кардио-конструктор'} onClose={() => setCardioView(null)} wide>
+          {cardioView === 'card' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <CardioLinkCard onOpenCardio={() => setCardioView('constructor')} />
+              <button style={{ ...BTN, padding: '10px 14px', fontSize: 12, minHeight: 44 }} onClick={() => setCardioView('constructor')} title="Собрать или редактировать кардио-цикл">
+                ⚙️ Перейти к конструктору →
+              </button>
+            </div>
+          ) : (
+            <CardioConstructor />
+          )}
+        </TrainingModal>
+      )}
+
       {/* Шаг «🗓 Недели»: расписание, таблица плана, редактор недель/сессий, статистика */}
       {estep === 'weeks' && (
       <>
@@ -1019,12 +1040,15 @@ return (
           {!program.meta.designRef && savedDesigns.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, color: DIM_STRONG }}>🎨 Привязать дизайн периодизации:</span>
-              <select aria-label="Дизайн периодизации" value={designLinkId} onChange={e => setDesignLinkId(e.target.value)} style={{ ...IN, padding: '6px 8px', fontSize: 11, minHeight: 44, maxWidth: 260 }}>
-                <option value="">— выберите дизайн —</option>
-                {savedDesigns.map(d => (
-                  <option key={d.id} value={d.id}>{d.name} ({d.blocks.length} блоков)</option>
-                ))}
-              </select>
+              <EditorPopupSelect
+                value={designLinkId}
+                options={[{ id: '', label: '— выберите дизайн —' }, ...savedDesigns.map(d => ({ id: d.id, label: `${d.name} (${d.blocks.length} блоков)` }))]}
+                onChange={setDesignLinkId}
+                ariaLabel="Дизайн периодизации"
+                title="Дизайн периодизации"
+                placeholder="— выберите дизайн —"
+                buttonStyle={{ maxWidth: 260 }}
+              />
               <button style={{ ...BTN, padding: '6px 10px', fontSize: 11, minHeight: 44, opacity: designLinkId ? 1 : 0.4 }}
                 disabled={!designLinkId}
                 onClick={() => {
@@ -1179,12 +1203,22 @@ return (
       <div className="constructor-surface editor-meta-card" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
          <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
         <div style={{ display: 'flex', gap: 6 }}>
-           <select aria-label="Цель программы" style={IN} value={program.meta.goal} onChange={e => updateMeta({ goal: e.target.value })}>
-            {GOAL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
-           <select aria-label="Уровень подготовки" style={IN} value={program.meta.level} onChange={e => updateMeta({ level: e.target.value })}>
-            {LEVEL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-          </select>
+           <EditorPopupSelect
+            value={program.meta.goal}
+            options={GOAL_OPTS.map(o => ({ id: o.id, label: o.label }))}
+            onChange={v => updateMeta({ goal: v })}
+            ariaLabel="Цель программы"
+            title="Цель программы"
+            buttonStyle={{ flex: 1 }}
+          />
+           <EditorPopupSelect
+            value={program.meta.level}
+            options={LEVEL_OPTS.map(o => ({ id: o.id, label: o.label }))}
+            onChange={v => updateMeta({ level: v })}
+            ariaLabel="Уровень подготовки"
+            title="Уровень подготовки"
+            buttonStyle={{ flex: 1 }}
+          />
           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Дней/нед
             {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks */}
