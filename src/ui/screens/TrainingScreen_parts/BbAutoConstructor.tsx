@@ -82,7 +82,7 @@ import {
   type PrepAdjustment,
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
-  type PrepPhaseKey, type ContestEventEntry,
+  type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildPrepCycle, recommendMinimalMode, prepCutProjection, type PrepCycleConfig, type PrepCycleResult } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
@@ -5275,6 +5275,33 @@ export const BbAutoConstructor: React.FC = () => {
                       })}
                     </div>
                     <div style={{ color: 'rgba(255,255,255,0.65)' }}>{compliance.recommendation}</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            {/* 🍽 Питание на сегодня (из единого prep-плана) */}
+            {(() => {
+              try {
+                const base: PeakNutritionBase = {
+                  kcal: Math.round(profileWeight * 31),
+                  proteinG: Math.round(profileWeight * 2.2),
+                  fatG: Math.round(profileWeight * (prepSex === 'female' ? 0.8 : 0.6)),
+                  carbsG: 0,
+                  waterMl: 3000,
+                  sodiumMg: 2800,
+                };
+                const nt = nutritionTargetsForPrepDate(isoToday(), prepResult.prepPlan, base);
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <div style={{ fontWeight: 800, color: '#4ade80', marginBottom: 4 }}>🍽 Питание на сегодня {nt.phaseLabel ? `· ${nt.phaseLabel}` : ''}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.8)' }}>
+                      {nt.kcal} ккал · Б {nt.proteinG}г · У {nt.carbsG}г · Ж {nt.fatG}г
+                      {nt.waterMl ? ` · 💧 ${(nt.waterMl / 1000).toFixed(1)}л` : ''}
+                      {nt.sodiumMg ? ` · Na ${nt.sodiumMg}мг` : ''}
+                    </div>
+                    {nt.note && <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{nt.note}</div>}
+                    <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Эти цели уже применяет планировщик питания (вкладка «🏁 Тапер ББ»).</div>
                   </div>
                 );
               } catch { return null; }
