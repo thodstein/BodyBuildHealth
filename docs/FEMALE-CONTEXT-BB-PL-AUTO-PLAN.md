@@ -354,12 +354,20 @@ PED-логика остаётся общей и дозозависимой:
 - **RED-S**: `redsRiskSignals(context, {weightTrendPctPerWeek, bodyFatPct, sleepHours, cycleIrregular, calorieDeficitActive})` в athlete-context.engine — только предупреждения, без авто-изменений; UI-подсказка в карточке режима BB («темп ≤ 0.5%/нед»).
 - Тесты: `athlete-context.test.ts` +5 (RED-S), `female-weight-classes.test.ts` 6. Проверено: tsc 0; целевые 32/32; user-program + pl-export + taper 21/21; bb-auto-smoke 5/5.
 
+### Раунд 3 (Aug 18-19 2026, uncommitted)
+
+- **Синхронизация пола с профилем**: ProMetricsPanel и RelativeStrengthCalcTab инициализируют локальный пол из `getProfile()` (ручной выбор остаётся).
+- **RED-S в contest prep**: `validateBBContestPrepConfig` — для female при `bodyFatPct < 14` добавляется RED-S warning (нарушения цикла/костное здоровье, темп ≤ 0.5%/нед). Без изменения расчётов.
+- **Медицинский advisory**: `athleteContextAdvisory(context)` → `{ level: 'ok' | 'review', reasons }` для pregnancy/postpartum (ACOG 2020) — не меняет план.
+- **Печать PL**: `buildPLPrintHtml` принимает опциональный `opts.athleteMode` → «· ♀ Женский контекст» в заголовке (вызывающие PLPlanView не тронуты — файл в чужой зоне).
+- Тесты: `athlete-context.test.ts` +3 (advisory) = 13; NEW `bb-contest-prep-female-reds.test.ts` 3. Проверено: tsc 0; contest-prep 187/187; целевые 16/16.
+- ВНИМАНИЕ (параллельная работа): чужой агент локально затёр правки раунда 2 в `program-store.ts`/`PeakingPanel.tsx`/`TaperPlannerTab.tsx` (worktree = без них). На origin/main мои коммиты раунда 2 целы (проверено `git grep origin/main`). Эти 3 файла — активная зона других агентов, не перезаписываю.
+
 ### Осталось на будущие раунды
 
-- Беременность/postpartum как отдельный адаптационный путь с медицинским review (сейчас — только warning через reproductiveContext).
-- Синхронизация пола в ProMetricsPanel/RelativeStrengthCalcTab с профилем (локальные селекторы остаются ручными).
+- Беременность/postpartum как отдельный адаптационный путь с медицинским review (advisory готов, интеграция в конструкторы — отдельный этап).
 - RED-S/железо/костные сигналы в питании (движок bb-contest-prep уже содержит женские floors).
-- Печать PL (PLPlanView → buildPLPrintHtml) — файл в зоне параллельных правок, не тронут.
+- Прокидка athleteMode в вызовы `buildPLPrintHtml` из PLPlanView (файл в чужой зоне).
 
 ## 15. Источники
 - Refalo et al., 2025, sex differences in hypertrophy: https://doi.org/10.7717/peerj.19042

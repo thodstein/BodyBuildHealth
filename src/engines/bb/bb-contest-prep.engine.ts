@@ -476,6 +476,9 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   if (cfg.sex === 'female') {
     warnings.push('⚠ Женщины: вода не ниже 1.5–2 л/день, натрий не ниже 800 мг — риск гипонатриемии выше при меньшей массе.');
   }
+  if (cfg.sex === 'female' && cfg.bodyFatPct != null && cfg.bodyFatPct < 14) {
+    warnings.push(`⚠ RED-S: % жира ${cfg.bodyFatPct}% при подготовке — риск нарушений цикла и костного здоровья; контроль энергии/железа и мед-оценка (темп ≤ 0.5%/нед).`);
+  }
   if (profile && profile.light) {
     warnings.push(`⚠ Категория «${profile.label}»: не пересушивать — судьи хотят мягкую сухость, агрессивные water/sodium-протоколы ломают look.`);
   }

@@ -16,6 +16,7 @@ import {
 } from '../../../engines/pl-norms.engine';
 
 import { applyToPlanner } from './planner-bridge';
+import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.6)';
@@ -44,7 +45,7 @@ const FEDS: { id: Federation; label: string }[] = [
 ];
 
 export const RelativeStrengthCalcTab: React.FC = () => {
-  const [sex, setSex] = useState<Sex>('male');
+  const [sex, setSex] = useState<Sex>(() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } });
   const [bw, setBw] = useState<number>(88);
   const [squat, setSquat] = useState<number>(180);
   const [bench, setBench] = useState<number>(120);

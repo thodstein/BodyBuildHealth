@@ -293,11 +293,12 @@ export function buildPLPrintHtml(
   title: string,
   scopeLabel: string,
   weeks: LMSPlanWeek[],
-  opts?: { summary?: { label: string; value: string }[] },
+  opts?: { summary?: { label: string; value: string }[]; athleteMode?: 'standard' | 'female_context' },
 ): string {
   const safeTitle = escHtml(title);
   const safeScope = escHtml(scopeLabel);
   const date = escHtml(new Date().toLocaleDateString('ru-RU'));
+  const modeNote = opts?.athleteMode === 'female_context' ? ' · ♀ Женский контекст' : '';
   const phaseColor = (w: LMSPlanWeek): string => {
     const ph = (w.macroPhase || w.sourcePhase || '').toLowerCase();
     if (ph.includes('peak') || ph.includes('competition')) return '#c02626';
@@ -344,7 +345,7 @@ export function buildPLPrintHtml(
   const footer = `<div class="footer">Health Engine · BB-builder · ${date}<br>План носит справочный характер. Рекомендуется согласовать нагрузку с тренером и врачом.</div>`;
   return `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>${safeTitle} — план</title>
 <style>.pl-print{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#111827;background:#fff;margin:0;padding:26px;box-sizing:border-box}.pl-print .cover{background:linear-gradient(120deg,#065f46 0%,#0e9f6e 55%,#065f46 100%);color:#fff;padding:26px 30px 22px;border-radius:14px;margin:0 0 20px}.pl-print .brand{font-size:11px;letter-spacing:.22em;text-transform:uppercase;opacity:.85;font-weight:700}.pl-print h1{font-size:26px;margin:8px 0 4px;font-weight:800}.pl-print .sub{font-size:13px;opacity:.92}.pl-print .pms{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}.pl-print .pm-card{flex:1;min-width:120px;background:#f6faf8;border:1px solid #dde7e2;border-radius:12px;padding:12px 14px}.pl-print .pm-card .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;font-weight:700}.pl-print .pm-card .v{font-size:24px;font-weight:800;color:#065f46;margin-top:2px}.pl-print .pm-card .u{font-size:11px;color:#6b7280}.pl-print .summary{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 20px}.pl-print .sum-item{flex:1;min-width:110px;border:1px solid #dde7e2;border-left:3px solid #059669;border-radius:8px;padding:8px 12px;background:#fbfdfc}.pl-print .sum-item .k{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}.pl-print .sum-item .v{font-weight:700;font-size:14px}.pl-print .week{margin:0 0 20px;border:1px solid #dde7e2;border-radius:12px;overflow:hidden;page-break-inside:avoid}.pl-print .week-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:#fff;padding:10px 16px;font-weight:800;font-size:14px}.pl-print .week-head .wkpm{font-weight:400;opacity:.94;font-size:12px}.pl-print .week-body{padding:12px 16px 14px}.pl-print h4{margin:12px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#065f46}.pl-print table{width:100%;border-collapse:collapse;margin:0 0 12px}.pl-print thead{display:table-header-group}.pl-print th{background:#eef5f1;color:#14532d;font-size:10px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:8px 10px;border-bottom:2px solid #059669}.pl-print td{padding:8px 10px;font-size:12px;border-bottom:1px solid #eef1ef}.pl-print tr:nth-child(even) td{background:#fbfdfc}.pl-print tr{page-break-inside:avoid}.pl-print .num{text-align:right;font-variant-numeric:tabular-nums}.pl-print .ex{font-weight:600}.pl-print .chip{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;color:#fff}.pl-print .chip.o{background:#059669}.pl-print .chip.d{background:#b45309}.pl-print .chip.a{background:#6b7280}.pl-print .empty{color:#9ca3af;font-size:12px;margin:4px 0}.pl-print .footer{margin-top:26px;padding-top:12px;border-top:1px solid #dde7e2;font-size:9px;color:#9ca3af;line-height:1.6}.pl-print section,.pl-print .week{page-break-inside:avoid}@media print{.pl-print{padding:10px}.pl-print .cover{border-radius:0}}</style></head>
-<body class="pl-print"><div class="cover"><div class="brand">Health Engine · BB-builder · Планировщик ПЛ</div><h1>${safeTitle}</h1><div class="sub">${safeScope} · ${date}</div></div>${pmsHtml}${summaryHtml}${weekBlocks}${footer}</body></html>`;
+<body class="pl-print"><div class="cover"><div class="brand">Health Engine · BB-builder · Планировщик ПЛ</div><h1>${safeTitle}${modeNote}</h1><div class="sub">${safeScope} · ${date}</div></div>${pmsHtml}${summaryHtml}${weekBlocks}${footer}</body></html>`;
 }
 
 /** Печать/PDF. В обычном браузере — окно печати (десктоп). В WebView/Telegram

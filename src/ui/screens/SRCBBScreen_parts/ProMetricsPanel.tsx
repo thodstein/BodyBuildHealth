@@ -10,6 +10,7 @@ import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { listSchemes, generateProgression } from '../../../engines/pro/progression-pro.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { PL_NORM_TABLES, classifyTotal, findCategory, getNormTable, RANK_ORDER, RANK_LABELS, type ClassificationResult, type NormTable, type Federation, type Discipline } from '../../../engines/pl-norms.engine';
+import { getProfile } from '../../../core/profile-manager';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -58,7 +59,7 @@ export const ProMetricsPanel: React.FC = () => {
   const [bench, setBench] = useState<number>(140);
   const [deadlift, setDeadlift] = useState<number>(260);
   const [bw, setBw] = useState<number>(90);
-  const [sex, setSex] = useState<'male' | 'female'>('male');
+  const [sex, setSex] = useState<'male' | 'female'>(() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } });
   const total = squat + bench + deadlift;
   const rs = useMemo(() => relativeStrengthReport(total, bw, sex), [total, bw, sex]);
 

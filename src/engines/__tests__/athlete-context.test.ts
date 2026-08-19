@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  athleteContextAdvisory,
   athletePolicyHints,
   athletePolicySummary,
   normalizeAthleteContext,
@@ -72,5 +73,23 @@ describe('RED-S risk signals (female_context only)', () => {
 
   it('standard/male context yields no RED-S signals', () => {
     expect(redsRiskSignals({ sex: 'male', athleteMode: 'standard' }, { calorieDeficitActive: true, weightTrendPctPerWeek: 0.8 })).toEqual([]);
+  });
+});
+
+describe('medical advisory (pregnancy/postpartum)', () => {
+  it('pregnancy requires medical review in female context', () => {
+    const a = athleteContextAdvisory({ sex: 'female', athleteMode: 'female_context', reproductiveContext: 'pregnancy' });
+    expect(a.level).toBe('review');
+    expect(a.reasons[0]).toContain('Беременность');
+  });
+
+  it('postpartum requires medical review', () => {
+    const a = athleteContextAdvisory({ sex: 'female', athleteMode: 'female_context', reproductiveContext: 'postpartum' });
+    expect(a.level).toBe('review');
+  });
+
+  it('standard and plain female context are ok', () => {
+    expect(athleteContextAdvisory({ sex: 'male', athleteMode: 'standard' }).level).toBe('ok');
+    expect(athleteContextAdvisory({ sex: 'female', athleteMode: 'female_context', reproductiveContext: 'cycle' }).level).toBe('ok');
   });
 });

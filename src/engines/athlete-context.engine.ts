@@ -140,3 +140,28 @@ export function redsRiskSignals(context?: Partial<AthleteContext> | null, opts: 
   }
   return warnings;
 }
+
+export interface AthleteAdvisory {
+  level: 'ok' | 'review' | 'blocked';
+  reasons: string[];
+}
+
+/**
+ * Медицинский advisory для особых контекстов (беременность/postpartum).
+ * Не меняет тренировочный план — только явная оценка для UI/экспорта.
+ */
+export function athleteContextAdvisory(context?: Partial<AthleteContext> | null): AthleteAdvisory {
+  const c = normalizeAthleteContext(context);
+  if (c.athleteMode !== 'female_context') return { level: 'ok', reasons: [] };
+  if (c.reproductiveContext === 'pregnancy' || c.reproductiveContext === 'postpartum') {
+    return {
+      level: 'review',
+      reasons: [
+        c.reproductiveContext === 'pregnancy'
+          ? 'Беременность: интенсивная подготовка, дефицит и пиковые протоколы требуют медицинской оценки (ACOG 2020).'
+          : 'Послеродовой период: возврат к интенсивному объёму и дефициту — после медицинского разрешения.',
+      ],
+    };
+  }
+  return { level: 'ok', reasons: [] };
+}
