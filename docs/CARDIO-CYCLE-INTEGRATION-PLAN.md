@@ -386,7 +386,9 @@ interface CardioLogEntry {
 
 ### Этап F: годовой UI и печать
 
-- [ ] добавить кардио-слой на heatmap макроцикла (отложено: `MacrocyclePanel.tsx` — чужой WIP MC-5);
+- [x] добавить кардио-слой на heatmap макроцикла (минуты/нед из годовых кардио-циклов
+      `he_annual_cardio_cycles`, fallback — цикл макро; `annualCardioWeekMinutes`/`maxAnnualCardioMinutes`,
+      оранжевая полоска + legend — коммит a4f7071f, MacrocyclePanel);
 - [x] кардио-слой «Итог года» (мини-бары циклов под таймлайном фаз — 5b82b9f06, MacrocyclePanel);
 - [x] показывать кардио в карточке конструктора (недели/фазы/минуты);
 - [x] добавить печатную сводку (`buildCardioPrintHtml`);

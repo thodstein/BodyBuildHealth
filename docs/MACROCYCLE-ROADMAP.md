@@ -25,8 +25,11 @@
       `autodraftBBPlan(≤16 нед)` → цикл недель до totalWeeks → `applyMacrocycleToBBPlan(bbMacro)`;
       ручной режим через planner-bridge kind `program` (готовую UserProgram), ББ-авто через
       `he_bb_plan_saved` + событие `he-bb-plan-saved`.
-- [~] **B7. Авто-делоды на стыках фаз** — для ББ есть `shouldPeriodicDeload` в macrocycle-to-bb;
-      TODO: переходные недели на стыках блоков в ПЛ-пути.
+- [x] **B7. Авто-делоды на стыках фаз** — `applyPLJunctionDeloads` в `block-builders.engine`:
+      когда подряд идут два тренировочных PL-блока (endurance/strength) и у предыдущего нет
+      собственной разгрузки (taper/transition/peak/competition), последняя неделя предыдущего
+      блока становится делодом (×0.5/RIR+2, метка `[annual-junction-deload]`, идемпотентно);
+      BB-блоки и стыки PL→transition/PL→BB не трогаются. (коммит 2242c52ab)
 - [x] **B8. Heatmap года** — сетка недель с цветами фаз в «Итог года» (активная неделя подсвечена,
       tooltip «Нед N: фаза»). ACWR-контроль перед пиками — с данными дневника (этап A5).
 - [x] **B9. Сценарий «перенёс соревнование»** — сдвиг даты/недели → перестройка макро сохраняет
@@ -64,10 +67,12 @@
 - [x] **E3. PL и BB cardio taper adapters** — `applyPLCardioTaper`/`applyBBCardioTaper` (идемпотентны,
       делод-недели не режутся повторно) + `adaptCardioToStrength` (ACWR caution/dangerous, частые ноги,
       recoveryLow). Кардио-сессии НЕ добавляются в силовые планы — только в CardioCycle.
-- [~] **E4. Интеграционные блоки** — ✅ ручной конструктор (`CardioLinkCard` в ProgramEditorView),
+- [x] **E4. Интеграционные блоки** — ✅ ручной конструктор (`CardioLinkCard` в ProgramEditorView),
       ✅ ПЛ-авто (`SRCBBScreen`, вкладка «🗓 Годовой план»), ✅ ББ-авто (`BbAutoConstructor`, шаг
       «🗓 Годовой план»): статус связи, открыть конструктор через событие `planning-track-open`,
-      пересчёт под ACWR, отключение. Осталось по желанию: подтверждение diff перед пересчётом.
+      пересчёт под ACWR, отключение. ✅ подтверждение diff перед пересчётом (E4-diff: «что
+      изменится» + «Применить»/«Отмена», CardioLinkCard) + ✅ сравнение кардио-циклов в
+      сравнении сценариев года (MacrocyclePanel). (коммиты 2242c52ab)
 - [x] **E5. Дневник кардио и feedback** — `he_cardio_sessions` (`cardio-diary.engine.ts`):
       CRUD (cap 500), статы 7/28 дн (минуты/RPE/ЧСС/ккал), adherence недели и сводка,
       `computeCardioAdvice` (ACWR/RPE/план → снизить/сохранить/увеличить); UI `CardioDiaryPanel`.

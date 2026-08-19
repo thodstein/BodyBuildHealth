@@ -1140,7 +1140,27 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
   const copyMacroSummary = () => {
     const src = isBB ? bbMacro : macro;
     if (!src) return;
-    const text = buildMacroSummary(src).join('\n');
+    const lines = buildMacroSummary(src);
+    // п.20: кардио-сводка года в «📋 Сводка» (если кардио-циклы собраны по блокам).
+    try {
+      const plan = loadAnnualTrainingPlan();
+      if (plan) {
+        const specs = annualCardioSpecs(plan);
+        const cardioMap = loadAnnualCardioCycles();
+        const lib = loadCardioCycles();
+        const cycles: Record<string, ReturnType<typeof loadCardioCycles>[number]> = {};
+        for (const s of specs) {
+          const cid = cardioMap[s.blockKey];
+          const c = cid ? lib.find(x => x.id === cid) : undefined;
+          if (c) cycles[s.blockKey] = c;
+        }
+        const cardioText = annualCardioText(specs, cycles);
+        if (cardioText.length > 0) {
+          lines.push('', '❤️ Кардио-сводка года:', ...cardioText);
+        }
+      }
+    } catch { /* ignore */ }
+    const text = lines.join('\n');
     const done = () => { setCopyFlash(true); window.setTimeout(() => setCopyFlash(false), 2000); };
     try {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
