@@ -7,6 +7,7 @@
  * Constants: WEAK_OPTS, EQUIPMENT_OPTS, LOAD_STRATEGY_OPTS, DELOAD_PROTOCOL_OPTS, INTENSITY_TECHNIQUE_OPTS
  */
 import React, { useMemo, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { SET_TEMPLATES, GROUP_RU } from './program-types';
 import { ACCENT, ACCENT_LINE, BTN, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
@@ -36,6 +37,121 @@ import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
+
+/* ─── Попап-выбор в редакторе: замена нативных select (дни недели, фазы).
+   Нативный select рендерит попап в светлой схеме ОС (белый фон + белый текст
+   тёмной темы → опции невидимы). Попап-карточки: тёмный sheet, portal в body. */
+const EditorOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
+  if (typeof document === 'undefined') return null;
+  return ReactDOM.createPortal(
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }}>
+      {children}
+    </div>,
+    document.body,
+  );
+};
+
+const editorSheet: React.CSSProperties = {
+  width: '88%', maxWidth: 340, maxHeight: '78vh', borderRadius: 16,
+  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+};
+
+const editorSheetCloseBtn: React.CSSProperties = {
+  width: '100%', marginTop: 12, padding: '10px', borderRadius: 8,
+  border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
+  color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+};
+
+/** Попап-выбор дня недели (карточки, занятые дни отключаются). */
+const DayOfWeekPicker: React.FC<{
+  value: number;
+  occupied?: number[];
+  onChange: (d: number) => void;
+  ariaLabel?: string;
+}> = ({ value, occupied = [], onChange, ariaLabel }) => {
+  const [open, setOpen] = useState(false);
+  const sel = TRAINING_DAY_NAMES[value] ?? '—';
+  return (
+    <>
+      <button type="button" aria-label={ariaLabel} onClick={() => setOpen(true)}
+        style={{ ...IN, padding: '6px 8px', fontSize: 11, minHeight: 44, flex: '0 0 74px', cursor: 'pointer', fontWeight: 700, textAlign: 'center' }}>
+        {sel}
+      </button>
+      {open && (
+        <EditorOverlay onClose={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={editorSheet}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 }}>День недели</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {TRAINING_DAY_NAMES.map((d, di) => {
+                  const isSel = di === value;
+                  const isOcc = occupied.includes(di);
+                  return (
+                    <button key={di} type="button" disabled={isOcc} onClick={() => { onChange(di); setOpen(false); }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: isOcc ? 'not-allowed' : 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
+                        background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)' }}>
+                      <span>{d}{isOcc ? ' · занято' : ''}</span>
+                      {isSel && <span style={{ fontSize: 10 }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setOpen(false)} style={editorSheetCloseBtn}>Закрыть</button>
+            </div>
+          </div>
+        </EditorOverlay>
+      )}
+    </>
+  );
+};
+
+/** Попап-выбор фазы недели. */
+const PhasePicker: React.FC<{
+  value: string;
+  options: Array<{ id: string; label: string }>;
+  onChange: (v: string) => void;
+  ariaLabel?: string;
+}> = ({ value, options, onChange, ariaLabel }) => {
+  const [open, setOpen] = useState(false);
+  const sel = options.find(o => o.id === value);
+  return (
+    <>
+      <button type="button" aria-label={ariaLabel} onClick={() => setOpen(true)}
+        style={{ ...IN, padding: '6px 8px', fontSize: 11, minHeight: 44, flex: '0 0 auto', cursor: 'pointer', fontWeight: 700, textAlign: 'center' }}>
+        {sel?.label ?? '—'}
+      </button>
+      {open && (
+        <EditorOverlay onClose={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={editorSheet}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
+            <div style={{ padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 }}>Фаза недели</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {options.map(o => {
+                  const isSel = o.id === value;
+                  return (
+                    <button key={o.id} type="button" onClick={() => { onChange(o.id); setOpen(false); }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
+                        background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: isSel ? ACCENT : 'rgba(255,255,255,0.85)' }}>
+                      <span>{o.label}</span>
+                      {isSel && <span style={{ fontSize: 10 }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setOpen(false)} style={editorSheetCloseBtn}>Закрыть</button>
+            </div>
+          </div>
+        </EditorOverlay>
+      )}
+    </>
+  );
+};
 
 /** Быстрые шаблоны тренировочных дней — день с готовыми упражнениями из каталога. */
 const DAY_TEMPLATES: Array<{
@@ -278,12 +394,17 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                 </>
               );
             })()}
-            <select style={{ ...IN, padding: '4px 6px', fontSize: 11, flex: '0 0 auto', minHeight: 44 }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as UserWeek['phase'] })}>
-              <option value="accumulation">Накопление</option>
-              <option value="intensification">Интенсификация</option>
-              <option value="deload">Разгрузка</option>
-              <option value="peaking">Пик</option>
-            </select>
+            <PhasePicker
+              value={w.phase}
+              options={[
+                { id: 'accumulation', label: 'Накопление' },
+                { id: 'intensification', label: 'Интенсификация' },
+                { id: 'deload', label: 'Разгрузка' },
+                { id: 'peaking', label: 'Пик' },
+              ]}
+              onChange={v => updateWeek(wi, { phase: v as UserWeek['phase'] })}
+              ariaLabel={`Фаза недели ${w.week}`}
+            />
             {/* P0-2: RIR-навигатор — целевой RIR фазы vs фактический в плане */}
             {(() => {
               const phaseRir: Record<string, string> = { accumulation: '3→1', intensification: '2→0', deload: '4', peaking: '1→0' };
@@ -480,9 +601,12 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
           </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6, marginTop: 6 }}>
             <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня (например: Грудь / Трицепс)" aria-label={`Название тренировки ${si + 1}`} />
-            <select style={{ ...IN, padding: '6px 8px', fontSize: 11, flex: '0 0 74px', minHeight: 44 }} value={dow} onChange={e => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), trainingDayForIndex(si)) })} aria-label={`День недели тренировки ${si + 1}`}>
-              {TRAINING_DAY_NAMES.map((day, di) => <option key={di} value={di} disabled={sessions.some((other, oi) => oi !== si && sessionDayOfWeek(other, oi) === di)}>{day}{sessions.some((other, oi) => oi !== si && sessionDayOfWeek(other, oi) === di) ? ' · занято' : ''}</option>)}
-            </select>
+            <DayOfWeekPicker
+              value={dow}
+              occupied={sessions.flatMap((other, oi) => oi === si ? [] : [sessionDayOfWeek(other, oi)])}
+              onChange={d => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(d, trainingDayForIndex(si)) })}
+              ariaLabel={`День недели тренировки ${si + 1}`}
+            />
             <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
           </div>
           {noteOpenIdx === si && (
@@ -1231,9 +1355,11 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
               {body.schedule.map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
                   <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
-                  <select style={{ ...IN, padding: '4px 6px', fontSize: 10 }} value={s.dayOfWeek} onChange={e => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), s.dayOfWeek) }; set({ schedule: sc }); }}>
-                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d, di) => <option key={di} value={di}>{d}</option>)}
-                  </select>
+                  <DayOfWeekPicker
+                    value={s.dayOfWeek}
+                    onChange={d => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: normalizeProgramDayOfWeek(d, s.dayOfWeek) }; set({ schedule: sc }); }}
+                    ariaLabel={`День недели сессии ${s.sessionIdx + 1}`}
+                  />
                 </div>
               ))}
             </div>
@@ -1340,9 +1466,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 onClick={() => setExpandedWeek(isExp ? null : wi)}
                 style={{ padding: '6px 10px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', background: 'rgba(167,139,250,0.10)', border: `1px solid ${phaseColor}44`, color: DIM_STRONG, minHeight: 44 }}
               >{isExp ? '▼' : '▶'} Неделя {w.week}</button>
-              <select style={{ ...IN, padding: '4px 6px', fontSize: 11, minHeight: 44, flex: '0 0 auto' }} value={w.phase} onChange={e => updateWeek(wi, { phase: e.target.value as PLWeek['phase'] })}>
-                {PHASE_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select>
+              <PhasePicker value={w.phase} options={PHASE_OPTS} onChange={v => updateWeek(wi, { phase: v as PLWeek['phase'] })} ariaLabel={`Фаза недели ${w.week}`} />
               <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
               </label>
@@ -1357,9 +1481,12 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                     <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: 1, minHeight: 44 }} value={d.name} onChange={e => updateDay(wi, di, { name: e.target.value })} placeholder="Название дня" />
-                      <select style={{ ...IN, padding: '5px 6px', fontSize: 11, minHeight: 44, flex: '0 0 74px' }} value={d.dayOfWeek ?? trainingDayForIndex(di)} onChange={e => updateDay(wi, di, { dayOfWeek: normalizeProgramDayOfWeek(Number(e.target.value), trainingDayForIndex(di)) })} aria-label={`День недели ${d.name}`}>
-                         {TRAINING_DAY_NAMES.map((day, dayIdx) => <option key={dayIdx} value={dayIdx} disabled={w.days.some((other, otherIndex) => otherIndex !== di && (other.dayOfWeek ?? trainingDayForIndex(otherIndex)) === dayIdx)}>{day}{w.days.some((other, otherIndex) => otherIndex !== di && (other.dayOfWeek ?? trainingDayForIndex(otherIndex)) === dayIdx) ? ' · занято' : ''}</option>)}
-                      </select>
+                      <DayOfWeekPicker
+                        value={d.dayOfWeek ?? trainingDayForIndex(di)}
+                        occupied={w.days.flatMap((other, otherIndex) => otherIndex === di ? [] : [other.dayOfWeek ?? trainingDayForIndex(otherIndex)])}
+                        onChange={nd => updateDay(wi, di, { dayOfWeek: normalizeProgramDayOfWeek(nd, trainingDayForIndex(di)) })}
+                        ariaLabel={`День недели ${d.name}`}
+                      />
                       <span style={{ fontSize: 10, color: DIM }}>{d.exercises.length} упр. · {TRAINING_DAY_NAMES[d.dayOfWeek ?? di % 7]}</span>
                       <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
                     </div>

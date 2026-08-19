@@ -284,68 +284,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [goNextStep, goPrevStep, estepIdx]);
-  // Детерминированная фиксация шапки: sticky может не сработать из-за
-  // overflow:hidden на main/внутренней обёртке и transform-анимаций предков,
-  // поэтому при уходе верха редактора за экран переключаем шапку в position:fixed
-  // с замером левого края/ширины (document-capture scroll + window + ResizeObserver).
-  // Гистерезис: пин при r.top <= 0, снятие только при r.top >= 4 — без дребезга
-  // на границе (неприлинтованная шапка не «прыгает»).
-  const editorHeaderRef = useRef<HTMLDivElement | null>(null);
-  const [headerPinned, setHeaderPinned] = useState(false);
-  const [headerPad, setHeaderPad] = useState(0);
-  const [headerRect, setHeaderRect] = useState<{ left: number; width: number } | null>(null);
-  useEffect(() => {
-    let ro: ResizeObserver | null = null;
-    const pinnedRef = { current: false };
-    const measure = () => {
-      const root = editorRootRef.current;
-      const header = editorHeaderRef.current;
-      if (!root || !header) return;
-      const r = root.getBoundingClientRect();
-      const wantPin = pinnedRef.current ? r.top <= 4 : r.top <= 0;
-      if (wantPin === pinnedRef.current) return;
-      pinnedRef.current = wantPin;
-      if (wantPin) {
-        setHeaderPinned(true);
-        setHeaderPad(header.offsetHeight);
-        setHeaderRect({ left: r.left, width: r.width });
-      } else {
-        setHeaderPinned(false);
-        setHeaderPad(0);
-        setHeaderRect(null);
-      }
-    };
-    try {
-      const root = editorRootRef.current;
-      if (!root) return;
-      if (typeof ResizeObserver !== 'undefined') {
-        ro = new ResizeObserver(() => measure());
-        ro.observe(root);
-      }
-      // Перехват scroll в capture-фазе на document ловит скролл ЛЮБОГО контейнера
-      // (в приложении реальный скроллер может быть не .training-screen и не main).
-      document.addEventListener('scroll', measure, { capture: true, passive: true });
-      window.addEventListener('scroll', measure, { passive: true });
-      window.addEventListener('resize', measure);
-      // Гарантированный пин даже там, где scroll-события не шлются во время
-      // прокрутки (iOS WebView / Telegram) — периодическая проверка позиции.
-      const timer = window.setInterval(measure, 250);
-      measure();
-      return () => {
-        ro?.disconnect();
-        document.removeEventListener('scroll', measure, { capture: true } as EventListenerOptions);
-        window.removeEventListener('scroll', measure);
-        window.removeEventListener('resize', measure);
-        window.clearInterval(timer);
-      };
-    } catch { /* jsdom: getBoundingClientRect/ResizeObserver могут отсутствовать */ }
-    return () => {
-      ro?.disconnect();
-      document.removeEventListener('scroll', measure, { capture: true } as EventListenerOptions);
-      window.removeEventListener('scroll', measure);
-      window.removeEventListener('resize', measure);
-    };
-  }, []);
+  // Шапка редактора — обычная статичная панель (не липкая): без пиннинга
+  // position:fixed/sticky, чтобы не перекрывать селекты дней недели и фаз.
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
@@ -694,11 +634,9 @@ for (const w of program.hybrid.bbWeeks ?? []) {
     }, [program, dir, showToast]);
 
 return (
-      <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: headerPinned ? headerPad : undefined }}>
-       {/* Липкая панель действий — компактная, всегда наверху */}
-        <div className="editor-topbar-shell" ref={editorHeaderRef} style={headerPinned && headerRect
-          ? { position: 'fixed', top: 0, left: headerRect.left, width: headerRect.width, zIndex: 60, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }
-          : { position: 'sticky', top: 0, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
+      <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+       {/* Панель действий — обычная (не липкая) */}
+        <div className="editor-topbar-shell" style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
         <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <button style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 40 }} onClick={safeBack}>← К списку</button>
           <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>

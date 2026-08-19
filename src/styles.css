@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #0A0A0A;
   --bg-secondary: #141414;
   --bg-tertiary: #1A1A1A;
@@ -61,6 +62,7 @@
 /* Светлая тема: активируется через data-theme="light" на documentElement.
    Дизайн — Apple HIG (white cards, soft shadows, SF-стиль типографики). */
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #F5F5F7;
   --bg-secondary: #FFFFFF;
   --bg-tertiary: #F2F2F5;
@@ -2565,6 +2567,19 @@ input[type="range"]:active {
     0 0 20px rgba(0,230,138,0.08) !important;
   outline: none !important;
   background: rgba(118,118,128,0.15) !important;
+}
+
+/* ────────── НАТИВНЫЕ ПОПАПЫ SELECT (option) — тёмная схема ──────────
+   Без color-scheme браузер рендерит выпадающий список белым (светлая схема ОС),
+   а текст опций наследует белый цвет темы → опции невидимы и «не выбираются».
+   color-scheme на :root уже задан; здесь страховка для старых движков. */
+select option {
+  background: #141414;
+  color: #FFFFFF;
+}
+[data-theme="light"] select option {
+  background: #FFFFFF;
+  color: #1D1D1F;
 }
 
 /* ────────── RANGE-СЛАЙДЕРЫ ────────── */
