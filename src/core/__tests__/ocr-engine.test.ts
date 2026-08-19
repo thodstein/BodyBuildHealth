@@ -282,6 +282,26 @@ describe('processUploadedFile: text input pipeline', () => {
   });
 });
 
+describe('OCR endpoint routing', () => {
+  it('keeps nutrition photos on the image OCR endpoint', async () => {
+    const source = await import('../ocr-engine?route-test=1');
+    const file = new File(['not-a-real-image'], 'food.jpg', { type: 'image/jpeg' });
+    const originalFetch = globalThis.fetch;
+    let requestedUrl = '';
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ ok: true, text: 'Курица 200 г 330 ккал Б:40 Ж:10 У:0' }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const result = await source.processUploadedFile(file);
+      expect(requestedUrl).toContain('/api/ocr-image');
+      expect(result.meals.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Reference range preservation — parse → save → load → abnormality
 // ═══════════════════════════════════════════════════════════════════════════

@@ -11,10 +11,10 @@ export const config = {
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker('rus', 1, { langPath: require('@tesseract.js-data/rus').langPath, gzip: true } as any);
+  const worker = await createWorker('rus+eng', 1);
   try {
     await worker.setParameters({
-      tessedit_pageseg_mode: '3' as any,
+      tessedit_pageseg_mode: '6' as any,
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
     });
