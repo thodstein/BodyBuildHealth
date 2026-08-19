@@ -104,6 +104,17 @@ describe('calcMealDIAAS / calcDIAAS', () => {
     expect(turkeyD).toBeGreaterThan(riceD);
   });
 
+  it('пища без амино-профиля больше не занижает DIAAS приёма (дефляция убрана)', () => {
+    const profiled = FOOD_DB.find(x => x.id === 'turkey_breast' && x.amino_acid_profile_100g);
+    const unprofiled = FOOD_DB.find(x => x.id !== 'turkey_breast' && x.protein >= 20 && !x.amino_acid_profile_100g);
+    if (!profiled || !unprofiled) { expect(true).toBe(true); return; }
+    const single = calcMealDIAAS([{ foodId: profiled.id, weightGrams: 100 }]);
+    const mixed = calcMealDIAAS([{ foodId: profiled.id, weightGrams: 100 }, { foodId: unprofiled.id, weightGrams: 100 }]);
+    // Без фикса белок unprofiled шёл в знаменатель (аминокислоты 0) → DIAAS был занижен.
+    expect(mixed.diaas).toBeGreaterThanOrEqual(single.diaas - 0.01);
+    expect(mixed.diaas).toBeGreaterThan(0);
+  });
+
   it('компоновщик и V2 используют один DIAAS для продукта', () => {
     const food = f('turkey_breast');
     const v2 = calcDIAAS(food);

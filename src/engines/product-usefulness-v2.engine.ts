@@ -648,9 +648,12 @@ export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[
   const totalW = entries.reduce((s, e) => s + e.w, 0);
   if (totalW === 0) return { diaas: 0, limitingAA: '—', reliable: false };
 
-  // Sum amino acids weighted by weight
+  // Sum amino acids weighted by weight. ONLY foods with an amino profile contribute
+  // protein to the denominator — otherwise protein without amino data inflates the
+  // denominator (0 amino acids) and unfairly deflates the meal DIAAS.
   const sum = { histidine: 0, isoleucine: 0, leucine: 0, lysine: 0, methionine: 0, cysteine: 0,
     phenylalanine: 0, tyrosine: 0, threonine: 0, tryptophan: 0, valine: 0, protein: 0 };
+  let profiledW = 0;
   for (const e of entries) {
     const a = e.f!.amino_acid_profile_100g;
     const w = e.w / 100;
@@ -661,8 +664,9 @@ export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[
       sum.phenylalanine += (a.phenylalanine_mg ?? 0) * w; sum.tyrosine += (a.phenylalanine_mg ?? 0) * 0.6 * w; // Tyr estimated from Phe
       sum.threonine += (a.threonine_mg ?? 0) * w; sum.tryptophan += (a.tryptophan_mg ?? 0) * w;
       sum.valine += (a.valine_mg ?? 0) * w;
+      sum.protein += e.f!.protein * w;
+      profiledW += w;
     }
-    sum.protein += e.f!.protein * w;
   }
 
   if (sum.protein === 0) return { diaas: 0, limitingAA: '—', reliable: false };
@@ -681,7 +685,12 @@ export function calcMealDIAAS(products: { foodId: string; weightGrams: number }[
   };
 
   const limiting = Object.entries(ratios).reduce((min, curr) => curr[1] < min[1] ? curr : min);
-  const avgCoef = entries.reduce((s, e) => s + (DIGEST[e.f!.category] ?? 0.85) * e.w, 0) / totalW;
+  const avgBaseW = profiledW > 0 ? profiledW : totalW;
+  const avgCoef = entries.reduce((s, e) => {
+    const a = e.f!.amino_acid_profile_100g;
+    if (!a) return s;
+    return s + (DIGEST[e.f!.category] ?? 0.85) * (e.w / 100);
+  }, 0) / avgBaseW;
   const diaas = Math.min(limiting[1] * avgCoef, 1.5);
   const mealReliable = entries.every(e => e.f!.amino_acid_profile_100g);
   const missingMeal = Object.values(ratios).filter(r => r === 0).length;
