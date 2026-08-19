@@ -84,7 +84,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, recommendMinimalMode, prepCutProjection, type PrepCycleConfig, type PrepCycleResult } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -348,6 +348,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepSplit, setPrepSplit] = useState<string>('');
   const [prepBodyFat, setPrepBodyFat] = useState<number | undefined>(undefined);
   const [prepResult, setPrepResult] = useState<PrepCycleResult | null>(null);
+  const [prepSeason, setPrepSeason] = useState<ReturnType<typeof buildPrepSeason> | null>(null);
   const [pcBusy, setPcBusy] = useState<boolean>(false);
   const [prepComps, setPrepComps] = useState<ContestEventEntry[]>([]);
   const [prepMainId, setPrepMainId] = useState<string>('');
@@ -4975,6 +4976,41 @@ export const BbAutoConstructor: React.FC = () => {
       || cfg.splitPatternId !== (prepSplit || undefined);
   }, [prepResult, pcWeeks, prepTaper, pcShowDate, prepCat, prepAccent, prepMinimal, prepMinMode, prepSplit]);
 
+  // 🏁 Сезон: цепочка prep-циклов под все старты (P3.3).
+  const buildPrepSeasonCfg = (): PrepSeasonConfig => {
+    const c = buildPrepCycleCfg();
+    return {
+      category: c.category, sex: c.sex,
+      accentMuscles: c.accentMuscles, minimalMuscles: c.minimalMuscles, minimalMode: c.minimalMode,
+      splitPatternId: c.splitPatternId,
+      level: c.level, trainingYears: c.trainingYears, equipment: c.equipment, injuries: c.injuries,
+      mobilityRestrictions: c.mobilityRestrictions, workMax: c.workMax, avoidAxialLoad: c.avoidAxialLoad,
+      bodyFat: c.bodyFat, leanMass: c.leanMass, hrvMs: c.hrvMs, sleepHours: c.sleepHours, stressLevel: c.stressLevel,
+      labMrvMultiplier: c.labMrvMultiplier,
+      enhanced: c.enhanced, pedDoses: c.pedDoses, courseIntensity: c.courseIntensity,
+      weightKg: c.weightKg, bodyFatPct: c.bodyFatPct, experienceLevel: c.experienceLevel, prepCount: c.prepCount,
+      prepVolumeMult: c.prepVolumeMult, currentCalories: c.currentCalories,
+      carbLoadStrategy: c.carbLoadStrategy, waterStrategy: c.waterStrategy, sodiumStrategy: c.sodiumStrategy,
+      confirmedManipulation: c.confirmedManipulation, contraindications: c.contraindications,
+      competitions: prepComps, prepWeeksPerComp: pcWeeks, taperWeeks: prepTaper,
+    };
+  };
+
+  const handleBuildSeason = () => {
+    if (prepComps.length < 2) { flash('Добавьте минимум 2 старта в параметрах, чтобы собрать сезон'); return; }
+    setPcBusy(true);
+    try {
+      const res = buildPrepSeason(buildPrepSeasonCfg());
+      setPrepSeason(res);
+      setPrepResult(res.cycles[res.cycles.length - 1] ?? null);
+      setPrepStep('result');
+      flash(`🏁 Сезон: собрано ${res.cycles.length} цикла (по одному на старт)`);
+    } catch (e) {
+      flash(`⚠ ${(e as Error)?.message ?? 'Не удалось собрать сезон'}`);
+    }
+    setPcBusy(false);
+  };
+
   const handleSavePrepCycle = () => {
     if (!prepResult) return;
     try {
@@ -5163,12 +5199,31 @@ export const BbAutoConstructor: React.FC = () => {
               <button style={{ ...BTN_GHOST, flex: 1 }} onClick={() => setPrepStep('split')}>← Назад</button>
               <button style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff' }} disabled={pcBusy} onClick={handleBuildPrep}>{pcBusy ? '⏳ Сборка...' : '🏁 Собрать prep-цикл'}</button>
             </div>
+            <button style={{ ...BTN_GHOST, width: '100%', borderColor: '#60a5fa', color: '#60a5fa' }} disabled={pcBusy || prepComps.length < 2} onClick={handleBuildSeason}>
+              🏁 Собрать сезон (по всем {prepComps.length >= 2 ? `${prepComps.length} стартам` : 'стартам — добавьте ≥2'})
+            </button>
           </div>
         )}
 
         {prepStep === 'result' && prepResult && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 800 }}>📋 Готово — Prep-цикл</div>
+            {prepSeason && (
+              <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🏁 Сезон: {prepSeason.cycles.length} старта</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {prepSeason.summary.map((s, i) => (
+                    <button key={i} onClick={() => { setPrepResult(prepSeason.cycles[i]); setPrepStep('result'); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left', padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
+                      <span style={{ fontWeight: 700, color: s.priority === 'A' ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>[{s.priority ?? '—'}]</span>
+                      <span style={{ flex: 1 }}>{s.name}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.55)' }}>{s.date} · {s.totalWeeks} нед (подг {s.prepWeeks}+тапер {s.taperWeeks}+пик)</span>
+                    </button>
+                  ))}
+                </div>
+                {prepSeason.warnings.length > 0 && <div style={{ color: '#fbbf24', marginTop: 4 }}>{prepSeason.warnings.join(' ')}</div>}
+              </div>
+            )}
             {prepStale && (
               <div style={{ fontSize: 10, color: '#f87171', padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
                 ⚠ Параметры изменены после сборки — результат устарел. Вернитесь и нажмите «🏁 Собрать prep-цикл» заново.

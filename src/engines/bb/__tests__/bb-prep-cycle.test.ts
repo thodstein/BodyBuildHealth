@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
-  accentToContestSpec, prepCutProjection, type PrepCycleConfig,
+  accentToContestSpec, prepCutProjection, buildPrepSeason, type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
 import { DEFAULT_WORKMAX } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
@@ -261,5 +261,50 @@ describe('bb-prep-cycle: прогноз сушки к шоу', () => {
     const p = prepCutProjection(r.prepPlan, 80);
     expect(p.targetWeightKg).toBeNull();
     expect(p.projectedShowWeightKg).toBeLessThan(80);
+  });
+});
+
+describe('bb-prep-cycle: сезон (несколько стартов)', () => {
+  function seasonCfg(comps: Array<{ id: string; date: string; name: string; priority?: 'A' | 'B' | 'C' }>): PrepSeasonConfig {
+    const b = base();
+    return {
+      category: b.category, sex: b.sex,
+      accentMuscles: b.accentMuscles, minimalMuscles: b.minimalMuscles, minimalMode: b.minimalMode,
+      splitPatternId: b.splitPatternId,
+      level: b.level, trainingYears: b.trainingYears, equipment: b.equipment, workMax: b.workMax,
+      enhanced: b.enhanced, weightKg: b.weightKg, experienceLevel: b.experienceLevel,
+      competitions: comps, prepWeeksPerComp: 8, taperWeeks: 2,
+    };
+  }
+
+  it('строит по циклу на каждый старт, каждый якорится к своей дате', () => {
+    const r = buildPrepSeason(seasonCfg([
+      { id: 'c1', date: '2027-03-01', name: 'Весенний', priority: 'B' },
+      { id: 'c2', date: '2027-06-01', name: 'Главный', priority: 'A' },
+      { id: 'c3', date: '2027-09-15', name: 'Финал', priority: 'C' },
+    ]));
+    expect(r.cycles.length).toBe(3);
+    expect(r.summary.length).toBe(3);
+    // порядок по дате
+    expect(r.summary[0].date).toBe('2027-03-01');
+    expect(r.summary[1].date).toBe('2027-06-01');
+    expect(r.summary[2].date).toBe('2027-09-15');
+    // каждый цикл якорится к своей дате шоу и имеет свой главный старт
+    expect(r.cycles[0].prepPlan.showDate).toBe('2027-03-01');
+    expect(r.cycles[1].prepPlan.showDate).toBe('2027-06-01');
+    expect(r.cycles[2].prepPlan.showDate).toBe('2027-09-15');
+    expect(r.cycles[1].config.mainCompetitionId).toBe('c2');
+    // суммарные недели = prep+taper+1
+    expect(r.cycles[0].bbPlan.weeks.length).toBe(8 + 2 + 1);
+  });
+
+  it('слишком близкие старты — подготовка усекается с предупреждением', () => {
+    const r = buildPrepSeason(seasonCfg([
+      { id: 'c1', date: '2027-03-01', name: 'A' },
+      { id: 'c2', date: '2027-04-01', name: 'B' }, // ~4 нед после A
+    ]));
+    // второй: gap ~4 нед → prep = 4 - 2 taper - 1 = 1 нед
+    expect(r.summary[1].prepWeeks).toBeLessThanOrEqual(1);
+    expect(r.warnings.some(w => /усечен/.test(w))).toBe(true);
   });
 });

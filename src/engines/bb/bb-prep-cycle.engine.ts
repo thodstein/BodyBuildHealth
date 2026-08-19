@@ -429,3 +429,139 @@ export function prepCutProjection(
     note,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Сезон: цепочка prep-циклов под несколько соревнований (P3.3)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Конфиг сезона: общие параметры спортсмена/акцентов + список стартов. */
+export interface PrepSeasonConfig {
+  sex: 'male' | 'female';
+  category: BBContestCategory;
+  accentMuscles: string[];
+  minimalMuscles: string[];
+  minimalMode?: PrepMinimalMode;
+  splitPatternId?: string;
+  level: string;
+  trainingYears?: number;
+  equipment?: string[];
+  injuries?: Injury[];
+  mobilityRestrictions?: string[];
+  workMax?: Record<string, number>;
+  avoidAxialLoad?: boolean;
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  labMrvMultiplier?: number;
+  enhanced: boolean;
+  pedDoses?: Record<string, number>;
+  courseIntensity?: CourseIntensity;
+  weightKg: number;
+  bodyFatPct?: number;
+  experienceLevel: ExperienceLevel;
+  prepCount?: number;
+  prepVolumeMult?: number;
+  currentCalories?: number;
+  carbLoadStrategy?: CarbLoadStrategy;
+  waterStrategy?: WaterStrategy;
+  sodiumStrategy?: SodiumStrategy;
+  confirmedManipulation?: boolean;
+  contraindications?: string[];
+  /** Соревнования сезона (сортируются по дате). */
+  competitions: ContestEventEntry[];
+  /** Длительность одного prep-блока между стартами (4-26; усекается, если не влезает). */
+  prepWeeksPerComp?: number;
+  taperWeeks?: number;
+}
+
+export interface PrepSeasonResult {
+  /** Цепочка циклов, по одному на старт (порядок по дате). */
+  cycles: PrepCycleResult[];
+  /** Сводка «дата → старт → подготовка/тапер/пик». */
+  summary: Array<{ date: string; name: string; priority?: 'A' | 'B' | 'C'; prepWeeks: number; taperWeeks: number; totalWeeks: number }>;
+  warnings: string[];
+}
+
+/** Собрать сезон: для каждого старта отдельный prep-цикл, тапер/пик к его дате. */
+export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
+  const comps = (cfg.competitions || [])
+    .filter(c => c && c.date && c.name)
+    .sort((a, b) => (a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0));
+  if (comps.length === 0) throw new Error('Сезон: укажите хотя бы одно соревнование с датой.');
+
+  const userWeeks = clamp(Math.round(cfg.prepWeeksPerComp ?? 12), 4, 26);
+  const taperWeeks = clamp(Math.round(cfg.taperWeeks ?? 3), 1, 4);
+  const warnings: string[] = [];
+  const cycles: PrepCycleResult[] = [];
+  const summary: PrepSeasonResult['summary'] = [];
+
+  let prevDate: string | null = null;
+  for (let i = 0; i < comps.length; i++) {
+    const comp = comps[i];
+    // Подготовка не должна залезать на предыдущий старт.
+    let prepWeeks = userWeeks;
+    if (prevDate) {
+      const gapWeeks = Math.floor(isoDiffDays(prevDate, comp.date!) / 7);
+      prepWeeks = Math.min(prepWeeks, Math.max(1, gapWeeks - taperWeeks - 1));
+    }
+    if (prepWeeks < 3) {
+      warnings.push(`⚠ Старт «${comp.name}» (${comp.date}) идёт рано после предыдущего — подготовка усечена до ${prepWeeks} нед (только ${taperWeeks} нед тапера + пик).`);
+    }
+    const totalWeeks = prepWeeks + taperWeeks + 1;
+    const cycleCfg: PrepCycleConfig = {
+      category: cfg.category,
+      sex: cfg.sex,
+      accentMuscles: cfg.accentMuscles,
+      minimalMuscles: cfg.minimalMuscles,
+      minimalMode: cfg.minimalMode,
+      splitPatternId: cfg.splitPatternId,
+      weeks: totalWeeks,
+      taperWeeks,
+      showDate: comp.date!,
+      level: cfg.level,
+      trainingYears: cfg.trainingYears,
+      equipment: cfg.equipment,
+      injuries: cfg.injuries,
+      mobilityRestrictions: cfg.mobilityRestrictions,
+      workMax: cfg.workMax,
+      avoidAxialLoad: cfg.avoidAxialLoad,
+      bodyFat: cfg.bodyFat,
+      leanMass: cfg.leanMass,
+      hrvMs: cfg.hrvMs,
+      sleepHours: cfg.sleepHours,
+      stressLevel: cfg.stressLevel,
+      labMrvMultiplier: cfg.labMrvMultiplier,
+      enhanced: cfg.enhanced,
+      pedDoses: cfg.pedDoses,
+      courseIntensity: cfg.courseIntensity,
+      weightKg: cfg.weightKg,
+      bodyFatPct: cfg.bodyFatPct,
+      experienceLevel: cfg.experienceLevel,
+      prepCount: cfg.prepCount,
+      prepVolumeMult: cfg.prepVolumeMult,
+      currentCalories: cfg.currentCalories,
+      carbLoadStrategy: cfg.carbLoadStrategy,
+      waterStrategy: cfg.waterStrategy,
+      sodiumStrategy: cfg.sodiumStrategy,
+      confirmedManipulation: cfg.confirmedManipulation,
+      contraindications: cfg.contraindications,
+      competitions: comps.map(c => ({ id: c.id, name: c.name, date: c.date, priority: c.priority })),
+      mainCompetitionId: comp.id,
+    };
+    const cycle = buildPrepCycle(cycleCfg);
+    cycles.push(cycle);
+    summary.push({
+      date: comp.date!,
+      name: comp.name,
+      priority: comp.priority,
+      prepWeeks,
+      taperWeeks,
+      totalWeeks,
+    });
+    prevDate = comp.date!;
+  }
+
+  return { cycles, summary, warnings };
+}
