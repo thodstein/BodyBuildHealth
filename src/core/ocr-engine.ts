@@ -310,7 +310,7 @@ async function serverOcrImage(file: File): Promise<string> {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
+  const timeout = setTimeout(() => controller.abort(), 240_000);
   let response: Response;
   try {
     response = await fetch('./api/ocr-image', {
@@ -320,7 +320,7 @@ async function serverOcrImage(file: File): Promise<string> {
       signal: controller.signal,
     });
   } catch (error: any) {
-    if (error?.name === 'AbortError') throw new Error('Серверный OCR превысил лимит 45 секунд. Попробуйте более компактный скриншот.');
+    if (error?.name === 'AbortError') throw new Error('Серверный OCR превысил лимит 240 секунд. Попробуйте более компактный скриншот.');
     throw error;
   } finally {
     clearTimeout(timeout);
