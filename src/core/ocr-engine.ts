@@ -54,6 +54,29 @@ async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
   });
 }
 
+async function prepareImageForServer(file: File): Promise<Blob> {
+  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = 1800;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const compressed = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+    return compressed && compressed.size < file.size ? compressed : file;
+  } catch {
+    return file;
+  }
+}
+
 export interface OCRResult {
   text: string;
   labs: ParsedLabValue[];
@@ -303,7 +326,8 @@ async function serverOcrScannedPdf(file: File): Promise<string> {
 }
 
 async function serverOcrImage(file: File): Promise<string> {
-  const bytes = new Uint8Array(await readFileAsArrayBuffer(file));
+  const upload = await prepareImageForServer(file);
+  const bytes = new Uint8Array(await readFileAsArrayBuffer(upload));
   let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {
