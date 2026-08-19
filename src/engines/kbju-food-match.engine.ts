@@ -6,6 +6,7 @@
  */
 import { FOOD_DB, calcBBQualityScore, type FoodItem } from '../core/nutrition-database';
 import { getMicro } from '../core/nutrition-micros';
+import { calcDIAAS } from './product-usefulness-v2.engine';
 
 export interface KbjuTarget {
   kcal: number;
@@ -57,52 +58,11 @@ export interface AdvancedFilter {
   excludeGlycation?: boolean;
 }
 
-const DIET_PROFILE = { protein: 0.95, dairy: 0.97, egg: 0.97, fish: 0.94, grain: 0.85, legume: 0.82, nut: 0.88, veg_fruit: 0.85, other: 0.85 };
-const REF_PATTERN: Record<string, number> = { leucine: 59, isoleucine: 30, valine: 39, lysine: 45, methionine: 22, cysteine: 6, phenylalanine: 38, tyrosine: 19, threonine: 23, tryptophan: 6, histidine: 15 };
-
-function getFoodAminoValue(f: FoodItem, key: string): number {
-  const a = f.amino_acid_profile_100g;
-  if (!a) return 0;
-  const map: Record<string, number | undefined> = {
-    leucine: a.leucine_mg, isoleucine: a.isoleucine_mg, valine: a.valine_mg,
-    lysine: a.lysine_mg, methionine: a.methionine_mg, cysteine: a.cysteine_mg,
-    phenylalanine: a.phenylalanine_mg, tyrosine: (a as any).tyrosine_mg,
-    threonine: a.threonine_mg, tryptophan: a.tryptophan_mg, histidine: a.histidine_mg,
-  };
-  return (map[key] ?? 0) / 1000; // mg → g per 100g
-}
-
-function calcFoodDIAAS(f: FoodItem): { diaas: number; limitingAA: string } {
-  const digest = DIET_PROFILE[f.category as keyof typeof DIET_PROFILE] || 0.85;
-  let minRatio = Infinity;
-  let limiting = 'нет данных';
-  let hasData = false;
-  const metCys = getFoodAminoValue(f, 'methionine') + getFoodAminoValue(f, 'cysteine');
-  const pheTyr = getFoodAminoValue(f, 'phenylalanine') + getFoodAminoValue(f, 'tyrosine');
-  const refMetCys = (REF_PATTERN['methionine'] || 0) + (REF_PATTERN['cysteine'] || 0);
-  const refPheTyr = (REF_PATTERN['phenylalanine'] || 0) + (REF_PATTERN['tyrosine'] || 0);
-
-  const pairs: [string, number, number][] = [
-    ['лейцин', getFoodAminoValue(f, 'leucine'), REF_PATTERN['leucine'] || 0],
-    ['изолейцин', getFoodAminoValue(f, 'isoleucine'), REF_PATTERN['isoleucine'] || 0],
-    ['валин', getFoodAminoValue(f, 'valine'), REF_PATTERN['valine'] || 0],
-    ['лизин', getFoodAminoValue(f, 'lysine'), REF_PATTERN['lysine'] || 0],
-    ['мет+цис', metCys, refMetCys],
-    ['фен+тир', pheTyr, refPheTyr],
-    ['треонин', getFoodAminoValue(f, 'threonine'), REF_PATTERN['threonine'] || 0],
-    ['триптофан', getFoodAminoValue(f, 'tryptophan'), REF_PATTERN['tryptophan'] || 0],
-    ['гистидин', getFoodAminoValue(f, 'histidine'), REF_PATTERN['histidine'] || 0],
-  ];
-  for (const [name, val, ref] of pairs) {
-    if (ref <= 0) continue;
-    hasData = true;
-    const proteinContent = f.protein || 1;
-    const ratio = proteinContent > 0 ? (val * digest) / (proteinContent * ref) : 0;
-    if (ratio < minRatio) { minRatio = ratio; limiting = name; }
-  }
-  if (!hasData) return { diaas: 0, limitingAA: 'нет данных' };
-  return { diaas: Math.round(minRatio * 100) / 100, limitingAA: limiting };
-}
+const LIMITING_AA_RU: Record<string, string> = {
+  histidine: 'гистидин', isoleucine: 'изолейцин', leucine: 'лейцин', lysine: 'лизин',
+  methionine_cystine: 'мет+цис', phenylalanine_tyrosine: 'фен+тир', threonine: 'треонин',
+  tryptophan: 'триптофан', valine: 'валин',
+};
 
 function calcAminoScore(f: FoodItem): number {
   const a = f.amino_acid_profile_100g;
@@ -189,7 +149,8 @@ export function calcKbjuMatchScore(food: FoodItem, target: KbjuTarget, currentKb
   else if (score >= 55) { label = 'Хорошо'; color = '#22c55e'; }
   else if (score >= 35) { label = 'Средне'; color = '#f59e0b'; }
 
-  const diaas = calcFoodDIAAS(food);
+  // Канонический DIAAS: те же reference/digestibility/Tyr/reliability, что и V2-скоринг.
+  const diaas = calcDIAAS(food);
 
   return {
     foodId: food.id,
@@ -206,7 +167,7 @@ export function calcKbjuMatchScore(food: FoodItem, target: KbjuTarget, currentKb
     gi: food.gi || 0,
     tier: food.tier,
     diaas: diaas.diaas,
-    diaasLimitingAA: diaas.limitingAA,
+    diaasLimitingAA: LIMITING_AA_RU[diaas.limitingAA] || diaas.limitingAA,
     pral: food.electrolytes_100g?.pral_index,
     bbQuality: food.bb_quality_score || calcBBQualityScore(food),
     aminoScore: calcAminoScore(food),

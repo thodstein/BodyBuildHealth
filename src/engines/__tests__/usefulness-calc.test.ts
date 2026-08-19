@@ -103,6 +103,14 @@ describe('calcMealDIAAS / calcDIAAS', () => {
     // индейка: полный аминопрофиль + digest 0.95; рис: неполный профиль + digest 0.85
     expect(turkeyD).toBeGreaterThan(riceD);
   });
+
+  it('компоновщик и V2 используют один DIAAS для продукта', () => {
+    const food = f('turkey_breast');
+    const v2 = calcDIAAS(food);
+    const composer = calcKbjuMatchScore(food, { kcal: 500, protein: 30, fat: 15, carbs: 50 });
+    expect(composer.diaas).toBe(v2.diaas);
+    expect(composer.diaasLimitingAA).toBe('валин');
+  });
 });
 
 // ─── analyzeDailyDiet ────────────────────────────────────────────────
