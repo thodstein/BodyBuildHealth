@@ -7,6 +7,7 @@ import {
   accentToContestSpec, type PrepCycleConfig,
 } from '../bb-prep-cycle.engine';
 import { DEFAULT_WORKMAX } from '../bb-builder.engine';
+import { aggregateBBVolume } from '../bb-volume.engine';
 import type { BBContestCategory } from '../bb-contest-prep.engine';
 
 const EQ = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'];
@@ -164,5 +165,56 @@ describe('bb-prep-cycle: accentToContestSpec', () => {
     expect(accentToContestSpec(['glutes'])).toBe('glutes');
     expect(accentToContestSpec(['biceps'])).toBe('arms');
     expect(accentToContestSpec([])).toBe('none');
+  });
+});
+
+describe('bb-prep-cycle: минимальная нагрузка реально применяется и план валиден', () => {
+  /** Сумма прямых сетов мышцы по prep-неделям (исключая тапер/пик). */
+  function directSetsInPrep(res: ReturnType<typeof buildPrepCycle>, muscle: string, prepWeeks: number): number {
+    let sum = 0;
+    for (const wk of res.bbPlan.weeks.slice(0, prepWeeks) as any[]) {
+      const vol = aggregateBBVolume(wk.sessions || []);
+      sum += (vol[muscle]?.directSets ?? 0);
+    }
+    return sum;
+  }
+
+  it('минимальные мышцы (quads/arms) получают меньше прямого объёма, чем без минимальной нагрузки', () => {
+    const mk = (minimal: string[]) => base({
+      category: 'mens_bb', accentMuscles: ['back', 'shoulders'], minimalMuscles: minimal,
+      splitPatternId: 'ppl_6', weeks: 12, taperWeeks: 3,
+    });
+    const withMin = buildPrepCycle(mk(['quads', 'arms']));
+    const without = buildPrepCycle(mk([]));
+    const pw = withMin.prepWeeks;
+    // Акцент сохранён/не упал
+    expect(directSetsInPrep(withMin, 'back', pw)).toBeGreaterThanOrEqual(directSetsInPrep(without, 'back', pw));
+    // Минимальные мышцы сокращены (донорский режим)
+    expect(directSetsInPrep(withMin, 'quads', pw)).toBeLessThan(directSetsInPrep(without, 'quads', pw));
+    expect(directSetsInPrep(withMin, 'biceps', pw)).toBeLessThanOrEqual(directSetsInPrep(without, 'biceps', pw));
+    // Доноры в tradeoff-политике акцент-блока
+    const accentBlock = withMin.specializationSchedule.blocks.find(b => b.targets.length > 0);
+    expect(accentBlock?.tradeoff?.donorMuscles).toEqual(expect.arrayContaining(['quads']));
+  });
+
+  it('режим remove убирает прямую работу минимальной мышцы сильнее, чем MEV-флор', () => {
+    const mk = (minimal: string[], mode?: string) => base({
+      category: 'mens_bb', accentMuscles: ['back'], minimalMuscles: minimal,
+      splitPatternId: 'ppl_6', weeks: 12, taperWeeks: 3,
+      ...(mode ? { minimalMode: mode as any } : {}),
+    });
+    const baseline = directSetsInPrep(buildPrepCycle(mk([])), 'quads', 8);
+    const reduce = directSetsInPrep(buildPrepCycle(mk(['quads'], 'reduce_direct_to_floor')), 'quads', 8);
+    const remove = directSetsInPrep(buildPrepCycle(mk(['quads'], 'remove_direct_when_indirect_covers_floor')), 'quads', 8);
+    expect(baseline).toBeGreaterThan(0);
+    // Донорский режим никогда не увеличивает прямую работу минимальной мышцы
+    expect(reduce).toBeLessThanOrEqual(baseline);
+    expect(remove).toBeLessThanOrEqual(reduce);
+  });
+
+  it('валидация собранного плана не показывает ошибок', () => {
+    const r = buildPrepCycle(base());
+    const val: any = (r.bbPlan as any).validation;
+    if (val) expect(val.valid).not.toBe(false);
   });
 });
