@@ -249,7 +249,12 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
   const doUpdateWeight = () => {
     if (!popup || popup.selectedMealIdx === undefined || popup.selectedItemIdx === undefined || !popup.editWeight) return;
     saveUndo();
-    const w = popup.editWeight;
+    // P0-3: санитизация граммовки на границе UI (зеркалит safeWeight движка) —
+    // NaN/0/отрицательное не должны обнулять/инвертировать макросы приёма.
+    const w = Number.isFinite(popup.editWeight) && popup.editWeight > 0
+      ? Math.round(Math.min(2000, Math.max(10, popup.editWeight)))
+      : 0;
+    if (w <= 0) { closePopup(); return; }
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
