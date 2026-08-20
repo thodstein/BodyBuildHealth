@@ -323,7 +323,7 @@ export const CardioParamsStep: React.FC<{
         <button style={lowImpact ? CHIP_ACTIVE : CHIP} onClick={() => setLowImpact(!lowImpact)}>
           {lowImpact ? '🦴 Щадить суставы: вкл' : 'Щадить суставы: выкл'}
         </button>
-        <div style={HINT}>При «щадить суставы» высокоударный бег недоступен и заменяется низкоуударным видом.</div>
+        <div style={HINT}>При «щадить суставы» высокоударный бег недоступен и заменяется низкоударным видом.</div>
       </SectionCard>
 
       {/* ── 6. Дни ног ── */}
@@ -408,6 +408,27 @@ export const CardioParamsStep: React.FC<{
                 />
               </div>
             ))}
+            {(() => {
+              const sum = phaseSplit.base + phaseSplit.build + phaseSplit.maintenance;
+              const compWeeks = comps.reduce((s, c) => s + Math.max(0, taperWeeks), 0);
+              const available = Math.max(0, totalWeeks - compWeeks);
+              if (sum > available) {
+                return (
+                  <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">
+                    ⚠ Сумма фаз ({sum} нед) больше доступных недель цикла ({available} нед
+                    {compWeeks > 0 ? `, из них ${compWeeks} нед занято taper/пиком стартов` : ''}). Цикл будет короче — сократите фазы или увеличьте горизонт.
+                  </div>
+                );
+              }
+              if (sum < available && available > 0) {
+                return (
+                  <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '6px 8px' }} role="status">
+                    ⚠ Распределено {sum} нед из {available} — оставшиеся {available - sum} нед будут поддержанием.
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div style={HINT}>Итого распределено: {phaseSplit.base + phaseSplit.build + phaseSplit.maintenance} нед (сверх — поддерживающие; taper/пик задаются стартами).</div>
           </div>
         )}

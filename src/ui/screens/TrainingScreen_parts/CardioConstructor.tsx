@@ -13,10 +13,10 @@ import {
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
   cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel, cardioCycleSummary,
-  cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
+  cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion, restoreCardioCycleVersion, clearCardioCycleHistory,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
-  cardioProfileFactors, cardioNutritionNotes,
+  cardioProfileFactors, cardioNutritionNotes, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioCycleInput, type CardioGoal, type CardioCompetitionRef, type CardioLevel, type CardioEquipment, type CardioVariant, type CardioScenario,
 } from '../../../engines/lms/cardio.engine';
 import { planFromStored, type BBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
@@ -91,6 +91,8 @@ interface WizardState {
   factorHrv: boolean;
   factorPed: boolean;
   factorJoints: boolean;
+  variant: CardioVariant;
+  comps: CardioCompetitionRef[];
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -157,6 +159,13 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Определяет вариант нагрузки по фактическим опциям цикла (config → variant). */
+function variantFromConfig(cfg: { level?: CardioLevel; recoveryLow?: boolean }): CardioVariant {
+  if (cfg.level === 'beginner' && cfg.recoveryLow === true) return 'gentle';
+  if (cfg.level === 'advanced' && cfg.recoveryLow === false) return 'intense';
+  return 'base';
+}
+
 function downloadIcs(cycle: CardioCycle): void {
   try {
     const blob = new Blob([buildCardioIcs(cycle)], { type: 'text/calendar;charset=utf-8' });
@@ -203,9 +212,9 @@ export const CardioConstructor: React.FC = () => {
   const [age, setAge] = useState(String(wizard.age ?? profileAge() ?? 30));
   const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
   const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
-  const [variant, setVariant] = useState<CardioVariant>('base');
+  const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
-  const [comps, setComps] = useState<CardioCompetitionRef[]>([]);
+  const [comps, setComps] = useState<CardioCompetitionRef[]>(wizard.comps ?? []);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
   const pf = useMemo(() => {
     try { return cardioProfileFactors(getProfile()?.settings ?? {}); } catch { return {}; }
@@ -322,12 +331,53 @@ export const CardioConstructor: React.FC = () => {
       : variant === 'intense'
         ? { level: 'advanced' as CardioLevel, recoveryLow: false }
         : { level, recoveryLow };
-    const c = buildCardioCycle({ ...base, ...vOpts, config: base });
+    // config = фактические применённые опции (вариант запекается в конфиг),
+    // иначе «⚙️ Изменить параметры» восстановит другой уровень и пересборка
+    // даст иной цикл, чем показанный пользователю.
+    const applied = { ...base, ...vOpts };
+    const c = buildCardioCycle({ ...applied, config: applied });
     saveCardioCycle(c);
     setActiveCardioCycle(c);
     setCycle(c);
     reload();
     flashMsg('✅ Кардио-цикл собран и сохранён в библиотеку');
+  };
+
+  /** Живой пересчёт при выборе варианта нагрузки: вариант применяется сразу. */
+  const selectVariant = (v: CardioVariant) => {
+    setVariant(v);
+    const base: CardioCycleInput = {
+      goal,
+      totalWeeks,
+      daysAvailable,
+      bodyWeight,
+      competitions: comps,
+      taperWeeks,
+      taper: taperEnabled,
+      peakWeek,
+      level,
+      recoveryLow,
+      equipment,
+      lowImpact,
+      age: Math.max(12, Math.min(90, Number(age) || 30)),
+      restingHr: Number(restingHr) > 0 ? Number(restingHr) : undefined,
+      sex,
+      legDays,
+      ...previewFactors,
+      phaseSplit: phaseSplit.auto ? undefined : { base: phaseSplit.base, build: phaseSplit.build, maintenance: phaseSplit.maintenance },
+    };
+    const vOpts = v === 'gentle'
+      ? { level: 'beginner' as CardioLevel, recoveryLow: true }
+      : v === 'intense'
+        ? { level: 'advanced' as CardioLevel, recoveryLow: false }
+        : { level, recoveryLow };
+    const applied = { ...base, ...vOpts };
+    const c = buildCardioCycle({ ...applied, config: applied });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    setCycle(c);
+    reload();
+    flashMsg(`⇄ Вариант «${CARDIO_VARIANT_LABELS[v]}» применён — цикл пересобран`);
   };
 
   const editConfig = () => {
@@ -357,7 +407,7 @@ export const CardioConstructor: React.FC = () => {
       joints: cfg.autoLowImpact === true,
     });
     setPhaseSplit(cfg.phaseSplit ? { auto: false, base: cfg.phaseSplit.base ?? 0, build: cfg.phaseSplit.build ?? 0, maintenance: cfg.phaseSplit.maintenance ?? 0 } : { auto: true, base: 0, build: 0, maintenance: 0 });
-    setVariant('base');
+    setVariant(cfg.level != null ? variantFromConfig(cfg) : 'base');
     setStep('params');
     flashMsg('⚙️ Параметры загружены из цикла — измените и пересоберите');
   };
@@ -424,7 +474,9 @@ export const CardioConstructor: React.FC = () => {
   };
 
   const removeCycle = (c: CardioCycle) => {
+    if (!window.confirm(`Удалить кардио-цикл «${c.name || 'без названия'}» (${c.totalWeeks} нед)? Это также очистит его историю версий.`)) return;
     removeCardioCycle(c.id);
+    clearCardioCycleHistory(c.id);
     if (cycle?.id === c.id) { setActiveCardioCycle(null); setCycle(null); }
     reload();
   };
@@ -573,10 +625,11 @@ export const CardioConstructor: React.FC = () => {
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
+        variant, comps,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -634,6 +687,8 @@ export const CardioConstructor: React.FC = () => {
   }, [cycle, step, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, comps, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, restingHr, sex]);
 
   // Цикл устарел относительно текущих параметров мастера (для предпросмотра).
+  const effLevel = variant === 'gentle' ? ('beginner' as CardioLevel) : variant === 'intense' ? ('advanced' as CardioLevel) : level;
+  const effRecoveryLow = variant === 'gentle' ? true : variant === 'intense' ? false : recoveryLow;
   const paramsDirty = useMemo(() => {
     if (!cycle?.config) return false;
     const cfg = cycle.config;
@@ -641,12 +696,12 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.goal !== goal) return true;
     if (cfg.totalWeeks != null && cfg.totalWeeks !== totalWeeks) return true;
     if (cfg.daysAvailable != null && cfg.daysAvailable !== daysAvailable) return true;
-    if (!!cfg.recoveryLow !== recoveryLow) return true;
+    if (!!cfg.recoveryLow !== effRecoveryLow) return true;
     if (cfg.bodyWeight != null && cfg.bodyWeight !== bodyWeight) return true;
     if (cfg.taperWeeks != null && cfg.taperWeeks !== taperWeeks) return true;
     if (!!cfg.taper !== taperEnabled) return true;
     if (!!cfg.peakWeek !== peakWeek) return true;
-    if (cfg.level != null && cfg.level !== level) return true;
+    if (cfg.level != null && cfg.level !== effLevel) return true;
     if (!same(cfg.equipment, equipment)) return true;
     if (!!cfg.lowImpact !== lowImpact) return true;
     if (cfg.age != null && cfg.age !== Math.max(12, Math.min(90, Number(age) || 30))) return true;
@@ -661,7 +716,7 @@ export const CardioConstructor: React.FC = () => {
     if (cfg.stressLevel !== previewFactors.stressLevel) return true;
     if (cfg.hrvMs !== previewFactors.hrvMs) return true;
     return false;
-  }, [cycle, goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors]);
+  }, [cycle, goal, totalWeeks, daysAvailable, effRecoveryLow, effLevel, bodyWeight, taperWeeks, taperEnabled, peakWeek, level, equipment, lowImpact, age, legDays, sex, restingHr, comps, phaseSplit, previewFactors]);
 
   const resetParams = () => {
     setGoal('cut');
@@ -738,7 +793,13 @@ export const CardioConstructor: React.FC = () => {
 
   const stepIdx = STEPS.findIndex(s => s.id === step);
   const goNext = () => {
-    if (step === 'preview' && !cycle) { build(); return; }
+    if (step === 'preview' && !cycle) {
+      build();
+      // «Собрать и далее →»: собрать и сразу перейти на следующий шаг (Управление),
+      // а не требовать второй клик после пересборки.
+      if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1].id);
+      return;
+    }
     if (stepIdx < STEPS.length - 1) setStep(STEPS[stepIdx + 1].id);
   };
   const goPrev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1].id); };
@@ -867,7 +928,7 @@ export const CardioConstructor: React.FC = () => {
           <CardioPreviewStep
             cycle={cycle} onBuild={build} onRename={renameCycle} onEditConfig={editConfig}
             daysAvailable={daysAvailable} recoveryLow={recoveryLow}
-            variant={variant} onVariant={setVariant}
+            variant={variant} onVariant={selectVariant}
             variants={planVariants} explanation={planExplanation}
             paramsDirty={paramsDirty}
             onImproved={applyImproved}

@@ -251,6 +251,23 @@ describe('computeCardioAdvice', () => {
     const a = computeCardioAdvice(c, log, { referenceIso: REF });
     expect(a.action).toBe('keep');
   });
+
+  it('база рекомендации — рабочие недели, без taper/peak/transition', () => {
+    // Цикл: 2 рабочие недели по 60 мин + 1 taper-неделя 15 мин.
+    // Если бы базой были ВСЕ недели — план (60+60+15)/3 = 45 мин, и 25 мин
+    // факта давали бы «increase» лишь формально. Реальная база — рабочие
+    // недели (60 мин): 25 мин = <60% → честный «increase».
+    const cw = buildCardioCycle({ goal: 'health', totalWeeks: 3, id: 'adv-work' });
+    cw.weeks = cw.weeks.map((w, i) => ({
+      ...w,
+      totalMinutes: i === 2 ? 15 : 60,
+      sessions: w.sessions.map(s => ({ ...s, durationMin: i === 2 ? 15 : 60 })),
+      phase: i === 2 ? 'taper' : 'maintenance',
+    }));
+    const log = [entry({ date: '2026-01-05', durationMin: 25, completed: true })];
+    const a = computeCardioAdvice(cw, log, { referenceIso: REF });
+    expect(a.action).toBe('increase');
+  });
 });
 
 describe('план vs факт (cardioWeekFact / cardioCycleCompliance)', () => {

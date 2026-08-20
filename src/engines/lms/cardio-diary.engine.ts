@@ -49,6 +49,62 @@ export function clearCardioLog(): void {
   try { localStorage.removeItem(CARDIO_LOG_KEY); } catch { /* ignore */ }
 }
 
+/** Полная замена журнала (для undo/восстановления снимка). */
+export function replaceCardioLog(entries: CardioLogEntry[]): CardioLogEntry[] {
+  const list = (Array.isArray(entries) ? entries : [])
+    .filter((e): e is CardioLogEntry => !!e && typeof e === 'object' && typeof e.date === 'string' && typeof e.durationMin === 'number')
+    .slice(0, CARDIO_LOG_CAP);
+  try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+  return list;
+}
+
+/**
+ * Валидация полей формы журнала. Возвращает список ошибок (пусто — всё корректно).
+ * Числовые поля клампятся к разумным диапазонам, чтобы в журнал не попадали
+ * «RPE 42», «ЧСС 400» или «км 999» (см. анализ конструктора кардио, A3).
+ */
+export interface CardioLogFieldWarnings {
+  rpe?: string;
+  hr?: string;
+  km?: string;
+  minutes?: string;
+}
+
+export function validateCardioLogFields(fields: {
+  rpe?: string | number;
+  hr?: string | number;
+  km?: string | number;
+  minutes?: string | number;
+}): CardioLogFieldWarnings {
+  const warnings: CardioLogFieldWarnings = {};
+  const toNum = (v: string | number | undefined): number | null => {
+    if (v == null) return null;
+    const s = typeof v === 'number' ? String(v) : v.trim();
+    if (s === '') return null;
+    const n = Number(s.replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const rpe = toNum(fields.rpe);
+  if (rpe != null && (rpe < 1 || rpe > 10)) warnings.rpe = 'RPE вне диапазона 1–10';
+  const hr = toNum(fields.hr);
+  if (hr != null && hr < 20) warnings.hr = 'ЧСС слишком низкий (мин 20 уд/мин)';
+  else if (hr != null && hr > 260) warnings.hr = 'ЧСС слишком высокий (макс 260 уд/мин)';
+  const km = toNum(fields.km);
+  if (km != null && km < 0) warnings.km = 'Дистанция не может быть отрицательной';
+  else if (km != null && km > 200) warnings.km = 'Дистанция слишком большая (макс 200 км)';
+  const min = toNum(fields.minutes);
+  if (min != null && min < 1) warnings.minutes = 'Длительность минимум 1 мин';
+  else if (min != null && min > 600) warnings.minutes = 'Длительность слишком большая (макс 600 мин)';
+  return warnings;
+}
+
+/** Нормализация числового поля формы к диапазону (fallback, если пусто). */
+export function clampCardioLogNumber(raw: string | number, min: number, max: number, fallback: number): number {
+  const n = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(n * 10) / 10));
+}
+
 function toLocalIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -206,7 +262,11 @@ export function computeCardioAdvice(
     return { action: 'keep', reason: 'Активный кардио-цикл не выбран — записывайте сессии, план вернётся.' };
   }
   const stats = cardioLogStats(log, 7, opts.referenceIso);
-  const plannedWeekly = cycle.weeks.length > 0 ? Math.round(cycle.weeks.reduce((s, w) => s + w.totalMinutes, 0) / cycle.weeks.length) : 0;
+  // База рекомендации — РАБОЧИЕ недели (base/build/maintenance/contest_prep):
+  // taper/peak/transition специально снижены по объёму и искажали бы план вниз,
+  // делая его "легче достижимым" и занижая реальную нагрузку.
+  const workWeeks = cycle.weeks.filter(w => w.phase === 'base' || w.phase === 'build' || w.phase === 'maintenance' || w.phase === 'contest_prep');
+  const plannedWeekly = workWeeks.length > 0 ? Math.round(workWeeks.reduce((s, w) => s + w.totalMinutes, 0) / workWeeks.length) : 0;
   if (opts.acwr != null && opts.acwr >= 1.5) {
     return { action: 'reduce', reason: `ACWR ${opts.acwr.toFixed(2)} — опасная зона: кардио-объём снизить, HIIT исключить.` };
   }

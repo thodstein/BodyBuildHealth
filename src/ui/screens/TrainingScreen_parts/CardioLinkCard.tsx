@@ -16,7 +16,7 @@ import { getCardioLink, clearCardioLink, subscribeCardioLink, SPORT_LABELS } fro
 import {
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, adaptCardioToStrength,
   cardioSessionsForDate, cardioNextSession, cardioEquipmentLabel, legDaysFromBBPlan,
-  compareCardioCycles, formatCardioComparison,
+  compareCardioCycles, formatCardioComparison, saveCardioCycleVersion,
   type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { cardioDayLoad, loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
@@ -110,6 +110,8 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
 
   const applyRecalc = useCallback(() => {
     if (!pendingDiff) return;
+    // Снапшот ДО пересчёта — для undo в конструкторе («↩ Вернуть версию»).
+    saveCardioCycleVersion(pendingDiff.before, 'До пересчёта под ACWR');
     saveCardioCycle(pendingDiff.after);
     setActiveCardioCycle(pendingDiff.after);
     flashMsg(pendingDiff.acwr != null

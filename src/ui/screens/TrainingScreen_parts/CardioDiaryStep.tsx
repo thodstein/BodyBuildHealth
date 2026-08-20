@@ -10,6 +10,7 @@ import {
   type CardioCycle,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CardioDiaryPanel } from './CardioDiaryPanel';
 import { CardioAutoTunePanel } from './CardioAutoTunePanel';
@@ -34,7 +35,8 @@ export const CardioDiaryStep: React.FC<{
   const [localCycle, setLocalCycle] = useState<CardioCycle | null>(cycle);
   useEffect(() => { setLocalCycle(cycle); }, [cycle]);
   const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
-  const reloadLog = useCallback(() => { setLog(loadCardioLog()); onChanged(); }, [onChanged]);
+  const [srpe, setSrpe] = useState<SRPESession[]>(() => loadSRPESessions());
+  const reloadLog = useCallback(() => { setLog(loadCardioLog()); setSrpe(loadSRPESessions()); onChanged(); }, [onChanged]);
 
   const handleReschedule = useCallback((next: CardioCycle) => {
     saveCardioCycleVersion(localCycle ?? next, '↗ перенос сессии');
@@ -62,8 +64,8 @@ export const CardioDiaryStep: React.FC<{
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <CardioDayCard cycle={localCycle} />
-      <CardioProgressCard cycle={localCycle} />
+      <CardioDayCard cycle={localCycle} log={log} srpe={srpe} />
+      <CardioProgressCard cycle={localCycle} log={log} />
       {startInfo && (
         <div className="ck-week" style={{ fontSize: 11, color: startInfo.left === 0 ? '#f87171' : '#fbbf24', background: 'linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))', border: '1px solid rgba(245,158,11,0.3)', borderLeft: `3px solid ${startInfo.left === 0 ? '#ef4444' : '#f59e0b'}`, borderRadius: 12, padding: '8px 10px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }}>
           {startInfo.left === 0
@@ -74,7 +76,7 @@ export const CardioDiaryStep: React.FC<{
       <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
       <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
       <CardioVolumeChart cycle={localCycle} log={log} />
-      <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} />
+      <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
     </div>
   );
 };

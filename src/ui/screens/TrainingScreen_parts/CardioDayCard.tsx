@@ -5,8 +5,8 @@
  */
 import React, { useMemo } from 'react';
 import { cardioEquipmentLabel, loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
-import { cardioDayLoad, loadCardioLog, cardioPaceMinPerKm } from '../../../engines/lms/cardio-diary.engine';
-import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { cardioDayLoad, loadCardioLog, cardioPaceMinPerKm, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { CARD, ROW, BTN_PRIMARY } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -18,10 +18,10 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () => void }> = ({ cycle: cycleProp, onOpen }) => {
+export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () => void; log?: CardioLogEntry[]; srpe?: SRPESession[] }> = ({ cycle: cycleProp, onOpen, log: logProp, srpe: srpeProp }) => {
   const cycle = cycleProp !== undefined ? cycleProp : loadActiveCardioCycle();
-  const log = useMemo(() => loadCardioLog(), []);
-  const srpe = useMemo(() => loadSRPESessions(), []);
+  const log = useMemo(() => logProp ?? loadCardioLog(), [logProp]);
+  const srpe = useMemo(() => srpeProp ?? loadSRPESessions(), [srpeProp]);
 
   const today = todayIso();
   const load = useMemo(() => cardioDayLoad(cycle, log, srpe, today, cycle?.startDate), [cycle, log, srpe, today]);

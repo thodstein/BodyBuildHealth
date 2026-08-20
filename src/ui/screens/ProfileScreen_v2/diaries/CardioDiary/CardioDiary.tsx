@@ -306,13 +306,6 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           </label>
           <button style={btnPrimary(ACCENT)} onClick={add}>{editingId ? '💾 Обновить' : '💾 Записать'}</button>
         </div>
-        {todayLegDay?.isLegDay && date === todayIso() && (
-          <div style={{ fontSize: 12, marginTop: 8, padding: '6px 10px', borderRadius: 8, color: ['zone2', 'miss', 'hiit'].includes(type) ? '#f87171' : '#fbbf24', background: ['zone2', 'miss', 'hiit'].includes(type) ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${['zone2', 'miss', 'hiit'].includes(type) ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}` }} role="status">
-            {['zone2', 'miss', 'hiit'].includes(type)
-              ? '🦵 Сегодня день тяжёлых ног — интенсивное кардио лучше перенести или заменить на recovery.'
-              : '🦵 Сегодня день тяжёлых ног — recovery можно.'}
-          </div>
-        )}
       </div>
 
       {/* Журнал */}
@@ -325,7 +318,6 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             return (
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ width: 84, fontSize: 12, color: colors.textMuted }}>{e.date}</span>
-                {legDayDates.has(e.date) && <span style={{ fontSize: 11 }} title="День тяжёлых ног">🦵</span>}
                 <span style={{ width: 86, fontSize: 13, fontWeight: 700, color: t?.color ?? colors.text }}>{t?.label ?? e.type}</span>
                 <span style={{ fontSize: 12, color: colors.text }}>{e.durationMin} мин</span>
                 {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.calories} ккал</span>}

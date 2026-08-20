@@ -8,7 +8,7 @@ import {
   cardioWeekForDate, cardioNextSession, cardioEquipmentLabel, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   cardioCoachHints, type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
-import { loadCardioLog, cardioWeekFact } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, cardioWeekFact, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -21,14 +21,14 @@ function todayIso(): string {
 const HINT_COLOR: Record<string, string> = { test: '#4ade80', deload: '#fbbf24', taper: '#eab308', peak: '#f87171' };
 const HINT_ICON: Record<string, string> = { test: '🔬', deload: '🧘', taper: '📉', peak: '🎭' };
 
-export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cycle }) => {
+export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: CardioLogEntry[] }> = ({ cycle, log: logProp }) => {
   const data = useMemo(() => {
     if (!cycle) return null;
     const ref = cycle.startDate;
     const week = cardioWeekForDate(cycle, todayIso(), ref);
     const current = week?.week ?? 0;
     const pct = cycle.totalWeeks > 0 ? Math.round((Math.min(current, cycle.totalWeeks) / cycle.totalWeeks) * 100) : 0;
-    const log = loadCardioLog();
+    const log = logProp ?? loadCardioLog();
     const done = cycle.weeks.filter(w => w.week < current).map(w => cardioWeekFact(cycle, w.week, log, ref));
     const planned = done.reduce((s, a) => s + a.plannedSessions, 0);
     const actual = done.reduce((s, a) => s + a.doneSessions, 0);
@@ -51,7 +51,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
       totalWeeks: cycle.totalWeeks,
       hint,
     };
-  }, [cycle]);
+  }, [cycle, logProp]);
 
   if (!cycle || !data) return null;
 

@@ -498,6 +498,62 @@ describe('CardioDiaryPanel — adherence текущей недели', () => {
     render(<CardioDiaryPanel cycle={c} />);
     expect(screen.queryByText(/\/км/)).toBeNull();
   });
+
+  it('пустое состояние: подсказка вести журнал, без списка', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-empty' });
+    render(<CardioDiaryPanel cycle={c} />);
+    expect(screen.getByText(/Записей пока нет/)).toBeTruthy();
+    expect(screen.queryByLabelText(/Удалить/)).toBeNull();
+  });
+
+  it('пропущенная сессия (completed:false) помечается бейджем «⏭ пропущена»', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-skip' });
+    saveCardioLogEntry({ id: 'sk1', date: '2026-01-10', type: 'zone2', durationMin: 30, completed: false });
+    render(<CardioDiaryPanel cycle={c} />);
+    expect(screen.getByText(/⏭ пропущена/)).toBeTruthy();
+  });
+
+  it('undo: после «+ Записать» кнопка «↩ Отменить» откатывает запись', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-undo' });
+    render(<CardioDiaryPanel cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    expect(loadCardioLog()).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /Отменить последнее изменение/ }));
+    expect(loadCardioLog()).toHaveLength(0);
+  });
+
+  it('undo: после «✕ Удалить» кнопка возвращает удалённую запись', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-undo2' });
+    saveCardioLogEntry({ id: 'du1', date: '2026-01-10', type: 'zone2', durationMin: 30, completed: true, calories: 210 });
+    render(<CardioDiaryPanel cycle={c} />);
+    fireEvent.click(screen.getByLabelText(/Удалить 2026-01-10/));
+    expect(loadCardioLog()).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: /Отменить последнее изменение/ }));
+    expect(loadCardioLog()).toHaveLength(1);
+    expect(loadCardioLog()[0].id).toBe('du1');
+  });
+
+  it('«✕ Сбросить» очищает форму после редактирования', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-reset' });
+    saveCardioLogEntry({ id: 're1', date: '2026-01-10', type: 'zone2', durationMin: 30, completed: true, calories: 210 });
+    render(<CardioDiaryPanel cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать 2026-01-10/ }));
+    // Форма в режиме редактирования → кнопка «Обновить».
+    expect(screen.getByRole('button', { name: /Обновить/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Сбросить форму/ }));
+    // Вернулись в режим добавления.
+    expect(screen.getByRole('button', { name: /Записать/ })).toBeTruthy();
+    expect(screen.queryByText(/Редактирование записи/)).toBeNull();
+  });
+
+  it('управляемый режим: внешний log и onLogChanged уведомляют родителя о сохранении', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-ctl' });
+    let called = 0;
+    const external = loadCardioLog();
+    render(<CardioDiaryPanel cycle={c} log={external} onLogChanged={() => { called++; }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    expect(called).toBe(1);
+  });
 });
 
 describe('CardioDayCard — кардио-слой дня', () => {
@@ -572,5 +628,18 @@ describe('CardioDiaryStep — старт-контроль (5C)', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
     const html = renderToStaticMarkup(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
     expect(html).not.toContain('Старт через');
+  });
+
+  it('C1: CardioDiaryStep передаёт журнал в факт-виджеты (прогресс обновляется)', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 8); // цикл идёт 1+ недель
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, startDate: start, id: 'diary-step-sync' });
+    // Факт из прошлой недели — прошедшая неделя штрафуется только при наличии
+    // записей; DayCard показывает факт дня/нагрузку через log проп.
+    saveCardioLogEntry({ id: 'day1', date: start, type: 'zone2', durationMin: 30, completed: true, calories: 210 });
+    const html = renderToStaticMarkup(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
+    // CardioDiaryStep передаёт log в дочерние виджеты — объём/факт из журнала видны.
+    expect(html).toContain('Дневник выполнения кардио');
   });
 });

@@ -657,6 +657,13 @@ describe('история версий цикла', () => {
     expect(latestCardioCycleVersion('h-1')?.reason).toBe('до подстройки');
     const restored = restoreCardioCycleVersion('h-1');
     expect(restored?.id).toBe('h-1');
+    // Снапшот НЕ удаляется при restore (undo неразрушающий): повторный restore
+    // вернёт ту же версию; история чистится через clearCardioCycleHistory.
+    expect(latestCardioCycleVersion('h-1')).not.toBeNull();
+    expect(loadCardioCycleVersions()).toHaveLength(1);
+    // Повторный restore возвращает ту же версию.
+    expect(restoreCardioCycleVersion('h-1')?.id).toBe('h-1');
+    clearCardioCycleHistory('h-1');
     expect(latestCardioCycleVersion('h-1')).toBeNull();
     expect(loadCardioCycleVersions()).toHaveLength(0);
   });

@@ -4,10 +4,10 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
+  loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
-  cardioPaceMinPerKm,
-  type CardioLogEntry,
+  cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
+  type CardioLogEntry, type CardioLogFieldWarnings,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeightAdvice, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType, type CardioCoachHint } from '../../../engines/lms/cardio.engine';
@@ -29,8 +29,14 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: number | null; recoveryLow?: boolean; onApplyWeightAdjust?: () => void }> = ({ cycle, acwr, recoveryLow, onApplyWeightAdjust }) => {
-  const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
+export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: number | null; recoveryLow?: boolean; onApplyWeightAdjust?: () => void; log?: CardioLogEntry[]; onLogChanged?: () => void }> = ({ cycle, acwr, recoveryLow, onApplyWeightAdjust, log: logProp, onLogChanged }) => {
+  const [internalLog, setInternalLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
+  // Управляемый режим: родитель (CardioDiaryStep) передаёт журнал и уведомляется
+  // об изменениях — виджеты синхронизированы после сохранения в таймере.
+  const log = logProp ?? internalLog;
+  const commitLog = useCallback((next: CardioLogEntry[]) => {
+    if (onLogChanged) { onLogChanged(); } else { setInternalLog(next); }
+  }, [onLogChanged]);
   const [date, setDate] = useState(todayIso());
   const [type, setType] = useState<CardioType>('zone2');
   const [minutes, setMinutes] = useState('30');
@@ -41,6 +47,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [showAll, setShowAll] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
+  // Undo: снимок журнала до последней операции (добавление/обновление/удаление).
+  const [undoPrev, setUndoPrev] = useState<CardioLogEntry[] | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -102,7 +111,14 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   }, [cycle, log]);
 
   const add = () => {
-    const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
+    const w = validateCardioLogFields({ rpe, hr, km, minutes });
+    if (w.rpe || w.hr || w.km || w.minutes) {
+      setWarnings(w);
+      flashMsg('⚠ Проверьте значения: ' + [w.rpe, w.hr, w.km, w.minutes].filter(Boolean).join('; '));
+      return;
+    }
+    setWarnings(null);
+    const dur = clampCardioLogNumber(minutes, 5, 180, 30);
     const entry: CardioLogEntry = {
       id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
@@ -111,7 +127,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
     };
     const next = saveCardioLogEntry(entry);
-    setLog(next);
+    setUndoPrev(log);
+    commitLog(next);
     setKcal('');
     setKm('');
     setEditingId(null);
@@ -120,7 +137,12 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
 
   return (
     <div style={CARD}>
-      <div style={LABEL}>📓 Дневник выполнения кардио</div>
+      <div style={ROW}>
+        <span style={LABEL}>📓 Дневник выполнения кардио</span>
+        {undoPrev && (
+          <button style={{ ...BTN, minHeight: 30, padding: '4px 10px', fontSize: 10 }} onClick={() => { const restored = replaceCardioLog(undoPrev); commitLog(restored); setUndoPrev(null); flashMsg('↩ Отменено'); }} aria-label="Отменить последнее изменение">↩ Отменить</button>
+        )}
+      </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 600 }} role="status">{flash}</div>}
 
       <div style={ROW}>
@@ -137,7 +159,13 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
         <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
         <button style={BTN_PRIMARY} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
+        <button style={BTN} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
       </div>
+      {warnings && (
+        <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">
+          ⚠ {[warnings.rpe, warnings.hr, warnings.km, warnings.minutes].filter(Boolean).join(' · ')}
+        </div>
+      )}
 
       {adherence && (
         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
@@ -182,24 +210,31 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         } catch { return null; }
       })()}
 
+      {log.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>
+          📭 Записей пока нет — заполните форму выше и нажмите «+ Записать», чтобы вести журнал кардио.
+        </div>
+      )}
       {log.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {(showAll ? log : log.slice(0, 6)).map(e => (
             <div key={e.id} style={ROW}>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 84 }}>{e.date}</span>
               <span style={{ fontSize: 11, minWidth: 60 }}>{TYPE_LABEL[e.type]}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>{e.durationMin} мин</span>
-              {e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
-              {e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
-              {e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
-              {e.distanceKm != null && e.distanceKm > 0 && (
+              {e.completed === false
+                ? <span style={{ fontSize: 10, color: '#f87171', minWidth: 60 }}>⏭ пропущена</span>
+                : <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>{e.durationMin} мин</span>}
+              {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
+              {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
+              {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
+              {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
                 <>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.distanceKm} км</span>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 70 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
                 </>
               )}
               <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
-              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
+              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setUndoPrev(log); commitLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>
           ))}
           {log.length > 6 && (

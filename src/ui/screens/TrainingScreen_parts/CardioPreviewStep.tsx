@@ -216,7 +216,7 @@ export const CardioPreviewStep: React.FC<{
         <div style={LABEL}>⇄ Варианты нагрузки</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {variants.map(v => (
-            <div key={v.id} style={variant === v.id ? VARIANT_BTN_ACTIVE : VARIANT_BTN} onClick={() => onVariant(v.id)} role="button" aria-label={`Вариант: ${v.label}`}>
+            <div key={v.id} style={variant === v.id ? VARIANT_BTN_ACTIVE : VARIANT_BTN} onClick={() => onVariant(v.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onVariant(v.id); } }} role="button" tabIndex={0} aria-pressed={variant === v.id} aria-label={`Вариант: ${v.label}`}>
               <div style={{ fontSize: 12, fontWeight: 800 }}>{v.label}</div>
               <div style={{ marginTop: 2, opacity: 0.7 }}>{v.summary.avgMinutesPerWeek} мин/нед · {v.summary.hiitWeeks} HIIT</div>
               <div style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }}>{v.desc}</div>

@@ -9,7 +9,7 @@ import {
   cardioEquipmentLabel,
   type CardioCycle, type CardioType, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
-import { saveCardioLogEntry, estimateCardioEntryKcal, cardioExpectedDistanceHint } from '../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
 
@@ -58,6 +58,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   const [hr, setHr] = useState('');
   const [km, setKm] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -72,15 +73,21 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       setActive(prev => {
         if (!prev) return null;
         if (prev.remainingSec <= 1) {
-          if (timerRef.current != null) window.clearInterval(timerRef.current);
-          setFinished({ type: prev.type, durationMin: prev.durationMin });
           return null;
         }
         return { ...prev, remainingSec: prev.remainingSec - 1 };
       });
     }, 1000);
     return () => { if (timerRef.current != null) window.clearInterval(timerRef.current); };
-  }, [active?.paused, active?.type]);
+  }, [active?.paused, active?.type, active?.durationMin]);
+
+  useEffect(() => {
+    if (!active) return;
+    if (active.remainingSec <= 1) {
+      if (timerRef.current != null) window.clearInterval(timerRef.current);
+      setFinished({ type: active.type, durationMin: active.durationMin });
+    }
+  }, [active]);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -98,6 +105,13 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
   const save = () => {
     if (!finished) return;
+    const w = validateCardioLogFields({ rpe, hr, km });
+    if (w.rpe || w.hr || w.km) {
+      setWarnings(w);
+      flashMsg('⚠ Проверьте значения: ' + [w.rpe, w.hr, w.km].filter(Boolean).join('; '));
+      return;
+    }
+    setWarnings(null);
     let weight: number | null = null;
     try {
       const weights = getWeightLog();
@@ -105,7 +119,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       if (sorted.length > 0) weight = sorted[0].weight;
     } catch { /* ignore */ }
     saveCardioLogEntry({
-      id: 'c-' + Date.now(),
+      id: 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
       date: todayIso(),
       type: finished.type,
       durationMin: finished.durationMin,
@@ -124,8 +138,19 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   };
 
   const skip = (type: CardioType, durationMin: number) => {
+    // Не дублировать пропуск: если сегодня уже есть пропущенная сессия того же
+    // типа — не пишем вторую запись (иначе рекомендации считают «2 пропуска»).
+    let alreadySkipped = false;
+    try {
+      const log = loadCardioLog();
+      alreadySkipped = log.some(e => e.date === todayIso() && e.type === type && e.completed === false);
+    } catch { /* ignore */ }
+    if (alreadySkipped) {
+      flashMsg('⏭ Сессия уже отмечена пропущенной сегодня');
+      return;
+    }
     saveCardioLogEntry({
-      id: 'c-' + Date.now(),
+      id: 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6),
       date: todayIso(),
       type,
       durationMin,
@@ -194,6 +219,11 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
             <button style={BTN_PRIMARY} onClick={save}>💾 Сохранить в дневник</button>
           </div>
+          {warnings && (
+            <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">
+              ⚠ {[warnings.rpe, warnings.hr, warnings.km].filter(Boolean).join(' · ')}
+            </div>
+          )}
           {(() => {
             const hint = cardioExpectedDistanceHint(finished.type, finished.durationMin);
             return hint ? (

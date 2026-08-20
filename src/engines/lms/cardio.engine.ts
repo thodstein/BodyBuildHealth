@@ -396,6 +396,36 @@ export function buildCardioPlan(input: CardioInput): CardioPlan {
 // ─── CardioCycle — построение ───
 
 /**
+ * Нормализация ручного распределения фаз: сумма фаз не может превышать
+ * totalWeeks (иначе build-фаза «съедает» поддерживающие недели и цикл
+ * заканчивается раньше заявленного горизонта). Избыток усекается начиная
+ * с последней фазы; значения клампятся к [0, totalWeeks].
+ */
+export function normalizeCardioPhaseSplit(
+  input: { base?: number; build?: number; maintenance?: number },
+  totalWeeks: number,
+): { base: number; build: number; maintenance: number } {
+  const t = Math.max(0, Math.round(totalWeeks));
+  const raw = {
+    base: input.base != null ? Math.round(input.base) : 0,
+    build: input.build != null ? Math.round(input.build) : 0,
+    maintenance: input.maintenance != null ? Math.round(input.maintenance) : 0,
+  };
+  let sum = raw.base + raw.build + raw.maintenance;
+  if (sum <= t) return raw;
+  // Усекаем с конца: maintenance → build → base, пока сумма не войдёт в горизонт.
+  const out = { ...raw };
+  for (const key of ['maintenance', 'build', 'base'] as const) {
+    if (sum <= t) break;
+    const over = sum - t;
+    const cut = Math.min(out[key], over);
+    out[key] -= cut;
+    sum -= cut;
+  }
+  return out;
+}
+
+/**
  * Определить фазу недели: ramp base → build → maintenance,
  * taper/peak у соревнования, transition на последней неделе (без соревнований).
  * При заданном phaseSplit используется ручное распределение недель;
@@ -599,11 +629,7 @@ export function buildCardioCycle(input: CardioCycleInput): CardioCycle {
   const peakWeek = input.peakWeek !== false;
   const taperEnabled = input.taper !== false;
   const phaseSplit = input.phaseSplit
-    ? {
-        base: input.phaseSplit.base != null ? clamp(Math.round(input.phaseSplit.base), 0, Math.max(0, totalWeeks - 2)) : 0,
-        build: input.phaseSplit.build != null ? clamp(Math.round(input.phaseSplit.build), 0, Math.max(0, totalWeeks - 2)) : 0,
-        maintenance: input.phaseSplit.maintenance != null ? clamp(Math.round(input.phaseSplit.maintenance), 0, Math.max(0, totalWeeks - 2)) : 0,
-      }
+    ? normalizeCardioPhaseSplit(input.phaseSplit, totalWeeks)
     : undefined;
   const levelMult = CARDIO_LEVEL_MULT[input.level ?? 'intermediate'];
   const lowImpact = !!input.lowImpact || (!!input.autoLowImpact && !!input.jointIssues);
@@ -1746,14 +1772,12 @@ export function latestCardioCycleVersion(cycleId: string): CardioCycleVersion | 
   return loadCardioCycleVersions().find(v => v.cycleId === cycleId) ?? null;
 }
 
-/** Восстановить версию: возвращает цикл и удаляет снапшот из истории. */
+/** Восстановить последнюю версию цикла для undo. Снапшот НЕ удаляется:
+ * повторный вызов снова вернёт ту же версию, а новый «Сохранить версию»
+ * перезапишет её (LIFO). Для полной очистки истории — clearCardioCycleHistory. */
 export function restoreCardioCycleVersion(cycleId: string): CardioCycle | null {
-  const all = loadCardioCycleVersions();
-  const idx = all.findIndex(v => v.cycleId === cycleId);
-  if (idx < 0) return null;
-  const [version] = all.splice(idx, 1);
-  try { localStorage.setItem(CARDIO_HISTORY_KEY, JSON.stringify(all)); } catch { /* ignore */ }
-  return version.cycle;
+  const v = latestCardioCycleVersion(cycleId);
+  return v ? v.cycle : null;
 }
 
 /** Очистить историю версий цикла (при полном удалении цикла). */
@@ -2589,6 +2613,9 @@ export function autoTuneCardioCycle(
     const pct = plannedSessions > 0 ? done.length / plannedSessions : 0;
     const avgRpe = done.filter(e => typeof e.rpe === 'number').reduce((s, e) => s + (e.rpe ?? 0), 0) / Math.max(1, done.filter(e => typeof e.rpe === 'number').length);
     weekStats.push({ week: w.week, doneCount: done.length, pct, avgRpe, rest: false });
+    // Прошлые недели не трогаем: авто-тюн применяется только к текущей и будущим
+    // (иначе «план vs факт» уже прожитых недель меняется ретроспективно).
+    if (w.week < currentWeek) return w;
     let sessions = w.sessions;
     const bw = cycleBodyWeight(cycle);
     const sex = cycle.config?.sex;
