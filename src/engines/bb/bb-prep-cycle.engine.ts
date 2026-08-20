@@ -112,6 +112,8 @@ export interface PrepCycleConfig {
   prepVolumeMult?: number;
   /** Стратегия объёма подготовки (крутизна каскада): gentle/balanced/aggressive. */
   prepVolumeStrategy?: PrepVolumeStrategy;
+  /** Prep-делод каждые N недель подготовки (0 = выкл; дефолт 5). */
+  prepDeloadEvery?: number;
   currentCalories?: number;
   carbLoadStrategy?: CarbLoadStrategy;
   waterStrategy?: WaterStrategy;
@@ -389,11 +391,15 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
   // затем applyPrepVolumeCascade накладывает фазовый спуск × атлет-множители (PED/стаж/
   // уровень/восстановление) + дефицит-мод по категории. Тапер ×0.6 остаётся финальным спуском.
   const volumePlan = prepVolumePlan(cfg, prepWeeks);
-  const bbPlanPrep = applyPrepVolumeCascade(
-    applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+  const bbPlanPrep = applyPrepDeloads(
+    applyPrepVolumeCascade(
+      applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+      cfg,
+      prepWeeks,
+      volumePlan,
+    ),
     cfg,
     prepWeeks,
-    volumePlan,
   );
 
   const warnings = [...v.warnings];
@@ -785,6 +791,39 @@ export function applyPrepVolumeCascade(
   return { ...plan, weeks } as BBPlanWithPrep;
 }
 
+/** Prep-делоды в подготовке (микро-периодизация, направление B):
+ *  каждые prepDeloadEvery недель подготовки — разгрузка (объём ×0.7, RIR +2),
+ *  сброс усталости и сохранение мышц при длительном дефиците (Helms 2017). */
+export function applyPrepDeloads(
+  plan: BBPlanWithPrep,
+  cfg: PrepCycleConfig,
+  prepWeeks: number,
+): BBPlanWithPrep {
+  const every = Math.max(0, Math.round(cfg.prepDeloadEvery ?? 5));
+  if (every <= 0 || !plan || !Array.isArray(plan.weeks)) return plan;
+  const weeks = (plan.weeks as any[]).map((wk, idx) => {
+    if (wk.contestPhase !== 'preparation' && wk.contestPhase !== 'final_preparation') return wk;
+    const wk1 = idx + 1;
+    if (wk1 % every !== 0) return wk;
+    const sessions = (wk.sessions || []).map((s: any) => ({
+      ...s,
+      exercises: (s.exercises || []).map((e: any) => {
+        const newSets = Math.max(2, Math.round((e.sets || 0) * 0.7));
+        const rir = clamp((Number(e.rir) || 2) + 2, 2, 5);
+        return { ...e, sets: newSets, rir, workSets: (e.workSets || []).slice(0, newSets).map((ws: any) => ({ ...ws, rir })), comment: `${e.comment || ''} 🔄 Prep-делод: объём ×70%, RIR +2 (разгрузка).` };
+      }),
+    }));
+    return {
+      ...wk,
+      sessions: (sessions || []).filter((s: any) => (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0) >= 6),
+      deload: true,
+      phase: 'deload',
+      prepProtocol: `Prep-делод (нед ${wk1}): объём ×70%, RIR +2 — сброс усталости, мышцы сохраняются.`,
+    };
+  });
+  return { ...plan, weeks } as BBPlanWithPrep;
+}
+
 /** Пропорционально привести суммарные сеты недели к целевому значению (мин 2 сета/упражнение),
  *  при нехватке — отбрасывая хвостовые accessory-упражнения (тапер/подготовка снижают плотность). */
 function scaleWeekToTarget(week: any, target: number): any {
@@ -950,6 +989,8 @@ export interface PrepSeasonConfig {
   prepVolumeMult?: number;
   /** Стратегия объёма подготовки (крутизна каскада): gentle/balanced/aggressive. */
   prepVolumeStrategy?: PrepVolumeStrategy;
+  /** Prep-делод каждые N недель подготовки (0 = выкл; дефолт 5). */
+  prepDeloadEvery?: number;
   currentCalories?: number;
   carbLoadStrategy?: CarbLoadStrategy;
   waterStrategy?: WaterStrategy;

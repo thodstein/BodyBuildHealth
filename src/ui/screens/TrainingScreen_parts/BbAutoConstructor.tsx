@@ -347,6 +347,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepMinimal, setPrepMinimal] = useState<string[]>([]);
   const [prepMinMode, setPrepMinMode] = useState<PrepMinimalMode>('reduce_direct_to_floor');
   const [prepVolumeStrategy, setPrepVolumeStrategy] = useState<'gentle' | 'balanced' | 'aggressive'>('balanced');
+  const [prepDeloadEvery, setPrepDeloadEvery] = useState<number>(5);
   const [prepSplit, setPrepSplit] = useState<string>('');
   const [prepBodyFat, setPrepBodyFat] = useState<number | undefined>(undefined);
   const [prepResult, setPrepResult] = useState<PrepCycleResult | null>(null);
@@ -4918,6 +4919,7 @@ export const BbAutoConstructor: React.FC = () => {
     minimalMuscles: prepMinimal,
     minimalMode: prepMinMode,
     prepVolumeStrategy,
+    prepDeloadEvery,
     splitPatternId: prepSplit || undefined,
     weeks: pcWeeks,
     taperWeeks: prepTaper,
@@ -5018,6 +5020,7 @@ export const BbAutoConstructor: React.FC = () => {
       category: c.category, sex: c.sex,
       accentMuscles: c.accentMuscles, minimalMuscles: c.minimalMuscles, minimalMode: c.minimalMode,
       prepVolumeStrategy,
+      prepDeloadEvery,
       splitPatternId: c.splitPatternId,
       level: c.level, trainingYears: c.trainingYears, equipment: c.equipment, injuries: c.injuries,
       mobilityRestrictions: c.mobilityRestrictions, workMax: c.workMax, avoidAxialLoad: c.avoidAxialLoad,
@@ -5252,6 +5255,18 @@ export const BbAutoConstructor: React.FC = () => {
                 })}
               </div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>Объём держится на уровне обычного ББ-авто (MAV) во всей подготовке; стратегия влияет на финальный спуск к таперу.</div>
+            </div>
+
+            {/* Prep-делоды */}
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>🔄 Prep-делод (разгрузка каждые N недель подготовки):</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {([[0, 'Выкл'], [4, '4 нед'], [5, '5 нед'], [6, '6 нед']] as const).map(([id, label]) => {
+                  const on = prepDeloadEvery === id;
+                  return <button key={id} type="button" onClick={() => setPrepDeloadEvery(id)} style={{ ...chipBtn(String(id), on), minHeight: 36, fontSize: 10 }}>{label}</button>;
+                })}
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>Делод: объём ×0.7, RIR +2 — сброс усталости и сохранение мышц при длительном дефиците (Helms 2017).</div>
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>

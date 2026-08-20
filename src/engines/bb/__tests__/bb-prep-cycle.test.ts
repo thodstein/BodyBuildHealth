@@ -483,4 +483,18 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     expect(fplan.femaleNotes.length).toBeGreaterThan(0);
     expect(fplan.macros.fatFloorG).toBeGreaterThanOrEqual(40); // женский жир-флор
   });
+
+  it('prep-делоды каждые N недель (объём ×0.7, RIR +2, deload-метка)', () => {
+    const r = buildPrepCycle(base({ category: 'mens_physique', sex: 'male', weeks: 12, taperWeeks: 2, prepDeloadEvery: 4 }));
+    const weeks = r.bbPlan.weeks as any[];
+    const deloads = weeks.filter((w: any) => w.deload === true);
+    expect(deloads.length).toBeGreaterThan(0);
+    const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    const deloadSets = setsOf(deloads[0]);
+    const nonDeloadSets = setsOf(weeks.find((w: any) => w.contestPhase === 'preparation' && !w.deload));
+    expect(deloadSets).toBeLessThan(nonDeloadSets);
+    expect(String(deloads[0].prepProtocol || '')).toContain('Prep-делод');
+    // deload-недели не в тапере/пике
+    expect(deloads.every((w: any) => w.contestPhase !== 'taper' && w.contestPhase !== 'peak_week')).toBe(true);
+  });
 });
