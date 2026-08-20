@@ -5,7 +5,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
-  cardioLogStats, computeCardioAdvice, cardioWeekFact,
+  cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
   type CardioLogEntry,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
@@ -35,13 +35,24 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [minutes, setMinutes] = useState('30');
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
+  const [kcal, setKcal] = useState('');
+  const [showAll, setShowAll] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
+  // Последний вес из журнала для оценки ккал (fallback — 80 кг).
+  const lastWeight = useMemo<number | null>(() => {
+    try {
+      const weights = getWeightLog();
+      const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
+      return sorted.length > 0 ? sorted[0].weight : null;
+    } catch { return null; }
+  }, [log]);
+
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
   const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
-  const advice = useMemo(() => computeCardioAdvice(cycle ?? { totalWeeks: 0, totalKcal: 0, weeks: [], rationale: [], goal: 'health', id: '', name: '', source: 'auto', version: 1, createdAt: '', linkedCompetitionIds: [] } as CardioCycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
+  const advice = useMemo(() => computeCardioAdvice(cycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
   const adherence = useMemo(() => {
     if (!cycle) return null;
     // Текущая неделя по дате (неделя 1 = cycle.startDate); фоллбек — неделя 1.
@@ -81,9 +92,11 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       id: newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
+      calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined),
     };
     const next = saveCardioLogEntry(entry);
     setLog(next);
+    setKcal('');
     flashMsg('💾 Сессия записана');
   };
 
@@ -102,6 +115,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Мин" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="Минуты" />
         <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 80 }} aria-label="RPE" />
         <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="ЧСС" />
+        <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
         <button style={BTN_PRIMARY} onClick={add}>+ Записать</button>
       </div>
 
@@ -121,9 +135,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
+        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
-        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин
+        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: ADVICE_COLOR[advice.action] }}>
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
@@ -150,16 +164,22 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
 
       {log.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {log.slice(0, 6).map(e => (
+          {(showAll ? log : log.slice(0, 6)).map(e => (
             <div key={e.id} style={ROW}>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 84 }}>{e.date}</span>
               <span style={{ fontSize: 11, minWidth: 60 }}>{TYPE_LABEL[e.type]}</span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>{e.durationMin} мин</span>
               {e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
               {e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
+              {e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
               <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => setLog(removeCardioLogEntry(e.id))} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>
           ))}
+          {log.length > 6 && (
+            <button style={{ ...BTN, minHeight: 30, padding: '5px 10px', alignSelf: 'flex-start' }} onClick={() => setShowAll(v => !v)} aria-label={showAll ? 'Скрыть записи' : `Показать все записи (${log.length})`}>
+              {showAll ? '▴ Скрыть' : `▾ Показать все (${log.length})`}
+            </button>
+          )}
         </div>
       )}
     </div>

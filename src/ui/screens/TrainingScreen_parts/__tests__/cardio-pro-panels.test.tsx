@@ -355,6 +355,45 @@ describe('CardioDiaryPanel — adherence текущей недели', () => {
     // Неделя 4 в cut-цикле — делод → подсказка «🧘 …Делод…».
     expect(screen.getByText(/Делод/)).toBeTruthy();
   });
+
+  it('запись сессии авто-оценивает ккал по типу/минутам (вес по умолчанию 80)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-kcal' });
+    render(<CardioDiaryPanel cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    expect(screen.getByText(/Сессия записана/)).toBeTruthy();
+    const log = loadCardioLog();
+    expect(log).toHaveLength(1);
+    // zone2 30 мин × 7 ккал/мин (80 кг) = 210.
+    expect(log[0].calories).toBe(210);
+  });
+
+  it('ручной ввод «ккал» переопределяет авто-оценку', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-kcal2' });
+    render(<CardioDiaryPanel cycle={c} />);
+    fireEvent.change(screen.getByLabelText('Ккал'), { target: { value: '500' } });
+    fireEvent.click(screen.getByRole('button', { name: /Записать/ }));
+    const log = loadCardioLog();
+    expect(log[0].calories).toBe(500);
+  });
+
+  it('история > 6 записей: «Показать все (N)» раскрывает журнал', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-more' });
+    for (let i = 0; i < 8; i++) {
+      saveCardioLogEntry({ id: 'hist-' + i, date: `2026-01-${String(i + 1).padStart(2, '0')}`, type: 'zone2', durationMin: 30, completed: true, calories: 210 });
+    }
+    render(<CardioDiaryPanel cycle={c} />);
+    const toggle = screen.getByRole('button', { name: /Показать все записи \(8\)/ });
+    expect(toggle).toBeTruthy();
+    expect(screen.getAllByLabelText(/Удалить/)).toHaveLength(6);
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: /Скрыть записи/ })).toBeTruthy();
+    expect(screen.getAllByLabelText(/Удалить/)).toHaveLength(8);
+  });
+
+  it('без активного цикла — рекомендация подсказывает записывать сессии (без хака-объекта)', () => {
+    render(<CardioDiaryPanel cycle={null} />);
+    expect(screen.getByText(/не выбран/)).toBeTruthy();
+  });
 });
 
 describe('CardioDayCard — кардио-слой дня', () => {

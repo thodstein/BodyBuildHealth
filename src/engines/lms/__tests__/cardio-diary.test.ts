@@ -6,6 +6,7 @@ import {
   cardioWeekAdherence, cardioAdherenceSummary, computeCardioAdvice,
   cardioWeekFact, cardioCycleCompliance,
   cardioDayFact, cardioDayLoad, cardioHrCompliance,
+  estimateCardioEntryKcal,
   type CardioLogEntry,
 } from '../cardio-diary.engine';
 
@@ -94,8 +95,40 @@ describe('adherence', () => {
   });
 });
 
+describe('estimateCardioEntryKcal', () => {
+  it('zone2 45 мин при 80 кг = 315 (MET-модель движка)', () => {
+    expect(estimateCardioEntryKcal('zone2', 45)).toBe(315);
+  });
+
+  it('hiit 15 мин при 80 кг = 210', () => {
+    expect(estimateCardioEntryKcal('hiit', 15)).toBe(210);
+  });
+
+  it('вес влияет линейно (кг × поправка)', () => {
+    expect(estimateCardioEntryKcal('zone2', 45, 100)).toBe(Math.round(315 * 100 / 80));
+  });
+
+  it('вес 0/отрицательный → дефолт 80', () => {
+    expect(estimateCardioEntryKcal('zone2', 45, 0)).toBe(315);
+    expect(estimateCardioEntryKcal('zone2', 45, -5)).toBe(315);
+  });
+});
+
 describe('computeCardioAdvice', () => {
   const c = buildCardioCycle({ goal: 'cut', totalWeeks: 8 });
+
+  it('null-цикл → keep с подсказкой «не выбран»', () => {
+    const a = computeCardioAdvice(null, [], {});
+    expect(a.action).toBe('keep');
+    expect(a.reason).toContain('не выбран');
+  });
+
+  it('цикл без недель → keep с подсказкой «не выбран»', () => {
+    const empty = { ...c, weeks: [] };
+    const a = computeCardioAdvice(empty, [], {});
+    expect(a.action).toBe('keep');
+    expect(a.reason).toContain('не выбран');
+  });
 
   it('опасный ACWR → reduce', () => {
     const a = computeCardioAdvice(c, [], { acwr: 1.6 });

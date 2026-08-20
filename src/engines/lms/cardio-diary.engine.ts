@@ -4,7 +4,7 @@
  * и объяснимые рекомендации (снизить/сохранить/увеличить) на основе факта.
  */
 import type { CardioCycle, CardioSession, CardioType } from './cardio.engine';
-import { cardioSessionsForDate, cardioWeekForDate } from './cardio.engine';
+import { cardioSessionsForDate, cardioWeekForDate, kcalForCardio } from './cardio.engine';
 
 export const CARDIO_LOG_KEY = 'he_cardio_sessions';
 export const CARDIO_LOG_CAP = 500;
@@ -147,15 +147,23 @@ export interface CardioAdvice {
   reason: string;
 }
 
+/** Оценка ккал сессии журнала по MET-модели движка (вес по умолчанию 80 кг). */
+export function estimateCardioEntryKcal(type: CardioType, durationMin: number, weightKg?: number): number {
+  return kcalForCardio(type, durationMin, weightKg && weightKg > 0 ? weightKg : 80);
+}
+
 /**
  * Объяснимая рекомендация: факт vs план (7 дней), RPE/ЧСС, ACWR-контекст.
  * Возвращает действие и причину; кардио не пересобирается молча.
  */
 export function computeCardioAdvice(
-  cycle: CardioCycle,
+  cycle: CardioCycle | null,
   log: CardioLogEntry[],
   opts: { acwr?: number | null; recoveryLow?: boolean; referenceIso?: string } = {},
 ): CardioAdvice {
+  if (!cycle || cycle.weeks.length === 0) {
+    return { action: 'keep', reason: 'Активный кардио-цикл не выбран — записывайте сессии, план вернётся.' };
+  }
   const stats = cardioLogStats(log, 7, opts.referenceIso);
   const plannedWeekly = cycle.weeks.length > 0 ? Math.round(cycle.weeks.reduce((s, w) => s + w.totalMinutes, 0) / cycle.weeks.length) : 0;
   if (opts.acwr != null && opts.acwr >= 1.5) {

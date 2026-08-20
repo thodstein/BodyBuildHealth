@@ -11,10 +11,11 @@ import { btnBase, btnPrimary, chip, chipActive, main as pageMain, sectionTitle, 
 import { DiaryHeader } from '../DiaryHeader';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
-  cardioLogStats, cardioWeekAdherence,
+  cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal,
   type CardioLogEntry,
 } from '../../../../../engines/lms/cardio-diary.engine';
 import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
+import { getWeightLog } from '../../../../../engines/profile-store';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const ACCENT = '#4ade80';
@@ -79,10 +80,17 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
 
   const add = () => {
     const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
+    let weight: number | null = null;
+    try {
+      const weights = getWeightLog();
+      const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
+      if (sorted.length > 0) weight = sorted[0].weight;
+    } catch { /* ignore */ }
     const entry: CardioLogEntry = {
       id: newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
+      calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
     };
     saveCardioLogEntry(entry);
     reload();
@@ -140,13 +148,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>7 дней</div>
           <strong style={{ fontSize: 20, color: ACCENT }}>{stats7.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
           {stats7.avgHr != null && <div style={{ fontSize: 12, color: colors.textMuted }}>ЧСС ср. {stats7.avgHr}</div>}
         </div>
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>28 дней</div>
           <strong style={{ fontSize: 20, color: ACCENT }}>{stats28.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
         </div>
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>Всего</div>
@@ -203,6 +211,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
                 <span style={{ width: 84, fontSize: 12, color: colors.textMuted }}>{e.date}</span>
                 <span style={{ width: 86, fontSize: 13, fontWeight: 700, color: t?.color ?? colors.text }}>{t?.label ?? e.type}</span>
                 <span style={{ fontSize: 12, color: colors.text }}>{e.durationMin} мин</span>
+                {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.calories} ккал</span>}
                 {e.avgHr != null && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.avgHr} уд</span>}
                 {e.rpe != null && <span style={{ fontSize: 12, color: colors.textMuted }}>RPE {e.rpe}</span>}
                 {!e.completed && <span style={{ fontSize: 11, color: colors.warning }}>пропущена</span>}

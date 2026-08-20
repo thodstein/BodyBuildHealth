@@ -9,7 +9,8 @@ import {
   cardioEquipmentLabel,
   type CardioCycle, type CardioType, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
-import { saveCardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, estimateCardioEntryKcal } from '../../../engines/lms/cardio-diary.engine';
+import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
 
 const INPUT: React.CSSProperties = {
@@ -96,6 +97,12 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
   const save = () => {
     if (!finished) return;
+    let weight: number | null = null;
+    try {
+      const weights = getWeightLog();
+      const sorted = Array.isArray(weights) ? [...weights].filter(e => Number.isFinite(e.weight)).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
+      if (sorted.length > 0) weight = sorted[0].weight;
+    } catch { /* ignore */ }
     saveCardioLogEntry({
       id: 'c-' + Date.now(),
       date: todayIso(),
@@ -104,6 +111,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
+      calories: estimateCardioEntryKcal(finished.type, finished.durationMin, weight ?? undefined),
     });
     onSaved?.();
     setFinished(null);
