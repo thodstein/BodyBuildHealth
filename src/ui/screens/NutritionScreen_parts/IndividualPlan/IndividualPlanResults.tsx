@@ -350,6 +350,12 @@ export const IndividualPlanResults: React.FC = () => {
       )}
       {generated && (<>
         <MealQuickControls />
+        {generated && dayPlan && Array.isArray(dayPlan.notes) && dayPlan.notes.some((n: string) => (n || '').includes('Перегрузка приёма')) && (
+          <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: '#fbbf24', lineHeight: 1.4 }}>
+            <span style={{ fontSize: 12 }}>⚠️</span>
+            <span>Часть приёмов перегружена (каша/крупа упирается в лимит порции) — углеводы дня не добиваются. Увеличьте число приёмов в «Настройки → Расписание», чтобы распределить нагрузку.</span>
+          </div>
+        )}
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
           <div style={{ color:'rgba(255,255,255,0.7)', fontSize:10, marginBottom:6, textAlign:'center' }}>Нажмите на день для плана на 1 день</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
