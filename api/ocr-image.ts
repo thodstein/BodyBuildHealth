@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 
@@ -13,8 +15,11 @@ export const config = {
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
   const rus = require('@tesseract.js-data/rus');
+  const root = dirname(fileURLToPath(import.meta.url));
   const worker = await createWorker('rus', 1, {
     langPath: rus.langPath,
+    workerPath: join(root, '../node_modules/tesseract.js/dist/worker.min.js'),
+    corePath: join(root, '../node_modules/tesseract.js-core'),
     gzip: true,
   } as any);
   try {
