@@ -62,6 +62,7 @@ import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine'
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
+import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
 import { loadSessions } from '../../engines/workout-logger.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
@@ -120,7 +121,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['plan', '📋 План цикла'], ['diagnostics', '🎯 Диагностика'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -384,6 +385,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             orthopedicBlockedPatterns,
        diagnosticExerciseMap,
        diagnosticDayMap,
+       limiterExerciseMap,
+       limiterProtocolMap,
+       limiterDayMap,
       peds: peds.length ? peds : undefined,
       pedDoses,
       nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
@@ -432,12 +436,15 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
            weakGroupExerciseMap,
             plWeakPointExerciseMap,
             orthopedicBlockedPatterns,
-           diagnosticExerciseMap,
-           diagnosticDayMap,
-          peds: peds.length ? peds : undefined,
-          pedDoses,
-          nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-          acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+            diagnosticExerciseMap,
+            diagnosticDayMap,
+            limiterExerciseMap,
+            limiterProtocolMap,
+            limiterDayMap,
+           peds: peds.length ? peds : undefined,
+           pedDoses,
+           nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
+           acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
            autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
             pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
             faithful: true,
@@ -646,6 +653,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
    const [orthopedicBlockedPatterns, setOrthopedicBlockedPatterns] = useState<string[]>([]);
    const [diagnosticExerciseMap, setDiagnosticExerciseMap] = useState<Record<string, string[]>>({});
    const [diagnosticDayMap, setDiagnosticDayMap] = useState<Record<string, number[]>>({});
+   // 🧩 Калькулятор «Лимитирующие факторы движения» (limiter-событие): выбранные упражнения + категорийные протоколы.
+   const [limiterExerciseMap, setLimiterExerciseMap] = useState<Record<string, string[]>>({});
+   const [limiterProtocolMap, setLimiterProtocolMap] = useState<Record<string, { protocol: { sets: number; reps: number; pct: number; rir: number; tempo?: string; rest?: string; holdSec?: number; note?: string }; category: string }>>({});
+   const [limiterDayMap, setLimiterDayMap] = useState<Record<string, number[]>>({});
   // Clear stale day selections when cycle changes (old cycle may have had different day count)
   useEffect(() => {
     setWeakGroupDayMap({});
@@ -980,6 +991,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         }
         if (p.data?.weakGroupExerciseMap) setWeakGroupExerciseMap(p.data.weakGroupExerciseMap);
         if (p.data?.weakGroupDayMap) setWeakGroupDayMap(p.data.weakGroupDayMap);
+       pendingApplyRef.current = p;
+    } else if (p.kind === 'limiter') {
+       // 🧩 Калькулятор «Лимитирующие факторы движения» — категорийные протоколы.
+       setLimiterExerciseMap(p.data?.limiterExerciseMap ?? {});
+       setLimiterProtocolMap(p.data?.limiterProtocolMap ?? {});
+       setLimiterDayMap(p.data?.limiterDayMap ?? {});
        pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
@@ -1363,13 +1380,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся из исходной раскладки СРЦ.
             </div>;
           })()}
-          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#c084fc', marginBottom: 4 }}>🎯 Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
-              Выберите движение, фазу, отклонения траектории и упражнения. «➕ Слабая точка в план» добавит ассистентов в план при сборке (тяжёлый + памп-день). Исходный цикл не изменяется. Протокол упражнений — из раскладки этого цикла.
-            </div>
-            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
-          </div>
            {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
                      <div style={{ marginTop: 10 }}>
             <PedInputPanel
@@ -1478,6 +1488,23 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
       {mainTab === 'pl' && subView === 'tools' && (
         <PlannerToolsPanel mode="pl" />
+      )}
+
+      {/* 🎯 Диагностика (дашборд): лимитирующие факторы + слабые мышцы → слабые точки → мёртвые точки → VBT → движение штанги */}
+      {mainTab === 'pl' && subView === 'diagnostics' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          <div style={H}>🎯 Диагностика движения (дашборд)</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.5 }}>
+            Единый дашборд: калькулятор лимитирующих факторов (скорость/дожимы/стабилизация/режимы сокращения/
+            гипертрофия/антропометрия/тип старта/хват/координация/выносливость) + «Слабые мышцы → Слабые точки →
+            Мёртвые точки → VBT → Движение штанги». Исходный цикл не изменяется; отмеченные упражнения добавляются
+            при сборке плана.
+          </div>
+          <LimiterCalculatorCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} />
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
+            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
+          </div>
+        </div>
       )}
 
       {mainTab === 'bb' && subView === 'plan' && (

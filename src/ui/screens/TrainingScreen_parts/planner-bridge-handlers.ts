@@ -187,6 +187,67 @@ const weakpointsHandler: Handler = (payload, { program: p, onChange, showToast, 
   showToast('🔗 Слабые группы: ' + (groups.join(', ') || 'нет') + (skippedDiagnostics ? ' · диагностические упражнения пропущены (программа из каталога циклов, не custom)' : ''));
 };
 
+/** Калькулятор «Лимитирующие факторы движения»: добавляет выбранные упражнения с
+ *  КАТЕГОРИЙНЫМ протоколом (скорость/дожимы/эксцентрика/изометрия — из опции, не из
+ *  раскладки цикла). НЕ трогает слабые группы/weakPoints профиля. */
+function appendLimiterToPL(
+  pl: PLProgramBody,
+  limiterMap: Record<string, string[]>,
+  protocolMap: Record<string, { protocol: { sets: number; reps: number; pct: number; rir: number; tempo?: string; rest?: string; holdSec?: number; note?: string }; category: string }>,
+  dayMap: Record<string, number[]>,
+): PLProgramBody | null {
+  const allNames = Object.values(limiterMap ?? {}).flatMap(list =>
+    Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : []);
+  if (allNames.length === 0) return null;
+  if (!pl.customWeeks || pl.customWeeks.length === 0) return null;
+
+  const weeks = pl.customWeeks.map(w => ({ ...w, days: w.days.map(d => ({ ...d, exercises: [...d.exercises] })) }));
+  const firstWeek = weeks[0];
+  const dayCount = firstWeek.days.length;
+  if (dayCount === 0) return null;
+  const dayOf = (idx: number | undefined): number => {
+    const i = typeof idx === 'number' && Number.isFinite(idx) ? idx - 1 : 0;
+    if (i < 0 || i >= dayCount) return 0;
+    return i;
+  };
+
+  for (const [key, list] of Object.entries(limiterMap ?? {})) {
+    const names = Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [];
+    if (names.length === 0) continue;
+    const spec = protocolMap?.[key];
+    const p = spec?.protocol ?? { sets: 3, reps: 10, pct: 0.6, rir: 2 };
+    const configuredDays = (dayMap?.[key] ?? []).filter((d): d is number => typeof d === 'number');
+    names.forEach((name, index) => {
+      const dayIdx = configuredDays.length > 0 ? dayOf(configuredDays[index % configuredDays.length]) : dayOf(undefined);
+      const target = weeks[0].days[dayIdx];
+      if (!target) return;
+      if (target.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())) return;
+      const reps = p.holdSec ? 1 : Math.max(1, p.reps);
+      target.exercises.push({
+        name,
+        lift: plLiftOf(name, 'accessory'),
+        muscle: 'accessory',
+        sets: [{ pct: p.pct, reps, sets: Math.max(1, p.sets), rir: p.rir }],
+      });
+    });
+  }
+  return { ...pl, customWeeks: weeks };
+}
+
+const limiterHandler: Handler = (payload, { program: p, onChange, showToast }) => {
+  const limiterExerciseMap: Record<string, string[]> = payload.data?.limiterExerciseMap ?? {};
+  const limiterProtocolMap: Record<string, { protocol: { sets: number; reps: number; pct: number; rir: number; tempo?: string; rest?: string; holdSec?: number; note?: string }; category: string }> = payload.data?.limiterProtocolMap ?? {};
+  const limiterDayMap: Record<string, number[]> = payload.data?.limiterDayMap ?? {};
+  const total = Object.values(limiterExerciseMap).reduce((s, n) => s + n.length, 0);
+  let skipped = false;
+  if (p.pl && total > 0) {
+    const extended = appendLimiterToPL(p.pl, limiterExerciseMap, limiterProtocolMap, limiterDayMap);
+    if (extended) onChange({ ...p, pl: extended });
+    else skipped = true;
+  }
+  showToast(skipped ? '⚠ Лимитирующие факторы: упражнения пропущены (программа из каталога циклов, не custom)' : `🔗 Лимитирующие факторы: добавлено упражнений — ${total}`);
+};
+
 const pmHandler: Handler = (payload, { program: p, onChange, showToast }) => {
   const d = payload.data ?? {};
   const prof = loadTrainingProfile();
@@ -520,6 +581,7 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   split: splitHandler,
   pri: priHandler,
   weakpoints: weakpointsHandler,
+  limiter: limiterHandler,
   pm: pmHandler,
   tempo: tempoHandler,
   rir: rirHandler,

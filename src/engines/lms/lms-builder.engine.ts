@@ -16,6 +16,7 @@ import { selectExercisesSmart } from '../exercise-selector.engine';
 import { mesocyclePhaseForWeek, RIR_MATRIX, MesoPhaseConfigs, type MesocyclePhase } from '../rir-matrix.engine';
 import { diagnoseWeakPoint, type Lift, type WeakPoint } from './weakpoint-pl';
 import { diagnoseLift } from '../pro/lift-diagnostics.engine';
+import type { LimiterProtocol } from '../pro/limiter-calculator.engine';
 import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 
 import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks } from '../volume-landmarks.engine';
@@ -60,6 +61,13 @@ export interface LMSBuildInput {
   /** Выбранные ассистенты из биомеханической диагностики и bar-path. */
   diagnosticExerciseMap?: Record<string, string[]>;
   diagnosticDayMap?: Record<string, number[]>;
+  /** Калькулятор «Лимитирующие факторы движения»: выбранные упражнения per option key
+   *  (key = `${lift}|${category}|${optionId}`). */
+  limiterExerciseMap?: Record<string, string[]>;
+  /** Категорийные протоколы опций лимитирующих факторов (не из раскладки цикла —
+   *  скорость/дожимы/эксцентрика/изометрия имеют собственные протоколы). */
+  limiterProtocolMap?: Record<string, { protocol: LimiterProtocol; category: string }>;
+  limiterDayMap?: Record<string, number[]>;
   /** Ортопедические паттерны, запрещённые только для добавляемых ассистентов. */
   orthopedicBlockedPatterns?: string[];
   /** ACWR-зона для авто-делода (если передана — применяется к объёму/RIR). */
@@ -917,6 +925,125 @@ function injectDiagnosticExercises(
   }
 }
 
+/**
+ * Инъекция упражнений калькулятора «Лимитирующие факторы движения»
+ * (limiterExerciseMap/limiterProtocolMap/limiterDayMap).
+ *
+ * В отличие от диагностики (протокол из раскладки цикла) здесь протокол берётся
+ * ИЗ ОПЦИИ (limiterProtocolMap[key]): скорость 8×2 @55%, дожимы 4×3 @80%, эксцентрика
+ * 3×4 @65% темп 6-0-1-0, изометрия 4×1 удержание 3-5с — категорийная специфика.
+ *
+ * Правила (паритет с диагностикой):
+ *  - per-day dedup (ассистент не дублируется в ОДНОМ дне; в разных днях — можно);
+ *  - day cap ≤ 10 упражнений;
+ *  - MRV-бюджет группы применяется ТОЛЬКО для категории «гипертрофия лимитирующих
+ *    групп» (limiter_hypertrophy) — специальные методы (скорость/дожимы/эксцентрика/
+ *    изометрия/хват/координация) имеют низкую системную усталость при своих %
+ *    и не считаются в гипетрофийный бюджет (методика динамических усилий).
+ *  - темп/удержания/особые условия — в notes (workSets несут сеты/повторы/%/RIR).
+ */
+function injectLimiterExercises(
+  days: LMSPlanDay[],
+  limiterMap: Record<string, string[]> | undefined,
+  protocolMap: Record<string, { protocol: LimiterProtocol; category: string }> | undefined,
+  dayMap: Record<string, number[]> | undefined,
+  pmRow: Record<string, number>,
+  fallbackPm: number,
+  template?: SRCycleTemplate,
+  mrvParams?: DiagnosticMrvParams,
+  notes?: string[],
+): void {
+  if (!limiterMap) return;
+
+  const mainNameMap: Record<string, string> = {
+    bench: 'Жим лежа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя',
+    row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
+  };
+
+  const autoDaysFor = (key: string): number[] => {
+    const lift = key.split('|')[0];
+    const mainName = mainNameMap[lift];
+    if (!mainName) return [0];
+    const ranked = days.map((day, index) => ({
+      index,
+      mainSets: day.exercises
+        .filter(exercise => {
+          const exerciseName = norm(exercise.name);
+          const targetName = norm(mainName);
+          return exerciseName === targetName || exerciseName.includes(targetName) || targetName.includes(exerciseName);
+        })
+        .reduce((total, exercise) => total + exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
+    })).filter(day => day.mainSets > 0);
+    if (ranked.length === 0) return [0];
+    const heavy = [...ranked].sort((a, b) => b.mainSets - a.mainSets)[0].index;
+    const light = [...ranked]
+      .filter(day => day.index !== heavy)
+      .sort((a, b) => a.mainSets - b.mainSets)[0]?.index;
+    return light == null ? [heavy] : [heavy, light];
+  };
+
+  const groupMrvBudget = (group: string): number | null => {
+    if (!mrvParams) return null;
+    return groupMrvBudgetFor(mrvParams.vrLevel, mrvParams.combinedMrvMult, mrvParams.acwrVolMod, mrvParams.arVolMult, group);
+  };
+  const weeklyGroupSets = (group: string): number => days.reduce((sum, d) => sum + d.exercises
+    .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
+    .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
+
+  for (const [key, names] of Object.entries(limiterMap)) {
+    if (!names?.length) continue;
+    const spec = protocolMap?.[key];
+    if (!spec) continue; // опция без протокола не впрыскивается (небыло в UI)
+    const { protocol, category } = spec;
+    const countsTowardMrv = category === 'limiter_hypertrophy';
+    const configuredDays = dayMap?.[key];
+    const selectedDays = Array.isArray(configuredDays) && configuredDays.length > 0
+      ? configuredDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
+      : autoDaysFor(key);
+    const targetDays = selectedDays.length > 0 ? selectedDays : autoDaysFor(key);
+
+    const placements = targetDays.length > names.length
+      ? targetDays.map((dayIndex, index) => ({ dayIndex, name: names[index % names.length] }))
+      : names.map((name, index) => ({ dayIndex: targetDays[index % targetDays.length], name }));
+
+    for (const { dayIndex, name } of placements) {
+      const day = days[dayIndex];
+      if (!day) continue;
+      if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
+      if (day.exercises.length >= 10) continue;
+      const pm = pmRow[name] ?? fallbackPm;
+      const group = diagnosticGroupForExercise(name);
+      const sets = Math.max(1, protocol.sets);
+      if (countsTowardMrv && group) {
+        const budget = groupMrvBudget(group);
+        if (budget != null && weeklyGroupSets(group) + sets > budget) {
+          notes?.push(`⚠ Лимит.фактор: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + sets} сетов > MRV ${budget} (гипертрофия лимитирующей группы).`);
+          continue;
+        }
+      }
+      const reps = protocol.holdSec ? 1 : Math.max(1, protocol.reps);
+      const load = (protocol.pct ?? 0) >= 0.8 ? 'Тяжелая' : 'Средняя';
+      day.exercises.push({
+        name,
+        group: group ?? 'accessory',
+        coef: 0.3,
+        mnosz: 1,
+        load,
+        pm,
+        rir: protocol.rir,
+        workSets: [{ pct: protocol.pct, reps, sets, weight: workWeight(pm, protocol.pct), rir: protocol.rir }],
+      });
+      const extras = [
+        protocol.tempo ? `темп ${protocol.tempo}` : '',
+        protocol.rest ? `отдых ${protocol.rest}` : '',
+        protocol.holdSec ? `удержание ${protocol.holdSec}с` : '',
+        protocol.note ? `(${protocol.note})` : '',
+      ].filter(Boolean).join(' · ');
+      notes?.push(`🔥 Лимит.фактор: ${name} → день ${dayIndex + 1} (${sets}×${reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}${extras ? ' · ' + extras : ''}) · группа ${group ?? '—'}.`);
+    }
+  }
+}
+
 export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   const { template, pmMap, fallbackPm = 80 } = input;
   if (fallbackPm <= 0) throw new Error('buildLMSPlan: fallbackPm must be > 0');
@@ -1188,6 +1315,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
     }
     injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes);
+    injectLimiterExercises(days, input.limiterExerciseMap, input.limiterProtocolMap, input.limiterDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes);
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
     // PL-логика:

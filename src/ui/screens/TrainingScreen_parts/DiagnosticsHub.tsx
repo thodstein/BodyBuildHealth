@@ -12,14 +12,16 @@ import type { TrainingProfile } from './training-profile';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
+import { LimiterCalculatorCard } from './LimiterCalculatorCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-type DiagnosticsHubMode = 'movement' | 'sticking' | 'rir' | 'mesocorr';
+type DiagnosticsHubMode = 'movement' | 'limiter' | 'sticking' | 'rir' | 'mesocorr';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
   { m: 'movement', label: 'Мёртвые точки → Слабые точки → Движение штанги', icon: '🎯' },
+  { m: 'limiter', label: 'Лимитирующие факторы движения', icon: '🧩' },
   { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
   { m: 'rir', label: 'RIR-калибр.', icon: '🎯' },
   { m: 'mesocorr', label: 'Коррекция мезо', icon: '🔧' },
@@ -74,7 +76,8 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        Единый калькулятор движения (мёртвые точки, слабые точки, bar-path), анализ срывов из дневника,
+        Единый калькулятор движения (мёртвые точки, слабые точки, bar-path), калькулятор лимитирующих
+        факторов (скорость/дожимы/стабилизация/режимы сокращения/хват/координация), анализ срывов из дневника,
         RIR-калибровка и автоматическая коррекция мезоцикла.
       </div>
 
@@ -93,6 +96,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
       </div>
 
       {mode === 'movement' && <PlDeadpointsBarPathCard />}
+      {mode === 'limiter' && <LimiterCalculatorCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
       {mode === 'rir' && <RIRCalibrationCard />}
       {mode === 'mesocorr' && (

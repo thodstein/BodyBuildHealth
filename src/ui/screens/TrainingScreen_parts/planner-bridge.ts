@@ -24,7 +24,7 @@
 const KEY = 'he_planner_apply';
 type Listener = (payload: PlannerApply | null) => void;
 
-export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block';
+export type PlannerApplyKind = 'split' | 'pri' | 'weakpoints' | 'pm' | 'tempo' | 'rir' | 'mrv' | 'deload' | 'volume' | 'peak' | 'methodology' | 'program' | 'design' | 'macrocycle' | 'cardio' | 'annual_block' | 'limiter';
 
 export interface SplitPayload { cycle: string[][]; name?: string }
 export interface PmPayload { squat?: number; bench?: number; dead?: number; lift?: string; value?: number }
@@ -43,7 +43,16 @@ export interface MacrocyclePayload { macro: unknown; level?: string; goal?: stri
 export interface CardioPayload { cycleId?: string; cycle?: unknown }
 export interface AnnualBlockPayload { blockKey: string; program?: unknown }
 
-export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload;
+/** Калькулятор «Лимитирующие факторы движения»: выбранные упражнения + категорийные протоколы.
+ *  key = `${lift}|${category}|${optionId}`. Протокол — из опции (не из раскладки цикла). */
+export interface LimiterProtocolShape { sets: number; reps: number; pct: number; rir: number; tempo?: string; rest?: string; holdSec?: number; note?: string }
+export interface LimiterPayload {
+  limiterExerciseMap?: Record<string, string[]>;
+  limiterProtocolMap?: Record<string, { protocol: LimiterProtocolShape; category: string }>;
+  limiterDayMap?: Record<string, number[]>;
+}
+
+export type PlannerApplyData = SplitPayload | PmPayload | WeakpointsPayload | PriPayload | TempoPayload | RirPayload | MrvPayload | DeloadPayload | VolumePayload | PeakPayload | MethodologyPayload | ProgramPayload | DesignPayload | MacrocyclePayload | CardioPayload | AnnualBlockPayload | LimiterPayload;
 
 /** Типобезопасная карта данных для публичного канала. */
 export interface PlannerApplyDataByKind {
@@ -64,6 +73,7 @@ export interface PlannerApplyDataByKind {
   macrocycle: MacrocyclePayload;
   cardio: CardioPayload;
   annual_block: AnnualBlockPayload;
+  limiter: LimiterPayload;
 }
 
 export interface PlannerApply {

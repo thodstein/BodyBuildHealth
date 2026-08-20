@@ -229,7 +229,7 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:6 }}>
             <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
-            <PopupNumber label="Приёмов пищи" value={mealsCount} min={3} max={8} onChange={setMealsCount} />
+            <PopupNumber label="Приёмов пищи" value={mealsCount} min={3} max={10} onChange={setMealsCount} />
           </div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
             {MINIMAL_GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
@@ -340,7 +340,7 @@ export const IndividualPlanSettings: React.FC = () => {
               const goalMap: Record<string, any> = { bulk: 'mass', cut: 'fat_loss', maintenance: 'maintenance', strength: 'strength', recomposition: 'recomposition', rehab: 'rehab' };
               setGoal(goalMap[s.primaryGoal] || 'maintenance');
             }
-            if (s?.workoutsPerWeek) setMealsCount(Math.max(3, Math.min(8, s.workoutsPerWeek + 1)));
+            if (s?.workoutsPerWeek) setMealsCount(Math.max(3, Math.min(10, s.workoutsPerWeek + 1)));
             if (s?.bedtime) setBedTime(s.bedtime);
             if (s?.wakeTime) setWakeTime(s.wakeTime);
           }} style={{
@@ -1327,7 +1327,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         <div>
           <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4,display:'block'}}>Количество приёмов пищи</label>
           <div style={{ display: 'flex', gap: 4 }}>
-            {[3,4,5,6,7,8].map(n => (
+            {[3,4,5,6,7,8,9,10].map(n => (
               <PillBtn key={n} active={mealsCount === n} onClick={() => setMealsCount(n)} color={mealsCount === n ? '#06b6d4' : undefined}>{n}</PillBtn>
             ))}
           </div>

@@ -734,7 +734,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [mealsCount, setMealsCount] = useState<number>(() => {
     try {
       const v = (s as any)?.nutrition?.mealsPerDay;
-      if (typeof v === 'number' && v >= 2 && v <= 8) return v;
+      if (typeof v === 'number' && v >= 2 && v <= 10) return v;
     } catch {}
     return 4;
   });

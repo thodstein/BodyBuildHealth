@@ -5040,6 +5040,16 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepSeason(res);
       setPrepResult(res.cycles[res.cycles.length - 1] ?? null);
       setPrepStep('result');
+      // Авто-подключение к таперу питания: сохраняем главный (A) или последний цикл сезона.
+      const mainIdx = res.summary.findIndex(s => s.priority === 'A');
+      const main = res.cycles[mainIdx >= 0 ? mainIdx : res.cycles.length - 1];
+      if (main) {
+        try {
+          const cfg = configFromPlan(main.prepPlan);
+          savePrepToProfile(main.prepPlan, cfg);
+          window.dispatchEvent(new CustomEvent('he-bb-contest-prep-updated', { detail: { prepPlanId: main.prepPlan.id } }));
+        } catch { /* silent */ }
+      }
       flash(`🏁 Сезон: собрано ${res.cycles.length} цикла (по одному на старт)`);
     } catch (e) {
       flash(`⚠ ${(e as Error)?.message ?? 'Не удалось собрать сезон'}`);

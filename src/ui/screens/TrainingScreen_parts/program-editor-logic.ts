@@ -25,37 +25,6 @@ export function sessionDayOfWeek(session: Pick<UserSession, 'dayOfWeek'>, index:
     : trainingDayForIndex(index);
 }
 
-/** Рекомендованный день недели для сессии (по индексу в неделе) — стандартная раскладка Пн/Ср/Пт/Вт/Чт/Сб/Вс. */
-export function recommendedDayForIndex(index: number): number {
-  return trainingDayForIndex(index);
-}
-
-/** Сессия стоит на своём рекомендованном дне недели? */
-export function sessionUsesRecommendedDay(session: Pick<UserSession, 'dayOfWeek'>, index: number): boolean {
-  return sessionDayOfWeek(session, index) === trainingDayForIndex(index);
-}
-
-/**
- * Перенести сессию (по индексу) на новый день недели во ВСЕХ неделях программы —
- * шаблон недели повторяется для всех мезоциклов. Невалидный день → рекомендация.
- */
-export function moveWeekScheduleDay(weeks: UserWeek[], sessionIdx: number, day: number): UserWeek[] {
-  const d = Number.isInteger(day) && day >= 0 && day <= 6 ? day : trainingDayForIndex(sessionIdx);
-  return weeks.map(w =>
-    sessionIdx < 0 || sessionIdx >= w.sessions.length
-      ? w
-      : { ...w, sessions: w.sessions.map((s, i) => (i === sessionIdx ? { ...s, dayOfWeek: d } : s)) },
-  );
-}
-
-/** Вернуть всем неделям рекомендованные дни недели (Пн/Ср/Пт/Вт/Чт/Сб/Вс по индексу сессии). */
-export function resetScheduleToRecommended(weeks: UserWeek[]): UserWeek[] {
-  return weeks.map(w => ({
-    ...w,
-    sessions: w.sessions.map((s, i) => ({ ...s, dayOfWeek: trainingDayForIndex(i) })),
-  }));
-}
-
 export function firstFreeTrainingDay(sessions: Array<Pick<UserSession, 'dayOfWeek'>>): number {
   const used = new Set(sessions.map((session, index) => sessionDayOfWeek(session, index)));
   return TRAINING_DAY_ORDER.find(day => !used.has(day)) ?? trainingDayForIndex(sessions.length);

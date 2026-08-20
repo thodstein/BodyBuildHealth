@@ -42,7 +42,7 @@ export interface Meal {
   label: string; time: string;
   items: MealItem[];
   totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number };
-  type: 'breakfast' | 'lunch' | 'snack' | 'snack2' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
+  type: 'breakfast' | 'lunch' | 'snack' | 'snack2' | 'snack3' | 'snack4' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
   rationale: string[];
   mpsCheck?: { proteinG: number; leucineG: number; triggers_mTOR: boolean };
   target?: { p: number; c: number; f: number };
@@ -346,6 +346,27 @@ function pickRotation(dayOffset: number): { label: string; ids: string[]; note: 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
 const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal','millet','couscous','noodle','bulgur','chickpea','lentil','beans','corn','bread']);
 
+// ─── E1: Продуктовая типология приёмов ────────────────────────────────
+// Завтрак ≠ ужин: подбор продуктов по типу приёма, а не из общего пула.
+// Ключевые слова для «завтрашних» углеводов (каши/хлопья/манка/мюсли/рис/гречка).
+const BREAKFAST_CARB_KEYWORDS = ['овсян','овсяные хлопья','хлопья','манк','рисов','рис ','мюсли','гречк','рисовый крем','геркул'];
+// «Завтрашние» фрукты/сухофрукты (ягоды, банан, изюм, курага, чернослив, финики).
+const BREAKFAST_FRUIT_KEYWORDS = ['ягод','банан','черник','клубник','малин','смородин','изюм','кураг','черносл','финик','сухофрук','ежевик','голубик','киви','яблок'];
+// Подбор завтрашнего пула углеводов (fallback → общий, если завтрашнего нет).
+function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: any[]; fruits: any[] } {
+  const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
+  const match = (f: any, kws: string[]) => {
+    const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
+    return kws.some(k => name.includes(k) || id.includes(k));
+  };
+  const carbs = source.filter((f: any) => match(f, BREAKFAST_CARB_KEYWORDS));
+  const fruits = pool.carbFruit.filter((f: any) => match(f, BREAKFAST_FRUIT_KEYWORDS));
+  return {
+    carbs: carbs.length > 0 ? carbs : [...source],
+    fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
+  };
+}
+
 // ─── Утилиты: детерминированный выбор ─────────────────────────────────
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9999) * 10000;
@@ -601,9 +622,12 @@ function buildWholeMeal(
     vegColorIdx?: number; // which VEG_COLOR_GROUPS to prefer
     refeedDay?: boolean; // Этап 5: настоящий рефид-день (быстрые/низкоклетчаточные углеводы, лёгкие овощи)
     fiberCapG?: number; // Этап 7: верхний предел клетчатки (пик-неделя ББ) — лёгкие овощи
+    breakfast?: boolean; // E1: продуктовый пул «завтрака» (каши/хлопья + ягоды/сухофрукты), а не общий
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast } = params;
+  // E1: завтрак использует собственный продуктовый пул (каши/хлопья + ягоды/банан/сухофрукты).
+  const _breakfastPools = breakfast ? breakfastCarbPool(pool) : null;
   // D-28: effective preferred = (global preferred MINUS foods bound to other meals) ∪ meal-bound for THIS meal.
   // This ensures rice_cream bound to breakfast is preferred ONLY on breakfast, not everywhere.
   const _otherMealBound = new Set<string>(Object.entries(params.preferredByMealFull || {}).filter(([m]) => m !== label).flatMap(([, v]) => [...(v as any)]));
@@ -675,7 +699,8 @@ function buildWholeMeal(
     // Этап 5: на рефид-дне предпочитаем быстрые (высоко-GI, низкоклетчаточные) углеводы —
     // это ускоряет гликогеновый ре-синтез и снижает объём клетчатки в приёме.
     const _carbPool = (refeedDay && pool.carbFast.length > 0) ? pool.carbFast : pool.carbSlow;
-    const carbPool = _carbPool;
+    // E1: на завтраке отдаём предпочтение «завтрашним» углеводам (каши/хлопья), fallback — общий пул.
+    const carbPool = (_breakfastPools && _breakfastPools.carbs.length > 0) ? (_breakfastPools.carbs as any) : _carbPool;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
     const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
     // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
@@ -727,6 +752,21 @@ function buildWholeMeal(
           }
         }
       }
+      // E5: углеводная «добивка» фруктом/сухофруктами/ягодами — когда крупяные порции
+      // упёрлись в кап (280/350 г), остаток закрываем фруктом вместо наращивания каши.
+      if (remC > 15 && (pool.carbFruit.length > 0 || (_breakfastPools && _breakfastPools.fruits.length > 0))) {
+        const fruitPool = (_breakfastPools && _breakfastPools.fruits.length > 0) ? _breakfastPools.fruits : pool.carbFruit;
+        const used = new Set(items.map(i => i.id));
+        const fTop = fruitPool.filter((f: any) => !used.has(f.id));
+        const fSrc = pickPriority(fTop.length > 0 ? fTop : fruitPool, seed + 21, { lockedIds, recentIds, hardRecentIds });
+        if (fSrc) {
+          const gramsF = gramsForMacro(fSrc, remC, 'carbs', carbPortionCap(fSrc));
+          if (gramsF >= 30) {
+            const fItem = makeItem(fSrc, gramsF, 'fruit');
+            items.push(fItem); remP -= fItem.p; remF -= fItem.f; remC -= fItem.c;
+          }
+        }
+      }
     }
   }
 
@@ -754,8 +794,9 @@ function buildWholeMeal(
 
   // 4. Фрукт (ягоды/киви как пребиотик и антиоксидант) (предпочтение — preferred)
   if (includeFruit) {
-    const prefFruit = preferredIds && preferredIds.size > 0 ? pool.carbFruit.filter(f => preferredIds.has(f.id)) : [];
-    const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : pool.carbFruit, seed + 4, { lockedIds, recentIds, hardRecentIds });
+    const fruitPool = (_breakfastPools && _breakfastPools.fruits.length > 0) ? (_breakfastPools.fruits as any) : pool.carbFruit;
+    const prefFruit = preferredIds && preferredIds.size > 0 ? fruitPool.filter(f => preferredIds.has(f.id)) : [];
+    const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : fruitPool, seed + 4, { lockedIds, recentIds, hardRecentIds });
     if (fSrc) {
       const grams = 80 + Math.floor(seededRandom(seed + 5) * 60);
       const item = makeItem(fSrc, grams, 'fruit');
@@ -1268,7 +1309,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // дефицита/перебора ни при каком mealsCount (3-8); обед — главный приём.
   // Жёсткие %-фиксации (раньше 20/21/14/20/25) ломались, когда mealsCount исключал
   // часть приёмов — углеводы «терялись» → недобор ~20%, а обед получался ~10%.
-  const CARB_W: Record<string, number> = { breakfast: 1.0, lunch: 1.7, dinner: 0.7, prew: 1.0, postw: 1.2, snack: 0.5, snack2: 0.5, preSleep: 0.3, intra: 0.4 };
+  const CARB_W: Record<string, number> = { breakfast: 1.0, lunch: 1.7, dinner: 0.7, prew: 1.0, postw: 1.2, snack: 0.5, snack2: 0.5, snack3: 0.4, snack4: 0.4, preSleep: 0.3, intra: 0.4 };
   const intraEligible = trainWindow && input.allowIntraWorkout && (!input.trainDurationMin || input.trainDurationMin >= 75);
   // set of roles that WILL be built (must match the build conditions below)
   const _builtRoles: string[] = ['breakfast','lunch','dinner'];
@@ -1277,13 +1318,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (!trainWindow && input.mealsCount >= 3) _builtRoles.push('snack');
   if (intraEligible) _builtRoles.push('intra');
   if (input.mealsCount >= 6) _builtRoles.push('snack2');  // второй перекус для 6-8 приёмов
+  if (input.mealsCount >= 8) _builtRoles.push('snack3');  // третий перекус для 8-10 приёмов
+  if (input.mealsCount >= 9) _builtRoles.push('snack4');  // четвёртый перекус для 9-10 приёмов
   // mealsCount cap: core (breakfast/lunch/dinner) + postw на тренинге — неприкосновенны;
-  // лишнее выбрасываем в порядке приоритета: snack2 → intra → snack → preSleep → prew.
+  // лишнее выбрасываем в порядке приоритета: snack4 → snack3 → snack2 → intra → snack → preSleep → prew.
   // P1-fix: reordered so snack2 (second snack, least important for MPS) is dropped
   // before intra (which matters for long sessions). Previous order dropped intra
   // first, leaving snack2 — less useful for training days.
   let _roles = [..._builtRoles];
-  for (const r of ['snack2','intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
+  for (const r of ['snack4','snack3','snack2','intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
   if (_roles.length > input.mealsCount) _roles = _roles.slice(0, Math.max(3, input.mealsCount));
   const _keep = new Set(_roles);
   // FIX 2.2 (БАГ-10): preSleep резервировал углеводную долю 0.3 в _wSum, но никогда её не отдавал
@@ -1299,6 +1342,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const postwCarbG = _carbFor('postw');
   const snackC = _carbFor('snack');
   const snack2C = _carbFor('snack2');
+  const snack3C = _carbFor('snack3');
+  const snack4C = _carbFor('snack4');
   const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
   // Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
@@ -1321,9 +1366,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     postw: (_keep.has('postw') && trainWindow) ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
     snack: _keep.has('snack') ? { p: snackP, c: snackC, f: snackF } : null,
     snack2: _keep.has('snack2') ? { p: snackP, c: snack2C, f: snackF } : null,
+    snack3: _keep.has('snack3') ? { p: snackP, c: snack3C, f: snackF } : null,
+    snack4: _keep.has('snack4') ? { p: snackP, c: snack4C, f: snackF } : null,
   };
 
-  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0) + (mealBudget.snack2?.p || 0);
+  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0) + (mealBudget.snack2?.p || 0) + (mealBudget.snack3?.p || 0) + (mealBudget.snack4?.p || 0);
   const goalProteinTarget = adjustedProteinG || input.goalProteinG;
   let residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
   // Если pre-sleep исключён (мало приёмов) — остаток белка распределяется между
@@ -1367,7 +1414,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     carbG: mealBudget.breakfast.c,
     fatG: mealBudget.breakfast.f,
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
-    includeVeg: input.mealsCount >= 5, includeFruit: true,
+    includeVeg: input.mealsCount >= 5, includeFruit: true, breakfast: true,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
     lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
     rationales: [
@@ -1440,6 +1487,37 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       rationales: ['Второй перекус: поддержка MPS + углеводное окно при большом числе приёмов'],
     });
     meals.push(snack2); markUsed(snack2);
+  }
+
+  // E6: третий/четвёртый перекус (для 8-10 приёмов) — равномерно в оставшиеся окна дня.
+  {
+    const _midMin = (a: number, b: number) => Math.round((a + b) / 2);
+    const _fmt = (min: number) => String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+    const [bh, bm] = tBreakfast.split(':').map(Number);
+    const [lh, lm] = tLunch.split(':').map(Number);
+    const [dh, dm] = tDinner.split(':').map(Number);
+    const [bh2, bm2] = tBed.split(':').map(Number);
+    const bMin = bh * 60 + bm, lMin = lh * 60 + lm, dMin = dh * 60 + dm, bedMin = bh2 * 60 + bm2;
+    const _slots: { label: string; type: 'snack3' | 'snack4'; min: number; seed: number }[] = [];
+    // snack3: середина завтрак→обед (утренний перекус). snack4: середина ужин→сон.
+    _slots.push({ label: 'Перекус', type: 'snack3', min: _midMin(bMin, lMin), seed: seedBase + 27 });
+    _slots.push({ label: 'Перекус', type: 'snack4', min: _midMin(dMin, bedMin), seed: seedBase + 31 });
+    for (const s of _slots) {
+      if (_keep.has(s.type) && mealBudget[s.type]) {
+        const rot = rotationForMeal(s.type === 'snack3' ? 6 : 7);
+        const m = buildWholeMeal({
+          label: s.label, time: _fmt(s.min), type: s.type, refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
+          mealPreferredIds: input.preferredByMeal?.[s.label],
+          preferredByMealFull: input.preferredByMeal,
+          proteinG: mealBudget[s.type].p, carbG: mealBudget[s.type].c, fatG: mealBudget[s.type].f,
+          pool, proteinRotationIds: rot.ids, seed: s.seed,
+          includeVeg: false, includeFruit: true,
+          preferredIds: effectivePreferred, dayUsedPreferredIds, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
+          rationales: [`${s.label}: поддержка MPS при большом числе приёмов (равномерное распределение белка)`],
+        });
+        meals.push(m); markUsed(m);
+      }
+    }
   }
 
 
@@ -1570,6 +1648,31 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + m; };
     return toMin(a.time) - toMin(b.time);
   });
+
+  // ─── E4: предупреждение перегрузки приёма + предложение увеличить приёмы ──
+  // Если крупяная порция приёма упёрлась в кап (280/350 г), а углеводная цель дня
+  // не достигнута — «некуда впихнуть продукты». Подсказываем увеличить число приёмов.
+  {
+    const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + m; };
+    const grainCap = maxGrainPerMeal(input.budget);
+    const overloaded = meals.filter(m => m.items.some(it => it.role === 'carb_slow' && (it.amount || 0) >= grainCap));
+    if (overloaded.length > 0) {
+      const names = overloaded.map(m => m.label).join(', ');
+      notes.push(`⚠ Перегрузка приёма: в «${names}» порция каши/крупы упёрлась в лимит ${grainCap} г. Углеводы дня не добиваются — увеличьте число приёмов пищи (сейчас ${input.mealsCount}, минимум ${Math.min(6, input.mealsCount + 1)}), чтобы распределить нагрузку.`);
+    }
+    // E2 (spacing note): слишком большие или слишком малые интервалы между белковыми приёмами.
+    const _times = meals.map(m => toMin(m.time)).filter((v): v is number => !isNaN(v)).sort((a, b) => a - b);
+    if (_times.length >= 2) {
+      let minGap = Infinity, maxGap = 0;
+      for (let i = 1; i < _times.length; i++) { const g = _times[i] - _times[i - 1]; if (g > 0) { minGap = Math.min(minGap, g); maxGap = Math.max(maxGap, g); } }
+      if (maxGap > 5 * 60 && _times.length >= 3) {
+        notes.push(`⏱ Большой интервал (${Math.round(maxGap / 60)} ч) между приёмами — белок распределён неравномерно. Увеличьте число приёмов или сдвиньте время обеда/ужина, чтобы интервалы были 3–5 ч.`);
+      }
+      if (minGap < 60 && minGap !== Infinity) {
+        notes.push(`⏱ Приёмы слишком близко (<${Math.round(minGap)} мин) — разнесите их минимум на 2.5 ч, чтобы поддержать MPS-окно.`);
+      }
+    }
+  }
 
   // ─── Дневные итоговые ────────────────────────────────────────────────
   const totals = meals.reduce((acc, m) => ({
