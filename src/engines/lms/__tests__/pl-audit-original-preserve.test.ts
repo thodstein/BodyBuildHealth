@@ -294,3 +294,71 @@ describe('ПЛ-тапер: тренерские проверки (B3-B6)', () =>
     expect(evalRes!.nextStrategy).toBe('balanced');
   });
 });
+
+describe('ПЛ-авто: UI-путь buildSrc (faithful + авторегуляция + ACWR + слабые группы)', () => {
+  // Воспроизводит реальный путь SRCBBScreen.buildSrc (faithful:true, progressionEnabled:true,
+  // авторегуляция/ACWR/слабые группы/точки) и проверяет главное правило: исходный цикл
+  // сохраняется (pct/reps/порядок), ассистенты — только сверху, авто-тапер выключен.
+  it('исходные упражнения сохраняют pct/reps/порядок даже при активных autoReg + ACWR-danger', () => {
+    const before = JSON.parse(JSON.stringify(CYCLE_09K));
+    const plan = buildLMSPlan({
+      template: CYCLE_09K, pmMap, fallbackPm: 80,
+      faithful: true,
+      progressionEnabled: true,
+      weakPoints: ['chest', 'back'],
+      plWeakPoints: [{ lift: 'bench', weakPoint: 'lockout' }],
+      autoReg: { topSetPctMultiplier: 0.92, volumeMultiplier: 0.8, rirShift: 1, deload: true },
+      acwr: { ratio: 1.6, zone: 'dangerous' },
+    });
+    // Шаблон не мутирован.
+    expect(CYCLE_09K).toEqual(before);
+    const layouts = CYCLE_09K.weeks && CYCLE_09K.weeks.length > 0 ? CYCLE_09K.weeks : [CYCLE_09K.week1];
+    for (let wi = 0; wi < layouts.length; wi++) {
+      const srcWeek = layouts[wi];
+      const pWeek = plan.weeks[wi];
+      for (let di = 0; di < srcWeek.length; di++) {
+        const srcDay = srcWeek[di];
+        const pDay = pWeek.days[di];
+        // Слабые группы добавляются СВЕРХУ — source-упражнения в начале дня не тронуты.
+        expect(pDay.exercises.length).toBeGreaterThanOrEqual(srcDay.exercises.length);
+        for (let ei = 0; ei < srcDay.exercises.length; ei++) {
+          const se = srcDay.exercises[ei];
+          const pe = pDay.exercises[ei];
+          expect(pe.name).toBe(se.name);
+          expect(pe.workSets.length).toBe(se.sets.length);
+          for (let si = 0; si < se.sets.length; si++) {
+            // pct и reps — байт-в-байт, несмотря на autoReg/ACWR.
+            expect(pe.workSets[si].pct).toBe(se.sets[si].pct);
+            expect(pe.workSets[si].reps).toBe(se.sets[si].reps);
+          }
+        }
+      }
+    }
+    // Ассистенты реально добавлены (всего упражнений больше).
+    const totalPlan = plan.weeks.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.length, 0), 0);
+    const totalSrc = layouts.reduce((s, w) => s + w.reduce((ss, d) => ss + d.exercises.length, 0), 0);
+    expect(totalPlan).toBeGreaterThan(totalSrc);
+    // Авто-тапер при faithful НЕ применяется (финальная неделя не помечена taperWeek).
+    expect(plan.weeks.every(w => !w.taperWeek)).toBe(true);
+  });
+
+  it('appendPLTaperWeeks (UI-путь тапера) не меняет исходные недели плана', () => {
+    const plan = buildLMSPlan({ template: CYCLE_01, pmMap, fallbackPm: 80, faithful: true, progressionEnabled: false, weeksOverride: CYCLE_01.meta.weeks });
+    const base = JSON.parse(JSON.stringify(plan.weeks));
+    const out = appendPLTaperWeeks(plan, 2, {
+      reference: '2026-08-30',
+      windowWeeks: 4,
+      mockMeet: { strategy: 'balanced' },
+      meetWeek: { strategy: 'balanced' },
+      postMeet: { volumeMult: 0.5 },
+      meetData: { actualPm: { 'Присед': 150 }, plannedPm: { 'Присед': 160 } },
+    });
+    // Исходные недели плана байт-в-байт (тапер добавлен, не переписан).
+    expect(out.weeks.slice(0, plan.weeks.length)).toEqual(base);
+    // Блок добавлен (ramp + taper + mock + meet + post), у финальной — прикиды.
+    expect(out.weeks.length).toBeGreaterThan(plan.weeks.length);
+    const tail = out.weeks.slice(plan.weeks.length);
+    expect(tail.some(w => w.meetWeek)).toBe(true);
+    expect(tail.some(w => w.postMeet)).toBe(true);
+  });
+});
