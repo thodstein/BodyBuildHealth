@@ -17,7 +17,6 @@ import {
 } from '../../../engines/pro/limiter-calculator.engine';
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { applyToPlanner } from './planner-bridge';
-import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.55)';
@@ -129,7 +128,7 @@ const ExerciseRow: React.FC<{ item: LimiterExerciseItem; selected: boolean; onTo
   </div>
 );
 
-export const LimiterCalculatorCard: React.FC<{ dayCount?: number; template?: SRCycleTemplate | null }> = ({ dayCount = 7, template = null }) => {
+export const LimiterCalculatorCard: React.FC<{ dayCount?: number }> = ({ dayCount = 7 }) => {
   const initial = useMemo(loadLimiterCardState, []);
   const [lift, setLift] = useState<Lift>(initial.lift);
   const [category, setCategory] = useState<LimiterCategory | ''>(initial.category);
@@ -237,6 +236,11 @@ export const LimiterCalculatorCard: React.FC<{ dayCount?: number; template?: SRC
             {LIMITER_CATEGORIES.find(c => c.id === effectiveCategory)?.description}
           </div>
         )}
+        {effectiveCategory === 'speed_strength' && (
+          <div style={{ marginTop: 6, fontSize: 10, color: '#fbbf24', lineHeight: 1.45, padding: '7px 9px', borderRadius: 8, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            ⚡ Подсказка: потеря скорости штанги (VBT) определяет вероятную фазу срыва — см. секцию «VBT: скорость штанги» в калькуляторе «Слабые мышцы → … → Движение штанги» ниже в дашборде.
+          </div>
+        )}
       </div>
 
       {/* Опции категории */}
@@ -253,7 +257,14 @@ export const LimiterCalculatorCard: React.FC<{ dayCount?: number; template?: SRC
             const optName = o;
             return (
               <div key={o.id} style={{ marginTop: 8, padding: 9, borderRadius: 8, background: 'rgba(74,222,128,0.04)', border: '1px solid rgba(74,222,128,0.14)' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: col.color }}>{o.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: col.color }}>{o.label}</div>
+                  {o.methodOverlay && (
+                    <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 5, color: '#fbbf24', background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)', fontWeight: 700 }}>
+                      🔁 метод на движении в плане — применяется к нему, отдельное упражнение не добавляется
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 9, color: DIM, marginTop: 2, lineHeight: 1.4 }}>{o.description}</div>
                 <div style={{ fontSize: 9, color: '#fbbf24', marginTop: 4, lineHeight: 1.4 }}>📋 {o.method}</div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 3, lineHeight: 1.4 }}>🧠 {o.rationale}</div>

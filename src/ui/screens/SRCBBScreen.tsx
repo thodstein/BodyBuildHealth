@@ -1500,7 +1500,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             Мёртвые точки → VBT → Движение штанги». Исходный цикл не изменяется; отмеченные упражнения добавляются
             при сборке плана.
           </div>
-          <LimiterCalculatorCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} />
+          <LimiterCalculatorCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
             <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
           </div>

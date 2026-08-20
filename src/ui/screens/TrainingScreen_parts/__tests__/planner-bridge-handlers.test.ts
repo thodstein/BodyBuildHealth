@@ -371,4 +371,46 @@ describe('planner bridge � cardio handler (���� ���� � ��
     expect(created.meta.title).toBe('Год (дизайн)');
     expect(created.meta.designRef).toEqual({ id: 'design-2', name: 'Год', hash: designFingerprint(design) });
   });
+
+  it('limiter: добавляет выбранные упражнения с категорийным протоколом в custom-ПЛ', () => {
+    const onChange = vi.fn();
+    const ctx: BridgeCtx = { program: createBlank('pl'), dir: 'pl', update: vi.fn(), onChange, showToast: vi.fn(), tprofile: {} as BridgeCtx['tprofile'] };
+    const limiterData = {
+      limiterExerciseMap: { 'squat|speed_strength|speed_squat_start': ['Присед на ящик (box squat)'] },
+      limiterProtocolMap: { 'squat|speed_strength|speed_squat_start': { protocol: { sets: 8, reps: 2, pct: 0.55, rir: 3 }, category: 'speed_strength' } },
+      limiterDayMap: { 'squat|speed_strength|speed_squat_start': [1] },
+    };
+    expect(applyBridgePayloadDispatch(payload('limiter', limiterData), ctx)).toBe(true);
+    expect(onChange).toHaveBeenCalled();
+    const patched = onChange.mock.calls[0][0];
+    const ex = patched.pl.customWeeks[0].days[0].exercises.find((e: any) => e.name === 'Присед на ящик (box squat)');
+    expect(ex).toBeTruthy();
+    expect(ex.sets[0]).toMatchObject({ pct: 0.55, reps: 2, sets: 8, rir: 3 });
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('Лимитирующие факторы'));
+  });
+
+  it('limiter: без customWeeks — предупреждение, без падения', () => {
+    const ctx: BridgeCtx = { program: createBlank('pl'), dir: 'pl', update: vi.fn(), onChange: vi.fn(), showToast: vi.fn(), tprofile: {} as BridgeCtx['tprofile'] };
+    (ctx.program as any).pl = { ...ctx.program.pl, customWeeks: [] };
+    const limiterData = {
+      limiterExerciseMap: { 'squat|speed_strength|speed_squat_start': ['Присед на ящик (box squat)'] },
+      limiterProtocolMap: { 'squat|speed_strength|speed_squat_start': { protocol: { sets: 8, reps: 2, pct: 0.55, rir: 3 }, category: 'speed_strength' } },
+    };
+    expect(() => applyBridgePayloadDispatch(payload('limiter', limiterData), ctx)).not.toThrow();
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('пропущены'));
+  });
+
+  it('limiter: повторная отправка не дублирует упражнение в дне (dedup)', () => {
+    const onChange = vi.fn();
+    const ctx: BridgeCtx = { program: createBlank('pl'), dir: 'pl', update: vi.fn(), onChange, showToast: vi.fn(), tprofile: {} as BridgeCtx['tprofile'] };
+    const limiterData = {
+      limiterExerciseMap: { 'squat|speed_strength|speed_squat_start': ['Присед на ящик (box squat)', 'Присед на ящик (box squat)'] },
+      limiterProtocolMap: { 'squat|speed_strength|speed_squat_start': { protocol: { sets: 8, reps: 2, pct: 0.55, rir: 3 }, category: 'speed_strength' } },
+      limiterDayMap: { 'squat|speed_strength|speed_squat_start': [1, 1] },
+    };
+    applyBridgePayloadDispatch(payload('limiter', limiterData), ctx);
+    const patched = onChange.mock.calls[0][0];
+    const day0 = patched.pl.customWeeks[0].days[0];
+    expect(day0.exercises.filter((e: any) => e.name === 'Присед на ящик (box squat)').length).toBeLessThanOrEqual(1);
+  });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LIMITER_CATEGORIES, LIMITER_OPTIONS, limiterCategoriesForLift, limiterOptionsFor,
   limiterOptionsForLift, limiterOptionById, analyzeLimiterOption, resolveLimiterExercise,
-  limiterGroupForExercise, analyzeLimiterForLift, limiterProtocolFor,
+  limiterGroupForExercise, analyzeLimiterForLift, limiterProtocolFor, limiterNameGroup,
 } from '../limiter-calculator.engine';
 import type { LimiterCategory } from '../limiter-calculator.engine';
 import type { Lift } from '../../lms/weakpoint-pl';
@@ -145,5 +145,67 @@ describe('limiter-calculator.engine: качество упражнений', () 
     expect(ecc.protocol.tempo).toMatch(/6/);
     const iso = limiterOptionById('mode_bench_iso')!;
     expect(iso.protocol.holdSec).toBeGreaterThanOrEqual(3);
+  });
+
+  it('ВСЕ 9 движений покрыты хотя бы одной категорией (нет мёртвых движений)', () => {
+    for (const lift of ALL_LIFTS) {
+      expect(limiterCategoriesForLift(lift).length, `${lift} категорий`).toBeGreaterThanOrEqual(1);
+    }
+    expect(limiterCategoriesForLift('row').length).toBeGreaterThanOrEqual(2);
+    expect(limiterCategoriesForLift('pulldown').length).toBeGreaterThanOrEqual(1);
+    expect(limiterCategoriesForLift('incline_press').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('классификатор групп ПО ИМЕНИ: бицепс→arms, присед→legs, наклонный жим→chest', () => {
+    expect(limiterNameGroup('Бицепс стоя')).toBe('arms');
+    expect(limiterNameGroup('Бицепс с гантелями')).toBe('arms');
+    expect(limiterNameGroup('Молотковые сгибания')).toBe('arms');
+    expect(limiterNameGroup('Французский жим')).toBe('arms');
+    expect(limiterNameGroup('Жим узким хватом')).toBe('arms');
+    expect(limiterNameGroup('Сгибания кисти стоя')).toBe('arms');
+    expect(limiterNameGroup('Присед')).toBe('legs');
+    expect(limiterNameGroup('Присед на ящик (box squat)')).toBe('legs');
+    expect(limiterNameGroup('Жим ногами')).toBe('legs');
+    expect(limiterNameGroup('Разгибания ног в тренажёре')).toBe('legs');
+    expect(limiterNameGroup('Сгибание ног лёжа (бицепс бедра)')).toBe('legs');
+    expect(limiterNameGroup('Жим на наклонной')).toBe('chest');
+    expect(limiterNameGroup('Жим штанги на наклонной (30°)')).toBe('chest');
+    expect(limiterNameGroup('Скоростной жим')).toBe('chest');
+    expect(limiterNameGroup('Дожим с 3 см')).toBe('chest');
+    expect(limiterNameGroup('Тяга с плинтов (rack pull)')).toBe('back');
+    expect(limiterNameGroup('Становая тяга с дефицитом')).toBe('back');
+    expect(limiterNameGroup('Наклоны со штангой')).toBe('back');
+    expect(limiterNameGroup('Гиперэкстензия')).toBe('back');
+    expect(limiterNameGroup('Армейский жим')).toBe('shoulders');
+    expect(limiterNameGroup('Махи гантелями в стороны')).toBe('shoulders');
+    expect(limiterGroupForExercise('Бицепс стоя')).toBe('arms');
+  });
+
+  it('скобко-точный резолв: «Жим в раме (старт)» ≠ «Жим в раме (дожим)»', () => {
+    expect(resolveLimiterExercise('Жим в раме (старт)')?.name).toBe('Жим в раме (старт)');
+    expect(resolveLimiterExercise('Жим в раме (дожим)')?.name).toBe('Жим в раме (дожим)');
+    expect(resolveLimiterExercise('Жим с досок (board press)')?.name).toBe('Жим с досок (board press)');
+    expect(resolveLimiterExercise('Присед на ящик (box squat)')?.name).toBe('Присед на ящик (box squat)');
+    expect(resolveLimiterExercise('Присед Андерсона (со дна)')?.name).toBe('Присед Андерсона (со дна)');
+  });
+
+  it('реальные упражнения из базы резолвятся точно (метод-оверлеи переведены в отдельные)', () => {
+    for (const n of ['Темповой присед (5-3-0)', 'Присед на ящик (box squat)', 'Присед Андерсона (со дна)',
+      'Тяга с плинтов (rack pull)', 'Становая тяга с дефицитом', 'Становая тяга с паузой ниже колен',
+      'Жим с пинков (pin press)', 'Жим Спото (пауза над грудью)', 'Удержание штанги в становой',
+      'Жим с цепями', 'Жим с резиновыми лентами', 'Гудморнинг (наклоны со штангой)',
+      'Сгибание ног лёжа (бицепс бедра)', 'Разгибания ног в тренажёре', 'Фронтальный присед']) {
+      expect(resolveLimiterExercise(n)?.name, n).toBe(n);
+    }
+  });
+
+  it('метод-оверлеи не используют только основное движение (всё впрыскиваемо)', () => {
+    // Ни одна опция не имеет assistance, состоящий ТОЛЬКО из названия основного лифта.
+    const MAIN = new Set(['Присед', 'Жим лежа', 'Становая тяга', 'Жим стоя', 'Подъём на бицепс']);
+    for (const o of LIMITER_OPTIONS) {
+      if (o.methodOverlay) continue;
+      const allMain = o.assistance.every(n => MAIN.has(n));
+      expect(allMain, `опция ${o.id} состоит только из основного движения`).toBe(false);
+    }
   });
 });

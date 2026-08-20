@@ -990,12 +990,28 @@ function injectLimiterExercises(
     .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
     .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
 
+  // Группа лимитирующего упражнения — по ИМЕНИ (поле groups СРЦ-пула — коды движений,
+  // а не мышцы: «Бицепс стоя» с кодами ЖМ/ЖИМ давал chest, «Присед» с ТГ — back).
+  const limiterInjGroup = (name: string): string | null => {
+    const n = norm(name);
+    if (/пресс|скруч|планк|анти.?рот|ротац|(?:^|[^а-яё])кор(?:$|[^а-яё])|core/.test(n)) return 'core';
+    if (/жим стоя|армейск|махи|дельт|плеч/.test(n)) return 'shoulders';
+    if (/присед|выпад|жим ногами|разгибани.*ног|сгибани.*ног|икр|гудморнинг|good.?morning|бицепс бедра|бедра/.test(n)) return 'legs';
+    if (/жим узким|француз|трицепс|разгибан.*рук|разгибани.*блок|кист|запяст|wrist/.test(n)) return 'arms';
+    if (/бицепс(?! бедра)|сгибан.*рук|молот|скотт|брахи|curl/.test(n)) return 'arms';
+    if (/жим/.test(n)) return 'chest';
+    if (/тяга|становая|гипер|наклон|шраги|подтяг|пул/.test(n)) return 'back';
+    return null;
+  };
+
   for (const [key, names] of Object.entries(limiterMap)) {
     if (!names?.length) continue;
     const spec = protocolMap?.[key];
-    if (!spec) continue; // опция без протокола не впрыскивается (небыло в UI)
+    if (!spec) continue; // опция без протокола не впрыскивается (не было в UI)
     const { protocol, category } = spec;
     const countsTowardMrv = category === 'limiter_hypertrophy';
+    const lift = key.split('|')[0];
+    const mainName = mainNameMap[lift] || 'Жим';
     const configuredDays = dayMap?.[key];
     const selectedDays = Array.isArray(configuredDays) && configuredDays.length > 0
       ? configuredDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
@@ -1009,10 +1025,15 @@ function injectLimiterExercises(
     for (const { dayIndex, name } of placements) {
       const day = days[dayIndex];
       if (!day) continue;
-      if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
+      // Метод-оверлей: упражнение уже в этом дне (напр. «Присед» для эксцентрики/ёмкости) —
+      // отдельное не добавляется, но ПРОЗРАЧНО помечаем (метод применяется к движению).
+      if (day.exercises.some(ex => norm(ex.name) === norm(name))) {
+        notes?.push(`💡 Лимит.фактор: «${name}» уже в плане (день ${dayIndex + 1}) — метод применяется к этому движению, отдельное упражнение не добавлено.`);
+        continue;
+      }
       if (day.exercises.length >= 10) continue;
-      const pm = pmRow[name] ?? fallbackPm;
-      const group = diagnosticGroupForExercise(name);
+      const pm = pmForInjected(name, mainName, pmRow, fallbackPm);
+      const group = limiterInjGroup(name) ?? diagnosticGroupForExercise(name);
       const sets = Math.max(1, protocol.sets);
       if (countsTowardMrv && group) {
         const budget = groupMrvBudget(group);

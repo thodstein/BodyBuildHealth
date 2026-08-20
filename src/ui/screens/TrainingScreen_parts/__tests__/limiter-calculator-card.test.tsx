@@ -39,7 +39,7 @@ describe('LimiterCalculatorCard (калькулятор лимитирующих
     clickCategory(/Скорость \(динамический метод\)/);
     expect(screen.getByText('Скорость вставания из ямы')).toBeTruthy();
     expect(screen.getAllByText(/Динамический метод/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/8×2 @55% RIR 3/)).toBeTruthy();
+    expect(screen.getAllByText(/8×2 @55% RIR 3/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('дожим (жим лёжа): 4×3 @80% — частичные повторы, тяжёлый протокол', () => {
