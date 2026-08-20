@@ -66,6 +66,7 @@ export function cardioLogStats(log: CardioLogEntry[], days: number, referenceIso
   avgRpe: number | null;
   avgHr: number | null;
   kcal: number;
+  km: number;
 } {
   const from = dateDaysAgo(days, referenceIso);
   const rows = log.filter(e => e.completed && e.date >= from);
@@ -78,6 +79,7 @@ export function cardioLogStats(log: CardioLogEntry[], days: number, referenceIso
     avgRpe: rpes.length > 0 ? Math.round(rpes.reduce((s, e) => s + (e.rpe ?? 0), 0) / rpes.length * 10) / 10 : null,
     avgHr: hrs.length > 0 ? Math.round(hrs.reduce((s, e) => s + (e.avgHr ?? 0), 0) / hrs.length) : null,
     kcal: rows.reduce((s, e) => s + (e.calories ?? 0), 0),
+    km: Math.round(rows.reduce((s, e) => s + (e.distanceKm ?? 0), 0) * 10) / 10,
   };
 }
 
@@ -195,16 +197,19 @@ export function computeCardioAdvice(
 export interface CardioWeekFact extends CardioAdherence {
   /** Фактически сожжённые ккал (поле calories журнала) за неделю. */
   factKcal: number;
+  /** Фактическая дистанция (поле distanceKm журнала) за неделю. */
+  factKm: number;
 }
 
-/** Факт недели цикла: план/выполнено/минуты/ккал (0 если calories не записывались). */
+/** Факт недели цикла: план/выполнено/минуты/ккал/км (0 если не записывались). */
 export function cardioWeekFact(cycle: CardioCycle, week: number, log: CardioLogEntry[], referenceIso?: string): CardioWeekFact {
   const a = cardioWeekAdherence(cycle, week, log, referenceIso);
   const start = weekStartIso(week, referenceIso);
   const end = weekStartIso(week + 1, referenceIso);
   const done = log.filter(e => e.completed && e.date >= start && e.date < end);
   const factKcal = done.reduce((s, e) => s + (e.calories ?? 0), 0);
-  return { ...a, factKcal };
+  const factKm = Math.round(done.reduce((s, e) => s + (e.distanceKm ?? 0), 0) * 10) / 10;
+  return { ...a, factKcal, factKm };
 }
 
 export interface CardioCycleCompliance {
@@ -236,6 +241,7 @@ export interface CardioDayFact {
   done: CardioLogEntry[];
   minutes: number;
   kcal: number;
+  km: number;
   avgRpe: number | null;
 }
 
@@ -244,11 +250,13 @@ export function cardioDayFact(log: CardioLogEntry[], dateIso: string): CardioDay
   const done = log.filter(e => e.completed && e.date === dateIso);
   const minutes = done.reduce((s, e) => s + e.durationMin, 0);
   const kcal = done.reduce((s, e) => s + (e.calories ?? 0), 0);
+  const km = Math.round(done.reduce((s, e) => s + (e.distanceKm ?? 0), 0) * 10) / 10;
   const rpes = done.filter(e => typeof e.rpe === 'number' && e.rpe > 0);
   return {
     done,
     minutes,
     kcal,
+    km,
     avgRpe: rpes.length > 0 ? Math.round((rpes.reduce((s, e) => s + (e.rpe ?? 0), 0) / rpes.length) * 10) / 10 : null,
   };
 }

@@ -53,8 +53,8 @@ describe('CRUD журнала', () => {
 
 describe('статистика', () => {
   it('cardioLogStats 7 дней: только выполненные и в окне', () => {
-    saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 30, rpe: 6, avgHr: 130, calories: 200, completed: true }));
-    saveCardioLogEntry(entry({ date: '2026-01-06', durationMin: 15, type: 'hiit', rpe: 9, avgHr: 160, calories: 220, completed: true }));
+    saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 30, rpe: 6, avgHr: 130, calories: 200, distanceKm: 5, completed: true }));
+    saveCardioLogEntry(entry({ date: '2026-01-06', durationMin: 15, type: 'hiit', rpe: 9, avgHr: 160, calories: 220, distanceKm: 2.5, completed: true }));
     saveCardioLogEntry(entry({ date: '2025-12-01', durationMin: 999, completed: true }));
     saveCardioLogEntry(entry({ date: '2026-01-07', durationMin: 10, completed: false }));
     const s = cardioLogStats(loadCardioLog(), 7, REF);
@@ -63,6 +63,7 @@ describe('статистика', () => {
     expect(s.avgRpe).toBe(7.5);
     expect(s.avgHr).toBe(145);
     expect(s.kcal).toBe(420);
+    expect(s.km).toBe(7.5);
   });
 
   it('dateDaysAgo/weekStartIso работают локально (независимо от TZ)', () => {
@@ -183,11 +184,11 @@ describe('computeCardioAdvice', () => {
 });
 
 describe('план vs факт (cardioWeekFact / cardioCycleCompliance)', () => {
-  it('cardioWeekFact: минуты/сессии/ккал факта в окне недели', () => {
+  it('cardioWeekFact: минуты/сессии/ккал/км факта в окне недели', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4 });
     const log = [
-      entry({ date: '2026-01-05', durationMin: 30, calories: 210, completed: true }),
-      entry({ date: '2026-01-08', durationMin: 25, calories: 175, completed: true }),
+      entry({ date: '2026-01-05', durationMin: 30, calories: 210, distanceKm: 5, completed: true }),
+      entry({ date: '2026-01-08', durationMin: 25, calories: 175, distanceKm: 3, completed: true }),
       entry({ date: '2026-01-12', durationMin: 60, calories: 500, completed: true }), // неделя 2
       entry({ date: '2026-01-09', durationMin: 20, completed: false }),
     ];
@@ -195,6 +196,7 @@ describe('план vs факт (cardioWeekFact / cardioCycleCompliance)', () => 
     expect(f.doneSessions).toBe(2);
     expect(f.doneMinutes).toBe(55);
     expect(f.factKcal).toBe(385);
+    expect(f.factKm).toBe(8);
     expect(f.plannedSessions).toBeGreaterThan(0);
   });
 
@@ -220,8 +222,8 @@ describe('план vs факт (cardioWeekFact / cardioCycleCompliance)', () => 
 describe('день: план, факт, нагрузка (кардио-слой дневника)', () => {
   it('cardioDayFact: выполненные сессии за дату', () => {
     const log = [
-      entry({ date: '2026-01-05', durationMin: 30, rpe: 6, calories: 210, completed: true }),
-      entry({ date: '2026-01-05', durationMin: 15, type: 'hiit', rpe: 9, calories: 220, completed: true }),
+      entry({ date: '2026-01-05', durationMin: 30, rpe: 6, calories: 210, distanceKm: 5, completed: true }),
+      entry({ date: '2026-01-05', durationMin: 15, type: 'hiit', rpe: 9, calories: 220, distanceKm: 2.5, completed: true }),
       entry({ date: '2026-01-06', durationMin: 60, completed: true }),
       entry({ date: '2026-01-05', durationMin: 20, completed: false }),
     ];
@@ -229,6 +231,7 @@ describe('день: план, факт, нагрузка (кардио-слой 
     expect(f.done).toHaveLength(2);
     expect(f.minutes).toBe(45);
     expect(f.kcal).toBe(430);
+    expect(f.km).toBe(7.5);
     expect(f.avgRpe).toBe(7.5);
   });
 

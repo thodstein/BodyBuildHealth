@@ -36,6 +36,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
   const [kcal, setKcal] = useState('');
+  const [km, setKm] = useState('');
   const [showAll, setShowAll] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -93,10 +94,12 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined),
+      distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
     };
     const next = saveCardioLogEntry(entry);
     setLog(next);
     setKcal('');
+    setKm('');
     flashMsg('💾 Сессия записана');
   };
 
@@ -116,6 +119,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 80 }} aria-label="RPE" />
         <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="ЧСС" />
         <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
+        <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
         <button style={BTN_PRIMARY} onClick={add}>+ Записать</button>
       </div>
 
@@ -135,9 +139,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
+        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
-        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
+        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: ADVICE_COLOR[advice.action] }}>
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
@@ -172,6 +176,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
               {e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
               {e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
               {e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
+              {e.distanceKm != null && e.distanceKm > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.distanceKm} км</span>}
               <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => setLog(removeCardioLogEntry(e.id))} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>
           ))}

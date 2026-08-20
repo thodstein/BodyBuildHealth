@@ -299,6 +299,21 @@ describe('CardioSessionTimer', () => {
     unmount();
   });
 
+  it('CSR: при сохранении пишутся ккал (авто) и дистанция', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-7' });
+    const { unmount } = render(<CardioSessionTimer cycle={c} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Старт/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Завершить/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Км/ }), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /Сохранить в дневник/ }));
+    const log = loadCardioLog();
+    expect(log).toHaveLength(1);
+    // zone2: 7 ккал/мин при 80 кг × фактическая длительность сессии.
+    expect(log[0].calories).toBe(7 * log[0].durationMin);
+    expect(log[0].distanceKm).toBe(5);
+    unmount();
+  });
+
   it('«↗ Перенести» переносит сессию и отдаёт новый цикл наружу', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-4', daysAvailable: 2 });
     let next: unknown = null;

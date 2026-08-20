@@ -46,6 +46,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   const [minutes, setMinutes] = useState('30');
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
+  const [km, setKm] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
@@ -91,6 +92,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
+      distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
     };
     saveCardioLogEntry(entry);
     reload();
@@ -148,13 +150,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>7 дней</div>
           <strong style={{ fontSize: 20, color: ACCENT }}>{stats7.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
           {stats7.avgHr != null && <div style={{ fontSize: 12, color: colors.textMuted }}>ЧСС ср. {stats7.avgHr}</div>}
         </div>
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>28 дней</div>
           <strong style={{ fontSize: 20, color: ACCENT }}>{stats28.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
         </div>
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>Всего</div>
@@ -195,6 +197,10 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             <span style={labelStyle}>RPE 1-10</span>
             <input value={rpe} onChange={e => setRpe(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70 }} aria-label="RPE сессии" />
           </label>
+          <label style={{ display: 'block' }}>
+            <span style={labelStyle}>км</span>
+            <input value={km} onChange={e => setKm(e.target.value)} inputMode="decimal" style={{ ...inputStyle, width: 70 }} aria-label="Км сессии" title="Дистанция (для бега/езды)" />
+          </label>
           <button style={btnPrimary(ACCENT)} onClick={add}>💾 Записать</button>
         </div>
       </div>
@@ -212,6 +218,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
                 <span style={{ width: 86, fontSize: 13, fontWeight: 700, color: t?.color ?? colors.text }}>{t?.label ?? e.type}</span>
                 <span style={{ fontSize: 12, color: colors.text }}>{e.durationMin} мин</span>
                 {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.calories} ккал</span>}
+                {e.distanceKm != null && e.distanceKm > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.distanceKm} км</span>}
                 {e.avgHr != null && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.avgHr} уд</span>}
                 {e.rpe != null && <span style={{ fontSize: 12, color: colors.textMuted }}>RPE {e.rpe}</span>}
                 {!e.completed && <span style={{ fontSize: 11, color: colors.warning }}>пропущена</span>}

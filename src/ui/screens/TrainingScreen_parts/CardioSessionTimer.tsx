@@ -56,6 +56,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   const [finished, setFinished] = useState<{ type: CardioType; durationMin: number } | null>(null);
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
+  const [km, setKm] = useState('');
   const [flash, setFlash] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
 
@@ -112,11 +113,13 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: estimateCardioEntryKcal(finished.type, finished.durationMin, weight ?? undefined),
+      distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
     });
     onSaved?.();
     setFinished(null);
     setRpe('');
     setHr('');
+    setKm('');
     flashMsg('💾 Сессия записана в дневник');
   };
 
@@ -188,6 +191,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
           <div style={ROW}>
             <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={INPUT} aria-label="RPE" />
             <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС ср." inputMode="numeric" style={INPUT} aria-label="ЧСС" />
+            <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
             <button style={BTN_PRIMARY} onClick={save}>💾 Сохранить в дневник</button>
           </div>
         </div>
