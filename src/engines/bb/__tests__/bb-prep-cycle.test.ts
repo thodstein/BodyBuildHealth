@@ -445,4 +445,17 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     // Минимальная мышца — ~0-2 сета/нед (флор 0.25×MEV), а не полный объём
     expect(Math.max(...weeklyQuads)).toBeLessThanOrEqual(3);
   });
+
+  it('при исключении ног пустые Legs-дни убираются (нет сессии <6 сетов)', () => {
+    const r = buildPrepCycle(base({ category: 'mens_bb', accentMuscles: ['chest'], minimalMuscles: ['legs'], splitPatternId: 'ppl_6', weeks: 10, taperWeeks: 2 }));
+    const prepWeeks = (r.bbPlan.weeks as any[]).filter(w => w.contestPhase === 'preparation');
+    expect(prepWeeks.length).toBeGreaterThan(0);
+    const working = (s: any) => (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);
+    let minSessionSets = Infinity;
+    for (const wk of prepWeeks) for (const s of (wk.sessions || [])) minSessionSets = Math.min(minSessionSets, working(s));
+    // Ни одна оставшаяся сессия не пустая (пустые Legs-дни отброшены)
+    expect(minSessionSets).toBeGreaterThanOrEqual(6);
+    // В неделе остались осмысленные сессии
+    expect(prepWeeks[0].sessions.length).toBeGreaterThan(0);
+  });
 });

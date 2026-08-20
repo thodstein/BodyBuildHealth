@@ -619,6 +619,15 @@ export function applyPrepVolumeCascade(
     };
   });
 
+  // Если день (сессия) оказался почти пустым из-за исключённых мышц (<6 рабочих сетов) —
+  // убираем его в prep-неделях: пустой день → отдых (не тратим время/день впустую).
+  const workingSetsOf = (s: any) => (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);
+  for (const wk of weeks) {
+    if (wk.contestPhase === 'preparation' || wk.contestPhase === 'final_preparation') {
+      wk.sessions = (wk.sessions || []).filter((s: any) => workingSetsOf(s) >= 6);
+    }
+  }
+
   // Нормализация тапера: якорь = средний объём финала подготовки × нисходящий фактор,
   // чтобы тапер гарантированно был ниже prep-финала (монотонная кривая к пику).
   const prepWk = weeks.filter((w: any) => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation');
