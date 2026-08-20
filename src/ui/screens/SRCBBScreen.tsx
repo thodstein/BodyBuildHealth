@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, selectBestCycle, explainSelection, modeMismatchWarning, type LMSSelectorInput } from '../../engines/lms/lms-selector.engine';
 import { buildLMSPlan, extractExercises, getPLWeakPointRecommendations, getPLWeakGroupExerciseCandidates, originalCycleWeeks, appendPLTaperWeeks, refreshMeetAttempts, computeMeetAttemptsFromPmRow, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
@@ -63,6 +63,7 @@ import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
+import { PLSeasonBuilder } from './SRCBBScreen_parts/PLSeasonBuilder';
 import { loadSessions } from '../../engines/workout-logger.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
@@ -121,7 +122,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['plan', '📋 План цикла'], ['diagnostics', '🎯 Диагностика'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['settings', '1 ⚙️ Настройки'], ['diagnostics', '2 🎯 Слабые точки + 🧮'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -632,6 +633,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
   }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir, pedAuto, peds.length]);
   const best = ranked[0];
+  const [seasonNotes, setSeasonNotes] = useState<string[]>([]);
+  const [plSeasonMode, setPlSeasonMode] = useState<'single' | 'season'>(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
+      return s && s.mode === 'season' ? 'season' : 'single';
+    } catch { return 'single'; }
+  });
   useEffect(() => { try { const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}'); localStorage.setItem('he_pl_session', JSON.stringify({ ...cur, peds, pedDoses, courseIntensity })); } catch { /* ignore */ } }, [peds, pedDoses, courseIntensity]);
   const _validateBBPlan = (plan: any): BBPlan | null => {
     if (!plan || !Array.isArray(plan.weeks) || !plan.weeks.length) return null;
@@ -1230,6 +1238,38 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setMethodNote('🔄 Сборка сброшена — начинаем заново');
   };
 
+  const seasonBuildOpts = useMemo(() => ({
+    pmMap: { ...exercisePMs, 'Присед': exercisePMs['Присед'] || pmSquat, 'Жим лежа': exercisePMs['Жим лежа'] || pmBench, 'Становая тяга': exercisePMs['Становая тяга'] || pmDead },
+    fallbackPm: 80,
+    progressionMode: (pedAuto && peds.length > 0 ? 'on_course' : 'natural') as LMSBuildInput['mode'],
+    courseIntensity,
+    peds: peds.length ? peds : undefined,
+    pedDoses,
+    nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
+    acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+    autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
+    pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+    volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
+    focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
+    currentReadiness: linked.readiness?.recovery,
+    equipment: (linked.profile?.settings as Record<string, any> | undefined)?.equipment,
+    weakPoints,
+    plWeakPoints,
+    weakGroupDayMap,
+    plWeakPointDayMap,
+    weakGroupExerciseMap,
+    plWeakPointExerciseMap,
+    orthopedicBlockedPatterns,
+    diagnosticExerciseMap,
+    diagnosticDayMap,
+    limiterExerciseMap,
+    limiterProtocolMap,
+    limiterDayMap,
+    athleteMode: plAthleteMode,
+    athleteContext: plAthleteContext,
+    recovery: getRecoveryMetrics(linked),
+  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, limiterExerciseMap, limiterProtocolMap, limiterDayMap, plAthleteMode, plAthleteContext]);
+
   return (
     <div key={mainTab} className="pl-auto-screen" style={{ padding: '12px 0', color: '#fff', width: '100%', maxWidth: '100%', margin: 0, minWidth: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
@@ -1257,10 +1297,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         </div>
       )}
 
-      {mainTab === 'pl' && subView === 'plan' && (
+      {mainTab === 'pl' && subView === 'settings' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           {renderMacroEditBanner()}
-          <div style={H}>🏆 Авто-подбор силового цикла</div>
+          <div style={H}>1 ⚙️ Настройки (+💉 ПЕД + 🥗 питание)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, minWidth: 0 }}>
             <PopupSelect label="Уровень спортсмена" value={level} onChange={setLevel} options={[['novice','Новичок'],['II-KMS','II разряд — КМС'],['KMS-MS','КМС — МС'],['MS-MSMK','МС — МСМК'],['II-MS','II разряд — МС'],['intermediate','Средний']].map(([id,label]) => ({ id, label }))} />
             <PopupSelect label="Цель тренировок" value={goal} onChange={setGoal} options={[['strength','Сила'],['mass','Мышечная масса'],['endurance','Выносливость'],['peak','Выход на пик'],['mixed','Смешанная']].map(([id,label]) => ({ id, label }))} />
@@ -1318,10 +1358,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               </>
             )}
           </div>
-           {best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
-          <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
-          <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
-          {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
           <div style={H}>💪 Предельные максимумы (ПМ) по упражнениям цикла</div>
           {(() => {
             const tpl = getCycleById(selectedCycleId);
@@ -1329,7 +1365,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             const exs = extractExercises(tpl);
             const isArmCycle = exs.some(e => e.includes('Кисть') || e.includes('Натяжка') || e.includes('Боковой') || e.includes('Приведение'));
             const mainCount = exs.filter(e => e.includes('Присед') || e.includes('Жим') || e.includes('Становая') || e.includes('Тяга')).length;
-            const cols = exs.length <= 3 ? exs.length : exs.length <= 6 ? 3 : 4;
             if (mainCount <= 3 && !isArmCycle) {
               return (
                 <>
@@ -1380,8 +1415,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся из исходной раскладки СРЦ.
             </div>;
           })()}
-           {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
-                     <div style={{ marginTop: 10 }}>
+          {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
+          <div style={{ marginTop: 10 }}>
             <PedInputPanel
               peds={peds}
               onToggle={togglePed}
@@ -1451,8 +1486,45 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               })()}
             </div>
           </div>
+          {/* 🧩 Сезон по микроциклам */}
+          <PLSeasonBuilder
+            selector={{ goal: goal as never, level: level as never, bodyWeight: bw, daysPerWeek: days, direction: dir as never, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural' }}
+            meets={meetList.map(m => ({ id: m.id, name: m.name, weeksToStart: m.weeksToStart }))}
+            taper={{
+              mode: peakMode,
+              weightGoal: taperWeightGoal,
+              strategy: attemptStrategy,
+              mockMeet: mockMeetOn,
+              postMeet: postMeetOn,
+              windowWeeks: weeksToMeet,
+            }}
+            buildOpts={seasonBuildOpts}
+            onBuilt={(out, notes) => { setBuiltSrc(out); setSrcWeek(1); setSeasonNotes(notes); if (notes && notes.length > 0) setMethodNote(notes[notes.length - 1]); }}
+            onNavigatePlan={() => setSubView('plan')}
+          />
+          <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); setSubView('plan'); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
+          {seasonNotes.length > 0 && (
+            <div role="alert" style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd', fontSize: 11, lineHeight: 1.5 }}>
+              {seasonNotes.map((n, i) => <div key={i}>{n}</div>)}
+            </div>
+          )}
+          <div style={{ marginTop: 10, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>Далее: 2 Слабые точки + 10 калькуляторов →</button>
+          </div>
+        </div>
+      )}
 
-           <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
+      {mainTab === 'pl' && subView === 'plan' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          {renderMacroEditBanner()}
+          {plSeasonMode !== 'season' && best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          {plSeasonMode !== 'season' && (
+            <>
+              <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
+              <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
+              {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
+            </>
+          )}
           {/* 🏁 Компактный статус соревнований + переход в мастерскую тапера (отдельная вкладка) */}
           <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>
@@ -1486,8 +1558,28 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         </div>
       )}
 
-      {mainTab === 'pl' && subView === 'tools' && (
-        <PlannerToolsPanel mode="pl" />
+      {mainTab === 'pl' && subView === 'charts' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          <div style={H}>4 📊 Графики</div>
+          <TrainingMetricsChart lms={lmsChart} bb={undefined} />
+          <div style={{ marginTop: 8 }}><ProMetricsPanel /></div>
+        </div>
+      )}
+
+      {mainTab === 'pl' && subView === 'reference' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          <div style={H}>5 📚 Справка и отчёты</div>
+          {builtSrc && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              <button
+                onClick={() => { try { const w = window.open('', '_blank', 'width=900,height=700'); if (!w) { setMethodNote('⚠ Браузер заблокировал всплывающее окно'); return; } w.document.write('<title>ПЛ-план</title>'); w.document.close(); } catch (e) { setMethodNote('⚠ Ошибка: ' + (e as Error).message); } }}
+                style={{ ...BTN_GHOST, minHeight: 36, fontSize: 11, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }}
+              >🖨 Печать / PDF</button>
+            </div>
+          )}
+          {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
+          <div style={{ marginTop: 8 }}><PlannerToolsPanel mode="pl" /></div>
+        </div>
       )}
 
       {/* 🎯 Диагностика (дашборд): лимитирующие факторы + слабые мышцы → слабые точки → мёртвые точки → VBT → движение штанги */}
