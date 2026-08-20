@@ -8,6 +8,9 @@ import {
   resizeTrainingSessions,
   sessionDayOfWeek,
   trainingDayForIndex,
+  moveWeekScheduleDay,
+  resetScheduleToRecommended,
+  sessionUsesRecommendedDay,
 } from '../program-editor-logic';
 import type { UserWeek, TrainingProfile } from '../../../../engines/user-program/user-program.types';
 import { newId } from '../../../../engines/user-program/user-program.types';
@@ -89,6 +92,73 @@ describe('training day assignment', () => {
     expect(result).toHaveLength(2);
     expect(result.every(session => session.focus === 'deload')).toBe(true);
     expect(result.every(session => session.blocks.length === 1)).toBe(true);
+  });
+});
+
+describe('week schedule card (карточка «Неделя — расписание»)', () => {
+  it('рекомендованный день сессии = стандартная раскладка Пн/Ср/Пт/Вт/Чт/Сб/Вс', () => {
+    expect(trainingDayForIndex(0)).toBe(0);
+    expect(trainingDayForIndex(1)).toBe(2);
+    expect(trainingDayForIndex(2)).toBe(4);
+    expect(trainingDayForIndex(3)).toBe(1);
+    expect(trainingDayForIndex(4)).toBe(3);
+    expect(trainingDayForIndex(5)).toBe(5);
+    expect(trainingDayForIndex(6)).toBe(6);
+  });
+
+  it('sessionUsesRecommendedDay: сессия на рекомендованном дне или нет', () => {
+    expect(sessionUsesRecommendedDay({}, 0)).toBe(true); // без dayOfWeek → Пн (рекомендован)
+    expect(sessionUsesRecommendedDay({ dayOfWeek: 0 }, 0)).toBe(true);
+    expect(sessionUsesRecommendedDay({ dayOfWeek: 3 }, 0)).toBe(false);
+    expect(sessionUsesRecommendedDay({ dayOfWeek: 4 }, 2)).toBe(true);
+    expect(sessionUsesRecommendedDay({ dayOfWeek: 9 }, 1)).toBe(true); // невалидный → рекомендация
+  });
+
+  it('moveWeekScheduleDay переносит сессию во ВСЕ недели (шаблон повторяется)', () => {
+    const weeks = [makeWeek(1, false, 3), makeWeek(2, false, 3), makeWeek(3, true, 3)];
+    const result = moveWeekScheduleDay(weeks, 1, 5);
+    expect(result.every(w => w.sessions[1].dayOfWeek === 5)).toBe(true);
+    expect(sessionDayOfWeek(result[0].sessions[0], 0)).toBe(0); // остальные не тронуты
+    // несуществующий индекс сессии — недели не меняются
+    const noop = moveWeekScheduleDay(weeks, 9, 5);
+    expect(sessionDayOfWeek(noop[0].sessions[1], 1)).toBe(2);
+    // неделя с меньшим числом сессий защищена границей
+    const mixed = [makeWeek(1, false, 3), makeWeek(2, true, 1)];
+    const mixedResult = moveWeekScheduleDay(mixed, 2, 5);
+    expect(sessionDayOfWeek(mixedResult[1].sessions[0], 0)).toBe(0);
+  });
+
+  it('moveWeekScheduleDay нормализует невалидный день к рекомендации', () => {
+    const weeks = [makeWeek(1, false, 2)];
+    expect(moveWeekScheduleDay(weeks, 0, 9)[0].sessions[0].dayOfWeek).toBe(trainingDayForIndex(0));
+    expect(moveWeekScheduleDay(weeks, 1, -3)[0].sessions[1].dayOfWeek).toBe(trainingDayForIndex(1));
+    expect(moveWeekScheduleDay(weeks, 1, 2.5)[0].sessions[1].dayOfWeek).toBe(trainingDayForIndex(1));
+  });
+
+  it('moveWeekScheduleDay не мутирует исходные недели', () => {
+    const weeks = [makeWeek(1, false, 2)];
+    const snapshot = JSON.stringify(weeks);
+    moveWeekScheduleDay(weeks, 0, 5);
+    expect(JSON.stringify(weeks)).toBe(snapshot);
+  });
+
+  it('resetScheduleToRecommended расставляет рекомендованные дни по всем неделям', () => {
+    const weeks = [makeWeek(1, false, 3), makeWeek(2, false, 3)];
+    const moved = moveWeekScheduleDay(weeks, 0, 6);
+    const result = resetScheduleToRecommended(moved);
+    expect(result[0].sessions.map((s, i) => sessionDayOfWeek(s, i))).toEqual([0, 2, 4]);
+    expect(result[1].sessions.map((s, i) => sessionDayOfWeek(s, i))).toEqual([0, 2, 4]);
+    // явный нерекомендованный день тоже возвращается
+    const custom = makeWeek(1, false, 1);
+    custom.sessions[0].dayOfWeek = 5;
+    expect(sessionDayOfWeek(resetScheduleToRecommended([custom])[0].sessions[0], 0)).toBe(0);
+  });
+
+  it('resetScheduleToRecommended не мутирует исходные недели', () => {
+    const weeks = [makeWeek(1, false, 2)];
+    const snapshot = JSON.stringify(weeks);
+    resetScheduleToRecommended(weeks);
+    expect(JSON.stringify(weeks)).toBe(snapshot);
   });
 });
 

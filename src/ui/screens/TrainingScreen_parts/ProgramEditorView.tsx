@@ -13,7 +13,7 @@ import { HybridPlanPanel } from './HybridPlanPanel';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { MethodologyEncyclopedia } from './MethodologyEncyclopedia';
 import { BbContextPanel } from './program-editor-context-panels';
-import { BBEditor, PLEditor, BBConstraintsPanel } from './ProgramEditorComponents';
+import { BBEditor, PLEditor, BBConstraintsPanel, TRAINING_DAY_NAMES } from './ProgramEditorComponents';
 import { PlanDiagnosticsPanel, InteractiveVolumePanel, ExerciseInfoPanel, ProgressionCoach, SplitConsultant, PlanSummaryTable, AutoPeriodizationPanel, SubstitutionPanel } from './editor-panels';
 import { LoadGuardPanel, RealMRVPanel, RIRCalibrationPanel, TonnageEstimatePanel, StickingPointPanel, PlateAutoPanel, WhatIfGuardPanel, ReadinessForecastPanel, CheckinGuardPanel, BiomechanicsPanel } from './ProGuardPanels';
 import { ProPanelSection, ProPanelsGroup, ThemeToggle } from './ProPanelSection';
@@ -49,7 +49,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, cloneFromLibrary, createBlank, createFromBuild, deleteRevision } from '../../../engines/user-program/program-store';
 import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
-import { resizeTrainingSessions, sessionDayOfWeek } from './program-editor-logic';
+import { resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex, moveWeekScheduleDay, resetScheduleToRecommended, sessionUsesRecommendedDay } from './program-editor-logic';
 import { BulkApplyCard } from './BulkApplyCard';
 import { useEditorToast } from './EditorToast';
 import { TrainingModal } from './TrainingModal';
@@ -109,6 +109,11 @@ export function escapeHtml(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
+/** Попап карточки «🗓 Неделя — расписание»: перенос существующей сессии или назначение на свободный день. */
+type SchedulePick =
+  | { kind: 'move'; sessionIdx: number; day: number }
+  | { kind: 'assign'; day: number };
+
 export interface ProgramEditorProps {
   program: UserProgram;
   onChange: (p: UserProgram) => void;
@@ -139,6 +144,19 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
   const showToast = (m: string, variant?: import('./EditorToast').ToastVariant) => showToastRaw(m, variant);
+
+  // Карточка «🗓 Неделя — расписание» (BB): попап смены/назначения дня недели
+  const [schedulePick, setSchedulePick] = useState<SchedulePick | null>(null);
+  const setWeekSessionDay = useCallback((sessionIdx: number, day: number) => {
+    if (!program.bb) return;
+    update({ bb: { ...program.bb, weeks: moveWeekScheduleDay(program.bb.weeks, sessionIdx, day) } });
+    showToast(`📅 День ${sessionIdx + 1} → ${TRAINING_DAY_NAMES[day]}`);
+  }, [program, update, showToast]);
+  const resetScheduleRecommended = useCallback(() => {
+    if (!program.bb) return;
+    update({ bb: { ...program.bb, weeks: resetScheduleToRecommended(program.bb.weeks) } });
+    showToast('⭐ Расписание возвращено к рекомендованным дням (Пн·Ср·Пт…)');
+  }, [program, update, showToast]);
 
   // P0-1: связь «программа ↔ дизайн периодизации» — список сохранённых дизайнов для карточки в шаге «Недели»
   const [designLinkId, setDesignLinkId] = useState('');
@@ -1088,12 +1106,13 @@ return (
           chest: '#22c55e', back: '#3b82f6', legs: '#f59e0b', shoulders: '#a78bfa',
           arms: '#ef4444', core: '#06b6d4',
         };
-        let dayLabels: Array<{ idx: number; label: string; muscles: string[] }> = [];
+        let dayLabels: Array<{ idx: number; label: string; muscles: string[]; sessionIdx?: number }> = [];
         if (dir === 'bb' && program.bb) {
           dayLabels = (program.bb.weeks[0]?.sessions ?? []).map((s, i) => ({
             idx: sessionDayOfWeek(s, i),
             label: s.name || `День ${i + 1}`,
             muscles: Array.from(new Set((s.blocks ?? []).map((b) => b.muscle).filter(Boolean))),
+            sessionIdx: i,
           }));
         } else if (dir === 'pl' && program.pl) {
           dayLabels = (program.pl.schedule ?? []).map((s, i) => ({
@@ -1102,9 +1121,11 @@ return (
             muscles: ['—'],
           }));
         }
-        const dayByDow: Record<number, { idx: number; label: string; muscles: string[] }> = {};
+        const dayByDow: Record<number, { idx: number; label: string; muscles: string[]; sessionIdx?: number }> = {};
         dayLabels.forEach((d) => { dayByDow[d.idx % 7] = d; });
         const todayIdx = (new Date().getDay() + 6) % 7;
+        const bbEditable = dir === 'bb' && !!(program.bb?.weeks?.[0]?.sessions ?? []).length;
+        const bbSessions = bbEditable ? (program.bb?.weeks?.[0]?.sessions ?? []) : [];
         return (
           <div className="constructor-surface" style={{ ...CARD, padding: 10 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
@@ -1112,21 +1133,36 @@ return (
               <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>
                 (по плану текущей редактируемой программы)
               </span>
+              {bbEditable && (
+                <button
+                  type="button"
+                  aria-label="Вернуть рекомендованные дни недели"
+                  title="Вернуть рекомендованные дни недели (Пн·Ср·Пт…) для всех сессий"
+                  onClick={resetScheduleRecommended}
+                  style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 40, marginLeft: 6, borderColor: 'rgba(0,230,138,0.35)', color: ACCENT }}
+                >
+                  ⟳ По рекомендации
+                </button>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(52px, 1fr))', gap: 4 }}>
               {WEEKDAYS.map((day, wi) => {
                 const d = dayByDow[wi];
                 const isToday = wi === todayIdx;
                 const fill = d ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)';
-                return (
-                  <div key={wi} style={{
-                    minHeight: 64, borderRadius: 6, padding: '6px 4px',
-                    background: fill,
-                    border: isToday ? '2px solid #00e68a' : (d ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.05)'),
-                    textAlign: 'center',
-                    boxShadow: isToday ? '0 0 10px rgba(0,230,138,0.25)' : 'none',
-                  }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: d ? '#00e68a' : DIM }}>{day}{isToday ? ' · сегодня' : ''}</div>
+                const isRec = bbEditable && d?.sessionIdx != null && sessionUsesRecommendedDay(bbSessions[d.sessionIdx], d.sessionIdx);
+                const cellStyle: React.CSSProperties = {
+                  minHeight: 64, borderRadius: 6, padding: '6px 4px',
+                  background: fill,
+                  border: isToday ? '2px solid #00e68a' : (d ? '1px solid rgba(0,230,138,0.25)' : '1px solid rgba(255,255,255,0.05)'),
+                  textAlign: 'center',
+                  boxShadow: isToday ? '0 0 10px rgba(0,230,138,0.25)' : 'none',
+                };
+                const inner = (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: d ? '#00e68a' : DIM }}>
+                      {day}{isRec ? '⭐' : ''}{isToday ? ' · сегодня' : ''}
+                    </div>
                     {d ? (
                       <>
                         <div style={{ fontSize: 10, color: DIM_STRONG, marginTop: 4, fontWeight: 600 }}>{d.label}</div>
@@ -1143,15 +1179,127 @@ return (
                       </>
                     ) : (
                       <div style={{ fontSize: 10, color: DIM, marginTop: 12, fontStyle: 'italic' }}>отдых</div>
-            )}
-                  </div>
+                    )}
+                  </>
+                );
+                if (!bbEditable) {
+                  return <div key={wi} style={cellStyle}>{inner}</div>;
+                }
+                const isFree = !d;
+                return (
+                  <button
+                    key={wi}
+                    type="button"
+                    aria-label={isFree
+                      ? `Назначить тренировку на ${day}`
+                      : `Сменить день: ${d!.label}`}
+                    title={isFree ? 'Назначить тренировку на этот день' : 'Изменить день этой тренировки'}
+                    onClick={() => setSchedulePick(isFree
+                      ? { kind: 'assign', day: wi }
+                      : { kind: 'move', sessionIdx: d!.sessionIdx!, day: wi })}
+                    style={{ ...cellStyle, display: 'block', width: '100%', font: 'inherit', color: 'inherit', cursor: 'pointer', margin: 0 }}
+                  >
+                    {inner}
+                  </button>
                 );
               })}
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
-              Шаблон недели повторяется для всех мезоциклов. Делод-недели должны быть явно отмечены флагом «deload» в структуре.
+              {bbEditable
+                ? 'Нажмите на день, чтобы перенести тренировку или назначить её на свободный день. ⭐ — рекомендованный день (Пн·Ср·Пт…). Изменение применяется ко всем неделям программы.'
+                : 'Шаблон недели повторяется для всех мезоциклов. Делод-недели должны быть явно отмечены флагом «deload» в структуре.'}
             </div>
           </div>
+        );
+      })()}
+
+      {/* Попап карточки «🗓 Неделя — расписание» (BB): смена/назначение дня недели */}
+      {schedulePick && dir === 'bb' && program.bb?.weeks?.[0]?.sessions && (() => {
+        const w0 = program.bb!.weeks[0]!;
+        const sessions = w0.sessions;
+        const { day } = schedulePick;
+        const closeBtnStyle: React.CSSProperties = { ...BTN_GHOST, marginTop: 8, width: '100%', fontSize: 11, minHeight: 44 };
+        return (
+          <TrainingModal
+            title={schedulePick.kind === 'move'
+              ? `📅 День: ${sessions[schedulePick.sessionIdx]?.name || `День ${schedulePick.sessionIdx + 1}`}`
+              : `📅 Назначить на ${TRAINING_DAY_NAMES[day]}`}
+            onClose={() => setSchedulePick(null)}
+          >
+            {schedulePick.kind === 'move' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>
+                  Выберите день недели. ⭐ — рекомендованный для этой сессии; занятые дни недоступны.
+                </div>
+                {TRAINING_DAY_NAMES.map((d, di) => {
+                  const si = schedulePick.sessionIdx;
+                  const isSel = di === day;
+                  const isOcc = sessions.some((s, i) => i !== si && sessionDayOfWeek(s, i) === di);
+                  const isRec = trainingDayForIndex(si) === di;
+                  return (
+                    <button
+                      key={di}
+                      type="button"
+                      disabled={isOcc}
+                      aria-label={`Перенести на ${d}`}
+                      onClick={() => { setWeekSessionDay(si, di); setSchedulePick(null); }}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                        padding: '10px 12px', borderRadius: 10, cursor: isOcc ? 'not-allowed' : 'pointer',
+                        textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
+                        background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)',
+                        minHeight: 44,
+                      }}
+                    >
+                      <span>{d}{isRec ? ' ⭐ рекомендованный' : ''}{isOcc ? ' · занято' : ''}</span>
+                      {isSel && <span style={{ fontSize: 10 }}>✓</span>}
+                    </button>
+                  );
+                })}
+                <button type="button" onClick={() => setSchedulePick(null)} style={closeBtnStyle}>Закрыть</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>
+                  День {TRAINING_DAY_NAMES[day]} свободен. Выберите, какую тренировку назначить на него:
+                </div>
+                {sessions.map((s, si) => {
+                  const cur = sessionDayOfWeek(s, si);
+                  if (cur === day) return null;
+                  return (
+                    <button
+                      key={si}
+                      type="button"
+                      aria-label={`Перенести на ${TRAINING_DAY_NAMES[day]}: ${s.name || `День ${si + 1}`}`}
+                      onClick={() => { setWeekSessionDay(si, day); setSchedulePick(null); }}
+                      style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                        padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11,
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                        color: 'rgba(255,255,255,0.85)', minHeight: 44,
+                      }}
+                    >
+                      <span>{si + 1}. {s.name || `День ${si + 1}`}</span>
+                      <span style={{ fontSize: 10, color: DIM }}>{TRAINING_DAY_NAMES[cur]} → {TRAINING_DAY_NAMES[day]}</span>
+                    </button>
+                  );
+                })}
+                {sessions.length === 0 && (
+                  <div style={{ fontSize: 10, color: DIM, fontStyle: 'italic' }}>
+                    В неделе нет тренировочных дней — добавьте их в редакторе ниже («Как собрать программу»).
+                  </div>
+                )}
+                {sessions.length > 0 && sessions.every((s, si) => sessionDayOfWeek(s, si) === day) && (
+                  <div style={{ fontSize: 10, color: DIM, fontStyle: 'italic' }}>
+                    Все тренировки недели уже назначены на этот день.
+                  </div>
+                )}
+                <button type="button" onClick={() => setSchedulePick(null)} style={closeBtnStyle}>Закрыть</button>
+              </div>
+            )}
+          </TrainingModal>
         );
       })()}
 
