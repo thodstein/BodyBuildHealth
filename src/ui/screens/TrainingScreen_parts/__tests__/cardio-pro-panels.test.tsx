@@ -443,6 +443,25 @@ describe('CardioDiaryPanel — adherence текущей недели', () => {
     expect(log[0].durationMin).toBe(45);
     expect(screen.getByText(/45 мин/)).toBeTruthy();
   });
+
+  it('запись с км показывает темп «м:сс/км» в строке и в сводке 7д', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-pace' });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    saveCardioLogEntry({ id: 'p1', date: iso, type: 'zone2', durationMin: 30, distanceKm: 5, completed: true, calories: 210 });
+    render(<CardioDiaryPanel cycle={c} />);
+    expect(screen.getByText('6:00/км')).toBeTruthy();
+    expect(screen.getByText(/7д:.*6:00\/км/)).toBeTruthy();
+  });
+
+  it('запись без км не показывает темп', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-pace2' });
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    saveCardioLogEntry({ id: 'p2', date: iso, type: 'zone2', durationMin: 30, completed: true, calories: 210 });
+    render(<CardioDiaryPanel cycle={c} />);
+    expect(screen.queryByText(/\/км/)).toBeNull();
+  });
 });
 
 describe('CardioDayCard — кардио-слой дня', () => {

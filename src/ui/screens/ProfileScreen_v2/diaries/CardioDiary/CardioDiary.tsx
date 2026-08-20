@@ -11,7 +11,7 @@ import { btnBase, btnPrimary, chip, chipActive, main as pageMain, sectionTitle, 
 import { DiaryHeader } from '../DiaryHeader';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
-  cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal,
+  cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
   type CardioLogEntry,
 } from '../../../../../engines/lms/cardio-diary.engine';
 import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
@@ -124,10 +124,10 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   };
 
   const exportCsv = () => {
-    const head = 'Дата,Тип,Минуты,Км,Ккал,ЧСС ср.,RPE,Завершено\n';
+    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,Завершено\n';
     const body = log.map(e =>
       [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, e.durationMin,
-        e.distanceKm ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
+        e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
         e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
     const a = document.createElement('a');
@@ -146,7 +146,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     const typeLabel = (id: CardioType) => TYPES.find(t => t.id === id)?.label ?? id;
     const rows = log.map(e =>
       `<tr><td>${escHtml(e.date)}</td><td>${escHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
-      `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
+      `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
       `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td></tr>`,
     ).join('');
     const html = `<!doctype html>
@@ -164,12 +164,12 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
 </style>
 <h1>❤️ Кардио-дневник</h1>
 <div class="summary">
-  <div class="card"><b>7 дней</b><br>${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}</div>
-  <div class="card"><b>28 дней</b><br>${stats28.sessions} сесс · ${stats28.minutes} мин${stats28.km > 0 ? ` · ${stats28.km} км` : ''}${stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
+  <div class="card"><b>7 дней</b><br>${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.avgPace ? ` · ${stats7.avgPace}` : ''}${stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}</div>
+  <div class="card"><b>28 дней</b><br>${stats28.sessions} сесс · ${stats28.minutes} мин${stats28.km > 0 ? ` · ${stats28.km} км` : ''}${stats28.avgPace ? ` · ${stats28.avgPace}` : ''}${stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
   <div class="card"><b>Всего</b><br>${doneSessions} сесс · ${totalMinutes} мин</div>
 </div>
 <table>
-  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th></tr>
+  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th></tr>
   ${rows}
 </table>`;
     w.document.write(html);
@@ -228,13 +228,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>7 дней</div>
           <strong style={{ fontSize: 20, color: ACCENT }}>{stats7.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
           {stats7.avgHr != null && <div style={{ fontSize: 12, color: colors.textMuted }}>ЧСС ср. {stats7.avgHr}</div>}
         </div>
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>28 дней</div>
           <strong style={{ fontSize: 20, color: ACCENT }}>{stats28.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
         </div>
         <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
           <div style={labelStyle}>Всего</div>
@@ -296,7 +296,12 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
                 <span style={{ width: 86, fontSize: 13, fontWeight: 700, color: t?.color ?? colors.text }}>{t?.label ?? e.type}</span>
                 <span style={{ fontSize: 12, color: colors.text }}>{e.durationMin} мин</span>
                 {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.calories} ккал</span>}
-                {e.distanceKm != null && e.distanceKm > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.distanceKm} км</span>}
+                {e.distanceKm != null && e.distanceKm > 0 && (
+                  <>
+                    <span style={{ fontSize: 12, color: colors.textMuted }}>{e.distanceKm} км</span>
+                    <span style={{ fontSize: 12, color: colors.textMuted }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                  </>
+                )}
                 {e.avgHr != null && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.avgHr} уд</span>}
                 {e.rpe != null && <span style={{ fontSize: 12, color: colors.textMuted }}>RPE {e.rpe}</span>}
                 {!e.completed && <span style={{ fontSize: 11, color: colors.warning }}>пропущена</span>}

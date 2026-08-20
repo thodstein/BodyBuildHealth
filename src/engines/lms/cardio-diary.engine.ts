@@ -67,6 +67,7 @@ export function cardioLogStats(log: CardioLogEntry[], days: number, referenceIso
   avgHr: number | null;
   kcal: number;
   km: number;
+  avgPace: string | null;
 } {
   const from = dateDaysAgo(days, referenceIso);
   const rows = log.filter(e => e.completed && e.date >= from);
@@ -80,6 +81,7 @@ export function cardioLogStats(log: CardioLogEntry[], days: number, referenceIso
     avgHr: hrs.length > 0 ? Math.round(hrs.reduce((s, e) => s + (e.avgHr ?? 0), 0) / hrs.length) : null,
     kcal: rows.reduce((s, e) => s + (e.calories ?? 0), 0),
     km: Math.round(rows.reduce((s, e) => s + (e.distanceKm ?? 0), 0) * 10) / 10,
+    avgPace: cardioAvgPaceMinPerKm(rows),
   };
 }
 
@@ -152,6 +154,22 @@ export interface CardioAdvice {
 /** Оценка ккал сессии журнала по MET-модели движка (вес по умолчанию 80 кг). */
 export function estimateCardioEntryKcal(type: CardioType, durationMin: number, weightKg?: number): number {
   return kcalForCardio(type, durationMin, weightKg && weightKg > 0 ? weightKg : 80);
+}
+
+/** Темп сессии: мин/км в формате «м:сс/км» или null (нет дистанции/времени). */
+export function cardioPaceMinPerKm(distanceKm?: number, minutes?: number): string | null {
+  if (!distanceKm || distanceKm <= 0 || !minutes || minutes <= 0) return null;
+  const sec = Math.round((minutes * 60) / distanceKm);
+  if (sec <= 0) return null;
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}/км`;
+}
+
+/** Средний темп по набору записей (взвешенно по дистанции): м:сс/км или null. */
+export function cardioAvgPaceMinPerKm(entries: { distanceKm?: number; durationMin: number }[]): string | null {
+  const totalKm = entries.reduce((s, e) => s + (e.distanceKm ?? 0), 0);
+  const totalMin = entries.reduce((s, e) => s + e.durationMin, 0);
+  if (totalKm <= 0 || totalMin <= 0) return null;
+  return cardioPaceMinPerKm(totalKm, totalMin);
 }
 
 /**

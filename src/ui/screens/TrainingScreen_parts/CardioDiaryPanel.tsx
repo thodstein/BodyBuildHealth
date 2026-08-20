@@ -6,6 +6,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
+  cardioPaceMinPerKm,
   type CardioLogEntry,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
@@ -154,9 +155,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
+        7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
-        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
+        {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: ADVICE_COLOR[advice.action] }}>
         {advice.action === 'reduce' ? '▼ Снизить' : advice.action === 'increase' ? '▲ Увеличить' : '▶ Продолжать'}: {advice.reason}
@@ -191,7 +192,12 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
               {e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
               {e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
               {e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
-              {e.distanceKm != null && e.distanceKm > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.distanceKm} км</span>}
+              {e.distanceKm != null && e.distanceKm > 0 && (
+                <>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.distanceKm} км</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 70 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                </>
+              )}
               <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
               <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>

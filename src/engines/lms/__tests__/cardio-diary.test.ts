@@ -6,7 +6,7 @@ import {
   cardioWeekAdherence, cardioAdherenceSummary, computeCardioAdvice,
   cardioWeekFact, cardioCycleCompliance,
   cardioDayFact, cardioDayLoad, cardioHrCompliance,
-  estimateCardioEntryKcal,
+  estimateCardioEntryKcal, cardioPaceMinPerKm, cardioAvgPaceMinPerKm,
   type CardioLogEntry,
 } from '../cardio-diary.engine';
 
@@ -112,6 +112,52 @@ describe('estimateCardioEntryKcal', () => {
   it('вес 0/отрицательный → дефолт 80', () => {
     expect(estimateCardioEntryKcal('zone2', 45, 0)).toBe(315);
     expect(estimateCardioEntryKcal('zone2', 45, -5)).toBe(315);
+  });
+});
+
+describe('cardioPaceMinPerKm / cardioAvgPaceMinPerKm (темп мин/км)', () => {
+  it('5 км за 30 мин → 6:00/км', () => {
+    expect(cardioPaceMinPerKm(5, 30)).toBe('6:00/км');
+  });
+
+  it('округление секунд: 5 км за 27 мин → 5:24/км', () => {
+    expect(cardioPaceMinPerKm(5, 27)).toBe('5:24/км');
+  });
+
+  it('null без дистанции/времени/с нулями и отрицательными', () => {
+    expect(cardioPaceMinPerKm(undefined, 30)).toBeNull();
+    expect(cardioPaceMinPerKm(0, 30)).toBeNull();
+    expect(cardioPaceMinPerKm(5, 0)).toBeNull();
+    expect(cardioPaceMinPerKm(5, undefined)).toBeNull();
+    expect(cardioPaceMinPerKm(-3, 30)).toBeNull();
+  });
+
+  it('средний темп взвешен по дистанции (сумма км / сумма минут)', () => {
+    const rows = [
+      { distanceKm: 5, durationMin: 30 },
+      { distanceKm: 5, durationMin: 40 },
+    ];
+    expect(cardioAvgPaceMinPerKm(rows)).toBe('7:00/км');
+  });
+
+  it('средний темп: null при нулевой дистанции/пустом наборе', () => {
+    expect(cardioAvgPaceMinPerKm([{ distanceKm: 0, durationMin: 30 }])).toBeNull();
+    expect(cardioAvgPaceMinPerKm([{ distanceKm: undefined, durationMin: 30 }])).toBeNull();
+    expect(cardioAvgPaceMinPerKm([])).toBeNull();
+  });
+
+  it('cardioLogStats.avgPace считается по завершённым записям окна', () => {
+    saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 30, distanceKm: 5 }));
+    saveCardioLogEntry(entry({ date: '2026-01-06', durationMin: 30, distanceKm: 5 }));
+    saveCardioLogEntry(entry({ date: '2026-01-20', durationMin: 30, distanceKm: 5, completed: false }));
+    const stats = cardioLogStats(loadCardioLog(), 30, REF);
+    expect(stats.avgPace).toBe('6:00/км');
+  });
+
+  it('cardioLogStats.avgPace: null без км в окне', () => {
+    saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 30 }));
+    const stats = cardioLogStats(loadCardioLog(), 30, REF);
+    expect(stats.avgPace).toBeNull();
   });
 });
 

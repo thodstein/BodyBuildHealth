@@ -5,7 +5,7 @@
  */
 import React, { useMemo } from 'react';
 import { cardioEquipmentLabel, loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
-import { cardioDayLoad, loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { cardioDayLoad, loadCardioLog, cardioPaceMinPerKm } from '../../../engines/lms/cardio-diary.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { CARD, ROW, BTN_PRIMARY } from './CardioUI';
 
@@ -61,7 +61,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       <div style={{ fontSize: 11, color: load.done.length > 0 ? '#4ade80' : 'rgba(255,255,255,0.45)' }}>
         Факт: {load.done.length === 0
           ? 'кардио не записано.'
-          : `${load.done.length} сессий · ${load.cardioMinutes} мин${load.done.some(e => e.distanceKm) ? ' · ' + load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0) + ' км' : ''}${load.done.some(e => e.rpe != null) ? ' · RPE ' + (load.done.filter(e => e.rpe != null).reduce((s, e) => s + (e.rpe ?? 0), 0) / load.done.filter(e => e.rpe != null).length).toFixed(1) : ''}`}
+          : `${load.done.length} сессий · ${load.cardioMinutes} мин${load.done.some(e => e.distanceKm) ? ' · ' + load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0) + ' км' : ''}${cardioPaceMinPerKm(load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0), load.cardioMinutes) ? ' · ' + cardioPaceMinPerKm(load.done.reduce((s, e) => s + (e.distanceKm ?? 0), 0), load.cardioMinutes) : ''}${load.done.some(e => e.rpe != null) ? ' · RPE ' + (load.done.filter(e => e.rpe != null).reduce((s, e) => s + (e.rpe ?? 0), 0) / load.done.filter(e => e.rpe != null).length).toFixed(1) : ''}`}
       </div>
       {(load.cardioMinutes > 0 || load.strengthSessions > 0) && (
         <div style={{ fontSize: 11, color: '#fbbf24' }}>
