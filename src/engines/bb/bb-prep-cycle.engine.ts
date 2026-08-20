@@ -535,6 +535,37 @@ export function prepCardioPlan(cfg: PrepCycleConfig): PrepCardioPlan {
 // План питания подготовки (направление «Подготовка питание»)
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Категорийная пик-тренировка (направление D): для лёгких категорий (bikini/wellness)
+ *  деплеция мягче (меньше объёма, больше отдыха/позирования), для массовых — полный протокол. */
+export interface PeakTrainingProfile {
+  category: BBContestCategory;
+  type: string;
+  minutesPerDepleteDay: number;
+  pumpBackstageMinutes: number;
+  notes: string[];
+}
+
+export function peakTrainingProfile(cfg: PrepCycleConfig): PeakTrainingProfile {
+  const profile = CATEGORY_PROFILES[cfg.category];
+  const light = !!profile?.light;
+  const mass = !!profile && profile.targetBodyFatPct <= 5;
+  return {
+    category: cfg.category,
+    type: light ? 'Мягкая деплеция (лёгкие категории)' : mass ? 'Полный протокол деплеции (массовые)' : 'Стандартная деплеция',
+    minutesPerDepleteDay: light ? 30 : mass ? 50 : 40,
+    pumpBackstageMinutes: light ? 20 : 25,
+    notes: [
+      light
+        ? 'Bikini/Wellness: 2 лёгких круга по 30 мин, мягкая сухость, больше отдыха и позирования — не перетруждать.'
+        : mass
+          ? 'Bodybuilding/212: 3 круга по 50 мин — полная деплеция гликогена, затем памп-нагрузка backstage.'
+          : 'Стандартная деплеция 40 мин: 3 круга верх/низ, затем памп.',
+      `Памп-рутинг backstage ~${light ? 20 : 25} мин: резинки, отжимания, лёгкие гантели 15-20 повт × 2-3 круга, без усталости.`,
+      'Позирование в пик-неделю растёт к шоу (см. блок «🎭 Позирование»).',
+    ],
+  };
+}
+
 export interface PrepNutritionWeek {
   week: number;
   phase: string;               // preparation / final_preparation / taper / peak_week

@@ -85,7 +85,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, peakTrainingProfile, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -5512,6 +5512,22 @@ export const BbAutoConstructor: React.FC = () => {
                       <div>🏃 Кардио-расход: ~{np.cardioKcalPerWeek} ккал/нед</div>
                       {np.femaleNotes.map((f, i) => <div key={i} style={{ color: '#f9a8d4' }}>👩 {f}</div>)}
                     </div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            {/* 🏋️ Пик-тренировка (категорийная) */}
+            {(() => {
+              try {
+                const pt = peakTrainingProfile(prepResult.config);
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.18)' }}>
+                    <div style={{ fontWeight: 800, color: '#f472b6', marginBottom: 4 }}>🏋️ Пик-тренировка: {pt.type}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Деплеция ~{pt.minutesPerDepleteDay} мин/день · памп backstage ~{pt.pumpBackstageMinutes} мин
+                    </div>
+                    {pt.notes.map((n, i) => <div key={i} style={{ color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{n}</div>)}
                   </div>
                 );
               } catch { return null; }
