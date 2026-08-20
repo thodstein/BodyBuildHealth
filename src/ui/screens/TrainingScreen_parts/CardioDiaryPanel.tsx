@@ -38,9 +38,22 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [kcal, setKcal] = useState('');
   const [km, setKm] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
+
+  // Загрузить запись в форму для редактирования (та же id — save заменяет).
+  const startEdit = (e: CardioLogEntry) => {
+    setEditingId(e.id);
+    setDate(e.date);
+    setType(e.type);
+    setMinutes(String(e.durationMin));
+    setRpe(e.rpe != null ? String(e.rpe) : '');
+    setHr(e.avgHr != null ? String(e.avgHr) : '');
+    setKcal(e.calories != null ? String(e.calories) : '');
+    setKm(e.distanceKm != null ? String(e.distanceKm) : '');
+  };
 
   // Последний вес из журнала для оценки ккал (fallback — 80 кг).
   const lastWeight = useMemo<number | null>(() => {
@@ -90,7 +103,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const add = () => {
     const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
     const entry: CardioLogEntry = {
-      id: newId(), date, type, durationMin: dur, completed: true,
+      id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: Number(kcal) > 0 ? Number(kcal) : estimateCardioEntryKcal(type, dur, lastWeight ?? undefined),
@@ -100,7 +113,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     setLog(next);
     setKcal('');
     setKm('');
-    flashMsg('💾 Сессия записана');
+    setEditingId(null);
+    flashMsg(editingId ? '✏️ Сессия обновлена' : '💾 Сессия записана');
   };
 
   return (
@@ -114,13 +128,14 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
           <button key={t} style={type === t ? CHIP_ACTIVE : CHIP} onClick={() => setType(t)}>{TYPE_LABEL[t]}</button>
         ))}
       </div>
+      {editingId && <div style={{ fontSize: 11, color: '#fbbf24' }}>✏️ Редактирование записи — сохраните или нажмите ✕ на строке, чтобы отменить.</div>}
       <div style={ROW}>
         <input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Мин" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="Минуты" />
         <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 80 }} aria-label="RPE" />
         <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="ЧСС" />
         <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
         <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
-        <button style={BTN_PRIMARY} onClick={add}>+ Записать</button>
+        <button style={BTN_PRIMARY} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
       </div>
 
       {adherence && (
@@ -177,7 +192,8 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
               {e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
               {e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
               {e.distanceKm != null && e.distanceKm > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.distanceKm} км</span>}
-              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => setLog(removeCardioLogEntry(e.id))} aria-label={`Удалить ${e.date}`}>✕</button>
+              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
+              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>
           ))}
           {log.length > 6 && (

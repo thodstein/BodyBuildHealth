@@ -59,6 +59,18 @@ describe('CardioDiary — CSR', () => {
     expect(loadCardioLog().length).toBe(0);
   });
 
+  it('редактирование: ✎ заполняет форму, «Обновить» меняет запись (та же id)', () => {
+    saveCardioLogEntry({ id: 'x5', date: '2026-08-17', type: 'zone2', durationMin: 30, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать 2026-08-17/ }));
+    fireEvent.change(screen.getByLabelText('Минуты сессии'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: /Обновить/ }));
+    expect(loadCardioLog().length).toBe(1);
+    expect(loadCardioLog()[0].durationMin).toBe(40);
+    expect(loadCardioLog()[0].id).toBe('x5');
+    expect(screen.getAllByText(/40 мин/).length).toBeGreaterThan(0);
+  });
+
   it('активный цикл: блок «план vs факт» показывает выполнение текущей недели', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cd-1' });
     saveCardioCycle(c);

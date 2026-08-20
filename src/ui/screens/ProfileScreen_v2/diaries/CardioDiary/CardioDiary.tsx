@@ -47,11 +47,23 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
   const [km, setKm] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
   const reload = useCallback(() => { setLog(loadCardioLog()); onDataChange?.(); }, [onDataChange]);
+
+  // Загрузить запись в форму для редактирования (та же id — save заменяет).
+  const startEdit = (e: CardioLogEntry) => {
+    setEditingId(e.id);
+    setDate(e.date);
+    setType(e.type);
+    setMinutes(String(e.durationMin));
+    setRpe(e.rpe != null ? String(e.rpe) : '');
+    setHr(e.avgHr != null ? String(e.avgHr) : '');
+    setKm(e.distanceKm != null ? String(e.distanceKm) : '');
+  };
 
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
   const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
@@ -88,15 +100,16 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
       if (sorted.length > 0) weight = sorted[0].weight;
     } catch { /* ignore */ }
     const entry: CardioLogEntry = {
-      id: newId(), date, type, durationMin: dur, completed: true,
+      id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
       rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
       avgHr: Number(hr) > 0 ? Number(hr) : undefined,
       calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
     };
     saveCardioLogEntry(entry);
+    setEditingId(null);
     reload();
-    flashMsg('💾 Сессия записана');
+    flashMsg(editingId ? '✏️ Сессия обновлена' : '💾 Сессия записана');
   };
 
   const remove = (id: string) => {
@@ -201,7 +214,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             <span style={labelStyle}>км</span>
             <input value={km} onChange={e => setKm(e.target.value)} inputMode="decimal" style={{ ...inputStyle, width: 70 }} aria-label="Км сессии" title="Дистанция (для бега/езды)" />
           </label>
-          <button style={btnPrimary(ACCENT)} onClick={add}>💾 Записать</button>
+          <button style={btnPrimary(ACCENT)} onClick={add}>{editingId ? '💾 Обновить' : '💾 Записать'}</button>
         </div>
       </div>
 
@@ -224,7 +237,14 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
                 {!e.completed && <span style={{ fontSize: 11, color: colors.warning }}>пропущена</span>}
                 <span style={{ flex: 1 }} />
                 <button
-                  onClick={() => remove(e.id)}
+                  onClick={() => startEdit(e)}
+                  aria-label={`Редактировать ${e.date}`}
+                  style={{ ...btnBase(ACCENT), minHeight: 30, padding: '4px 9px', color: '#fbbf24', borderColor: 'rgba(245,158,11,0.3)' }}
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={() => { if (editingId === e.id) setEditingId(null); remove(e.id); }}
                   aria-label={`Удалить ${e.date}`}
                   style={{ ...btnBase(ACCENT), minHeight: 30, padding: '4px 9px', color: '#f87171', borderColor: 'rgba(239,68,68,0.3)' }}
                 >

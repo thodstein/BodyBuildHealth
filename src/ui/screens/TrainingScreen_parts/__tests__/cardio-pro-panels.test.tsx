@@ -429,6 +429,20 @@ describe('CardioDiaryPanel — adherence текущей недели', () => {
     render(<CardioDiaryPanel cycle={null} />);
     expect(screen.getByText(/не выбран/)).toBeTruthy();
   });
+
+  it('редактирование: ✎ заполняет форму, «Обновить» меняет запись (та же id)', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'dp-edit' });
+    saveCardioLogEntry({ id: 'e1', date: '2026-01-10', type: 'zone2', durationMin: 30, completed: true, calories: 210 });
+    render(<CardioDiaryPanel cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать 2026-01-10/ }));
+    fireEvent.change(screen.getByLabelText('Минуты'), { target: { value: '45' } });
+    fireEvent.click(screen.getByRole('button', { name: /Обновить/ }));
+    const log = loadCardioLog();
+    expect(log).toHaveLength(1);
+    expect(log[0].id).toBe('e1');
+    expect(log[0].durationMin).toBe(45);
+    expect(screen.getByText(/45 мин/)).toBeTruthy();
+  });
 });
 
 describe('CardioDayCard — кардио-слой дня', () => {
