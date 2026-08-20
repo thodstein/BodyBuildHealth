@@ -132,6 +132,14 @@ describe('Этап 5: рефид-день как полноценная стру
     const refeed = buildDayPlan(trainInput({ refeedDay: true, goalCarbsG: 520 }));
     expect(refeed.notes.some(n => (n || '').startsWith('⚠ Клетчатка'))).toBe(false);
   });
+
+  it('Этап 7: пик-день с низким fiberMaxG не предупреждает о клетчатке и лёгкие овощи', () => {
+    const peak = buildDayPlan(trainInput({ refeedDay: false, fiberCapG: 40, goalCarbsG: 500 }));
+    // Низкий лимит клетчатки → намеренно лёгкие овощи, без красного предупреждения.
+    expect(peak.notes.some(n => (n || '').startsWith('⚠ Клетчатка'))).toBe(false);
+    expect(peak.meals.length).toBeGreaterThan(0);
+    expect(peak.totals.c).toBeGreaterThan(0);
+  });
 });
 
 describe('Этап 2: кэш пулов учитывает quality (БАГ-14)', () => {

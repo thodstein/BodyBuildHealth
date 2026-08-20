@@ -1822,7 +1822,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
            carbGiPref: _mp ? _mp.carbGiPref : undefined,
            quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
            // Этап 5: настоящий рефид-день — движок предпочитает быстрые/низкоклетчаточные углеводы.
-           refeedDay: isRefeedDay,
+            refeedDay: isRefeedDay,
+            // Этап 7: лимит клетчатки из prep/пик-недели ББ (fiberMaxG) — на пик-дне лёгкие овощи.
+            fiberCapG: _peakTargets?.fiberMaxG,
          };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
