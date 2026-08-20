@@ -1,5 +1,26 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Кардио-дневник: ккал, дистанция (км), факт-сводки, редактирование, экспорт (Aug 20 2026, pushed)
+
+Серия раундов по кардио-дневнику (движок `src/engines/lms/cardio-diary.engine.ts` + UI).
+
+- **Ккал-оценка и дистанция (км)** (`372da001`): `estimateCardioEntryKcal(type, minutes, weight?)`
+  (zone2 7 ккал/мин при 80 кг, пересчёт на реальный вес; hiit/miss/recovery — коэффициенты),
+  `CardioLogEntry.distanceKm?` + `speedKmh?`; `cardioLogStats`/`cardioWeekFact`/`cardioDayFact`
+  считают `km` и `kcal`; ввод км в `CardioDiaryPanel` (конструктор), `CardioSessionTimer`,
+  профильном `CardioDiary` и `CardioDayCard`; «план vs факт» в дневнике показывает ккал/км.
+- **Факт-сводки**: `CardioVolumeChart` — строка под графиком «факт N ккал · M км» (`c527b833`);
+  `CardioProgressCard` переведён с `cardioWeekAdherence` на `cardioWeekFact`, в строке
+  «выполнение прошлых недель» — ккал/км (`cff04486`).
+- **Редактирование записей** (`04ff990e`): в обоих журналах (конструктор + Профиль) кнопка ✎
+  заполняет форму, «Обновить» сохраняет с той же id (`saveCardioLogEntry` заменяет по id);
+  удаление редактируемой записи сбрасывает режим.
+- **Экспорт профильного журнала** (`4e086e8e`): меню «••• Ещё» — «📥 CSV-файл» (дата/тип/минуты/
+  км/ккал/ЧСС/RPE/завершено, формул-защита `=+-@` → префикс `'`), «🖨 Печать / PDF» (HTML-сводка
+  7/28д + таблица, XSS-экранирование), «🗑 Очистить дневник» (с подтверждением).
+- Тесты: cardio-diary (движок) + cardio-pro-panels + профильный cardio-diary — кардио-область
+  **359/359**, tsc 0 по своим файлам. Чужие WIP не тронуты.
+
 ## Облачная синхронизация через Telegram (Aug 18 2026, uncommitted)
 
 Привязка данных к аккаунту Telegram: localStorage (ключи `he_*`, включая фото) синхронизируется
