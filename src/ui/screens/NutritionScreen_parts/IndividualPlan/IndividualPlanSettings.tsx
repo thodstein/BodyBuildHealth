@@ -10,6 +10,7 @@ import {
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
+import { getProfile } from "../../../../core/profile-manager";
 import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
@@ -71,7 +72,7 @@ export const IndividualPlanSettings: React.FC = () => {
     injName, setInjName, injTime, setInjTime, injDose, setInjDose,
     injUnit, setInjUnit, injType, setInjType, injEster, setInjEster,
     injectDrugTypes,
-    calcTargets, effectiveKcal, effectiveP, effectiveF, effectiveC,
+    calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     budget, setBudget, nutrLevel, setNutrLevel,
@@ -969,6 +970,22 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
             );
           })}
         </div>
+        {(() => {
+          // FIX 1.5: предупреждение, если метрики тела = дефолтам (профиль не заполнен).
+          // Профиль читаем напрямую, чтобы не зависеть от локальных правок в планировщике.
+          let _incomplete = false;
+          try {
+            const _p = getProfile()?.settings as any;
+            const _pers = _p?.personal || {};
+            if (!_pers.weight || !_pers.height || !_pers.age || !_pers.sex) _incomplete = true;
+          } catch {}
+          if (!_incomplete) return null;
+          return (
+            <div style={{ fontSize: 8, color: '#f59e0b', marginBottom: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+              ⚠️ В профиле не заполнены метрики тела (вес/рост/возраст/пол) — КБЖУ считается по дефолтам (80кг / 180см / 30л). Откройте «Профиль → Пользователь» или нажмите «👤 Из профиля».
+            </div>
+          );
+        })()}
         {kbjuMode !== 'manual' ? (
           <div>
             {(() => {
@@ -1006,13 +1023,22 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               })}
             </div>;
             })()}
-            {(calcTargets.bmr || 0) > 0 && (
-              <div style={{ display:'flex', gap:6, marginBottom:6, fontSize:9, color:'rgba(255,255,255,0.9)' }}>
-                <span>BMR: <b style={{color:'#00e68a'}}>{calcTargets.bmr}</b> ккал</span>
-                <span>TDEE: <b style={{color:'#60a5fa'}}>{calcTargets.tdee}</b> ккал</span>
-                {(calcTargets.adjustment || 0) !== 0 && <span>Коррекция: <b style={{color: (calcTargets.adjustment || 0) > 0 ? '#f59e0b' : '#22c55e'}}>{(calcTargets.adjustment || 0) > 0 ? '+' : ''}{calcTargets.adjustment}</b> ккал</span>}
-              </div>
-            )}
+            {(() => {
+              // FIX 1.3: подпись BMR/TDEE/Коррекция должна отражать ТОТ ЖЕ источник, что и цифры.
+              // Раньше всегда показывался auto-calc даже в режиме 'profile' — визуальное противоречие.
+              const _src = kbjuMode === 'profile' ? profileTargets : calcTargets;
+              const _bmr = _src?.bmr || 0;
+              const _tdee = _src?.tdee || 0;
+              const _adj = _src?.adjustment || 0;
+              if (_bmr <= 0) return null;
+              return (
+                <div style={{ display:'flex', gap:6, marginBottom:6, fontSize:9, color:'rgba(255,255,255,0.9)' }}>
+                  <span>BMR: <b style={{color:'#00e68a'}}>{_bmr}</b> ккал</span>
+                  <span>TDEE: <b style={{color:'#60a5fa'}}>{_tdee}</b> ккал</span>
+                  {_adj !== 0 && <span>Коррекция: <b style={{color: _adj > 0 ? '#f59e0b' : '#22c55e'}}>{_adj > 0 ? '+' : ''}{_adj}</b> ккал</span>}
+                </div>
+              );
+            })()}
             {(() => {
               // D-22: nutrMult already folded into effective* — do NOT multiply again.
               const pKcal = effectiveP * 4;

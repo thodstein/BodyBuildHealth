@@ -660,6 +660,9 @@ export interface UnifiedSettings {
     manualTargets?: { kcal: number; protein: number; fat: number; carbs: number };
     /** Ручной г/кг белка (override proteinPerKg) */
     manualGPerKg?: number;
+    /** Ручной г/кг (полный split: protein/fat/carbs) — пишет планировщик питания.
+     *  Отдельно от proteinPerKg (число), чтобы объект не ломал numeric-потребителей. */
+    manualGPerKgSplit?: { protein?: number; fat?: number; carbs?: number };
     /** Низкоуглеводный вечерний приём */
     eveningLowCarb?: boolean;
     /** Процент суперкомпенсации (5-15%) */

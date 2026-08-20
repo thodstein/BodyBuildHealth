@@ -520,27 +520,25 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [metabolicAdaptEnabled, setMetabolicAdaptEnabled] = useState<boolean>(!!_pf.metabolicAdaptEnabled);
   const [metabolicAdaptPct, setMetabolicAdaptPct] = useState<number>(typeof _pf.metabolicAdaptPct === 'number' ? _pf.metabolicAdaptPct : 10);
   const [dietPauseMode, setDietPauseMode] = useState<'none' | 'refeed' | 'flex_80_20' | 'periodization_2_1' | 'diet_5_2'>((['none', 'refeed', 'flex_80_20', 'periodization_2_1', 'diet_5_2'] as const).includes(_pf.dietPauseMode as any) ? _pf.dietPauseMode : 'none');
-  // P1-fix: manualGPerKg инициализируется из Profile (UnifiedSettings.nutrition.manualGPerKg) + legacy
+  // P1-fix: manualGPerKg инициализируется из Profile (UnifiedSettings.nutrition.manualGPerKgSplit) + legacy
   const [manualGPerKg, setManualGPerKg] = useState<Record<string, number>>(() => {
+    const norm = (o: any): Record<string, number> => ({
+      protein: typeof o?.protein === 'number' && !isNaN(o.protein) ? o.protein : 0,
+      fat: typeof o?.fat === 'number' && !isNaN(o.fat) ? o.fat : 0,
+      carbs: typeof o?.carbs === 'number' && !isNaN(o.carbs) ? o.carbs : 0,
+    });
     try {
-      const v = (s as any)?.nutrition?.manualGPerKg;
-      if (v && typeof v === 'object') {
-        return {
-          protein: typeof v.protein === 'number' && !isNaN(v.protein) ? v.protein : 0,
-          fat: typeof v.fat === 'number' && !isNaN(v.fat) ? v.fat : 0,
-          carbs: typeof v.carbs === 'number' && !isNaN(v.carbs) ? v.carbs : 0,
-        };
-      }
+      const v = (s as any)?.nutrition?.manualGPerKgSplit;
+      if (v && typeof v === 'object') return norm(v);
+    } catch {}
+    try {
+      // Миграция: старые сохранения ошибочно писали объект в numeric proteinPerKg.
+      const pp = (s as any)?.nutrition?.proteinPerKg;
+      if (pp && typeof pp === 'object' && !Array.isArray(pp)) return norm(pp);
     } catch {}
     try {
       const v = JSON.parse(localStorage.getItem('he_manual_g_per_kg') || 'null');
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
-        return {
-          protein: typeof v.protein === 'number' && !isNaN(v.protein) ? v.protein : 0,
-          fat: typeof v.fat === 'number' && !isNaN(v.fat) ? v.fat : 0,
-          carbs: typeof v.carbs === 'number' && !isNaN(v.carbs) ? v.carbs : 0,
-        };
-      }
+      if (v && typeof v === 'object' && !Array.isArray(v)) return norm(v);
     } catch {}
     return { protein: 0, fat: 0, carbs: 0 };
   });
@@ -552,7 +550,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const phaseToGoal: Record<PhaseId, GoalId> = { course: 'mass', bridge: 'maintenance', pct: 'maintenance', recovery: 'maintenance', cutting: 'cutting', maintenance: 'maintenance', recomp: 'recomposition', fat_loss: 'fat_loss', post_cut: 'post_cut' };
   const autoGoal = phaseToGoal[phase] || 'maintenance';
   const [goalUserSet, setGoalUserSet] = useState(false);
-  useEffect(() => { if (!goalUserSet) setGoal(autoGoal); }, [phase, autoGoal, goalUserSet]);
+  // FIX 1.2: авто-цель из фазы применяется ТОЛЬКО если пользователь явно не выбрал цель
+  // И в профиле нет не-нейтральной первичной цели. Раньше фаза 'course' (по умолчанию)
+  // принудительно ставила goal='mass' (набор), затирая primaryGoal=fat_loss/cut из профиля —
+  // калории считались на «набор» при сушке.
+  const profilePrimaryGoal = (s?.primaryGoal as GoalId) || 'maintenance';
+  useEffect(() => {
+    if (goalUserSet) return;
+    if (profilePrimaryGoal && profilePrimaryGoal !== 'maintenance') return;
+    setGoal(autoGoal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, autoGoal, goalUserSet, profilePrimaryGoal]);
 
   const [injections, setInjections] = useState<DrugInjection[]>(() => {
     if (courseEntries.length > 0) {
@@ -1372,7 +1380,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (s.nutrition.excludedFoods) setExcludedFoods(s.nutrition.excludedFoods);
         if (s.nutrition.preferredFoods) setPreferredFoods(s.nutrition.preferredFoods);
         if (s.nutrition.preferredByMeal) setPreferredByMeal(s.nutrition.preferredByMeal);
-        if (s.nutrition.proteinPerKg) setManualGPerKg(s.nutrition.proteinPerKg);
+        // FIX 1.1: читаем split-объект г/кг из профиля (не numeric proteinPerKg).
+        const _mg = (s.nutrition as any).manualGPerKgSplit;
+        if (_mg && typeof _mg === 'object') {
+          setManualGPerKg({
+            protein: typeof _mg.protein === 'number' && !isNaN(_mg.protein) ? _mg.protein : 0,
+            fat: typeof _mg.fat === 'number' && !isNaN(_mg.fat) ? _mg.fat : 0,
+            carbs: typeof _mg.carbs === 'number' && !isNaN(_mg.carbs) ? _mg.carbs : 0,
+          });
+        } else if (s.nutrition.proteinPerKg && typeof s.nutrition.proteinPerKg === 'number') {
+          setManualGPerKg({ protein: s.nutrition.proteinPerKg, fat: 0, carbs: 0 });
+        }
         if (s.nutrition.sodiumG) {/* stored */}
         if (s.nutrition.eveningLowCarb) setEveningLowCarb(s.nutrition.eveningLowCarb);
         if (s.nutrition.surplusPct) setSurplusPct(s.nutrition.surplusPct);
@@ -1419,8 +1437,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (excludedFoods.length) next.nutrition.excludedFoods = excludedFoods;
       if (preferredFoods.length) next.nutrition.preferredFoods = preferredFoods;
       if (preferredByMeal && Object.keys(preferredByMeal).length) next.nutrition.preferredByMeal = preferredByMeal;
-      if (manualGPerKg) next.nutrition.proteinPerKg = manualGPerKg;
+      // FIX 1.1: ручной г/кг — объект {protein,fat,carbs} пишется в отдельное поле manualGPerKgSplit,
+      // НЕ в numeric proteinPerKg (раньше ломал числовое поле для ББ-авто/organ-load).
+      next.nutrition.manualGPerKgSplit = (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0)
+        ? { protein: manualGPerKg.protein || 0, fat: manualGPerKg.fat || 0, carbs: manualGPerKg.carbs || 0 }
+        : undefined;
+      // Миграция: heal уже испорченного numeric proteinPerKg (объект → число 1.8, объект переносим в Split).
+      if (next.nutrition.proteinPerKg && typeof next.nutrition.proteinPerKg === 'object' && !Array.isArray(next.nutrition.proteinPerKg)) {
+        if (!next.nutrition.manualGPerKgSplit) next.nutrition.manualGPerKgSplit = next.nutrition.proteinPerKg;
+        next.nutrition.proteinPerKg = 1.8;
+      }
       next.nutrition.eveningLowCarb = eveningLowCarb;
+      // FIX 1.4/1.5: сохраняем ручные цели КБЖУ + режим обратно в профиль
+      // (раньше писались только в localStorage — профиль оставался устаревшим).
+      if (manualKcal !== null && manualP !== null && manualF !== null && manualC !== null) {
+        next.nutrition.manualTargets = { kcal: manualKcal, protein: manualP, fat: manualF, carbs: manualC };
+      }
+      next.nutrition.kbjuMode = (kbjuMode === 'manual' ? 'manual' : (kbjuMode === 'profile' ? 'auto' : 'auto'));
       if (surplusPct) next.nutrition.surplusPct = surplusPct;
       next.nutrition.histamineSensitive = histamineSensitive;
       if (!next.health) next.health = {};
