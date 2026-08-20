@@ -1,4 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const MAX_BYTES = 12 * 1024 * 1024;
 const OCR_TIMEOUT_MS = 240_000;
@@ -9,12 +12,10 @@ export const config = {
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
-  const rus = await import('@tesseract.js-data/rus');
-  const worker = await createWorker('rus+eng', 1, {
+  const rus = require('@tesseract.js-data/rus');
+  const worker = await createWorker('rus', 1, {
     langPath: rus.langPath,
     gzip: true,
-    workerPath: undefined,
-    corePath: undefined,
   } as any);
   try {
     await worker.setParameters({
