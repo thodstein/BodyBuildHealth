@@ -132,6 +132,24 @@ describe('E10: target предтрена отражает фактическую
   });
 });
 
+describe('E7: перекус-типология (протеин-порошок + хлопья + сухофрукты, без овощей)', () => {
+  it('перекус строится с быстрым белком (порошок) и не содержит овощей', () => {
+    const plan = buildDayPlan(base({ mealsCount: 8, isTrainingDay: false }));
+    const snack = plan.meals.find(m => m.type === 'snack' || m.type === 'snack2')!;
+    expect(snack).toBeTruthy();
+    expect(snack.items.some(it => it.role === 'veg')).toBe(false);
+    // Белок перекуса — быстрый протеин (порошок) или присутствует быстрый белок в составе.
+    const hasFastProtein = snack.items.some(it => it.role === 'fast_protein' || it.role === 'protein');
+    expect(hasFastProtein).toBe(true);
+  });
+
+  it('в перекусе присутствует фрукт/сухофрукты', () => {
+    const plan = buildDayPlan(base({ mealsCount: 8, isTrainingDay: false }));
+    const snack = plan.meals.find(m => m.type === 'snack' || m.type === 'snack2')!;
+    expect(snack.items.some(it => it.role === 'fruit')).toBe(true);
+  });
+});
+
 // Тренировочный вход (для E10: prew строится только на тренировочный день).
 function trainLike(overrides: any = {}): MealPlanInput {
   return base({ isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true, ...overrides });

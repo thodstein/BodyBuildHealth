@@ -190,6 +190,7 @@ export interface PlanCtx {
   removeFoodItem: (a: number, b: number, c: number) => void;
   replaceMealWithRecipe: (recipe: Recipe, mealIdx: number, dayIdx?: number) => void;
   addFoodToMeal: (dayIdx: number, mealIdx: number, food: any) => void;
+addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean }) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
@@ -1201,6 +1202,30 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, items => [...items, item]);
     } else if (resolved.plan === 'week') {
       updateMultiDayPlan(weekPlan, resolved.day, mealIdx, items => [...items, item]);
+    }
+  };
+
+  // E7: быстрый «порошок + хлопья» в перекус — протеин-изолят + овсяные хлопья с фиксированной дозировкой.
+  const addSnackComboToMeal = (dayIdx: number, mealIdx: number) => {
+    const resolved = _resolvePlanDay(dayIdx);
+    if (!resolved) return;
+    const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
+    if (!dayData?.meals?.[mealIdx]) return;
+    const mk = (f: any, grams: number) => ({ name: f.name, id: f.id, amount: grams, kcal: Math.round((f.kcal || 0) * grams / 100), p: Math.round((f.protein || 0) * grams / 100), f: Math.round((f.fat || 0) * grams / 100), c: Math.round((f.carbs || 0) * grams / 100), fiber: Math.round((f.fiber || 0) * grams / 100) });
+    const whey = FOOD_DB.find(f => f.id === 'whey_isolate') || FOOD_DB.find(f => f.id === 'whey_protein');
+    const oats = FOOD_DB.find(f => f.id === 'oats');
+    const additions = [] as any[];
+    if (whey) additions.push(mk(whey, 30));
+    if (oats) additions.push(mk(oats, 50));
+    if (additions.length === 0) return;
+    saveUndo();
+    const apply = (items: any[]) => [...items, ...additions];
+    if (resolved.plan === 'day') {
+      _applyDayPlanMealUpdate(mealIdx, apply);
+    } else if (resolved.plan === 'three') {
+      updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, apply);
+    } else if (resolved.plan === 'week') {
+      updateMultiDayPlan(weekPlan, resolved.day, mealIdx, apply);
     }
   };
 
@@ -3046,7 +3071,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
     updateItemAmount, removeFoodItem, replaceMealWithRecipe, generatePlan,
     weekEditDay, openWeekDayForEdit, switchPlanDays,
-    addFoodToMeal, undoLast,
+    addFoodToMeal, addSnackComboToMeal, undoLast,
     toggleAllergen, toggleHealthIssue, loadSavedPlan,
     autofillFromProfile, saveToProfile,
     generateCheatMeal, generateCarbload, generateBUTCH,

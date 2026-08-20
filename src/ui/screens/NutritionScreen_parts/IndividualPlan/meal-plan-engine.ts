@@ -370,6 +370,32 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: Fo
     fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
   };
 }
+// ─── E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи) ──
+const SNACK_CARB_KEYWORDS = ['хлопья','овсян','рисов','манк','мюсли','гречк','сухар','рисовый крем','хлеб','рис '];
+const SNACK_FRUIT_KEYWORDS = ['изюм','кураг','черносл','финик','сухофрук','ягод','банан','инжир','черника','малин'];
+const SNACK_NUT_KEYWORDS = ['орех','миндаль','кешью','грецкий','арахис','фундук','пекан','кокос','тыквенные семечки','чиа','семечк'];
+function snackCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: FoodItem[]; fruits: FoodItem[] } {
+  const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
+  const match = (f: FoodItem, kws: string[]) => {
+    const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
+    return kws.some(k => name.includes(k) || id.includes(k));
+  };
+  const carbs = source.filter((f) => match(f, SNACK_CARB_KEYWORDS));
+  const fruits = pool.carbFruit.filter((f) => match(f, SNACK_FRUIT_KEYWORDS));
+  return {
+    carbs: carbs.length > 0 ? carbs : [...source],
+    fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
+  };
+}
+function snackNutPool(pool: ReturnType<typeof buildFoodPools>): FoodItem[] {
+  const match = (f: FoodItem) => {
+    const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
+    return SNACK_NUT_KEYWORDS.some(k => name.includes(k) || id.includes(k));
+  };
+  const nuts = pool.fats.filter(match);
+  return nuts.length > 0 ? nuts : pool.fats;
+}
+
 
 // ─── Утилиты: детерминированный выбор ─────────────────────────────────
 function seededRandom(seed: number): number {
@@ -627,12 +653,16 @@ function buildWholeMeal(
     refeedDay?: boolean; // Этап 5: настоящий рефид-день (быстрые/низкоклетчаточные углеводы, лёгкие овощи)
     fiberCapG?: number; // Этап 7: верхний предел клетчатки (пик-неделя ББ) — лёгкие овощи
     breakfast?: boolean; // E1: продуктовый пул «завтрака» (каши/хлопья + ягоды/сухофрукты), а не общий
+    snack?: boolean; // E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи)
     extraLiquids?: { food: FoodItem; grams: number; role?: MealItem['role'] }[]; // E8: молоко/кокосовое масло в завтрак
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, extraLiquids } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, extraLiquids } = params;
   // E1: завтрак использует собственный продуктовый пул (каши/хлопья + ягоды/банан/сухофрукты).
   const _breakfastPools = breakfast ? breakfastCarbPool(pool) : null;
+  // E7: перекус использует собственный пул (порошок + хлопья + сухофрукты + орехи).
+  const _snackPools = snack ? snackCarbPool(pool) : null;
+  const _snackNuts = snack ? snackNutPool(pool) : null;
   // D-28: effective preferred = (global preferred MINUS foods bound to other meals) ∪ meal-bound for THIS meal.
   // This ensures rice_cream bound to breakfast is preferred ONLY on breakfast, not everywhere.
   const _otherMealBound = new Set<string>(Object.entries(params.preferredByMealFull || {}).filter(([m]) => m !== label).flatMap(([, v]) => [...(v as any)]));
@@ -658,6 +688,7 @@ function buildWholeMeal(
   const preferredRot = preferredIds && preferredIds.size > 0 ? _allProteinPool.filter(f => preferredIds.has(f.id)) : [];
   const proteinPool = preferredRot.length > 0
     ? preferredRot
+    : snack && pool.fastProtein.length > 0 ? [...pool.fastProtein, ...rotPoolFinal]
     : rotPoolFinal.length > 0 ? rotPoolFinal
     : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
     : (remF < 12 && pool.proteinLean.length > 0) ? pool.proteinLean
@@ -705,7 +736,9 @@ function buildWholeMeal(
     // это ускоряет гликогеновый ре-синтез и снижает объём клетчатки в приёме.
     const _carbPool = (refeedDay && pool.carbFast.length > 0) ? pool.carbFast : pool.carbSlow;
     // E1: на завтраке отдаём предпочтение «завтрашним» углеводам (каши/хлопья), fallback — общий пул.
-    const carbPool = (_breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool;
+    const carbPool = (snack && _snackPools && _snackPools.carbs.length > 0)
+      ? _snackPools.carbs
+      : (breakfast && _breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
     const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
     // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
@@ -760,7 +793,9 @@ function buildWholeMeal(
       // E5: углеводная «добивка» фруктом/сухофруктами/ягодами — когда крупяные порции
       // упёрлись в кап (280/350 г), остаток закрываем фруктом вместо наращивания каши.
       if (remC > 15 && (pool.carbFruit.length > 0 || (_breakfastPools && _breakfastPools.fruits.length > 0))) {
-        const fruitPool = (_breakfastPools && _breakfastPools.fruits.length > 0) ? _breakfastPools.fruits : pool.carbFruit;
+    const fruitPool = (snack && _snackPools && _snackPools.fruits.length > 0)
+      ? _snackPools.fruits
+      : (breakfast && _breakfastPools && _breakfastPools.fruits.length > 0) ? _breakfastPools.fruits : pool.carbFruit;
         const used = new Set(items.map(i => i.id));
         const fTop = fruitPool.filter((f: any) => !used.has(f.id));
         const fSrc = pickPriority(fTop.length > 0 ? fTop : fruitPool, seed + 21, { lockedIds, recentIds, hardRecentIds });
@@ -811,8 +846,9 @@ function buildWholeMeal(
 
   // 5. Жиры: остаточный принцип (если remF > 5) (предпочтение — preferred)
   if (remF > 5) {
-    const prefFat = preferredIds && preferredIds.size > 0 ? pool.fats.filter(f => preferredIds.has(f.id)) : [];
-    const fatSource = pickPriority(prefFat.length > 0 ? prefFat : pool.fats, seed + 6, { lockedIds, recentIds, hardRecentIds });
+    const fatSourcePool = (snack && _snackNuts && _snackNuts.length > 0) ? _snackNuts : pool.fats;
+    const prefFat = preferredIds && preferredIds.size > 0 ? fatSourcePool.filter(f => preferredIds.has(f.id)) : [];
+    const fatSource = pickPriority(prefFat.length > 0 ? prefFat : fatSourcePool, seed + 6, { lockedIds, recentIds, hardRecentIds });
     if (fatSource) {
       const grams = gramsForMacro(fatSource, remF, 'fat');
       if (grams > 0) {
@@ -1486,6 +1522,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     proteinG: mealBudget.snack.p,
       carbG: mealBudget.snack.c,
       fatG: mealBudget.snack.f,
+      snack: true,
       pool, proteinRotationIds: snackRot.ids, seed: seedBase + 8,
       includeVeg: false, includeFruit: true,
       preferredIds: effectivePreferred, dayUsedPreferredIds,
@@ -1509,7 +1546,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,
       pool, proteinRotationIds: snack2Rot.ids, seed: seedBase + 13,
-      includeVeg: false, includeFruit: true,
+      includeVeg: false, includeFruit: true, snack: true,
       preferredIds: effectivePreferred, dayUsedPreferredIds, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
       rationales: ['Второй перекус: поддержка MPS + углеводное окно при большом числе приёмов'],
     });
@@ -1539,7 +1576,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           preferredByMealFull: input.preferredByMeal,
           proteinG: mb.p, carbG: mb.c, fatG: mb.f,
           pool, proteinRotationIds: rot.ids, seed: s.seed,
-          includeVeg: false, includeFruit: true,
+          includeVeg: false, includeFruit: true, snack: true,
           preferredIds: effectivePreferred, dayUsedPreferredIds, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
           rationales: [`${s.label}: поддержка MPS при большом числе приёмов (равномерное распределение белка)`],
         });
