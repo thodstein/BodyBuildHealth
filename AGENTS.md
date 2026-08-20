@@ -1,20 +1,43 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
-## Кардио: дни ног в профильном дневнике (Aug 20 2026, pushed f585d396)
+## Кардио: пакеты A–D — валидация журнала, undo, работа дня, советы по рабочим неделям (Aug 20 2026, pushed 3ccc5af0)
 
-Поверх экспортов цикла: `config.legDays` виден и в профильном «❤️ Кардио-дневнике».
+Поверх дней ног: комплексная доводка кардио-конструктора и дневника по плану A–D.
 
-- **`CardioDiary.tsx`** (ProfileScreen_v2/diaries/CardioDiary): memo-вычисление дат-дней ног из
-  активного цикла через `cardioLegDayForDate` (Set `legDayDates` + `todayLegDay`); строки журнала
-  на день ног получают 🦵-бейдж (title «День тяжёлых ног»); форма записи при дате=сегодня и
-  дне ног показывает `role="status"`-подсказку — красную «…лучше перенести или заменить на
-  recovery» при zone2/miss/hiit, янтарную «recovery можно» при recovery; CSV и Печать/PDF —
-  колонка «День ног» (да/🦵).
-- Тесты: +3 (бейдж только для дня ног, подсказка формы сегодня + смена типа на Recovery,
-  отсутствие подсказки в не-день ног; детерминированные: dow = `(getDay()+6)%7`). Профильный
-  дневник **14/14**, кардио-область **456/456** (14 файлов), tsc 0 по своим файлам.
-- ВНИМАНИЕ: параллельный агент откатил мои правки CardioDiary во время tsc-прогона — правки
-  восстановлены и закоммичены сразу после целевого прогона тестов.
+- **A1**: гейт прошлых недель в `autoTuneCardioCycle` — прошлые недели не переписываются
+  авто-подстройкой (после `weekStats.push` возврат как есть).
+- **A2 (варианты)**: `selectVariant(v)` — живое применение варианта: `setVariant(v)` +
+  пересборка `buildCardioCycle({...base, ...vOpts, config: applied})` + `saveCardioCycle` +
+  `setActiveCardioCycle` + `setCycle` + `reload()` + flash «⇄ Вариант „X“ применён — цикл пересобран».
+  `WizardState` += variant/comps; wizard-save и init учитывают их; `editConfig` → `variantFromConfig`.
+- **A3 (валидация журнала)**: `validateCardioLogFields` (RPE 1–10, ЧСС 20–260, км 0–200, минуты 1–600;
+  **пустые строки трактуются как null** — фикс: `Number('') === 0` давал ложный warning и блокировал
+  сохранение) + `clampCardioLogNumber`; warnings (`role="alert"`) во всех 3 формах
+  (CardioDiaryPanel/CardioSessionTimer/профильный CardioDiary); NEW `replaceCardioLog(entries)` —
+  полная замена журнала для undo.
+- **B1**: `goNext` на preview без цикла — сразу `build()` + переход на следующий шаг.
+- **B2**: `normalizeCardioPhaseSplit(input, totalWeeks)` в движке (клампы + усечение суммы до totalWeeks)
+  + в CardioParamsStep предупреждение о сумме фаз (красное «> доступных недель» / жёлтое «распределено меньше»).
+- **B3 (undo версий)**: `restoreCardioCycleVersion` больше НЕ удаляет снапшот (неразрушающий undo);
+  `clearCardioCycleHistory(c.id)` при удалении цикла (`removeCycle` в CardioConstructor);
+  `saveCardioCycleVersion(before, 'До пересчёта под ACWR')` перед ACWR-пересчётом (CardioLinkCard.applyRecalc).
+- **C1 (синхронизация факта)**: `CardioDiaryStep` держит `log`/`srpe` в state и передаёт в дочерние
+  виджеты — `CardioDayCard` (пропы `log`/`srpe`), `CardioProgressCard` (`log`), `CardioVolumeChart` (`log`),
+  `CardioDiaryPanel` (`log`/`onLogChanged`). Факт-виджеты больше не читают localStorage только при mount —
+  обновляются после сохранения в таймере. Управляемый режим панели журнала.
+- **C2 (панель журнала)**: `CardioDiaryPanel` — undo-кнопка «↩ Отменить» (восстанавливает снимок через
+  `replaceCardioLog`), пустое состояние («📭 Записей пока нет…»), бейдж «⏭ пропущена» для `completed:false`,
+  кнопка «✕ Сбросить» формы; CardioSessionTimer — id-суффикс `c-<ts>-<rand>` и дедуп пропуска
+  (сегодня уже пропущен тот же тип → flash без второй записи).
+- **C3 (советы)**: `computeCardioAdvice` базируется на **рабочих неделях**
+  (base/build/maintenance/contest_prep), исключая taper/peak/transition (занижали бы план).
+- **D**: `window.confirm` перед удалением цикла; a11y карточек вариантов CardioPreviewStep
+  (`role=button`+`tabIndex`+`aria-pressed`+Enter/Space); опечатка «низкоуударным»→«низкоударным».
+- Тесты: +8 (C3 совет по рабочим неделям; CardioDiaryPanel undo×2/пустое состояние/бейдж пропуска/
+  сброс формы/управляемый режим; CardioDiaryStep передача log). Обновлён тест undo-версий
+  (restore не удаляет снапшот). Кардио-область **461/461** (14 файлов), tsc 0 по своим файлам
+  (чужие WIP: daily-quality-score, IndividualPlanResults, WeightDiary/BodyRecompVelocity/
+  WaistHeightRatio, ProgramEditorView).
 
 ## Кардио: дни ног в печатной сводке и текстовом экспорте (Aug 20 2026, pushed ebe8b4bf)
 
