@@ -102,6 +102,13 @@ describe('PLSeasonBuilder', () => {
     expect(screen.queryByText(/Циклы между соревнованиями/)).not.toBeNull();
     expect(screen.queryByText(/Старт 1 \(нед 8\)/)).not.toBeNull();
     expect(screen.queryByText(/Старт 2 \(нед 20\)/)).not.toBeNull();
+    // Ручной выбор цикла на пролёт (второй «👆 Выбрать вручную» — карточка пролётов),
+    // выбираем 12-нед цикл в 8-нед окно → бейдж «⬇ сжат».
+    const manualBtns = screen.getAllByText('👆 Выбрать вручную');
+    fireEvent.click(manualBtns[manualBtns.length - 1]);
+    const gapSelect = screen.getByLabelText(/пролёта к «Старт 2»/);
+    fireEvent.change(gapSelect, { target: { value: 'cycle-01' } });
+    expect(screen.getAllByText(/⬇ сжат/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
     expect(Array.isArray(built!.weeks) && built!.weeks.length > 20).toBe(true);

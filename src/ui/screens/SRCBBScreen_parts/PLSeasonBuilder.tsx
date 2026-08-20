@@ -29,6 +29,10 @@ import {
 import type { LMSRankedCycle, LMSSelectorInput } from '../../../engines/lms/lms-selector.engine';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 import type { PLSeasonMeet, MacroTaperOpts } from '../../../engines/lms/lms-macro-taper.engine';
+import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+
+const ALL_PL_CYCLES = LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding');
 
 export interface PLSeasonBuilderProps {
   selector: LMSSelectorInput;
@@ -259,22 +263,45 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
               {seg.meetName} (нед {seg.meetWeek}) · окно {seg.availableWeeks} нед · тапер {seg.taperWeeks} нед{taper.postMeet ? ' + пост' : ''}
             </div>
             {compPickMode === 'manual' && (
-              <select
-                value={seg.cycleId}
-                onChange={e => setCompSelections(prev => ({ ...prev, [i]: e.target.value }))}
-                style={selStyle}
-                aria-label={`Выбор цикла для пролёта к «${seg.meetName}»`}
-              >
-                {seg.candidates.length === 0 && <option value="">Нет подходящих — выберите из каталога</option>}
-                {seg.candidates.map(c => (
-                  <option key={c.cycle.meta.id} value={c.cycle.meta.id}>
-                    {c.cycle.meta.title} · {c.cycle.meta.level} · {c.cycle.meta.weeks} нед
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={seg.cycleId}
+                  onChange={e => setCompSelections(prev => ({ ...prev, [i]: e.target.value }))}
+                  style={selStyle}
+                  aria-label={`Выбор цикла для пролёта к «${seg.meetName}»`}
+                >
+                  {seg.candidates.length === 0 && <option value="">Нет подходящих — выберите из каталога</option>}
+                  {seg.candidates.map(c => (
+                    <option key={c.cycle.meta.id} value={c.cycle.meta.id}>
+                      {c.cycle.meta.title} · {c.cycle.meta.level} · {c.cycle.meta.weeks} нед
+                    </option>
+                  ))}
+                </select>
+                {seg.candidates.length === 0 && (
+                  <select
+                    value={seg.cycleId}
+                    onChange={e => setCompSelections(prev => ({ ...prev, [i]: e.target.value }))}
+                    style={{ ...selStyle, marginTop: 4, borderColor: 'rgba(245,158,11,0.4)' }}
+                    aria-label={`Любой цикл из каталога для пролёта к «${seg.meetName}»`}
+                  >
+                    <option value="">Любой цикл из каталога…</option>
+                    {ALL_PL_CYCLES.map(c => (
+                      <option key={c.meta.id} value={c.meta.id}>
+                        {c.meta.title} · {c.meta.level} · {c.meta.weeks} нед
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
             )}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-              {seg.cycleId ? `Цикл: ${seg.cycleTitle} (${seg.cycleWeeks} нед) → ${seg.fitMode === 'skip' ? 'только старт' : `${seg.fitWeeks} нед`}` : 'Поддерживающий объём (последняя неделя цикла)'}
+              {seg.cycleId
+                ? <>Цикл: <b>{seg.cycleTitle}</b> ({seg.cycleWeeks} нед) → {seg.fitMode === 'skip' ? 'только старт' : `${seg.fitWeeks} нед`}
+                  {seg.fitMode === 'shrink' && <span style={{ color: '#fb923c', fontWeight: 700 }}> · ⬇ сжат {seg.cycleWeeks}→{seg.fitWeeks}</span>}
+                  {seg.fitMode === 'extend' && <span style={{ color: '#60a5fa', fontWeight: 700 }}> · ⬆ растянут</span>}
+                  {seg.fitMode === 'exact' && <span style={{ color: '#22c55e', fontWeight: 700 }}> · ✓ точно</span>}
+                </>
+                : 'Поддерживающий объём (последняя неделя цикла)'}
               {seg.notes.slice(1).map((n, ni) => <span key={ni} style={{ display: 'block', color: 'rgba(255,255,255,0.4)' }}>{n}</span>)}
             </div>
           </div>

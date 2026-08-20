@@ -1560,7 +1560,17 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           }} />
           {plSeasonMode === 'season' && (
             <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
-              🧩 Сезон по микроциклам активен — циклы и их ужатие выбраны в шаге «1 Настройки»; здесь отображается итоговый план (включая пик/тапер под соревнования).
+              {seasonNotes.length > 0 ? (
+                <>
+                  <div style={{ fontWeight: 800, marginBottom: 4 }}>🧩 Сезон по микроциклам</div>
+                  {seasonNotes.slice(0, 12).map((n, i) => <div key={i} style={{ color: 'rgba(196,181,253,0.85)' }}>{n}</div>)}
+                </>
+              ) : (
+                <>
+                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать сезон» в шаге «1 Настройки». Здесь будет итоговый план (включая пик/тапер под соревнования).
+                  <button style={{ ...BTN_GHOST, minHeight: 32, fontSize: 10, marginLeft: 6, border: '1px solid rgba(168,85,247,0.4)', color: '#c4b5fd' }} onClick={() => setSubView('settings')}>→ 1 Настройки</button>
+                </>
+              )}
             </div>
           )}
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
@@ -1574,6 +1584,71 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>4 📊 Графики</div>
           <TrainingMetricsChart lms={lmsChart} bb={undefined} />
+          {/* 📈 Тренды e1RM из дневника (план: шаг 4 — графики) */}
+          <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Тренды e1RM (из дневника тренировок)</div>
+            {e1rmSeries.length === 0 ? (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.</div>
+            ) : (
+              <div style={{ marginBottom: 8 }}>
+                {e1rmSeries.map(s => {
+                  const W = 100, H = 34;
+                  const pts = s.pts.map(p => p.val);
+                  const min = Math.min(...pts), max = Math.max(...pts);
+                  const range = Math.max(1, max - min);
+                  const px = (i: number) => (i / Math.max(1, pts.length - 1)) * W;
+                  const py = (v: number) => H - 3 - ((v - min) / range) * (H - 6);
+                  const trend = pts.length >= 2 ? ((pts[pts.length - 1] - pts[0]) / Math.max(1, pts[0]) * 100) : 0;
+                  const dirColor = trend <= -5 ? '#ef4444' : trend <= 1 ? '#eab308' : '#22c55e';
+                  return (
+                    <div key={s.lift} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: s.color, width: 84, flexShrink: 0 }}>{s.label} {pts[pts.length - 1]} кг</div>
+                      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ flex: 1, maxWidth: 180 }}>
+                        <polyline points={s.pts.map((p, i) => `${px(i)},${py(p.val)}`).join(' ')} fill="none" stroke={s.color} strokeWidth={1.6} />
+                        {s.pts.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />)}
+                      </svg>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: dirColor, flexShrink: 0 }}>{trend > 0 ? '▲' : trend < 0 ? '▼' : '→'} {Math.abs(trend).toFixed(1)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {exerciseE1rm.length > 0 && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Тренд по упражнению:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                  {exerciseE1rm.slice(0, 15).map(e => (
+                    <button key={e.name} onClick={() => setSelectedTrendEx(selectedTrendEx === e.name ? null : e.name)} style={{
+                      padding: '4px 9px', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 10,
+                      border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
+                      background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
+                      color: selectedTrendEx === e.name ? 'var(--accent)' : 'rgba(255,255,255,0.65)',
+                    }}>{e.name} · {e.e1} кг</button>
+                  ))}
+                </div>
+                {selectedTrendEx && (() => {
+                  if (exTrendSeries.length < 2) {
+                    return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})</div>;
+                  }
+                  const vals = exTrendSeries.map(p => p.e1);
+                  const W = 100, H = 40;
+                  const min = Math.min(...vals), max = Math.max(...vals);
+                  const range = Math.max(1, max - min);
+                  const px = (i: number) => (i / Math.max(1, vals.length - 1)) * W;
+                  const py = (v: number) => H - 3 - ((v - min) / range) * (H - 6);
+                  return (
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>{selectedTrendEx} · посл: {vals[vals.length - 1]} кг</div>
+                      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 200 }}>
+                        <polyline points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
+                        {exTrendSeries.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />)}
+                      </svg>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
           <div style={{ marginTop: 8 }}><ProMetricsPanel /></div>
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>← 3 План</button>
