@@ -80,6 +80,26 @@ describe('CardioDiary — CSR', () => {
     expect(screen.getByRole('menuitem', { name: /Очистить дневник/ })).toBeTruthy();
   });
 
+  it('undo: после записи кнопка «↩ Отменить запись» восстанавливает предыдущее состояние', () => {
+    saveCardioLogEntry({ id: 'x7', date: '2026-08-17', type: 'zone2', durationMin: 30, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    fireEvent.click(screen.getByRole('button', { name: /Записать сессию/ }));
+    expect(loadCardioLog().length).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: /Отменить запись/ }));
+    expect(loadCardioLog().length).toBe(1);
+    expect(loadCardioLog()[0].id).toBe('x7');
+  });
+
+  it('undo после удаления возвращает запись', () => {
+    saveCardioLogEntry({ id: 'x8', date: '2026-08-17', type: 'zone2', durationMin: 30, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    fireEvent.click(screen.getByRole('button', { name: /Удалить 2026-08-17/ }));
+    expect(loadCardioLog().length).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: /Отменить запись/ }));
+    expect(loadCardioLog().length).toBe(1);
+    expect(loadCardioLog()[0].id).toBe('x8');
+  });
+
   it('активный цикл: блок «план vs факт» показывает выполнение текущей недели', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cd-1' });
     saveCardioCycle(c);

@@ -49,6 +49,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   const [km, setKm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [undo, setUndo] = useState<CardioLogEntry[] | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -106,6 +107,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
       calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
       distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
     };
+    setUndo(log);
     saveCardioLogEntry(entry);
     setEditingId(null);
     reload();
@@ -113,8 +115,18 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   };
 
   const remove = (id: string) => {
+    setUndo(log);
     removeCardioLogEntry(id);
     reload();
+  };
+
+  // Откат последнего изменения (добавление/обновление/удаление).
+  const restoreUndo = () => {
+    if (!undo) return;
+    try { localStorage.setItem('he_cardio_sessions', JSON.stringify(undo)); } catch { /* ignore */ }
+    setUndo(null);
+    reload();
+    flashMsg('↩ Изменение отменено');
   };
 
   const csvCell = (v: unknown) => {
@@ -201,6 +213,9 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             {adherence.cycle.name}: {adherence.doneSessions}/{adherence.plannedSessions} сессий нед {adherence.week}
           </span>
         ) : undefined}
+        undoActive={!!undo}
+        onUndo={restoreUndo}
+        undoLabel="↩ Отменить запись"
       />
 
       {flash && <div style={{ color: ACCENT, fontSize: 13, fontWeight: 600, padding: '4px 2px' }} role="status">{flash}</div>}
