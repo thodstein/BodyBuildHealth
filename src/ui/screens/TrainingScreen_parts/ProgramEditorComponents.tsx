@@ -376,6 +376,10 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           style={{ ...CARD, padding: 10 }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span
+              title="Перетащите для изменения порядка недель"
+              style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >☰</span>
             <button
               className="editor-week-toggle"
               type="button"
@@ -1127,7 +1131,7 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
         <span>{sets.length} шт.</span>
       </div>
       {sets.map((s, i) => (
-        <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '6px 8px' }}>
+        <div key={i} style={{ background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 8, padding: '6px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
              <span className="editor-set-index">{i + 1}</span>
              <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" placeholder="повт" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />

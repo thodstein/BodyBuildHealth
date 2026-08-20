@@ -384,6 +384,34 @@
 .manual-constructor--editor textarea {
   border-radius: 9px;
 }
+/* Карточки редактора: плавная подсветка при наведении/фокусе — паритет с
+   .macrocycle-week-card. Границы карточек заданы токенами (--editor-*), здесь
+   только живая реакция поверх инлайн-стилей. */
+.manual-constructor--editor .editor-week-card,
+.manual-constructor--editor .editor-session-card,
+.manual-constructor--editor .editor-exercise-card {
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+@media (hover: hover) {
+  .manual-constructor--editor .editor-week-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.6) !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+  }
+  .manual-constructor--editor .editor-session-card:hover {
+    border-color: rgba(0,230,138,0.5) !important;
+    background: rgba(0,230,138,0.07) !important;
+  }
+  .manual-constructor--editor .editor-exercise-card:hover {
+    border-color: rgba(167,139,250,0.5) !important;
+    background: rgba(167,139,250,0.08) !important;
+  }
+}
+.manual-constructor--editor .editor-week-card:focus-within,
+.manual-constructor--editor .editor-session-card:focus-within,
+.manual-constructor--editor .editor-exercise-card:focus-within {
+  border-color: rgba(255,255,255,0.4) !important;
+}
 .constructor-surface {
   background: var(--constructor-surface) !important;
   border-color: var(--constructor-border) !important;
