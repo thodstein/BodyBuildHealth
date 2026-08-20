@@ -111,4 +111,13 @@ describe('PLSeasonBuilder', () => {
     const html = renderToStaticMarkup(<PLSeasonBuilder {...props()} />);
     expect(html).toContain('Сезон по микроциклам');
   });
+
+  it('управляемый режим: mode/onModeChange пробрасываются в родителя', () => {
+    const changes: ('single' | 'season')[] = [];
+    render(<PLSeasonBuilder {...props({ mode: 'season', onModeChange: (m) => changes.push(m) })} />);
+    // Управляемый режим 'season' — слоты видны сразу.
+    expect(screen.getAllByText(/Выносливость/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('🎯 Одиночный цикл'));
+    expect(changes).toEqual(['single']);
+  });
 });

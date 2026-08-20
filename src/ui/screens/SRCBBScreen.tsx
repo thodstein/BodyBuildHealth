@@ -1489,6 +1489,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           </div>
           {/* 🧩 Сезон по микроциклам */}
           <PLSeasonBuilder
+            mode={plSeasonMode}
+            onModeChange={setPlSeasonMode}
             selector={{ goal: goal as never, level: level as never, bodyWeight: bw, daysPerWeek: days, direction: dir as never, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural' }}
             meets={meetList.map(m => ({ id: m.id, name: m.name, weeksToStart: m.weeksToStart }))}
             taper={{
@@ -1556,6 +1558,15 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
             tempoStr, getTempo, methodHints,
           }} />
+          {plSeasonMode === 'season' && (
+            <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
+              🧩 Сезон по микроциклам активен — циклы и их ужатие выбраны в шаге «1 Настройки»; здесь отображается итоговый план (включая пик/тапер под соревнования).
+            </div>
+          )}
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>← 2 Слабые точки + 10 калькуляторов</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>4 Графики →</button>
+          </div>
         </div>
       )}
 
@@ -1564,6 +1575,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           <div style={H}>4 📊 Графики</div>
           <TrainingMetricsChart lms={lmsChart} bb={undefined} />
           <div style={{ marginTop: 8 }}><ProMetricsPanel /></div>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>← 3 План</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('reference')}>5 Справка и отчёты →</button>
+          </div>
         </div>
       )}
 
@@ -1611,15 +1626,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           )}
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
           <div style={{ marginTop: 8 }}><PlannerToolsPanel mode="pl" /></div>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>← 4 Графики</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
+          </div>
         </div>
       )}
 
       {/* 🎯 Диагностика (дашборд): лимитирующие факторы + слабые мышцы → слабые точки → мёртвые точки → VBT → движение штанги */}
       {mainTab === 'pl' && subView === 'diagnostics' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          <div style={H}>🎯 Диагностика движения (дашборд)</div>
+          <div style={H}>2 🎯 Слабые точки + 10 калькуляторов</div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.5 }}>
-            Единый дашборд: калькулятор лимитирующих факторов (скорость/дожимы/стабилизация/режимы сокращения/
+            Калькулятор лимитирующих факторов (скорость/дожимы/стабилизация/режимы сокращения/
             гипертрофия/антропометрия/тип старта/хват/координация/выносливость) + «Слабые мышцы → Слабые точки →
             Мёртвые точки → VBT → Движение штанги». Исходный цикл не изменяется; отмеченные упражнения добавляются
             при сборке плана.
@@ -1627,6 +1646,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           <LimiterCalculatorCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
             <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
           </div>
         </div>
       )}

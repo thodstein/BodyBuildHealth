@@ -42,6 +42,9 @@ export interface PLSeasonBuilderProps {
     windowWeeks?: number;                    // weeksToMeet
   };
   buildOpts: Omit<CompGapBuildOptions, 'selector' | 'meets' | 'mode' | 'selections' | 'taper'>;
+  /** Управляемый режим (из родителя SRCBBScreen — вкладка «План» скрывает каталог одиночного цикла). */
+  mode?: 'single' | 'season';
+  onModeChange?: (m: 'single' | 'season') => void;
   onBuilt: (out: LMSBuildOutput | null, notes: string[]) => void;
   onNavigatePlan: () => void;
 }
@@ -65,13 +68,19 @@ const selStyle: React.CSSProperties = {
   borderRadius: 6, color: '#fff', padding: '4px 6px', fontSize: 11, minHeight: 32,
 };
 
-export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meets, taper, buildOpts, onBuilt, onNavigatePlan }) => {
-  const [seasonMode, setSeasonMode] = useState<'single' | 'season'>(() => {
+export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meets, taper, buildOpts, mode, onModeChange, onBuilt, onNavigatePlan }) => {
+  const [localMode, setLocalMode] = useState<'single' | 'season'>(() => {
     try {
       const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
       return s && s.mode === 'season' ? 'season' : 'single';
     } catch { return 'single'; }
   });
+  const seasonMode = mode ?? localMode;
+  const setSeasonMode = (m: 'single' | 'season') => {
+    if (mode != null) { onModeChange?.(m); }
+    else { setLocalMode(m); }
+    saveSeasonStateValue(m);
+  };
   const [slots, setSlots] = useState<PLSeasonSlot[]>(() => {
     try {
       const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
@@ -139,15 +148,17 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
     });
   };
 
-  const saveSeasonState = () => {
+  const saveSeasonStateValue = (m: 'single' | 'season') => {
     try {
       const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
       localStorage.setItem('he_pl_session', JSON.stringify({
         ...cur,
-        season: { mode: seasonMode, slots, pickMode, selections, compPickMode, compSelections },
+        season: { mode: m, slots, pickMode, selections, compPickMode, compSelections },
       }));
     } catch { /* ignore */ }
   };
+
+  const saveSeasonState = () => saveSeasonStateValue(seasonMode);
 
   const buildSeason = () => {
     try {
