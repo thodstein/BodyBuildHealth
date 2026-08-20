@@ -85,7 +85,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, peakTrainingProfile, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, peakTrainingProfile, buildPrepProgression, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import { buildPrepProcess, PREP_PROCEDURES } from '../../../engines/bb/bb-prep-process.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
@@ -5518,6 +5518,27 @@ export const BbAutoConstructor: React.FC = () => {
               } catch { return null; }
             })()}
 
+            {/* 📈 Прогрессия нагрузки (по неделям) */}
+            {(() => {
+              try {
+                const pg = buildPrepProgression(prepResult.prepPlan, prepResult.config);
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.18)' }}>
+                    <div style={{ fontWeight: 800, color: '#fbbf24', marginBottom: 4 }}>📈 Прогрессия нагрузки (по неделям)</div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{pg.principle}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {pg.weeks.map(w => (
+                        <span key={w.week} title={`${w.weightNote} · повторы ${w.repsRange[0]}-${w.repsRange[1]} · RIR ${w.rir[0]}-${w.rir[1]}`} style={{ padding: '3px 7px', borderRadius: 7, fontSize: 8.5, fontWeight: 700, background: w.phase === 'peak_week' ? 'rgba(236,72,153,0.12)' : w.phase === 'taper' ? 'rgba(245,158,11,0.14)' : 'rgba(251,191,36,0.1)', border: `1px solid ${w.phase === 'taper' ? 'rgba(245,158,11,0.4)' : 'rgba(251,191,36,0.3)'}`, color: w.phase === 'peak_week' ? '#f472b6' : w.phase === 'taper' ? '#fbbf24' : '#fde68a' }}>
+                          н{w.week} {w.phase === 'preparation' ? 'prep' : w.phase === 'final_preparation' ? 'финал' : w.phase === 'taper' ? 'тапер' : 'пик'} · {w.repsRange[0]}-{w.repsRange[1]} повт · RIR {w.rir[0]}-{w.rir[1]}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{pg.note}</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
             {/* 🏋️ Пик-тренировка (категорийная) */}
             {(() => {
               try {
@@ -5525,16 +5546,14 @@ export const BbAutoConstructor: React.FC = () => {
                 return (
                   <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.18)' }}>
                     <div style={{ fontWeight: 800, color: '#f472b6', marginBottom: 4 }}>🏋️ Пик-тренировка: {pt.type}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>
-                      Деплеция ~{pt.minutesPerDepleteDay} мин/день · памп backstage ~{pt.pumpBackstageMinutes} мин
-                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>Деплеция ~{pt.minutesPerDepleteDay} мин/день · памп backstage ~{pt.pumpBackstageMinutes} мин</div>
                     {pt.notes.map((n, i) => <div key={i} style={{ color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{n}</div>)}
                   </div>
                 );
               } catch { return null; }
             })()}
 
-            {/* 🩺 Медицинский процесс подготовки (мониторинг + процедуры под контролем врача) */}
+            {/* 🩺 Медицинский процесс подготовки */}
             {(() => {
               try {
                 const pr = buildPrepProcess(prepResult.config, prepResult.prepPlan);
@@ -5544,20 +5563,12 @@ export const BbAutoConstructor: React.FC = () => {
                     <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🩺 Медицинский процесс подготовки (мониторинг + процедуры под контролем врача)</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                       {pr.steps.map(s => (
-                        <span key={s.id} title={s.title} style={{ padding: '3px 8px', borderRadius: 8, fontSize: 8.5, fontWeight: 700, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', color: '#93c5fd' }}>
-                          {s.title.split(' ').slice(0, 2).join(' ')}
-                        </span>
+                        <span key={s.id} title={s.title} style={{ padding: '3px 8px', borderRadius: 8, fontSize: 8.5, fontWeight: 700, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', color: '#93c5fd' }}>{s.title.split(' ').slice(0, 2).join(' ')}</span>
                       ))}
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>
-                      🧪 Анализы: {pr.labPanel.map(l => l.name).join(' · ')}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-                      💧 {pr.hydrationGuidelines[0]} {pr.hydrationGuidelines[1]}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-                      🩸 Процедуры (под контролем врача): {rec.map(p => p.name).join(' · ')}
-                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>🧪 Анализы: {pr.labPanel.map(l => l.name).join(' · ')}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>💧 {pr.hydrationGuidelines[0]} {pr.hydrationGuidelines[1]}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>🩸 Процедуры (под контролем врача): {rec.map(p => p.name).join(' · ')}</div>
                     <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>🔄 {pr.postShow.phase}: {pr.postShow.details[0]}</div>
                     {pr.warnings.map((w, i) => <div key={i} style={{ color: '#fbbf24', marginTop: 2 }}>{w}</div>)}
                   </div>

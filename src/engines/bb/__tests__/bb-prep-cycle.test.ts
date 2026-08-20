@@ -6,7 +6,7 @@ import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
   accentToContestSpec, prepCutProjection, buildPrepSeason, posingPlanForCategory,
   savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan,
-  prepVolumePlan, prepDeficitMult, prepAthleteMult, prepRecoveryMult, prepVolumePhaseForWeek,
+  prepVolumePlan, prepDeficitMult, prepAthleteMult, prepRecoveryMult, prepVolumePhaseForWeek, buildPrepProgression,
   type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
 import { buildBBPlan, DEFAULT_WORKMAX } from '../bb-builder.engine';
@@ -502,6 +502,24 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     expect(PREP_LAB_PANEL.some(l => /Электролиты/.test(l.name))).toBe(true);
   });
 
+  it('прогрессия нагрузки: double progression в подготовке, интенсивность в тапере, памп в пике', () => {
+    const r = buildPrepCycle(base({ category: 'mens_physique', sex: 'male', weeks: 10, taperWeeks: 2 }));
+    const prog = buildPrepProgression(r.prepPlan, r.config);
+    expect(prog.weeks.length).toBe(r.config.weeks); // 10 = весь цикл
+    const prepWk = prog.weeks.find(w => w.phase === 'preparation');
+    const taperWk = prog.weeks.find(w => w.phase === 'taper');
+    const peakWk = prog.weeks.find(w => w.phase === 'peak_week');
+    if (prepWk) {
+      expect(String(prepWk.weightNote)).toMatch(/2.5 кг|повторы/);
+      expect(prepWk.rir[0]).toBeLessThanOrEqual(2);
+    }
+    if (taperWk) expect(taperWk.rir[1]).toBeGreaterThanOrEqual(3);
+    if (peakWk) expect(String(peakWk.weightNote)).toContain('памп');
+    expect(prog.principle).toContain('Double progression');
+  });
+});
+
+describe('bb-prep-cycle: prep-тренировка (делоды/тапер/пик/мед/прогрессия)', () => {
   it('prep-делоды каждые N недель (объём ×0.7, RIR +2, deload-метка)', () => {
     const r = buildPrepCycle(base({ category: 'mens_physique', sex: 'male', weeks: 12, taperWeeks: 2, prepDeloadEvery: 4 }));
     const weeks = r.bbPlan.weeks as any[];
@@ -526,5 +544,22 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     const hasSpecComment = taperWeeks.some((w: any) => (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) => String(e.comment || '').includes('Спец-тапер'))));
     expect(hasSpecComment).toBe(true);
     void accSets;
+  });
+
+  it('медицинский процесс подготовки: шаги, процедуры под контролем врача, анализы, гидратация', () => {
+    const r = buildPrepCycle(base({ category: 'mens_bb', sex: 'male', weeks: 12, taperWeeks: 3, enhanced: true, weightKg: 95 }));
+    const proc = buildPrepProcess(r.config, r.prepPlan);
+    const stages = new Set(proc.steps.map(s => s.stage));
+    expect(stages.has('medical_screen')).toBe(true);
+    expect(stages.has('labs_baseline')).toBe(true);
+    expect(stages.has('hydration')).toBe(true);
+    expect(stages.has('post_show')).toBe(true);
+    expect(PREP_PROCEDURES.length).toBeGreaterThan(0);
+    expect(PREP_PROCEDURES.every(p => p.doctorOnly === true)).toBe(true);
+    expect(proc.recommendedProcedures).toContain('ecg_cardio');
+    expect(proc.recommendedProcedures).toContain('endocrinology');
+    expect(proc.hydrationGuidelines.some(g => /гипонатрием/.test(g))).toBe(true);
+    expect(PREP_LAB_PANEL.some(l => /Почки/.test(l.name))).toBe(true);
+    expect(PREP_LAB_PANEL.some(l => /Электролиты/.test(l.name))).toBe(true);
   });
 });

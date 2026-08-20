@@ -703,6 +703,90 @@ function refeedWeeksText(weeks: PrepNutritionWeek[]): string {
     : 'Рефидов нет — короткий prep, строгий дефицит.';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Прогрессия нагрузки в подготовке (тренировочный прогресс, «прогресс»)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepProgressionWeek {
+  week: number;
+  phase: string;
+  weightNote: string;
+  repsRange: [number, number];
+  rir: [number, number];
+  intensityGuidance: string;
+}
+
+export interface PrepProgressionPlan {
+  weeks: PrepProgressionWeek[];
+  principle: string;
+  note: string;
+}
+
+/** План прогрессии нагрузки по неделям (доказательно: в дефиците сохраняем ИНТЕНСИВНОСТЬ
+ *  и прогрессируем нагрузку для сохранения мышц — Helms 2017; Schoenfeld 2021).
+ *  - Подготовка: double progression (повторы → вес), RIR 1-2, вес базовых +2.5 кг / 2-3 нед.
+ *  - Финальная подготовка: интенсивность сохраняется, объём чуть ниже.
+ *  - Тапер: вес сохранён, RIR 2-4, без отказа и новых упражнений.
+ *  - Пик-неделя: лёгкий памп (40-60% веса), без отказа. */
+export function buildPrepProgression(prepPlan: BBContestPrepPlan, cfg: PrepCycleConfig): PrepProgressionPlan {
+  const prepWeeks = prepPlan.preparation.weeks;
+  const taperWeeks = prepPlan.taper.weeks;
+  const total = prepWeeks + taperWeeks + 1;
+  const weeks: PrepProgressionWeek[] = [];
+
+  for (let i = 1; i <= total; i++) {
+    const phaseRange = prepPhaseForWeek(prepPlan, i);
+    const phase = phaseRange?.key ?? (i <= prepWeeks ? 'preparation' : i <= prepWeeks + taperWeeks ? 'taper' : 'peak_week');
+    if (phase === 'preparation') {
+      // Double progression: в заданном диапазоне повторов добавляем повторы, при верхней
+      // границе — +2.5 кг (базовые) / +1 кг (изоляция). Каждые 2-3 нед — ступень веса.
+      weeks.push({
+        week: i,
+        phase,
+        weightNote: i % 3 === 1 ? 'Шаг веса: базовые +2.5 кг, изоляция +1 кг (после верхней границы повторов)' : 'Добавляйте повторы в диапазоне (double progression); вес не повышать до верхней границы',
+        repsRange: [6, 12],
+        rir: [1, 2],
+        intensityGuidance: 'Интенсивность (вес) сохраняем/прогрессируем — защита мышц в дефиците (Helms 2017).',
+      });
+    } else if (phase === 'final_preparation') {
+      weeks.push({
+        week: i,
+        phase,
+        weightNote: 'Вес сохраняется, объём чуть ниже (×0.97); без форсирования',
+        repsRange: [8, 12],
+        rir: [2, 3],
+        intensityGuidance: 'Не снижайте вес — только объём; RIR 2-3.',
+      });
+    } else if (phase === 'taper') {
+      const tw = i - prepWeeks; // 1..taperWeeks
+      const taperMult = 0.92 - 0.1 * (taperWeeks - tw); // последняя неделя тапера — ниже объём
+      weeks.push({
+        week: i,
+        phase,
+        weightNote: `Вес сохранён (~${Math.round(taperMult * 100)}% объёма), без отказа, без новых упражнений`,
+        repsRange: [6, 10],
+        rir: [2, 4],
+        intensityGuidance: 'Интенсивность сохраняется (Bosquet 2005): вес тот же, объём ↓, RIR 2-4.',
+      });
+    } else {
+      weeks.push({
+        week: i,
+        phase,
+        weightNote: 'Пик-неделя: лёгкий памп 40-60% веса, 2-3 сета, без отказа',
+        repsRange: [12, 15],
+        rir: [3, 5],
+        intensityGuidance: 'Деплеция → загрузка; только памп, усталость минимальна.',
+      });
+    }
+  }
+
+  return {
+    weeks,
+    principle: 'Double progression в дефиците: добавляем повторы, затем вес; интенсивность сохраняем всю подготовку; тапер — вес тот же, объём ↓.',
+    note: 'Прогрессия веса в плане уже заложена (buildBBPlan: prescribeLoad + RIR-дрейф + авторегуляция из дневника). Блок — сводка по неделям.',
+  };
+}
+
 /** План объёма подготовки (доказательный): подготовка ДЕРЖИТ объём на уровне обычного
  *  ББ-авто (MAV, PED/стаж/уровень/восстановление масштабируют вверх через buildBBPlan),
  *  снижение — только в финальном тапере (последние недели). Это НЕ режущий каскад с 1-й недели.
