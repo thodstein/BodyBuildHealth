@@ -22,6 +22,7 @@ import {
   canonicalMuscle, type SpecializationBlock, type SpecializationSchedule,
 } from './bb-specialization.engine';
 import type { Injury } from '../manual-plan-builder';
+import type { BBTrainingFocus } from './bb-goal-types';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
   isoToday, isoDiffDays, isoAddDays,
@@ -58,11 +59,32 @@ export interface PrepCycleConfig {
   // ── Атлет ──
   level: string;
   trainingYears?: number;
+  /** Training focus (strength/hypertrophy/endurance); по умолчанию — из профиля категории. */
+  trainingFocus?: BBTrainingFocus;
   equipment?: string[];
   injuries?: Injury[];
   mobilityRestrictions?: string[];
   workMax?: Record<string, number>;
   avoidAxialLoad?: boolean;
+
+  // ── Доп. параметры обычного ББ-авто (полный паритет с buildBBPlan) ──
+  bodyweightCapability?: BBBuilderInput['bodyweightCapability'];
+  favoriteExercises?: string[];
+  excludedExercises?: string[];
+  intensityTechnique?: BBBuilderInput['intensityTechnique'];
+  autoDeload?: boolean;
+  deloadType?: BBBuilderInput['deloadType'];
+  loadStrategy?: BBBuilderInput['loadStrategy'];
+  autoRegResult?: BBBuilderInput['autoRegResult'];
+  methodology?: BBBuilderInput['methodology'];
+  athleteMode?: BBBuilderInput['athleteMode'];
+  athleteContext?: BBBuilderInput['athleteContext'];
+  labWarnings?: string[];
+  labIntensityNote?: string;
+  eccentricMult?: number;
+  previousPlan?: BBPlan;
+  supersetMode?: BBBuilderInput['supersetMode'];
+  volumeScheme?: BBBuilderInput['volumeScheme'];
 
   // ── Восстановление/питание → MRV (как в обычном конструкторе) ──
   bodyFat?: number;
@@ -71,6 +93,8 @@ export interface PrepCycleConfig {
   sleepHours?: number;
   stressLevel?: number;
   labMrvMultiplier?: number;
+  proteinPerKg?: number;
+  calorieSurplus?: number;
 
   // ── PED ──
   enhanced: boolean;
@@ -83,6 +107,8 @@ export interface PrepCycleConfig {
   experienceLevel: ExperienceLevel;
   prepCount?: number;
   prepVolumeMult?: number;
+  /** Стратегия объёма подготовки (крутизна каскада): gentle/balanced/aggressive. */
+  prepVolumeStrategy?: PrepVolumeStrategy;
   currentCalories?: number;
   carbLoadStrategy?: CarbLoadStrategy;
   waterStrategy?: WaterStrategy;
@@ -258,8 +284,10 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
   const input: BBBuilderInput = {
     patternId,
     level: cfg.level,
+    trainingYears: cfg.trainingYears,
     goal: profile.prepGoalHint as BBGoal,
     weeks: totalWeeks,
+    bodyweightCapability: cfg.bodyweightCapability,
     workMax: cfg.workMax ?? {},
     weakPoints: accent,
     focusGroup: accent[0],
@@ -269,19 +297,37 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     volumeGoal: 'mav',
     avoidAxialLoad: cfg.avoidAxialLoad,
     injuries: cfg.injuries ?? [],
+    favoriteExercises: cfg.favoriteExercises ?? [],
+    excludedExercises: cfg.excludedExercises ?? [],
     mobilityRestrictions: cfg.mobilityRestrictions,
     sex: cfg.sex,
     planStartWeek: prepStartIso,
     courseIntensity: cfg.courseIntensity ?? 'moderate',
-    trainingFocus: profile.trainingFocus,
+    pedDoses: cfg.pedDoses,
+    trainingFocus: cfg.trainingFocus ?? profile.trainingFocus,
+    intensityTechnique: cfg.intensityTechnique,
+    autoDeload: cfg.autoDeload,
+    deloadType: cfg.deloadType,
+    loadStrategy: cfg.loadStrategy,
+    autoRegResult: cfg.autoRegResult,
+    methodology: cfg.methodology,
+    athleteMode: cfg.athleteMode,
+    athleteContext: cfg.athleteContext,
     bodyFat: cfg.bodyFat,
     leanMass: cfg.leanMass,
     hrvMs: cfg.hrvMs,
     sleepHours: cfg.sleepHours,
     stressLevel: cfg.stressLevel,
     labMrvMultiplier: cfg.labMrvMultiplier,
-    proteinPerKg: 2.0,
-    calorieSurplus: profile.prepGoalHint === 'cut' ? -300 : 0,
+    labWarnings: cfg.labWarnings,
+    labIntensityNote: cfg.labIntensityNote,
+    eccentricMult: cfg.eccentricMult,
+    previousPlan: cfg.previousPlan,
+    supersetMode: cfg.supersetMode,
+    volumeScheme: cfg.volumeScheme,
+    // Питание: приоритет явно заданного; иначе prep-дефолты (белок 2.0 г/кг, лёгкий дефицит).
+    proteinPerKg: cfg.proteinPerKg ?? 2.0,
+    calorieSurplus: cfg.calorieSurplus ?? (profile.prepGoalHint === 'cut' ? -300 : 0),
   };
 
   let pedAdapt: PEDAdaptation | undefined;
@@ -369,6 +415,9 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
 // финальный тапер). Интенсивность (вес) сохраняется, RIR плавно растёт.
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Стратегия объёма подготовки: крутизна каскада (сохранить массу / сбалансировано / агрессивно). */
+export type PrepVolumeStrategy = 'gentle' | 'balanced' | 'aggressive';
+
 export interface PrepVolumePhase {
   /** Доля prep-блока (0..1). */
   fromPct: number;
@@ -382,23 +431,30 @@ export interface PrepVolumePlan {
   phases: PrepVolumePhase[];
   /** Множитель дефицита по категории/%жира. */
   deficitMult: number;
-  /** Множитель атлета (PED/стаж/уровень). */
+  /** Множитель атлета (PED/стаж/уровень) — масштабирует целевой объём вверх/вниз. */
   athleteMult: number;
   /** Множитель восстановления (HRV/сон/стресс). */
   recoveryMult: number;
+  /** Базовая цель недельного объёма на группу мышц (для натурала/среднего стажа). */
+  targetSetsPerMusclePerWeek: [number, number];
+  /** Целевой диапазон с учётом атлет-множителя (PED/стаж/уровень): для атлета со стажем/на курсе — выше. */
+  scaledTargetSetsPerMusclePerWeek: [number, number];
   note: string;
 }
 
-/** Дефицит-мод по категории и текущему %жира (В2): чем суше/дальше — тем меньше объём. */
+/** Дефицит-мод по категории и текущему %жира (В2).
+ *  Доказательно: при дефиците ОБЪЁМ ДЕРЖИМ ВЫСОКИМ (сохранение мышц; Helms 2017,
+ *  Schoenfeld 2021), снижаем лишь слегка — основной спуск происходит в финальном тапере.
+ *  Диапазон узкий (0.93–1.0), чтобы подготовка не превращалась в тапер с 1-й недели. */
 export function prepDeficitMult(cfg: Pick<PrepCycleConfig, 'category' | 'bodyFatPct'>): number {
   const profile = CATEGORY_PROFILES[cfg.category];
-  if (!profile) return 0.93;
+  if (!profile) return 0.97;
   const gap = cfg.bodyFatPct != null && profile.targetBodyFatPct != null ? cfg.bodyFatPct - profile.targetBodyFatPct : 0;
-  if (profile.light) return 0.98;                       // bikini/wellness — мягкая сушка
-  if (cfg.bodyFatPct == null) return 0.93;              // не знаем %жира — умеренно
-  if (gap <= 2) return 0.96;                            // близко к цели
-  if (gap <= 5) return 0.92;                            // средний дефицит
-  return 0.87;                                          // агрессивный дефицит
+  if (profile.light) return 1.0;                        // bikini/wellness — мягкая сушка, объём полный
+  if (cfg.bodyFatPct == null) return 0.97;              // не знаем %жира — чуть умереннее
+  if (gap <= 2) return 0.98;                            // близко к цели — объём почти полный
+  if (gap <= 5) return 0.96;                            // средний дефицит — лёгкое снижение
+  return 0.93;                                          // агрессивный дефицит — но НЕ тапер
 }
 
 /** Множитель атлета (PED/стаж/уровень): кто восстанавливается лучше — держит больше объёма. */
@@ -406,40 +462,61 @@ export function prepAthleteMult(cfg: Pick<PrepCycleConfig, 'enhanced' | 'trainin
   let m = 1.0;
   const years = Number.isFinite(cfg.trainingYears) ? (cfg.trainingYears as number) : 0;
   if (cfg.enhanced) m *= 1.12;                          // курс — больше объёма под дефицитом
-  if (cfg.level === 'enhanced' || cfg.level === 'advanced' || years >= 5) m *= 1.06;
+  if (cfg.level === 'enhanced' || cfg.level === 'advanced' || years >= 5) m *= 1.05;
   if (cfg.level === 'beginner' || years < 2) m *= 0.9;  // новичок — консервативнее
-  return clamp(m, 0.8, 1.3);
+  return clamp(m, 0.9, 1.2);
 }
 
-/** Множитель восстановления (низкая готовность → меньше объёма подготовки). */
+/** Множитель восстановления (низкая готовность → чуть меньше объёма подготовки). */
 export function prepRecoveryMult(cfg: Pick<PrepCycleConfig, 'hrvMs' | 'sleepHours' | 'stressLevel' | 'bodyFat'>): number {
   let m = 1.0;
-  if (cfg.hrvMs != null && cfg.hrvMs < 50) m *= 0.96;
-  if (cfg.sleepHours != null && cfg.sleepHours < 6) m *= 0.96;
-  if (cfg.stressLevel != null && cfg.stressLevel >= 7) m *= 0.96;
-  if (cfg.bodyFat != null && cfg.bodyFat > 25) m *= 0.97;
-  return clamp(m, 0.85, 1.1);
+  if (cfg.hrvMs != null && cfg.hrvMs < 50) m *= 0.97;
+  if (cfg.sleepHours != null && cfg.sleepHours < 6) m *= 0.97;
+  if (cfg.stressLevel != null && cfg.stressLevel >= 7) m *= 0.97;
+  if (cfg.bodyFat != null && cfg.bodyFat > 25) m *= 0.98;
+  return clamp(m, 0.9, 1.05);
 }
 
-/** План объёма подготовки (каскад × дефицит × атлет × восстановление). */
+/** План объёма подготовки (доказательный): основная часть — ПОЛНЫЙ объём (сохранение мышц),
+ *  лёгкое снижение к финалу подготовки, реальный спуск — в финальном тапере.
+ *  Целевой ориентир: 10–15 сетов/группу/нед (Helms; Schoenfeld 2021; da Silveira 2025). */
 export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVolumePlan {
   const deficitMult = prepDeficitMult(cfg);
   const athleteMult = prepAthleteMult(cfg);
   const recoveryMult = prepRecoveryMult(cfg);
-  const global = clamp(deficitMult * athleteMult * recoveryMult, 0.75, 1.15);
+  // Стратегия пользователя: крутизна (сохранить массу / сбалансировано / агрессивно).
+  const strategy = cfg.prepVolumeStrategy ?? 'balanced';
+  const strategyMult = strategy === 'gentle' ? 1.05 : strategy === 'aggressive' ? 0.95 : 1.0;
+  // ВАЖНО: не даём prep-множителю уйти в тапер — нижняя граница 0.85.
+  const global = clamp(deficitMult * athleteMult * recoveryMult * strategyMult, 0.85, 1.1);
   const base: Array<Omit<PrepVolumePhase, 'volumeMult'> & { base: number }> = [
-    { fromPct: 0, toPct: 0.4, base: 1.0, rir: [1, 2] },      // начало — поддерживающий
-    { fromPct: 0.4, toPct: 0.8, base: 0.88, rir: [2, 2] },   // середина — умеренный
-    { fromPct: 0.8, toPct: 1.0, base: 0.76, rir: [2, 3] },   // финал подготовки — снижен
+    { fromPct: 0, toPct: 0.5, base: 1.0, rir: [1, 2] },     // основная подготовка — полный объём
+    { fromPct: 0.5, toPct: 0.85, base: 0.96, rir: [1, 2] }, // середина — слегка снижаем (дефицит)
+    { fromPct: 0.85, toPct: 1.0, base: 0.90, rir: [2, 3] }, // финал подготовки — умеренно (НЕ тапер)
   ];
   const phases: PrepVolumePhase[] = base.map(p => ({
     fromPct: p.fromPct,
     toPct: p.toPct,
-    volumeMult: clamp(p.base * global, 0.6, 1.0),
+    volumeMult: clamp(p.base * global, 0.85, 1.0),
     rir: p.rir,
   }));
-  const note = `дефицит ×${deficitMult.toFixed(2)} · атлет (PED/стаж) ×${athleteMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)} (всего ×${global.toFixed(2)})`;
-  return { phases, deficitMult, athleteMult, recoveryMult, note };
+  const strategyLabel = strategy === 'gentle' ? 'сохранить массу' : strategy === 'aggressive' ? 'агрессивная сушка' : 'сбалансированная';
+  // Масштабированный целевой объём: база 10–15 (натурал/средний стаж) × атлет-множитель
+  // (PED/стаж/уровень). У продвинутого на курсе целевой объём на группу заметно выше.
+  const scaledTargetSetsPerMusclePerWeek: [number, number] = [
+    Math.round(10 * athleteMult),
+    Math.round(15 * athleteMult),
+  ];
+  const note = `база 10–15 сетов/группу/нед (натурал/средний стаж) → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» ×${strategyMult.toFixed(2)} · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)} (всего ×${global.toFixed(2)})`;
+  return {
+    phases,
+    deficitMult,
+    athleteMult,
+    recoveryMult,
+    targetSetsPerMusclePerWeek: [10, 15] as [number, number],
+    scaledTargetSetsPerMusclePerWeek,
+    note,
+  };
 }
 
 /** Подфаза плана для недели (1-index) prep-блока. */
@@ -633,11 +710,31 @@ export interface PrepSeasonConfig {
   splitPatternId?: string;
   level: string;
   trainingYears?: number;
+  trainingFocus?: BBTrainingFocus;
   equipment?: string[];
   injuries?: Injury[];
   mobilityRestrictions?: string[];
   workMax?: Record<string, number>;
   avoidAxialLoad?: boolean;
+  bodyweightCapability?: BBBuilderInput['bodyweightCapability'];
+  favoriteExercises?: string[];
+  excludedExercises?: string[];
+  intensityTechnique?: BBBuilderInput['intensityTechnique'];
+  autoDeload?: boolean;
+  deloadType?: BBBuilderInput['deloadType'];
+  loadStrategy?: BBBuilderInput['loadStrategy'];
+  autoRegResult?: BBBuilderInput['autoRegResult'];
+  methodology?: BBBuilderInput['methodology'];
+  athleteMode?: BBBuilderInput['athleteMode'];
+  athleteContext?: BBBuilderInput['athleteContext'];
+  labWarnings?: string[];
+  labIntensityNote?: string;
+  eccentricMult?: number;
+  previousPlan?: BBPlan;
+  supersetMode?: BBBuilderInput['supersetMode'];
+  volumeScheme?: BBBuilderInput['volumeScheme'];
+  proteinPerKg?: number;
+  calorieSurplus?: number;
   bodyFat?: number;
   leanMass?: number;
   hrvMs?: number;
@@ -652,6 +749,8 @@ export interface PrepSeasonConfig {
   experienceLevel: ExperienceLevel;
   prepCount?: number;
   prepVolumeMult?: number;
+  /** Стратегия объёма подготовки (крутизна каскада): gentle/balanced/aggressive. */
+  prepVolumeStrategy?: PrepVolumeStrategy;
   currentCalories?: number;
   carbLoadStrategy?: CarbLoadStrategy;
   waterStrategy?: WaterStrategy;
@@ -711,11 +810,31 @@ export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
       showDate: comp.date!,
       level: cfg.level,
       trainingYears: cfg.trainingYears,
+      trainingFocus: cfg.trainingFocus,
       equipment: cfg.equipment,
       injuries: cfg.injuries,
       mobilityRestrictions: cfg.mobilityRestrictions,
       workMax: cfg.workMax,
       avoidAxialLoad: cfg.avoidAxialLoad,
+      bodyweightCapability: cfg.bodyweightCapability,
+      favoriteExercises: cfg.favoriteExercises,
+      excludedExercises: cfg.excludedExercises,
+      intensityTechnique: cfg.intensityTechnique,
+      autoDeload: cfg.autoDeload,
+      deloadType: cfg.deloadType,
+      loadStrategy: cfg.loadStrategy,
+      autoRegResult: cfg.autoRegResult,
+      methodology: cfg.methodology,
+      athleteMode: cfg.athleteMode,
+      athleteContext: cfg.athleteContext,
+      labWarnings: cfg.labWarnings,
+      labIntensityNote: cfg.labIntensityNote,
+      eccentricMult: cfg.eccentricMult,
+      previousPlan: cfg.previousPlan,
+      supersetMode: cfg.supersetMode,
+      volumeScheme: cfg.volumeScheme,
+      proteinPerKg: cfg.proteinPerKg,
+      calorieSurplus: cfg.calorieSurplus,
       bodyFat: cfg.bodyFat,
       leanMass: cfg.leanMass,
       hrvMs: cfg.hrvMs,
@@ -730,6 +849,7 @@ export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
       experienceLevel: cfg.experienceLevel,
       prepCount: cfg.prepCount,
       prepVolumeMult: cfg.prepVolumeMult,
+      prepVolumeStrategy: cfg.prepVolumeStrategy,
       currentCalories: cfg.currentCalories,
       carbLoadStrategy: cfg.carbLoadStrategy,
       waterStrategy: cfg.waterStrategy,

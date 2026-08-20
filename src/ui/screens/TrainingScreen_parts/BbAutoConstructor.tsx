@@ -4933,8 +4933,30 @@ export const BbAutoConstructor: React.FC = () => {
     sleepHours: Number((linked.profile?.settings as any)?.lifestyle?.sleepHours) || undefined,
     stressLevel: Number((linked.profile?.settings as any)?.lifestyle?.stressLevel) || undefined,
     labMrvMultiplier: labAdjust?.mrvMultiplier,
+    labWarnings: labAdjust?.warnings,
+    labIntensityNote: labAdjust?.intensityNote,
     enhanced: peds.length > 0,
+    pedDoses,
     courseIntensity,
+    trainingFocus: bbTrainingFocus,
+    bodyweightCapability: (prof as any)?.bodyweightCapability,
+    favoriteExercises: bbFavEx,
+    excludedExercises: bbExclEx,
+    avoidAxialLoad: (prof as any)?.avoidAxialLoad || false,
+    intensityTechnique: intensityTech,
+    autoDeload,
+    deloadType,
+    loadStrategy,
+    autoRegResult: (autoRegOn && autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
+    methodology: bbMethodology,
+    athleteMode,
+    athleteContext,
+    eccentricMult,
+    previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+    supersetMode,
+    volumeScheme,
+    proteinPerKg: Number((linked.profile?.settings as any)?.nutrition?.proteinPerKg) || undefined,
+    calorieSurplus: Number((linked.profile?.settings as any)?.nutrition?.calorieSurplus) || undefined,
     weightKg: profileWeight,
     bodyFatPct: prepBodyFat,
     experienceLevel: (bbLevel === 'enhanced' || bbLevel === 'advanced' ? 'advanced' : bbLevel === 'beginner' ? 'beginner' : 'intermediate') as 'beginner' | 'intermediate' | 'advanced',
@@ -5302,8 +5324,12 @@ export const BbAutoConstructor: React.FC = () => {
                   ))}
                   <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24' }}>→ тапер ×0.6 → пик</span>
                 </div>
-                <div style={{ color: 'rgba(255,255,255,0.6)' }}>{prepResult.volumePlan.note}</div>
-                <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>Объём снижается по фазам подготовки; вес (интенсивность) сохраняется, RIR плавно растёт. Тапер — финальный спуск к пику.</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  🎯 Целевой объём на группу мышц/нед: базовый {prepResult.volumePlan.targetSetsPerMusclePerWeek[0]}–{prepResult.volumePlan.targetSetsPerMusclePerWeek[1]} сетов
+                  → <b style={{ color: '#93c5fd' }}>~{prepResult.volumePlan.scaledTargetSetsPerMusclePerWeek[0]}–{prepResult.volumePlan.scaledTargetSetsPerMusclePerWeek[1]}</b> с учётом PED/стажа/уровня
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{prepResult.volumePlan.note}</div>
+                <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>База 10–15 сетов/группу/нед — для натурала/среднего стажа. У продвинутого атлета (стаж, PED, уровень) целевой объём выше — это уже заложено в плане. Объём подготовки снижается лишь умеренно; тапер — финальный спуск к пику.</div>
               </div>
             )}
 

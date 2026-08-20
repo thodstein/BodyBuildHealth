@@ -382,4 +382,21 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     const taper = weeks.find((w: any) => w.contestPhase === 'taper');
     expect(taper && setsOf(taper)).toBeLessThan(late);
   });
+
+  it('атлет-параметры (PED/стаж/уровень) реально влияют на объём плана и целевой диапазон', () => {
+    const natural = prepVolumePlan(base({ enhanced: false, trainingYears: 3, level: 'intermediate' }), 8);
+    const enhanced = prepVolumePlan(base({ enhanced: true, trainingYears: 6, level: 'advanced' }), 8);
+    // масштабированный целевой диапазон выше у продвинутого на курсе
+    expect(enhanced.scaledTargetSetsPerMusclePerWeek[1]).toBeGreaterThan(natural.scaledTargetSetsPerMusclePerWeek[1]);
+    expect(enhanced.athleteMult).toBeGreaterThan(natural.athleteMult);
+    // фактический объём плана за prep-неделю: у курса/большого стажа больше сетов
+    const n = buildPrepCycle(base({ enhanced: false, trainingYears: 3, level: 'intermediate' }));
+    const e = buildPrepCycle(base({ enhanced: true, trainingYears: 6, level: 'advanced', pedDoses: { AAS: 600 } }));
+    const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, ex: any) => b + (ex.sets || 0), 0), 0);
+    const nPrep = n.bbPlan.weeks.filter((w: any) => w.contestPhase === 'preparation');
+    const ePrep = e.bbPlan.weeks.filter((w: any) => w.contestPhase === 'preparation');
+    expect(nPrep.length).toBeGreaterThan(0);
+    expect(ePrep.length).toBeGreaterThan(0);
+    expect(setsOf(ePrep[0])).toBeGreaterThan(setsOf(nPrep[0]));
+  });
 });
