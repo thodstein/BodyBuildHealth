@@ -10,7 +10,6 @@ export const config = {
 async function recognizeImage(buffer: Buffer): Promise<string> {
   const { createWorker } = await import('tesseract.js');
   const rus = await import('@tesseract.js-data/rus');
-  const eng = await import('@tesseract.js-data/eng');
   const worker = await createWorker('rus+eng', 1, {
     langPath: rus.langPath,
     gzip: true,
