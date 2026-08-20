@@ -1,5 +1,22 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Кардио-конструктор: дни ног в исполнении — карточка дня (Aug 20 2026, pushed 898e7bb3)
+
+Поверх дней ног в раскладке недели: учёт перенесён и в фазу выполнения (дневник).
+
+- **Движок** (`cardio.engine.ts`): `cardioLegDayForDate(cycle, dateIso)` → `{ dayOfWeek, isLegDay } |
+  null` — день недели (Пн=0) даты и является ли он днём тяжёлых ног по `config.legDays`;
+  null без цикла/при некорректной дате.
+- **UI `CardioDayCard`**: 🦵-баннер в день ног (`role="status"`) — красный «лучше перенести
+  его или заменить на recovery» при плановой сессии сегодня zone2/miss/hiit, янтарный
+  «сегодня recovery — можно» при recovery-плане, «интенсивное кардио сегодня не
+  планируется» без плана; `CardioDiaryStep` рендерит карточку с `cycle` — доработок не потребовал.
+- Тесты: движок +5 (null без цикла, маппинг даты→Пн=0, isLegDay true/false, без legDays → false,
+  некорректная дата → null), CardioDayCard +2 (детерминированные: dow сегодня из `(getDay()+6)%7`,
+  `legDays:[dow]` + zone2 → предупреждение; recovery → «можно» без предупреждения). Кардио-область
+  **449/449** (14 файлов), tsc 0 по своим файлам (чужие WIP-ошибки: body-measurements-modal,
+  WaistHeightRatio, daily-quality-score, ProgramEditorView).
+
 ## Кардио-конструктор: дни ног в раскладке недели (Aug 20 2026, pushed 9b94d9aa)
 
 Поверх ориентира/оформления: день тяжёлых ног (`config.legDays`) виден в раскладке недели.
