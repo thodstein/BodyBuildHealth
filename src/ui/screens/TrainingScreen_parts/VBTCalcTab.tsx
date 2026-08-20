@@ -17,10 +17,13 @@ import {
   velocityLoss,
   thresholdForIntent,
   velocityLossZone,
+  diagnoseVelocity,
   type VBTLift,
   type VBTIntent,
   type VelocityLossThreshold,
 } from '../../../engines/pro/vbt.engine';
+import { analyzeStickingCorrections, type AssistanceAnalysis } from '../../../engines/pro/lift-assistance.engine';
+import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
 
@@ -74,6 +77,19 @@ export const VBTCalcTab: React.FC = () => {
     const thr = thresholdForIntent(intent);
     return velocityLoss(vs, thr);
   }, [velocitiesStr, intent]);
+
+  // Корректирующие упражнения фазы срыва (VBT): при превышении порога потери
+  // скорости → вероятная слабая фаза (максимальный момент) → корректировки.
+  const vbtCorrections = useMemo<AssistanceAnalysis | null>(() => {
+    const vs = velocitiesStr.split(/[\s,]+/).map(Number).filter(n => n > 0);
+    if (vs.length < 2) return null;
+    const best = Math.max(...vs);
+    const last = vs[vs.length - 1];
+    const liftAsLift = lift as Lift;
+    const d = diagnoseVelocity(liftAsLift, best, last, measuredWeight > 0 ? measuredWeight : undefined);
+    if (!d.exceeded || !d.suggestedPhase) return null;
+    return analyzeStickingCorrections(liftAsLift, d.suggestedPhase);
+  }, [velocitiesStr, lift, measuredWeight]);
 
   // LVP-таблица для выбранного движения
   const lvpTable = LOAD_VELOCITY_PROFILE[lift];
@@ -168,6 +184,22 @@ export const VBTCalcTab: React.FC = () => {
           <div style={SMALL}>Введите скорости повторов в формате «1.0, 0.9, 0.8...».</div>
         )}
       </div>
+
+      {/* Корректирующие упражнения фазы срыва */}
+      {vbtCorrections && vbtCorrections.items.length > 0 && (
+        <div style={CARD}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🏋️ Корректировки фазы срыва (VBT)</div>
+          <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>
+            Скорость упала за порог {vlThreshold}% — вероятная слабая фаза «{vbtCorrections.phase}» (максимальный момент). Корректирующие упражнения:
+          </div>
+          {vbtCorrections.items.map((item, i) => (
+            <div key={i} style={ROWStyle(ACCENT)}>
+              <span style={{ color: '#fff', fontWeight: 700 }}>{item.exercise.name}</span>
+              <span style={{ color: DIM, whiteSpace: 'nowrap' }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}% RIR {item.protocol.rir}{item.optimal ? ' · ⭐' : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* LVP таблица */}
       <ExpandableCard title={`📊 Load-Velocity Profile: ${LIFT_RU[lift]}`} accent={ACCENT} short="Скорость по %1RM (Gonzalez-Badillo / Jovanovic)">

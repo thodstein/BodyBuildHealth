@@ -79,7 +79,7 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     return ss + (aliases.some(a => en.includes(a)) ? (e.sets || []).length : 0);
   }, 0), 0);
-  const labels: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
+  const labels: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Становая тяга (классика)', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс' };
   return {
     lift, label: labels[lift] || lift,
     currentMax,
@@ -101,6 +101,8 @@ const LIFT_ALIASES: Record<Lift, string[]> = {
   row: ['barbell row', 'тяга в наклоне', 'bent over row', 'pendlay row'],
   pulldown: ['pulldown', 'тяга верхнего', 'lat pulldown', 'подтягивания'],
   incline_press: ['incline bench', 'жим на наклонной', 'жим под углом', 'incline press'],
+  sumo: ['sumo', 'сумо', 'тяга сумо', 'sumo deadlift'],
+  biceps: ['biceps', 'бицепс', 'подъём на бицепс', 'сгибание', 'curl'],
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -110,6 +112,7 @@ const PHASE_LABELS: Record<string, string> = {
   start: 'Старт',
   bottom: 'Яма (нижняя точка)',
   sumo_start: 'Сумо: старт (срыв)',
+  sumo_mid: 'Сумо: середина (проход коленей)',
   sumo_lockout: 'Сумо: дожим (замыкание)',
   ohp_start: 'Старт с плеч',
   ohp_mid: 'Середина',
@@ -123,6 +126,9 @@ const PHASE_LABELS: Record<string, string> = {
   inc_off: 'Сход с груди (верх)',
   inc_mid: 'Середина',
   inc_lockout: 'Дожим',
+  biceps_start: 'Сгибание: старт',
+  biceps_mid: 'Сгибание: середина',
+  biceps_top: 'Сгибание: пик (сокращение)',
 };
 
 const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
@@ -130,7 +136,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
 
   const analysis = useMemo(() => {
     if (!sessions.length) return [];
-    const lifts: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press'];
+    const lifts: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press', 'sumo', 'biceps'];
     return lifts.map(l => detectFailures(sessions, l, LIFT_ALIASES[l])).filter(Boolean) as LiftFailureData[];
   }, [sessions]);
 

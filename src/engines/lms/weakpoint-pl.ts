@@ -25,13 +25,14 @@ function findExerciseByLabel(label: string): Exercise | undefined {
   });
 }
 
-export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press';
+export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press' | 'sumo' | 'biceps';
 export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom'
-  | 'sumo_start' | 'sumo_lockout'
+  | 'sumo_start' | 'sumo_mid' | 'sumo_lockout'
   | 'ohp_start' | 'ohp_mid' | 'ohp_lockout'
   | 'row_start' | 'row_mid' | 'row_squeeze'
   | 'pd_top' | 'pd_mid' | 'pd_squeeze'
-  | 'inc_off' | 'inc_mid' | 'inc_lockout';
+  | 'inc_off' | 'inc_mid' | 'inc_lockout'
+  | 'biceps_start' | 'biceps_mid' | 'biceps_top';
 
 export interface WeakPointDiagnosis {
   lift: Lift;
@@ -82,6 +83,16 @@ const DIAGNOSIS: Record<Lift, Partial<Record<WeakPoint, Omit<WeakPointDiagnosis,
     inc_mid: { weakPoint: 'inc_mid', label: 'Середина', description: 'Зависание в середине — переход верх груди→трицепс.', assistanceFromCatalog: ['Жим с остановками', 'Скоростной жим', 'Жим гантелей на наклонной'], intensityPct: 0.7, rationale: 'Остановки и скоростной жим — мощность в средней фазе.' },
     inc_lockout: { weakPoint: 'inc_lockout', label: 'Дожим', description: 'Не дожимает вверху — слабый трицепс.', assistanceFromCatalog: ['Французский жим', 'Дожим с плинтов', 'Жим в раме (дожим)'], intensityPct: 0.75, rationale: 'Французский жим и дожимы изолируют трицепс в локдауне.' },
   },
+  sumo: {
+    sumo_start: { weakPoint: 'sumo_start', label: 'Сумо: срыв (старт с пола)', description: 'Срыв с пола в сумо — слабые ягодицы/приводящие бедра при вертикальном корпусе.', assistanceFromCatalog: ['Присед в широкой постановке', 'Становая тяга из ямы', 'Тяга с плинтов (rack pull)'], intensityPct: 0.7, rationale: 'Широкая постановка и тяга из ямы перегружают ягодицы/приводящие в стартовом положении сумо.' },
+    sumo_mid: { weakPoint: 'sumo_mid', label: 'Сумо: середина (проход коленей)', description: 'Зависание на коленях в сумо — удержание позиции спиной и тазом при вертикальном торсе.', assistanceFromCatalog: ['Становая тяга с остановками', 'Румынская тяга', 'Тяга с плинтов (rack pull)'], intensityPct: 0.7, rationale: 'Остановки тренируют удержание позиции; РДЛ — бицепс бедра/ягодицы в проходе.' },
+    sumo_lockout: { weakPoint: 'sumo_lockout', label: 'Сумо: замыкание бёдер (дожим)', description: 'Не замыкает бёдра вверху — слабые ягодицы/разгибатели спины.', assistanceFromCatalog: ['Тяга с плинтов (rack pull)', 'Присед в широкой постановке', 'Румынская тяга'], intensityPct: 0.75, rationale: 'Тяга с плинтов выше колен + широкая постановка — изоляция финальной фазы сумо.' },
+  },
+  biceps: {
+    biceps_start: { weakPoint: 'biceps_start', label: 'Сгибание: старт (с полного разгибания)', description: 'Слабый срыв из полного разгибания локтя — недостаточная сила бицепса/брахиалиса в нижней точке.', assistanceFromCatalog: ['Подъём штанги на бицепс', 'Подъём на скамье Скотта', 'Сгибание на бицепс в блоках'], intensityPct: 0.6, rationale: 'Контролируемый старт без раскачки + изоляция Скотта — стартовая сила бицепса.' },
+    biceps_mid: { weakPoint: 'biceps_mid', label: 'Сгибание: середина (переход)', description: 'Зависание в середине — слабый переход и недостаток объёма бицепса/брахиалиса.', assistanceFromCatalog: ['Подъём штанги на бицепс', 'Молотки (нейтральный хват)', 'Подъём гантелей на бицепс'], intensityPct: 0.65, rationale: 'Молотки включают брахиалис (толщина руки); штанга/гантели — контролируемая середина.' },
+    biceps_top: { weakPoint: 'biceps_top', label: 'Сгибание: верхнее сокращение (пик)', description: 'Слабая пиковая контракция вверху — бицепс не «выкручивается» в верхней точке.', assistanceFromCatalog: ['Подъём гантелей на наклонной скамье', 'Паучий подъём (на наклонной скамье лицом вниз)', 'Молотки (нейтральный хват)'], intensityPct: 0.6, rationale: 'Наклонная скамья (растянутая позиция) и паучий подъём — пиковое сокращение и контроль верха.' },
+  },
 };
 
 export function diagnoseWeakPoint(lift: Lift, weakPoint: WeakPoint): WeakPointDiagnosis {
@@ -115,4 +126,6 @@ export const WEAK_POINTS_BY_LIFT: Record<Lift, WeakPoint[]> = {
   row: ['row_start', 'row_mid', 'row_squeeze'],
   pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
   incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
+  sumo: ['sumo_start', 'sumo_mid', 'sumo_lockout'],
+  biceps: ['biceps_start', 'biceps_mid', 'biceps_top'],
 };

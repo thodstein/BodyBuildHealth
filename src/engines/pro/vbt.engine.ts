@@ -133,6 +133,7 @@ import type { Lift, WeakPoint } from '../lms/weakpoint-pl';
 const VELOCITY_STICKING_PHASE: Record<Lift, WeakPoint> = {
   bench: 'off_chest', squat: 'bottom', deadlift: 'start',
   ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
+  sumo: 'sumo_start', biceps: 'biceps_start',
 };
 
 export interface VelocityDiagnosis {
@@ -162,8 +163,10 @@ export function diagnoseVelocity(
   const lossPct = vl?.lossPct ?? 0;
   const exceeded = !!vl?.exceeded;
   // LVP есть для squat/bench/deadlift/ohp/row; pulldown→row (вертикальная тяга),
-  // incline_press→bench (жимовый паттерн) — ближайшие профили.
-  const vbtLift: VBTLift = lift === 'pulldown' ? 'row' : lift === 'incline_press' ? 'bench' : lift;
+  // incline_press→bench (жимовый паттерн), sumo→deadlift (тяговый паттерн),
+  // biceps→row (сгибательный паттерн) — ближайшие профили.
+  const vbtLift: VBTLift = lift === 'pulldown' ? 'row' : lift === 'incline_press' ? 'bench'
+    : lift === 'sumo' ? 'deadlift' : lift === 'biceps' ? 'row' : lift;
   let e1RMByVelocity: number | null = null;
   if (weightKg && weightKg > 0 && lastVelocity > 0) {
     e1RMByVelocity = estimate1RMFromVelocity(vbtLift, lastVelocity, weightKg).e1RM || null;

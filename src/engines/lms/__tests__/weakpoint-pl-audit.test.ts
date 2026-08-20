@@ -72,4 +72,23 @@ describe('weakpoint-pl: диагностика мёртвых точек', () =>
     expect(d.assistance).toEqual([]);
     expect(d.rationale).toBe('диагноз не определён');
   });
+
+  it('новые движения: sumo (отдельная тяга) и biceps — полный диагноз и резолв из каталога', () => {
+    // sumo — отдельное движение со своими фазами (не часть deadlift).
+    expect(WEAK_POINTS_BY_LIFT.sumo).toEqual(['sumo_start', 'sumo_mid', 'sumo_lockout']);
+    for (const p of WEAK_POINTS_BY_LIFT.sumo) {
+      const d = diagnoseWeakPoint('sumo', p);
+      expect(d.label).not.toBe('-');
+      expect(d.assistance.length).toBeGreaterThan(0);
+      for (const a of d.assistance) expect(catalogNames.has(norm(a))).toBe(true);
+    }
+    // biceps — отдельное движение со своими фазами.
+    expect(WEAK_POINTS_BY_LIFT.biceps).toEqual(['biceps_start', 'biceps_mid', 'biceps_top']);
+    for (const p of WEAK_POINTS_BY_LIFT.biceps) {
+      const d = diagnoseWeakPoint('biceps', p);
+      expect(d.label).not.toBe('-');
+      expect(d.assistance.length).toBeGreaterThan(0);
+      for (const a of d.assistance) expect(catalogNames.has(norm(a))).toBe(true);
+    }
+  });
 });

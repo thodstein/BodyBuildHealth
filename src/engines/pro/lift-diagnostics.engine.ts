@@ -60,6 +60,16 @@ const STICKING_POINTS: Partial<Record<Lift, Partial<Record<WeakPoint, StickingPo
     inc_mid: { phase: "inc_mid", angleRangeDeg: [30, 90], keyJoint: "локоть (переход)", weakMuscles: ["Верх груди", "Трицепс"], biomechanicalReason: "Переход грудь→трицепс в середине.", corrections: ["Жим с остановками", "Скоростной жим", "Жим гантелей на наклонной"], loadCues: "Остановки в амплитуде." },
     inc_lockout: { phase: "inc_lockout", angleRangeDeg: [90, 180], keyJoint: "локоть (разгибание)", weakMuscles: ["Трицепс"], biomechanicalReason: "Дожим вверху — трицепс.", corrections: ["Французский жим", "Дожим с 3 см", "Жим в раме (дожим)"], loadCues: "Изоляция трицепса в верхней фазе." },
   },
+  sumo: {
+    sumo_start: { phase: "sumo_start", angleRangeDeg: [0, 20], keyJoint: "таз+колено (срыв сумо)", weakMuscles: ["Ягодицы", "Приводящие бедра"], biomechanicalReason: "В сумо срыв идёт от ягодиц/приводящих при вертикальном корпусе; слабый срыв = недостаток силы бёдер.", corrections: ["Тяга из ямы (широкая постановка)", "Присед в широкой постановке", "Тяга с плинтов"], loadCues: "Дефицит в широкой постановке — перегрузка срыва сумо." },
+    sumo_mid: { phase: "sumo_mid", angleRangeDeg: [20, 70], keyJoint: "колено+таз (проход коленей)", weakMuscles: ["Разгибатели спины", "Бицепс бедра"], biomechanicalReason: "Проход коленей в сумо — удержание позиции при вертикальном торсе; слабый переход = спина/задняя цепь.", corrections: ["Тяга с остановками", "Румынская тяга", "Тяга с плинтов"], loadCues: "Остановки удерживают позицию; РДЛ — задняя цепь в проходе." },
+    sumo_lockout: { phase: "sumo_lockout", angleRangeDeg: [70, 180], keyJoint: "таз (замыкание бёдер)", weakMuscles: ["Ягодицы", "Разгибатели спины"], biomechanicalReason: "Финальная фаза сумо — разгибание таза и замыкание бёдер; слабый дожим = ягодицы/спина.", corrections: ["Тяга с плинтов (выше колен)", "Присед в широкой постановке", "Румынская тяга"], loadCues: "Тяга с плинтов выше колен изолирует замыкание сумо." },
+  },
+  biceps: {
+    biceps_start: { phase: "biceps_start", angleRangeDeg: [0, 30], keyJoint: "локоть (разгибание, старт)", weakMuscles: ["Бицепс", "Брахиалис"], biomechanicalReason: "Старт из полного разгибания локтя — максимальная нагрузка на растянутый бицепс; слабый старт = сила сгибателей.", corrections: ["Подъём штанги на бицепс", "Подъём на скамье Скотта", "Сгибание на бицепс в блоках"], loadCues: "Контролируемый старт без раскачки; Скотта изолирует нижнюю фазу." },
+    biceps_mid: { phase: "biceps_mid", angleRangeDeg: [30, 100], keyJoint: "локоть (сгибание)", weakMuscles: ["Бицепс", "Брахиалис"], biomechanicalReason: "Середина — слабый переход/недостаток объёма сгибателей.", corrections: ["Подъём штанги на бицепс", "Молотки (нейтральный хват)", "Подъём гантелей на бицепс"], loadCues: "Молотки включают брахиалис (толщина); контролируемая середина." },
+    biceps_top: { phase: "biceps_top", angleRangeDeg: [100, 150], keyJoint: "локоть (верхнее сокращение)", weakMuscles: ["Бицепс (пиковая контракция)"], biomechanicalReason: "Слабая пиковая контракция — бицепс не «выкручивается» вверху.", corrections: ["Подъём гантелей на наклонной скамье", "Паучий подъём (на наклонной скамье лицом вниз)", "Молотки (нейтральный хват)"], loadCues: "Наклонная скамья (растянутая позиция) и паучий подъём — пиковое сокращение." },
+  },
 };
 
 export interface LiftDiagnosis {
@@ -243,6 +253,7 @@ export function phaseForReps(reps: number, lift: Lift): WeakPoint | null {
   const MAX_MOMENT_PHASE: Partial<Record<Lift, WeakPoint>> = {
     bench: 'off_chest', squat: 'bottom', deadlift: 'start',
     ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
+    sumo: 'sumo_start', biceps: 'biceps_start',
   };
   let candidate: WeakPoint | null = null;
   if (reps <= 2) candidate = MAX_MOMENT_PHASE[lift] ?? null;

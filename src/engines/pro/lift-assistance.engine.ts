@@ -54,6 +54,8 @@ function groupsForLiftPhase(lift: Lift, phase: WeakPoint): string[] {
     row: ['back', 'arms'],
     pulldown: ['back', 'arms'],
     incline_press: ['chest', 'arms'],
+    sumo: ['legs', 'back'],
+    biceps: ['arms'],
   };
   const fallback = LIFT_FALLBACK_GROUPS[lift] ?? [];
   for (const g of fallback) groups.add(g);
@@ -110,6 +112,7 @@ const DEFAULT_PROTOCOL = { pct: 0.6, reps: 10, sets: 3, rir: 2 };
 const LIFT_RU: Record<Lift, string> = {
   bench: 'жим лёжа', squat: 'присед', deadlift: 'становая тяга',
   ohp: 'жим стоя', row: 'тяга в наклоне', pulldown: 'тяга верхнего блока', incline_press: 'жим на наклонной',
+  sumo: 'становая тяга (сумо)', biceps: 'подъём на бицепс',
 };
 
 /** Группа упражнения → что она нагружает (для rationale по тренерски). */
@@ -307,6 +310,8 @@ const LIFT_PHASES_ALL: Record<Lift, WeakPoint[]> = {
   row: ['row_start', 'row_mid', 'row_squeeze'],
   pulldown: ['pd_top', 'pd_mid', 'pd_squeeze'],
   incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
+  sumo: ['sumo_start', 'sumo_mid', 'sumo_lockout'],
+  biceps: ['biceps_start', 'biceps_mid', 'biceps_top'],
 };
 
 /**

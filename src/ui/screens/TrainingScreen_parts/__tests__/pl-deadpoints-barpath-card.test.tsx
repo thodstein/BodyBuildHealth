@@ -229,7 +229,7 @@ describe('PlDeadpointsBarPathCard (единый калькулятор движ�
       }], totalVolume: 720, totalSets: 2, totalReps: 4, avgIntensity: 90, prCount: 0, notes: '',
     }];
     render(<PlDeadpointsBarPathCard sessions={sessions as any} />);
-    fireEvent.click(screen.getByText('Становая тяга'));
+    fireEvent.click(screen.getByText('Становая тяга (классика)'));
     expect(screen.getByText(/🤸 Сумо: 2 тяжёлых подходов/)).toBeTruthy();
     expect(screen.getByText(/срываются в фазе «Сумо: старт \(срыв\)»/)).toBeTruthy();
   });

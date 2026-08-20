@@ -229,7 +229,7 @@ function exEnGroup(g: string | undefined): string | undefined {
  *  deadlift → 'hamstrings' (задняя цепь), не 'back' (становая не растит широчайшие).
  *  Иначе MRV-кап accessory считался по back, а не по hamstrings. */
 function liftToEnGroup(lift: Lift): string {
-  const m: Record<string, string> = { bench: 'chest', squat: 'legs', deadlift: 'hamstrings', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest' };
+  const m: Record<string, string> = { bench: 'chest', squat: 'legs', deadlift: 'hamstrings', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest', sumo: 'hamstrings', biceps: 'arms' };
   return m[lift] || 'back';
 }
 
@@ -597,7 +597,7 @@ function injectPLWeakPoints(
   orthopedicBlockedPatterns: string[] = [],
   fallbackPm: number = 80,
 ): void {
-  const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей' };
+  const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс' };
   const MAX_CORRECTIONS = 2;
   for (const wp of weakPoints) {
     const mainName = mainNameMap[wp.lift] || 'Жим';
