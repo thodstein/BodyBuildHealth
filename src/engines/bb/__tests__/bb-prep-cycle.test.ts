@@ -11,6 +11,7 @@ import {
 } from '../bb-prep-cycle.engine';
 import { buildBBPlan, DEFAULT_WORKMAX } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
+import { buildPrepProcess, PREP_PROCEDURES, PREP_LAB_PANEL } from '../bb-prep-process.engine';
 import { isoToday, isoAddDays } from '../bb-contest-prep.engine';
 import type { BBContestCategory } from '../bb-contest-prep.engine';
 
@@ -482,6 +483,23 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     const fplan = buildPrepNutritionPlan(fr.prepPlan, fr.config);
     expect(fplan.femaleNotes.length).toBeGreaterThan(0);
     expect(fplan.macros.fatFloorG).toBeGreaterThanOrEqual(40); // женский жир-флор
+  });
+
+  it('медицинский процесс подготовки: шаги, процедуры под контролем врача, анализы, гидратация', () => {
+    const r = buildPrepCycle(base({ category: 'mens_bb', sex: 'male', weeks: 12, taperWeeks: 3, enhanced: true, weightKg: 95 }));
+    const proc = buildPrepProcess(r.config, r.prepPlan);
+    const stages = new Set(proc.steps.map(s => s.stage));
+    expect(stages.has('medical_screen')).toBe(true);
+    expect(stages.has('labs_baseline')).toBe(true);
+    expect(stages.has('hydration')).toBe(true);
+    expect(stages.has('post_show')).toBe(true);
+    expect(PREP_PROCEDURES.length).toBeGreaterThan(0);
+    expect(PREP_PROCEDURES.every(p => p.doctorOnly === true)).toBe(true);
+    expect(proc.recommendedProcedures).toContain('ecg_cardio');
+    expect(proc.recommendedProcedures).toContain('endocrinology');
+    expect(proc.hydrationGuidelines.some(g => /гипонатрием/.test(g))).toBe(true);
+    expect(PREP_LAB_PANEL.some(l => /Почки/.test(l.name))).toBe(true);
+    expect(PREP_LAB_PANEL.some(l => /Электролиты/.test(l.name))).toBe(true);
   });
 
   it('prep-делоды каждые N недель (объём ×0.7, RIR +2, deload-метка)', () => {

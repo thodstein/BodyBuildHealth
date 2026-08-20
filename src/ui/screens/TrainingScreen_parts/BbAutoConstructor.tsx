@@ -86,6 +86,7 @@ import {
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, peakTrainingProfile, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepProcess, PREP_PROCEDURES } from '../../../engines/bb/bb-prep-process.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -5528,6 +5529,37 @@ export const BbAutoConstructor: React.FC = () => {
                       Деплеция ~{pt.minutesPerDepleteDay} мин/день · памп backstage ~{pt.pumpBackstageMinutes} мин
                     </div>
                     {pt.notes.map((n, i) => <div key={i} style={{ color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{n}</div>)}
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            {/* 🩺 Медицинский процесс подготовки (мониторинг + процедуры под контролем врача) */}
+            {(() => {
+              try {
+                const pr = buildPrepProcess(prepResult.config, prepResult.prepPlan);
+                const rec = PREP_PROCEDURES.filter(p => pr.recommendedProcedures.includes(p.id));
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.18)' }}>
+                    <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🩺 Медицинский процесс подготовки (мониторинг + процедуры под контролем врача)</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                      {pr.steps.map(s => (
+                        <span key={s.id} title={s.title} style={{ padding: '3px 8px', borderRadius: 8, fontSize: 8.5, fontWeight: 700, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', color: '#93c5fd' }}>
+                          {s.title.split(' ').slice(0, 2).join(' ')}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>
+                      🧪 Анализы: {pr.labPanel.map(l => l.name).join(' · ')}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                      💧 {pr.hydrationGuidelines[0]} {pr.hydrationGuidelines[1]}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                      🩸 Процедуры (под контролем врача): {rec.map(p => p.name).join(' · ')}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>🔄 {pr.postShow.phase}: {pr.postShow.details[0]}</div>
+                    {pr.warnings.map((w, i) => <div key={i} style={{ color: '#fbbf24', marginTop: 2 }}>{w}</div>)}
                   </div>
                 );
               } catch { return null; }
