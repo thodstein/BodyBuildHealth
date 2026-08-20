@@ -517,6 +517,23 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     if (peakWk) expect(String(peakWk.weightNote)).toContain('памп');
     expect(prog.principle).toContain('Double progression');
   });
+
+  it('тренировочная кривая: объём держится в prep, тапер монотонно нисходит, пик — лёгкий памп', () => {
+    const r = buildPrepCycle(base({ category: 'mens_physique', sex: 'male', weeks: 12, taperWeeks: 3 }));
+    const weeks = r.bbPlan.weeks as any[];
+    const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    const taper = weeks.filter((w: any) => w.contestPhase === 'taper').map(setsOf);
+    const peak = weeks.find((w: any) => w.contestPhase === 'peak_week');
+    const prepAvg = weeks.filter((w: any) => w.contestPhase === 'preparation' && !w.deload).reduce((a: number, w: any) => a + setsOf(w), 0)
+      / Math.max(1, weeks.filter((w: any) => w.contestPhase === 'preparation' && !w.deload).length);
+    // тапер монотонно нисходит к пику
+    for (let i = 1; i < taper.length; i++) expect(taper[i]).toBeLessThanOrEqual(taper[i - 1]);
+    // пик — лёгкий памп (~18-20 сетов), заметно ниже prep
+    expect(setsOf(peak)).toBeLessThanOrEqual(22);
+    expect(setsOf(peak)).toBeLessThan(prepAvg * 0.5);
+    // тапер ниже prep (реальный спуск, а не рост)
+    expect(taper[taper.length - 1]).toBeLessThan(prepAvg);
+  });
 });
 
 describe('bb-prep-cycle: prep-тренировка (делоды/тапер/пик/мед/прогрессия)', () => {

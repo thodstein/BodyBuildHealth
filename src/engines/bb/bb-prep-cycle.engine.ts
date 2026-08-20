@@ -26,7 +26,9 @@ import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
-  isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, buildPeakWeek, configFromPlan,
+  isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, prepPhaseForDate, buildPeakWeek, configFromPlan,
+  prepWeightAdvice, prepTrainingCompliance,
+  type PrepWeightAdvice, type PrepWeightStatus,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
   type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy,
@@ -391,18 +393,20 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
   // затем applyPrepVolumeCascade накладывает фазовый спуск × атлет-множители (PED/стаж/
   // уровень/восстановление) + дефицит-мод по категории. Тапер ×0.6 остаётся финальным спуском.
   const volumePlan = prepVolumePlan(cfg, prepWeeks);
-  const bbPlanPrep = applyPrepTaperSparing(
-    applyPrepDeloads(
-      applyPrepVolumeCascade(
-        applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+  const bbPlanPrep = applyPrepPeakReduction(
+    applyPrepTaperSparing(
+      applyPrepDeloads(
+        applyPrepVolumeCascade(
+          applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+          cfg,
+          prepWeeks,
+          volumePlan,
+        ),
         cfg,
         prepWeeks,
-        volumePlan,
       ),
       cfg,
-      prepWeeks,
     ),
-    cfg,
   );
 
   const warnings = [...v.warnings];
@@ -958,16 +962,53 @@ export function applyPrepTaperSparing(plan: BBPlanWithPrep, cfg: PrepCycleConfig
       ...s,
       exercises: (s.exercises || []).map((e: any) => {
         const m = canonicalMuscle(e.muscle || '');
-        const base = (e as any)._baseSets ?? e.sets ?? 0;
         let mult = 1.0;
-        if (accentCanonical.has(m)) mult = 1.25;   // спец-мышца щадится
+        if (accentCanonical.has(m)) mult = 1.1;      // спец-мышца щадится (без возврата к базе)
         else if (minimalCanonical.has(m)) mult = 0.8; // минимальная — режется сильнее
-        const newSets = mult === 1.0 ? e.sets : Math.min(base, Math.max(2, Math.round(e.sets * mult)));
-        const rir = clamp((Number(e.rir) || 3) + (mult >= 1.25 ? -0 : 0), 2, 4);
+        const newSets = mult === 1.0 ? e.sets : Math.max(2, Math.round(e.sets * mult));
         return { ...e, sets: newSets, workSets: (e.workSets || []).slice(0, newSets), comment: `${e.comment || ''} ${accentCanonical.has(m) ? '⭐ Спец-тапер: объём щадится.' : minimalCanonical.has(m) ? '⬇ Минимальная: тапер сильнее.' : ''}` };
       }),
     }));
     return { ...wk, sessions, prepProtocol: `${wk.prepProtocol || ''} 📉 Тапер: без новых упражнений, интенсивность сохраняется, RIR 2-4.` };
+  });
+  // Гарантия монотонного спуска тапера: каждая тапер-неделя ≤ предыдущей (к пику объём только ↓).
+  const taperIdx = weeks.map((w, i) => [w, i] as const).filter(([w]) => w.contestPhase === 'taper').map(([, i]) => i);
+  for (let k = 1; k < taperIdx.length; k++) {
+    const prev = totalSetsOfWeek(weeks[taperIdx[k - 1]]);
+    const cur = totalSetsOfWeek(weeks[taperIdx[k]]);
+    if (cur > prev) weeks[taperIdx[k]] = scaleWeekToTarget(weeks[taperIdx[k]], prev);
+  }
+  return { ...plan, weeks } as BBPlanWithPrep;
+}
+
+/** Суммарные рабочие сеты недели. */
+function totalSetsOfWeek(wk: any): number {
+  return (wk.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+}
+
+/** Пик-неделя: свести к лёгкому пампу (~18 сетов, 2 сета × 12-15, лёгкий вес, RIR 4) —
+ *  не тяжёлая тренировка, только налить мышцы кровью. */
+export function applyPrepPeakReduction(plan: BBPlanWithPrep): BBPlanWithPrep {
+  if (!plan || !Array.isArray(plan.weeks)) return plan;
+  const weeks = (plan.weeks as any[]).map((wk) => {
+    if (wk.contestPhase !== 'peak_week') return wk;
+    let sessions = (wk.sessions || []).map((s: any) => ({
+      ...s,
+      // Пик-неделя: максимум 3 упражнения на сессию, 2 сета, лёгкий вес, памп.
+      exercises: (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).slice(0, 3).map((e: any) => ({
+        ...e,
+        sets: 2,
+        rir: 4,
+        repsRange: [12, 15],
+        weight: Math.max(5, Math.round((Number(e.weight) || 0) * 0.5)),
+        workSets: (e.workSets || []).slice(0, 2).map((ws: any) => ({ ...ws, rir: 4, reps: 14 })),
+        comment: `${e.comment || ''} 🎭 Пик-неделя: памп 2 сета × 12-15, ~50% веса, без отказа.`,
+      })),
+    }));
+    // Свести к ~18 рабочим сетам на всю пик-неделю (памп, не объём).
+    const total = sessions.reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    if (total > 18) sessions = scaleWeekToTarget({ sessions }, 18).sessions;
+    return { ...wk, sessions, prepProtocol: `${wk.prepProtocol || ''} 🎭 Пик-неделя: лёгкий памп ~18 сетов, без отказа.` };
   });
   return { ...plan, weeks } as BBPlanWithPrep;
 }
