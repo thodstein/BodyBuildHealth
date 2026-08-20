@@ -63,7 +63,7 @@ import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
-import { PLSeasonBuilder } from './SRCBBScreen_parts/PLSeasonBuilder';
+import { PLSeasonBuilder, type SeasonBuildInfo } from './SRCBBScreen_parts/PLSeasonBuilder';
 import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
 import { loadSessions } from '../../engines/workout-logger.engine';
 
@@ -123,7 +123,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['settings', '1 ⚙️ Настройки'], ['diagnostics', '2 🎯 Слабые точки + 🧮'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['settings', '1 ⚙️ Настройки'], ['season', '🧩 Сезон'], ['diagnostics', '2 🎯 Слабые точки + 🧮'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -635,6 +635,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir, pedAuto, peds.length]);
   const best = ranked[0];
   const [seasonNotes, setSeasonNotes] = useState<string[]>([]);
+  const [seasonSegments, setSeasonSegments] = useState<SeasonBuildInfo[]>([]);
   const [plSeasonMode, setPlSeasonMode] = useState<'single' | 'season'>(() => {
     try {
       const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
@@ -1273,6 +1274,25 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     recovery: getRecoveryMetrics(linked),
   }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, limiterExerciseMap, limiterProtocolMap, limiterDayMap, plAthleteMode, plAthleteContext]);
 
+  // Сводка для печати/экспорта: базовые метрики + циклы сезона (с «ужатиями»).
+  const plPrintSummary = (): { label: string; value: string }[] => {
+    const rows: { label: string; value: string }[] = [
+      { label: 'Недель', value: `${builtSrc?.weeks.length ?? 0}` },
+      { label: 'Дней/нед', value: `${days}` },
+      { label: 'Присед ПМ', value: `${pmSquat} кг` },
+      { label: 'Жим ПМ', value: `${pmBench} кг` },
+      { label: 'Тяга ПМ', value: `${pmDead} кг` },
+    ];
+    if (plSeasonMode === 'season' && seasonSegments.length > 0) {
+      seasonSegments.forEach(s => {
+        if (s.fitMode === 'shrink') rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬇ сжат ${s.cycleWeeks}→${s.weeks} нед` });
+        else if (s.fitMode === 'extend') rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬆ растянут → ${s.weeks} нед` });
+        else rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `${s.weeks} нед` });
+      });
+    }
+    return rows;
+  };
+
   return (
     <div key={mainTab} className="pl-auto-screen" style={{ padding: '12px 0', color: '#fff', width: '100%', maxWidth: '100%', margin: 0, minWidth: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
@@ -1489,7 +1509,21 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               })()}
             </div>
           </div>
-          {/* 🧩 Сезон по микроциклам */}
+          <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); setSubView('plan'); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>← 2 Слабые точки + 10 калькуляторов</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('season')}>🧩 Сезон →</button>
+          </div>
+        </div>
+      )}
+
+      {mainTab === 'pl' && subView === 'season' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          {renderMacroEditBanner()}
+          <div style={H}>🧩 Сезон по микроциклам</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.5 }}>
+            Постройте сезон из периодов-микроциклов (выносливость 6–20 / сила 6–12 / скорость+координация 6–10 / пик 8–10 нед) — авто-подбор или ручной выбор каждого цикла из базы; задайте соревнования, чтобы между стартами циклы ужимались под окно и у каждого старта был пик/тапер.
+          </div>
           <PLSeasonBuilder
             mode={plSeasonMode}
             onModeChange={setPlSeasonMode}
@@ -1504,17 +1538,17 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               windowWeeks: weeksToMeet,
             }}
             buildOpts={seasonBuildOpts}
-            onBuilt={(out, notes) => { setBuiltSrc(out); setSrcWeek(1); setSeasonNotes(notes); if (notes && notes.length > 0) setMethodNote(notes[notes.length - 1]); }}
+            onBuilt={(out, notes, segments) => { setBuiltSrc(out); setSrcWeek(1); setSeasonNotes(notes); setSeasonSegments(segments || []); if (notes && notes.length > 0) setMethodNote(notes[notes.length - 1]); }}
             onNavigatePlan={() => setSubView('plan')}
           />
-          <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); setSubView('plan'); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
           {seasonNotes.length > 0 && (
             <div role="alert" style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd', fontSize: 11, lineHeight: 1.5 }}>
               {seasonNotes.map((n, i) => <div key={i}>{n}</div>)}
             </div>
           )}
-          <div style={{ marginTop: 10, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>Далее: 2 Слабые точки + 10 калькуляторов →</button>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
           </div>
         </div>
       )}
@@ -1565,12 +1599,24 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               {seasonNotes.length > 0 ? (
                 <>
                   <div style={{ fontWeight: 800, marginBottom: 4 }}>🧩 Сезон по микроциклам</div>
-                  {seasonNotes.slice(0, 12).map((n, i) => <div key={i} style={{ color: 'rgba(196,181,253,0.85)' }}>{n}</div>)}
+                  {seasonSegments.length > 0 && (
+                    <div style={{ display: 'grid', gap: 4, marginBottom: 6 }}>
+                      {seasonSegments.map((s, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ color: 'rgba(196,181,253,0.85)' }}>{s.periodLabel ? `${s.periodLabel}: ` : ''}{s.cycleTitle} · {s.weeks} нед</span>
+                          {s.fitMode === 'shrink' && <span style={{ color: '#fb923c', fontWeight: 700, fontSize: 10 }}>⬇ сжат {s.cycleWeeks}→{s.weeks}</span>}
+                          {s.fitMode === 'extend' && <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: 10 }}>⬆ растянут</span>}
+                          {s.fitMode === 'skip' && <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 10 }}>только старт</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {seasonNotes.slice(0, 8).map((n, i) => <div key={i} style={{ color: 'rgba(196,181,253,0.6)', fontSize: 10 }}>{n}</div>)}
                 </>
               ) : (
                 <>
-                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать сезон» в шаге «1 Настройки». Здесь будет итоговый план (включая пик/тапер под соревнования).
-                  <button style={{ ...BTN_GHOST, minHeight: 32, fontSize: 10, marginLeft: 6, border: '1px solid rgba(168,85,247,0.4)', color: '#c4b5fd' }} onClick={() => setSubView('settings')}>→ 1 Настройки</button>
+                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать сезон» на вкладке «Сезон». Здесь будет итоговый план (включая пик/тапер под соревнования).
+                  <button style={{ ...BTN_GHOST, minHeight: 32, fontSize: 10, marginLeft: 6, border: '1px solid rgba(168,85,247,0.4)', color: '#c4b5fd' }} onClick={() => setSubView('season')}>→ 🧩 Сезон</button>
                 </>
               )}
             </div>
@@ -1585,6 +1631,30 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'charts' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>4 📊 Графики</div>
+          {builtSrc && builtSrc.weeks.length > 0 && (() => {
+            const W = builtSrc.weeks;
+            const weekData = W.map(wk => ({
+              week: wk.week,
+              sets: wk.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + (e.workSets || []).reduce((s2, ws) => s2 + (ws.sets || 0), 0), 0), 0),
+              tonnage: wk.days.reduce((s, d) => s + (d.metrics?.tonnage || 0), 0),
+            }));
+            const maxT = Math.max(1, ...weekData.map(w => w.tonnage));
+            return (
+              <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fb7185', marginBottom: 6 }}>🔥 Объём по неделям (heatmap)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(34px, 1fr))', gap: 4 }}>
+                  {weekData.map(w => {
+                    const intensity = w.tonnage / maxT;
+                    const bg = intensity > 0.85 ? '#ef4444' : intensity > 0.6 ? '#f59e0b' : intensity > 0.35 ? '#eab308' : intensity > 0.15 ? '#22c55e' : '#14532d';
+                    return (
+                      <div key={w.week} title={`Неделя ${w.week}: ${w.sets} сетов · ${Math.round(w.tonnage).toLocaleString('ru-RU')} кг`} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg, color: intensity > 0.6 ? '#000' : '#fff', fontSize: 10, fontWeight: 800, cursor: 'default' }}>{w.week}</div>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
+              </div>
+            );
+          })()}
           <TrainingMetricsChart lms={lmsChart} bb={undefined} />
           {/* 📈 Тренды e1RM из дневника (план: шаг 4 — графики) */}
           <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -1668,15 +1738,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 onClick={() => {
                   try {
                     const cycle = getCycleById(selectedCycleId);
-                    const scope = cycle ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед` : 'Силовой цикл ПЛ';
+                    const scope = plSeasonMode === 'season'
+                      ? `Сезон по микроциклам · ${seasonSegments.map(s => s.cycleTitle).join(' → ')}`
+                      : (cycle ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед` : 'Силовой цикл ПЛ');
                     const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, builtSrc!.weeks, {
-                      summary: [
-                        { label: 'Недель', value: `${builtSrc!.weeks.length}` },
-                        { label: 'Дней/нед', value: `${days}` },
-                        { label: 'Присед ПМ', value: `${pmSquat} кг` },
-                        { label: 'Жим ПМ', value: `${pmBench} кг` },
-                        { label: 'Тяга ПМ', value: `${pmDead} кг` },
-                      ],
+                      summary: plPrintSummary(),
                       athleteMode: builtSrc!.athleteMode,
                     });
                     printPLHtml(html, { title: 'ПЛ-план', text: 'Печать / PDF плана силового цикла' });
@@ -1687,13 +1753,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               <button
                 onClick={() => {
                   try {
-                    const wb = buildPLExcelWorkbook('Силовой цикл ПЛ', plExportRows(builtSrc!.weeks), [
-                      { label: 'Недель', value: `${builtSrc!.weeks.length}` },
-                      { label: 'Дней/нед', value: `${days}` },
-                      { label: 'Присед ПМ', value: `${pmSquat} кг` },
-                      { label: 'Жим ПМ', value: `${pmBench} кг` },
-                      { label: 'Тяга ПМ', value: `${pmDead} кг` },
-                    ]);
+                    const wb = buildPLExcelWorkbook('Силовой цикл ПЛ', plExportRows(builtSrc!.weeks), plPrintSummary());
                     downloadPLExcel(wb, 'pl-plan.xlsx');
                   } catch (e) { setMethodNote('⚠ Ошибка экспорта: ' + (e as Error).message); }
                 }}

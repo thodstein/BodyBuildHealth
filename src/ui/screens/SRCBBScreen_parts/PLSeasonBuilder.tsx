@@ -59,8 +59,17 @@ export interface PLSeasonBuilderProps {
   /** Управляемый режим (из родителя SRCBBScreen — вкладка «План» скрывает каталог одиночного цикла). */
   mode?: 'single' | 'season';
   onModeChange?: (m: 'single' | 'season') => void;
-  onBuilt: (out: LMSBuildOutput | null, notes: string[]) => void;
+  onBuilt: (out: LMSBuildOutput | null, notes: string[], segments: SeasonBuildInfo[]) => void;
   onNavigatePlan: () => void;
+}
+
+/** Компактная сводка выбранных циклов сезона (для вкладки «План» и печати). */
+export interface SeasonBuildInfo {
+  cycleTitle: string;
+  weeks: number;       // фактическая длина в сезоне (после ужатия/растяжения)
+  cycleWeeks: number;  // исходная длина выбранного цикла
+  fitMode: 'exact' | 'extend' | 'shrink' | 'skip';
+  periodLabel?: string; // метка периода/пролёта
 }
 
 const PERIOD_ICON: Record<string, string> = {
@@ -202,6 +211,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
       const useGaps = meets.length >= 2 && compGap && compGap.segments.length > 0;
       const notes: string[] = [];
       let out: LMSBuildOutput | null = null;
+      const buildInfo: SeasonBuildInfo[] = [];
       if (useGaps) {
         // compGap.weeks уже включает пик-блоки (buildPLSeasonPeaks) — используем напрямую.
         notes.push(...compGap!.notes);
@@ -212,6 +222,15 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           weeks: compGap!.weeks,
           cycleMetrics: seasonCycleMetrics(compGap!.weeks),
         };
+        compGap!.segments.forEach(seg => {
+          buildInfo.push({
+            cycleTitle: seg.cycleTitle,
+            weeks: seg.fitWeeks ?? 0,
+            cycleWeeks: seg.cycleWeeks,
+            fitMode: seg.fitMode,
+            periodLabel: `Пролёт к «${seg.meetName}»`,
+          });
+        });
       } else if (seasonPlan.segments.length > 0) {
         out = assembleSeasonPlan(seasonPlan, {
           ...buildOpts,
@@ -221,15 +240,25 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
         });
         notes.push(...seasonPlan.notes);
         out = { ...out, cycleMetrics: seasonCycleMetrics(out.weeks) };
+        seasonPlan.segments.forEach(seg => {
+          const orig = LMS_CYCLES.find(c => c.meta.id === seg.cycleId)?.meta.weeks ?? seg.weeks;
+          buildInfo.push({
+            cycleTitle: seg.cycleTitle,
+            weeks: seg.weeks,
+            cycleWeeks: orig,
+            fitMode: seg.fit.mode,
+            periodLabel: seg.slot.label,
+          });
+        });
       }
       if (!out) {
-        onBuilt(null, ['⚠ Сезон пуст — включите хотя бы один период или добавьте соревнования.']);
+        onBuilt(null, ['⚠ Сезон пуст — включите хотя бы один период или добавьте соревнования.'], []);
         return;
       }
-      onBuilt(out, notes);
+      onBuilt(out, notes, buildInfo);
       onNavigatePlan();
     } catch (e) {
-      onBuilt(null, ['⚠ Ошибка сборки сезона: ' + (e as Error).message]);
+      onBuilt(null, ['⚠ Ошибка сборки сезона: ' + (e as Error).message], []);
     }
   };
 

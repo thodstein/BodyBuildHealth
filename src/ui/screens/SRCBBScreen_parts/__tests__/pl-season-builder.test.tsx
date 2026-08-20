@@ -90,6 +90,7 @@ describe('PLSeasonBuilder', () => {
 
   it('карточка «Циклы между соревнованиями» появляется при ≥2 соревнованиях и собирает сезон с пиками', () => {
     let built: LMSBuildOutput | null = null;
+    let segments: import('../PLSeasonBuilder').SeasonBuildInfo[] = [];
     seedSeasonMode('season');
     render(<PLSeasonBuilder {...props({
       meets: [
@@ -97,7 +98,7 @@ describe('PLSeasonBuilder', () => {
         { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
       ],
       taper: { mode: 'classic' as const, mockMeet: true, postMeet: true, windowWeeks: 2 },
-      onBuilt: (o) => { built = o; },
+      onBuilt: (o, _n, segs) => { built = o; segments = segs || []; },
     })} />);
     expect(screen.queryByText(/Циклы между соревнованиями/)).not.toBeNull();
     expect(screen.queryByText(/Старт 1 \(нед 8\)/)).not.toBeNull();
@@ -115,6 +116,9 @@ describe('PLSeasonBuilder', () => {
     // Агрегированные метрики сезона валидны (PLPlanView вызывает tonnage.toFixed — не должно упасть).
     expect(Number.isFinite(built!.cycleMetrics.tonnage)).toBe(true);
     expect(built!.cycleMetrics.tonnage).toBeGreaterThan(0);
+    // Сводка сегментов сезона передана в родителя (для вкладки «План» и печати).
+    expect(segments.length).toBeGreaterThanOrEqual(2);
+    expect(segments.some(s => s.fitMode === 'shrink' && s.cycleWeeks > s.weeks)).toBe(true);
   });
 
   it('SSR-рендер карточки не падает', () => {
