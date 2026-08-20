@@ -744,7 +744,7 @@ export const CardioConstructor: React.FC = () => {
   const goPrev = () => { if (stepIdx > 0) setStep(STEPS[stepIdx - 1].id); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minWidth: 0, maxWidth: '100%' }}>
+    <div className="cardio-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minWidth: 0, maxWidth: '100%' }}>
       {/* Шапка мастера */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>❤️ Кардио-конструктор</div>

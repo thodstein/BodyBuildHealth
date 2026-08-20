@@ -3180,3 +3180,59 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
     padding-right: 0 !important;
   }
 }
+
+/* ─── Кардио-конструктор: интерактивные состояния поверх inline-стилей ─── */
+.cardio-constructor button {
+  transition: filter 0.15s ease, transform 0.06s ease, box-shadow 0.15s ease;
+}
+.cardio-constructor button:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.cardio-constructor button:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.95);
+}
+.cardio-constructor input,
+.cardio-constructor select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cardio-constructor input:focus,
+.cardio-constructor select:focus {
+  outline: none;
+  border-color: rgba(0, 230, 138, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(0, 230, 138, 0.18);
+}
+/* Карточки секций и недель — мягкий hover */
+.cardio-constructor .ck-card,
+.cardio-constructor .ck-week {
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.cardio-constructor .ck-week:hover {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.cardio-constructor .ck-tile {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.cardio-constructor .ck-tile:hover {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+/* Шапка мастера — градиентная плашка */
+.cardio-constructor .ck-group-head {
+  background: linear-gradient(90deg, rgba(0, 230, 138, 0.08), transparent);
+}
+/* Степпер шагов: активный шаг — мягкое свечение */
+.cardio-constructor button[style*="2px solid var(--accent)"] {
+  box-shadow: 0 0 12px rgba(0, 230, 138, 0.25);
+}
+/* Чипы сессий недели — hover подсветка */
+.cardio-constructor span[style*="border-radius: 20px"] {
+  transition: background 0.15s ease;
+}
+@media (hover: hover) {
+  .cardio-constructor span[style*="border-radius: 20px"]:hover {
+    background: rgba(0, 230, 138, 0.12) !important;
+  }
+}
