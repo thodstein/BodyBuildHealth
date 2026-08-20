@@ -23,6 +23,7 @@ import {
 } from './bb-specialization.engine';
 import type { Injury } from '../manual-plan-builder';
 import type { BBTrainingFocus } from './bb-goal-types';
+import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
   isoToday, isoDiffDays, isoAddDays,
@@ -85,6 +86,8 @@ export interface PrepCycleConfig {
   previousPlan?: BBPlan;
   supersetMode?: BBBuilderInput['supersetMode'];
   volumeScheme?: BBBuilderInput['volumeScheme'];
+  /** DUP-периодизация (применяется overlay поверх плана, как в обычном ББ-авто). */
+  dupMode?: DUPMode;
 
   // ── Восстановление/питание → MRV (как в обычном конструкторе) ──
   bodyFat?: number;
@@ -285,7 +288,7 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     patternId,
     level: cfg.level,
     trainingYears: cfg.trainingYears,
-    goal: profile.prepGoalHint as BBGoal,
+    goal: 'maintenance' as BBGoal,
     weeks: totalWeeks,
     bodyweightCapability: cfg.bodyweightCapability,
     workMax: cfg.workMax ?? {},
@@ -325,9 +328,10 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     previousPlan: cfg.previousPlan,
     supersetMode: cfg.supersetMode,
     volumeScheme: cfg.volumeScheme,
-    // Питание: приоритет явно заданного; иначе prep-дефолты (белок 2.0 г/кг, лёгкий дефицит).
+    // Питание: приоритет явно заданного; prep держит объём на уровне ББ-авто (MAV),
+    // лёгкий дефицит — через питание/contest-prep, НЕ через режущий goal='cut'.
     proteinPerKg: cfg.proteinPerKg ?? 2.0,
-    calorieSurplus: cfg.calorieSurplus ?? (profile.prepGoalHint === 'cut' ? -300 : 0),
+    calorieSurplus: cfg.calorieSurplus ?? -200,
   };
 
   let pedAdapt: PEDAdaptation | undefined;
@@ -335,7 +339,11 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     const peds: PED[] = ['AAS'];
     pedAdapt = adaptForPEDs(peds, input.workMax ?? {}, cfg.pedDoses, cfg.courseIntensity ?? 'moderate');
   }
-  const bbPlan: BBPlan = buildBBPlan(input, pedAdapt);
+  let bbPlan: BBPlan = buildBBPlan(input, pedAdapt);
+  // DUP-периодизация (как в обычном ББ-авто) — поверх базового плана, до prep-overlay.
+  if (cfg.dupMode && cfg.dupMode !== 'none') {
+    bbPlan = applyDUPOverlay(bbPlan, { mode: cfg.dupMode, cycleDays: cfg.dupMode === 'full_dup' ? 3 : 2 });
+  }
 
   const prepCfg: BBContestPrepConfig = {
     sex: cfg.sex,
@@ -477,27 +485,28 @@ export function prepRecoveryMult(cfg: Pick<PrepCycleConfig, 'hrvMs' | 'sleepHour
   return clamp(m, 0.9, 1.05);
 }
 
-/** План объёма подготовки (доказательный): основная часть — ПОЛНЫЙ объём (сохранение мышц),
- *  лёгкое снижение к финалу подготовки, реальный спуск — в финальном тапере.
- *  Целевой ориентир: 10–15 сетов/группу/нед (Helms; Schoenfeld 2021; da Silveira 2025). */
+/** План объёма подготовки (доказательный): подготовка ДЕРЖИТ объём на уровне обычного
+ *  ББ-авто (MAV, PED/стаж/уровень/восстановление масштабируют вверх через buildBBPlan),
+ *  снижение — только в финальном тапере (последние недели). Это НЕ режущий каскад с 1-й недели.
+ *  Ориентир: 10–15 сетов/группу/нед × атлет-масштаб (Helms; Schoenfeld 2021; da Silveira 2025). */
 export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVolumePlan {
   const deficitMult = prepDeficitMult(cfg);
   const athleteMult = prepAthleteMult(cfg);
   const recoveryMult = prepRecoveryMult(cfg);
-  // Стратегия пользователя: крутизна (сохранить массу / сбалансировано / агрессивно).
+  // Стратегия пользователя влияет лишь на ФИНАЛЬНУЮ подготовку/переход к таперу (не на основную часть).
   const strategy = cfg.prepVolumeStrategy ?? 'balanced';
-  const strategyMult = strategy === 'gentle' ? 1.05 : strategy === 'aggressive' ? 0.95 : 1.0;
-  // ВАЖНО: не даём prep-множителю уйти в тапер — нижняя граница 0.85.
-  const global = clamp(deficitMult * athleteMult * recoveryMult * strategyMult, 0.85, 1.1);
+  const strategyMult = strategy === 'gentle' ? 1.02 : strategy === 'aggressive' ? 0.97 : 1.0;
+  // ВАЖНО: prep держит объём ~MAV (×1.0). Множители почти не режут (нижняя граница 0.92).
+  const global = clamp(deficitMult * athleteMult * recoveryMult * strategyMult, 0.92, 1.1);
   const base: Array<Omit<PrepVolumePhase, 'volumeMult'> & { base: number }> = [
-    { fromPct: 0, toPct: 0.5, base: 1.0, rir: [1, 2] },     // основная подготовка — полный объём
-    { fromPct: 0.5, toPct: 0.85, base: 0.96, rir: [1, 2] }, // середина — слегка снижаем (дефицит)
-    { fromPct: 0.85, toPct: 1.0, base: 0.90, rir: [2, 3] }, // финал подготовки — умеренно (НЕ тапер)
+    { fromPct: 0, toPct: 0.6, base: 1.0, rir: [1, 2] },     // основная подготовка — полный объём (MAV)
+    { fromPct: 0.6, toPct: 0.9, base: 0.98, rir: [1, 2] },  // середина — минимальное снижение
+    { fromPct: 0.9, toPct: 1.0, base: 0.95, rir: [2, 3] },  // финал подготовки — лёгкий (НЕ тапер)
   ];
   const phases: PrepVolumePhase[] = base.map(p => ({
     fromPct: p.fromPct,
     toPct: p.toPct,
-    volumeMult: clamp(p.base * global, 0.85, 1.0),
+    volumeMult: clamp(p.base * global, 0.92, 1.0),
     rir: p.rir,
   }));
   const strategyLabel = strategy === 'gentle' ? 'сохранить массу' : strategy === 'aggressive' ? 'агрессивная сушка' : 'сбалансированная';
@@ -507,7 +516,7 @@ export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVol
     Math.round(10 * athleteMult),
     Math.round(15 * athleteMult),
   ];
-  const note = `база 10–15 сетов/группу/нед (натурал/средний стаж) → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» ×${strategyMult.toFixed(2)} · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)} (всего ×${global.toFixed(2)})`;
+  const note = `объём ≈ обычного ББ-авто (MAV) · база 10–15 сетов/группу/нед → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)}`;
   return {
     phases,
     deficitMult,
@@ -733,6 +742,8 @@ export interface PrepSeasonConfig {
   previousPlan?: BBPlan;
   supersetMode?: BBBuilderInput['supersetMode'];
   volumeScheme?: BBBuilderInput['volumeScheme'];
+  /** DUP-периодизация (применяется overlay поверх плана, как в обычном ББ-авто). */
+  dupMode?: DUPMode;
   proteinPerKg?: number;
   calorieSurplus?: number;
   bodyFat?: number;
@@ -833,6 +844,7 @@ export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
       previousPlan: cfg.previousPlan,
       supersetMode: cfg.supersetMode,
       volumeScheme: cfg.volumeScheme,
+      dupMode: cfg.dupMode,
       proteinPerKg: cfg.proteinPerKg,
       calorieSurplus: cfg.calorieSurplus,
       bodyFat: cfg.bodyFat,

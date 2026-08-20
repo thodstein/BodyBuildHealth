@@ -4955,6 +4955,7 @@ export const BbAutoConstructor: React.FC = () => {
     previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
     supersetMode,
     volumeScheme,
+    dupMode,
     proteinPerKg: Number((linked.profile?.settings as any)?.nutrition?.proteinPerKg) || undefined,
     calorieSurplus: Number((linked.profile?.settings as any)?.nutrition?.calorieSurplus) || undefined,
     weightKg: profileWeight,

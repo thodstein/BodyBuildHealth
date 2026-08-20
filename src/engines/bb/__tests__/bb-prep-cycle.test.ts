@@ -9,7 +9,7 @@ import {
   prepVolumePlan, prepDeficitMult, prepAthleteMult, prepRecoveryMult, prepVolumePhaseForWeek,
   type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
-import { DEFAULT_WORKMAX } from '../bb-builder.engine';
+import { buildBBPlan, DEFAULT_WORKMAX } from '../bb-builder.engine';
 import { aggregateBBVolume } from '../bb-volume.engine';
 import { isoToday, isoAddDays } from '../bb-contest-prep.engine';
 import type { BBContestCategory } from '../bb-contest-prep.engine';
@@ -398,5 +398,23 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     expect(nPrep.length).toBeGreaterThan(0);
     expect(ePrep.length).toBeGreaterThan(0);
     expect(setsOf(ePrep[0])).toBeGreaterThan(setsOf(nPrep[0]));
+  });
+
+  it('объём подготовки ≈ обычного ББ-авто (maintenance), а не урезанный goal=cut', () => {
+    const b = base({ accentMuscles: [], minimalMuscles: [], category: 'bikini', sex: 'female', weeks: 8, taperWeeks: 2 });
+    const prep = buildPrepCycle(b);
+    const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((x: number, e: any) => x + (e.sets || 0), 0), 0);
+    const prepWk = (prep.bbPlan.weeks as any[]).find((w: any) => w.contestPhase === 'preparation');
+    const prepSets = setsOf(prepWk);
+    // Обычный ББ-авто: buildBBPlan (maintenance) с теми же параметрами.
+    const plain = buildBBPlan({
+      patternId: prep.config.splitPatternId || 'upper_lower_4',
+      level: b.level, goal: 'maintenance', weeks: 8, workMax: { ...DEFAULT_WORKMAX },
+      equipment: EQ, sex: 'female', volumeGoal: 'mav',
+    });
+    const plainSets = setsOf(plain.weeks[0]);
+    // Prep-объём не должен быть сильно меньше обычного ББ-авто (<25% разницы).
+    expect(prepSets).toBeGreaterThan(plainSets * 0.75);
+    expect(prepSets).toBeLessThanOrEqual(plainSets * 1.3);
   });
 });
