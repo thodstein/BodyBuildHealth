@@ -125,8 +125,8 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           return (
             <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':isIntraWorkout?'rgba(34,197,94,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}
               onDragOver={e=>{e.preventDefault();setDropTarget(mi);}} onDragLeave={()=>setDropTarget(null)} onDrop={e=>{e.preventDefault();if(draggedItem&&draggedItem.mealIdx!==mi)moveFoodItem(draggedItem.mealIdx,mi,draggedItem.itemIdx);setDropTarget(null);}}>
-              <div style={{padding:'7px 10px 5px',background:isPreWorkout?'rgba(139,92,246,0.06)':isPostWorkout?'rgba(245,158,11,0.06)':isIntraWorkout?'rgba(34,197,94,0.06)':'#202023',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                <div style={{display:'flex',alignItems:'center',gap:5}}>
+              <div style={{padding:'7px 10px 5px',background:isPreWorkout?'rgba(139,92,246,0.06)':isPostWorkout?'rgba(245,158,11,0.06)':isIntraWorkout?'rgba(34,197,94,0.06)':'#202023',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)',flexWrap:'wrap',gap:4,wordBreak:'break-word'}}>
+                <div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                   <span style={{fontSize:8,fontWeight:600,color:'rgba(255,255,255,0.85)'}}>{m.time}</span>
                   <span style={{width:3,height:12,borderRadius:2,background:accentColor}}/>
                   <span style={{fontSize:10,fontWeight:700,color:accentColor}}>{m.label}</span>

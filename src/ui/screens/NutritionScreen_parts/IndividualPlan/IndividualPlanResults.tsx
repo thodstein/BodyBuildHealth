@@ -863,7 +863,7 @@ export const IndividualPlanResults: React.FC = () => {
               return (
                 <div key={mi} style={{ position: 'relative', marginBottom: 8, paddingLeft: 16 }}>
                   <div style={{ position: 'absolute', left: -16, top: 4, width: 10, height: 10, borderRadius: '50%', background: '#06b6d4', border: '2px solid #18181b' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap', wordBreak: 'break-word' }}>
                     <span style={{ fontSize: 8, fontWeight: 600, color: '#06b6d4', minWidth: 40 }}>{m.time}</span>
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{m.label}</span>
                     {m.mpsCheck && (m.mpsCheck.triggers_mTOR

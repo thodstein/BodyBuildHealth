@@ -136,6 +136,10 @@ export interface MealPlanInput {
   // Этап 7: верхний предел клетчатки (из prep/пик-недели ББ — fiberMaxG). На пик-дне снижает
   // объём овощей, чтобы высокоуглеводная загрузка не «упиралась» в порции.
   fiberCapG?: number;
+  // E8: осознанный выбор пользователя — молоко к завтраку (учитывает no_dairy/аллергены)
+  // и кокосовое масло/жиры в рацион. Пусто/не установлено = не добавлять.
+  addMilkToBreakfast?: boolean;
+  coconutOilBoost?: boolean;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -353,14 +357,14 @@ const BREAKFAST_CARB_KEYWORDS = ['овсян','овсяные хлопья','х�
 // «Завтрашние» фрукты/сухофрукты (ягоды, банан, изюм, курага, чернослив, финики).
 const BREAKFAST_FRUIT_KEYWORDS = ['ягод','банан','черник','клубник','малин','смородин','изюм','кураг','черносл','финик','сухофрук','ежевик','голубик','киви','яблок'];
 // Подбор завтрашнего пула углеводов (fallback → общий, если завтрашнего нет).
-function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: any[]; fruits: any[] } {
+function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: FoodItem[]; fruits: FoodItem[] } {
   const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
-  const match = (f: any, kws: string[]) => {
+  const match = (f: FoodItem, kws: string[]) => {
     const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
     return kws.some(k => name.includes(k) || id.includes(k));
   };
-  const carbs = source.filter((f: any) => match(f, BREAKFAST_CARB_KEYWORDS));
-  const fruits = pool.carbFruit.filter((f: any) => match(f, BREAKFAST_FRUIT_KEYWORDS));
+  const carbs = source.filter((f) => match(f, BREAKFAST_CARB_KEYWORDS));
+  const fruits = pool.carbFruit.filter((f) => match(f, BREAKFAST_FRUIT_KEYWORDS));
   return {
     carbs: carbs.length > 0 ? carbs : [...source],
     fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
@@ -623,9 +627,10 @@ function buildWholeMeal(
     refeedDay?: boolean; // Этап 5: настоящий рефид-день (быстрые/низкоклетчаточные углеводы, лёгкие овощи)
     fiberCapG?: number; // Этап 7: верхний предел клетчатки (пик-неделя ББ) — лёгкие овощи
     breakfast?: boolean; // E1: продуктовый пул «завтрака» (каши/хлопья + ягоды/сухофрукты), а не общий
+    extraLiquids?: { food: FoodItem; grams: number; role?: MealItem['role'] }[]; // E8: молоко/кокосовое масло в завтрак
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, extraLiquids } = params;
   // E1: завтрак использует собственный продуктовый пул (каши/хлопья + ягоды/банан/сухофрукты).
   const _breakfastPools = breakfast ? breakfastCarbPool(pool) : null;
   // D-28: effective preferred = (global preferred MINUS foods bound to other meals) ∪ meal-bound for THIS meal.
@@ -700,7 +705,7 @@ function buildWholeMeal(
     // это ускоряет гликогеновый ре-синтез и снижает объём клетчатки в приёме.
     const _carbPool = (refeedDay && pool.carbFast.length > 0) ? pool.carbFast : pool.carbSlow;
     // E1: на завтраке отдаём предпочтение «завтрашним» углеводам (каши/хлопья), fallback — общий пул.
-    const carbPool = (_breakfastPools && _breakfastPools.carbs.length > 0) ? (_breakfastPools.carbs as any) : _carbPool;
+    const carbPool = (_breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
     const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
     // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
@@ -794,7 +799,7 @@ function buildWholeMeal(
 
   // 4. Фрукт (ягоды/киви как пребиотик и антиоксидант) (предпочтение — preferred)
   if (includeFruit) {
-    const fruitPool = (_breakfastPools && _breakfastPools.fruits.length > 0) ? (_breakfastPools.fruits as any) : pool.carbFruit;
+    const fruitPool = (_breakfastPools && _breakfastPools.fruits.length > 0) ? _breakfastPools.fruits : pool.carbFruit;
     const prefFruit = preferredIds && preferredIds.size > 0 ? fruitPool.filter(f => preferredIds.has(f.id)) : [];
     const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : fruitPool, seed + 4, { lockedIds, recentIds, hardRecentIds });
     if (fSrc) {
@@ -874,6 +879,15 @@ function buildWholeMeal(
           }
         }
       }
+  // E8: дополнительные жидкости/жиры в приём (молоко, кокосовое масло) — добавляются в состав,
+  // включаются в totals приёма автоматически (reduce ниже).
+  if (extraLiquids && extraLiquids.length > 0) {
+    for (const el of extraLiquids) {
+      const _usedIds = new Set(items.map(it => it.id));
+      if (_usedIds.has(el.food.id)) continue;
+      items.push(makeItem(el.food, el.grams, el.role || 'liquid'));
+    }
+  }
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
@@ -935,7 +949,7 @@ function buildPreWorkout(
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
   }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   return {
-    label, time, items, totals, type: 'preworkout', target: { p: PREW_PROTEIN_G, c: PREW_CARB_SLOW_G, f: PREW_FAT_MAX_G },
+    label, time, items, totals, type: 'preworkout', target: { p: PREW_PROTEIN_G, c: carbG, f: PREW_FAT_MAX_G },
     rationale: [
       `Pre-workout за ~90 мин: белок ${PREW_PROTEIN_G} г (снижение катаболизма)`,
       // P2-fix: используем фактический carbG вместо захардкоженной константы PREW_CARB_SLOW_G
@@ -1406,6 +1420,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
   const breakfastRot = rotationForMeal(0);
+  // E8: молоко к завтраку и кокосовое масло (по выбору пользователя, с учётом исключений).
+  const _breakfastExtras: { food: FoodItem; grams: number; role?: MealItem['role'] }[] = [];
+  const _dairyExcluded = combinedExcluded.has('milk') || combinedExcluded.has('kefir') ||
+    (input.allergenTags ? [...input.allergenTags].some(t => t === 'dairy' || t === 'молочные' || t === 'лактоза') : false);
+  if (input.addMilkToBreakfast && !_dairyExcluded) {
+    const _milk = FOOD_DB.find(f => f.id === 'milk' && !combinedExcluded.has(f.id));
+    if (_milk) _breakfastExtras.push({ food: _milk, grams: 200, role: 'liquid' });
+  }
+  if (input.coconutOilBoost) {
+    const _co = FOOD_DB.find(f => f.id === 'coconut_oil' && !combinedExcluded.has(f.id));
+    if (_co) _breakfastExtras.push({ food: _co, grams: 10, role: 'fat' });
+  }
   const breakfast = buildWholeMeal({
     label: 'Завтрак', time: tBreakfast, type: 'breakfast', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
     mealPreferredIds: input.preferredByMeal?.['Завтрак'],
@@ -1415,6 +1441,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     fatG: mealBudget.breakfast.f,
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
     includeVeg: input.mealsCount >= 5, includeFruit: true, breakfast: true,
+    extraLiquids: _breakfastExtras.length > 0 ? _breakfastExtras : undefined,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
     lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
     rationales: [
@@ -1503,13 +1530,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _slots.push({ label: 'Перекус', type: 'snack3', min: _midMin(bMin, lMin), seed: seedBase + 27 });
     _slots.push({ label: 'Перекус', type: 'snack4', min: _midMin(dMin, bedMin), seed: seedBase + 31 });
     for (const s of _slots) {
-      if (_keep.has(s.type) && mealBudget[s.type]) {
+      const mb = mealBudget[s.type];
+      if (_keep.has(s.type) && mb) {
         const rot = rotationForMeal(s.type === 'snack3' ? 6 : 7);
         const m = buildWholeMeal({
           label: s.label, time: _fmt(s.min), type: s.type, refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
           mealPreferredIds: input.preferredByMeal?.[s.label],
           preferredByMealFull: input.preferredByMeal,
-          proteinG: mealBudget[s.type].p, carbG: mealBudget[s.type].c, fatG: mealBudget[s.type].f,
+          proteinG: mb.p, carbG: mb.c, fatG: mb.f,
           pool, proteinRotationIds: rot.ids, seed: s.seed,
           includeVeg: false, includeFruit: true,
           preferredIds: effectivePreferred, dayUsedPreferredIds, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,

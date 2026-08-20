@@ -84,6 +84,7 @@ export const IndividualPlanSettings: React.FC = () => {
     allergens, toggleAllergen,
     healthIssues, setHealthIssues, toggleHealthIssue,
     eveningLowCarb, setEveningLowCarb,
+    addMilkToBreakfast, setAddMilkToBreakfast, coconutOilBoost, setCoconutOilBoost,
     planType, setPlanType,
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
     specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
@@ -1728,6 +1729,26 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 </span>
               );
             })}
+          </div>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:5, marginTop:6 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:10, background: addMilkToBreakfast ? 'rgba(99,102,241,0.12)' : '#202023', border:`1px solid ${addMilkToBreakfast ? '#6366f1' : 'rgba(255,255,255,0.06)'}` }}>
+            <div>
+              <div style={{ fontSize:10, fontWeight:600, color: addMilkToBreakfast ? '#818cf8' : '#fff' }}>🥛 Молоко к завтраку</div>
+              <div style={{ fontSize:8, color: addMilkToBreakfast ? 'rgba(129,140,248,0.8)' : 'rgba(255,255,255,0.6)' }}>Добавлять молоко в завтрак (если не «без молочных»)</div>
+            </div>
+            <button onClick={() => { const nv = !addMilkToBreakfast; setAddMilkToBreakfast(nv); try { localStorage.setItem('he_add_milk_breakfast', nv ? 'true' : 'false'); } catch {} }} style={{ width:34, height:18, borderRadius:9, border:'none', position:'relative', cursor:'pointer', transition:'background 0.2s', background: addMilkToBreakfast ? '#6366f1' : 'rgba(255,255,255,0.15)', flexShrink:0 }}>
+              <span style={{ position:'absolute', top:2, width:14, height:14, borderRadius:'50%', background:'#fff', transition:'left 0.2s', left: addMilkToBreakfast ? 17 : 2 }} />
+            </button>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:10, background: coconutOilBoost ? 'rgba(245,158,11,0.12)' : '#202023', border:`1px solid ${coconutOilBoost ? '#f59e0b' : 'rgba(255,255,255,0.06)'}` }}>
+            <div>
+              <div style={{ fontSize:10, fontWeight:600, color: coconutOilBoost ? '#fbbf24' : '#fff' }}>🥥 Кокосовое масло</div>
+              <div style={{ fontSize:8, color: coconutOilBoost ? 'rgba(251,191,36,0.8)' : 'rgba(255,255,255,0.6)' }}>MCT-жиры для быстрой энергии (завтрак/перекусы)</div>
+            </div>
+            <button onClick={() => { const nv = !coconutOilBoost; setCoconutOilBoost(nv); try { localStorage.setItem('he_coconut_oil_boost', nv ? 'true' : 'false'); } catch {} }} style={{ width:34, height:18, borderRadius:9, border:'none', position:'relative', cursor:'pointer', transition:'background 0.2s', background: coconutOilBoost ? '#f59e0b' : 'rgba(255,255,255,0.15)', flexShrink:0 }}>
+              <span style={{ position:'absolute', top:2, width:14, height:14, borderRadius:'50%', background:'#fff', transition:'left 0.2s', left: coconutOilBoost ? 17 : 2 }} />
+            </button>
           </div>
         </div>
         <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); persistPlannerValue('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
