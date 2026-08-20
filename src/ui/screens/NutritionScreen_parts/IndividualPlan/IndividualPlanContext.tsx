@@ -1452,12 +1452,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         next.nutrition.proteinPerKg = 1.8;
       }
       next.nutrition.eveningLowCarb = eveningLowCarb;
-      // FIX 1.4/1.5: сохраняем ручные цели КБЖУ + режим обратно в профиль
-      // (раньше писались только в localStorage — профиль оставался устаревшим).
+      // FIX 1.4/1.5: сохраняем ручные цели КБЖУ + режим обратно в профиль.
       if (manualKcal !== null && manualP !== null && manualF !== null && manualC !== null) {
         next.nutrition.manualTargets = { kcal: manualKcal, protein: manualP, fat: manualF, carbs: manualC };
       }
-      next.nutrition.kbjuMode = (kbjuMode === 'manual' ? 'manual' : (kbjuMode === 'profile' ? 'auto' : 'auto'));
+      next.nutrition.kbjuMode = (kbjuMode === 'manual' ? 'manual' : 'auto');
       if (surplusPct) next.nutrition.surplusPct = surplusPct;
       next.nutrition.histamineSensitive = histamineSensitive;
       if (!next.health) next.health = {};
@@ -1747,6 +1746,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _cycDir = dayKcalMod - 1; // >0 = up-day, <0 = down-day
         const _dampK = (_diaryActive && Math.sign(_cycDir) === Math.sign(diaryComp.delta.kcal)) ? (1 - Math.abs(_cycDir)) : 1;
         const _dampC = (_diaryActive && Math.sign(dayCarbMod - 1) === Math.sign(diaryComp.delta.c)) ? (1 - Math.abs(dayCarbMod - 1)) : 1;
+        // Этап 8 (БАГ-17): недельная периодизация в V2-пути. Раньше periodizationEnabled
+        // применялся ТОЛЬКО в классическом fallback (buildWeek, пост-скейлинг порций).
+        // Здесь чередуем калорийность по неделе плана: 2 нед рабочая + 1 нед поддержание.
+        if (periodizationEnabled) {
+          const _pWeek = ((offset + 6) / 7) % 3; // 0,1 = рабочая нед, 2 = поддержание
+          if (_pWeek === 2) {
+            dayKcalMod = 1.0; dayCarbMod = 1.0;
+          }
+        }
         // #4b Пик-неделя ББ / 🏁 Contest prep: абсолютные цели по РЕАЛЬНОЙ дате дня
         // (today + offset) — приоритет над cycling/компенсацией.
         // Приоритет источников: единый план (goals.bbContestPrepPlan, покрывает и подготовку)
@@ -1793,9 +1801,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainStartMin: linkToTraining && isTrainDay(offset) ? toMin(trainStart) : undefined,
           allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
-          // Этап 4 (БАГ-15/16): инъекции передаются в V2-движок для привязки приёмов
-          // к времени укола (инсулин/ГР/ИГФ) — раньше только в классическом fallback.
-          injections: injections.map(i => ({ type: i.type, name: i.name, time: i.time, dose: i.dose, esterType: i.esterType, trainLinked: i.trainLinked, trainTiming: i.trainTiming })),
           excludedIds: (() => { const s = new Set(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
           preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
@@ -1821,10 +1826,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
            menstrualPhaseNote: _mp ? _mp.note : undefined,
            carbGiPref: _mp ? _mp.carbGiPref : undefined,
            quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
-           // Этап 5: настоящий рефид-день — движок предпочитает быстрые/низкоклетчаточные углеводы.
-            refeedDay: isRefeedDay,
-            // Этап 7: лимит клетчатки из prep/пик-недели ББ (fiberMaxG) — на пик-дне лёгкие овощи.
-            fiberCapG: _peakTargets?.fiberMaxG,
+           // Этап 4 (БАГ-15/16): инъекции в V2-движок для привязки приёмов к уколам.
+           injections: injections.map(i => ({ type: i.type, name: i.name, time: i.time, dose: i.dose, esterType: i.esterType, trainLinked: i.trainLinked, trainTiming: i.trainTiming })),
+           // Этап 5: настоящий рефид-день — движок выбирает быстрые/низкоклетчаточные углеводы.
+           refeedDay: isRefeedDay,
+           // Этап 7: лимит клетчатки из prep/пик-недели ББ (fiberMaxG) — на пик-дне лёгкие овощи.
+           fiberCapG: _peakTargets?.fiberMaxG,
          };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
@@ -1899,7 +1906,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           microSummary: v2.microSummary,
           diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? diaryComp : undefined,
           isRefeedDay,
-          refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Выбраны быстрые/низкоклетчаточные углеводы, овощи легче — больше места углеводам. Психологическая разгрузка на сушке.' : undefined,
+          refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
+          // Этап 8: пометка недели периодизации в плане (2+1: каждая 3-я неделя — поддержание).
+          periodizationWeekNote: periodizationEnabled ? ((((offset + 6) / 7) % 3) === 2 ? '📅 Неделя поддержания (периодизация 2+1) — калории вернулись к норме.' : '📅 Рабочая неделя периодизации — заданный профицит/дефицит.') : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
           boneNotes: _boneNotes.length > 0 ? _boneNotes : undefined,
           sleepNote: _sleepNote,
@@ -3058,7 +3067,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, renderMealList, annualPhase }), [ctx, plannerMode, renderMealList, annualPhase]);
