@@ -1228,3 +1228,90 @@ export function weightHeatmap(
   }
   return { cells, min, max };
 }
+
+/* ── Unified PDF Export for All Diaries ────────────────────────────────────── */
+
+export interface DiaryExportData {
+  title: string;
+  entries: DiaryEntryLike[];
+  meta?: Record<string, string>;
+}
+
+const escHtml = (v: unknown): string => {
+  const map: Record<string, string> = { '&': '&', '<': '<', '>': '>', '"': '"', "'": "'" };
+  return String(v ?? '').replace(/[&<>"']/g, (x) => map[x] || x);
+};
+
+const entryToHtmlTable = (entries: DiaryEntryLike[], title: string): string => {
+  if (!entries.length) return `<h3>${escHtml(title)}</h3><p>Нет записей</p>`;
+  const allFields = new Set<string>();
+  entries.forEach((e) => e.fields.forEach((f) => allFields.add(f.label)));
+  const fields = [...allFields].sort();
+  const rowsHtml = entries
+    .map(
+      (e) =>
+        `<tr><td>${escHtml(e.date)}</td>${fields
+          .map((f) => {
+            const val = e.fields.find((x) => x.label === f)?.value ?? '—';
+            return `<td>${escHtml(val)}</td>`;
+          })
+          .join('')}</tr>`
+    )
+    .join('');
+  return `
+    <h3>${escHtml(title)} (${entries.length} записей)</h3>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:24px;font-size:11px">
+      <thead><tr style="background:#f3f4f6"><th style="border:1px solid #ddd;padding:6px">Дата</th>${fields
+        .map((f) => `<th style="border:1px solid #ddd;padding:6px">${escHtml(f)}</th>`)
+        .join('')}</tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  `;
+};
+
+/** Экспорт всех дневников в один PDF через window.print() */
+export const exportAllDiariesPdf = (diaries: DiaryExportData[], filename = 'diaries-all.pdf'): void => {
+  const html = `
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escHtml(filename.replace('.pdf', ''))}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; color: #111; line-height: 1.4; }
+    h1 { font-size: 20px; margin-bottom: 8px; color: #111; }
+    h2 { font-size: 16px; margin: 20px 0 8px; color: #333; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+    h3 { font-size: 14px; margin: 16px 0 8px; color: #374151; }
+    p { margin: 8px 0; color: #6b7280; font-size: 12px; }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    td, th { border: 1px solid #ddd; padding: 5px 8px; vertical-align: top; }
+    .meta { background: #f9fafb; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 12px; }
+    .meta-row { display: flex; justify-content: space-between; margin: 4px 0; }
+    .meta-label { color: #6b7280; }
+    .meta-value { font-weight: 600; color: #111; }
+    @media print {
+      @page { margin: 16mm; }
+      body { margin: 0; }
+      h1, h2, h3 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>${escHtml(filename.replace('.pdf', ''))}</h1>
+  <div class="meta">
+    <div class="meta-row"><span class="meta-label">Дата создания:</span> <span class="meta-value">${new Date().toLocaleString('ru-RU')}</span></div>
+    <div class="meta-row"><span class="meta-label">Всего дневников:</span> <span class="meta-value">${diaries.length}</span></div>
+  </div>
+  ${diaries.map((d) => entryToHtmlTable(d.entries, d.title)).join('')}
+  ${diaries.flatMap((d) => Object.entries(d.meta || {}).map(([k, v]) => `<h2>${escHtml(k)}</h2><p>${escHtml(v)}</p>`)).join('')}
+</body>
+</html>
+  `;
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 100);
+};
