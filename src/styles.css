@@ -412,6 +412,25 @@
 .manual-constructor--editor .editor-exercise-card:focus-within {
   border-color: rgba(255,255,255,0.4) !important;
 }
+/* Чипы редактора/быстрого старта: живой отклик поверх инлайн-стилей
+   (цвет задан инлайн, здесь — только lift/тень/фокус) */
+button.editor-chip {
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+@media (hover: hover) {
+  button.editor-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.28);
+  }
+  button.editor-chip:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+}
+button.editor-chip:focus-visible {
+  outline: 2px solid rgba(0,230,138,0.5);
+  outline-offset: 1px;
+}
 .constructor-surface {
   background: var(--constructor-surface) !important;
   border-color: var(--constructor-border) !important;

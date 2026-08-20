@@ -1476,6 +1476,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                       }}
                       title={diag.description + '\n' + diag.rationale + '\nУпр: ' + diag.assistance.join(', ')}
                       style={{ padding: '5px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)', color: '#ef4444', fontWeight: 700, minHeight: 44, textAlign: 'left', lineHeight: 1.3 }}
+                      className="editor-chip"
                     >
                       <div>{diag.label}</div>
                       <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>{diag.assistance.slice(0, 2).join(' · ')}</div>
@@ -1514,7 +1515,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             {isExp && (
               <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {w.days.map((d, di) => (
-                    <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div key={di} className="editor-session-card" style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       <input style={{ ...IN, padding: '5px 8px', fontSize: 11, flex: 1, minHeight: 44 }} value={d.name} onChange={e => updateDay(wi, di, { name: e.target.value })} placeholder="Название дня" />
                       <DayOfWeekPicker
@@ -1527,7 +1528,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                       <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
                     </div>
                     {d.exercises.map((ex, ei) => (
-                      <div key={ei} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.14)' }}>
+                      <div key={ei} className="editor-exercise-card" style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.14)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: DIM }}>Упр {ei + 1}</span>
                           <ExerciseLabPicker
@@ -1663,7 +1664,7 @@ const WeakPointChips: React.FC<{ value: string[]; onChange: (v: string[]) => voi
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
       {WEAK_OPTS.map(m => {
         const on = value.includes(m);
-        return <button key={m} onClick={() => toggle(m)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.02)', color: on ? '#fff' : DIM, minHeight: 44 }}>{GROUP_RU[m] ?? m}</button>;
+        return <button key={m} className="editor-chip" onClick={() => toggle(m)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.02)', color: on ? '#fff' : DIM, minHeight: 44 }}>{GROUP_RU[m] ?? m}</button>;
       })}
     </div>
   );
@@ -1690,7 +1691,7 @@ const INTENSITY_TECHNIQUE_OPTS = [
 ];
 
 const Chip: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode; color?: string }> = ({ active, onClick, children, color }) => (
-  <button onClick={onClick} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: active ? '1px solid ' + (color || '#00e68a') : '1px solid rgba(255,255,255,0.08)', background: active ? (color || '#00e68a') + '20' : 'rgba(255,255,255,0.02)', color: active ? '#fff' : DIM, minHeight: 44 }}>{children}</button>
+  <button className="editor-chip" onClick={onClick} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: active ? '1px solid ' + (color || '#00e68a') : '1px solid rgba(255,255,255,0.08)', background: active ? (color || '#00e68a') + '20' : 'rgba(255,255,255,0.02)', color: active ? '#fff' : DIM, minHeight: 44 }}>{children}</button>
 );
 
 const BBConstraintsPanel: React.FC<{
