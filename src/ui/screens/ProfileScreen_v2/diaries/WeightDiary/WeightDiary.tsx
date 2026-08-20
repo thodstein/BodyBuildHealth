@@ -859,28 +859,6 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const bmiLabel = body?.bmi == null ? '' : body.bmi >= 30 ? 'Ожирение' : body.bmi >= 25 ? 'Избыточный вес' : body.bmi < 18.5 ? 'Дефицит' : 'Норма';
   const bmiColor = body?.bmi == null ? undefined : body.bmi >= 30 ? c.red : body.bmi >= 25 ? c.orange : body.bmi < 18.5 ? c.orange : c.green;
 
-  const buildWeightEntries = () => rows.map(r => {
-    const fields = FIELDS.filter(f => r[f] !== undefined).map(f => ({ label: LABELS[f], value: String(r[f]), unit: UNIT[f] }));
-    if (r.notes) fields.push({ label: 'Заметка', value: r.notes, unit: '' });
-    return { date: r.date, fields };
-  });
-
-  const exportAllDiaries = () => exportAllDiariesPdf([
-    { title: '⚖️ Вес и замеры', entries: buildWeightEntries() },
-  ]);
-  
-  const exportActions = [
-    { label: '📥 CSV-файл', onClick: doExportCsv },
-    { label: '🖨 Печать / PDF (вес)', onClick: doPrint },
-    { label: '📄 PDF: все дневники', onClick: exportAllDiaries },
-    { label: '🗄 Архив', onClick: () => setShowArchive((v: boolean) => !v), danger: false },
-    { label: '📥 Фото из архива', onClick: importArchivePhotos },
-    { label: '🖼 Сбросить фото', onClick: clearAllPhotos, danger: true },
-    { label: '📋 Из профиля', onClick: syncFromProfile },
-    { label: '💾 В профиль', onClick: syncToProfile },
-    { label: '🗑 Очистить дневник', onClick: () => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }, danger: true },
-  ];
-
   return (
     <div className="wd-diary"
       style={{
@@ -903,7 +881,17 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         onToday={() => setModal(true)}
         undoActive={!!undo}
         onUndo={() => { if (undo) { commit(undo, false); setUndo(null); } }}
-        exportActions={exportActions}
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: doExportCsv },
+          { label: '🖨 Печать / PDF (вес)', onClick: doPrint },
+          { label: '📄 PDF: все дневники', onClick: exportAllDiaries },
+          { label: '🗄 Архив', onClick: () => setShowArchive((v: boolean) => !v), danger: false },
+          { label: '📥 Фото из архива', onClick: importArchivePhotos },
+          { label: '🖼 Сбросить фото', onClick: clearAllPhotos, danger: true },
+          { label: '📋 Из профиля', onClick: syncFromProfile },
+          { label: '💾 В профиль', onClick: syncToProfile },
+          { label: '🗑 Очистить дневник', onClick: () => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }, danger: true },
+        ]}
       />
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '8px 14px 72px' }}>

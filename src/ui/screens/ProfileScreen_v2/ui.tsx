@@ -32,14 +32,261 @@ export const colors = {
   tealDim: 'rgba(20,184,166,0.15)',
 };
 
+/* ── Enhanced Design System: Gradients, Animations, Glassmorphism ──────── */
+
+export const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif";
+
+export const c = {
+  bg: '#0a0a0a',
+  card: '#1c1c1e',
+  cardBorder: 'rgba(255,255,255,0.08)',
+  cardHighlight: 'inset 0 0.5px 0 rgba(255,255,255,0.07)',
+  hairline: 'rgba(255,255,255,0.07)',
+  row: 'rgba(255,255,255,0.04)',
+  text: '#f5f5f7',
+  text2: 'rgba(235,235,245,0.62)',
+  text3: 'rgba(235,235,245,0.36)',
+  green: '#30d158',
+  red: '#ff453a',
+  orange: '#ff9f0a',
+  yellow: '#ffd60a',
+  blue: '#0a84ff',
+  purple: '#bf5af2',
+  teal: '#64d2ff',
+  pink: '#ff375f',
+  gray: '#8e8e93',
+  glass: 'rgba(28,28,30,0.72)',
+  glassBorder: 'rgba(255,255,255,0.12)',
+  glassHighlight: 'rgba(255,255,255,0.08)',
+  gradGreen: 'linear-gradient(135deg, #30d158 0%, #22c55e 100%)',
+  gradBlue: 'linear-gradient(135deg, #0a84ff 0%, #0071e3 100%)',
+  gradPurple: 'linear-gradient(135deg, #bf5af2 0%, #a855f7 100%)',
+  gradOrange: 'linear-gradient(135deg, #ff9f0a 0%, #f97316 100%)',
+  gradRed: 'linear-gradient(135deg, #ff453a 0%, #ff6b5a 100%)',
+  gradTeal: 'linear-gradient(135deg, #64d2ff 0%, #06b6d4 100%)',
+  gradPink: 'linear-gradient(135deg, #ff375f 0%, #f43f5e 100%)',
+  gradSunset: 'linear-gradient(135deg, #ff9f0a 0%, #f97316 50%, #ef4444 100%)',
+  gradOcean: 'linear-gradient(135deg, #0a84ff 0%, #06b6d4 50%, #30d158 100%)',
+  gradCosmic: 'linear-gradient(135deg, #bf5af2 0%, #a855f7 50%, #0a84ff 100%)',
+} as const;
+
+export const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
+
+export const keyframes = {
+  fadeIn: '@keyframes ui-fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }',
+  slideUp: '@keyframes ui-slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }',
+  slideRight: '@keyframes ui-slideRight { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }',
+  scaleIn: '@keyframes ui-scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }',
+  shimmer: '@keyframes ui-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }',
+  pulse: '@keyframes ui-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }',
+  float: '@keyframes ui-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }',
+};
+
+export const animations = {
+  fadeIn: 'ui-fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+  slideUp: 'ui-slideUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+  slideRight: 'ui-slideRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+  scaleIn: 'ui-scaleIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+  shimmer: 'ui-shimmer 2s infinite linear',
+  pulse: 'ui-pulse 2s infinite ease-in-out',
+  float: 'ui-float 3s infinite ease-in-out',
+};
+
+export const staggerDelay = (index: number, base = 0.08): React.CSSProperties => ({
+  animationDelay: `${index * base}s`,
+});
+
 export const glassCard: React.CSSProperties = {
-  background: colors.bg,
-  backdropFilter: 'blur(28px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+  background: c.glass,
+  backdropFilter: 'blur(20px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  borderRadius: 18,
+  border: `1px solid ${c.glassBorder}`,
+  boxShadow: `0 8px 32px rgba(0,0,0,0.32), inset 0 1px 0 ${c.glassHighlight}`,
+  padding: 20,
+  marginBottom: 14,
+  animation: animations.slideUp,
+};
+
+export const glassCardElevated: React.CSSProperties = {
+  ...glassCard,
+  boxShadow: `0 16px 48px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 ${c.glassHighlight}`,
+  border: `1px solid ${c.glassBorder}`,
+};
+
+export const glassTile: React.CSSProperties = {
+  background: c.glass,
+  backdropFilter: 'blur(16px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(180%)',
   borderRadius: 16,
-  border: `1px solid ${colors.border}`,
-  boxShadow: '0 4px 20px rgba(0,0,0,0.25), inset 0 0.5px 0 rgba(255,255,255,0.06)',
-  padding: 16,
+  border: `1px solid ${c.glassBorder}`,
+  boxShadow: `0 4px 20px rgba(0,0,0,0.24), inset 0 1px 0 ${c.glassHighlight}`,
+  padding: '14px 16px',
+  transition: 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s',
+};
+
+export const chip = (active: boolean, color: string): React.CSSProperties => ({
+  minHeight: 30,
+  padding: '0 12px',
+  borderRadius: 999,
+  cursor: 'pointer',
+  border: `1px solid ${active ? `${color}55` : 'rgba(255,255,255,0.1)'}`,
+  background: active ? `${color}1f` : 'transparent',
+  color: active ? color : colors.textMuted,
+  fontSize: 11.5,
+  fontWeight: 500,
+  fontFamily: FONT,
+  whiteSpace: 'nowrap',
+  transition: 'background 0.15s, color 0.15s',
+});
+
+export const chipGlass = (active: boolean, color: string): React.CSSProperties => ({
+  minHeight: 30,
+  padding: '0 12px',
+  borderRadius: 999,
+  cursor: 'pointer',
+  border: `1px solid ${active ? `${color}66` : c.glassBorder}`,
+  background: active ? `${color}22` : c.glass,
+  backdropFilter: 'blur(16px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+  boxShadow: active ? `0 2px 10px ${color}33, inset 0 1px 0 ${c.glassHighlight}` : `inset 0 1px 0 ${c.glassHighlight}`,
+  color: active ? color : colors.textMuted,
+  fontSize: 11.5,
+  fontWeight: 500,
+  fontFamily: FONT,
+  whiteSpace: 'nowrap',
+  transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
+});
+
+export const metricLabel: React.CSSProperties = {
+  display: 'block',
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: '0.4px',
+  textTransform: 'uppercase',
+  color: colors.textMuted,
+  marginBottom: 2,
+  fontFamily: FONT,
+};
+
+export const metricValue: React.CSSProperties = {
+  ...tnum,
+  display: 'block',
+  fontSize: 17,
+  fontWeight: 700,
+  letterSpacing: '-0.3px',
+  color: colors.text,
+  fontFamily: FONT,
+};
+
+export const metricValueLarge: React.CSSProperties = {
+  ...metricValue,
+  fontSize: 28,
+  fontWeight: 800,
+  letterSpacing: '-0.8px',
+};
+
+export const metricDelta: React.CSSProperties = {
+  ...tnum,
+  display: 'block',
+  fontSize: 11,
+  fontWeight: 500,
+  color: colors.textMuted,
+  marginTop: 2,
+  fontFamily: FONT,
+};
+
+export const metricValueGradient = (grad: string): React.CSSProperties => ({
+  ...metricValue,
+  background: grad,
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+});
+
+export const metricValueLargeGradient = (grad: string): React.CSSProperties => ({
+  ...metricValueLarge,
+  background: grad,
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+});
+
+export const metricDeltaGradient = (grad: string): React.CSSProperties => ({
+  ...metricDelta,
+  background: grad,
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+});
+
+export const progressBar = (grad: string, height = 8): React.CSSProperties => ({
+  height,
+  borderRadius: 999,
+  background: `rgba(255,255,255,0.08)`,
+  overflow: 'hidden',
+});
+
+export const progressFill = (grad: string, pct: number): React.CSSProperties => ({
+  height: '100%',
+  width: `${Math.max(0, Math.min(100, pct))}%`,
+  borderRadius: 999,
+  background: grad,
+  transition: 'width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+});
+
+export const chartLine = (color: string, width = 2, dash?: string): React.CSSProperties => ({
+  stroke: color,
+  strokeWidth: width,
+  fill: 'none',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  strokeDasharray: dash,
+  filter: `drop-shadow(0 2px 4px ${color}44)`,
+});
+
+export const chartArea = (color: string, opacity = 0.15): React.CSSProperties => ({
+  fill: color,
+  fillOpacity: opacity,
+  filter: `drop-shadow(0 4px 12px ${color}33)`,
+});
+
+export const glowRing = (color: string, size = 8): React.CSSProperties => ({
+  width: size,
+  height: size,
+  borderRadius: '50%',
+  background: `radial-gradient(circle at 30% 30%, ${color}cc, ${color}33 60%, transparent 100%)`,
+  boxShadow: `0 0 ${size * 2}px ${color}66, inset 0 0 ${size}px ${color}44`,
+});
+
+export const flexCenter: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+export const flexBetween: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+};
+
+export const gridAutoFit = (minWidth = '160px'): React.CSSProperties => ({
+  display: 'grid',
+  gridTemplateColumns: `repeat(auto-fit, minmax(${minWidth}, 1fr))`,
+  gap: 12,
+});
+
+export const grid3: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 12,
+};
+
+export const grid2: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, 1fr)',
+  gap: 12,
 };
 
 export const tabCard: React.CSSProperties = {
