@@ -533,6 +533,28 @@ describe('CardioDayCard — кардио-слой дня', () => {
     render(<CardioDayCard cycle={c} />);
     expect(screen.getByText(/Нед 4:/)).toBeTruthy();
   });
+
+  it('CSR: день ног с интенсивной плановой сессией — предупреждение о переносе', () => {
+    const d = new Date();
+    const dow = (d.getDay() + 6) % 7;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'day-lg-1' });
+    c.config = { ...c.config!, legDays: [dow] };
+    c.weeks[0].sessions = [{ type: 'zone2', durationMin: 30, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 210, purpose: 'x', dayOfWeek: dow }];
+    render(<CardioDayCard cycle={c} />);
+    expect(screen.getByText(/День тяжёлых ног/)).toBeTruthy();
+    expect(screen.getByText(/лучше перенести/)).toBeTruthy();
+  });
+
+  it('CSR: день ног с recovery в плане — «можно» без предупреждения', () => {
+    const d = new Date();
+    const dow = (d.getDay() + 6) % 7;
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'day-lg-2' });
+    c.config = { ...c.config!, legDays: [dow] };
+    c.weeks[0].sessions = [{ type: 'recovery', durationMin: 20, weeklyFrequency: 1, intensity: 'low', kcalPerSession: 90, purpose: 'x', dayOfWeek: dow }];
+    render(<CardioDayCard cycle={c} />);
+    expect(screen.getByText(/recovery — можно/)).toBeTruthy();
+    expect(screen.queryByText(/лучше перенести/)).toBeNull();
+  });
 });
 
 describe('CardioDiaryStep — старт-контроль (5C)', () => {

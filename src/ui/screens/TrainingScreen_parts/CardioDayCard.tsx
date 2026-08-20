@@ -4,7 +4,7 @@
  * (кардио + силовые sRPE). Является кардио-слоем в дневнике/конструкторах.
  */
 import React, { useMemo } from 'react';
-import { cardioEquipmentLabel, loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
+import { cardioEquipmentLabel, loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, type CardioCycle, type CardioType } from '../../../engines/lms/cardio.engine';
 import { cardioDayLoad, loadCardioLog, cardioPaceMinPerKm } from '../../../engines/lms/cardio-diary.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { CARD, ROW, BTN_PRIMARY } from './CardioUI';
@@ -25,6 +25,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
 
   const today = todayIso();
   const load = useMemo(() => cardioDayLoad(cycle, log, srpe, today, cycle?.startDate), [cycle, log, srpe, today]);
+  const legDay = useMemo(() => cardioLegDayForDate(cycle, today), [cycle, today]);
   // Тренерская подсказка текущей недели (замер/делод/taper/пик).
   const weekHint = useMemo(() => {
     if (!cycle) return null;
@@ -51,6 +52,15 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
           {load.planned.length === 0
             ? 'План: кардио на сегодня нет.'
             : 'План: ' + load.planned.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')}
+        </div>
+      )}
+      {legDay?.isLegDay && (
+        <div style={{ fontSize: 10, background: load.planned.some(s => s.type !== 'recovery') ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${load.planned.some(s => s.type !== 'recovery') ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'}`, borderRadius: 8, padding: '4px 8px', color: load.planned.some(s => s.type !== 'recovery') ? '#f87171' : '#fbbf24' }} role="status">
+          {load.planned.some(s => s.type !== 'recovery')
+            ? `🦵 День тяжёлых ног: на сегодня запланировано интенсивное кардио (${load.planned.filter(s => s.type !== 'recovery').map(s => TYPE_LABEL[s.type]).join(', ')}) — лучше перенести его или заменить на recovery.`
+            : load.planned.length > 0
+              ? '🦵 День тяжёлых ног: сегодня recovery — можно.'
+              : '🦵 День тяжёлых ног: интенсивное кардио сегодня не планируется.'}
         </div>
       )}
       {weekHint && (

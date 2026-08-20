@@ -14,7 +14,7 @@ import {
   buildCardioSummaryText,
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
-  cardioWeekLegConflicts,
+  cardioWeekLegConflicts, cardioLegDayForDate,
   cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
   bumpCardioZone2Volume, cardioSafetyReport, configFromCycle,
   cardioProfileFactors, cardioNutritionNotes,
@@ -875,6 +875,37 @@ describe('cardioWeekLegConflicts', () => {
   it('неделя вне диапазона — пусто', () => {
     const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lc-4', legDays: [0] });
     expect(cardioWeekLegConflicts(c, 99)).toEqual([]);
+  });
+});
+
+describe('cardioLegDayForDate', () => {
+  it('без цикла — null', () => {
+    expect(cardioLegDayForDate(null, '2026-08-17')).toBeNull();
+  });
+
+  it('дата → день недели (Пн=0), день ног из конфига', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lgd-1' });
+    c.config = { ...c.config!, legDays: [0] };
+    const out = cardioLegDayForDate(c, '2026-08-17');
+    expect(out).not.toBeNull();
+    expect(out!.dayOfWeek).toBe(0);
+    expect(out!.isLegDay).toBe(true);
+  });
+
+  it('день не в списке ног — isLegDay false', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lgd-2' });
+    c.config = { ...c.config!, legDays: [3] };
+    expect(cardioLegDayForDate(c, '2026-08-17')!.isLegDay).toBe(false);
+  });
+
+  it('без дней ног в конфиге — всегда false', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lgd-3' });
+    expect(cardioLegDayForDate(c, '2026-08-17')!.isLegDay).toBe(false);
+  });
+
+  it('некорректная дата — null', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lgd-4' });
+    expect(cardioLegDayForDate(c, 'not-a-date')).toBeNull();
   });
 });
 

@@ -2402,6 +2402,21 @@ export function cardioWeekForDate(cycle: CardioCycle, dateIso: string, reference
   return cycle.weeks.find(w => w.week === week) ?? null;
 }
 
+export interface CardioLegDayInfo {
+  dayOfWeek: number;
+  isLegDay: boolean;
+}
+
+/** День недели (Пн=0) даты и является ли он днём тяжёлых ног цикла. */
+export function cardioLegDayForDate(cycle: CardioCycle | null, dateIso: string): CardioLegDayInfo | null {
+  if (!cycle) return null;
+  const d = new Date(dateIso.length === 10 ? dateIso + 'T00:00:00' : dateIso);
+  if (!Number.isFinite(d.getTime())) return null;
+  const dayOfWeek = (d.getDay() + 6) % 7;
+  const leg = new Set((cycle.config?.legDays ?? []).filter(x => x >= 0 && x <= 6));
+  return { dayOfWeek, isLegDay: leg.has(dayOfWeek) };
+}
+
 /** Сессии на конкретную дату (раскладка по дням недели, без силового контекста). */
 export function cardioSessionsForDate(cycle: CardioCycle, dateIso: string, referenceIso?: string): { week: CardioWeek; sessions: CardioSession[] } | null {
   const week = cardioWeekForDate(cycle, dateIso, referenceIso);
