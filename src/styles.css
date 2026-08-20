@@ -437,6 +437,21 @@ button.editor-chip:focus-visible {
 button.editor-schedule-cell {
   transition: border-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
 }
+/* Кнопки шапки редактора и панели «⋯ Ещё»: hover-подъём + лёгкое свечение */
+.manual-constructor--editor .editor-topbar-shell button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+@media (hover: hover) {
+  .manual-constructor--editor .editor-topbar-shell button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+    filter: brightness(1.12);
+  }
+  .manual-constructor--editor .editor-topbar-shell button:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.94);
+  }
+}
 @media (hover: hover) {
   button.editor-schedule-cell:hover {
     border-color: rgba(0,230,138,0.65) !important;
