@@ -131,6 +131,20 @@ describe('PLSeasonBuilder', () => {
     expect(changes).toEqual(['single']);
   });
 
+  it('один старт в сезоне — пик/тапер применяется поверх (buildPLSeasonPeaks через assembleSeasonPlan)', () => {
+    let built: LMSBuildOutput | null = null;
+    seedSeasonMode('season');
+    render(<PLSeasonBuilder {...props({
+      meets: [{ id: 'm1', name: 'Старт', weeksToStart: 20 }],
+      taper: { mode: 'classic' as const, mockMeet: true, meetWeek: true, postMeet: true, windowWeeks: 2 },
+      onBuilt: (o) => { built = o; },
+    })} />);
+    fireEvent.click(screen.getByText(/Собрать сезон/));
+    expect(built).not.toBeNull();
+    expect(built!.weeks.some(w => w.meetWeek)).toBe(true);
+    expect(built!.weeks.length).toBeGreaterThan(20);
+  });
+
   it('ручные выборы (pickMode/selections) восстанавливаются из сессии', () => {
     localStorage.setItem('he_pl_session', JSON.stringify({
       season: { mode: 'season', slots: undefined, pickMode: 'manual', selections: { 0: 'cycle-01' }, compPickMode: 'manual', compSelections: { 0: 'cycle-03' } },

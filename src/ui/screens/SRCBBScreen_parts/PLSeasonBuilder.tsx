@@ -137,6 +137,16 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
 
   const slotCandidates = useMemo(() => enabledSlots.map(s => candidateCyclesForSlot(s, selector)), [enabledSlots, selector]);
 
+  // Единая сборка taper-опций для buildPLSeasonPeaks (и пролёты, и одиночный старт).
+  const taperOpts = useMemo<MacroTaperOpts>(() => ({
+    mode: taper.mode,
+    weightGoal: taper.weightGoal === 'auto' ? undefined : taper.weightGoal,
+    strategy: taper.strategy,
+    mockMeet: taper.mockMeet,
+    postMeet: taper.postMeet,
+    windowWeeks: taper.windowWeeks ?? 2,
+  }), [taper.mode, taper.weightGoal, taper.strategy, taper.mockMeet, taper.postMeet, taper.windowWeeks]);
+
   const seasonPlan: PLSeasonPlan = useMemo(() => {
     if (seasonMode !== 'season' || enabledSlots.length === 0) {
       return { segments: [], totalWeeks: 0, notes: [], cycleIds: [] };
@@ -152,17 +162,10 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
         selector,
         mode: compPickMode,
         selections: compSelections,
-        taper: {
-          mode: taper.mode,
-          weightGoal: taper.weightGoal === 'auto' ? undefined : taper.weightGoal,
-          strategy: taper.strategy,
-          mockMeet: taper.mockMeet,
-          postMeet: taper.postMeet,
-          windowWeeks: taper.windowWeeks ?? 2,
-        },
+        taper: taperOpts,
       });
     } catch { return null; }
-  }, [seasonMode, meets, compPickMode, compSelections, selector, buildOpts, taper]);
+  }, [seasonMode, meets, compPickMode, compSelections, selector, buildOpts, taperOpts]);
 
   const setSlotWeeks = (idx: number, weeks: number) => {
     setSlots(prev => prev.map((s, i) => (i === idx ? { ...s, weeks: clampSlotWeeks(s, weeks) } : s)));
@@ -210,7 +213,12 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           cycleMetrics: seasonCycleMetrics(compGap!.weeks),
         };
       } else if (seasonPlan.segments.length > 0) {
-        out = assembleSeasonPlan(seasonPlan, { ...buildOpts, mode: buildOpts.progressionMode });
+        out = assembleSeasonPlan(seasonPlan, {
+          ...buildOpts,
+          mode: buildOpts.progressionMode,
+          meets: meets.length ? meets : undefined,
+          taper: taperOpts,
+        });
         notes.push(...seasonPlan.notes);
         out = { ...out, cycleMetrics: seasonCycleMetrics(out.weeks) };
       }
