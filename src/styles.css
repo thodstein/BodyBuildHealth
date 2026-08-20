@@ -476,6 +476,24 @@ button.editor-schedule-cell {
     filter: brightness(0.92);
   }
 }
+/* Общий hover для остальных кнопок контента редактора (инлайн BTN/BTN_GHOST и мини-кнопки).
+   Инлайн-стили (background/border/box-shadow) не перебиваются; добавляется только
+   подъём + лёгкое осветление. Специфичные правила (.editor-chip и т.п.) выше — равная/меньшая
+   специфичность, этот блок стоит позже и дополняет их единым откликом. */
+.manual-constructor--editor button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+@media (hover: hover) {
+  .manual-constructor--editor button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.22);
+    filter: brightness(1.1);
+  }
+  .manual-constructor--editor button:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.94);
+  }
+}
 .constructor-surface {
   background: var(--constructor-surface) !important;
   border-color: var(--constructor-border) !important;
