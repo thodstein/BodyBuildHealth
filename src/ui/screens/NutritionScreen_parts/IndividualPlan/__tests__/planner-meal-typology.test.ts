@@ -221,6 +221,26 @@ describe('N1: профиль вкуса завтрака (основа по вы
   });
 });
 
+describe('N7: завтрак-шаблоны (классический завтрак бодибилдера)', () => {
+  it('шаблон classic_oat — овсянка + банан + ягоды + молоко', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, breakfastTemplate: 'classic_oat' as any }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    const names = breakfast.items.map(it => it.name.toLowerCase()).join(' ');
+    expect(names).toMatch(/овсян/); // овсянка
+    expect(names).toMatch(/банан/); // банан
+    expect(names).toMatch(/ягод|черник/); // ягоды
+    expect(names).toMatch(/молок/); // молоко
+  });
+
+  it('шаблон eggs_toast — яйца без молока', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, breakfastTemplate: 'eggs_toast' as any }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    const names = breakfast.items.map(it => it.name.toLowerCase()).join(' ');
+    expect(names).toMatch(/яичн|яйцо|egg/);
+    expect(names).not.toMatch(/молок/);
+  });
+});
+
 // Тренировочный вход (для E10: prew строится только на тренировочный день).
 function trainLike(overrides: any = {}): MealPlanInput {
   return base({ isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true, ...overrides });

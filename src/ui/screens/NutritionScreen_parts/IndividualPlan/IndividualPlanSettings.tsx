@@ -84,7 +84,7 @@ export const IndividualPlanSettings: React.FC = () => {
     allergens, toggleAllergen,
     healthIssues, setHealthIssues, toggleHealthIssue,
     eveningLowCarb, setEveningLowCarb,
-    addMilkToBreakfast, setAddMilkToBreakfast, coconutOilBoost, setCoconutOilBoost, breakfastStyle, setBreakfastStyle,
+    addMilkToBreakfast, setAddMilkToBreakfast, coconutOilBoost, setCoconutOilBoost, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
     planType, setPlanType,
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
     specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
@@ -1766,6 +1766,26 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                   border: breakfastStyle === o.id ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(255,255,255,0.06)',
                   color: breakfastStyle === o.id ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
                   fontWeight: breakfastStyle === o.id ? 700 : 400,
+                }}>{o.label}</span>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 4 }}>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>📋 Шаблон завтрака</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+              {[
+                { id: 'auto', label: 'Авто' },
+                { id: 'classic_oat', label: '🥣 Овсянка+банан+ягоды' },
+                { id: 'protein_flakes', label: '🌾 Хлопья+протеин' },
+                { id: 'eggs_toast', label: '🍳 Яйца+тост' },
+                { id: 'cottage_berries', label: '🥛 Творог+черника' },
+              ].map(o => (
+                <span key={o.id} onClick={() => { setBreakfastTemplate(o.id as any); try { localStorage.setItem('he_breakfast_template', o.id); } catch {} }} style={{
+                  display:'inline-flex', alignItems:'center', padding:'3px 8px', borderRadius:7, cursor:'pointer', fontSize:9,
+                  background: breakfastTemplate === o.id ? 'rgba(244,114,182,0.15)' : 'rgba(255,255,255,0.03)',
+                  border: breakfastTemplate === o.id ? '1px solid rgba(244,114,182,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                  color: breakfastTemplate === o.id ? '#f9a8d4' : 'rgba(255,255,255,0.6)',
+                  fontWeight: breakfastTemplate === o.id ? 700 : 400,
                 }}>{o.label}</span>
               ))}
             </div>

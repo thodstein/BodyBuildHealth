@@ -142,6 +142,8 @@ export interface MealPlanInput {
   coconutOilBoost?: boolean;
   // N1: профиль вкуса завтрака — основа (каша/хлопья/яйца/творог).
   breakfastStyle?: BreakfastStyle;
+  // N7: завтрак-шаблон — готовый «классический завтрак бодибилдера» (детерминированный состав).
+  breakfastTemplate?: BreakfastTemplateId;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -373,6 +375,16 @@ const BREAKFAST_STYLE_PROTEIN: Record<Exclude<BreakfastStyle, 'auto'>, string[]>
   eggs: ['egg_whole', 'egg_white', 'omelet'],
   cottage: ['cottage_cheese', 'tvorog', 'йогурт греческ', 'yogurt_greek'],
 };
+// N7: завтрак-шаблоны — готовые «классический завтрак бодибилдера» с детерминированным составом.
+export type BreakfastTemplateId = 'auto' | 'classic_oat' | 'protein_flakes' | 'eggs_toast' | 'cottage_berries';
+export interface BreakfastTemplate { id: BreakfastTemplateId; label: string; foods: string[]; milk?: boolean; }
+export const BREAKFAST_TEMPLATES: BreakfastTemplate[] = [
+  { id: 'classic_oat', label: '🥣 Овсянка + банан + ягоды', foods: ['oats', 'banana', 'berries'], milk: true },
+  { id: 'protein_flakes', label: '🌾 Хлопья + протеин + сухофрукты', foods: ['oats', 'whey_isolate', 'dried_apricots', 'dates'], milk: true },
+  { id: 'eggs_toast', label: '🍳 Яйца + тост + ягоды', foods: ['egg_whole', 'egg_white', 'bread_white', 'berries'] },
+  { id: 'cottage_berries', label: '🥛 Творог + хлопья + черника', foods: ['cottage_cheese_5', 'oats', 'blueberries'], milk: false },
+];
+
 // Подбор завтрашнего пула углеводов (fallback → общий, если завтрашнего нет).
 function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: BreakfastStyle = 'auto'): { carbs: FoodItem[]; fruits: FoodItem[] } {
   const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
@@ -1552,6 +1564,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _co = FOOD_DB.find(f => f.id === 'coconut_oil' && !combinedExcluded.has(f.id));
     if (_co) _breakfastExtras.push({ food: _co, grams: 10, role: 'fat' });
   }
+  // N7: завтрак-шаблон — предпочитаемые продукты шаблона + молоко (если в шаблоне).
+  const _bfTmpl = (input.breakfastTemplate && input.breakfastTemplate !== 'auto')
+    ? BREAKFAST_TEMPLATES.find(t => t.id === input.breakfastTemplate)
+    : null;
+  // N7: продукты шаблона форсируются через lock (абсолютный приоритет выбора).
+  if (_bfTmpl?.milk && !_dairyExcluded) {
+    const _milk = FOOD_DB.find(f => f.id === 'milk' && !combinedExcluded.has(f.id));
+    if (_milk && !_breakfastExtras.some(e => e.food.id === 'milk')) _breakfastExtras.push({ food: _milk, grams: 200, role: 'liquid' });
+  }
   const breakfast = buildWholeMeal({
     label: 'Завтрак', time: tBreakfast, type: 'breakfast', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
     mealPreferredIds: input.preferredByMeal?.['Завтрак'],
@@ -1570,6 +1591,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       'Ягоды — антоцианы, защита от свободных радикалов',
     ],
   });
+  // N7: гарантированно добавляем продукты шаблона (детерминированный «классический завтрак»),
+  // даже если они не прошли пороги пулов (например овсянка <15 г углеводов → вне carbSlow).
+  if (_bfTmpl && _bfTmpl.foods.length > 0) {
+    const _tmplPortion: Record<string, number> = { oats: 60, banana: 120, berries: 100, whey_isolate: 30, dried_apricots: 40, dates: 40, egg_whole: 110, egg_white: 110, bread_white: 60, cottage_cheese_5: 150, blueberries: 100 };
+    for (const fid of _bfTmpl.foods) {
+      if (breakfast.items.some(it => it.id === fid)) continue;
+      const food = FOOD_DB.find(f => f.id === fid && !combinedExcluded.has(f.id));
+      if (!food) continue;
+      const grams = _tmplPortion[fid] || 80;
+      const role: MealItem['role'] = food.category === 'veg_fruit' ? 'fruit' : food.category === 'dairy' ? 'slow_protein' : (food.category === 'supplement' ? 'fast_protein' : 'protein');
+      breakfast.items.push(makeItem(food, grams, role));
+    }
+    breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  }
   meals.push(breakfast);
   markUsed(breakfast);
 
