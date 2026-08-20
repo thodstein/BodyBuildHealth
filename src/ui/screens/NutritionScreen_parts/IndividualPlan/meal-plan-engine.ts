@@ -160,22 +160,17 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
   amylopectin: 80, dextrose: 80, collagen_hydrolysate: 20,
 };
 // Глобальный лимит на одну порцию любого продукта (г)
-const MAX_GRAM_PER_ITEM = 500;
-// D-18: Realistic portion cap for cooked grains/cereals (porridge, buckwheat, rice, pasta,
-// barley, millet, quinoa ~12-28g carbs/100g). Without this, a 140g-carb lunch target pushes
-// buckwheat to ~700g portions (capped only at the global 500g) — an absurd single bowl.
-// Cap grains at 280g per meal; if the carb target needs more, a second carb source is added.
-const MAX_GRAIN_GRAM_PER_MEAL = 280;
-// D-21: realistic dry-grain portion ceiling. Grains/pasta are tracked DRY (~64-83g carbs/100g),
-// so a normal large portion is ~100-150g dry (~300-400g cooked). 150g dry ~ 90-120g carbs — a
-// big but sane single bowl; more than that splits into a second carb source (D-18b).
-const MAX_DRY_GRAIN_GRAM_PER_MEAL = 150;
+// Этап 6: для уровня «Максимум»/enhanced лимиты выше, чтобы высококалорийные планы
+// сходились к цели, а не упирались в порционные потолки (раньше 500/280/150).
+function maxGramPerItem(budget?: string): number { return (budget === 'max' || budget === 'enhanced') ? 600 : 500; }
+function maxGrainPerMeal(budget?: string): number { return (budget === 'max' || budget === 'enhanced') ? 350 : 280; }
+function maxDryGrainPerMeal(budget?: string): number { return (budget === 'max' || budget === 'enhanced') ? 200 : 150; }
 
 // D-18: realistic per-portion ceiling for a carb source. Low-density cooked starches
 // (grains ~12-28g/100g, potato ~17-21g, cooked pasta) need huge gram portions to hit a
 // carb target — without a cap a 140g-carb lunch pushes buckwheat to ~700g. High-density
 // carbs (bread ~50g/100g, dried fruit, honey) naturally portion small, so they keep the
-// global MAX_GRAM_PER_ITEM ceiling. Threshold: <30g carbs/100g = "cooked starch" bowl.
+// global maxGramPerItem ceiling (budget-aware). Threshold: <30g carbs/100g = "cooked starch" bowl.
 function carbPortionCap(food: FoodItem): number {
   const carbPer100 = food.carbs || 0;
   // D-18 + D-21: grains/pasta are now tracked DRY (bodybuilding rule) — carb density
@@ -183,9 +178,10 @@ function carbPortionCap(food: FoodItem): number {
   // dry cereals at 150g. Low-density cooked starches that are still cooked-weight
   // (potato, corn on the cob ~17-21g/100g) keep the 280g cooked cap. Bread and other
   // ready-to-eat medium-density carbs keep the global 500g ceiling.
-  if (carbPer100 >= 55) return MAX_DRY_GRAIN_GRAM_PER_MEAL;   // dry grains/pasta
-  if (carbPer100 > 0 && carbPer100 < 30) return MAX_GRAIN_GRAM_PER_MEAL; // cooked starch (potato)
-  return MAX_GRAM_PER_ITEM;
+  const _budget = _currentBudget;
+  if (carbPer100 >= 55) return maxDryGrainPerMeal(_budget);   // dry grains/pasta
+  if (carbPer100 > 0 && carbPer100 < 30) return maxGrainPerMeal(_budget); // cooked starch (potato)
+  return maxGramPerItem(_budget);
 }
 
 const MEAT_KEYWORDS = ['beef','pork','chicken','turkey','lamb','veal','duck','salmon','tuna','shrimp','cod','mackerel','trout','sardine','crab','lobster','squid','octopus','venison','rabbit','goose','pate','sausage','bacon','ham','pepperoni','salami','bologna','hot_dog','meatball','cutlet','steak','pollock','tilapia','herring','anchovy','clam','mussel','oyster','scallops','catfish','flounder','sole','white_fish','whelk','cockles','seafood_','fish_','_fish','mintai','mahi','trumpeter','shellfish','cockle','abalone','conch','snail','escargot','sea_urchin','sea_cucumber','caviar','roe','liver','kidney','heart_tripe','tongue','brain','sweetbread','gizzard','bison','frog','elk','boar','quail','pheasant','goat','mutton','crayfish','krill','eel','sturgeon','halibut','perch','carp','pike','bream','bass','grouper','snapper','tongue','tripe','oxtail','trotters','wings','drumstick','thigh','breast_','_breast','mince','_minced'];
@@ -375,6 +371,7 @@ let _tasteProfile: any = undefined;
 let _deprioritizedIds: Set<string> | undefined = undefined;
 let _categoryPref: any = undefined;
 let _qualityMode: 'full' | 'basic' = 'full';
+let _currentBudget: string = 'medium';
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
@@ -453,10 +450,10 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   if (per100 <= 0) return 0;
   // Role-aware minimum: fat-dense foods (oils, nuts) need smaller min grams
   const minG = macro === 'fat' && per100 >= 80 ? 5 : macro === 'fat' && per100 >= 50 ? 10 : 20;
-  // D-18: realistic per-item gram ceiling. Default to MAX_GRAM_PER_ITEM; caller may pass a
-  // tighter cap (e.g. MAX_GRAIN_GRAM_PER_MEAL for cooked grains so a 140g-carb target doesn't
-  // produce a 500g bowl of buckwheat).
-  const ceiling = Math.min(MAX_GRAM_PER_ITEM, capG ?? MAX_GRAM_PER_ITEM);
+  // D-18: realistic per-item gram ceiling. Default to maxGramPerItem; caller may pass a
+  // tighter cap (e.g. maxGrainPerMeal for cooked grains so a 140g-carb target doesn't
+  // produce a 600g bowl of buckwheat).
+  const ceiling = Math.min(maxGramPerItem(_currentBudget), capG ?? maxGramPerItem(_currentBudget));
   const base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
   const supplementCap = SUPPLEMENT_MAX_G[food.id];
   return supplementCap ? Math.min(supplementCap, base) : base;
@@ -1131,6 +1128,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     input = { ...input, mealsCount: 5 };
   }
   _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
+  _currentBudget = input.budget || 'medium';
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
   const tBreakfast = input.wakeTime || '07:30';
@@ -1686,7 +1684,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
           const addGrams = Math.round(kcalPerItem / (food.kcal || 1) * 100);
-          const newAmount = Math.min(MAX_GRAM_PER_ITEM, item.amount + addGrams);
+          const newAmount = Math.min(maxGramPerItem(_currentBudget), item.amount + addGrams);
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
@@ -1753,7 +1751,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
           const addGrams = Math.min(Math.round(item.amount * 1.5), Math.round(addPerItem / food.fat * 100));
-          const newAmount = Math.min(MAX_GRAM_PER_ITEM, item.amount + addGrams);
+          const newAmount = Math.min(maxGramPerItem(_currentBudget), item.amount + addGrams);
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
@@ -1784,7 +1782,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // D-18: respect the realistic grain-portion ceiling when sizing carb items, so the
         // daily-macro correction loops can't inflate a 280g buckwheat bowl back to 365g+ to
         // close a carb deficit. A small total shortfall is preferable to an absurd portion.
-        let upCap = MAX_GRAM_PER_ITEM;
+        let upCap = maxGramPerItem(_currentBudget);
         if (item.role === 'carb_slow' || item.role === 'carb_fast') {
           const fd = FOOD_DB.find(f => f.id === item.id);
           if (fd) upCap = carbPortionCap(fd);
@@ -1878,8 +1876,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const deltaGrams = needDeltaG / best.per100 * 100;
     const minAmount = SUPPLEMENT_MAX_G[best.food.id] ? 5 : 10;
     const suppMax = SUPPLEMENT_MAX_G[best.food.id];
-    let maxAmount = suppMax ?? MAX_GRAM_PER_ITEM;
-    // D-18: grain carb items are capped at MAX_GRAIN_GRAM_PER_MEAL even during precise
+    let maxAmount = suppMax ?? maxGramPerItem(_currentBudget);
+    // D-18: grain carb items are capped at maxGrainPerMeal even during precise
     // adjustment — don't push a single buckwheat/rice portion above a realistic bowl.
     if (!suppMax && (best.item.role === 'carb_slow' || best.item.role === 'carb_fast') && carbPortionCap(best.food) < maxAmount) {
       maxAmount = carbPortionCap(best.food);

@@ -164,3 +164,25 @@ describe('Этап 5: детерминизм спец-режимов (Пробе
     expect(JSON.stringify(a.foods)).toBe(JSON.stringify(b.foods));
   });
 });
+
+describe('Этап 6: бюджет-зависимые порционные лимиты (максимум = сходимость)', () => {
+  it('высококалорийный план на бюджете max сходится к цели не хуже medium', () => {
+    // На max/enhanced лимиты круп подняты (350/200/600 vs 280/150/500), поэтому
+    // большой углеводный бюджет добирается без «упора в порции» — отклонение ≤7%.
+    const hiMax = buildDayPlan(trainInput({ budget: 'max' as const, goalKcal: 4200, goalCarbsG: 560, goalProteinG: 220, goalFatG: 110 }));
+    const dev = Math.abs(hiMax.totals.c - 560) / 560;
+    expect(dev).toBeLessThanOrEqual(0.07);
+    expect(hiMax.totals.kcal).toBeGreaterThan(3500);
+  });
+
+  it('max-бюджет позволяет более крупные порции углеводов, чем medium', () => {
+    // Одна и та же высокая углеводная цель: на max-бюджете овсянка/рис в крупной
+    // порции в одном приёме достижимы, на medium — упираются в 280г-потолок.
+    const base = { weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const, mealsCount: 5, isTrainingDay: false, budget: 'medium' as const, dayOffset: 0, cyclePhase: 'maintenance' as const, variety: 'max' as const, eveningLowCarb: false, quality: 'full' as const, randomSalt: 3, wakeTime: '07:00', bedTime: '23:00', dinnerTime: '19:00' };
+    const med = buildDayPlan({ ...base, goalKcal: 3600, goalProteinG: 190, goalFatG: 90, goalCarbsG: 500 } as MealPlanInput);
+    const maxP = buildDayPlan({ ...base, budget: 'max' as const, goalKcal: 3600, goalProteinG: 190, goalFatG: 90, goalCarbsG: 500 } as MealPlanInput);
+    const medDev = Math.abs(med.totals.c - 500) / 500;
+    const maxDev = Math.abs(maxP.totals.c - 500) / 500;
+    expect(maxDev).toBeLessThanOrEqual(medDev);
+  });
+});
