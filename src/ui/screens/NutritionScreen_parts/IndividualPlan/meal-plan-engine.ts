@@ -1470,9 +1470,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (trainWindow && _keep.has('postw')) _fixedPts.push(postwMin);
   if (intraEligible && _keep.has('intra')) _fixedPts.push((input.trainStartMin || 0) + 30);
   const _snackOrder = ['snack', 'snack2', 'snack3', 'snack4'];
-  const _snackTimes = gapFillTimes(_fixedPts, _snackOrder.filter(r => _keep.has(r)).length);
+  const _keptSnacks = _snackOrder.filter(r => _keep.has(r));
+  const _snackTimes = gapFillTimes(_fixedPts, _keptSnacks.length);
   const _snackTimeOf = (role: string): string => {
-    const i = _snackOrder.indexOf(role);
+    const i = _keptSnacks.indexOf(role);
     return i >= 0 && i < _snackTimes.length ? fmtMin(_snackTimes[i]) : tSnack;
   };
   // FIX 2.2 (БАГ-10): preSleep резервировал углеводную долю 0.3 в _wSum, но никогда её не отдавал

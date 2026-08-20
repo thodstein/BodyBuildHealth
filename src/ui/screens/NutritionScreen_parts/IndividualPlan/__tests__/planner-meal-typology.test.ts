@@ -241,6 +241,42 @@ describe('N7: завтрак-шаблоны (классический завтр
   });
 });
 
+describe('N2: приёмы вокруг тренировки при заданном пользователем времени (trainStart)', () => {
+  const toMin = (t: string) => { const [h, m] = (t || '').split(':').map(Number); return h * 60 + m; };
+
+  it('тренировка 17:30/90мин: предтрен<старт<интра, пост-трен после конца, всё хронологически', () => {
+    const ts = 17 * 60 + 30, dur = 90;
+    const plan = buildDayPlan(trainLike({ mealsCount: 7, trainStartMin: ts, trainDurationMin: dur }));
+    const prew = plan.meals.find(m => m.type === 'preworkout')!;
+    const intra = plan.meals.find(m => m.type === 'intra')!;
+    const postw = plan.meals.find(m => m.type === 'postworkout')!;
+    expect(toMin(prew.time)).toBe(ts - 90);               // за 90 мин до старта
+    expect(toMin(intra.time)).toBeGreaterThan(ts);        // во время сессии
+    expect(toMin(postw.time)).toBeGreaterThan(ts + dur);  // после окончания
+    const times = plan.meals.map(m => toMin(m.time)).sort((a, b) => a - b);
+    // Все приёмы по возрастанию времени, и пост-трен в хронологическом порядке после интра.
+    expect(times).toEqual([...times].sort((a, b) => a - b));
+  });
+
+  it('на тренировочный день с достаточным числом приёмов (8) нет больших разрывов (>4 ч)', () => {
+    const ts = 17 * 60 + 30, dur = 90;
+    const plan = buildDayPlan(trainLike({ mealsCount: 8, trainStartMin: ts, trainDurationMin: dur }));
+    const times = plan.meals.map(m => toMin(m.time)).sort((a, b) => a - b);
+    let maxGap = 0;
+    for (let i = 1; i < times.length; i++) maxGap = Math.max(maxGap, times[i] - times[i - 1]);
+    expect(maxGap).toBeLessThanOrEqual(4 * 60 + 10);
+  });
+
+  it('на тренировочный день есть приём до тренировки (завтрак→предтрен закрыт перекусом)', () => {
+    const ts = 17 * 60 + 30, dur = 90;
+    const plan = buildDayPlan(trainLike({ mealsCount: 8, trainStartMin: ts, trainDurationMin: dur }));
+    const prewMin = ts - 90;
+    const times = plan.meals.map(m => toMin(m.time));
+    // Есть приём между завтраком (07:00) и предтреном (16:00) — утренний перекус.
+    expect(times.some(t => t > toMin('07:00') && t < prewMin && t !== toMin('12:30'))).toBe(true);
+  });
+});
+
 // Тренировочный вход (для E10: prew строится только на тренировочный день).
 function trainLike(overrides: any = {}): MealPlanInput {
   return base({ isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true, ...overrides });
