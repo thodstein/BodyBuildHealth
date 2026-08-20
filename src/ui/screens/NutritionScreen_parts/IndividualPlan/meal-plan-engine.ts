@@ -513,7 +513,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const basePool = _baseFiltered;
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
     if (_qualityMode === 'basic') return arr.filter(f => !isPremiumOrExotic(f.id));
-    if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 8);
+    if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 7);
     // Д-3: 'low' budget = affordable quality AND not premium/exotic (abalone, game, macadamia, etc.)
     if (budget === 'low') return arr.filter(f => (f.bb_quality_score ?? 5) <= 7 && !isPremiumOrExotic(f.id));
     return arr.filter(f => !isPremiumOrExotic(f.id));
@@ -950,14 +950,17 @@ function buildPostWorkout(
 }
 
 // ─── МЕТОД: intra-workout (тяжёлый training) ─────────────────────────
-function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>): Meal {
+function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, carbG?: number): Meal {
   const items: MealItem[] = [];
   if (pool.eaa) items.push(makeItem(pool.eaa, INTRA_EAA_G, 'fast_protein'));
   // Dextrin (amylopectin): если нет — синтетический пункт
+  // FIX 2.2 (БАГ-10): intra отдаёт свою распределённую углеводную долю (_carbFor('intra')),
+  // а не фикс. 40 г/ч — иначе карб-веса резервировались, но не доставлялись.
+  const _intraCarbG = Math.max(20, Math.round(carbG ?? INTRA_CARB_G_PER_H));
   if (pool.dextrin) {
-    items.push(makeItem(pool.dextrin, INTRA_CARB_G_PER_H, 'liquid'));
+    items.push(makeItem(pool.dextrin, _intraCarbG, 'liquid'));
   } else {
-    items.push({ id: 'cyclic_dextrin', name: 'Циклический декстрин', amount: INTRA_CARB_G_PER_H, kcal: INTRA_CARB_G_PER_H * 4, p: 0, f: 0, c: INTRA_CARB_G_PER_H, fiber: 0, role: 'liquid' });
+    items.push({ id: 'cyclic_dextrin', name: 'Циклический декстрин', amount: _intraCarbG, kcal: _intraCarbG * 4, p: 0, f: 0, c: _intraCarbG, fiber: 0, role: 'liquid' });
   }
 
   const totals = items.reduce((acc, it) => ({
@@ -966,10 +969,10 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
   }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   void seed;
   return {
-    label: '🏋 Intra-workout', time, items, totals, type: 'intra', target: { p: INTRA_EAA_G, c: INTRA_CARB_G_PER_H, f: 0 },
+    label: '🏋 Intra-workout', time, items, totals, type: 'intra', target: { p: INTRA_EAA_G, c: _intraCarbG, f: 0 },
     rationale: [
       `EAA ${INTRA_EAA_G} г — предотвращение катаболизма во время длительной (>60 мин) сессии`,
-      `Циклодекстрин ${INTRA_CARB_G_PER_H} г/ч — поддержание глюкозы и гликогена`,
+      `Циклодекстрин ${_intraCarbG} г — поддержание глюкозы и гликогена (доля от дневного КБЖУ)`,
       `Без жиров — максимальная скорость gastric emptying`,
     ],
   };
@@ -1162,6 +1165,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         [...combinedExcluded].sort(), !!input.isVegetarian, input.budget, varietyPoolSize,
         [...(input.preferredIds || [])].sort(), [...(input.allergenTags || [])].sort(),
         input.specificity || null, input.categoryPref || null, input.intolerances || null,
+        // FIX 2.3 (БАГ-14): пулы зависят от _qualityMode (basic фильтрует premium/exotic),
+        // но quality не входил в сигнатуру кэша — смена full↔basic возвращала старые пулы.
+        input.quality || 'full',
       ]);
       const cached = _poolCache.get(key);
       if (cached) return cached;
@@ -1255,7 +1261,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   for (const r of ['snack2','intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
   if (_roles.length > input.mealsCount) _roles = _roles.slice(0, Math.max(3, input.mealsCount));
   const _keep = new Set(_roles);
-  const _wOf = (r: string): number => { let v = CARB_W[r] ?? 0.5; if (r === 'dinner' && input.eveningLowCarb) v *= 0.5; return v; };
+  // FIX 2.2 (БАГ-10): preSleep резервировал углеводную долю 0.3 в _wSum, но никогда её не отдавал
+  // (buildPreSleep целенаправленно 0-углеводный — казеин). Доля «терялась», сжимая остальные приёмы.
+  // Теперь preSleep не участвует в распределении углеводов вовсе.
+  const _wOf = (r: string): number => { if (r === 'preSleep') return 0; let v = CARB_W[r] ?? 0.5; if (r === 'dinner' && input.eveningLowCarb) v *= 0.5; return v; };
   const _wSum = _roles.reduce((s, r) => s + _wOf(r), 0) || 1;
   const _carbFor = (r: string): number => _keep.has(r) ? Math.round(carbsTotal * _wOf(r) / _wSum) : 0;
   const breakC = _carbFor('breakfast');
@@ -1424,9 +1433,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // intraEligible объявлен выше (блок carb-distribution); gate по mealsCount через _keep.
   if (intraEligible && _keep.has('intra') && input.trainStartMin) {
     const intraTime = fmtTime(input.trainStartMin + 30);
-    const intra = buildIntraWorkout(intraTime, seedBase + 4, pool);
+    const intra = buildIntraWorkout(intraTime, seedBase + 4, pool, _carbFor('intra'));
     meals.push(intra);
-    notes.push('Intra-workout: EAA + циклодекстрин (поддержание глюкозы на длинной тренировке)');
+    notes.push(`Intra-workout: EAA + циклодекстрин (${_carbFor('intra')} г — доля от дневного КБЖУ, поддержание глюкозы на длинной тренировке)`);
   }
 
   // 5. Post-workout (+60 мин) ──────────────────────────────────────────
