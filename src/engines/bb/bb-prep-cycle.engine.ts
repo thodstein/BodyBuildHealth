@@ -26,7 +26,7 @@ import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
-  isoToday, isoDiffDays, isoAddDays,
+  isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, buildPeakWeek, configFromPlan,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
   type ContestSpecialization, type ExperienceLevel, type SodiumStrategy, type WaterStrategy,
@@ -520,6 +520,144 @@ export function prepCardioPlan(cfg: PrepCycleConfig): PrepCardioPlan {
     zone: 'Zone 2 (лёгкое, ~60–70% ЧССmax) — расход ккал в дефиците, мышцы сохраняются',
     note: `Кардио в подготовке растёт (da Silveira 2025). Рекомендуем ~${minutes} мин/нед Zone 2 + ~${stepsPerDay} шагов/день. Не заменяет силовую — объём держим на уровне ББ-авто.`,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// План питания подготовки (направление «Подготовка питание»)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PrepNutritionWeek {
+  week: number;
+  phase: string;               // preparation / final_preparation / taper / peak_week
+  kcal: number;
+  proteinG: number;
+  fatG: number;
+  carbsG: number;
+  refeed: boolean;             // неделя с 1 рефид-днём
+  note: string;
+}
+
+export interface PrepNutritionPlan {
+  weeks: PrepNutritionWeek[];
+  macros: { proteinPerKg: [number, number]; fatFloorG: number; carbsMinG: number };
+  refeedStrategy: string;
+  mealTiming: string[];
+  micronutrients: string[];
+  hydration: string;
+  cardioKcalPerWeek: number;
+  femaleNotes: string[];
+  note: string;
+}
+
+/** Полный план питания подготовки: недельная прогрессия калорий, макро-сплит,
+ *  рефиды, тайминг белка, микронутриенты, гидратация, кардио-ккал.
+ *  Доказательно: белок 2.2–2.5 г/кг (Helms 2017), жир-флор (RED-S), дефицит 0.25–0.75%/нед. */
+export function buildPrepNutritionPlan(
+  prepPlan: BBContestPrepPlan,
+  cfg: PrepCycleConfig,
+): PrepNutritionPlan {
+  const profile = CATEGORY_PROFILES[cfg.category] ?? CATEGORY_PROFILES.mens_physique;
+  const w = prepPlan.preparation.startingWeightKg || cfg.weightKg || 80;
+  const sex = cfg.sex;
+  const isFemale = sex === 'female';
+  const proteinPerKg: [number, number] = profile.light
+    ? [2.0, 2.2]                 // bikini/wellness — мягче
+    : isFemale ? [2.2, 2.5] : [2.2, 2.5];
+  const proteinG = Math.round(w * ((proteinPerKg[0] + proteinPerKg[1]) / 2));
+  const fatFloorPerKg = isFemale ? 0.8 : 0.6;
+  const fatFloorG = Math.max(isFemale ? 40 : 30, Math.round(w * fatFloorPerKg));
+  const carbsMinG = 50;
+  const baseKcal = Math.max(isFemale ? 1400 : 1200, Math.round(prepPlan.preparation.currentCalories || w * 31));
+  const ratePct = clamp(prepPlan.preparation.targetRatePctPerWeek || 0.5, 0.25, 0.75);
+
+  const prepWeeks = prepPlan.preparation.weeks;
+  const taperWeeks = prepPlan.taper.weeks;
+  const totalPrep = prepWeeks + taperWeeks;
+  const weeks: PrepNutritionWeek[] = [];
+
+  for (let i = 1; i <= totalPrep; i++) {
+    const phaseRange = prepPhaseForWeek(prepPlan, i);
+    const phaseKey = phaseRange?.key ?? (i <= prepWeeks ? 'preparation' : 'taper');
+    let kcal = baseKcal;
+    let carbsG: number;
+    let note: string;
+    let refeed = false;
+    if (phaseKey === 'taper') {
+      // Тапер: калории стабильны (усталость падает, катаболизм не нужен), карбс чуть выше (гликоген).
+      kcal = baseKcal;
+      carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
+      note = 'Тапер: калории стабильны, карбс слегка выше — подготовка гликогена к пик-неделе.';
+    } else if (phaseKey === 'final_preparation') {
+      // Финал подготовки: лёгкий дефицит, рефид раз в неделю.
+      kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal * 0.97));
+      refeed = true;
+      carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
+      note = 'Финал подготовки: лёгкий дефицит (×0.97), белок и жиры не режутся, 1 рефид-день/нед.';
+    } else {
+      // Подготовка: ступенчатая прогрессия — каждые 2 недели −120 ккал (поддержание темпа).
+      kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal - Math.floor((i - 1) / 2) * 120));
+      refeed = i % 3 === 0; // каждые 3 недели — рефид-день
+      carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
+      note = `Подготовка (нед ${i}): дефицит ~${Math.round(ratePct * 100 * 10) / 10}%/нед${refeed ? ', 1 рефид-день (карбс до ~поддержания)' : ''}, вода/натрий стабильны.`;
+    }
+    weeks.push({ week: i, phase: phaseKey, kcal, proteinG, fatG: fatFloorG, carbsG, refeed, note });
+  }
+
+  // Пик-неделя: представительный день (шоу-день) из buildPeakWeek.
+  const peakDay = buildPeakWeek({ ...configFromPlan(prepPlan), weeksOut: 1 })[6];
+  if (peakDay) {
+    weeks.push({
+      week: totalPrep + 1,
+      phase: 'peak_week',
+      kcal: peakDay.kcal,
+      proteinG: peakDay.proteinG,
+      fatG: peakDay.fatG,
+      carbsG: peakDay.carbsG,
+      refeed: false,
+      note: 'Пик-неделя: по протоколу buildPeakWeek (деплеция→загрузка→шоу).',
+    });
+  }
+
+  const cardioKcalPerWeek = Math.round(prepCardioPlan(cfg).minutesPerWeek * 6); // Zone 2 ≈ 6 ккал/мин
+  const micronutrients = [
+    isFemale ? 'Железо: красное мясо/печень/шпинат 2-3×/нед (дефицит типичен для женской сушки).' : 'Железо: при усталости — красное мясо/печень 1-2×/нед.',
+    'Кальций 1000-1200 мг/день (молочные/обогащённые) — кости при низком % жира.',
+    'Магний 300-400 мг/день + калий 3500-4000 мг — анти-судороги, не снижать.',
+    'Натрий ~2800 мг/день (стабильно) — в пик-неделю по протоколу.',
+  ];
+  const femaleNotes = isFemale
+    ? [
+        'RED-S: минимум 1400 ккал/день, энергетическая доступность ≥30 ккал/кг FFM.',
+        'Темп ≤0.4%/нед (меньше жировой ткани), анализ по среднему за 7 дней.',
+        'Лютеиновая фаза: задержка воды +0.5-1 кг — норма, не усиливайте дефицит.',
+      ]
+    : [];
+
+  const mealTiming = [
+    'Белок 0.4-0.55 г/кг вокруг тренировки (MPS-окно), кап ~50 г за приём.',
+    'Распределение: 4-5 приёмов по 25-50 г белка каждый.',
+    'Карбс вокруг тренировки (до/после) — гликоген и восстановление.',
+  ];
+
+  return {
+    weeks,
+    macros: { proteinPerKg, fatFloorG, carbsMinG },
+    refeedStrategy: refeedWeeksText(weeks),
+    mealTiming,
+    micronutrients,
+    hydration: `Вода ~3 л/день (женщины ≥1.5-2 л, минимум 40 мл/кг), натрий 2800 мг стабильно.`,
+    cardioKcalPerWeek,
+    femaleNotes,
+    note: `План питания подготовки: белок ${proteinG} г (${proteinPerKg[0]}-${proteinPerKg[1]} г/кг), жиры ≥${fatFloorG} г, карбс на остаток (мин ${carbsMinG} г). Дефицит ${Math.round(ratePct * 1000) / 10}%/нед.`,
+  };
+}
+
+/** Текст стратегии рефидов по неделям плана. */
+function refeedWeeksText(weeks: PrepNutritionWeek[]): string {
+  const ref = weeks.filter(w => w.refeed).map(w => w.week);
+  return ref.length > 0
+    ? `Рефид-дни (карбс до ~поддержания, жир ↓): нед ${ref.join(', ')}.`
+    : 'Рефидов нет — короткий prep, строгий дефицит.';
 }
 
 /** План объёма подготовки (доказательный): подготовка ДЕРЖИТ объём на уровне обычного

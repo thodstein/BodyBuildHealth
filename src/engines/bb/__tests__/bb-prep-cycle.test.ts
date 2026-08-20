@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
   accentToContestSpec, prepCutProjection, buildPrepSeason, posingPlanForCategory,
-  savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan,
+  savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan,
   prepVolumePlan, prepDeficitMult, prepAthleteMult, prepRecoveryMult, prepVolumePhaseForWeek,
   type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
@@ -457,5 +457,30 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     expect(minSessionSets).toBeGreaterThanOrEqual(6);
     // В неделе остались осмысленные сессии
     expect(prepWeeks[0].sessions.length).toBeGreaterThan(0);
+  });
+
+  it('план питания подготовки: прогрессия ккал, макро-сплит, рефиды, микронутриенты', () => {
+    const r = buildPrepCycle(base({ category: 'mens_physique', sex: 'male', weeks: 12, taperWeeks: 3, weightKg: 82 }));
+    const plan = buildPrepNutritionPlan(r.prepPlan, r.config);
+    // понедельные строки: подготовка + тапер + пик
+    expect(plan.weeks.length).toBeGreaterThanOrEqual(12);
+    const prepWeek = plan.weeks.find(w => w.phase === 'preparation');
+    expect(prepWeek).toBeDefined();
+    if (prepWeek) {
+      expect(prepWeek.proteinG).toBeGreaterThanOrEqual(150); // ~2.2 г/кг × 82
+      expect(prepWeek.fatG).toBeGreaterThanOrEqual(30);
+      expect(prepWeek.carbsG).toBeGreaterThanOrEqual(50);
+    }
+    // прогрессия: позже в подготовке ккал ≤ раньше
+    const prepWeeksArr = plan.weeks.filter(w => w.phase === 'preparation');
+    expect(prepWeeksArr[prepWeeksArr.length - 1].kcal).toBeLessThanOrEqual(prepWeeksArr[0].kcal);
+    // тапер: калории стабильны, карбс выше
+    const taperWeek = plan.weeks.find(w => w.phase === 'taper');
+    if (taperWeek) expect(taperWeek.kcal).toBeGreaterThanOrEqual((prepWeeksArr[0]?.kcal ?? 0) * 0.9);
+    // женские ноты для female
+    const fr = buildPrepCycle(base({ category: 'bikini', sex: 'female', weeks: 10, taperWeeks: 2, weightKg: 60 }));
+    const fplan = buildPrepNutritionPlan(fr.prepPlan, fr.config);
+    expect(fplan.femaleNotes.length).toBeGreaterThan(0);
+    expect(fplan.macros.fatFloorG).toBeGreaterThanOrEqual(40); // женский жир-флор
   });
 });

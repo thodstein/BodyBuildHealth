@@ -85,7 +85,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -5469,6 +5469,34 @@ export const BbAutoConstructor: React.FC = () => {
                     </div>
                     {nt.note && <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{nt.note}</div>}
                     <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Эти цели уже применяет планировщик питания (вкладка «🏁 Тапер ББ»).</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            {/* 🍽 План питания подготовки (недели/фазы/макро/рефиды/микро) */}
+            {(() => {
+              try {
+                const np = buildPrepNutritionPlan(prepResult.prepPlan, prepResult.config);
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.18)' }}>
+                    <div style={{ fontWeight: 800, color: '#4ade80', marginBottom: 4 }}>🍽 План питания подготовки</div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{np.note}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                      {np.weeks.slice(0, 20).map(w => (
+                        <span key={w.week} title={w.note} style={{ padding: '3px 7px', borderRadius: 7, fontSize: 8.5, fontWeight: 700, background: w.phase === 'peak_week' ? 'rgba(236,72,153,0.12)' : w.phase === 'taper' ? 'rgba(245,158,11,0.12)' : w.refeed ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${w.refeed ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.1)'}`, color: w.phase === 'peak_week' ? '#f472b6' : w.phase === 'taper' ? '#fbbf24' : 'rgba(255,255,255,0.85)' }}>
+                          н{w.week} {w.phase === 'preparation' ? (w.refeed ? 'рефид' : 'prep') : w.phase === 'final_preparation' ? 'финал' : w.phase === 'taper' ? 'тапер' : 'пик'} · {w.kcal}кк · Б{w.proteinG}/У{w.carbsG}/Ж{w.fatG}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)' }}>
+                      <div>⚖ {np.refeedStrategy}</div>
+                      <div>🍗 {np.mealTiming.join(' ')}</div>
+                      <div>💊 {np.micronutrients.join(' ')}</div>
+                      <div>💧 {np.hydration}</div>
+                      <div>🏃 Кардио-расход: ~{np.cardioKcalPerWeek} ккал/нед</div>
+                      {np.femaleNotes.map((f, i) => <div key={i} style={{ color: '#f9a8d4' }}>👩 {f}</div>)}
+                    </div>
                   </div>
                 );
               } catch { return null; }
