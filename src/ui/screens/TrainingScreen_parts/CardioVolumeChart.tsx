@@ -35,6 +35,8 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
       pct: planned > 0 ? Math.round((done / planned) * 100) : null,
       doneS,
       plannedS,
+      factKcal: rows.reduce((s, r) => s + r.factKcal, 0),
+      factKm: Math.round(rows.reduce((s, r) => s + r.factKm, 0) * 10) / 10,
     };
   }, [cycle, log]);
 
@@ -96,6 +98,7 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
             Пик: {peak} {label} (нед {peakWeek}) · Средняя: {avg} {label}
             {fact && <span style={{ color: fact.pct != null && fact.pct < 60 ? '#f87171' : 'rgba(255,255,255,0.35)' }}> · Выполнение прошедших недель: {fact.pct}% (сессий {fact.doneS}/{fact.plannedS})</span>}
+            {fact && fact.factKcal > 0 && <span> · Факт: {fact.factKcal} ккал{fact.factKm > 0 ? ` · ${fact.factKm} км` : ''}</span>}
           </div>
           <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3b82f6', marginRight: 4 }} />план</span>

@@ -220,14 +220,17 @@ describe('CardioVolumeChart — план vs факт', () => {
     const start = iso(d);
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'vc-2', startDate: start });
     const log = [
-      { id: 'f1', date: start, type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true, calories: 180 },
-      { id: 'f2', date: plusDays(start, 1), type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true, calories: 180 },
+      { id: 'f1', date: start, type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true, calories: 180, distanceKm: 4 },
+      { id: 'f2', date: plusDays(start, 1), type: 'zone2' as const, durationMin: 25, rpe: 5, completed: true, calories: 180, distanceKm: 3.5 },
     ];
     render(<CardioVolumeChart cycle={c} log={log} />);
     fireEvent.click(screen.getByRole('button', { name: /Показать/ }));
     expect(screen.getByText(/план vs факт/)).toBeTruthy();
     expect(screen.getByText(/Выполнение прошедших недель/)).toBeTruthy();
     expect(screen.getByText(/факт \(дневник\)/)).toBeTruthy();
+    // Сводка факта: 180+180 ккал · 7.5 км за прошедшие недели.
+    expect(screen.getByText(/360 ккал/)).toBeTruthy();
+    expect(screen.getByText(/7\.5 км/)).toBeTruthy();
   });
 
   it('будущие недели не штрафуют выполнение (только прошедшие)', () => {
