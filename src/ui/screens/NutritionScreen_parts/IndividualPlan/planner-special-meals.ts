@@ -25,9 +25,25 @@ export interface SpecialMealDeps {
 const notExcluded = (excludedIds: string[] | undefined) => (f: any) =>
   !excludedIds || excludedIds.length === 0 || !excludedIds.includes(f.id);
 
+// Этап 5 (Пробел-3): детерминированный выбор продуктов для спец-режимов.
+// Раньше Math.random() давал разный результат на каждый рендер при тех же входах —
+// «Карб-загрузка»/«БУЧ»/«Сладкое»/«Ленивый день» меняли состав без причины.
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  let s = (seed >>> 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+const seedFor = (deps: SpecialMealDeps, salt: number): number =>
+  Math.round(deps.weight * 1000 + deps.effectiveKcal + deps.goal.length * 31 + salt + (deps.trainingDays || []).filter(Boolean).length * 7);
+
 export function generateCheatMeal(deps: SpecialMealDeps): any {
   const cals = Math.round(deps.effectiveKcal * 0.35);
-  const items = FOOD_DB.filter(f => f.category === 'fast_food' || (f.kcal > 200 && (f.name.toLowerCase().includes('бургер') || f.name.toLowerCase().includes('пицц') || f.name.toLowerCase().includes('картофель фри') || f.name.toLowerCase().includes('чипс') || f.name.toLowerCase().includes('шоколад') || f.name.toLowerCase().includes('морожен') || f.name.toLowerCase().includes('пончик')))).filter(notExcluded(deps.excludedIds)).sort(() => Math.random() - 0.5).slice(0, 2);
+  const items = seededShuffle(FOOD_DB.filter(f => f.category === 'fast_food' || (f.kcal > 200 && (f.name.toLowerCase().includes('бургер') || f.name.toLowerCase().includes('пицц') || f.name.toLowerCase().includes('картофель фри') || f.name.toLowerCase().includes('чипс') || f.name.toLowerCase().includes('шоколад') || f.name.toLowerCase().includes('морожен') || f.name.toLowerCase().includes('пончик')))).filter(notExcluded(deps.excludedIds)), seedFor(deps, 1)).slice(0, 2);
   const bju = { kcal: cals, p: Math.round(cals * 0.08 / 4), f: Math.round(cals * 0.40 / 9), c: Math.round(cals * 0.52 / 4) };
   // P1-fix: добавляем bjuBreakdown (раньше UI рендерил undefined)
   const bjuBreakdown = `${Math.round(bju.p * 4 / cals * 100)}% Б / ${Math.round(bju.f * 9 / cals * 100)}% Ж / ${Math.round(bju.c * 4 / cals * 100)}% У`;
@@ -43,7 +59,7 @@ export function generateCheatMeal(deps: SpecialMealDeps): any {
 
 export function generateCarbload(deps: SpecialMealDeps): any {
   const carbsPerKg = 8; const totalCarbs = Math.round(deps.weight * carbsPerKg);
-  const carbFoods = FOOD_DB.filter(f => (f.category === 'carb' || f.category === 'grain') && f.carbs > 20).filter(notExcluded(deps.excludedIds)).sort(() => Math.random() - 0.5).slice(0, 5);
+  const carbFoods = seededShuffle(FOOD_DB.filter(f => (f.category === 'carb' || f.category === 'grain') && f.carbs > 20).filter(notExcluded(deps.excludedIds)), seedFor(deps, 2)).slice(0, 5);
   // P1-fix: белок протокола загрузки = 1.0-1.5 г/кг (не суточный effectiveP),
   // жиры = 0.5 г/кг (минимум для гормонов), углеводы = totalCarbs.
   const proteinG = Math.round(deps.weight * 1.2);
@@ -82,10 +98,11 @@ export function generateBUTCH(deps: SpecialMealDeps): any {
 
 export function generateCravingPlan(deps: SpecialMealDeps): any {
   const sweetToothKcal = Math.min(500, Math.round(deps.effectiveKcal * 0.12));
-  const sweetItems = FOOD_DB.filter(f => {
+  const sweetPool = FOOD_DB.filter(f => {
     const n = f.name.toLowerCase();
     return n.includes('шоколад') || n.includes('морожен') || n.includes('печень') || n.includes('конфет') || n.includes('мед') || n.includes('варень') || n.includes('джем') || n.includes('банан') || n.includes('яблоко') || n.includes('виноград') || n.includes('финик');
-  }).filter(notExcluded(deps.excludedIds)).sort(() => Math.random() - 0.5).slice(0, 2);
+  }).filter(notExcluded(deps.excludedIds));
+  const sweetItems = seededShuffle(sweetPool, seedFor(deps, 3)).slice(0, 2);
   return {
     kcal: sweetToothKcal,
     days: deps.cravingDays,
@@ -99,10 +116,11 @@ export function generateCravingPlan(deps: SpecialMealDeps): any {
 
 export function generateLazyDayPlan(deps: SpecialMealDeps): any {
   const lazyKcal = Math.round(deps.effectiveKcal * 0.85);
-  const lazyItems = FOOD_DB.filter(f => {
+  const lazyPool = FOOD_DB.filter(f => {
     const n = f.name.toLowerCase();
     return (f.category === 'dairy' && f.carbs < 10) || n.includes('яйц') || n.includes('творог') || n.includes('йогурт') || n.includes('протеин') || n.includes('кефир') || n.includes('хлеб') || n.includes('овсян') || n.includes('банан') || n.includes('орех') || n.includes('авокадо');
-  }).filter(notExcluded(deps.excludedIds)).filter(f => f.carbs < 40).sort(() => Math.random() - 0.5).slice(0, 5);
+  }).filter(notExcluded(deps.excludedIds)).filter(f => f.carbs < 40);
+  const lazyItems = seededShuffle(lazyPool, seedFor(deps, 4)).slice(0, 5);
   return {
     kcal: lazyKcal,
     days: deps.lazyDayDays,

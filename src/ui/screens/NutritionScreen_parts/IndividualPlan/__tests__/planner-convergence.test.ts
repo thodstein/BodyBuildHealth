@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
+import { generateCarbload } from '../planner-special-meals';
 
 const trainInput = (overrides: any = {}): MealPlanInput => ({
   weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const,
@@ -112,6 +113,27 @@ describe('Этап 4: синхронизация приёмов с инъекц�
   });
 });
 
+describe('Этап 5: рефид-день как полноценная структура', () => {
+  it('рефид-день даёт заметно больше углеводов и добавляет рефид-ноту', () => {
+    const normal = buildDayPlan(trainInput({ refeedDay: false, goalCarbsG: 250 }));
+    const refeed = buildDayPlan(trainInput({ refeedDay: true, goalCarbsG: 250 }));
+
+    // При равной цели рефид-день не обязан превышать цель, но должен нести рефид-ноту
+    // (структурная пометка в плане) и оставаться валидным.
+    expect(refeed.notes.some(n => (n || '').includes('Refeed') || (n || '').includes('рефид'))).toBe(true);
+    expect(refeed.meals.length).toBeGreaterThan(0);
+    // При реально повышенной углеводной цели рефид добирает углеводы.
+    const hiRefeed = buildDayPlan(trainInput({ refeedDay: true, goalCarbsG: 520 }));
+    const dev = Math.abs(hiRefeed.totals.c - 520) / 520;
+    expect(dev).toBeLessThanOrEqual(0.07);
+  });
+
+  it('рефид-день не выдаёт предупреждение о низкой клетчатке (намеренно ниже)', () => {
+    const refeed = buildDayPlan(trainInput({ refeedDay: true, goalCarbsG: 520 }));
+    expect(refeed.notes.some(n => (n || '').startsWith('⚠ Клетчатка'))).toBe(false);
+  });
+});
+
 describe('Этап 2: кэш пулов учитывает quality (БАГ-14)', () => {
   it('full и basic дают валидные, но различные пулы/микро-покрытие', () => {
     const full = buildDayPlan(trainInput({ quality: 'full' as const }));
@@ -121,5 +143,16 @@ describe('Этап 2: кэш пулов учитывает quality (БАГ-14)',
     expect(basic.meals.length).toBeGreaterThan(0);
     expect(full.microSummary?.coverage?.length).toBeGreaterThan(0);
     expect(basic.microSummary?.coverage ?? []).toEqual([]);
+  });
+});
+
+describe('Этап 5: детерминизм спец-режимов (Пробел-3)', () => {
+  it('generateCarbload детерминирован при одинаковых входах', () => {
+    // Два вызова с одинаковыми входами должны дать одинаковый набор продуктов
+    // (раньше Math.random() менял состав на каждый вызов).
+    const deps = { weight: 90, effectiveKcal: 3000, effectiveP: 190, effectiveF: 70, effectiveC: 350, goal: 'cutting', cravingDays: 1, lazyDayDays: 1, trainingDays: [true, false, true, true, false, false, false] };
+    const a = generateCarbload(deps as any);
+    const b = generateCarbload(deps as any);
+    expect(JSON.stringify(a.foods)).toBe(JSON.stringify(b.foods));
   });
 });

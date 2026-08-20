@@ -1821,6 +1821,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
            menstrualPhaseNote: _mp ? _mp.note : undefined,
            carbGiPref: _mp ? _mp.carbGiPref : undefined,
            quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
+           // Этап 5: настоящий рефид-день — движок предпочитает быстрые/низкоклетчаточные углеводы.
+           refeedDay: isRefeedDay,
          };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
@@ -1895,7 +1897,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           microSummary: v2.microSummary,
           diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? diaryComp : undefined,
           isRefeedDay,
-          refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
+          refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.5 (восстановление гликогена/лептина), жиры снижены, белок удержан. Выбраны быстрые/низкоклетчаточные углеводы, овощи легче — больше места углеводам. Психологическая разгрузка на сушке.' : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
           boneNotes: _boneNotes.length > 0 ? _boneNotes : undefined,
           sleepNote: _sleepNote,
