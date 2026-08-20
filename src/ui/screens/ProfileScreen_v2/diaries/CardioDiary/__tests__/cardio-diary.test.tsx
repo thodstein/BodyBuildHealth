@@ -71,6 +71,15 @@ describe('CardioDiary — CSR', () => {
     expect(screen.getAllByText(/40 мин/).length).toBeGreaterThan(0);
   });
 
+  it('меню «••• Ещё» показывает экспорт (CSV/PDF) и очистку', () => {
+    saveCardioLogEntry({ id: 'x6', date: '2026-08-17', type: 'zone2', durationMin: 30, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    fireEvent.click(screen.getByRole('button', { name: /••• Ещё/ }));
+    expect(screen.getByRole('menuitem', { name: /CSV-файл/ })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /Печать \/ PDF/ })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /Очистить дневник/ })).toBeTruthy();
+  });
+
   it('активный цикл: блок «план vs факт» показывает выполнение текущей недели', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'cd-1' });
     saveCardioCycle(c);

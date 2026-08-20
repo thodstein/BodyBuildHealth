@@ -117,6 +117,67 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     reload();
   };
 
+  const csvCell = (v: unknown) => {
+    const s = String(v ?? '');
+    const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+
+  const exportCsv = () => {
+    const head = 'Дата,Тип,Минуты,Км,Ккал,ЧСС ср.,RPE,Завершено\n';
+    const body = log.map(e =>
+      [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, e.durationMin,
+        e.distanceKm ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
+        e.completed ? 'да' : 'нет'].map(csvCell).join(','),
+    ).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
+    a.download = `cardio-${todayIso()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const escHtml = (v: unknown) =>
+    String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+
+  const printPdf = () => {
+    const w = window.open('', '_blank');
+    if (!w) return;
+    const typeLabel = (id: CardioType) => TYPES.find(t => t.id === id)?.label ?? id;
+    const rows = log.map(e =>
+      `<tr><td>${escHtml(e.date)}</td><td>${escHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
+      `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
+      `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td></tr>`,
+    ).join('');
+    const html = `<!doctype html>
+<meta charset="utf-8">
+<title>Кардио-дневник</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; color: #333; }
+  h1 { color: #15803d; border-bottom: 2px solid #15803d; padding-bottom: 8px; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+  .card { padding: 8px 12px; border-radius: 6px; border-left: 4px solid #4ade80; background: #f0fdf4; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th { background: #15803d; color: #fff; padding: 6px; }
+  td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
+  @media print { body { margin: 0; } }
+</style>
+<h1>❤️ Кардио-дневник</h1>
+<div class="summary">
+  <div class="card"><b>7 дней</b><br>${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}</div>
+  <div class="card"><b>28 дней</b><br>${stats28.sessions} сесс · ${stats28.minutes} мин${stats28.km > 0 ? ` · ${stats28.km} км` : ''}${stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
+  <div class="card"><b>Всего</b><br>${doneSessions} сесс · ${totalMinutes} мин</div>
+</div>
+<table>
+  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th></tr>
+  ${rows}
+</table>`;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  };
+
   const totalMinutes = log.reduce((s, e) => s + e.durationMin, 0);
   const doneSessions = log.filter(e => e.completed).length;
 
@@ -130,7 +191,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         onClose={onClose}
         onAdd={add}
         addLabel="+ Записать сессию"
-        exportActions={[]}
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: exportCsv },
+          { label: '🖨 Печать / PDF', onClick: printPdf },
+          { label: '🗑 Очистить дневник', onClick: () => { if (log.length && window.confirm('Очистить весь кардио-дневник?')) { log.forEach(e => removeCardioLogEntry(e.id)); reload(); } }, danger: true },
+        ]}
         badge={adherence ? (
           <span style={{ fontSize: 12, color: ACCENT, background: `${ACCENT}1f`, border: `1px solid ${ACCENT}55`, borderRadius: 12, padding: '3px 10px' }}>
             {adherence.cycle.name}: {adherence.doneSessions}/{adherence.plannedSessions} сессий нед {adherence.week}
