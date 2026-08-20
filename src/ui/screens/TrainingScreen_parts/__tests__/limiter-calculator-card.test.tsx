@@ -3,61 +3,56 @@ import { render, fireEvent, screen, cleanup } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { LimiterCalculatorCard } from '../LimiterCalculatorCard';
-import { CYCLE_01 } from '../../../../data/lms-cycles/cycle-01';
 
 afterEach(() => {
   cleanup();
   localStorage.removeItem('he_pl_limiter_card_v1');
 });
 
-/** Категория «Скорость» встречается и как чип, и в заголовке секции — кликаем по чипу. */
-const clickCategory = (label: RegExp) => fireEvent.click(screen.getAllByText(label)[0]);
-
-describe('LimiterCalculatorCard (калькулятор лимитирующих факторов)', () => {
-  it('рендерится с заголовком и движениями', () => {
-    const html = renderToStaticMarkup(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
+describe('LimiterCalculatorCard (10 калькуляторов × 6 движений)', () => {
+  it('рендерится с заголовком и всеми 10 калькуляторами (категориями)', () => {
+    const html = renderToStaticMarkup(<LimiterCalculatorCard dayCount={3} />);
     expect(html).toContain('Калькулятор лимитирующих факторов движения');
-    expect(html).toContain('Присед');
-    expect(html).toContain('Жим лёжа');
-    expect(html).toContain('Становая тяга');
-    expect(html).toContain('Жим стоя');
-    expect(html).toContain('Подъём на бицепс');
+    for (const label of ['Скорость (динамический метод)', 'Дожимы и доседы (фазы амплитуды)', 'Стабилизация и жёсткость', 'Режимы сокращения', 'Гипертрофия лимитирующих групп', 'Антропометрия и рычаги', 'Тип старта и срыва', 'Хват и периферия', 'Координация и синергия', 'Профиль выносливости']) {
+      expect(html, label).toContain(label);
+    }
   });
 
-  it('для приседа доступны категории-факторы', () => {
-    const html = renderToStaticMarkup(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-    expect(html).toContain('Скорость (динамический метод)');
-    expect(html).toContain('Дожимы и доседы (фазы амплитуды)');
-    expect(html).toContain('Стабилизация и жёсткость');
-    expect(html).toContain('Режимы сокращения');
-    expect(html).toContain('Гипертрофия лимитирующих групп');
-    expect(html).toContain('Антропометрия и рычаги');
-  });
-
-  it('категория «Скорость» для приседа показывает параметр с методом и протоколом 8×2 @55%', () => {
-    render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-    clickCategory(/Скорость \(динамический метод\)/);
+  it('выбор калькулятора «Скорость» показывает параметры для ВСЕХ движений (жим лёжа + присед + ...)', () => {
+    render(<LimiterCalculatorCard dayCount={3} />);
+    fireEvent.click(screen.getByText('⚡ Скорость (динамический метод)'));
+    // Жим лёжа и присед — оба в этом калькуляторе
+    expect(screen.getByText('Скорость срыва с груди (стартовая сила)')).toBeTruthy();
     expect(screen.getByText('Скорость вставания из ямы')).toBeTruthy();
     expect(screen.getAllByText(/Динамический метод/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/8×2 @55% RIR 3/).length).toBeGreaterThanOrEqual(1);
+    // Секции движений видимы
+    expect(screen.getAllByText('🏋️ Жим лёжа').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('🏋️ Присед').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('дожим (жим лёжа): 4×3 @80% — частичные повторы, тяжёлый протокол', () => {
-    render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-    fireEvent.click(screen.getByText('Жим лёжа'));
-    clickCategory(/Дожимы и доседы \(фазы амплитуды\)/);
+  it('калькулятор «Дожимы и доседы»: дожим жима лёжа 4×3 @80%', () => {
+    render(<LimiterCalculatorCard dayCount={3} />);
+    fireEvent.click(screen.getByText('📏 Дожимы и доседы (фазы амплитуды)'));
     expect(screen.getByText('Слабый «дожим» (трицепс в финальной трети)')).toBeTruthy();
     expect(screen.getAllByText(/4×3 @80% RIR 1/).length).toBeGreaterThanOrEqual(1);
   });
 
+  it('фильтр движений: выбор «Жим лёжа» оставляет только его параметры', () => {
+    render(<LimiterCalculatorCard dayCount={3} />);
+    fireEvent.click(screen.getByText('⚡ Скорость (динамический метод)'));
+    fireEvent.click(screen.getAllByText('Жим лёжа')[0]);
+    expect(screen.getByText('Скорость срыва с груди (стартовая сила)')).toBeTruthy();
+    expect(screen.queryByText('Скорость вставания из ямы')).toBeNull();
+  });
+
   it('«➕ Рекомендуемое» добавляет упражнение и включает кнопку применения', () => {
-    render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-    clickCategory(/Скорость \(динамический метод\)/);
+    render(<LimiterCalculatorCard dayCount={3} />);
+    fireEvent.click(screen.getByText('⚡ Скорость (динамический метод)'));
     fireEvent.click(screen.getAllByText('➕ Рекомендуемое')[0]);
     expect(screen.getByText(/🛠 Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
   });
 
-  it('применение отправляет kind limiter с протоколами категорий (не трогает слабые группы)', () => {
+  it('применение отправляет kind limiter с протоколами категорий', () => {
     const origDispatch = window.dispatchEvent;
     const dispatched: any[] = [];
     window.dispatchEvent = (e: Event) => {
@@ -65,8 +60,8 @@ describe('LimiterCalculatorCard (калькулятор лимитирующих
       return origDispatch(e);
     };
     try {
-      render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-      clickCategory(/Скорость \(динамический метод\)/);
+      render(<LimiterCalculatorCard dayCount={3} />);
+      fireEvent.click(screen.getByText('⚡ Скорость (динамический метод)'));
       fireEvent.click(screen.getAllByText('➕ Рекомендуемое')[0]);
       fireEvent.click(screen.getByText(/🛠 Добавить выбранные упражнения в ПЛ-авто/));
       const payload = dispatched.find((d: any) => d?.kind === 'limiter');
@@ -83,20 +78,12 @@ describe('LimiterCalculatorCard (калькулятор лимитирующих
   });
 
   it('персистентность: выбор переживает remount', () => {
-    const { unmount } = render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-    clickCategory(/Скорость \(динамический метод\)/);
+    const { unmount } = render(<LimiterCalculatorCard dayCount={3} />);
+    fireEvent.click(screen.getByText('⚡ Скорость (динамический метод)'));
     fireEvent.click(screen.getAllByText('➕ Рекомендуемое')[0]);
     unmount();
-    render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
+    render(<LimiterCalculatorCard dayCount={3} />);
     expect(screen.getByText(/🛠 Добавить выбранные упражнения в ПЛ-авто \(\d+\)/)).toBeTruthy();
-  });
-
-  it('смена движения сбрасывает выбранные упражнения', () => {
-    render(<LimiterCalculatorCard dayCount={3} template={CYCLE_01} />);
-    clickCategory(/Скорость \(динамический метод\)/);
-    fireEvent.click(screen.getAllByText('➕ Рекомендуемое')[0]);
-    fireEvent.click(screen.getByText('Жим лёжа'));
-    expect(screen.getByText(/🛠 Добавить выбранные упражнения в ПЛ-авто \(0\)/)).toBeTruthy();
   });
 
   it('битый storage → дефолт без падения', () => {

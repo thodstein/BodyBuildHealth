@@ -6,6 +6,9 @@ import {
 } from '../limiter-calculator.engine';
 import type { LimiterCategory } from '../limiter-calculator.engine';
 import type { Lift } from '../../lms/weakpoint-pl';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { LMS_EXERCISES } from '../../../data/lms-cycles/lms-exercises';
+import { norm } from '../../norm';
 
 const ALL_LIFTS: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press', 'sumo', 'biceps'];
 const CORE_LIFTS: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
@@ -130,7 +133,9 @@ describe('limiter-calculator.engine: качество упражнений', () 
     const speedCount = full.speed_strength.length;
     expect(speedCount).toBeGreaterThanOrEqual(2);
     const biceps = analyzeLimiterForLift('biceps');
-    expect(biceps.anthropometry.length).toBe(0); // у бицепса нет антропометрии
+    // Полная матрица: у бицепса теперь есть опции во ВСЕХ 10 категориях.
+    expect(Object.keys(biceps).length).toBe(10);
+    expect(biceps.anthropometry.length).toBeGreaterThanOrEqual(1);
     expect(biceps.limiter_hypertrophy.length).toBeGreaterThan(0);
   });
 
@@ -145,6 +150,17 @@ describe('limiter-calculator.engine: качество упражнений', () 
     expect(ecc.protocol.tempo).toMatch(/6/);
     const iso = limiterOptionById('mode_bench_iso')!;
     expect(iso.protocol.holdSec).toBeGreaterThanOrEqual(3);
+  });
+
+  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ 10 категориях', () => {
+    const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
+    for (const lift of core) {
+      const cats = limiterCategoriesForLift(lift);
+      expect(cats, `${lift}: не все категории (${cats.length}/10)`).toHaveLength(10);
+      for (const c of LIMITER_CATEGORIES) {
+        expect(limiterOptionsFor(c.id, lift).length, `${lift}/${c.id}`).toBeGreaterThanOrEqual(1);
+      }
+    }
   });
 
   it('ВСЕ 9 движений покрыты хотя бы одной категорией (нет мёртвых движений)', () => {
@@ -206,6 +222,34 @@ describe('limiter-calculator.engine: качество упражнений', () 
       if (o.methodOverlay) continue;
       const allMain = o.assistance.every(n => MAIN.has(n));
       expect(allMain, `опция ${o.id} состоит только из основного движения`).toBe(false);
+    }
+  });
+
+  it('НИКАКИХ ВЫДУМАННЫХ: каждое имя упражнения — ТОЧНАЯ запись в базе (каталог/СРЦ), не фаззи-подбор', () => {
+    const catNames = new Set(EXERCISE_CATALOG.map(e => norm(e.name)));
+    const lmsNames = new Set(LMS_EXERCISES.map(l => norm(l.name)));
+    const bad: string[] = [];
+    for (const o of LIMITER_OPTIONS) {
+      for (const n of o.assistance) {
+        const nn = norm(n);
+        const inDb = catNames.has(nn) || lmsNames.has(nn);
+        if (!inDb) bad.push(`${o.id}: «${n}» нет точной записи в базе`);
+        const resolved = resolveLimiterExercise(n);
+        if (resolved && norm(resolved.name) !== nn) bad.push(`${o.id}: «${n}» резолвится в «${resolved.name}» (несовпадение)`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('полная матрица 10×6: каждая опция имеет ≥1 упражнение (все клетки непустые)', () => {
+    const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
+    for (const lift of core) {
+      for (const c of LIMITER_CATEGORIES) {
+        for (const o of limiterOptionsFor(c.id, lift)) {
+          const { items } = analyzeLimiterOption(o);
+          expect(items.length, `${lift}/${c.id}/${o.id} без упражнений`).toBeGreaterThanOrEqual(1);
+        }
+      }
     }
   });
 });
