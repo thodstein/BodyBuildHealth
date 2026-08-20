@@ -1658,7 +1658,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   };
 
   // ─── Generate Plan ───
-   const generatePlan = async (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean }) => {
+   const generatePlan = async (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean; overrides?: { mealsCount?: number } }) => {
       // ⏳ Неблокирующая генерация 3/7 дней: yield между днями, чтобы UI не фризил.
       // Многодневная генерация (3/7) ВСЕГДА неблокирующая — независимо от вызывающего
       // (месяц и другие точки входа не обязаны помнить про { async: true }).
@@ -1843,7 +1843,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
-          mealsCount, isTrainingDay: isTrainDay(offset),
+          mealsCount: opts?.overrides?.mealsCount ?? mealsCount, isTrainingDay: isTrainDay(offset),
           trainStartMin: linkToTraining && isTrainDay(offset) ? toMin(trainStart) : undefined,
           allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
