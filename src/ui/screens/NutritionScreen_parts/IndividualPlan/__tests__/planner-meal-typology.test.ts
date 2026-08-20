@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
+import { analyzeDailyDiet, getDefaultProfile } from '../../../../../engines/product-usefulness-v2.engine';
 
 const base = (overrides: any = {}): MealPlanInput => ({
   weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const,
@@ -274,6 +275,23 @@ describe('N2: приёмы вокруг тренировки при заданн
     const times = plan.meals.map(m => toMin(m.time));
     // Есть приём между завтраком (07:00) и предтреном (16:00) — утренний перекус.
     expect(times.some(t => t > toMin('07:00') && t < prewMin && t !== toMin('12:30'))).toBe(true);
+  });
+});
+
+describe('N4: перегруженность приёма в диет-отчёте', () => {
+  it('порция ≥280 г даёт overloadWarning', () => {
+    const r = analyzeDailyDiet([
+      { timing: 'lunch', products: [{ foodId: 'buckwheat', weightGrams: 320 }] },
+    ], getDefaultProfile());
+    expect(r.overloadWarning).toBe(true);
+    expect(r.maxSinglePortionG).toBeGreaterThanOrEqual(320);
+  });
+
+  it('нормальные порции не дают overloadWarning', () => {
+    const r = analyzeDailyDiet([
+      { timing: 'lunch', products: [{ foodId: 'buckwheat', weightGrams: 120 }, { foodId: 'chicken_breast', weightGrams: 150 }] },
+    ], getDefaultProfile());
+    expect(r.overloadWarning).toBe(false);
   });
 });
 

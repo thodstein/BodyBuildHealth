@@ -105,6 +105,9 @@ export interface DailyDietReport {
   glutathioneWarning: string | null;
   histamineWarning: string | null;
   histamineSensitive: boolean;
+  // N4: перегруженность приёма — крупяная/углеводная порция упирается в разумный потолок.
+  maxSinglePortionG: number;
+  overloadWarning: boolean;
 }
 
 export function getDefaultProfile(): UserDietProfile {
@@ -902,5 +905,8 @@ export function analyzeDailyDiet(
     glutathioneWarning,
     histamineWarning,
     histamineSensitive: profile.histamineSensitive,
+    // N4: максимальная одиночная порция (г) — если ≥280 г, приём перегружен (каша/крупа).
+    maxSinglePortionG: Math.round(allProducts.reduce((s, p) => Math.max(s, p.weightGrams), 0)),
+    overloadWarning: allProducts.some(p => p.weightGrams >= 280),
   };
 }

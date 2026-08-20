@@ -2258,6 +2258,11 @@ export const IndividualPlanResults: React.FC = () => {
                       <div style={{ padding:'3px 6px', borderRadius:4, background: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '#ef4444' : '#22c55e' }}>
                         🔬 HOMA-IR: {calcDailyReport.homaIr !== null ? calcDailyReport.homaIr.toFixed(1) : '—'} {(calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '🚨' : '✅'}
                       </div>
+                      {calcDailyReport.overloadWarning && (
+                        <div style={{ padding:'3px 6px', borderRadius:4, background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                          ⚠ Перегрузка приёма: порция {calcDailyReport.maxSinglePortionG} г — увеличьте число приёмов, чтобы распределить нагрузку
+                        </div>
+                      )}
                     </div>
                     {calcDailyReport.diaasWarning && (
                       <div style={{ marginTop:4, fontSize:10, padding:'4px 8px', borderRadius:6, background: 'rgba(139,92,246,0.06)', color: '#8b5cf6' }}>
