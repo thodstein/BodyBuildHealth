@@ -8,6 +8,7 @@ import type { LimiterCategory } from '../limiter-calculator.engine';
 import type { Lift } from '../../lms/weakpoint-pl';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { LMS_EXERCISES } from '../../../data/lms-cycles/lms-exercises';
+import { PL_CORRECTION_EXERCISES } from '../pl-correction-exercises';
 import { norm } from '../../norm';
 
 const ALL_LIFTS: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press', 'sumo', 'biceps'];
@@ -225,15 +226,14 @@ describe('limiter-calculator.engine: качество упражнений', () 
     }
   });
 
-  it('НИКАКИХ ВЫДУМАННЫХ: каждое имя упражнения — ТОЧНАЯ запись в базе (каталог/СРЦ), не фаззи-подбор', () => {
+  it('НИКАКИХ ВЫДУМАННЫХ: каждое имя — ТОЧНАЯ запись в EXERCISE_CATALOG или реестре ПЛ-коррекций (полная, не фаззи)', () => {
     const catNames = new Set(EXERCISE_CATALOG.map(e => norm(e.name)));
-    const lmsNames = new Set(LMS_EXERCISES.map(l => norm(l.name)));
+    const regNames = new Set(PL_CORRECTION_EXERCISES.map(e => norm(e.name)));
     const bad: string[] = [];
     for (const o of LIMITER_OPTIONS) {
       for (const n of o.assistance) {
         const nn = norm(n);
-        const inDb = catNames.has(nn) || lmsNames.has(nn);
-        if (!inDb) bad.push(`${o.id}: «${n}» нет точной записи в базе`);
+        if (!catNames.has(nn) && !regNames.has(nn)) bad.push(`${o.id}: «${n}» нет полной записи в базе (каталог/реестр)`);
         const resolved = resolveLimiterExercise(n);
         if (resolved && norm(resolved.name) !== nn) bad.push(`${o.id}: «${n}» резолвится в «${resolved.name}» (несовпадение)`);
       }
