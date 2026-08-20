@@ -112,6 +112,9 @@ describe('PLSeasonBuilder', () => {
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
     expect(Array.isArray(built!.weeks) && built!.weeks.length > 20).toBe(true);
+    // Агрегированные метрики сезона валидны (PLPlanView вызывает tonnage.toFixed — не должно упасть).
+    expect(Number.isFinite(built!.cycleMetrics.tonnage)).toBe(true);
+    expect(built!.cycleMetrics.tonnage).toBeGreaterThan(0);
   });
 
   it('SSR-рендер карточки не падает', () => {
@@ -126,5 +129,15 @@ describe('PLSeasonBuilder', () => {
     expect(screen.getAllByText(/Выносливость/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('🎯 Одиночный цикл'));
     expect(changes).toEqual(['single']);
+  });
+
+  it('ручные выборы (pickMode/selections) восстанавливаются из сессии', () => {
+    localStorage.setItem('he_pl_session', JSON.stringify({
+      season: { mode: 'season', slots: undefined, pickMode: 'manual', selections: { 0: 'cycle-01' }, compPickMode: 'manual', compSelections: { 0: 'cycle-03' } },
+    }));
+    render(<PLSeasonBuilder {...props()} />);
+    expect(screen.getAllByText('👆 Выбрать вручную').length).toBeGreaterThan(0);
+    const slotSelect = screen.getByLabelText(/Выбор цикла для периода «Выносливость»/);
+    expect((slotSelect as HTMLSelectElement).value).toBe('cycle-01');
   });
 });

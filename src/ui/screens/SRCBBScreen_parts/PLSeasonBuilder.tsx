@@ -27,12 +27,22 @@ import {
   type CompGapBuildOptions,
 } from '../../../engines/lms/lms-comp-gap.engine';
 import type { LMSRankedCycle, LMSSelectorInput } from '../../../engines/lms/lms-selector.engine';
-import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
+import type { LMSBuildOutput, LMSPlanWeek } from '../../../engines/lms/lms-builder.engine';
 import type { PLSeasonMeet, MacroTaperOpts } from '../../../engines/lms/lms-macro-taper.engine';
 import { LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
 
 const ALL_PL_CYCLES = LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding');
+
+/** Агрегированные метрики сезона (тот же расчёт, что в buildLMSPlan/PLCompetitionTab). */
+function seasonCycleMetrics(weeks: LMSPlanWeek[]) {
+  const exercises = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(ex => ({
+    name: ex.name, group: ex.group, coef: ex.coef, mnosz: ex.mnosz, pm: ex.pm,
+    sets: ex.workSets.map(s => ({ weight: s.weight, reps: s.reps, sets: s.sets })),
+  } as SRExercise))));
+  return calcCycleMetrics(exercises);
+}
 
 export interface PLSeasonBuilderProps {
   selector: LMSSelectorInput;
@@ -98,10 +108,30 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
     } catch { /* ignore */ }
     return buildDefaultSeasonSlots();
   });
-  const [pickMode, setPickMode] = useState<'auto' | 'manual'>('auto');
-  const [selections, setSelections] = useState<Record<number, string>>({});
-  const [compPickMode, setCompPickMode] = useState<'auto' | 'manual'>('auto');
-  const [compSelections, setCompSelections] = useState<Record<number, string>>({});
+  const [pickMode, setPickMode] = useState<'auto' | 'manual'>(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
+      return s && s.pickMode === 'manual' ? 'manual' : 'auto';
+    } catch { return 'auto'; }
+  });
+  const [selections, setSelections] = useState<Record<number, string>>(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
+      return s && typeof s.selections === 'object' && s.selections ? { ...s.selections } : {};
+    } catch { return {}; }
+  });
+  const [compPickMode, setCompPickMode] = useState<'auto' | 'manual'>(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
+      return s && s.compPickMode === 'manual' ? 'manual' : 'auto';
+    } catch { return 'auto'; }
+  });
+  const [compSelections, setCompSelections] = useState<Record<number, string>>(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
+      return s && typeof s.compSelections === 'object' && s.compSelections ? { ...s.compSelections } : {};
+    } catch { return {}; }
+  });
 
   const enabledSlots = useMemo(() => slots.filter(s => s.enabled), [slots]);
 
@@ -177,11 +207,12 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           template: firstCycle ?? ({} as LMSBuildOutput['template']),
           progressionRationale: notes.join('\n'),
           weeks: compGap!.weeks,
-          cycleMetrics: {} as LMSBuildOutput['cycleMetrics'],
+          cycleMetrics: seasonCycleMetrics(compGap!.weeks),
         };
       } else if (seasonPlan.segments.length > 0) {
         out = assembleSeasonPlan(seasonPlan, { ...buildOpts, mode: buildOpts.progressionMode });
         notes.push(...seasonPlan.notes);
+        out = { ...out, cycleMetrics: seasonCycleMetrics(out.weeks) };
       }
       if (!out) {
         onBuilt(null, ['⚠ Сезон пуст — включите хотя бы один период или добавьте соревнования.']);

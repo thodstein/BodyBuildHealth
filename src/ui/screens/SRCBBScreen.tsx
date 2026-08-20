@@ -1105,7 +1105,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   }, [builtBb, bbWeekSel, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
 
   const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
-  const runFocus = mainTab === 'pl' ? (getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл') : 'BB';
+  const runFocus = mainTab === 'pl'
+    ? (plSeasonMode === 'season' ? '🧩 Сезон по микроциклам' : (getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл'))
+    : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
     if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
     return builtSrc.weeks.map(wk => {
