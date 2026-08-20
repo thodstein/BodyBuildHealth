@@ -140,6 +140,8 @@ export interface MealPlanInput {
   // и кокосовое масло/жиры в рацион. Пусто/не установлено = не добавлять.
   addMilkToBreakfast?: boolean;
   coconutOilBoost?: boolean;
+  // N1: профиль вкуса завтрака — основа (каша/хлопья/яйца/творог).
+  breakfastStyle?: BreakfastStyle;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -356,19 +358,45 @@ const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_b
 const BREAKFAST_CARB_KEYWORDS = ['овсян','овсяные хлопья','хлопья','манк','рисов','рис ','мюсли','гречк','рисовый крем','геркул'];
 // «Завтрашние» фрукты/сухофрукты (ягоды, банан, изюм, курага, чернослив, финики).
 const BREAKFAST_FRUIT_KEYWORDS = ['ягод','банан','черник','клубник','малин','смородин','изюм','кураг','черносл','финик','сухофрук','ежевик','голубик','киви','яблок'];
+// N1: профиль вкуса завтрака — сужает углеводную основу под выбор пользователя.
+export type BreakfastStyle = 'auto' | 'porridge' | 'flakes' | 'eggs' | 'cottage';
+const BREAKFAST_STYLE_CARBS: Record<Exclude<BreakfastStyle, 'auto'>, string[]> = {
+  porridge: ['овсян','манк','гречк','геркул','пшённ','перловк'],
+  flakes: ['хлопья','рисов','мюсли','рисовый крем','овсяные хлопья','кукурузные хлопья'],
+  eggs: ['овсян','рис ','гречк','хлопья'],
+  cottage: ['овсян','манк','хлопья','рис '],
+};
+// N1: белковая основа завтрака по стилю (яйца/творог).
+const BREAKFAST_STYLE_PROTEIN: Record<Exclude<BreakfastStyle, 'auto'>, string[]> = {
+  porridge: [],
+  flakes: [],
+  eggs: ['egg_whole', 'egg_white', 'omelet'],
+  cottage: ['cottage_cheese', 'tvorog', 'йогурт греческ', 'yogurt_greek'],
+};
 // Подбор завтрашнего пула углеводов (fallback → общий, если завтрашнего нет).
-function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: FoodItem[]; fruits: FoodItem[] } {
+function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: BreakfastStyle = 'auto'): { carbs: FoodItem[]; fruits: FoodItem[] } {
   const source = pool.carbSlow.length > 0 ? pool.carbSlow : pool.carbFast;
   const match = (f: FoodItem, kws: string[]) => {
     const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
     return kws.some(k => name.includes(k) || id.includes(k));
   };
-  const carbs = source.filter((f) => match(f, BREAKFAST_CARB_KEYWORDS));
+  const styleKws = style !== 'auto' ? BREAKFAST_STYLE_CARBS[style] : null;
+  const carbs = styleKws
+    ? source.filter((f) => match(f, styleKws))
+    : source.filter((f) => match(f, BREAKFAST_CARB_KEYWORDS));
   const fruits = pool.carbFruit.filter((f) => match(f, BREAKFAST_FRUIT_KEYWORDS));
   return {
     carbs: carbs.length > 0 ? carbs : [...source],
     fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
   };
+}
+// N1: пул белковой основы завтрака по стилю (яйца/творог), fallback → общий белок.
+function breakfastProteinPref(pool: ReturnType<typeof buildFoodPools>, style: BreakfastStyle): FoodItem[] {
+  if (style === 'auto') return [];
+  const kws = BREAKFAST_STYLE_PROTEIN[style];
+  const all = [...pool.proteinSolid, ...pool.proteinLean, ...(pool.vegProteinExtra || [])];
+  const matched = all.filter((f) => kws.some(k => f.id.includes(k) || (f.name || '').toLowerCase().includes(k)));
+  return matched.length > 0 ? matched : [];
 }
 // ─── E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи) ──
 const SNACK_CARB_KEYWORDS = ['хлопья','овсян','рисов','манк','мюсли','гречк','сухар','рисовый крем','хлеб','рис '];
@@ -683,12 +711,15 @@ function buildWholeMeal(
     fiberCapG?: number; // Этап 7: верхний предел клетчатки (пик-неделя ББ) — лёгкие овощи
     breakfast?: boolean; // E1: продуктовый пул «завтрака» (каши/хлопья + ягоды/сухофрукты), а не общий
     snack?: boolean; // E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи)
+    breakfastStyle?: BreakfastStyle; // N1: основа завтрака (каша/хлопья/яйца/творог)
     extraLiquids?: { food: FoodItem; grams: number; role?: MealItem['role'] }[]; // E8: молоко/кокосовое масло в завтрак
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, extraLiquids } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, breakfastStyle, extraLiquids } = params;
   // E1: завтрак использует собственный продуктовый пул (каши/хлопья + ягоды/банан/сухофрукты).
-  const _breakfastPools = breakfast ? breakfastCarbPool(pool) : null;
+  const _breakfastPools = breakfast ? breakfastCarbPool(pool, breakfastStyle || 'auto') : null;
+  // N1: предпочтение белковой основы завтрака по стилю (яйца/творог).
+  const _breakfastProtein = breakfast ? breakfastProteinPref(pool, breakfastStyle || 'auto') : null;
   // E7: перекус использует собственный пул (порошок + хлопья + сухофрукты + орехи).
   const _snackPools = snack ? snackCarbPool(pool) : null;
   const _snackNuts = snack ? snackNutPool(pool) : null;
@@ -718,6 +749,7 @@ function buildWholeMeal(
   const proteinPool = preferredRot.length > 0
     ? preferredRot
     : snack && pool.fastProtein.length > 0 ? [...pool.fastProtein, ...rotPoolFinal]
+    : breakfast && _breakfastProtein && _breakfastProtein.length > 0 ? _breakfastProtein
     : rotPoolFinal.length > 0 ? rotPoolFinal
     : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
     : (remF < 12 && pool.proteinLean.length > 0) ? pool.proteinLean
@@ -1528,7 +1560,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     carbG: mealBudget.breakfast.c,
     fatG: mealBudget.breakfast.f,
     pool, proteinRotationIds: breakfastRot.ids, seed: seedBase + 1,
-    includeVeg: input.mealsCount >= 5, includeFruit: true, breakfast: true,
+    includeVeg: input.mealsCount >= 5, includeFruit: true, breakfast: true, breakfastStyle: input.breakfastStyle,
     extraLiquids: _breakfastExtras.length > 0 ? _breakfastExtras : undefined,
     preferredIds: effectivePreferred, dayUsedPreferredIds,
     lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,

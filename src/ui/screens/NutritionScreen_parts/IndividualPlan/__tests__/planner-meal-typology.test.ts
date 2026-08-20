@@ -203,6 +203,24 @@ describe('Пери-тренировочное распределение: пос
   });
 });
 
+describe('N1: профиль вкуса завтрака (основа по выбору)', () => {
+  it('стиль eggs — завтрак содержит яйца', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, breakfastStyle: 'eggs' as any }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    const proteinItem = breakfast.items.find(it => it.role === 'protein' || it.role === 'fast_protein');
+    expect(proteinItem).toBeTruthy();
+    expect((proteinItem!.name || '').toLowerCase()).toMatch(/яичн|яйцо|омлет|egg/);
+  });
+
+  it('стиль porridge — завтрашний углевод это каша/манка', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, breakfastStyle: 'porridge' as any }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    const carbItem = breakfast.items.find(it => it.role === 'carb_slow');
+    expect(carbItem).toBeTruthy();
+    expect((carbItem!.name || '').toLowerCase()).toMatch(/овсян|манк|гречк|каш/);
+  });
+});
+
 // Тренировочный вход (для E10: prew строится только на тренировочный день).
 function trainLike(overrides: any = {}): MealPlanInput {
   return base({ isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true, ...overrides });
