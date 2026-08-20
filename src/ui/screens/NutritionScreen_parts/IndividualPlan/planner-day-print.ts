@@ -109,7 +109,56 @@ export function buildWeekReportPrintHtml(days: WeekDayReportRow[]): string {
 <body>
 <h1>📅 Недельный отчёт питания</h1>
 <div style="font-size:13px;margin:10px 0">Дней: <b>${rows.length}</b> · Средние: <b>${kcalAvg}</b> ккал/день, DIAAS <b>${diaasAvg}</b>, GL <b>${giAvg}</b> · Всего флагов: <b>${totalFlags}</b> · Микро-дефицитов (сумма): <b>${defTotal}</b></div>
-${rows.length === 0 ? '<p style="font-size:12px;color:#888">Нет данных за неделю.</p>' : `<table><tr><th>Дата</th><th>Ккал</th><th>DIAAS</th><th>GL</th><th>Дефициты</th><th>Флаги</th></tr>${dayRows}</table>`}
+  ${rows.length === 0 ? '<p style="font-size:12px;color:#888">Нет данных за неделю.</p>' : `<table><tr><th>Дата</th><th>Ккал</th><th>DIAAS</th><th>GL</th><th>Дефициты</th><th>Флаги</th></tr>${dayRows}</table>`}
 </body></html>`;
+}
+
+/** N10: печать таймлайна дня — приёмы по часам с пери-зоной тренировки и продуктами. */
+export interface MealTimelinePrintItem {
+  time: string;
+  label: string;
+  type: string;
+  items: { name: string; amount: number }[];
+  totals: { kcal: number; p: number; f: number; c: number };
+}
+export function buildMealTimelinePrintHtml(meals: MealTimelinePrintItem[], meta: { title?: string; trainStart?: string; trainEnd?: string; kcal?: number } = {}): string {
+  const toMin = (t: string) => { const [h, m] = (t || '').split(':').map(Number); return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m); };
+  const sorted = [...meals].sort((a, b) => toMin(a.time) - toMin(b.time));
+  const badgeFor = (type: string): string => {
+    if (type === 'preworkout') return ' <span style="color:#8b5cf6;font-weight:700">ДО</span>';
+    if (type === 'intra') return ' <span style="color:#22c55e;font-weight:700">ВО ВРЕМЯ</span>';
+    if (type === 'postworkout') return ' <span style="color:#f59e0b;font-weight:700">ПОСЛЕ</span>';
+    return '';
+  };
+  const rows = sorted.map(m => `<tr>
+    <td style="padding:6px;border:1px solid #ddd;font-size:12px;font-weight:700;white-space:nowrap">${esc(m.time)}</td>
+    <td style="padding:6px;border:1px solid #ddd;font-size:12px">${esc(m.label)}${badgeFor(m.type)}</td>
+    <td style="padding:6px;border:1px solid #ddd;font-size:11px">${esc((m.items || []).map(it => `${it.name} ${Math.round(it.amount)}г`).join(', '))}</td>
+    <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.kcal || 0)}</td>
+    <td style="padding:6px;border:1px solid #ddd;font-size:11px;text-align:center;white-space:nowrap">Б ${Math.round(m.totals?.p || 0)} · Ж ${Math.round(m.totals?.f || 0)} · У ${Math.round(m.totals?.c || 0)}</td>
+  </tr>`).join('');
+  const trainRow = meta.trainStart
+    ? `<div style="font-size:12px;color:#8b5cf6;margin:8px 0">🏋️ Тренировка: ${esc(meta.trainStart)}${meta.trainEnd ? ' – ' + esc(meta.trainEnd) : ''}</div>`
+    : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(meta.title || 'Таймлайн дня')}</title>
+<style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:18px;border-bottom:2px solid #06b6d4;padding-bottom:8px}table{border-collapse:collapse;width:100%;margin-top:10px}th{font-size:11px;text-align:left}</style></head>
+<body>
+<h1>⏳ Таймлайн дня — ${esc(meta.title || '')}</h1>
+${meta.kcal ? `<div style="font-size:13px;margin:8px 0">Калорийность дня: <b>${Math.round(meta.kcal)}</b> ккал</div>` : ''}
+${trainRow}
+${sorted.length === 0 ? '<p style="font-size:12px;color:#888">Нет приёмов.</p>' : `<table><tr><th>Время</th><th>Приём</th><th>Продукты</th><th>Ккал</th><th>БЖУ</th></tr>${rows}</table>`}
+</body></html>`;
+}
+export function printMealTimeline(html: string): void {
+  try {
+    const w = window.open('', '_blank', 'width=820,height=900');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    window.setTimeout(() => { try { w.print(); } catch {} }, 250);
+  } catch {
+    // печать недоступна — игнорируем
+  }
 }
 

@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import { analyzeDailyDiet, getDefaultProfile } from '../../../../../engines/product-usefulness-v2.engine';
+import { buildMealTimelinePrintHtml } from '../planner-day-print';
 
 const base = (overrides: any = {}): MealPlanInput => ({
   weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const,
@@ -292,6 +293,26 @@ describe('N4: перегруженность приёма в диет-отчёт
       { timing: 'lunch', products: [{ foodId: 'buckwheat', weightGrams: 120 }, { foodId: 'chicken_breast', weightGrams: 150 }] },
     ], getDefaultProfile());
     expect(r.overloadWarning).toBe(false);
+  });
+});
+
+describe('N10: экспорт таймлайна дня (PDF)', () => {
+  it('строит HTML с приёмами по часам и пери-бейджами', () => {
+    const html = buildMealTimelinePrintHtml([
+      { time: '07:00', label: 'Завтрак', type: 'breakfast', items: [{ name: 'Овсянка', amount: 60 }], totals: { kcal: 200, p: 10, f: 3, c: 30 } },
+      { time: '16:00', label: 'Предтрен', type: 'preworkout', items: [{ name: 'Гречка', amount: 120 }], totals: { kcal: 300, p: 12, f: 2, c: 50 } },
+    ], { title: 'План', trainStart: '17:30', trainEnd: '19:00', kcal: 2500 });
+    expect(html).toContain('07:00');
+    expect(html).toContain('Завтрак');
+    expect(html).toContain('ДО');
+    expect(html).toContain('Тренировка: 17:30');
+    expect(html).toContain('2500');
+  });
+
+  it('экранирует пользовательские строки (XSS-safe)', () => {
+    const html = buildMealTimelinePrintHtml([{ time: '12:00', label: 'Обед', type: 'lunch', items: [{ name: '<script>alert(1)</script>', amount: 100 }], totals: { kcal: 0, p: 0, f: 0, c: 0 } }], { title: 'X' });
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>alert');
   });
 });
 

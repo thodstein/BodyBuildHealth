@@ -13,7 +13,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
-import { buildDayReportPrintHtml, printDayReport } from "./planner-day-print";
+import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline } from "./planner-day-print";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -2209,9 +2209,15 @@ export const IndividualPlanResults: React.FC = () => {
                 {/* Combined daily report */}
                 {calcDailyReport && calcResults.length > 1 && (
                   <div style={{ marginTop:8, borderRadius:10, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:4 }}>
                       <span>📈 Совокупный анализ ({calcResults.length} приёма)</span>
-                      <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
+                      <span style={{ display:'flex', gap:4 }}>
+                        <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
+                        <button onClick={() => printMealTimeline(buildMealTimelinePrintHtml(
+                          (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount })), totals: m.totals || {} })),
+                          { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart, trainEnd }
+                        ))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
+                      </span>
                     </div>
                     {/* Overall grade */}
                     {(() => {
