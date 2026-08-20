@@ -64,6 +64,7 @@ import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScree
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
 import { PLSeasonBuilder } from './SRCBBScreen_parts/PLSeasonBuilder';
+import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
 import { loadSessions } from '../../engines/workout-logger.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
@@ -1572,9 +1573,40 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {builtSrc && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
               <button
-                onClick={() => { try { const w = window.open('', '_blank', 'width=900,height=700'); if (!w) { setMethodNote('⚠ Браузер заблокировал всплывающее окно'); return; } w.document.write('<title>ПЛ-план</title>'); w.document.close(); } catch (e) { setMethodNote('⚠ Ошибка: ' + (e as Error).message); } }}
+                onClick={() => {
+                  try {
+                    const cycle = getCycleById(selectedCycleId);
+                    const scope = cycle ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед` : 'Силовой цикл ПЛ';
+                    const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, builtSrc!.weeks, {
+                      summary: [
+                        { label: 'Недель', value: `${builtSrc!.weeks.length}` },
+                        { label: 'Дней/нед', value: `${days}` },
+                        { label: 'Присед ПМ', value: `${pmSquat} кг` },
+                        { label: 'Жим ПМ', value: `${pmBench} кг` },
+                        { label: 'Тяга ПМ', value: `${pmDead} кг` },
+                      ],
+                      athleteMode: builtSrc!.athleteMode,
+                    });
+                    printPLHtml(html, { title: 'ПЛ-план', text: 'Печать / PDF плана силового цикла' });
+                  } catch (e) { setMethodNote('⚠ Ошибка печати: ' + (e as Error).message); }
+                }}
                 style={{ ...BTN_GHOST, minHeight: 36, fontSize: 11, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }}
               >🖨 Печать / PDF</button>
+              <button
+                onClick={() => {
+                  try {
+                    const wb = buildPLExcelWorkbook('Силовой цикл ПЛ', plExportRows(builtSrc!.weeks), [
+                      { label: 'Недель', value: `${builtSrc!.weeks.length}` },
+                      { label: 'Дней/нед', value: `${days}` },
+                      { label: 'Присед ПМ', value: `${pmSquat} кг` },
+                      { label: 'Жим ПМ', value: `${pmBench} кг` },
+                      { label: 'Тяга ПМ', value: `${pmDead} кг` },
+                    ]);
+                    downloadPLExcel(wb, 'pl-plan.xlsx');
+                  } catch (e) { setMethodNote('⚠ Ошибка экспорта: ' + (e as Error).message); }
+                }}
+                style={{ ...BTN_GHOST, minHeight: 36, fontSize: 11, border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}
+              >📥 Excel (.xlsx)</button>
             </div>
           )}
           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}

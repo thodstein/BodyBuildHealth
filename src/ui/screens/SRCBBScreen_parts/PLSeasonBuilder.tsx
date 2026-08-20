@@ -165,7 +165,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           cycleMetrics: {} as LMSBuildOutput['cycleMetrics'],
         };
       } else if (seasonPlan.segments.length > 0) {
-        out = assembleSeasonPlan(seasonPlan, buildOpts);
+        out = assembleSeasonPlan(seasonPlan, { ...buildOpts, mode: buildOpts.progressionMode });
         notes.push(...seasonPlan.notes);
       }
       if (!out) {
