@@ -1366,6 +1366,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Pulled OUT of dinner so dinner becomes lighter and pre-sleep is its own meal, not residual.
   const preSleepP = wantPreSleep ? Math.max(20, Math.round(mpsPerMeal * 0.7)) : 0;
   const trainWindow = input.isTrainingDay && !!input.trainStartMin;
+  // Пери-тренировочные времена (относительно старта и ДЛИТЕЛЬНОСТИ сессии):
+  //  - предтрен: за 90 мин до старта
+  //  - интра: на 30-й минуте (середина/начало длинной сессии)
+  //  - пост-трен: ЧЕРЕЗ 30 мин ПОСЛЕ окончания сессии (а не жёстко start+60, которое
+  //    при сессии 90+ мин попадало ВНУТРЬ тренировки — баг распределения).
+  const _sessionMin = input.trainDurationMin && input.trainDurationMin > 0 ? input.trainDurationMin : 60;
+  const prewMin = trainWindow ? (input.trainStartMin || 0) - 90 : NaN;
+  const postwMin = trainWindow ? (input.trainStartMin || 0) + _sessionMin + 30 : NaN;
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
   // Apply plan type multipliers (keto: low carb high fat, highcarb: high carb, etc.)
   const adjustedCarbsG = Math.round(input.goalCarbsG * ptm.cMult);
@@ -1414,8 +1422,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _toMin2 = (t: string): number => { try { const [h, m] = (t || '00:00').split(':').map(Number); return (isNaN(h) || isNaN(m)) ? NaN : h * 60 + m; } catch { return NaN; } };
   const _fixedPts: number[] = [_toMin2(tBreakfast), _toMin2(tLunch), _toMin2(tDinner)];
   if (_keep.has('preSleep') && wantPreSleep) _fixedPts.push(_toMin2(tPreSleep));
-  if (trainWindow && _keep.has('prew')) _fixedPts.push((input.trainStartMin || 0) - 90);
-  if (trainWindow && _keep.has('postw')) _fixedPts.push((input.trainStartMin || 0) + 60);
+  if (trainWindow && _keep.has('prew')) _fixedPts.push(prewMin);
+  if (trainWindow && _keep.has('postw')) _fixedPts.push(postwMin);
   if (intraEligible && _keep.has('intra')) _fixedPts.push((input.trainStartMin || 0) + 30);
   const _snackOrder = ['snack', 'snack2', 'snack3', 'snack4'];
   const _snackTimes = gapFillTimes(_fixedPts, _snackOrder.filter(r => _keep.has(r)).length);
@@ -1643,13 +1651,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     notes.push(`Intra-workout: EAA + циклодекстрин (${_carbFor('intra')} г — доля от дневного КБЖУ, поддержание глюкозы на длинной тренировке)`);
   }
 
-  // 5. Post-workout (+60 мин) ──────────────────────────────────────────
+  // 5. Post-workout (через 30 мин после окончания сессии) ─────────────
   if (trainWindow && mealBudget.postw && input.trainStartMin) {
-    const postTime = fmtTime(input.trainStartMin + 60);
+    const postTime = fmtMin(postwMin);
     const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds }, postwCarbG);
     meals.push(postw);
     markUsed(postw);
-    notes.push('Post-workout: сыворотка + быстрые углеводы в течение 60 мин (анаболическое окно)');
+    notes.push(`Post-workout: сыворотка + быстрые углеводы через 30 мин после окончания тренировки (${_sessionMin} мин) — анаболическое окно`);
   }
 
   // 6. Ужин — основная порция жиров и белковый ротационный ─────────────

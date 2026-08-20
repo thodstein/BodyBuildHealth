@@ -175,6 +175,34 @@ describe('N3/тайминг: перекусы распределяются по 
   });
 });
 
+describe('Пери-тренировочное распределение: пост-трен после окончания сессии', () => {
+  const toMin = (t: string) => { const [h, m] = (t || '').split(':').map(Number); return h * 60 + m; };
+
+  it('post-workout ставится через 30 мин после ОКОНЧАНИЯ сессии (не внутрь)', () => {
+    // Тренировка 17:30, длительность 90 мин → окончание 19:00, пост-трен ≈ 19:30.
+    const plan = buildDayPlan(trainLike({ mealsCount: 7, trainStartMin: 17 * 60 + 30, trainDurationMin: 90 }));
+    const postw = plan.meals.find(m => m.type === 'postworkout')!;
+    expect(postw).toBeTruthy();
+    const pm = toMin(postw.time);
+    expect(pm).toBeGreaterThan(17 * 60 + 30 + 90); // после конца сессии (19:00)
+    expect(pm).toBeLessThanOrEqual(17 * 60 + 30 + 90 + 60); // в пределах часа после
+  });
+
+  it('pre-workout за 90 мин до старта', () => {
+    const plan = buildDayPlan(trainLike({ mealsCount: 7, trainStartMin: 17 * 60 + 30 }));
+    const prew = plan.meals.find(m => m.type === 'preworkout')!;
+    expect(prew).toBeTruthy();
+    expect(toMin(prew.time)).toBe(17 * 60 + 30 - 90);
+  });
+
+  it('intra-workout во время сессии (30-я минута)', () => {
+    const plan = buildDayPlan(trainLike({ mealsCount: 7, trainStartMin: 17 * 60 + 30, trainDurationMin: 90 }));
+    const intra = plan.meals.find(m => m.type === 'intra')!;
+    expect(intra).toBeTruthy();
+    expect(toMin(intra.time)).toBe(17 * 60 + 30 + 30);
+  });
+});
+
 // Тренировочный вход (для E10: prew строится только на тренировочный день).
 function trainLike(overrides: any = {}): MealPlanInput {
   return base({ isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true, ...overrides });
