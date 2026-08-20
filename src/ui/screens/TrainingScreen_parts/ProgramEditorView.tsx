@@ -1190,6 +1190,7 @@ return (
                   <button
                     key={wi}
                     type="button"
+                    className="editor-schedule-cell"
                     aria-label={isFree
                       ? `Назначить тренировку на ${day}`
                       : `Сменить день: ${d!.label}`}
@@ -1240,6 +1241,7 @@ return (
                     <button
                       key={di}
                       type="button"
+                      className="editor-chip"
                       disabled={isOcc}
                       aria-label={`Перенести на ${d}`}
                       onClick={() => { setWeekSessionDay(si, di); setSchedulePick(null); }}
@@ -1272,6 +1274,7 @@ return (
                     <button
                       key={si}
                       type="button"
+                      className="editor-chip"
                       aria-label={`Перенести на ${TRAINING_DAY_NAMES[day]}: ${s.name || `День ${si + 1}`}`}
                       onClick={() => { setWeekSessionDay(si, day); setSchedulePick(null); }}
                       style={{

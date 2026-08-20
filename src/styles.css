@@ -431,6 +431,19 @@ button.editor-chip:focus-visible {
   outline: 2px solid rgba(0,230,138,0.5);
   outline-offset: 1px;
 }
+/* Ячейки сетки «🗓 Неделя — расписание»: подсветка при наведении (BB-редактирование) */
+button.editor-schedule-cell {
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+@media (hover: hover) {
+  button.editor-schedule-cell:hover {
+    border-color: rgba(0,230,138,0.65) !important;
+    box-shadow: 0 0 10px rgba(0,230,138,0.22);
+  }
+  button.editor-schedule-cell:active {
+    filter: brightness(0.92);
+  }
+}
 .constructor-surface {
   background: var(--constructor-surface) !important;
   border-color: var(--constructor-border) !important;
