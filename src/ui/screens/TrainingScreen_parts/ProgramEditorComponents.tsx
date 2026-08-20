@@ -373,7 +373,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
           onDrop={e => { e.preventDefault(); const from = weekDragRef.current; weekDragRef.current = null; if (from != null) moveWeek(from, wi); }}
           onDragEnd={() => { weekDragRef.current = null; }}
-          style={{ ...CARD, padding: 10 }}
+          style={{ ...CARD, padding: 10, borderLeft: '3px solid var(--editor-week-border)' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
             <span

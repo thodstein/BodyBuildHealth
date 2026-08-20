@@ -113,7 +113,9 @@
   border-top: 2px solid var(--accent-line);
 }
 .manual-constructor--editor .editor-week-card {
-  border: 1px solid var(--editor-week-border) !important;
+  border-top: 1px solid var(--editor-week-border) !important;
+  border-right: 1px solid var(--editor-week-border) !important;
+  border-bottom: 1px solid var(--editor-week-border) !important;
   border-radius: 14px !important;
   padding: 12px !important;
   background: linear-gradient(180deg, rgba(96,165,250,0.07), var(--constructor-surface)) !important;
