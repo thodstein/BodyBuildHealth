@@ -150,6 +150,31 @@ describe('E7: перекус-типология (протеин-порошок +
   });
 });
 
+describe('N3/тайминг: перекусы распределяются по самым большим разрывам (нет «6 ч между завтраком и обедом»)', () => {
+  const toMin = (t: string) => { const [h, m] = (t || '').split(':').map(Number); return h * 60 + m; };
+
+  it('при 6 приёмах (snack+snack2) завтрак→обед не остаётся пустым', () => {
+    const plan = buildDayPlan(base({ mealsCount: 6, isTrainingDay: false, wakeTime: '07:00', lunchTime: '13:00', dinnerTime: '19:00', bedTime: '23:00' }));
+    const times = plan.meals.map(m => toMin(m.time)).sort((a, b) => a - b);
+    const bMin = toMin('07:30'); // завтрак = wake+30
+    const lMin = toMin('13:00');
+    // Есть приём строго между завтраком и обедом (утренний перекус).
+    expect(times.some(t => t > bMin && t < lMin)).toBe(true);
+    // Ни один разрыв между соседними приёмами не превышает ~4 ч.
+    let maxGap = 0;
+    for (let i = 1; i < times.length; i++) maxGap = Math.max(maxGap, times[i] - times[i - 1]);
+    expect(maxGap).toBeLessThanOrEqual(4 * 60 + 10);
+  });
+
+  it('gapFillTimes распределяет перекусы в самые большие разрывы', () => {
+    const plan = buildDayPlan(base({ mealsCount: 6, isTrainingDay: false }));
+    // Перекусы не должны слипаться в один промежуток — их времена различны и разнесены.
+    const snackTimes = plan.meals.filter(m => m.type === 'snack' || m.type === 'snack2').map(m => toMin(m.time)).sort((a, b) => a - b);
+    expect(snackTimes.length).toBeGreaterThanOrEqual(2);
+    expect(snackTimes[1] - snackTimes[0]).toBeGreaterThanOrEqual(2 * 60);
+  });
+});
+
 // Тренировочный вход (для E10: prew строится только на тренировочный день).
 function trainLike(overrides: any = {}): MealPlanInput {
   return base({ isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true, ...overrides });

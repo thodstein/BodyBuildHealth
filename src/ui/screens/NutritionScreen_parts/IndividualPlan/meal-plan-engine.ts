@@ -396,6 +396,35 @@ function snackNutPool(pool: ReturnType<typeof buildFoodPools>): FoodItem[] {
   return nuts.length > 0 ? nuts : pool.fats;
 }
 
+// ─── N3/E2-фикс: распределение перекусов по САМЫМ БОЛЬШИМ разрывам ──
+// Раньше snack и snack2 оба ложились в промежуток «обед→ужин», а утренний разрыв
+// «завтрак→обед» оставался пустым (жалоба: «между завтраком и обедом 6 часов без еды»).
+// Теперь каждый перекус встаёт в середину самого большого из оставшихся разрывов
+// (largest-gap-first) — перекусы распределяются равномерно по дню.
+function gapFillTimes(fixedMin: number[], count: number): number[] {
+  const pts = [...fixedMin].filter(v => Number.isFinite(v)).sort((a, b) => a - b);
+  const result: number[] = [];
+  if (pts.length < 2) return result;
+  for (let i = 0; i < count; i++) {
+    let bestGap = -1, bestIdx = -1;
+    for (let j = 1; j < pts.length; j++) {
+      const g = pts[j] - pts[j - 1];
+      if (g > bestGap) { bestGap = g; bestIdx = j; }
+    }
+    // Не заполняем разрыв меньше 2.5 ч — иначе приёмы слишком близко.
+    if (bestGap < 150) break;
+    const mid = Math.round((pts[bestIdx - 1] + pts[bestIdx]) / 2);
+    result.push(mid);
+    pts.push(mid);
+    pts.sort((a, b) => a - b);
+  }
+  return result;
+}
+function fmtMin(min: number): string {
+  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+}
+
+
 
 // ─── Утилиты: детерминированный выбор ─────────────────────────────────
 function seededRandom(seed: number): number {
@@ -1379,6 +1408,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   for (const r of ['snack4','snack3','snack2','intra','snack','preSleep','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
   if (_roles.length > input.mealsCount) _roles = _roles.slice(0, Math.max(3, input.mealsCount));
   const _keep = new Set(_roles);
+  // N3/E2-фикс: перекусы распределяем по САМЫМ БОЛЬШИМ разрывам между фикс-приёмами,
+  // чтобы не было «6 часов между завтраком и обедом». Раньше snack и snack2 оба ложились
+  // в промежуток обед→ужин, утро оставалось пустым.
+  const _toMin2 = (t: string): number => { try { const [h, m] = (t || '00:00').split(':').map(Number); return (isNaN(h) || isNaN(m)) ? NaN : h * 60 + m; } catch { return NaN; } };
+  const _fixedPts: number[] = [_toMin2(tBreakfast), _toMin2(tLunch), _toMin2(tDinner)];
+  if (_keep.has('preSleep') && wantPreSleep) _fixedPts.push(_toMin2(tPreSleep));
+  if (trainWindow && _keep.has('prew')) _fixedPts.push((input.trainStartMin || 0) - 90);
+  if (trainWindow && _keep.has('postw')) _fixedPts.push((input.trainStartMin || 0) + 60);
+  if (intraEligible && _keep.has('intra')) _fixedPts.push((input.trainStartMin || 0) + 30);
+  const _snackOrder = ['snack', 'snack2', 'snack3', 'snack4'];
+  const _snackTimes = gapFillTimes(_fixedPts, _snackOrder.filter(r => _keep.has(r)).length);
+  const _snackTimeOf = (role: string): string => {
+    const i = _snackOrder.indexOf(role);
+    return i >= 0 && i < _snackTimes.length ? fmtMin(_snackTimes[i]) : tSnack;
+  };
   // FIX 2.2 (БАГ-10): preSleep резервировал углеводную долю 0.3 в _wSum, но никогда её не отдавал
   // (buildPreSleep целенаправленно 0-углеводный — казеин). Доля «терялась», сжимая остальные приёмы.
   // Теперь preSleep не участвует в распределении углеводов вовсе.
@@ -1516,7 +1560,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (hasSnack && mealBudget.snack) {
     const snackRot = rotationForMeal(3);
     const snack = buildWholeMeal({
-      label: 'Полдник', time: tSnack, type: 'snack', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
+      label: 'Полдник', time: _snackTimeOf('snack'), type: 'snack', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
       mealPreferredIds: input.preferredByMeal?.['Полдник'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.snack.p,
@@ -1541,7 +1585,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const snack2Rot = rotationForMeal(5);
     const tSnack2 = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); const [bh, bm] = tBed.split(':').map(Number); const bedMin2 = bh*60+bm; const afterDinner = Math.round(((dh*60+dm) + bedMin2) / 2); return mid > (dh*60+dm - 90) ? String(Math.floor(afterDinner/60)).padStart(2,'0') + ':' + String(afterDinner%60).padStart(2,'0') : String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
     const snack2 = buildWholeMeal({
-      label: 'Перекус', time: tSnack2, type: 'snack2', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
+      label: 'Перекус', time: _snackTimeOf('snack2'), type: 'snack2', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
       mealPreferredIds: input.preferredByMeal?.['Перекус'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,
@@ -1553,25 +1597,18 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     meals.push(snack2); markUsed(snack2);
   }
 
-  // E6: третий/четвёртый перекус (для 8-10 приёмов) — равномерно в оставшиеся окна дня.
+  // E6: третий/четвёртый перекус (для 8-10 приёмов) — в оставшиеся самые большие разрывы.
   {
-    const _midMin = (a: number, b: number) => Math.round((a + b) / 2);
-    const _fmt = (min: number) => String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
-    const [bh, bm] = tBreakfast.split(':').map(Number);
-    const [lh, lm] = tLunch.split(':').map(Number);
-    const [dh, dm] = tDinner.split(':').map(Number);
-    const [bh2, bm2] = tBed.split(':').map(Number);
-    const bMin = bh * 60 + bm, lMin = lh * 60 + lm, dMin = dh * 60 + dm, bedMin = bh2 * 60 + bm2;
-    const _slots: { label: string; type: 'snack3' | 'snack4'; min: number; seed: number }[] = [];
-    // snack3: середина завтрак→обед (утренний перекус). snack4: середина ужин→сон.
-    _slots.push({ label: 'Перекус', type: 'snack3', min: _midMin(bMin, lMin), seed: seedBase + 27 });
-    _slots.push({ label: 'Перекус', type: 'snack4', min: _midMin(dMin, bedMin), seed: seedBase + 31 });
+    const _slots: { label: string; type: 'snack3' | 'snack4'; seed: number }[] = [
+      { label: 'Перекус', type: 'snack3', seed: seedBase + 27 },
+      { label: 'Перекус', type: 'snack4', seed: seedBase + 31 },
+    ];
     for (const s of _slots) {
       const mb = mealBudget[s.type];
       if (_keep.has(s.type) && mb) {
         const rot = rotationForMeal(s.type === 'snack3' ? 6 : 7);
         const m = buildWholeMeal({
-          label: s.label, time: _fmt(s.min), type: s.type, refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
+          label: s.label, time: _snackTimeOf(s.type), type: s.type, refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
           mealPreferredIds: input.preferredByMeal?.[s.label],
           preferredByMealFull: input.preferredByMeal,
           proteinG: mb.p, carbG: mb.c, fatG: mb.f,
