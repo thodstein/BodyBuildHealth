@@ -331,6 +331,17 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                       </div>
                     );
                   })}
+                  {/* Этап 4 (4.4): маркеры инъекций на таймлайне дня */}
+                  {(injections || []).filter((i: any) => i.time && i.time.includes(':')).map((i: any, idx: number) => {
+                    const iMin = toMin(i.time);
+                    const iCol = (i.type || '').includes('инсулин') ? '#f59e0b' : (i.type || '') === 'ГР' ? '#8b5cf6' : '#ef4444';
+                    const iGlyph = (i.type || '').includes('инсулин') ? '💉' : (i.type || '') === 'ГР' ? '🌙' : '⚡';
+                    return (
+                      <div key={'inj' + idx} style={{ position: 'absolute', left: pos(iMin) + '%', top: 32, transform: 'translateX(-50%)', fontSize: 9 }} title={(i.time || '') + ' — укол ' + (i.name || i.type) + (i.trainLinked ? ' (привязан к тренировке)' : '')}>
+                        <span style={{ filter: 'none' }}>{iGlyph}</span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 6, color: 'rgba(255,255,255,0.6)' }}>
                   <span><span style={{ color: '#00e68a' }}>●</span> Приёмы</span>

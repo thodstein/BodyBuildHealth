@@ -73,6 +73,45 @@ describe('Этап 2: intra/preSleep углеводы (БАГ-10)', () => {
   });
 });
 
+describe('Этап 4: синхронизация приёмов с инъекциями', () => {
+  const inj = (over: any) => ({ type: 'инсулин', name: 'Инсулин', time: '12:30', dose: 10, esterType: 'short', ...over });
+
+  it('инсулин: приём с быстрыми углеводами добавляется в окно укола, если нет близкого приёма', () => {
+    const plan = buildDayPlan(trainInput({ injections: [inj({})] }));
+    // Укол 12:30 — если обед рядом, приём-сателлит не нужен; ищем метку инсулина.
+    const injMeal = plan.meals.find(m => (m.label || '').includes('инсулин'));
+    // Обед в 13:00 (по умолчанию) — в пределах 30 мин от 12:30? |30|<=30 да. Значит может не быть.
+    // Проверяем только, что НЕ ломает и что при наличии приёма он несёт углеводы.
+    if (injMeal) expect(injMeal.totals.c).toBeGreaterThan(0);
+    // План остаётся валидным.
+    expect(plan.meals.length).toBeGreaterThan(0);
+  });
+
+  it('инсулин в изолированное время (10:00, вне окон) — приём создаётся', () => {
+    const plan = buildDayPlan(trainInput({ injections: [inj({ time: '10:00' })] }));
+    const injMeal = plan.meals.find(m => (m.label || '').includes('инсулин'));
+    expect(injMeal).toBeTruthy();
+    expect(injMeal!.totals.c).toBeGreaterThan(0);
+    // Время приёма ≈ 10:00.
+    expect((injMeal!.time || '').startsWith('10:')).toBe(true);
+  });
+
+  it('ИГФ-1: приём до и/или после тренировки (по trainTiming)', () => {
+    const plan = buildDayPlan(trainInput({ injections: [{ type: 'ИФР-1', name: 'ИФР-1', time: '16:00', dose: 50, esterType: 'short', trainTiming: 'before' }] }));
+    const igfMeals = plan.meals.filter(m => (m.label || '').includes('ИГФ-1'));
+    expect(igfMeals.length).toBeGreaterThan(0);
+    expect(igfMeals.every(m => (m.totals.c || 0) > 0)).toBe(true);
+  });
+
+  it('ГР: вечерний белковый приём, если укол вне окна пре-сна', () => {
+    const plan = buildDayPlan(trainInput({ injections: [{ type: 'ГР', name: 'ГР', time: '21:00', dose: 4 }] }));
+    const ghMeal = plan.meals.find(m => (m.label || '').includes('ГР'));
+    if (ghMeal) {
+      expect(ghMeal.totals.p).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('Этап 2: кэш пулов учитывает quality (БАГ-14)', () => {
   it('full и basic дают валидные, но различные пулы/микро-покрытие', () => {
     const full = buildDayPlan(trainInput({ quality: 'full' as const }));

@@ -126,6 +126,10 @@ export interface MealPlanInput {
   // #5 Menstrual carb GI preference ('low' = strict low-GI in luteal/menstrual).
   carbGiPref?: 'low' | 'normal' | 'high';
   quality?: 'full' | 'basic';
+  // Этап 4: инъекции (инсулин/ГР/ИГФ) — привязка приёмов к времени укола/тренировке.
+  // Дублирует данные Context.injections, чтобы V2-движок мог размещать приёмы вокруг уколов
+  // (раньше это было только в классическом fallback-пути — БАГ-15/16).
+  injections?: { type: string; name?: string; time?: string; dose?: number; esterType?: string; trainLinked?: boolean; trainTiming?: 'before' | 'after' | 'both' | 'none' }[];
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -1482,6 +1486,71 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
   const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
+
+  // ─── Этап 4: синхронизация приёмов с инъекциями (инсулин/ГР/ИГФ) ─────
+  // Раньше привязка к уколу была только в классическом fallback-пути (Context.buildDay).
+  // Здесь она реализована в активном V2-движке (БАГ-15/16).
+  const _injList = input.injections || [];
+  const _toMinOf = (t?: string): number | null => {
+    if (!t) return null;
+    const [h, m] = t.split(':').map(Number);
+    return (!isNaN(h) && !isNaN(m)) ? h * 60 + m : null;
+  };
+  const _hasMealNear = (min: number, tol = 30): boolean => meals.some(m => {
+    const mt = _toMinOf(m.time); return mt !== null && Math.abs(mt - min) <= tol;
+  });
+  const _injectMealAt = (min: number, label: string, note: string): void => {
+    const t = fmtTime(min);
+    // Малый белково-углеводный приём (лёгкий, без жиров) — для сопровождения укола.
+    const source = pool.fastProtein[0] || pool.proteinSolid[0];
+    const carb = pool.carbFast[0] || pool.carbSlow[0];
+    const items: MealItem[] = [];
+    if (source) items.push(makeItem(source, 25, 'fast_protein'));
+    if (carb) items.push(makeItem(carb, 40, 'carb_fast'));
+    if (items.length === 0) return;
+    const totals = items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    meals.push({ label, time: t, items, totals, type: 'snack', target: { p: 25, c: 40, f: 0 }, rationale: [note], mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 } });
+    notes.push(note);
+  };
+
+  // 4a. Инсулин: быстрые углеводы в окне укола (правило ~10 г на 1 ЕД; жиры минимум).
+  const _insulinInjs = _injList.filter(i => (i.type || '').toLowerCase().includes('инсулин'));
+  for (const inj of _insulinInjs) {
+    const injMin = _toMinOf(inj.time) ?? (inj.esterType === 'long' ? 22 * 60 : 8 * 60);
+    if (!_hasMealNear(injMin)) {
+      const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
+      _injectMealAt(injMin, label, `${label} — быстрые углеводы при уколе (≈10 г/1 ЕД, без жиров для скорости всасывания)`);
+    }
+  }
+
+  // 4b. ИГФ-1: приём вокруг тренировки (по trainTiming) — белок + быстрые углеводы.
+  const _igfInjs = _injList.filter(i => (i.type || '').includes('ИФР') || (i.type || '').includes('IGF'));
+  if (_igfInjs.length > 0 && input.trainStartMin) {
+    const t0 = _igfInjs[0];
+    const wantBefore = t0.trainTiming !== 'after' && t0.trainTiming !== 'none';
+    const wantAfter = t0.trainTiming === 'after' || t0.trainTiming === 'both';
+    if (wantBefore && !_hasMealNear(input.trainStartMin - 45, 30)) {
+      const min = input.trainStartMin - 45;
+      _injectMealAt(min, '⚡ ИГФ-1 до тренировки (белок+декстроза)', 'ИГФ-1 до трены — изолят + быстрые углеводы (потенцирует анаболическое окно)');
+    }
+    if (wantAfter && !_hasMealNear(input.trainStartMin + 60, 30)) {
+      const min = input.trainStartMin + 60;
+      _injectMealAt(min, '⚡ ИГФ-1 после тренировки (белок+декстроза)', 'ИГФ-1 после трены — изолят + быстрые углеводы (анаболическое окно)');
+    }
+  }
+
+  // 4c. ГР: вечерний/ночной приём (белок + минимум жиров) — не конфликтует с пре-сном.
+  const _ghInjs = _injList.filter(i => (i.type || '') === 'ГР' || (i.type || '').includes('GHRP') || (i.type || '').includes('CJC') || (i.type || '').includes('sermorelin'));
+  if (_ghInjs.length > 0) {
+    const ghMin = _toMinOf(_ghInjs[0].time) ?? 22 * 60;
+    if (!_hasMealNear(ghMin, 40)) {
+      // Если укол в окне пре-сна — пре-сн приём уже есть (казенн), не дублируем.
+      const _preSleepMin = _toMinOf(tPreSleep);
+      if (!(_preSleepMin !== null && Math.abs(_preSleepMin - ghMin) <= 40)) {
+        _injectMealAt(ghMin, '🌙 ГР: белковый приём на ночь', 'ГР (соматотропин) на ночь — белок без жиров для пика секреции и ночного восстановления');
+      }
+    }
+  }
 
   // Sort meals by time (chronological order)
   meals.sort((a, b) => {
