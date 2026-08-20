@@ -14,7 +14,7 @@ import {
   cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
   type CardioLogEntry,
 } from '../../../../../engines/lms/cardio-diary.engine';
-import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
+import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../../../engines/profile-store';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
@@ -92,6 +92,16 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     } catch { return null; }
   }, []);
 
+  // Дни тяжёлых ног активного цикла: Set дат журнала-дней ног + «сегодня».
+  const activeCycle = useMemo(() => { try { return loadActiveCardioCycle(); } catch { return null; } }, []);
+  const legDayDates = useMemo(() => {
+    const s = new Set<string>();
+    if (!activeCycle) return s;
+    for (const e of log) { const info = cardioLegDayForDate(activeCycle, e.date); if (info?.isLegDay) s.add(e.date); }
+    return s;
+  }, [activeCycle, log]);
+  const todayLegDay = useMemo(() => (activeCycle ? cardioLegDayForDate(activeCycle, todayIso()) : null), [activeCycle]);
+
   const add = () => {
     const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
     let weight: number | null = null;
@@ -136,11 +146,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   };
 
   const exportCsv = () => {
-    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,Завершено\n';
+    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,День ног,Завершено\n';
     const body = log.map(e =>
       [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, e.durationMin,
         e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
-        e.completed ? 'да' : 'нет'].map(csvCell).join(','),
+        legDayDates.has(e.date) ? 'да' : '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
@@ -159,7 +169,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     const rows = log.map(e =>
       `<tr><td>${escHtml(e.date)}</td><td>${escHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
       `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
-      `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td></tr>`,
+      `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td><td>${legDayDates.has(e.date) ? '🦵' : ''}</td></tr>`,
     ).join('');
     const html = `<!doctype html>
 <meta charset="utf-8">
@@ -181,7 +191,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   <div class="card"><b>Всего</b><br>${doneSessions} сесс · ${totalMinutes} мин</div>
 </div>
 <table>
-  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th></tr>
+  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th></tr>
   ${rows}
 </table>`;
     w.document.write(html);
@@ -296,6 +306,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           </label>
           <button style={btnPrimary(ACCENT)} onClick={add}>{editingId ? '💾 Обновить' : '💾 Записать'}</button>
         </div>
+        {todayLegDay?.isLegDay && date === todayIso() && (
+          <div style={{ fontSize: 12, marginTop: 8, padding: '6px 10px', borderRadius: 8, color: ['zone2', 'miss', 'hiit'].includes(type) ? '#f87171' : '#fbbf24', background: ['zone2', 'miss', 'hiit'].includes(type) ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${['zone2', 'miss', 'hiit'].includes(type) ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}` }} role="status">
+            {['zone2', 'miss', 'hiit'].includes(type)
+              ? '🦵 Сегодня день тяжёлых ног — интенсивное кардио лучше перенести или заменить на recovery.'
+              : '🦵 Сегодня день тяжёлых ног — recovery можно.'}
+          </div>
+        )}
       </div>
 
       {/* Журнал */}
@@ -308,6 +325,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             return (
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ width: 84, fontSize: 12, color: colors.textMuted }}>{e.date}</span>
+                {legDayDates.has(e.date) && <span style={{ fontSize: 11 }} title="День тяжёлых ног">🦵</span>}
                 <span style={{ width: 86, fontSize: 13, fontWeight: 700, color: t?.color ?? colors.text }}>{t?.label ?? e.type}</span>
                 <span style={{ fontSize: 12, color: colors.text }}>{e.durationMin} мин</span>
                 {e.calories != null && e.calories > 0 && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.calories} ккал</span>}

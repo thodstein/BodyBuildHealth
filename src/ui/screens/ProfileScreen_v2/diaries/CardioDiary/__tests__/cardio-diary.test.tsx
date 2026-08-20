@@ -126,4 +126,36 @@ describe('CardioDiary — CSR', () => {
     // Неделя 4 в cut-цикле — делод → подсказка «Нед 4: …Делод…».
     expect(screen.getByText(/Нед 4:/)).toBeTruthy();
   });
+
+  it('журнал: записи на день ног активного цикла помечаются 🦵', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'cd-lg-row', legDays: [0] });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    saveCardioLogEntry({ id: 'lg1', date: '2026-08-17', type: 'zone2', durationMin: 30, completed: true });
+    saveCardioLogEntry({ id: 'lg2', date: '2026-08-19', type: 'zone2', durationMin: 30, completed: true });
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    // 2026-08-17 — понедельник (день ног), 2026-08-19 — среда (не день ног).
+    expect(screen.getAllByTitle('День тяжёлых ног').length).toBe(1);
+  });
+
+  it('форма: сегодня день ног — предупреждение при интенсивном типе, «можно» при recovery', () => {
+    const dow = (new Date().getDay() + 6) % 7;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'cd-lg-form', legDays: [dow] });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    expect(screen.getByText(/лучше перенести/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Тип: Recovery/ }));
+    expect(screen.getByText(/recovery можно/)).toBeTruthy();
+  });
+
+  it('форма: не день ног — подсказки 🦵 нет', () => {
+    const dow = (new Date().getDay() + 6) % 7;
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'cd-lg-none', legDays: [(dow + 1) % 7] });
+    saveCardioCycle(c);
+    setActiveCardioCycle(c);
+    render(<CardioDiary open onClose={() => {}} diaryKey="cardio" goals={GOALS} />);
+    expect(screen.queryByText(/лучше перенести/)).toBeNull();
+    expect(screen.queryByText(/recovery можно/)).toBeNull();
+  });
 });
