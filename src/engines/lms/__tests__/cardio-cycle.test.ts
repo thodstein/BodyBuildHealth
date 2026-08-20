@@ -703,6 +703,17 @@ describe('buildCardioSummaryText', () => {
     expect(t).toContain('(Вело)');
     expect(t).toContain('ЧСС');
   });
+
+  it('с днями ног — строка 🦵 с днями недели', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, legDays: [0, 3] });
+    const t = buildCardioSummaryText(c);
+    expect(t).toContain('🦵 Дни тяжёлых ног: Пн, Чт');
+  });
+
+  it('без дней ног — строки 🦵 нет', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4 });
+    expect(buildCardioSummaryText(c)).not.toContain('Дни тяжёлых ног');
+  });
 });
 
 // ─── Варианты плана и объяснение ───
@@ -1755,6 +1766,19 @@ describe('cardioFitnessForecast / cardioCoachHints', () => {
     const text = buildCardioSummaryText(c);
     expect(text).toContain('Прогноз адаптации');
     expect(text).toContain('Контрольные замеры');
+  });
+
+  it('печатная сводка: дни ног в шапке и 🦵-маркеры в таблице дней', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, legDays: [0] });
+    const html = buildCardioPrintHtml(c);
+    expect(html).toContain('🦵 Дни тяжёлых ног: Пн');
+    expect(html).toContain('Нед 1');
+    expect(html).toContain('#fff7e0');
+  });
+
+  it('печатная сводка: без дней ног — строки 🦵 нет', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4 });
+    expect(buildCardioPrintHtml(c)).not.toContain('Дни тяжёлых ног');
   });
 });
 

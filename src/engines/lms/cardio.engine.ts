@@ -2218,6 +2218,8 @@ export function buildCardioSummaryText(cycle: CardioCycle): string {
   lines.push(`❤️ ${cycle.name}`);
   lines.push(`Цель: ${CARDIO_GOAL_LABELS[cycle.goal]} · ${cycle.totalWeeks} нед · в среднем ${s.avgMinutesPerWeek} мин/нед · ${s.avgKcalPerWeek} ккал/нед · ${s.hiitWeeks} HIIT-нед`);
   if (cycle.linkedCompetitionIds?.length) lines.push(`Старты: ${cycle.linkedCompetitionIds.length}`);
+  const legDays = (cycle.config?.legDays ?? []).filter(d => d >= 0 && d <= 6);
+  if (legDays.length > 0) lines.push(`🦵 Дни тяжёлых ног: ${legDays.map(d => DAY_LABELS_RU[d]).join(', ')} — интенсивное кардио на них не ставится (recovery — можно).`);
   lines.push('── Недели ──');
   for (const w of cycle.weeks) {
     const sessions = w.sessions
@@ -2280,6 +2282,7 @@ function escHtml(value: string): string {
 /** HTML-сводка цикла для печати (XSS-safe экранирование пользовательских названий). */
 export function buildCardioPrintHtml(cycle: CardioCycle): string {
   const summary = cardioCycleSummary(cycle);
+  const legDays = (cycle.config?.legDays ?? []).filter(d => d >= 0 && d <= 6);
   const phaseRows = (Object.keys(summary.phaseWeeks) as CardioPhase[])
     .filter(p => summary.phaseWeeks[p] > 0)
     .map(p => `<tr><td>${escHtml(CARDIO_PHASE_LABELS[p])}</td><td>${summary.phaseWeeks[p]}</td></tr>`)
@@ -2294,10 +2297,11 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
   const dayRows = cycle.weeks.map(w => {
     const cells = DAY_LABELS_RU.map((d, di) => {
       const sess = spreadSessionsAcrossDays(w).filter(s => s.dayOfWeek === di);
+      const isLeg = legDays.includes(di);
       const content = sess.length === 0
         ? '—'
         : sess.map(s => `${s.type.toUpperCase()} ${s.durationMin}м${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? '<br>ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join('<br>');
-      return `<td style="vertical-align:top;font-size:11px">${escHtml(content)}</td>`;
+      return `<td style="vertical-align:top;font-size:11px${isLeg ? ';background:#fff7e0' : ''}">${isLeg ? '🦵 ' : ''}${escHtml(content)}</td>`;
     }).join('');
     return `<tr><td style="font-weight:700;font-size:11px">Нед ${w.week}<br>${escHtml(CARDIO_PHASE_LABELS[w.phase])}</td>${cells}</tr>`;
   }).join('');
@@ -2311,6 +2315,7 @@ export function buildCardioPrintHtml(cycle: CardioCycle): string {
 th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px;text-align:left}th{background:#f0f0f0}h2{font-size:18px}</style></head>
 <body><h2>❤️ ${escHtml(cycle.name)}</h2>
 <p>Цель: ${escHtml(CARDIO_GOAL_LABELS[cycle.goal])} · ${cycle.totalWeeks} нед · в среднем ${summary.avgMinutesPerWeek} мин/нед · ${summary.avgKcalPerWeek} ккал/нед</p>
+${legDays.length > 0 ? `<p style="font-size:12px;color:#8a6d1a">🦵 Дни тяжёлых ног: ${legDays.map(d => escHtml(DAY_LABELS_RU[d])).join(', ')} — интенсивное кардио на них не ставится (recovery — можно).</p>` : ''}
 <p style="font-size:12px;color:#555">📈 Прогноз адаптации: +${forecast.vo2GainPct}% VO2max за цикл (${forecast.effectiveWeeks} рабочих нед). ${escHtml(forecast.note)}</p>
 ${cycle.linkedMacrocycleId ? '<p style="font-size:12px;color:#555">🗓 Привязан к годовому плану (cardioCycleId).</p>' : ''}
 ${cycle.rationale.map(r => `<p style="font-size:12px;color:#555">${escHtml(r)}</p>`).join('')}
