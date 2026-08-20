@@ -173,14 +173,14 @@ export const BodyRecompVelocity: React.FC<BodyRecompVelocityProps> = ({ rows, he
                   {i > 0 && (
                     <path
                       d={`M${(i - 1) / (arr.length - 1) * 100},${35 - Math.max(-2.5, Math.min(2.5, arr[i - 1].fatVelocity)) * 12} L${x},${fatY}`}
-                      {...chartLine(c.orange, 2.5)}
+                      {...(chartLine(c.orange, 2.5) as React.SVGProps<SVGPathElement>)}
                     />
                   )}
                   {/* Lean line */}
                   {i > 0 && (
                     <path
                       d={`M${(i - 1) / (arr.length - 1) * 100},${35 - Math.max(-2.5, Math.min(2.5, arr[i - 1].leanVelocity)) * 12} L${x},${leanY}`}
-                      {...chartLine(c.green, 2.5)}
+                      {...(chartLine(c.green, 2.5) as React.SVGProps<SVGPathElement>)}
                     />
                   )}
                   {/* Data points */}

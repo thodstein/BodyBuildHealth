@@ -50,7 +50,7 @@ export function computeDayQualityScore(
 
   // штрафы по флагам дня
   const penalties: string[] = [];
-  const day = analyzeDailyDiet(meals, profile);
+  const day = analyzeDailyDiet(meals as Parameters<typeof analyzeDailyDiet>[0], profile);
   if (day.giLoadWarning) { score -= 0.5; penalties.push('Высокая гликемическая нагрузка дня'); }
   if (day.ammoniaRisk) { score -= 0.5; penalties.push('Аммонийная нагрузка (белок/LBM > 2.5, низкая клетчатка)'); }
   if (day.pralWarning === 'Закисление') { score -= 0.5; penalties.push('Закисление (PRAL)'); }

@@ -721,6 +721,18 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     w.focus();
     setTimeout(() => w.print(), 100);
   };
+  const exportAllDiaries = () => {
+    exportAllDiariesPdf([{
+      title: 'Вес и замеры',
+      entries: rows.map((r) => ({
+        date: r.date,
+        fields: [
+          { label: 'Вес', value: String(r.weight ?? ''), unit: 'кг' },
+          ...(r.notes ? [{ label: 'Заметки', value: r.notes, unit: '' }] : []),
+        ],
+      })),
+    }]);
+  };
   const beginEdit = (row: WeightEntry) => {
     setEditing(row.date);
     setDraft({ ...row });
@@ -737,7 +749,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       weight: Number(draft.weight),
     } as WeightEntry;
     commit(rows.filter((r) => r.date !== editing && r.date !== newDate).concat([merged]));
-    resetDraft();
+    setDraft({});
     setEditing(null);
   };
   const badgeFor = (field: Field, value: number | undefined, row: WeightEntry): React.ReactNode => {
@@ -1566,7 +1578,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                         {editing === row.date ? (
                           <>
                             <button style={btn} onClick={saveEdit}>Сохранить</button>{' '}
-                            <button style={btn} onClick={() => { resetDraft(); setEditing(null); }}>Отмена</button>
+                            <button style={btn} onClick={() => { setDraft({}); setEditing(null); }}>Отмена</button>
                           </>
                         ) : (
                           <>

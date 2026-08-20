@@ -2215,7 +2215,7 @@ export const IndividualPlanResults: React.FC = () => {
                         <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
                         <button onClick={() => printMealTimeline(buildMealTimelinePrintHtml(
                           (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount })), totals: m.totals || {} })),
-                          { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart, trainEnd }
+                          { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart }
                         ))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
                       </span>
                     </div>

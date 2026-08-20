@@ -25,6 +25,34 @@ export function sessionDayOfWeek(session: Pick<UserSession, 'dayOfWeek'>, index:
     : trainingDayForIndex(index);
 }
 
+/** Сессия стоит на рекомендованном дне для своего индекса. Без дня/невалидный день → true. */
+export function sessionUsesRecommendedDay(session: Pick<UserSession, 'dayOfWeek'>, index: number): boolean {
+  const dw = session.dayOfWeek;
+  if (dw == null || !Number.isInteger(dw) || dw < 0 || dw > 6) return true;
+  return dw === trainingDayForIndex(index);
+}
+
+/** Перенос сессии (по индексу) на день недели ВО ВСЕ недели (шаблон повторяется).
+ *  Не мутирует исходные недели; несуществующий индекс — без изменений. */
+export function moveWeekScheduleDay(weeks: UserWeek[], sessionIdx: number, dayOfWeek: number): UserWeek[] {
+  const validIdx = Number.isInteger(sessionIdx) && sessionIdx >= 0;
+  const normalized = Number.isInteger(dayOfWeek) && dayOfWeek >= 0 && dayOfWeek <= 6
+    ? dayOfWeek
+    : trainingDayForIndex(validIdx ? sessionIdx : 0);
+  return weeks.map(w => ({
+    ...w,
+    sessions: w.sessions.map((s, i) => i === sessionIdx ? { ...s, dayOfWeek: normalized } : s),
+  }));
+}
+
+/** Расставить рекомендованные дни по всем сессиям всех недель. Не мутирует исходные. */
+export function resetScheduleToRecommended(weeks: UserWeek[]): UserWeek[] {
+  return weeks.map(w => ({
+    ...w,
+    sessions: w.sessions.map((s, i) => ({ ...s, dayOfWeek: trainingDayForIndex(i) })),
+  }));
+}
+
 export function firstFreeTrainingDay(sessions: Array<Pick<UserSession, 'dayOfWeek'>>): number {
   const used = new Set(sessions.map((session, index) => sessionDayOfWeek(session, index)));
   return TRAINING_DAY_ORDER.find(day => !used.has(day)) ?? trainingDayForIndex(sessions.length);

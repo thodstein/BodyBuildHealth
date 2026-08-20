@@ -30,8 +30,8 @@ export const WaistHeightRatio: React.FC<WaistHeightRatioProps> = ({ rows, height
     // Health thresholds (Ashwell 2012)
     let status: 'optimal' | 'moderate' | 'high' | 'very_high' = 'optimal';
     let statusLabel = 'Оптимально';
-    let statusColor = c.green;
-    let statusGrad = c.gradGreen;
+    let statusColor: string = c.green;
+    let statusGrad: string = c.gradGreen;
     
     if (ratio < 0.4) {
       status = 'optimal';

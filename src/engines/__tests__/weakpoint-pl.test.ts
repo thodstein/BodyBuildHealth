@@ -57,8 +57,8 @@ describe('diagnoseWeakPoint', () => {
 });
 
 describe('WEAK_POINTS_BY_LIFT', () => {
-  it('содержит 7 лифтов', () => {
-    expect(Object.keys(WEAK_POINTS_BY_LIFT)).toHaveLength(7);
+  it('содержит 9 лифтов (включая сумо и бицепс)', () => {
+    expect(Object.keys(WEAK_POINTS_BY_LIFT)).toHaveLength(9);
   });
 
   it('bench имеет 4 слабых точки', () => {
