@@ -346,6 +346,23 @@ describe('CardioProgressCard', () => {
     // Неделя 4 в cut-цикле — делод (каждые 4 нед) → подсказка «Нед 4:».
     expect(screen.getByText(/Нед 4:/)).toBeTruthy();
   });
+
+  it('выполнение прошлых недель показывает факт-ккал и км из журнала', () => {
+    const d = new Date();
+    d.setDate(d.getDate() - 8); // неделя 1 прошла, неделя 2 текущая
+    const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 'p-3', startDate: start });
+    const next = new Date(d);
+    next.setDate(next.getDate() + 1);
+    const nextIso = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+    localStorage.setItem(LOG_KEY, JSON.stringify([
+      { id: 'f1', date: start, type: 'zone2', durationMin: 25, rpe: 5, completed: true, calories: 180, distanceKm: 4 },
+      { id: 'f2', date: nextIso, type: 'zone2', durationMin: 25, rpe: 5, completed: true, calories: 180, distanceKm: 3.5 },
+    ]));
+    render(<CardioProgressCard cycle={c} />);
+    expect(screen.getByText(/факт 360 ккал/)).toBeTruthy();
+    expect(screen.getByText(/7\.5 км/)).toBeTruthy();
+  });
 });
 
 describe('CardioDiaryPanel — adherence текущей недели', () => {

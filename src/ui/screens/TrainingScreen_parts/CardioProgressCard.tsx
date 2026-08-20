@@ -8,7 +8,7 @@ import {
   cardioWeekForDate, cardioNextSession, cardioEquipmentLabel, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   cardioCoachHints, type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
-import { loadCardioLog, cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, cardioWeekFact } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -29,10 +29,12 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
     const current = week?.week ?? 0;
     const pct = cycle.totalWeeks > 0 ? Math.round((Math.min(current, cycle.totalWeeks) / cycle.totalWeeks) * 100) : 0;
     const log = loadCardioLog();
-    const done = cycle.weeks.filter(w => w.week < current).map(w => cardioWeekAdherence(cycle, w.week, log, ref));
+    const done = cycle.weeks.filter(w => w.week < current).map(w => cardioWeekFact(cycle, w.week, log, ref));
     const planned = done.reduce((s, a) => s + a.plannedSessions, 0);
     const actual = done.reduce((s, a) => s + a.doneSessions, 0);
     const adherence = planned > 0 ? Math.round((actual / planned) * 100) : null;
+    const factKcal = done.reduce((s, a) => s + a.factKcal, 0);
+    const factKm = Math.round(done.reduce((s, a) => s + a.factKm, 0) * 10) / 10;
     const nextStart = cycle.weeks.find(w => w.week >= current && (w.phase === 'taper' || w.phase === 'peak'));
     // Подсказка текущей недели (тренерские заметки).
     const hint = current >= 1 ? cardioCoachHints(cycle).find(h => h.week === current) ?? null : null;
@@ -40,6 +42,8 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
       current,
       pct,
       adherence,
+      factKcal,
+      factKm,
       left: Math.max(0, cycle.totalWeeks - current),
       currentPhase: week?.phase ?? null,
       nextStart,
@@ -66,7 +70,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null }> = ({ cy
         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{data.pct}% пройдено</span>
         {data.adherence != null && (
           <span style={{ fontSize: 10, color: data.adherence >= 80 ? '#4ade80' : data.adherence >= 50 ? '#fbbf24' : '#f87171' }}>
-            · выполнение прошлых недель: {data.adherence}%
+            · выполнение прошлых недель: {data.adherence}%{data.factKcal > 0 ? ` · факт ${data.factKcal} ккал` : ''}{data.factKm > 0 ? ` · ${data.factKm} км` : ''}
           </span>
         )}
       </div>
