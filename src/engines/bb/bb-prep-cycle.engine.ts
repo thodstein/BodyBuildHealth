@@ -276,7 +276,13 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
       targets: accent,
     };
     if (minimal.length > 0 && mode !== 'none') {
-      block.tradeoff = { mode, donorMuscles: minimal, preserveIndirect: true };
+      // Минимальная нагрузка: режим remove → флор 0 (исключить), reduce → 0.25×MEV (~2-4 сета/нед).
+      block.tradeoff = {
+        mode,
+        donorMuscles: minimal,
+        preserveIndirect: true,
+        donorFloorMult: mode === 'remove_direct_when_indirect_covers_floor' ? 0 : 0.25,
+      };
     }
     specBlocks.push(block);
   }
@@ -579,6 +585,8 @@ export function applyPrepVolumeCascade(
 ): BBPlanWithPrep {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   const vp = volumePlan ?? prepVolumePlan(cfg, prepWeeks);
+  // Минимальные мышцы: убираем warmup-активаторы (иначе в UI дубль «разминка + рабочее» той же мышцы).
+  const minimalCanonical = new Set((cfg.minimalMuscles || []).map(canonicalMuscle));
   const weeks: any[] = (plan.weeks as any[]).map((wk, idx) => {
     const phaseKey = wk.contestPhase;
     if (phaseKey !== 'preparation' && phaseKey !== 'final_preparation') return wk;
@@ -588,7 +596,9 @@ export function applyPrepVolumeCascade(
     const rir = pv.rir;
     const sessions = (wk.sessions || []).map((s: any) => ({
       ...s,
-      exercises: (s.exercises || []).map((e: any) => {
+      exercises: (s.exercises || [])
+        .filter((e: any) => !((e as any).warmupActivator && minimalCanonical.has(canonicalMuscle(e.muscle || ''))))
+        .map((e: any) => {
         const baseSets = (e as any)._baseSets ?? e.sets ?? 0;
         const newSets = Math.max(2, Math.round(baseSets * mult));
         const source = e.workSets || [];

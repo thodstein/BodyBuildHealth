@@ -45,11 +45,13 @@ export interface TradeoffWeekReport {
 function trimDonorIsolations(
   week: BBWeek,
   donorCanonical: Set<string>,
-  mode: VolumeTradeoffPolicy['mode'],
+  policy: VolumeTradeoffPolicy,
   opts: TradeoffApplyOptions,
 ): number {
   const volume = aggregateBBVolume(week.sessions);
   const removed: number[] = [0];
+  const mode = policy.mode;
+  const floorMult = policy.donorFloorMult ?? 1;
   const directNow = (m: string) => volume[m]?.directSets ?? 0;
   const effectiveNow = (m: string) => volume[m]?.effectiveSets ?? 0;
   const adaptedMev = (m: string): number => {
@@ -65,7 +67,7 @@ function trimDonorIsolations(
       if ((ex as any).warmupActivator) continue;
       const m = canonicalMuscle(ex.muscle);
       if (!donorCanonical.has(m)) continue;
-      const floor = adaptedMev(m);
+      const floor = Math.max(1, Math.round(adaptedMev(m) * floorMult));
       const indirect = effectiveNow(m) - directNow(m);
       const targetDirect = mode === 'remove_direct_when_indirect_covers_floor' && indirect >= floor
         ? 0
@@ -183,7 +185,7 @@ export function applyTradeoffToWeek(
 ): TradeoffWeekReport {
   const donorCanonical = new Set(expandDonorMuscles(policy.donorMuscles).map(canonicalMuscle));
   const targetCanonical = new Set(targets.map(canonicalMuscle));
-  const removedSets = trimDonorIsolations(week, donorCanonical, policy.mode, opts);
+  const removedSets = trimDonorIsolations(week, donorCanonical, policy, opts);
   const { transferred, notes } = addToRecipient(week, targetCanonical, targets, opts, removedSets);
   return {
     week: week.week,

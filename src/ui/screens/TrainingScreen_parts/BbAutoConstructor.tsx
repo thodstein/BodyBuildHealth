@@ -4983,6 +4983,13 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepCarbMode(res.prepPlan.peakWeek.carbMode);
       setBuiltPlan(res.bbPlan);
       setPrepApplied(true);
+      // 🏁 Авто-подключение к таперу питания: сохраняем prep-план + конфиг и уведомляем
+      // планировщик (вкладка «🏁 Тапер ББ» + дневные цели) СРАЗУ при сборке, без доп. клика.
+      try {
+        const cfg = configFromPlan(res.prepPlan);
+        savePrepToProfile(res.prepPlan, cfg);
+        window.dispatchEvent(new CustomEvent('he-bb-contest-prep-updated', { detail: { prepPlanId: res.prepPlan.id } }));
+      } catch { /* silent */ }
       setPrepStep('result');
     } catch (e) {
       flash(`⚠ ${(e as Error)?.message ?? 'Не удалось собрать prep-цикл'}`);

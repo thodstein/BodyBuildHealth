@@ -223,13 +223,16 @@ export type VolumeTradeoffMode =
   | 'remove_direct_when_indirect_covers_floor';
 
 /** Политика доноров блока: прямые упражнения донора снижаются/убираются,
- *  косвенная нагрузка всегда сохраняется, effective volume не ниже MEV. */
+ *  косвенная нагрузка всегда сохраняется, effective volume не ниже MEV
+ *  (или ниже, если задан donorFloorMult — для prep «минимальная нагрузка»). */
 export interface VolumeTradeoffPolicy {
   mode: VolumeTradeoffMode;
   /** Мышцы-доноры (гранулярные или канонические). */
   donorMuscles: string[];
   /** Косвенную нагрузку донора не трогаем никогда. */
   preserveIndirect: true;
+  /** Множитель MEV-флора донора (1.0 = MEV; 0.25 = минимальная нагрузка prep; 0 = исключить). */
+  donorFloorMult?: number;
 }
 
 /** Один блок плана: недели [weekStart..weekEnd] с целями специализации.
@@ -287,6 +290,7 @@ export function buildSpecializationSchedule(
               mode: b.tradeoff.mode,
               donorMuscles: dedupeExactMuscles(b.tradeoff.donorMuscles),
               preserveIndirect: true as const,
+              ...(b.tradeoff.donorFloorMult != null ? { donorFloorMult: b.tradeoff.donorFloorMult } : {}),
             }
           : undefined;
         return {

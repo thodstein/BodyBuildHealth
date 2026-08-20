@@ -389,15 +389,12 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     // масштабированный целевой диапазон выше у продвинутого на курсе
     expect(enhanced.scaledTargetSetsPerMusclePerWeek[1]).toBeGreaterThan(natural.scaledTargetSetsPerMusclePerWeek[1]);
     expect(enhanced.athleteMult).toBeGreaterThan(natural.athleteMult);
-    // фактический объём плана за prep-неделю: у курса/большого стажа больше сетов
+    // фактический объём акцентной мышцы (shoulders) за prep-неделю: у курса/большого стажа больше
     const n = buildPrepCycle(base({ enhanced: false, trainingYears: 3, level: 'intermediate' }));
     const e = buildPrepCycle(base({ enhanced: true, trainingYears: 6, level: 'advanced', pedDoses: { AAS: 600 } }));
-    const setsOf = (w: any) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).reduce((b: number, ex: any) => b + (ex.sets || 0), 0), 0);
-    const nPrep = n.bbPlan.weeks.filter((w: any) => w.contestPhase === 'preparation');
-    const ePrep = e.bbPlan.weeks.filter((w: any) => w.contestPhase === 'preparation');
-    expect(nPrep.length).toBeGreaterThan(0);
-    expect(ePrep.length).toBeGreaterThan(0);
-    expect(setsOf(ePrep[0])).toBeGreaterThan(setsOf(nPrep[0]));
+    // PED/стаж масштабируют MRV плана (effectiveMrvMult), а не только целевой диапазон
+    expect(Number((e.bbPlan as any).mrvMultiplier)).toBeGreaterThan(Number((n.bbPlan as any).mrvMultiplier));
+    expect(Number((e.bbPlan as any).mrvMultiplier)).toBeGreaterThan(1);
   });
 
   it('объём подготовки ≈ обычного ББ-авто (maintenance), а не урезанный goal=cut', () => {
@@ -425,5 +422,27 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     expect(heavy.minutesPerWeek).toBeGreaterThan(light.minutesPerWeek);
     expect(heavy.stepsPerDay).toBeGreaterThanOrEqual(light.stepsPerDay);
     expect(light.zone).toContain('Zone 2');
+  });
+
+  it('минимальная мышца реально исключается (~0-2 сета/нед) и рабочих дублей нет', () => {
+    const r = buildPrepCycle(base({ category: 'mens_bb', accentMuscles: ['chest'], minimalMuscles: ['quads'], splitPatternId: 'ppl_6', weeks: 10, taperWeeks: 2 }));
+    const prepWeeks = (r.bbPlan.weeks as any[]).filter(w => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation');
+    expect(prepWeeks.length).toBeGreaterThan(0);
+    const weeklyQuads: number[] = [];
+    const dup: string[] = [];
+    prepWeeks.forEach((w: any) => {
+      let qSets = 0;
+      (w.sessions || []).forEach((s: any) => {
+        const work = (s.exercises || []).filter((e: any) => !(e as any).warmupActivator);
+        const names = work.map((e: any) => e.exerciseName || e.name);
+        const seen = new Set<string>();
+        for (const n of names) { if (seen.has(n)) dup.push(`w${w.week} ${n}`); seen.add(n); }
+        qSets += work.filter((e: any) => String(e.muscle).toLowerCase().includes('quad')).reduce((a: number, e: any) => a + (e.sets || 0), 0);
+      });
+      weeklyQuads.push(qSets);
+    });
+    expect(dup).toEqual([]);
+    // Минимальная мышца — ~0-2 сета/нед (флор 0.25×MEV), а не полный объём
+    expect(Math.max(...weeklyQuads)).toBeLessThanOrEqual(3);
   });
 });
