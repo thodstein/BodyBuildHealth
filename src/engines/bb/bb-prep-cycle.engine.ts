@@ -391,15 +391,18 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
   // затем applyPrepVolumeCascade накладывает фазовый спуск × атлет-множители (PED/стаж/
   // уровень/восстановление) + дефицит-мод по категории. Тапер ×0.6 остаётся финальным спуском.
   const volumePlan = prepVolumePlan(cfg, prepWeeks);
-  const bbPlanPrep = applyPrepDeloads(
-    applyPrepVolumeCascade(
-      applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+  const bbPlanPrep = applyPrepTaperSparing(
+    applyPrepDeloads(
+      applyPrepVolumeCascade(
+        applyContestPrepToBBPlan(bbPlan, prepCfg, { prepWeeks, taperWeeks, prepVolumeMult: 1.0, force: true }),
+        cfg,
+        prepWeeks,
+        volumePlan,
+      ),
       cfg,
       prepWeeks,
-      volumePlan,
     ),
     cfg,
-    prepWeeks,
   );
 
   const warnings = [...v.warnings];
@@ -592,7 +595,10 @@ export function buildPrepNutritionPlan(
       // Тапер: калории стабильны (усталость падает, катаболизм не нужен), карбс чуть выше (гликоген).
       kcal = baseKcal;
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
-      note = 'Тапер: калории стабильны, карбс слегка выше — подготовка гликогена к пик-неделе.';
+      const wna = cfg.confirmedManipulation
+        ? ' вода/натрий плавно снижаются к пик-неделе (подтверждено).'
+        : ' вода/натрий стабильны.';
+      note = `Тапер: калории стабильны, карбс слегка выше — подготовка гликогена к пик-неделе;${wna}`;
     } else if (phaseKey === 'final_preparation') {
       // Финал подготовки: лёгкий дефицит, рефид раз в неделю.
       kcal = Math.max(isFemale ? 1400 : 1200, Math.round(baseKcal * 0.97));
@@ -820,6 +826,33 @@ export function applyPrepDeloads(
       phase: 'deload',
       prepProtocol: `Prep-делод (нед ${wk1}): объём ×70%, RIR +2 — сброс усталости, мышцы сохраняются.`,
     };
+  });
+  return { ...plan, weeks } as BBPlanWithPrep;
+}
+
+/** Per-muscle тапер (направление C): в тапер-неделях акцент-мышца щадится сильнее
+ *  (объём ×1.25 к кривой, ≤ базы), минимальные режутся сильнее (×0.8), RIR 3-4.
+ *  Метка «без новых упражнений» — финальный тапер не добавляет новое. */
+export function applyPrepTaperSparing(plan: BBPlanWithPrep, cfg: PrepCycleConfig): BBPlanWithPrep {
+  if (!plan || !Array.isArray(plan.weeks)) return plan;
+  const accentCanonical = new Set((cfg.accentMuscles || []).map(canonicalMuscle));
+  const minimalCanonical = new Set((cfg.minimalMuscles || []).map(canonicalMuscle));
+  const weeks = (plan.weeks as any[]).map((wk) => {
+    if (wk.contestPhase !== 'taper') return wk;
+    const sessions = (wk.sessions || []).map((s: any) => ({
+      ...s,
+      exercises: (s.exercises || []).map((e: any) => {
+        const m = canonicalMuscle(e.muscle || '');
+        const base = (e as any)._baseSets ?? e.sets ?? 0;
+        let mult = 1.0;
+        if (accentCanonical.has(m)) mult = 1.25;   // спец-мышца щадится
+        else if (minimalCanonical.has(m)) mult = 0.8; // минимальная — режется сильнее
+        const newSets = mult === 1.0 ? e.sets : Math.min(base, Math.max(2, Math.round(e.sets * mult)));
+        const rir = clamp((Number(e.rir) || 3) + (mult >= 1.25 ? -0 : 0), 2, 4);
+        return { ...e, sets: newSets, workSets: (e.workSets || []).slice(0, newSets), comment: `${e.comment || ''} ${accentCanonical.has(m) ? '⭐ Спец-тапер: объём щадится.' : minimalCanonical.has(m) ? '⬇ Минимальная: тапер сильнее.' : ''}` };
+      }),
+    }));
+    return { ...wk, sessions, prepProtocol: `${wk.prepProtocol || ''} 📉 Тапер: без новых упражнений, интенсивность сохраняется, RIR 2-4.` };
   });
   return { ...plan, weeks } as BBPlanWithPrep;
 }

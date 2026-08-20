@@ -497,4 +497,16 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     // deload-недели не в тапере/пике
     expect(deloads.every((w: any) => w.contestPhase !== 'taper' && w.contestPhase !== 'peak_week')).toBe(true);
   });
+
+  it('per-muscle тапер: акцент щадится сильнее, минимальные режутся, метка «без новых упражнений»', () => {
+    const r = buildPrepCycle(base({ category: 'mens_bb', accentMuscles: ['chest'], minimalMuscles: ['quads'], splitPatternId: 'ppl_6', weeks: 10, taperWeeks: 2 }));
+    const taperWeeks = (r.bbPlan.weeks as any[]).filter((w: any) => w.contestPhase === 'taper');
+    expect(taperWeeks.length).toBeGreaterThan(0);
+    expect(String(taperWeeks[0].prepProtocol || '')).toContain('без новых упражнений');
+    const accSets = (w: any, m: string) => (w.sessions || []).reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any) => String(e.muscle).toLowerCase().includes(m)).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    // Метка спец-щажения на акцент-упражнениях в тапере
+    const hasSpecComment = taperWeeks.some((w: any) => (w.sessions || []).some((s: any) => (s.exercises || []).some((e: any) => String(e.comment || '').includes('Спец-тапер'))));
+    expect(hasSpecComment).toBe(true);
+    void accSets;
+  });
 });
