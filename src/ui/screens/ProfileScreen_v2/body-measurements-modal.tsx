@@ -2,8 +2,9 @@
  * body-measurements-modal.tsx — модалка добавления веса и замеров тела.
  * Подсказки «было N», повтор прошлых замеров, фото до/после (сжатие),
  * спарклайн веса за 7 дней.
+ * Presets: быстрые наборы замеров (Торс/Руки/Ноги/Состав/Полный).
  */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import { getWeightLog } from '../../../engines/profile-store';
@@ -68,6 +69,16 @@ const MEASURE_GROUPS: { title: string; icon: string; fields: { key: string; labe
   },
 ];
 
+/* ── Пресеты замеров: быстрые наборы полей ── */
+const MEASURE_PRESETS: { id: string; label: string; icon: string; fields: string[] }[] = [
+  { id: 'full', label: 'Полный', icon: '📋', fields: MEASURE_GROUPS.flatMap(g => g.fields.map(f => f.key)) },
+  { id: 'torso', label: 'Торс', icon: '👕', fields: ['waistCm', 'chestCm', 'hipCm', 'shoulderCm', 'neckCm'] },
+  { id: 'arms', label: 'Руки', icon: '💪', fields: ['bicepLeftCm', 'bicepRightCm', 'forearmLeftCm', 'forearmRightCm'] },
+  { id: 'legs', label: 'Ноги', icon: '🦵', fields: ['thighLeftCm', 'thighRightCm', 'calfLeftCm', 'calfRightCm'] },
+  { id: 'bodycomp', label: 'Состав', icon: '🧬', fields: ['bodyFat', 'muscleMass', 'waterMass'] },
+  { id: 'quick', label: 'Минимум', icon: '⚡', fields: ['waistCm', 'chestCm', 'bodyFat'] },
+];
+
 interface WeightDraft {
   date: string;
   values: Record<string, string>;
@@ -101,11 +112,24 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
     };
   };
   const [draft, setDraft, resetDraft] = useDiaryDraft<WeightDraft>('he_draft_weight', initial);
+  const [activePreset, setActivePreset] = useState<string>('full');
   const MAX_PHOTOS = 5;
   const MAX_SIZE_MB = 2;
 
   const notify = (msg: string, type: 'success' | 'warning' | 'error' = 'warning') => {
     if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, type);
+  };
+
+  const applyPreset = (presetId: string) => {
+    const preset = MEASURE_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    setDraft(d => ({
+      ...d,
+      values: Object.fromEntries(
+        Object.entries(d.values).filter(([k]) => !preset.fields.includes(k))
+      ),
+    }));
+    setActivePreset(presetId);
   };
 
   const prev = useMemo(() => {
@@ -214,7 +238,6 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         <div style={{ flex: 1 }}>
           <TextField label="Дата" value={draft.date} onChange={(v) => setDraft((p) => ({ ...p, date: v }))} type="date" />
         </div>
-        <TodayChip date={draft.date} onToday={() => setDraft((p) => ({ ...p, date: todayIso() }))} />
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <span style={{ ...fieldLabel, marginBottom: 4 }}>Время</span>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -243,14 +266,44 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         </div>
       </div>
 
-      {weightInvalid && <FormBanner tone="error">Вес обязателен — введите число больше 0</FormBanner>}
-      {existing && (
-        <FormBanner tone="warning">
-          Запись за {existing.date} уже есть: {typeof (existing as Record<string, unknown>).weight === 'number' ? `${(existing as Record<string, unknown>).weight} кг` : 'замеры'} — при сохранении будет заменена
-        </FormBanner>
-      )}
+    {/* ── Пресеты замеров ── */}
+    <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      <span style={{ ...fieldLabel, fontSize: 11 }}>Набор:</span>
+      {MEASURE_PRESETS.map(p => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => applyPreset(p.id)}
+          aria-pressed={activePreset === p.id}
+          style={{
+            border: `1px solid ${activePreset === p.id ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
+            background: activePreset === p.id ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
+            color: activePreset === p.id ? '#4ade80' : '#d4d4d8',
+            borderRadius: 8,
+            padding: '5px 10px',
+            cursor: 'pointer',
+            fontSize: 10,
+            lineHeight: 1,
+            fontWeight: 600,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+          title={p.label}
+        >
+          {p.icon} {p.label}
+        </button>
+      ))}
+    </div>
 
-      {prev && (
+    {weightInvalid && <FormBanner tone="error">Вес обязателен — введите число больше 0</FormBanner>}
+    {existing && (
+      <FormBanner tone="warning">
+        Запись за {existing.date} уже есть: {typeof (existing as Record<string, unknown>).weight === 'number' ? `${(existing as Record<string, unknown>).weight} кг` : 'замеры'} — при сохранении будет заменена
+      </FormBanner>
+    )}
+
+    {prev && (
         <div style={{ marginBottom: 10 }}>
           <RepeatLastChip label={`Повторить прошлые замеры (${String(prev.date || '')})`} onClick={fillFromLast} />
         </div>
@@ -265,29 +318,34 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
         )}
       </SectionCard>
 
-      {MEASURE_GROUPS.map((g) => (
-        <SectionCard key={g.title} icon={g.icon} title={g.title} color="#22c55e">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {g.fields.map((f) => {
-              const prevVal = typeof prev?.[f.key] === 'number' ? prev[f.key] as number : null;
-              return (
-                <div key={f.key}>
-                  <TextField
-                    label={f.label}
-                    value={draft.values[f.key] || ''}
-                    onChange={(v) => setValue(f.key, v)}
-                    type="number"
-                    min={0}
-                    step={0.1}
-                    unit={f.unit}
-                    hint={prevVal !== null ? `было ${prevVal}` : undefined}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </SectionCard>
-      ))}
+      {MEASURE_GROUPS.map((g) => {
+        const activeFields = MEASURE_PRESETS.find(p => p.id === activePreset)?.fields || [];
+        const visibleFields = g.fields.filter(f => activeFields.includes(f.key));
+        if (!visibleFields.length) return null;
+        return (
+          <SectionCard key={g.title} icon={g.icon} title={g.title} color="#22c55e">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {visibleFields.map((f) => {
+                const prevVal = typeof prev?.[f.key] === 'number' ? prev[f.key] as number : null;
+                return (
+                  <div key={f.key}>
+                    <TextField
+                      label={f.label}
+                      value={draft.values[f.key] || ''}
+                      onChange={(v) => setValue(f.key, v)}
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      unit={f.unit}
+                      hint={prevVal !== null ? `было ${prevVal}` : undefined}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+        );
+      })}
 
       <SectionCard icon="📝" title="Заметка и фото" color="#22c55e">
         <textarea

@@ -8,6 +8,9 @@ import { FfmiBmiTrend } from './FfmiBmiTrend';
 import { PhaseInsights } from './PhaseInsights';
 import { WeeklyHistogramImproved } from './WeeklyHistogramImproved';
 import { CompletenessIndicator } from './CompletenessIndicator';
+import { BodyRecompVelocity } from './BodyRecompVelocity';
+import { WaistHeightRatio } from './WaistHeightRatio';
+import { PhotoTimeline } from './PhotoTimeline';
 import { projectWeight } from '../../../../../engines/body-composition.engine';
 
 interface WeightDiaryVisualsProps {
@@ -120,6 +123,11 @@ export const WeightDiaryVisuals: React.FC<WeightDiaryVisualsProps> = ({ rows, go
       <FfmiBmiTrend rows={rows} heightCm={heightCm} sex={sex} />
       <WeeklyHistogramImproved rows={rows} />
       {latest && <CompletenessIndicator entry={latest} />}
+      
+      {/* New visualizations */}
+      <BodyRecompVelocity rows={rows} heightCm={heightCm} sex={sex} />
+      <WaistHeightRatio rows={rows} heightCm={heightCm} sex={sex} />
+      <PhotoTimeline rows={rows} />
     </>
   );
 };
