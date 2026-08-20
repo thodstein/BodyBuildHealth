@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { buildLMSPlan, appendPLTaperWeeks } from '../lms-builder.engine';
 import { buildPLTaperCurve, type TaperMode } from '../lms-taper.engine';
 import { buildPLPeakBlockLayout } from '../lms-peak-block.engine';
+import { applyMacroTaperToPLWeeks } from '../lms-macro-taper.engine';
+import { buildPLPeakWeekCutProtocol } from '../lms-taper-coach.engine';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { CYCLE_09K } from '../../../data/lms-cycles/cycle-09k';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
+import type { LMSPlanWeek } from '../lms-builder.engine';
 
 const pmMap = { 'Присед': 150, 'Жим лежа': 110, 'Становая тяга': 180 };
 
@@ -175,5 +178,35 @@ describe('ПЛ-пик-блок: окно до старта уважает дли
     expect(l.totalWeeks).toBe(8 + 1);
     // ramp + taper покрывают доступные недели окна (8 - mock - meet = 6)
     expect(l.rampWeeks + l.taperWeeks).toBe(6);
+  });
+});
+
+describe('ПЛ-тапер: краевые кейсы (A1/A2)', () => {
+  it('A1: протокол сгонки пуст, когда вес уже в категории (манипуляция не нужна)', () => {
+    const p = buildPLPeakWeekCutProtocol(80, 80);
+    expect(p.needed).toBe(false);
+    expect(p.days).toHaveLength(0);
+    // Агрессивная деплеция (вода ↓, натрий 4→0.5 г) не должна показываться без необходимости.
+    expect(p.days.map(d => d.waterMl)).not.toContain('6 л');
+  });
+
+  it('A1: при нужной сгонке протокол дней полный (7 дней вода/натрий/карбы)', () => {
+    const p = buildPLPeakWeekCutProtocol(85, 80);
+    expect(p.needed).toBe(true);
+    expect(p.days).toHaveLength(7);
+    expect(p.days[0].day).toBe(1);
+    expect(p.days[6].day).toBe(7);
+  });
+
+  it('A2: старт сразу после предыдущего соревнования → предупреждение о пустом тапере', () => {
+    const base = buildLMSPlan({ template: CYCLE_09K, pmMap, fallbackPm: 80, faithful: true, progressionEnabled: false, weeksOverride: CYCLE_09K.meta.weeks });
+    // Спаренные старты: competition на неделе 4 и 5 (вплотную, без промежуточной недели).
+    const weeks: LMSPlanWeek[] = base.weeks.slice(0, 7).map((w, i) => {
+      const macroPhase = (i + 1) === 4 || (i + 1) === 5 ? 'competition' : (i + 1) === 3 ? 'peak' : undefined;
+      return { ...w, macroPhase: macroPhase as LMSPlanWeek['macroPhase'] };
+    });
+    const res = applyMacroTaperToPLWeeks(weeks, { mode: 'classic', taperWeeksPerBlock: 2 });
+    // Второй старт (нед 5) не имеет недель под тапер — есть честное предупреждение.
+    expect(res.notes.some(n => n.includes('сразу после предыдущего соревнования'))).toBe(true);
   });
 });

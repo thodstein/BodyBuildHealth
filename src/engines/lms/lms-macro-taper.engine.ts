@@ -232,6 +232,14 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
     }
     if (applyCount > 0) notes.push(`📉 Тапер (${mode}): нед ${peakIdx.slice(-applyCount).map(i => out[i].week).join(', ')} — объём ↓, RIR ↑.`);
 
+    // A2-fix: старт ровно после предыдущего соревнования — недель под тапер/пик нет
+    // (цикл поиска peak-недель останавливается на предыдущем competition). Это крайний,
+    // но реальный кейс спаренных стартов; тапер физически негде разместить — честно
+    // предупреждаем, чтобы спортсмен снизил объём вручную.
+    if (applyCount === 0 && ci > 0 && out[ci - 1].macroPhase === 'competition') {
+      notes.push(`⚠ Старт (нед ${meet.week}) идёт сразу после предыдущего соревнования — нет недель для тапера/пика; при спаренных стартах снизьте объём вручную.`);
+    }
+
     // ── 3. Mock meet: неделя ЗА (applyCount+1) до старта (последняя перед peak-блоком) ──
     if (opts?.mockMeet) {
       const mockIdx = ci - applyCount - 1;

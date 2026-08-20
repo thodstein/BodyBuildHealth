@@ -5,10 +5,13 @@ import { describe, expect, it } from 'vitest';
 import { buildPLPeakWeekCutProtocol } from '../lms-taper-coach.engine';
 
 describe('buildPLPeakWeekCutProtocol', () => {
-  it('не нужна сгонка, если вес уже в категории', () => {
+  it('не нужна сгонка, если вес уже в категории — протокол деплеции пуст (A1)', () => {
     const p = buildPLPeakWeekCutProtocol(80, 80);
     expect(p.needed).toBe(false);
-    expect(p.days.length).toBe(7);
+    // A1-fix: при needed=false не отдаём агрессивный протокол вода/натрий/карбы
+    // (показ манипуляции без необходимости вводит в заблуждение и опасен).
+    expect(p.days.length).toBe(0);
+    expect(p.summary).toContain('не требуется');
   });
 
   it('нужна сгонка: 7-дневный протокол вода/натрий/карбы, вода ↓ к старту', () => {

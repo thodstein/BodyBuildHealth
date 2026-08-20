@@ -700,7 +700,11 @@ export function buildPLPeakWeekCutProtocol(
     ? `Сгонка ${toCutKg.toFixed(1)} кг к категории (пик-неделя ≈${capKg.toFixed(1)} кг вода+гликоген): вода ↓ 6→2 л, натрий ↓ 4→0.5 г, карбы ↓ 4→1 г/кг, взвешивание утром старта.`
     : 'Вес уже в категории — манипуляция водой/натрием не требуется (опционально лёгкий протокол).';
 
-  return { needed, toCutKg, peakWeekCapKg: capKg, days: base, summary, warnings };
+  // A1-fix: при needed=false (вес уже в категории) НЕ отдаём агрессивный протокол деплеции
+  // (вода 6→2 л, натрий 4→0.5 г) — показывать манипуляцию, когда она не нужна, вводит
+  // в заблуждение и опасно (риск дегидратации без необходимости). Дни протокола пусты;
+  // UI и так скрывает карточку сгонки при !needed.
+  return { needed, toCutKg, peakWeekCapKg: capKg, days: needed ? base : [], summary, warnings };
 }
 
 export { buildPLTaperCurve };
