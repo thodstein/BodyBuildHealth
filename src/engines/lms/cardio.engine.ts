@@ -1641,6 +1641,29 @@ export function assignSessionDays(sessions: CardioSession[], legDays?: number[],
   return out;
 }
 
+/** Сессия недели, попавшая на день тяжёлых ног. */
+export interface CardioLegDayConflict {
+  dayOfWeek: number;
+  sessions: CardioSession[];
+}
+
+/** Сессии недели, чей день (Пн=0) совпадает с днём тяжёлых ног цикла
+ *  (zone2/miss/hiit — конфликт; recovery — лёгкое, не конфликт). */
+export function cardioWeekLegConflicts(cycle: CardioCycle, weekNo: number): CardioLegDayConflict[] {
+  const leg = new Set((cycle.config?.legDays ?? []).filter(d => d >= 0 && d <= 6));
+  if (leg.size === 0) return [];
+  const w = cycle.weeks.find(x => x.week === weekNo);
+  if (!w) return [];
+  const laid = spreadSessionsAcrossDays(w);
+  const out: CardioLegDayConflict[] = [];
+  for (let i = 0; i < 7; i++) {
+    if (!leg.has(i)) continue;
+    const sessions = laid.filter(s => s.dayOfWeek === i && s.type !== 'recovery');
+    if (sessions.length > 0) out.push({ dayOfWeek: i, sessions });
+  }
+  return out;
+}
+
 // ─── Совет по динамике веса (плато на сушке) ───
 
 export interface CardioWeightAdvice {

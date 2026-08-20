@@ -8,7 +8,7 @@ import {
   cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel,
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
   spreadSessionsAcrossDays, DAY_LABELS_RU, cardioWeekForDate,
-  cardioFitnessForecast, cardioCoachHints,
+  cardioFitnessForecast, cardioCoachHints, cardioWeekLegConflicts,
   CARDIO_GOAL_LABELS, CARDIO_PHASE_LABELS, CARDIO_VARIANT_LABELS,
   type CardioCycle, type CardioType, type CardioVariant, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
@@ -91,6 +91,9 @@ export const CardioPreviewStep: React.FC<{
     const w = cycle.weeks.find(x => x.week === clamped);
     return w ? spreadSessionsAcrossDays(w) : [];
   }, [cycle, weekNo]);
+
+  const legDays = useMemo(() => new Set((cycle?.config?.legDays ?? []).filter(d => d >= 0 && d <= 6)), [cycle]);
+  const legConflicts = useMemo(() => (cycle ? cardioWeekLegConflicts(cycle, Math.max(1, Math.min(cycle.totalWeeks, weekNo))) : []), [cycle, weekNo]);
 
   const goCurrentWeek = () => {
     if (!cycle) return;
@@ -379,16 +382,17 @@ export const CardioPreviewStep: React.FC<{
         </div>
         <div className="cardio-day-grid" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {DAY_LABELS_RU.map((d, i) => {
+            const isLeg = legDays.has(i);
             const sess = weekDays.filter(s => s.dayOfWeek === i);
             return (
-              <div key={d} style={DAY_CELL}>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 3 }}>{d}</div>
+              <div key={d} style={{ ...DAY_CELL, ...(isLeg ? { background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)' } : {}) }}>
+                <div style={{ color: isLeg ? '#fbbf24' : 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 3 }}>{d}{isLeg ? ' 🦵' : ''}</div>
                 {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
                   <button
                     key={j}
                     onClick={() => setSelectedSession({ week: Math.min(cycle.totalWeeks, Math.max(1, weekNo)), dayOfWeek: i })}
                     title="Показать протокол сессии"
-                    style={{ color: '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 10 }}
+                    style={{ color: isLeg ? '#f87171' : '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 10 }}
                     aria-label={`Протокол: ${TYPE_LABEL[s.type]} ${d}`}
                   >
                     {TYPE_LABEL[s.type]} {s.durationMin}м{s.equipment ? ` ${cardioEquipmentLabel(s.equipment)}` : ''}
@@ -398,6 +402,16 @@ export const CardioPreviewStep: React.FC<{
             );
           })}
         </div>
+        {legDays.size > 0 && (
+          <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.8)' }}>
+            🦵 Дни тяжёлых ног: {DAY_LABELS_RU.filter((_, i) => legDays.has(i)).join(', ')} — интенсивное кардио на них не ставится (recovery — можно).
+          </div>
+        )}
+        {legConflicts.length > 0 && (
+          <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '7px 10px' }} role="alert">
+            ⚠ Нед {Math.max(1, Math.min(cycle.totalWeeks, weekNo))}: на дне ног ({legConflicts.map(c => DAY_LABELS_RU[c.dayOfWeek]).join(', ')}) оказались сессии — перенесите их на шаге «Конструктор недели».
+          </div>
+        )}
         {selectedSession && (() => {
           const w = cycle.weeks.find(x => x.week === selectedSession.week);
           const s = w?.sessions.find(x => x.dayOfWeek === selectedSession.dayOfWeek);

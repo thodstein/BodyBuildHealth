@@ -182,6 +182,32 @@ describe('CardioWeekEditor', () => {
     expect(w2.sessions.map(s => `${s.type}:${s.durationMin}`)).toEqual(w1.sessions.map(s => `${s.type}:${s.durationMin}`));
     expect(w2.totalMinutes).toBe(w1.totalMinutes);
   });
+
+  it('SSR: дни тяжёлых ног отмечены в раскладке и в футере', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, legDays: [0, 3] });
+    const html = renderToStaticMarkup(<CardioWeekEditor cycle={c} />);
+    expect(html).toContain('Пн 🦵');
+    expect(html).toContain('Чт 🦵');
+    expect(html).toContain('Дни тяжёлых ног: Пн, Чт');
+  });
+
+  it('сессия на дне ног показывает предупреждение (role=alert)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'we-6', legDays: [0] });
+    c.weeks[0].sessions = [{ type: 'zone2', durationMin: 30, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 210, purpose: 'x', dayOfWeek: 0 }];
+    render(<CardioWeekEditor cycle={c} />);
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some(a => a.textContent!.includes('Сессии на дне ног (Пн)'))).toBe(true);
+  });
+
+  it('редактор сессий: день ног помечен в селекторе дня + предупреждение в строке', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'we-7', legDays: [0] });
+    c.weeks[0].sessions = [{ type: 'zone2', durationMin: 30, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 210, purpose: 'x', dayOfWeek: 0 }];
+    render(<CardioWeekEditor cycle={c} />);
+    fireEvent.click(screen.getByRole('button', { name: /Редактировать сессии/ }));
+    expect(screen.getByRole('option', { name: 'Пн (ноги)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Вт' })).toBeTruthy();
+    expect(screen.getByText(/⚠ ноги/)).toBeTruthy();
+  });
 });
 
 describe('CardioVolumeChart', () => {

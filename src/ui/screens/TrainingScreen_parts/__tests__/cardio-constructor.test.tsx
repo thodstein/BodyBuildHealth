@@ -178,6 +178,19 @@ describe('CardioConstructor — CSR', () => {
     expect(saved.goal).toBe('cut');
   });
 
+  it('дни ног: выбор чипов → предпросмотр отмечает их в «Неделя по дням»', () => {
+    render(<CardioConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ноги: Чт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    expect(screen.getByText(/Дни тяжёлых ног: Пн, Чт/)).toBeTruthy();
+    expect(screen.getAllByText(/🦵/).length).toBeGreaterThanOrEqual(2);
+    const saved = loadCardioCycles()[0];
+    expect(saved.config?.legDays).toEqual([0, 3]);
+  });
+
   it('шаг 4: подключение к ПЛ-авто фиксируется в cardio-bridge', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));

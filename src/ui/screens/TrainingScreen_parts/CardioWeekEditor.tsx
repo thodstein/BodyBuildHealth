@@ -8,7 +8,7 @@ import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle, kcalForCardio,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight,
+  cardioWeekForDate, cardioSafetyReport, cycleBodyWeight, cardioWeekLegConflicts,
   type CardioCycle, type CardioType, type CardioSession, type CardioWeek,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
@@ -95,6 +95,9 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
 
   const safety = useMemo(() => (week ? cardioSafetyReport({ ...cycle!, weeks: [week] }).warnings : []), [week, cycle]);
 
+  const legDays = useMemo(() => new Set((cycle?.config?.legDays ?? []).filter(d => d >= 0 && d <= 6)), [cycle]);
+  const legConflicts = useMemo(() => (cycle && week ? cardioWeekLegConflicts(cycle, week.week) : []), [cycle, week]);
+
   const bw = cycle ? cycleBodyWeight(cycle) : 80;
 
   const scaleMinutes = (mult: number) => saveWeek(w => ({
@@ -136,15 +139,21 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       {safety.length > 0 && safety.map((s, i) => (
         <div key={i} style={{ fontSize: 10, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '5px 8px' }} role="alert">⚠ {s}</div>
       ))}
+      {legConflicts.length > 0 && (
+        <div style={{ fontSize: 10, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '5px 8px' }} role="alert">
+          ⚠ Сессии на дне ног ({legConflicts.map(c => DAY_LABELS_RU[c.dayOfWeek]).join(', ')}) — интенсивное кардио лучше перенести на свободный день.
+        </div>
+      )}
 
       <div className="cardio-day-grid" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {DAY_LABELS_RU.map((d, i) => {
+          const isLeg = legDays.has(i);
           const sess = days.filter(s => s.dayOfWeek === i);
           return (
-            <div key={d} style={DAY_CELL}>
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 2 }}>{d}</div>
+            <div key={d} style={{ ...DAY_CELL, ...(isLeg ? { background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)' } : {}) }}>
+              <div style={{ color: isLeg ? '#fbbf24' : 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 2 }}>{d}{isLeg ? ' 🦵' : ''}</div>
               {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
-                <div key={j} style={{ color: '#4ade80', fontWeight: 600, whiteSpace: 'nowrap' }}>{TYPE_SHORT[s.type]} {s.durationMin}м</div>
+                <div key={j} style={{ color: isLeg && s.type !== 'recovery' ? '#f87171' : '#4ade80', fontWeight: 600, whiteSpace: 'nowrap' }}>{TYPE_SHORT[s.type]} {s.durationMin}м</div>
               ))}
             </div>
           );
@@ -168,8 +177,11 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
               </select>
               <select value={s.dayOfWeek != null ? String(s.dayOfWeek) : ''} onChange={e => updateSession(idx, { dayOfWeek: e.target.value === '' ? undefined : Number(e.target.value) })} style={SEL} aria-label={`День недели сессии ${idx + 1}`}>
                 <option value="">Авто</option>
-                {DAY_LABELS_RU.map((d, di) => <option key={di} value={di}>{d}</option>)}
+                {DAY_LABELS_RU.map((d, di) => <option key={di} value={di}>{d}{legDays.has(di) ? ' (ноги)' : ''}</option>)}
               </select>
+              {s.dayOfWeek != null && legDays.has(s.dayOfWeek) && s.type !== 'recovery' && (
+                <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title="День тяжёлых ног — интенсивное кардио лучше перенести">⚠ ноги</span>
+              )}
               <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>мин ×</span>
               <button style={{ ...BTN, minHeight: 30, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
@@ -189,7 +201,9 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       )}
 
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
-        Раскладка по дням — ориентировочная (без учёта силовых тренировок); точные дни задайте в дневнике.
+        {legDays.size > 0
+          ? `🦵 Дни тяжёлых ног: ${DAY_LABELS_RU.filter((_, i) => legDays.has(i)).join(', ')} — интенсивное кардио на них не ставится (recovery — можно в любой день); точные дни задайте в дневнике.`
+          : 'Раскладка по дням — ориентировочная (без учёта силовых тренировок); точные дни задайте в дневнике.'}
       </div>
     </div>
   );

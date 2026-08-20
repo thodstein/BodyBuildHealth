@@ -14,6 +14,7 @@ import {
   buildCardioSummaryText,
   cardioPlanVariants, explainCardioChoice, improveCardioCycle, cardioSessionProtocol,
   assignSessionDays, loadCardioScenarios, saveCardioScenario, removeCardioScenario,
+  cardioWeekLegConflicts,
   cardioWeightAdvice, buildCardioIcs, cardioNextSession, cardioCycleToUserProgram,
   bumpCardioZone2Volume, cardioSafetyReport, configFromCycle,
   cardioProfileFactors, cardioNutritionNotes,
@@ -825,6 +826,55 @@ describe('assignSessionDays / legDays', () => {
     const sessions = [{ type: 'zone2' as const, durationMin: 30, weeklyFrequency: 2, intensity: 'moderate' as const, kcalPerSession: 210, purpose: 'x', dayOfWeek: 5 }];
     const out = assignSessionDays(sessions, [0, 1, 2, 3, 4]);
     expect(out[0].dayOfWeek).toBe(5);
+  });
+});
+
+describe('cardioWeekLegConflicts', () => {
+  it('без дней ног в конфиге — конфликтов нет', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4 });
+    expect(cardioWeekLegConflicts(c, 1)).toEqual([]);
+  });
+
+  it('авто-раскладка обходит дни ног — конфликтов нет', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 6, daysAvailable: 5, legDays: [0, 3] });
+    expect(cardioWeekLegConflicts(c, 1)).toEqual([]);
+    expect(cardioWeekLegConflicts(c, 6)).toEqual([]);
+  });
+
+  it('сессия с явным днём недели на дне ног — конфликт', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lc-1' });
+    c.config = { ...c.config!, legDays: [0] };
+    c.weeks[0].sessions = [{ type: 'zone2', durationMin: 30, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 210, purpose: 'x', dayOfWeek: 0 }];
+    const out = cardioWeekLegConflicts(c, 1);
+    expect(out).toHaveLength(1);
+    expect(out[0].dayOfWeek).toBe(0);
+    expect(out[0].sessions[0].type).toBe('zone2');
+  });
+
+  it('recovery на дне ног — не конфликт (лёгкое кардио допустимо)', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lc-2' });
+    c.config = { ...c.config!, legDays: [0] };
+    c.weeks[0].sessions = [{ type: 'recovery', durationMin: 20, weeklyFrequency: 1, intensity: 'low', kcalPerSession: 90, purpose: 'x', dayOfWeek: 0 }];
+    expect(cardioWeekLegConflicts(c, 1)).toEqual([]);
+  });
+
+  it('конфликты по нескольким дням ног группируются по дням', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lc-3' });
+    c.config = { ...c.config!, legDays: [0, 3] };
+    c.weeks[0].sessions = [
+      { type: 'zone2', durationMin: 30, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 210, purpose: 'x', dayOfWeek: 0 },
+      { type: 'hiit', durationMin: 20, weeklyFrequency: 1, intensity: 'high', kcalPerSession: 220, purpose: 'x', dayOfWeek: 3 },
+      { type: 'zone2', durationMin: 40, weeklyFrequency: 1, intensity: 'moderate', kcalPerSession: 280, purpose: 'x', dayOfWeek: 0 },
+    ];
+    const out = cardioWeekLegConflicts(c, 1);
+    expect(out).toHaveLength(2);
+    expect(out.find(x => x.dayOfWeek === 0)!.sessions).toHaveLength(2);
+    expect(out.find(x => x.dayOfWeek === 3)!.sessions).toHaveLength(1);
+  });
+
+  it('неделя вне диапазона — пусто', () => {
+    const c = buildCardioCycle({ goal: 'cut', totalWeeks: 4, id: 'lc-4', legDays: [0] });
+    expect(cardioWeekLegConflicts(c, 99)).toEqual([]);
   });
 });
 
