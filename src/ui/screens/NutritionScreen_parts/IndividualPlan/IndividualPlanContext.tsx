@@ -62,6 +62,7 @@ export interface PlanCtx {
   periodizationEnabled: boolean; setPeriodizationEnabled: (v: boolean) => void;
   trainType: string; setTrainType: (v: any) => void;
   trainIntensity: string; setTrainIntensity: (v: any) => void;
+  intraWorkoutEnabled: boolean; setIntraWorkoutEnabled: (v: boolean) => void;
   bodyFatPct: number; setBodyFatPct: (v: number) => void;
   sleepHours: number; setSleepHours: (v: number) => void;
   sleepQuality: number; setSleepQuality: (v: number) => void;
@@ -315,6 +316,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   const [trainType, setTrainType] = useState<'strength' | 'cardio' | 'mixed' | 'hiit'>((['strength', 'cardio', 'mixed', 'hiit'] as const).includes(_pf.trainType as any) ? _pf.trainType : 'strength');
   const [trainIntensity, setTrainIntensity] = useState<'low' | 'medium' | 'high'>((['low', 'medium', 'high'] as const).includes(_pf.trainIntensity as any) ? _pf.trainIntensity : 'medium');
+  // Этап 3 (Пробел-5): явный переключатель intra-workout (не жёстко 'high').
+  // По умолчанию вкл.; доступен и для medium/low (движок сам гейтит по длительности ≥75 мин).
+  const [intraWorkoutEnabled, setIntraWorkoutEnabled] = useState<boolean>(typeof _pf.intraWorkoutEnabled === 'boolean' ? _pf.intraWorkoutEnabled : true);
   const [householdActivity, setHouseholdActivity] = useState<'sedentary' | 'light' | 'moderate' | 'active'>((['sedentary', 'light', 'moderate', 'active'] as const).includes(_pf.householdActivity as any) ? _pf.householdActivity : 'light');
   const [bodyFatPct, setBodyFatPct] = useState<number>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings) через proxy
@@ -777,13 +781,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try {
       safeWriteJSON('he_planner_prefs', {
         cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled,
-        trainType, trainIntensity, householdActivity, cyclePhase, hungerLevel,
+        trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel,
         weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct,
         dietPauseMode, weightLogPeriod, phase, nutrLevel, budget, variety,
         lunchTime, dinnerTime, workFood, planType,
       });
     } catch {}
-  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, trainType, trainIntensity, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, weightLogPeriod, phase, nutrLevel, budget, variety, lunchTime, dinnerTime, workFood, planType]);
+  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, weightLogPeriod, phase, nutrLevel, budget, variety, lunchTime, dinnerTime, workFood, planType]);
   // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => {
     try {
@@ -1787,7 +1791,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
           mealsCount, isTrainingDay: isTrainDay(offset),
           trainStartMin: linkToTraining && isTrainDay(offset) ? toMin(trainStart) : undefined,
-          allowIntraWorkout: trainIntensity === 'high',
+          allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds: (() => { const s = new Set(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
@@ -2958,6 +2962,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     lazyDayMode, setLazyDayMode, lazyDayDays, setLazyDayDays,
     periodizationEnabled, setPeriodizationEnabled,
     trainType, setTrainType, trainIntensity, setTrainIntensity,
+    intraWorkoutEnabled, setIntraWorkoutEnabled,
     householdActivity, setHouseholdActivity,
     bodyFatPct, setBodyFatPct, sleepHours, setSleepHours,
     sleepQuality, setSleepQuality, stressLevel, setStressLevel,
@@ -3046,7 +3051,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [weight, height, age, sex, dailySteps, cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, mealsCount, allergens, healthIssues, eveningLowCarb, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, renderMealList, annualPhase }), [ctx, plannerMode, renderMealList, annualPhase]);

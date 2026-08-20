@@ -55,6 +55,7 @@ export const IndividualPlanSettings: React.FC = () => {
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
     trainType, setTrainType, trainIntensity, setTrainIntensity,
+    intraWorkoutEnabled, setIntraWorkoutEnabled,
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
     sleepHours, setSleepHours, sleepQuality, setSleepQuality,
     stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, applyBBPeakToPlan, planTab, setPlanTab, lifeStage, setLifeStage,
@@ -383,6 +384,11 @@ export const IndividualPlanSettings: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupSelect label="🏋️ Тип тренировок" value={trainType} options={[{id:'strength',label:'Силовые'},{id:'cardio',label:'Кардио'},{id:'mixed',label:'Смешанные'},{id:'hiit',label:'HIIT'}]} onChange={v => setTrainType(v as string)} />
           <PopupSelect label="📊 Интенсивность" value={trainIntensity} options={[{id:'low',label:'Низкая'},{id:'medium',label:'Средняя'},{id:'high',label:'Высокая'}]} onChange={v => setTrainIntensity(v as string)} />
+        </div>
+        <div style={{ marginBottom: 6 }}>
+          <button onClick={() => setIntraWorkoutEnabled(!intraWorkoutEnabled)} style={{ width:'100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, textAlign:'left', background: intraWorkoutEnabled ? 'rgba(34,197,94,0.08)' : '#202023', border:`1px solid ${intraWorkoutEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: intraWorkoutEnabled ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
+            🏋️ Intra-workout (углеводы+изотоник во время тренировки): {intraWorkoutEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupNumber label="🧈 % жира" value={bodyFatPct} min={3} max={60} step={0.5} suffix="%" onChange={setBodyFatPct} />

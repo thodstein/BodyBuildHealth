@@ -42,7 +42,7 @@ export interface Meal {
   label: string; time: string;
   items: MealItem[];
   totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number };
-  type: 'breakfast' | 'lunch' | 'snack' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
+  type: 'breakfast' | 'lunch' | 'snack' | 'snack2' | 'preworkout' | 'intra' | 'postworkout' | 'dinner' | 'presleep';
   rationale: string[];
   mpsCheck?: { proteinG: number; leucineG: number; triggers_mTOR: boolean };
   target?: { p: number; c: number; f: number };
@@ -567,6 +567,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     )),
     eaa: FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && f.id === 'supp_eaa') ?? FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && f.id === 'bcaa'),
     dextrin: FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && (f.id === 'amylopectin' || f.id === 'dextrose')),
+    // Этап 3 (Пробел-4): изотоник/электролиты для intra — не только EAA+декстрин.
+    isotonic: FOOD_DB.find(f => !excludedIds.has(f.id) && !matchesAllergenTags(f) && (f.id === 'isotonic' || f.id === 'drink_isotonic')),
   };
 }
 
@@ -962,6 +964,12 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
   } else {
     items.push({ id: 'cyclic_dextrin', name: 'Циклический декстрин', amount: _intraCarbG, kcal: _intraCarbG * 4, p: 0, f: 0, c: _intraCarbG, fiber: 0, role: 'liquid' });
   }
+  // Этап 3 (Пробел-4): изотоник/электролиты (Na/K/Mg) в intra — углеводы + регидрация.
+  // Доза: раствор ~6-8% — 25 г порошка на порцию (содержит Na 400/ K 200 / Mg 60 мг).
+  if (pool.isotonic) {
+    const _isoG = Math.min(25, SUPPLEMENT_MAX_G[pool.isotonic.id] ?? 25);
+    items.push(makeItem(pool.isotonic, _isoG, 'liquid'));
+  }
 
   const totals = items.reduce((acc, it) => ({
     kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
@@ -973,7 +981,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
     rationale: [
       `EAA ${INTRA_EAA_G} г — предотвращение катаболизма во время длительной (>60 мин) сессии`,
       `Циклодекстрин ${_intraCarbG} г — поддержание глюкозы и гликогена (доля от дневного КБЖУ)`,
-      `Без жиров — максимальная скорость gastric emptying`,
+      pool.isotonic ? `Изотоник (${pool.isotonic.name}) — Na/K/Mg электролиты + углеводы, регидрация во время сессии` : 'Без жиров — максимальная скорость gastric emptying',
     ],
   };
 }
@@ -1405,7 +1413,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const snack2Rot = rotationForMeal(5);
     const tSnack2 = (() => { const [lh, lm] = tLunch.split(':').map(Number); const [dh, dm] = tDinner.split(':').map(Number); const mid = Math.round(((lh*60+lm) + (dh*60+dm)) / 2); const [bh, bm] = tBed.split(':').map(Number); const bedMin2 = bh*60+bm; const afterDinner = Math.round(((dh*60+dm) + bedMin2) / 2); return mid > (dh*60+dm - 90) ? String(Math.floor(afterDinner/60)).padStart(2,'0') + ':' + String(afterDinner%60).padStart(2,'0') : String(Math.floor(mid/60)).padStart(2,'0') + ':' + String(mid%60).padStart(2,'0'); })();
     const snack2 = buildWholeMeal({
-      label: 'Перекус', time: tSnack2, type: 'snack',
+      label: 'Перекус', time: tSnack2, type: 'snack2',
       mealPreferredIds: input.preferredByMeal?.['Перекус'],
     preferredByMealFull: input.preferredByMeal,
     proteinG: mealBudget.snack2.p, carbG: mealBudget.snack2.c, fatG: mealBudget.snack2.f,

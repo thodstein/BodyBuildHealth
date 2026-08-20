@@ -28,6 +28,27 @@ describe('Этап 2: intra/preSleep углеводы (БАГ-10)', () => {
     expect(intra?.items.some(it => it.role === 'liquid' && it.c > 0)).toBe(true);
   });
 
+  it('Этап 3: intra включает изотоник/электролиты (не только EAA+декстрин)', () => {
+    const plan = buildDayPlan(trainInput());
+    const intra = plan.meals.find(m => m.type === 'intra');
+    expect(intra).toBeTruthy();
+    // В intra должен быть изотонический пункт (Na/K/Mg электролиты) + EAA + декстрин.
+    const isotonic = intra?.items.find(it => (it.name || '').toLowerCase().includes('изотон'));
+    expect(isotonic).toBeTruthy();
+    expect(intra?.items.some(it => (it.name || '').toLowerCase().includes('eaa') || it.role === 'fast_protein')).toBe(true);
+    expect(intra?.items.some(it => it.role === 'liquid' && it.c > 0)).toBe(true);
+  });
+
+  it('Этап 3: второй перекус имеет отдельный тип snack2 (не сливается со snack)', () => {
+    const plan = buildDayPlan(trainInput({ mealsCount: 8 }));
+    const snack2 = plan.meals.find(m => m.type === 'snack2');
+    const snack = plan.meals.find(m => m.type === 'snack');
+    // 8 приёмов на тренинге → snack не строится (только peri-workout), но snack2 тип различим.
+    expect(snack2).toBeTruthy();
+    expect(snack2?.label).toBe('Перекус');
+    expect(snack?.type).not.toBe('snack2');
+  });
+
   it('intra не использует фикс. 40 г — углеводы масштабируются от дневного бюджета', () => {
     // Высокоуглеводный план → intra получает БОЛЬШЕ углеводов, чем низкоуглеводный.
     const hi = buildDayPlan(trainInput({ goalCarbsG: 520 }));

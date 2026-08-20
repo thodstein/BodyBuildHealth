@@ -22,6 +22,33 @@ const _dayMicrosCache = new WeakMap<object, { visibleMicros: any[] } | null>();
 // FIX week-perf: findSimilarFoods сканирует FOOD_DB+сортирует — кэш по объекту продукта
 const _similarFoodsCache = new WeakMap<object, any[]>();
 
+// Этап 3 (Пробел-1): редактирование времени отдельного приёма. Вынесено на уровень модуля,
+// чтобы избежать хрупкого JSX-inline-парсинга. Возвращает новую копию dayPlan или null при отмене.
+function shiftMealTime(plan: any, mealIdx: number, saveUndo: () => void, setDayPlan: (v: any) => void): void {
+  const cur = plan?.meals?.[mealIdx]?.time || '12:00';
+  const res = window.prompt('🕒 Время приёма (ЧЧ:ММ):', cur);
+  if (!res) return;
+  const mt = res.trim().split(':');
+  if (mt.length !== 2) return;
+  const h = parseInt(mt[0], 10);
+  const mm = parseInt(mt[1], 10);
+  if (isNaN(h) || isNaN(mm) || h < 0 || h > 23 || mm < 0 || mm > 59) return;
+  const nt = (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+  saveUndo();
+  setDayPlan((prev: any) => {
+    if (!prev) return prev;
+    const meals = prev.meals.slice();
+    if (meals[mealIdx]) meals[mealIdx] = Object.assign({}, meals[mealIdx], { time: nt });
+    const totals = {
+      kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0),
+      p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0),
+      f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0),
+      c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0),
+    };
+    return { ...prev, meals, totals };
+  });
+}
+
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal } = ctx;
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
@@ -94,17 +121,18 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
            const mealDiaas = { diaas: _mm?.diaas || 0 };
            const mealGL = _mm?.gl || 0;
            const mealII = _mm?.ii || 0;
-          const isPreWorkout = m.label?.toLowerCase().includes('предтрен'); const isPostWorkout = m.label?.toLowerCase().includes('пост-трен'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : '#00e68a';
+          const isPreWorkout = m.label?.toLowerCase().includes('предтрен') || m.type === 'preworkout'; const isPostWorkout = m.label?.toLowerCase().includes('пост-трен') || m.type === 'postworkout'; const isIntraWorkout = m.type === 'intra' || m.label?.toLowerCase().includes('intra'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : isIntraWorkout ? '#22c55e' : '#00e68a';
           return (
-            <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}
+            <div key={mi} style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:`1px solid ${dropTarget===mi?'rgba(0,230,138,0.4)':isPreWorkout?'rgba(139,92,246,0.2)':isPostWorkout?'rgba(245,158,11,0.2)':isIntraWorkout?'rgba(34,197,94,0.2)':'rgba(255,255,255,0.15)'}`,transition:'all 0.2s',background:dropTarget===mi?'rgba(0,230,138,0.04)':undefined}}
               onDragOver={e=>{e.preventDefault();setDropTarget(mi);}} onDragLeave={()=>setDropTarget(null)} onDrop={e=>{e.preventDefault();if(draggedItem&&draggedItem.mealIdx!==mi)moveFoodItem(draggedItem.mealIdx,mi,draggedItem.itemIdx);setDropTarget(null);}}>
-              <div style={{padding:'7px 10px 5px',background:isPreWorkout?'rgba(139,92,246,0.06)':isPostWorkout?'rgba(245,158,11,0.06)':'#202023',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+              <div style={{padding:'7px 10px 5px',background:isPreWorkout?'rgba(139,92,246,0.06)':isPostWorkout?'rgba(245,158,11,0.06)':isIntraWorkout?'rgba(34,197,94,0.06)':'#202023',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
                 <div style={{display:'flex',alignItems:'center',gap:5}}>
                   <span style={{fontSize:8,fontWeight:600,color:'rgba(255,255,255,0.85)'}}>{m.time}</span>
                   <span style={{width:3,height:12,borderRadius:2,background:accentColor}}/>
                   <span style={{fontSize:10,fontWeight:700,color:accentColor}}>{m.label}</span>
                   {isPreWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(139,92,246,0.15)',color:'#a855f7',fontWeight:600}}>ДО</span>}
                   {isPostWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(245,158,11,0.15)',color:'#f59e0b',fontWeight:600}}>ПОСЛЕ</span>}
+                  {isIntraWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(34,197,94,0.15)',color:'#22c55e',fontWeight:600}}>ВО ВРЕМЯ</span>}
                   {d.timingScores?.[mi] && (
                     <span style={{fontSize:10,padding:'1px 5px',borderRadius:4,fontWeight:600,
                       background:d.timingScores[mi].status==='ideal'?'rgba(34,197,94,0.1)':d.timingScores[mi].status==='good'?'rgba(245,158,11,0.1)':'rgba(239,68,68,0.08)',
@@ -116,6 +144,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:4}}>
                   <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{mealKcal} ккал</span>
+                  <span onClick={()=>shiftMealTime(dayPlan, mi, saveUndo, setDayPlan)} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
                   <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
                   <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
                   <span onClick={()=>{saveUndo();const copy=JSON.parse(JSON.stringify(dayPlan?.meals?.[mi]));if(!copy)return;setDayPlan((prev:any)=>{if(!prev)return prev;const meals=[...prev.meals];const insertAt=Math.min(mi+1,meals.length);const dup={...copy,label:copy.label+' (копия)',time:(()=>{const[h,m]=(copy.time||'12:00').split(':').map(Number);const t=h*60+m+30;return`${String(Math.floor(t/60)%24).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`})()};meals.splice(insertAt,0,dup);const totals={kcal:meals.reduce((s:number,m2:any)=>s+(m2.totals?.kcal||0),0),p:meals.reduce((s:number,m2:any)=>s+(m2.totals?.p||0),0),f:meals.reduce((s:number,m2:any)=>s+(m2.totals?.f||0),0),c:meals.reduce((s:number,m2:any)=>s+(m2.totals?.c||0),0)};return{...prev,meals,totals}});}} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
