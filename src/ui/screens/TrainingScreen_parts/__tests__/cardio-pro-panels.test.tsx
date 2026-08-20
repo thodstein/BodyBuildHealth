@@ -327,6 +327,16 @@ describe('CardioSessionTimer', () => {
     expect(next).not.toBeNull();
     unmount();
   });
+
+  it('после завершения сессии показывается ориентир дистанции (км/ч) рядом с полем км', () => {
+    const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, id: 't-8' });
+    const { unmount } = render(<CardioSessionTimer cycle={c} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Старт/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Завершить/ }));
+    expect(screen.getByRole('textbox', { name: /Км/ })).toBeTruthy();
+    expect(screen.getByText(/Ориентир: ~.* км при .* км\/ч/)).toBeTruthy();
+    unmount();
+  });
 });
 
 describe('CardioProgressCard', () => {

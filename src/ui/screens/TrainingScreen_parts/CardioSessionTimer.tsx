@@ -9,7 +9,7 @@ import {
   cardioEquipmentLabel,
   type CardioCycle, type CardioType, type CardioEquipment,
 } from '../../../engines/lms/cardio.engine';
-import { saveCardioLogEntry, estimateCardioEntryKcal } from '../../../engines/lms/cardio-diary.engine';
+import { saveCardioLogEntry, estimateCardioEntryKcal, cardioExpectedDistanceHint } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
 
@@ -194,6 +194,12 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
             <button style={BTN_PRIMARY} onClick={save}>💾 Сохранить в дневник</button>
           </div>
+          {(() => {
+            const hint = cardioExpectedDistanceHint(finished.type, finished.durationMin);
+            return hint ? (
+              <div style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)', lineHeight: 1.4 }}>💡 Ориентир: {hint} — темп покажется в журнале после сохранения.</div>
+            ) : null;
+          })()}
         </div>
       )}
 

@@ -12,7 +12,7 @@ import {
   loadCardioCycles, saveCardioCycle, removeCardioCycle,
   loadActiveCardioCycle, setActiveCardioCycle,
   buildCardioIcs, buildCardioPrintHtml, compareCardioCycles, formatCardioComparison,
-  cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel,
+  cardioSessionsForDate, cardioWeekForDate, cardioEquipmentLabel, cardioCycleSummary,
   cardioPlanVariants, explainCardioChoice, saveCardioCycleVersion,
   loadCardioScenarios, saveCardioScenario, removeCardioScenario,
   bumpCardioZone2Volume,
@@ -745,45 +745,63 @@ export const CardioConstructor: React.FC = () => {
 
   return (
     <div className="cardio-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', minWidth: 0, maxWidth: '100%' }}>
-      {/* Шапка мастера */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>❤️ Кардио-конструктор</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {autoModeOn && (
-            <div style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: 16, padding: '3px 10px' }} title="Авто-режим: подстройка по дневнику на шаге «Дневник»">
-              🔄 авто-режим
-            </div>
-          )}
-          {nextStartInfo && nextStartInfo.left > 0 && (
-            <div style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 16, padding: '3px 10px' }}>
-              🏁 до старта: {nextStartInfo.left} нед
-            </div>
-          )}
-          {todayCardio && todayCardio.sessions.length > 0 && (
-            <button
-              onClick={() => setStep('diary')}
-              title="Перейти к дневнику и быстрому старту"
-              style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px', cursor: 'pointer' }}
-            >
-              🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')} ▶️
-            </button>
-          )}
-          {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
-          {prepPlan && (
-            <button
-              onClick={fromPrepPlan}
-              title={`Собрать кардио из prep-плана ББ: шоу ${prepPlan.showDate}, подготовка ${prepPlan.preparation.weeks} нед, taper ${prepPlan.taper.weeks} нед`}
-              aria-label="Собрать кардио из prep-плана"
-              style={{ fontSize: 11, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.35)', borderRadius: 16, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-            >
-              ⚙️ Из prep-плана ({prepPlan.preparation.weeks} нед)
-            </button>
-          )}
-          {peakWeekInfo && (
-            <div style={{ fontSize: 11, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 16, padding: '4px 10px' }} title="Пик-неделя кардио: только лёгкая активность, без HIIT">
-              🎭 Пик-неделя: нед {peakWeekInfo.week} ({peakWeekInfo.range})
-            </div>
-          )}
+      {/* Шапка мастера: прогресс + статусы + сводка активного цикла */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 16, background: 'linear-gradient(180deg, rgba(0,230,138,0.08), rgba(0,230,138,0.02))', border: '1px solid rgba(0,230,138,0.3)', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a' }}>❤️ Кардио-конструктор</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Шаг {stepIdx + 1} из {STEPS.length} — {STEPS[stepIdx].label}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {cycle && (() => {
+              const s = cardioCycleSummary(cycle);
+              return (
+                <>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 14, padding: '3px 10px' }} title="Средняя нагрузка цикла">{s.avgMinutesPerWeek} мин/нед</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 14, padding: '3px 10px' }} title="Средний расход цикла">{s.avgKcalPerWeek} ккал/нед</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 14, padding: '3px 10px' }} title="Длительность цикла">{cycle.totalWeeks} нед</span>
+                </>
+              );
+            })()}
+            {autoModeOn && (
+              <div style={{ fontSize: 10, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: 16, padding: '3px 10px' }} title="Авто-режим: подстройка по дневнику на шаге «Дневник»">
+                🔄 авто-режим
+              </div>
+            )}
+            {nextStartInfo && nextStartInfo.left > 0 && (
+              <div style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 16, padding: '3px 10px' }}>
+                🏁 до старта: {nextStartInfo.left} нед
+              </div>
+            )}
+            {todayCardio && todayCardio.sessions.length > 0 && (
+              <button
+                onClick={() => setStep('diary')}
+                title="Перейти к дневнику и быстрому старту"
+                style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 16, padding: '3px 10px', cursor: 'pointer' }}
+              >
+                🔔 Сегодня (нед {todayCardio.week.week}): {todayCardio.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}${s.targetHr?.max ? ' · ЧСС ' + s.targetHr.min + '-' + s.targetHr.max : ''}`).join(' · ')} ▶️
+              </button>
+            )}
+            {cycle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '4px 10px' }}>⭐ {cycle.name}</div>}
+            {prepPlan && (
+              <button
+                onClick={fromPrepPlan}
+                title={`Собрать кардио из prep-плана ББ: шоу ${prepPlan.showDate}, подготовка ${prepPlan.preparation.weeks} нед, taper ${prepPlan.taper.weeks} нед`}
+                aria-label="Собрать кардио из prep-плана"
+                style={{ fontSize: 11, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.35)', borderRadius: 16, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                ⚙️ Из prep-плана ({prepPlan.preparation.weeks} нед)
+              </button>
+            )}
+            {peakWeekInfo && (
+              <div style={{ fontSize: 11, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 16, padding: '4px 10px' }} title="Пик-неделя кардио: только лёгкая активность, без HIIT">
+                🎭 Пик-неделя: нед {peakWeekInfo.week} ({peakWeekInfo.range})
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(((stepIdx + 1) / STEPS.length) * 100)}>
+          <div style={{ height: 5, borderRadius: 3, width: `${Math.round(((stepIdx + 1) / STEPS.length) * 100)}%`, background: 'linear-gradient(90deg, #00e68a, #34d399)', transition: 'width 0.3s ease' }} />
         </div>
       </div>
 
@@ -799,10 +817,11 @@ export const CardioConstructor: React.FC = () => {
               onClick={() => setStep(s.id)}
               style={{
                 flex: '1 0 auto', minWidth: 84, padding: '8px 6px', borderRadius: 9, cursor: 'pointer',
-                border: active ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-                background: active ? 'rgba(0,230,138,0.18)' : done ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                border: active ? '1px solid rgba(0,230,138,0.6)' : done ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                background: active ? 'linear-gradient(180deg, rgba(0,230,138,0.3), rgba(0,230,138,0.12))' : done ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
                 color: active ? '#fff' : 'var(--text-dim)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                 fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+                boxShadow: active ? '0 0 12px rgba(0,230,138,0.25)' : 'none',
               }}
             >
               <span style={{ fontSize: 15 }}>{done ? '✅' : s.icon}</span>
@@ -877,11 +896,12 @@ export const CardioConstructor: React.FC = () => {
       )}
 
       {/* Навигация */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: 10, borderRadius: 14, background: 'rgba(24,24,27,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}>
         <button style={NAV_BTN} onClick={goPrev} disabled={stepIdx === 0} aria-label="Назад">← Назад</button>
+        <div style={{ flex: 1 }} />
         {stepIdx < STEPS.length - 1 && (
           <button style={NAV_BTN_PRIMARY} onClick={goNext} aria-label="Далее">
-            {step === 'preview' && !cycle ? '🛠 Собрать и далее →' : 'Далее →'}
+            {step === 'preview' && !cycle ? '🛠 Собрать и далее →' : `Далее: ${STEPS[stepIdx + 1].label} →`}
           </button>
         )}
       </div>

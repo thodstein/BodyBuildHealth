@@ -172,6 +172,27 @@ export function cardioAvgPaceMinPerKm(entries: { distanceKm?: number; durationMi
   return cardioPaceMinPerKm(totalKm, totalMin);
 }
 
+/** Типичная скорость по типу сессии (км/ч) — ориентир для подсказки дистанции. */
+const CARDIO_TYPICAL_SPEED_KMH: Record<CardioType, number> = {
+  zone2: 9, miss: 10, hiit: 8, recovery: 5,
+};
+
+const CARDIO_TYPE_HINT_LABEL: Record<CardioType, string> = {
+  zone2: 'Zone 2 (лёгкий бег)', miss: 'MISS (умеренно)', hiit: 'HIIT (с учётом отдыха)', recovery: 'Recovery (ходьба)',
+};
+
+/**
+ * Ожидаемая дистанция сессии по типу и длительности: «~N км при N км/ч (тип)»
+ * или null (нет/некорректная длительность). Ориентир для ввода км в журнале.
+ */
+export function cardioExpectedDistanceHint(type: CardioType, durationMin: number): string | null {
+  const kmh = CARDIO_TYPICAL_SPEED_KMH[type];
+  if (!kmh || !durationMin || durationMin <= 0) return null;
+  const km = Math.round((kmh * durationMin / 60) * 10) / 10;
+  const label = CARDIO_TYPE_HINT_LABEL[type];
+  return `~${km} км при ${kmh} км/ч (${label})`;
+}
+
 /**
  * Объяснимая рекомендация: факт vs план (7 дней), RPE/ЧСС, ACWR-контекст.
  * Возвращает действие и причину; кардио не пересобирается молча.

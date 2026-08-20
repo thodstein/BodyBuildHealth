@@ -154,6 +154,19 @@ describe('CardioConstructor — CSR', () => {
     expect(JSON.parse(localStorage.getItem(ACTIVE_KEY) ?? 'null')).toBeTruthy();
   });
 
+  it('шапка: прогресс-бар мастера (шаг N из 5) + сводка активного цикла в чипах', () => {
+    render(<CardioConstructor />);
+    expect(screen.getByText(/Шаг 1 из 5/)).toBeTruthy();
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    expect(screen.getByText(/Шаг 3 из 5/)).toBeTruthy();
+    expect(screen.getAllByText(/мин\/нед/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/ккал\/нед/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/12 нед/).length).toBeGreaterThan(0);
+  });
+
   it('пресет «Сушка · 16 нед» применяет параметры и виден в предпросмотре', () => {
     render(<CardioConstructor />);
     fireEvent.click(screen.getByRole('button', { name: /Пресет: Сушка · 16 нед/ }));

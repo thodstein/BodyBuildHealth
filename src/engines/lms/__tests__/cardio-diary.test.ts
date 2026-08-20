@@ -6,7 +6,7 @@ import {
   cardioWeekAdherence, cardioAdherenceSummary, computeCardioAdvice,
   cardioWeekFact, cardioCycleCompliance,
   cardioDayFact, cardioDayLoad, cardioHrCompliance,
-  estimateCardioEntryKcal, cardioPaceMinPerKm, cardioAvgPaceMinPerKm,
+  estimateCardioEntryKcal, cardioPaceMinPerKm, cardioAvgPaceMinPerKm, cardioExpectedDistanceHint,
   type CardioLogEntry,
 } from '../cardio-diary.engine';
 
@@ -158,6 +158,30 @@ describe('cardioPaceMinPerKm / cardioAvgPaceMinPerKm (темп мин/км)', ()
     saveCardioLogEntry(entry({ date: '2026-01-05', durationMin: 30 }));
     const stats = cardioLogStats(loadCardioLog(), 30, REF);
     expect(stats.avgPace).toBeNull();
+  });
+});
+
+describe('cardioExpectedDistanceHint', () => {
+  it('zone2 30 мин → ~4.5 км при 9 км/ч', () => {
+    expect(cardioExpectedDistanceHint('zone2', 30)).toBe('~4.5 км при 9 км/ч (Zone 2 (лёгкий бег))');
+  });
+
+  it('hiit 20 мин → ~2.7 км при 8 км/ч', () => {
+    expect(cardioExpectedDistanceHint('hiit', 20)).toBe('~2.7 км при 8 км/ч (HIIT (с учётом отдыха))');
+  });
+
+  it('recovery 40 мин → ~3.3 км при 5 км/ч', () => {
+    expect(cardioExpectedDistanceHint('recovery', 40)).toBe('~3.3 км при 5 км/ч (Recovery (ходьба))');
+  });
+
+  it('null при нулевой/отрицательной длительности', () => {
+    expect(cardioExpectedDistanceHint('zone2', 0)).toBeNull();
+    expect(cardioExpectedDistanceHint('zone2', -10)).toBeNull();
+    expect(cardioExpectedDistanceHint('zone2', undefined as unknown as number)).toBeNull();
+  });
+
+  it('miss: скорость 10 км/ч', () => {
+    expect(cardioExpectedDistanceHint('miss', 60)).toBe('~10 км при 10 км/ч (MISS (умеренно))');
   });
 });
 
