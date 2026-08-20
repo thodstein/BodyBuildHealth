@@ -3,7 +3,8 @@ import { buildLMSPlan, appendPLTaperWeeks } from '../lms-builder.engine';
 import { buildPLTaperCurve, type TaperMode } from '../lms-taper.engine';
 import { buildPLPeakBlockLayout } from '../lms-peak-block.engine';
 import { applyMacroTaperToPLWeeks } from '../lms-macro-taper.engine';
-import { buildPLPeakWeekCutProtocol } from '../lms-taper-coach.engine';
+import { buildPLPeakWeekCutProtocol, pmFeasibility, coachPLPeakPlan, sRPEAdjustment, evaluateMeetAttemptsFromDiary } from '../lms-taper-coach.engine';
+import type { MeetAttemptsInfo } from '../competition-attempts';
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { CYCLE_09K } from '../../../data/lms-cycles/cycle-09k';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
@@ -208,5 +209,88 @@ describe('ПЛ-тапер: краевые кейсы (A1/A2)', () => {
     const res = applyMacroTaperToPLWeeks(weeks, { mode: 'classic', taperWeeksPerBlock: 2 });
     // Второй старт (нед 5) не имеет недель под тапер — есть честное предупреждение.
     expect(res.notes.some(n => n.includes('сразу после предыдущего соревнования'))).toBe(true);
+  });
+});
+
+describe('ПЛ-тапер: тренерские проверки (B3-B6)', () => {
+  it('B3: неделя соревнований есть, а тапер отсутствует → danger-предупреждение', () => {
+    const plan = buildLMSPlan({ template: CYCLE_09K, pmMap, fallbackPm: 80, faithful: true, progressionEnabled: false, weeksOverride: CYCLE_09K.meta.weeks });
+    // Только meet-неделя, без тапер-недель.
+    plan.weeks[plan.weeks.length - 1] = { ...plan.weeks[plan.weeks.length - 1], meetWeek: true };
+    const v = coachPLPeakPlan(plan);
+    expect(v.notes.some(n => n.severity === 'danger' && n.text.includes('тапер отсутствует'))).toBe(true);
+    expect(v.score).toBeLessThan(100);
+  });
+
+  it('B3: score клампится в [0,100] даже при крайних условиях', () => {
+    // Пустой план → score 0 (минимальный).
+    const v = coachPLPeakPlan({ weeks: [] } as any);
+    expect(v.score).toBe(0);
+    // Полный сбалансированный вердикт не превышает 100.
+    const plan = buildLMSPlan({ template: CYCLE_09K, pmMap, fallbackPm: 80, faithful: true, progressionEnabled: false, weeksOverride: CYCLE_09K.meta.weeks });
+    const ok = coachPLPeakPlan(plan);
+    expect(ok.score).toBeGreaterThanOrEqual(0);
+    expect(ok.score).toBeLessThanOrEqual(100);
+  });
+
+  it('B4: без базы прогноза (нет факта и прогноза ПМ) → unrealistic, а не ложный tight', () => {
+    const f = pmFeasibility({ weeklyK: 0.005, weeksToMeet: 8, plannedPm: { 'Присед': 240 } });
+    expect(f.status).toBe('unrealistic');
+    expect(f.lifts[0].weeksNeeded).toBe(Number.POSITIVE_INFINITY);
+    expect(f.summary).toContain('нет базы для прогноза');
+  });
+
+  it('B4: база есть, цель достижима → realistic', () => {
+    const f = pmFeasibility({ weeklyK: 0.01, weeksToMeet: 8, forecastPm: { 'Присед': 220 }, plannedPm: { 'Присед': 230 } });
+    // 220 × 1.01^8 ≈ 238 ≥ 230 → достижимо.
+    expect(f.status).toBe('realistic');
+    expect(f.lifts[0].feasible).toBe(true);
+  });
+
+  it('B5: нагрузка ровно 14 дней назад относится к prev (не recent)', () => {
+    const day = (n: number, rpe: number, dur = 60) => {
+      const d = new Date('2026-08-16T00:00:00');
+      d.setDate(d.getDate() - n);
+      return { date: d.toISOString().slice(0, 10), sRPE: rpe, durationMin: dur };
+    };
+    // recent = сегодня (лёгкая), prev = ровно 14 и 15 дней назад (тяжёлая).
+    // Если бы -14 попал в recent, ratio ≈ 1.25 → delta 0. Ожидаем delta -1 (недогруз),
+    // значит -14 корректно в prev.
+    const sessions = [day(0, 2), day(14, 8), day(15, 8)];
+    const adj = sRPEAdjustment(sessions);
+    expect(adj.taperWeeksDelta).toBe(-1);
+  });
+
+  it('B5: нагрузка ровно 28 дней назад не входит ни в recent, ни в prev', () => {
+    const day = (n: number, rpe: number, dur = 60) => {
+      const d = new Date('2026-08-16T00:00:00');
+      d.setDate(d.getDate() - n);
+      return { date: d.toISOString().slice(0, 10), sRPE: rpe, durationMin: dur };
+    };
+    // recent = сегодня, prev = -14, -28 ровно → вне окон. recent == prev → ratio 1 → delta 0.
+    const sessions = [day(0, 8), day(14, 8), day(28, 8)];
+    const adj = sRPEAdjustment(sessions);
+    expect(adj.taperWeeksDelta).toBe(0);
+    expect(adj.note).toBeNull();
+  });
+
+  it('B6: три-вэй разброс вердиктов прикидов → nextStrategy balanced', () => {
+    const attempts: MeetAttemptsInfo = {
+      strategy: 'balanced',
+      lifts: [
+        { name: 'Присед', opener: 180, second: 190, third: 200, target: 200, warmup: [] },
+        { name: 'Жим лежа', opener: 110, second: 115, third: 120, target: 120, warmup: [] },
+        { name: 'Становая тяга', opener: 200, second: 210, third: 220, target: 220, warmup: [] },
+      ],
+    };
+    const sessions = [
+      { date: '2026-08-10', exercises: [{ name: 'Присед', sets: [{ weightKg: 205, reps: 1 }] }] },        // made third → conservative
+      { date: '2026-08-10', exercises: [{ name: 'Жим лежа', sets: [{ weightKg: 115, reps: 1 }] }] },       // made second → optimal
+      { date: '2026-08-10', exercises: [{ name: 'Становая тяга', sets: [{ weightKg: 190, reps: 1 }] }] },  // made none → aggressive
+    ];
+    const evalRes = evaluateMeetAttemptsFromDiary(attempts, sessions);
+    expect(evalRes).not.toBeNull();
+    expect(evalRes!.lifts.map(l => l.verdict).sort()).toEqual(['aggressive', 'conservative', 'optimal']);
+    expect(evalRes!.nextStrategy).toBe('balanced');
   });
 });

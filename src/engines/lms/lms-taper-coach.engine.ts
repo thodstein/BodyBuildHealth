@@ -80,14 +80,23 @@ export function pmFeasibility(ctx: TaperCoachCtx): PmFeasibility {
     const base = (actual[name] > 0 ? actual[name] : forecastBase[name]) || 0;
     const forecast = base > 0 ? base * Math.pow(1 + k, weeks) : 0;
     const gapKg = forecast > 0 ? plan - forecast : plan - base;
-    const weeksNeeded = forecast > 0 && gapKg > 0 ? Math.ceil(Math.log(plan / forecast) / Math.log(1 + k)) : 0;
+    // B4-fix: если базы для прогноза НЕТ (нет ни фактического, ни прогнозного ПМ),
+    // weeksNeeded нельзя рассчитать — Infinity уводит вердикт в 'unrealistic'
+    // (раньше weeksNeeded=0 давал ложный 'tight' и «нужно ещё 0 нед»).
+    const weeksNeeded = base > 0 && gapKg > 0
+      ? Math.ceil(Math.log(plan / forecast) / Math.log(1 + k))
+      : base > 0 ? 0 : Number.POSITIVE_INFINITY;
     return { name, forecast: Math.round(forecast * 10) / 10, planned: plan, gapKg: Math.round(gapKg * 10) / 10, weeksNeeded, feasible: gapKg <= 0 };
   });
   const needsMore = lifts.filter(l => !l.feasible);
   const status: PmFeasibility['status'] = needsMore.length === 0 ? 'realistic'
     : needsMore.every(l => l.weeksNeeded <= weeks) ? 'tight'
     : 'unrealistic';
-  const gapText = lifts.filter(l => !l.feasible).map(l => `${l.name}: +${l.gapKg} кг (нужно ещё ${l.weeksNeeded} нед)`).join('; ');
+  const gapText = lifts.filter(l => !l.feasible).map(l =>
+    l.weeksNeeded === Number.POSITIVE_INFINITY
+      ? `${l.name}: нет базы для прогноза (заполните фактический/прогнозный ПМ)`
+      : `${l.name}: +${l.gapKg} кг (нужно ещё ${l.weeksNeeded} нед)`,
+  ).join('; ');
   const summary = status === 'realistic'
     ? 'План ПМ в федерации достижим к старту при текущем темпе прогрессии.'
     : status === 'tight'
@@ -257,6 +266,13 @@ export function coachPLPeakPlan(plan: LMSBuildOutput, ctx?: TaperCoachCtx): Tape
 
   // ── Mock meet и пост-старт ──
   if (meetWeeks.length > 0) {
+    // B3-fix: неделя соревнований есть, а тапер отсутствует — к старту придёте с
+    // полным объёмом и накопленной усталостью. Раньше этот кейс давал только
+    // info-заметки (mock/post), без явного предупреждения о пропущенном тапере.
+    if (taperWeeksList.length === 0) {
+      score -= 20;
+      notes.push({ severity: 'danger', icon: '⛔', text: `Неделя соревнований есть, но тапер отсутствует — к старту придёте с полным объёмом и накопленной усталостью. Добавьте тапер-недели перед соревнованиями.` });
+    }
     if (!weeks.some(w => w.mockMeet)) { score -= 5; notes.push({ severity: 'info', icon: '🎯', text: 'Mock meet отсутствует — имитация прикидок за 10-14 дней до старта проверяет стратегию на практике.' }); }
     if (!weeks.some(w => w.postMeet)) { score -= 5; notes.push({ severity: 'info', icon: '🔄', text: 'Пост-соревновательная неделя отсутствует — восстановление после прикидок (×0.5, RIR +3) снижает риск перетренированности.' }); }
     notes.push({ severity: 'info', icon: '⏱', text: `Последние тяжёлые перед стартом: присед за ${LAST_HEAVY_DAYS.squat} дн, жим за ${LAST_HEAVY_DAYS.bench} дн, тяга за ${LAST_HEAVY_DAYS.deadlift} дн до старта; за 1-2 дня — только лёгкий прайминг 60-75% (синглы), ЦНС должна прийти свежей.` });
