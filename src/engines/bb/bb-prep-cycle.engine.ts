@@ -485,6 +485,37 @@ export function prepRecoveryMult(cfg: Pick<PrepCycleConfig, 'hrvMs' | 'sleepHour
   return clamp(m, 0.9, 1.05);
 }
 
+/** План кардио подготовки (доказательно: в предсоревновательный период кардио растёт;
+ *  da Silveira et al. 2025 — увеличение кардио у всех категорий). Zone 2 сохраняет мышцы в дефиците. */
+export interface PrepCardioPlan {
+  minutesPerWeek: number;
+  stepsPerDay: number;
+  zone: string;
+  note: string;
+}
+
+export function prepCardioPlan(cfg: PrepCycleConfig): PrepCardioPlan {
+  const profile = CATEGORY_PROFILES[cfg.category];
+  // База по категории: лёгкие (bikini/wellness) — меньше, массовые/агрессивные — больше.
+  let base = 220;
+  if (profile) {
+    if (profile.light) base = 170;
+    else if (profile.sex === 'female') base = 210;
+    else if (profile.targetBodyFatPct <= 5) base = 280; // mens_bb/212/classic — суше
+  }
+  const gap = cfg.bodyFatPct != null && profile ? Math.max(0, cfg.bodyFatPct - profile.targetBodyFatPct) : 3;
+  const deficitBoost = gap > 5 ? 70 : gap > 2 ? 35 : 0; // дальше от цели — больше кардио
+  const athleteBoost = cfg.enhanced ? 40 : 0;           // на курсе переносимость кардио выше
+  const minutes = clamp(Math.round(base + deficitBoost + athleteBoost), 120, 450);
+  const stepsPerDay = Math.min(16000, 8000 + Math.round((minutes - 150) / 25) * 500);
+  return {
+    minutesPerWeek: minutes,
+    stepsPerDay,
+    zone: 'Zone 2 (лёгкое, ~60–70% ЧССmax) — расход ккал в дефиците, мышцы сохраняются',
+    note: `Кардио в подготовке растёт (da Silveira 2025). Рекомендуем ~${minutes} мин/нед Zone 2 + ~${stepsPerDay} шагов/день. Не заменяет силовую — объём держим на уровне ББ-авто.`,
+  };
+}
+
 /** План объёма подготовки (доказательный): подготовка ДЕРЖИТ объём на уровне обычного
  *  ББ-авто (MAV, PED/стаж/уровень/восстановление масштабируют вверх через buildBBPlan),
  *  снижение — только в финальном тапере (последние недели). Это НЕ режущий каскад с 1-й недели.

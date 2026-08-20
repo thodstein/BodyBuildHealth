@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPrepCycle, validatePrepCycle, recommendMinimalMode, normalizePrepCycle,
   accentToContestSpec, prepCutProjection, buildPrepSeason, posingPlanForCategory,
-  savePosingCheckin, getPosingCheckins, posingWeekStats,
+  savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan,
   prepVolumePlan, prepDeficitMult, prepAthleteMult, prepRecoveryMult, prepVolumePhaseForWeek,
   type PrepCycleConfig, type PrepSeasonConfig,
 } from '../bb-prep-cycle.engine';
@@ -416,5 +416,14 @@ describe('bb-prep-cycle: план объёма подготовки (В1+В2, а
     // Prep-объём не должен быть сильно меньше обычного ББ-авто (<25% разницы).
     expect(prepSets).toBeGreaterThan(plainSets * 0.75);
     expect(prepSets).toBeLessThanOrEqual(plainSets * 1.3);
+  });
+
+  it('кардио подготовки растёт с дефицитом и у массовых категорий (da Silveira 2025)', () => {
+    const light = prepCardioPlan(base({ category: 'bikini', sex: 'female', bodyFatPct: 14 }));
+    const heavy = prepCardioPlan(base({ category: 'mens_bb', sex: 'male', bodyFatPct: 18, enhanced: true }));
+    expect(light.minutesPerWeek).toBeGreaterThanOrEqual(120);
+    expect(heavy.minutesPerWeek).toBeGreaterThan(light.minutesPerWeek);
+    expect(heavy.stepsPerDay).toBeGreaterThanOrEqual(light.stepsPerDay);
+    expect(light.zone).toContain('Zone 2');
   });
 });

@@ -76,6 +76,7 @@ import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
+  computeReadiness,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
   prepTrainingCompliance,
@@ -84,7 +85,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -345,6 +346,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepAccent, setPrepAccent] = useState<string[]>([]);
   const [prepMinimal, setPrepMinimal] = useState<string[]>([]);
   const [prepMinMode, setPrepMinMode] = useState<PrepMinimalMode>('reduce_direct_to_floor');
+  const [prepVolumeStrategy, setPrepVolumeStrategy] = useState<'gentle' | 'balanced' | 'aggressive'>('balanced');
   const [prepSplit, setPrepSplit] = useState<string>('');
   const [prepBodyFat, setPrepBodyFat] = useState<number | undefined>(undefined);
   const [prepResult, setPrepResult] = useState<PrepCycleResult | null>(null);
@@ -4915,6 +4917,7 @@ export const BbAutoConstructor: React.FC = () => {
     accentMuscles: prepAccent,
     minimalMuscles: prepMinimal,
     minimalMode: prepMinMode,
+    prepVolumeStrategy,
     splitPatternId: prepSplit || undefined,
     weeks: pcWeeks,
     taperWeeks: prepTaper,
@@ -5007,6 +5010,7 @@ export const BbAutoConstructor: React.FC = () => {
     return {
       category: c.category, sex: c.sex,
       accentMuscles: c.accentMuscles, minimalMuscles: c.minimalMuscles, minimalMode: c.minimalMode,
+      prepVolumeStrategy,
       splitPatternId: c.splitPatternId,
       level: c.level, trainingYears: c.trainingYears, equipment: c.equipment, injuries: c.injuries,
       mobilityRestrictions: c.mobilityRestrictions, workMax: c.workMax, avoidAxialLoad: c.avoidAxialLoad,
@@ -5220,6 +5224,19 @@ export const BbAutoConstructor: React.FC = () => {
               Он будет применён в планировщике питания автоматически (вкладка «🏁 Тапер ББ» и дневные цели).
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Текущий вес: {profileWeight} кг · пол: {prepSex === 'female' ? 'женский' : 'мужской'} · категория: {CATEGORY_PROFILES[prepCat].label}</div>
+
+            {/* Стратегия объёма подготовки */}
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Стратегия объёма подготовки (как сильно снижать к финалу):</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {([['gentle', '🛡 Сохранить массу'], ['balanced', '⚖ Сбалансированно'], ['aggressive', '🔥 Агрессивная сушка']] as const).map(([id, label]) => {
+                  const on = prepVolumeStrategy === id;
+                  return <button key={id} type="button" onClick={() => setPrepVolumeStrategy(id)} style={{ ...chipBtn(id, on), minHeight: 36, fontSize: 10 }}>{label}</button>;
+                })}
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>Объём держится на уровне обычного ББ-авто (MAV) во всей подготовке; стратегия влияет на финальный спуск к таперу.</div>
+            </div>
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={{ ...BTN_GHOST, flex: 1 }} onClick={() => setPrepStep('split')}>← Назад</button>
               <button style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#ec4899,#be185d)', color: '#fff' }} disabled={pcBusy} onClick={handleBuildPrep}>{pcBusy ? '⏳ Сборка...' : '🏁 Собрать prep-цикл'}</button>
@@ -5333,6 +5350,38 @@ export const BbAutoConstructor: React.FC = () => {
                 <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>База 10–15 сетов/группу/нед — для натурала/среднего стажа. У продвинутого атлета (стаж, PED, уровень) целевой объём выше — это уже заложено в плане. Объём подготовки снижается лишь умеренно; тапер — финальный спуск к пику.</div>
               </div>
             )}
+
+            {/* 🎯 Вердикт готовности по %жира */}
+            {(() => {
+              try {
+                const rd = computeReadiness({ ...configFromPlan(prepResult.prepPlan), bodyFatPct: prepResult.config.bodyFatPct });
+                const color = rd.verdict === 'on_track' ? '#4ade80' : rd.verdict === 'ahead' ? '#22c55e' : '#fbbf24';
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(34,197,94,0.05)', border: `1px solid ${color}44` }}>
+                    <div style={{ fontWeight: 800, color, marginBottom: 4 }}>
+                      🎯 Готовность: {rd.verdict === 'on_track' ? 'по графику' : rd.verdict === 'ahead' ? 'уже у цели' : 'сушка не дожата'}
+                      {rd.targetBf != null ? ` · цель ~${rd.targetBf}%` : ''}
+                      {rd.gap != null ? ` · осталось ${rd.gap}%` : ''}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.75)' }}>{rd.note}</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
+
+            {/* 🏃 Кардио подготовки */}
+            {(() => {
+              try {
+                const cp = prepCardioPlan(prepResult.config);
+                return (
+                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.2)' }}>
+                    <div style={{ fontWeight: 800, color: '#fb923c', marginBottom: 4 }}>🏃 Кардио подготовки: ~{cp.minutesPerWeek} мин/нед · ~{cp.stepsPerDay} шагов/день</div>
+                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>{cp.zone}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{cp.note}</div>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
 
             {/* 📉 Прогноз сушки к шоу */}
             {(() => {
