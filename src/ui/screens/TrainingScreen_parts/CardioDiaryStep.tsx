@@ -65,7 +65,7 @@ export const CardioDiaryStep: React.FC<{
       <CardioDayCard cycle={localCycle} />
       <CardioProgressCard cycle={localCycle} />
       {startInfo && (
-        <div style={{ fontSize: 11, color: startInfo.left === 0 ? '#f87171' : '#fbbf24', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '8px 10px' }}>
+        <div className="ck-week" style={{ fontSize: 11, color: startInfo.left === 0 ? '#f87171' : '#fbbf24', background: 'linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))', border: '1px solid rgba(245,158,11,0.3)', borderLeft: `3px solid ${startInfo.left === 0 ? '#ef4444' : '#f59e0b'}`, borderRadius: 12, padding: '8px 10px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }}>
           {startInfo.left === 0
             ? `🏁 Эта неделя — старт (${CARDIO_PHASE_LABELS[startInfo.phase]}): только лёгкое кардио (recovery), без HIIT.`
             : `🏁 Старт через ${startInfo.left} нед (нед ${startInfo.week}, ${CARDIO_PHASE_LABELS[startInfo.phase]}): taper снижает объём — HIIT уже убран; контролируйте вес (темп 0.5-1%/нед) и сон.${startInfo.lastWeight != null ? ` Последний вес: ${startInfo.lastWeight} кг.` : ''}`}

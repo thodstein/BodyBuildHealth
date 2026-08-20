@@ -296,7 +296,7 @@ export const CardioManageStep: React.FC<{
         {library.map(c => {
           const s = cardioCycleSummary(c);
           return (
-            <div key={c.id} style={{ padding: 8, borderRadius: 10, background: cycle?.id === c.id ? 'rgba(0,230,138,0.07)' : 'rgba(255,255,255,0.02)', border: cycle?.id === c.id ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div key={c.id} className="ck-week" style={{ padding: 8, borderRadius: 10, background: cycle?.id === c.id ? 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: cycle?.id === c.id ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${cycle?.id === c.id ? '#00e68a' : 'rgba(255,255,255,0.18)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={ROW}>
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {cycle?.id === c.id ? '⭐ ' : ''}{c.name}
@@ -328,7 +328,7 @@ export const CardioManageStep: React.FC<{
         {scenarios.map(sc => {
           const s = cardioCycleSummary(sc.cycle);
           return (
-            <div key={sc.id} style={{ padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div key={sc.id} className="ck-week" style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '3px solid rgba(167,139,250,0.55)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={ROW}>
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.name}</span>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{new Date(sc.savedAt).toLocaleDateString('ru-RU')} · {sc.cycle.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {s.hiitWeeks} HIIT</span>
