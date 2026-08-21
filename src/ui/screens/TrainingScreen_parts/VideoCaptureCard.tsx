@@ -86,6 +86,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VideoAnalysisResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [isTg, setIsTg] = useState(false);
 
   useEffect(()=>{
@@ -108,10 +109,58 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
     setStream(null);
     if(videoRef.current) videoRef.current.srcObject=null;
   };
-  const handleFile = (f: File | null)=>{
+  const handleFile = async (f: File | null)=>{
     if(!f) return;
-    setResult(mockAnalyze(lift));
-    onResult?.(mockAnalyze(lift));
+    setError(null);
+    setAnalyzing(true);
+    const url = URL.createObjectURL(f);
+    const vid = document.createElement('video');
+    vid.src = url;
+    vid.muted = true;
+    vid.playsInline = true;
+    vid.crossOrigin = 'anonymous';
+    try{
+      await new Promise<void>((res, rej)=>{
+        vid.onloadedmetadata = ()=> res();
+        vid.onerror = ()=> rej(new Error('Не удалось загрузить видео'));
+        setTimeout(()=>rej(new Error('Таймаут загрузки видео')), 8000);
+      });
+      // пробуем реальный CV
+      let out: VideoAnalysisResult | null = null;
+      try{
+        const { analyzeVideoElement } = await import('../../../engines/cv/pose-engine');
+        const m = await analyzeVideoElement(vid as any, lift);
+        if (m && (m.elbowAvgDeg!=null || m.barVelocity!=null)) {
+          out = {
+            elbowAvgDeg: m.elbowAvgDeg ?? 0,
+            gripRatio: m.gripRatio ?? 0,
+            barVelocity: m.barVelocity ?? null,
+            bridge: m.bridge ?? null,
+            note: m.elbowAvgDeg!=null ? 'CV-анализ BlazePose (локально, без сервера).' : 'Поза не распознана — использован мок.',
+          };
+        }
+      }catch(e){
+        console.warn('[video] pose failed', e);
+      }
+      if (!out) out = mockAnalyze(lift);
+      setResult(out);
+      onResult?.(out);
+      // сохранить отчёт локально для истории (не в облако — тяжёлый)
+      try{
+        const raw = JSON.parse(localStorage.getItem('he_cv_reports')||'[]');
+        raw.unshift({ ts: Date.now(), lift, fileName: f.name, result: out });
+        localStorage.setItem('he_cv_reports', JSON.stringify(raw.slice(0,20)));
+      }catch{}
+    }catch(e:any){
+      setError(e?.message || 'Ошибка обработки видео');
+      const r = mockAnalyze(lift);
+      setResult(r);
+      onResult?.(r);
+    }finally{
+      setAnalyzing(false);
+      URL.revokeObjectURL(url);
+      vid.remove();
+    }
   };
 
   const g = LIFT_GUIDE[lift] ?? LIFT_GUIDE.bench;
@@ -142,14 +191,15 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
 
       {/* Кнопки */}
       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
-        {!stream ? <button onClick={startCam} style={{ padding:'7px 12px', borderRadius:7, cursor:'pointer', background:'rgba(56,189,248,0.15)', color:ACCENT, border:'1px solid rgba(56,189,248,0.3)', fontWeight:700, fontSize:10 }}>📹 Включить камеру</button>
+        {!stream ? <button disabled={analyzing} onClick={startCam} style={{ padding:'7px 12px', borderRadius:7, cursor: analyzing?'not-allowed':'pointer', background:'rgba(56,189,248,0.15)', color:ACCENT, border:'1px solid rgba(56,189,248,0.3)', fontWeight:700, fontSize:10, opacity: analyzing?0.6:1 }}>📹 Включить камеру</button>
           : <button onClick={stopCam} style={{ padding:'7px 12px', borderRadius:7, cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.3)', fontWeight:700, fontSize:10 }}>⏹ Стоп</button>}
-        <label style={{ padding:'7px 12px', borderRadius:7, border:'1px solid rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.1)', color:ACCENT, fontSize:10, fontWeight:700, cursor:'pointer' }}>
+        <label style={{ padding:'7px 12px', borderRadius:7, border:'1px solid rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.1)', color:ACCENT, fontSize:10, fontWeight:700, cursor: analyzing?'not-allowed':'pointer', opacity: analyzing?0.6:1 }}>
           📁 Выбрать файл (надёжно в Telegram)
-          <input type="file" accept="video/*" capture="environment" style={{ display:'none' }} onChange={e=>handleFile(e.target.files?.[0] ?? null)} />
+          <input type="file" accept="video/*" capture="environment" style={{ display:'none' }} onChange={e=>handleFile(e.target.files?.[0] ?? null)} disabled={analyzing} />
         </label>
-        <button onClick={()=>{ const r=mockAnalyze(lift); setResult(r); onResult?.(r); }} style={{ padding:'7px 12px', borderRadius:7, cursor:'pointer', background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.25)', fontWeight:700, fontSize:10 }}>🧪 Демо-разбор</button>
+        <button disabled={analyzing} onClick={()=>{ const r=mockAnalyze(lift); setResult(r); onResult?.(r); }} style={{ padding:'7px 12px', borderRadius:7, cursor: analyzing?'not-allowed':'pointer', background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.25)', fontWeight:700, fontSize:10, opacity: analyzing?0.6:1 }}>🧪 Демо-разбор</button>
       </div>
+      {analyzing && <div style={{ marginTop:6, fontSize:10, color:ACCENT, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', padding:'6px 8px', borderRadius:6 }}>⏳ Анализ видео… BlazePose грузит WASM (первый раз ~2-3с с CDN), затем 5 fps.</div>}
       {error && <div style={{ marginTop:6, fontSize:10, color:'#f87171', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', padding:'6px 8px', borderRadius:6 }}>{error}</div>}
 
       {/* Preview */}

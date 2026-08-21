@@ -18,6 +18,7 @@
     "postinstall": "node scripts/sync-ocr-assets.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@napi-rs/canvas": "^1.0.7",
     "@supabase/supabase-js": "^2.106.2",
     "@tesseract.js-data/eng": "^1.0.0",
