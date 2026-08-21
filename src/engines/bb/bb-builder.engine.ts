@@ -1991,7 +1991,7 @@ function buildSession(
     const highVolumeArms = ['biceps', 'triceps'].includes(pl.muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3;
     const budgetCapPct = plans.length <= 2 ? 0.90 : (pedAdapt && pedAdapt.combinedRecoveryMultiplier >= 1.3 ? 0.70 : 0.60);
     let remainingBudget = highVolumeBack
-      ? Math.max(muscleBudget, pl.sets * 10)
+      ? Math.max(muscleBudget, pl.sets * 6)
       : balancedBack
         ? Math.max(muscleBudget, pl.sets * 6)
         : highVolumeLegs
