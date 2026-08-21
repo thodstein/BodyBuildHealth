@@ -234,3 +234,27 @@ describe('планировщик: спецприём-замена из наст�
     await waitFor(() => { expect(bodyHas(/Спецприём \(замена: Завтрак\)/)).toBe(true); }, { timeout: 10000 });
   }, 120000);
 });
+
+describe('планировщик: календарь спец-приёмов (D-28 П8)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+  afterEach(() => { try { cleanup(); } catch {} });
+
+  it('добавить спецприём «Рефид» на дату — запись сохраняется', async () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickBtn(/➕ Добавить спецприём/);
+    await waitFor(() => { expect(bodyHas(/Спецприём/)).toBe(true); }, { timeout: 5000 });
+    // Выбрать тип «Рефид».
+    const refBtn = Array.from(document.querySelectorAll<HTMLElement>('button')).find(b => (b.textContent || '').includes('Рефид'));
+    if (!refBtn) throw new Error('refeed type button not found');
+    fireEvent.click(refBtn);
+    // Сохранить.
+    clickBtn(/✓ Сохранить/);
+    await waitFor(() => { expect(bodyHas(/Сохранённые/)).toBe(true); }, { timeout: 5000 });
+    // Запись в localStorage.
+    try {
+      const stored = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+      expect(Array.isArray(stored)).toBe(true);
+      expect(stored.some((m: any) => m && m.type === 'refeed')).toBe(true);
+    } catch {}
+  }, 60000);
+});

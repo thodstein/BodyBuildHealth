@@ -4,8 +4,8 @@
  * - HTML содержит ключевые поля и флаги;
  * - пользовательские строки XSS-экранируются.
  */
-import { describe, it, expect } from 'vitest';
-import { buildDayReportPrintHtml, buildWeekReportPrintHtml } from '../planner-day-print';
+import { describe, it, expect, vi } from 'vitest';
+import { buildDayReportPrintHtml, buildWeekReportPrintHtml, printDayReport, printMealTimeline, buildMealTimelinePrintHtml } from '../planner-day-print';
 import { analyzeDailyDiet, getDefaultProfile } from '../../../../../engines/product-usefulness-v2.engine';
 
 describe('buildDayReportPrintHtml (P2-8)', () => {
@@ -48,5 +48,36 @@ describe('buildWeekReportPrintHtml (доп. 12)', () => {
     expect(html).toContain('2026-08-10');
     expect(html).toContain('</table>');
     expect(html).toContain('Средние');
+  });
+});
+
+describe('printDayReport / printMealTimeline (D-28 П8: окно печати)', () => {
+  it('printDayReport пишет HTML при доступном window.open (print — отложенный, guarded)', () => {
+    const written: string[] = [];
+    const fakeWin: any = {
+      document: { write: (h: string) => written.push(h), close: () => {}, focus: () => {} },
+      print: () => {},
+    };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWin as any);
+    expect(() => printDayReport('<p>test</p>')).not.toThrow();
+    expect(openSpy).toHaveBeenCalled();
+    expect(written[0]).toContain('<p>test</p>');
+    openSpy.mockRestore();
+  });
+
+  it('printDayReport не падает, когда window.open недоступен (jsdom)', () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null as any);
+    expect(() => printDayReport('<p>x</p>')).not.toThrow();
+    openSpy.mockRestore();
+  });
+
+  it('printMealTimeline открывает окно и не падает', () => {
+    const fakeWin: any = {
+      document: { write: () => {}, close: () => {}, focus: () => {} },
+      print: () => {},
+    };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWin as any);
+    expect(() => printMealTimeline(buildMealTimelinePrintHtml([{ time: '08:00', label: 'Завтрак', items: [{ name: 'Яйцо', amount: 100, kcal: 150 }] }], { title: 'День' }))).not.toThrow();
+    openSpy.mockRestore();
   });
 });
