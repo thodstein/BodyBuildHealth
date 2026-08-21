@@ -81,25 +81,25 @@ export const TonnageCalcTab: React.FC = () => {
           <button onClick={addRow} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.06)', color: ACCENT, cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>＋ Добавить упражнение</button>
         </div>
         {rows.map(row => (
-          <div key={row.id} style={{ display: 'flex', gap: 8, alignItems: 'end', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ flex: 2, minWidth: 140 }}>
-              <PopupSelect label="Упр." value={row.exerciseId}
+          <div key={row.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'end', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ flex: '1 1 100%', minWidth: 0 }}>
+              <PopupSelect label="Упражнение" value={row.exerciseId}
                 options={EXERCISE_CATALOG.map(e => ({ id: e.id, label: e.name, desc: `${e.group} · ${e.type === 'compound' ? 'Базовое' : 'Изолированное'}` }))}
                 hint="Поиск" onChange={v => upd(row.id, 'exerciseId', v)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 72px', minWidth: 72 }}>
               <PopupNumber label="Вес" value={row.weight} min={0} suffix=" кг" onChange={v => upd(row.id, 'weight', v)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 72px', minWidth: 72 }}>
               <PopupNumber label="Повт" value={row.reps} min={0} onChange={v => upd(row.id, 'reps', v)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 72px', minWidth: 72 }}>
               <PopupNumber label="Сеты" value={row.sets} min={0} onChange={v => upd(row.id, 'sets', v)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 72px', minWidth: 72 }}>
               <PopupNumber label="1ПМ" value={row.oneRM ?? 0} min={0} suffix=" кг" hint="0 = общий 1ПМ" onChange={v => upd(row.id, 'oneRM', v === 0 ? undefined : v)} />
             </div>
-            <button onClick={() => delRow(row.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12, padding: '9px 10px', minHeight: 38 }}>✕</button>
+            <button onClick={() => delRow(row.id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 8, cursor: 'pointer', fontSize: 12, padding: '9px 10px', minHeight: 38, alignSelf: 'flex-end' }}>✕</button>
           </div>
         ))}
         <div style={{ marginTop: 6, maxWidth: 200 }}>
