@@ -258,3 +258,14 @@ describe('планировщик: календарь спец-приёмов (D-
     } catch {}
   }, 60000);
 });
+
+describe('планировщик: нагрузка БЖУ (D-28 П9)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+  afterEach(() => { try { cleanup(); } catch {} });
+
+  it('вкладка «Нагрузка БЖУ» открывается с расчётом', async () => {
+    await generateAndOpenPlan();
+    clickBtn(/Нагрузка БЖУ/);
+    await waitFor(() => { expect(bodyHas(/Нагрузка БЖУ на органы/)).toBe(true); }, { timeout: 10000 });
+  }, 60000);
+});
