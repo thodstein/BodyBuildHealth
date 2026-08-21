@@ -2094,6 +2094,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
        try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations failed:', e); } catch {} }
        // P2-audit fix: guard scrollIntoView (jsdom/старые браузеры без API — uncaught TypeError).
        setTimeout(() => { try { if (resultsRef.current && typeof resultsRef.current.scrollIntoView === 'function') resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {} }, 100);
+       // P5-audit fix: planBusy сбрасывался только в классическом пути — в pro-пути «⏳ Генерация…» зависала навсегда.
+       try { setPlanBusy(false); } catch {}
        return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
       } catch (v2Err: any) {
         // Bug-2 fix: Pro упал — РЕАЛЬНЫЙ фоллбэк на классический движок (раньше был return = тупик без плана и ложное сообщение «переключитесь вручную»).

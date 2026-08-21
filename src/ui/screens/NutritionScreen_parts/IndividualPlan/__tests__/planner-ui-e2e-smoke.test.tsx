@@ -13,7 +13,8 @@ import { IndividualPlan } from '../index';
 const findBtn = (label: RegExp): HTMLElement | undefined => {
   const matches = Array.from(document.querySelectorAll<HTMLElement>('button,div,span'))
     .filter(b => (b.textContent || '').match(label))
-    .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+    // Сначала настоящие кнопки, затем самый «глубокий» элемент (короче текст).
+    .sort((a, b) => (a.tagName === 'BUTTON' ? 0 : 1) - (b.tagName === 'BUTTON' ? 0 : 1) || (a.textContent || '').length - (b.textContent || '').length);
   return matches[0];
 };
 
@@ -128,4 +129,29 @@ describe('планировщик: спец-приёмы по дате меняю
     await generateAndOpenPlan();
     await waitFor(() => { expect(bodyHas(/Фастинг по расписанию/)).toBe(true); }, { timeout: 25000 });
   });
+});
+
+describe('планировщик: месяц и компоновщик (D-28 П5)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+  afterEach(() => { try { cleanup(); } catch {} });
+
+  it('«План на месяц» открывает месячный режим', async () => {
+    await generateAndOpenPlan();
+    clickBtn(/📅 План на месяц/);
+    await waitFor(() => { expect(bodyHas(/Список недель/)).toBe(true); }, { timeout: 30000 });
+  }, 120000);
+
+  it('вкладка «Компоновщик» открывает режим компоновщика', async () => {
+    await generateAndOpenPlan();
+    clickBtn(/Компоновщик/);
+    await waitFor(() => { expect(bodyHas(/Режим компоновщика/)).toBe(true); }, { timeout: 10000 });
+    // режимы: Обычный / Продвинутый / Таргетинг
+    expect(bodyHas(/Таргетинг/)).toBe(true);
+  }, 60000);
+
+  it('вкладка «Отчёт» открывается с кнопкой генерации отчёта', async () => {
+    await generateAndOpenPlan();
+    clickBtn(/Отчёт/);
+    await waitFor(() => { expect(bodyHas(/Сгенерировать отчёт/)).toBe(true); }, { timeout: 10000 });
+  }, 60000);
 });
