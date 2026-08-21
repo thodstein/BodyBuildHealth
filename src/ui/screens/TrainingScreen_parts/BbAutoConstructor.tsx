@@ -43,8 +43,6 @@ import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-
 import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
-import type { AthleteMode, AthleteContext, AthleteSex, ReproductiveContext } from '../../../engines/athlete-context.engine';
-import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory, redsRiskSignals, reproductiveContextHint } from '../../../engines/athlete-context.engine';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
@@ -399,20 +397,6 @@ export const BbAutoConstructor: React.FC = () => {
   }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
-  // ♀ Режим спортсмена: явный контекст. Включается только пользователем;
-  // MRV/RIR/caps и PED/recovery pipeline не меняются автоматически.
-  const profileSex = linked.profile?.settings?.personal?.sex;
-  const [athleteMode, setAthleteMode] = useState<'standard' | 'female_context'>('standard');
-  const [reproductiveContext, setReproductiveContext] = useState<ReproductiveContext>('unknown');
-  const athleteContext: AthleteContext | undefined = useMemo(() => {
-    if (athleteMode !== 'female_context') return undefined;
-    return {
-      sex: (profileSex === 'female' ? 'female' : 'male') as AthleteSex,
-      athleteMode,
-      trainingYears: bbTrainingYears > 0 ? bbTrainingYears : undefined,
-      ...(reproductiveContext !== 'unknown' ? { reproductiveContext } : {}),
-    };
-  }, [athleteMode, profileSex, bbTrainingYears, reproductiveContext]);
   // 📅 Многоблочная специализация: список блоков (3-6 нед каждый), у каждого
   // блока цели 1-2, режим доноров и мышцы-доноры. Остаток плана — баланс.
   interface UISpecBlock {
@@ -1382,23 +1366,21 @@ export const BbAutoConstructor: React.FC = () => {
           specialization: specializationMode,
            mode: bbAdaptMode,
            methodology: bbMethodology,
-           trainingFocus: bbTrainingFocus,
-            sex: linked.profile?.settings?.personal?.sex,
-            athleteMode,
-            athleteContext,
-            bodyFat: linked.profile.settings.personal.bodyFat,
-            leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-            hrvMs: linked.profile.settings.lifestyle.morningHRV,
-            sleepHours: linked.profile.settings.lifestyle.sleepHours,
-            stressLevel: linked.profile.settings.lifestyle.stressLevel,
-           proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
-           calorieSurplus,
-           eccentricMult,
-           mobilityRestrictions,
-           labMrvMultiplier: labAdjust.mrvMultiplier,
-           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
-          });
-        if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
+            trainingFocus: bbTrainingFocus,
+             sex: linked.profile?.settings?.personal?.sex,
+             bodyFat: linked.profile.settings.personal.bodyFat,
+             leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+             hrvMs: linked.profile.settings.lifestyle.morningHRV,
+             sleepHours: linked.profile.settings.lifestyle.sleepHours,
+             stressLevel: linked.profile.settings.lifestyle.stressLevel,
+            proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+            calorieSurplus,
+            eccentricMult,
+            mobilityRestrictions,
+            labMrvMultiplier: labAdjust.mrvMultiplier,
+            previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+           });
+         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
         if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
       } else if (selectedCycleId || customCycle) {
         // BB-цикл путь (SRCycleTemplate → convertCycleToBBPlan)
@@ -1434,22 +1416,20 @@ export const BbAutoConstructor: React.FC = () => {
             equipment: bbEquipment,
            mode: bbAdaptMode,
            methodology: bbMethodology,
-           trainingFocus: bbTrainingFocus,
-            goal: bbGoal,
-             sex: linked.profile?.settings?.personal?.sex,
-             athleteMode,
-             athleteContext,
-             bodyFat: linked.profile.settings.personal.bodyFat,
-             leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-             hrvMs: linked.profile.settings.lifestyle.morningHRV,
-             sleepHours: linked.profile.settings.lifestyle.sleepHours,
-             stressLevel: linked.profile.settings.lifestyle.stressLevel,
-            proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
-            calorieSurplus,
-            eccentricMult,
-            mobilityRestrictions,
-            labMrvMultiplier: labAdjust.mrvMultiplier,
-            previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+            trainingFocus: bbTrainingFocus,
+             goal: bbGoal,
+              sex: linked.profile?.settings?.personal?.sex,
+              bodyFat: linked.profile.settings.personal.bodyFat,
+              leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+              hrvMs: linked.profile.settings.lifestyle.morningHRV,
+              sleepHours: linked.profile.settings.lifestyle.sleepHours,
+              stressLevel: linked.profile.settings.lifestyle.stressLevel,
+             proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+             calorieSurplus,
+             eccentricMult,
+             mobilityRestrictions,
+             labMrvMultiplier: labAdjust.mrvMultiplier,
+             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
         });
         const cycleWeeks = cycle.meta.sessionsPerWeek;
         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
@@ -1485,8 +1465,6 @@ export const BbAutoConstructor: React.FC = () => {
         equipment: bbEquipment,
         methodology: bbMethodology,
         sex: linked.profile?.settings?.personal?.sex,
-        athleteMode,
-        athleteContext,
         // P0-5: лабораторная коррекция MRV
         labMrvMultiplier: labAdjust.mrvMultiplier,
          labWarnings: labAdjust.warnings,
@@ -1678,10 +1656,9 @@ export const BbAutoConstructor: React.FC = () => {
            daysPerWeek: bbDays,
            source: bbSource,
            programPath: bbProgramPath,
-           programId: selectedProgramId || undefined,
-           cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
-           athleteMode,
-        };
+            programId: selectedProgramId || undefined,
+            cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
+         };
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
            avgRir: exportMetrics.avgRir,
@@ -1892,8 +1869,7 @@ export const BbAutoConstructor: React.FC = () => {
       return `<h2 style="margin:16px 0 6px">Неделя ${wk.week} (${esc(wk.phase || '')}${wk.deload ? ' — DELOAD' : ''})${peakNote}</h2>${prepNote}${sessionsHtml}`;
     }).join('');
     const rationaleHtml = (plan.rationale || []).map(r => `<div style="font-size:10px;color:#666;margin:2px 0">${esc(r)}</div>`).join('');
-    const modeNote = plan.athleteMode === 'female_context' ? ' · ♀ Женский контекст' : '';
-    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед${modeNote}</h1>${rationaleHtml}${weeksHtml}<script>window.print()</script></body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}<script>window.print()</script></body></html>`);
     w.document.close();
   };
 
@@ -1901,8 +1877,7 @@ export const BbAutoConstructor: React.FC = () => {
   const handleExportCSV = () => {
     if (!builtPlan) return;
     const plan = applyEditsToPlan(builtPlan);
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема', 'Контекст'].join(',')];
-    const contextValue = plan.athleteMode === 'female_context' ? 'female_context' : 'standard';
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема'].join(',')];
     for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
@@ -1924,7 +1899,6 @@ export const BbAutoConstructor: React.FC = () => {
               esc(ex.executionProfile?.mistakes.join('; ') || ''),
               esc(ex.comment || ''),
               esc(feat),
-              contextValue,
             ].join(','));
           }
         }
@@ -2090,59 +2064,6 @@ export const BbAutoConstructor: React.FC = () => {
   const renderParams = () => (
     <div>
       <div style={H}>📋 Шаг 1: Базовые параметры</div>
-
-      {/* ♀ Режим спортсмена: явный контекст, без скрытого изменения объёма */}
-      <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background: athleteMode === 'female_context' ? 'rgba(236,72,153,0.07)' : 'rgba(255,255,255,0.03)', border: athleteMode === 'female_context' ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ fontSize:11, fontWeight:700, color: athleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.75)', marginBottom:6 }}>♀ Режим спортсмена</div>
-        <div style={{ display:'flex', gap:6 }}>
-          <button onClick={() => setAthleteMode('standard')} style={{
-            flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
-            border: athleteMode === 'standard' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-            background: athleteMode === 'standard' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-            color: athleteMode === 'standard' ? '#00e68a' : 'rgba(255,255,255,0.6)',
-          }}>Стандартный</button>
-          <button onClick={() => setAthleteMode('female_context')} style={{
-            flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
-            border: athleteMode === 'female_context' ? '2px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
-            background: athleteMode === 'female_context' ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.02)',
-            color: athleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.6)',
-          }}>♀ Женский контекст</button>
-        </div>
-        <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)', lineHeight:1.5 }}>
-          Основная модель объёма, RIR и капы сохраняются. Режим добавляет прозрачный контекст (пол, категории, safety-подсказки) и действует только на следующую сборку.
-          {profileSex === 'female' && athleteMode === 'standard' && <span style={{ color:'rgba(236,72,153,0.8)' }}> В профиле указан женский пол — можно включить контекст.</span>}
-        </div>
-        {athleteMode === 'female_context' && (
-          <div style={{ marginTop:6, fontSize:10, color:'#f59e0b', lineHeight:1.5 }}>
-            🛡 При сушке держите темп ≤ 0.5%/нед и следите за энергетической доступностью — риск RED-S (нарушения цикла, кости).
-          </div>
-        )}
-        {athleteMode === 'female_context' && (
-          <>
-            <div style={{ marginTop:8, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.7)' }}>Репродуктивный контекст (не меняет план):</div>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:4 }}>
-              {REPRODUCTIVE_CONTEXT_OPTIONS.map(o => (
-                <button key={o.id} title={o.hint} onClick={() => setReproductiveContext(o.id)} style={{
-                  padding:'4px 9px', borderRadius:14, cursor:'pointer', fontWeight:600, fontSize:10,
-                  border: reproductiveContext === o.id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.12)',
-                  background: reproductiveContext === o.id ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.03)',
-                  color: reproductiveContext === o.id ? '#ec4899' : 'rgba(255,255,255,0.7)',
-                }}>{o.label}</button>
-              ))}
-            </div>
-            {reproductiveContext !== 'unknown' && (
-              <div style={{ marginTop:5, fontSize:10, color:'rgba(255,255,255,0.6)', lineHeight:1.5, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)', padding:'5px 8px', borderRadius:8 }}>
-                {reproductiveContextHint(reproductiveContext)}
-              </div>
-            )}
-            {athleteContextAdvisory({ sex: profileSex === 'female' ? 'female' : 'male', athleteMode, reproductiveContext }).level === 'review' && (
-              <div style={{ marginTop:6, fontSize:10, color:'#ef4444', lineHeight:1.5, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', padding:'6px 8px', borderRadius:8 }}>
-                {athleteContextAdvisory({ sex: profileSex === 'female' ? 'female' : 'male', athleteMode, reproductiveContext }).reasons.join(' ')}
-              </div>
-            )}
-          </>
-        )}
-      </div>
 
       {/* Plan mode: cycle vs generic split */}
       <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
@@ -2801,12 +2722,9 @@ export const BbAutoConstructor: React.FC = () => {
 
     return (
       <div>
-        <div style={{ ...H, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ ...H, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <span>📋 Шаг 4: План — {builtPlan.pattern.name}</span>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-            {builtPlan.athleteMode === 'female_context' && (
-              <span style={{ fontSize:10, fontWeight:700, color:'#ec4899', padding:'3px 8px', borderRadius:20, background:'rgba(236,72,153,0.12)', border:'1px solid rgba(236,72,153,0.3)' }}>♀ Женский контекст</span>
-            )}
             <button
             disabled={!!builtPlan.validation && !builtPlan.validation.valid}
             style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e', fontSize:11, padding:'4px 10px' }}
@@ -4790,20 +4708,6 @@ export const BbAutoConstructor: React.FC = () => {
               );
             })()}
 
-            {/* RED-S: женский контекст + подготовка (реальные данные плана) */}
-            {athleteMode === 'female_context' && prepPlan && (() => {
-              const reds = redsRiskSignals(athleteContext, {
-                calorieDeficitActive: true,
-                weightTrendPctPerWeek: prepPlan.preparation.targetRatePctPerWeek,
-                bodyFatPct: linked.profile.settings.personal.bodyFat,
-              });
-              return reds.length ? (
-                <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
-                  {reds.map(r => <div key={r} style={{ fontSize: 10, color: '#f59e0b', lineHeight: 1.5 }}>{r}</div>)}
-                </div>
-              ) : null;
-            })()}
-
             {/* ⚖️ Адаптация подготовки по весу */}
             <div style={{ marginTop:10 }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>⚖️ Адаптация по весу (среднее за 7 дней)</div>
@@ -5093,8 +4997,6 @@ export const BbAutoConstructor: React.FC = () => {
     loadStrategy,
     autoRegResult: (autoRegOn && autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
     methodology: bbMethodology,
-    athleteMode,
-    athleteContext,
     eccentricMult,
     previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
     supersetMode,

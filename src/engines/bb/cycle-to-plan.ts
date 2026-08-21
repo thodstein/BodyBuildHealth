@@ -23,7 +23,6 @@ import { loadSRPESessions } from '../pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
-import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
 import { finalizeBBPlan } from './bb-finalize.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
@@ -393,9 +392,6 @@ export interface CycleToPlanInput {
   trainingFocus?: BBTrainingFocus;
   /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
   sex?: 'male' | 'female';
-  /** Явный контекст спортсмена (прозрачно, без скрытого изменения pipeline). */
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
   /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
   bodyFat?: number;
   leanMass?: number;
@@ -1293,10 +1289,6 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
   });
-  if (input.athleteContext) {
-    finalized.athleteMode = input.athleteMode ?? 'standard';
-    finalized.athleteContext = input.athleteContext;
-  }
   return finalized;
 }
 
@@ -1346,9 +1338,6 @@ export interface ProgramToBBPlanOpts {
   trainingFocus?: BBTrainingFocus;
   /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
   sex?: 'male' | 'female';
-  /** Явный контекст спортсмена (прозрачно, без скрытого изменения pipeline). */
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
   bodyFat?: number;
   leanMass?: number;
   hrvMs?: number;
@@ -2118,10 +2107,6 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     trainingYears: opts.trainingYears,
     bodyweightCapability: opts.bodyweightCapability,
   });
-  if (opts.athleteContext) {
-    finalized.athleteMode = opts.athleteMode ?? 'standard';
-    finalized.athleteContext = opts.athleteContext;
-  }
   return finalized;
 }
 

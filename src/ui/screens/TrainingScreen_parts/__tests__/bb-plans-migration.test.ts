@@ -38,13 +38,13 @@ describe('Saved BB plan legacy migration', () => {
     expect(plan.params.planMode).toBe('generic_split');
   });
 
-  it('migrates athleteMode: legacy → standard, explicit female_context preserved', () => {
+  it('ignores removed athleteMode field (legacy values are dropped)', () => {
     localStorage.setItem('he_bb_plans', JSON.stringify([
       { id: 'legacy-mode', plan: { weeks: [{ week: 1, sessions: [] }] } },
       { id: 'female-mode', plan: { weeks: [{ week: 1, sessions: [] }] }, params: { athleteMode: 'female_context' } },
     ]));
     const plans = loadSavedBBPlans();
-    expect(plans[0].params.athleteMode).toBe('standard');
-    expect(plans[1].params.athleteMode).toBe('female_context');
+    expect((plans[0].params as any).athleteMode).toBeUndefined();
+    expect((plans[1].params as any).athleteMode).toBeUndefined();
   });
 });

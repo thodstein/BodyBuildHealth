@@ -30,8 +30,6 @@ import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
 import { findGentleSubstitutions } from '../exercise-substitution.engine';
 import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landmarks.engine';
-import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
-import { athletePolicyHints, athletePolicySummary } from '../athlete-context.engine';
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
@@ -123,10 +121,6 @@ export interface BBBuilderInput {
    *  силовом цикле (goal=strength_mass) и только по кнопке пользователя. */
   allowStrengthLifts?: boolean;
   sex?: 'male' | 'female';       // Пол — для приоритета glutes в ножные дни (женский сплит)
-  /** Явный режим контекста. Не заменяет sex, PED, стаж, recovery или MRV-капы. */
-  athleteMode?: AthleteMode;
-  /** Полный сериализуемый контекст спортсмена для отчёта/мостов. */
-  athleteContext?: AthleteContext;
   intensityTechnique?: IntensityTechnique; // П6: техника интенсивности для каждого primary
   autoDeload?: boolean;          // авто-делод по ACWR
   deloadType?: DeloadType;       // тип делода (pump/strength/rest)
@@ -292,9 +286,6 @@ export interface BBPlan {
   rationale: string[];
   /** P2-4: уровень пользователя (для bb-metrics без duck-typing). */
   level?: string;
-  /** Явный контекст спортсмена (пол/режим) — прозрачно, без скрытого изменения pipeline. */
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
   /** Volume-landmarks (MEV/MAV/MRV) по пиковой неделе — единый источник, как в PL/ручном. */
   volumeLandmarks?: VolumeLandmarkRow[];
   /** Частота тренировок каждой мышцы в неделю (1×/2×/3×) — ключевой фактор гипертрофии. */
@@ -1127,12 +1118,16 @@ function buildSession(
     }
   }
   // S-MRV: Системный бюджет утомления на день.
-  // Формула: dailyCap × S_MRV_FACTOR × pedMult × levelMult
+  // Формула: dailyCap × S_MRV_FACTOR × regimeMult × levelMult.
+  // Режим-множитель (×2 на курсе) растягивает дневной бюджет, чтобы multi-group
+  // дни (Upper: грудь+спина оба главными, ~50-60 сетов на курсе) вмещали обе
+  // главные мышцы, а не голодали (ранее спина съедала бюджет, грудь — 18 сетов).
   const levelMultMap: Record<string, number> = { beginner: 0.9, intermediate: 1.0, advanced: 1.15, enhanced: 1.3 };
   const levelMult = levelMultMap[level] ?? 1.0;
   // Экзотика (гиря/олимп/стронгмен/мобилити) — только для advanced/enhanced; каноника по умолчанию.
   const allowExotic = level === 'advanced' || level === 'enhanced';
-  const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * (pedAdapt?.combinedRecoveryMultiplier ?? 1) * levelMult);
+  const dayRegimeMult = computeRegimeMrvMult({ onCourse: !!(pedAdapt && pedAdapt.activePEDs && pedAdapt.activePEDs.length > 0), courseIntensity: pedAdapt?.courseIntensity });
+  const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * dayRegimeMult * levelMult);
   
   // Pre-calculate each muscle's expected volume to allocate budget proportionally
   const plans: MusclePlan[] = [];
@@ -1190,9 +1185,14 @@ function buildSession(
     // Для high-volume legs: quads принудительно primary даже если hamstrings
     // уже занял primary-слот. Без этого quads всегда accessory в чётные дни.
     const forceLegsPrimary = highVolumeLegsSession && ['quads', 'hamstrings', 'glutes'].includes(muscle);
+    // Для high-volume enhanced грудь/спина-дней (Upper/ChestBack/Push): грудь —
+    // со-главная со спиной, primary в ОБЕИХ сессиях (тяж и памп). Без этого грудь
+    // в памп-Upper остаётся accessory (1 упр) и голодает (18/нед вместо ~40).
+    const highVolumeTorsoSession = level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Chest|Push|ChestBack|Torso/.test(sched.sessionTag || '');
+    const forceTorsoPrimary = highVolumeTorsoSession && muscle === 'chest';
     // focusGroup: мышца специализации получает primary-слот даже если maxPrimaries достигнут.
     const isFocusMuscle = focusGroup && (muscle === focusGroup || isWeak(muscle, [focusGroup]));
-    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж') && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary && (musclePrimaryAssigned.size < maxPrimaries || muscle === sessionLeadMuscle || isFocusMuscle || forceLegsPrimary)) {
+    if (!musclePrimaryAssigned.has(muscle) && (resolved === 'тяж' || forceTorsoPrimary) && isMainMuscle && !SMALL_NEVER_PRIMARY.has(muscle) && fbAllowsPrimary && (musclePrimaryAssigned.size < maxPrimaries || muscle === sessionLeadMuscle || isFocusMuscle || forceLegsPrimary || forceTorsoPrimary)) {
       role = 'primary'; musclePrimaryAssigned.add(muscle);
     }
     // High-volume legs: принудительно primary для quads/hamstrings/glutes
@@ -1227,6 +1227,15 @@ function buildSession(
     // 3+ лет — 18 сетов, 6+ лет — 22 сета до дальнейшего fatigue/recovery fit.
     if (muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
       sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 22 : 18);
+    }
+    // High-volume enhanced грудь/плечи: в Upper/Push/Chest-днях (где спина доминирует)
+    // грудь и плечи получают прямой минимум, а не остаток после спины.
+    // Верх: грудь ~38-48/нед на курсе → ~16-18/сессию; плечи — 6-8.
+    if (muscle === 'chest' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Chest|Push|ChestBack|Torso/.test(sched.sessionTag || '') && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 18 : 14);
+    }
+    if (muscle === 'shoulders' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Push|Chest|Shoulders|Torso/.test(sched.sessionTag || '') && phase !== 'deload') {
+      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
     }
     // Natural advanced: спина не должна терять объём в Upper-днях из-за
     // fatigue budget (грудь забирает бюджет). Минимум 10 сетов на сессию.
@@ -3320,15 +3329,6 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     supersetMode: input.supersetMode,
     volumeScheme: input.volumeScheme,
   });
-  if (input.athleteContext) {
-    finalized.athleteContext = input.athleteContext;
-    finalized.athleteMode = input.athleteMode ?? 'standard';
-    const hints = athletePolicyHints(input.athleteContext);
-    if (hints.warnings.length > 0) {
-      finalized.rationale.push(`♀ ${athletePolicySummary(input.athleteContext)}`);
-      for (const w of hints.warnings) finalized.rationale.push(`⚠ ${w}`);
-    }
-  }
   // Слабые группы: +1 упражнение (3-4 сета) на отстающий вид, БЕЗ учёта капа (optional ⚡).
   // Добавляется ПОСЛЕ финализации, чтобы финализатор не срезал его.
   // Это НЕ специализация (забирает кап у других) — лишь смещение баланса паттернов.

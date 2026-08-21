@@ -28,7 +28,6 @@ import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
 import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
 import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
-import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export interface LMSBuildInput {
   template: SRCycleTemplate;
@@ -97,9 +96,6 @@ export interface LMSBuildInput {
   peakMode?: TaperMode;
   /** Число авто-тапер-недель при сборке (по умолчанию 2). */
   taperWeeks?: number;
-  /** Явный контекст спортсмена; не меняет силовой pipeline автоматически. */
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
 }
 
 
@@ -164,9 +160,6 @@ export interface LMSBuildOutput {
   cycleMetrics: SRCycleMetrics;
   /** Валидация объёма по группам мышц против MEV/MAV/MRV (volume-landmarks). */
   plVolumeLandmarks?: PLVolumeLandmark[];
-  /** Явный контекст спортсмена (пол/режим) — прозрачно, без скрытого изменения pipeline. */
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
 }
 
 /**
@@ -1573,18 +1566,12 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные недели — объём ↓, интенсивность сохранена (Bosquet 2005).' : '';
 
-  const contextNote = input.athleteMode === 'female_context' && input.athleteContext?.sex === 'female'
-    ? ` ♀ Женский контекст: базовая модель объёма/RIR и капы сохранены (без скрытых изменений).`
-    : '';
-
   return {
     template,
-    progressionRationale: proRationale + taperNote + contextNote,
+    progressionRationale: proRationale + taperNote,
     weeks: taperedWeeks,
     cycleMetrics,
     plVolumeLandmarks: getPLVolumeLandmarks(taperedWeeks, template.meta.level, combinedMrvMult),
-    athleteMode: input.athleteMode,
-    athleteContext: input.athleteContext,
   };
 }
 

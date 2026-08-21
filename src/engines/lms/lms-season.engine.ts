@@ -18,7 +18,6 @@ import { originalCycleWeeks, buildLMSPlan, type LMSBuildInput, type LMSBuildOutp
 import { buildPLSeasonPeaks, type MacroTaperOpts, type PLSeasonMeet } from './lms-macro-taper.engine';
 import { speedOrientationOf } from '../../data/lms-cycles/lms-speed-index';
 import type { PED } from '../bb/bb-ped-adaptation.engine';
-import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 // ─── Периоды-слоты ───────────────────────────────────────────────────────────────
 
@@ -325,8 +324,6 @@ export interface AssembleSeasonOptions {
   limiterExerciseMap?: LMSBuildInput['limiterExerciseMap'];
   limiterProtocolMap?: LMSBuildInput['limiterProtocolMap'];
   limiterDayMap?: LMSBuildInput['limiterDayMap'];
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
   recovery?: Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'>;
   taper?: MacroTaperOpts;
   meets?: PLSeasonMeet[];
@@ -368,8 +365,6 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
       acwr: opts.acwr,
       autoReg: opts.autoReg,
       pmAutoReg: opts.pmAutoReg,
-      athleteMode: opts.athleteMode,
-      athleteContext: opts.athleteContext,
       ...(opts.recovery ?? {}),
     });
     outputs.push(out);
@@ -391,8 +386,6 @@ export function assembleSeasonPlan(plan: PLSeasonPlan, opts: AssembleSeasonOptio
     progressionRationale: notes.join('\n'),
     weeks,
     cycleMetrics: first?.cycleMetrics ?? ({} as LMSBuildOutput['cycleMetrics']),
-    athleteMode: opts.athleteMode,
-    athleteContext: opts.athleteContext,
   };
 }
 

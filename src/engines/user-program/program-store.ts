@@ -416,8 +416,6 @@ export function createFromBuild(
     /** Исходная FullProgram (если план получен из клонирования библиотечной программы) — используется
      *  для восстановления phase/deload/weeks-структуры, иначе вычисляется из week.week/totalWeeks. */
     originalProgram?: FullProgram;
-    /** Явный контекст спортсмена (при отсутствии берётся из плана). */
-    athleteMode?: 'standard' | 'female_context';
   }
 ): UserProgram {
   const totalWeeks = plan.weeks?.length ?? 0;
@@ -474,7 +472,6 @@ export function createFromBuild(
     direction: 'bb',
     source: 'from_build',
     tags: ['from_build'],
-    athleteMode: params.athleteMode ?? plan.athleteMode ?? 'standard',
   });
   return { meta, bb: body };
 }

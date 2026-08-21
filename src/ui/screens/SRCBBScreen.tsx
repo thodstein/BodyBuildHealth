@@ -31,8 +31,6 @@ import { TrainingMetricsChart, type LMSWeekMetric, type BBMuscleMetric } from '.
 import { MethodsTab } from './TrainingScreen_parts/MethodsTab';
 import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
-import type { AthleteMode, AthleteContext, ReproductiveContext } from '../../engines/athlete-context.engine';
-import { REPRODUCTIVE_CONTEXT_OPTIONS, athleteContextAdvisory, reproductiveContextHint } from '../../engines/athlete-context.engine';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
@@ -57,7 +55,7 @@ import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '..
 import { pmDiaryMultiplier, type PMAutoRegMode } from '../../engines/lms/pm-autoreg.engine';
 import { competitionAttempts, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, type MeetStrategy } from '../../engines/lms/competition-attempts';
 import { recommendWeightCut } from '../../engines/gym-competition.engine';
-import { updateSection, getProfile } from '../../core/profile-manager';
+import { getProfile } from '../../core/profile-manager';
 import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
@@ -133,15 +131,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const _plSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
   const _profPL = loadTrainingProfile();
   const [level, setLevel] = useState<string>(_plSaved?.plLevel || 'II-KMS');
-  // ♀ Режим спортсмена: явный контекст (пол/режим) — pipeline PL не меняется автоматически.
-  const [plAthleteMode, setPlAthleteMode] = useState<'standard' | 'female_context'>(_plSaved?.plAthleteMode === 'female_context' ? 'female_context' : 'standard');
-  const plSex: 'male' | 'female' = (() => {
-    try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; }
-  })();
-  const [plReproductiveContext, setPlReproductiveContext] = useState<ReproductiveContext>(_plSaved?.plReproductiveContext === 'pregnancy' || _plSaved?.plReproductiveContext === 'postpartum' ? _plSaved.plReproductiveContext : 'unknown');
-  const plAthleteContext: AthleteContext | undefined = plAthleteMode === 'female_context'
-    ? { sex: plSex, athleteMode: plAthleteMode, competitionFederation: 'ipf', ...(plReproductiveContext !== 'unknown' ? { reproductiveContext: plReproductiveContext } : {}) }
-    : undefined;
   const [goal, setGoal] = useState<string>(_plSaved?.plGoal || 'strength');
   const [dir, setDir] = useState<string>(_plSaved?.plDir || 'powerlifting');
   // State для MacrocyclePanel (редактируемые level/goal в годовом плане)
@@ -268,7 +257,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!builtSrc) return;
     setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
-  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plAthleteMode })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, plAthleteMode]);
+  useEffect(() => { try { localStorage.setItem('he_pl_session', JSON.stringify({ selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId })); } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcAdditions, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId]);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
     if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
@@ -400,8 +389,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
       faithful: true,
-      athleteMode: plAthleteMode,
-      athleteContext: plAthleteContext,
       ...rec,
     });
     setBuiltSrc(plan); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
@@ -450,8 +437,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
            autoReg: autoRegMode === 'auto' ? { topSetPctMultiplier: autoRegResult.topSetPctMultiplier, volumeMultiplier: autoRegResult.volumeMultiplier, rirShift: autoRegResult.rirShift, deload: autoRegResult.deload } : undefined,
             pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
             faithful: true,
-            athleteMode: plAthleteMode,
-            athleteContext: plAthleteContext,
             ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
@@ -1269,10 +1254,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     limiterExerciseMap,
     limiterProtocolMap,
     limiterDayMap,
-    athleteMode: plAthleteMode,
-    athleteContext: plAthleteContext,
     recovery: getRecoveryMetrics(linked),
-  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, limiterExerciseMap, limiterProtocolMap, limiterDayMap, plAthleteMode, plAthleteContext]);
+  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
 
   // Сводка для печати/экспорта: базовые метрики + циклы сезона (с «ужатиями»).
   const plPrintSummary = (): { label: string; value: string }[] => {
@@ -1330,56 +1313,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг']].map(([id,label]) => ({ id, label }))} />
             <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
             <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
-          </div>
-          {/* ♀ Режим спортсмена: явный контекст PL (pipeline не меняется автоматически) */}
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: plAthleteMode === 'female_context' ? 'rgba(236,72,153,0.07)' : 'rgba(255,255,255,0.03)', border: plAthleteMode === 'female_context' ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: plAthleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.75)', marginBottom: 6 }}>♀ Режим спортсмена</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={() => setPlAthleteMode('standard')} style={{
-                flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 11,
-                border: plAthleteMode === 'standard' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-                background: plAthleteMode === 'standard' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-                color: plAthleteMode === 'standard' ? '#00e68a' : 'rgba(255,255,255,0.6)',
-              }}>Стандартный</button>
-              <button onClick={() => setPlAthleteMode('female_context')} style={{
-                flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 11,
-                border: plAthleteMode === 'female_context' ? '2px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
-                background: plAthleteMode === 'female_context' ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.02)',
-                color: plAthleteMode === 'female_context' ? '#ec4899' : 'rgba(255,255,255,0.6)',
-              }}>♀ Женский контекст</button>
-            </div>
-            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-              Проценты, RIR, объём и капы рассчитываются от вашего ПМ без автоматических изменений по полу. Контекст действует на следующую сборку.
-              {plSex === 'female' && plAthleteMode === 'standard' && <span style={{ color: 'rgba(236,72,153,0.8)' }}> В профиле указан женский пол — можно включить контекст.</span>}
-            </div>
-            {builtSrc?.athleteMode === 'female_context' && (
-              <div style={{ marginTop: 6, fontSize: 10, fontWeight: 700, color: '#ec4899' }}>♀ Женский контекст применён к текущему плану.</div>
-            )}
-            {plAthleteMode === 'female_context' && (
-              <>
-                <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>Репродуктивный контекст (не меняет план):</div>
-                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
-                  {REPRODUCTIVE_CONTEXT_OPTIONS.map(o => (
-                    <button key={o.id} title={o.hint} onClick={() => setPlReproductiveContext(o.id)} style={{
-                      padding: '4px 9px', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 10,
-                      border: plReproductiveContext === o.id ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.12)',
-                      background: plReproductiveContext === o.id ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.03)',
-                      color: plReproductiveContext === o.id ? '#ec4899' : 'rgba(255,255,255,0.7)',
-                    }}>{o.label}</button>
-                  ))}
-                </div>
-                {plReproductiveContext !== 'unknown' && (
-                  <div style={{ marginTop: 5, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.15)', padding: '5px 8px', borderRadius: 8 }}>
-                    {reproductiveContextHint(plReproductiveContext)}
-                  </div>
-                )}
-                {athleteContextAdvisory({ sex: plSex, athleteMode: plAthleteMode, reproductiveContext: plReproductiveContext }).level === 'review' && (
-                  <div style={{ marginTop: 6, fontSize: 10, color: '#ef4444', lineHeight: 1.5, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: '6px 8px', borderRadius: 8 }}>
-                    {athleteContextAdvisory({ sex: plSex, athleteMode: plAthleteMode, reproductiveContext: plReproductiveContext }).reasons.join(' ')}
-                  </div>
-                )}
-              </>
-            )}
           </div>
           <div style={H}>💪 Предельные максимумы (ПМ) по упражнениям цикла</div>
           {(() => {
@@ -1743,7 +1676,6 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                       : (cycle ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед` : 'Силовой цикл ПЛ');
                     const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, builtSrc!.weeks, {
                       summary: plPrintSummary(),
-                      athleteMode: builtSrc!.athleteMode,
                     });
                     printPLHtml(html, { title: 'ПЛ-план', text: 'Печать / PDF плана силового цикла' });
                   } catch (e) { setMethodNote('⚠ Ошибка печати: ' + (e as Error).message); }

@@ -82,8 +82,6 @@ export interface PrepCycleConfig {
   loadStrategy?: BBBuilderInput['loadStrategy'];
   autoRegResult?: BBBuilderInput['autoRegResult'];
   methodology?: BBBuilderInput['methodology'];
-  athleteMode?: BBBuilderInput['athleteMode'];
-  athleteContext?: BBBuilderInput['athleteContext'];
   labWarnings?: string[];
   labIntensityNote?: string;
   eccentricMult?: number;
@@ -326,8 +324,6 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
     loadStrategy: cfg.loadStrategy,
     autoRegResult: cfg.autoRegResult,
     methodology: cfg.methodology,
-    athleteMode: cfg.athleteMode,
-    athleteContext: cfg.athleteContext,
     bodyFat: cfg.bodyFat,
     leanMass: cfg.leanMass,
     hrvMs: cfg.hrvMs,
@@ -1196,8 +1192,6 @@ export interface PrepSeasonConfig {
   loadStrategy?: BBBuilderInput['loadStrategy'];
   autoRegResult?: BBBuilderInput['autoRegResult'];
   methodology?: BBBuilderInput['methodology'];
-  athleteMode?: BBBuilderInput['athleteMode'];
-  athleteContext?: BBBuilderInput['athleteContext'];
   labWarnings?: string[];
   labIntensityNote?: string;
   eccentricMult?: number;
@@ -1300,8 +1294,6 @@ export function buildPrepSeason(cfg: PrepSeasonConfig): PrepSeasonResult {
       loadStrategy: cfg.loadStrategy,
       autoRegResult: cfg.autoRegResult,
       methodology: cfg.methodology,
-      athleteMode: cfg.athleteMode,
-      athleteContext: cfg.athleteContext,
       labWarnings: cfg.labWarnings,
       labIntensityNote: cfg.labIntensityNote,
       eccentricMult: cfg.eccentricMult,

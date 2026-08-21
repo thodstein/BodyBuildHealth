@@ -18,7 +18,6 @@ import { candidateCyclesForSlot, fitCycleToWeeks, type PLSeasonPeriod, type PLSe
 import type { LMSRankedCycle, LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { PED } from '../bb/bb-ped-adaptation.engine';
-import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export interface GapSegment {
   meetId: string;          // старт, К КОТОРОМУ ведёт сегмент
@@ -90,8 +89,6 @@ export interface CompGapBuildOptions extends CompGapOptions {
   limiterExerciseMap?: LMSBuildInput['limiterExerciseMap'];
   limiterProtocolMap?: LMSBuildInput['limiterProtocolMap'];
   limiterDayMap?: LMSBuildInput['limiterDayMap'];
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
   recovery?: Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'>;
 }
 
@@ -230,8 +227,6 @@ export function planBetweenCompetitions(
       acwr: opts.acwr,
       autoReg: opts.autoReg,
       pmAutoReg: opts.pmAutoReg,
-      athleteMode: opts.athleteMode,
-      athleteContext: opts.athleteContext,
       ...(opts.recovery ?? {}),
     });
     segOutputs.set(j, out.weeks.length > 0 ? out.weeks : [placeholder(1)]);

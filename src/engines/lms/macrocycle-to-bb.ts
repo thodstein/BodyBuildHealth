@@ -45,9 +45,8 @@ export interface MacrocycleToBBOptions {
   peds?: string[];
   pedDoses?: Record<string, number>;
   courseIntensity?: 'mild' | 'moderate' | 'heavy';
-  /** Пол и явный режим контекста (BB-сборка). */
+  /** Пол (BB: glute-приоритет). */
   sex?: 'male' | 'female';
-  athleteMode?: 'standard' | 'female_context';
 }
 
 /** Структурированная разгрузка каждые N недели внутри базовых фаз.
@@ -249,7 +248,6 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions, pedAdapt
     excludedExercises: opts.excludedExercises,
     favoriteExercises: opts.favoriteExercises,
     sex: opts.sex,
-    athleteMode: opts.athleteMode,
   });
   const userProg = createFromBuild(bbPlan, {
     goal: opts.goal,

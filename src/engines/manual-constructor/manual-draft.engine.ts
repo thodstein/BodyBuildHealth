@@ -12,7 +12,6 @@ import { selectBestBBSplit } from '../bb/bb-selector.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { Injury } from '../manual-plan-builder';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
-import type { AthleteContext, AthleteMode } from '../athlete-context.engine';
 
 export interface MuscleGroupPlan {
   muscle: string;
@@ -49,8 +48,6 @@ export interface AutoDraftOptions {
   loadStrategy?: import('../bb/bb-autocoach.engine').LoadStrategy;
   /** Пол — для glute-приоритета в ножных днях. */
   sex?: 'male' | 'female';
-  athleteMode?: AthleteMode;
-  athleteContext?: AthleteContext;
   /** ISO-дата начала мезоцикла (для per-week оценки травм). */
   planStartWeek?: string;
   /** Training focus для RIR/reps/tempo (Schoenfeld 2021, Roberts 2022). */
@@ -184,8 +181,6 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     deloadType: opts.deloadType,
     loadStrategy: opts.loadStrategy,
     sex: opts.sex,
-    athleteMode: opts.athleteMode,
-    athleteContext: opts.athleteContext,
     planStartWeek: opts.planStartWeek,
     courseIntensity: (opts.courseIntensity ?? 'moderate') as CourseIntensity,
     trainingFocus: opts.trainingFocus,

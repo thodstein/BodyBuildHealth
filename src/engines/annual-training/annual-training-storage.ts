@@ -255,7 +255,6 @@ const CONFIG_FIELD_LABELS: [keyof AnnualBlockConfig, string][] = [
   ['equipment', 'оборудование'],
   ['focusGroup', 'фокус-группа'],
   ['specialization', 'специализация'],
-  ['athleteMode', 'режим'],
   ['taper', 'тапер'],
   ['peakWeek', 'пик-неделя'],
   ['peakConfig', 'конфиг пика'],
