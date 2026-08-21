@@ -783,6 +783,50 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
       });
     }
   }
+  // Объём-добивка груди: спина в Upper достигает 18-22 сетов через allocateExperiencedBackSession,
+  // а грудь оставалась на крохах (3 сета/упр). Добиваем грудь до target (14-18 сетов/сессию,
+  // 4-5 упражнений) в Upper/ChestBack/Push — как спина, чтобы грудь была со-главной.
+  const years = options.trainingYears ?? 0;
+  const chestNow = session.exercises.filter((e: any) => e.muscle === 'chest' && !(e as any).warmupActivator);
+  const chestSets = chestNow.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+  const targetSets = years >= 6 ? 18 : 14;
+  if (chestSets < targetSets) {
+    const usedNames = new Set(chestNow.map((e: any) => e.name));
+    const maxEx = options.level === 'enhanced' && years >= 3 ? 18 : 10;
+    let addedSets = 0;
+    // 1) Добить сеты существующих жимов до 4-5.
+    for (const e of chestNow) {
+      if (addedSets >= targetSets - chestSets) break;
+      const isPress = /жим|press|отжим|брус/.test(e.name);
+      if (isPress && e.sets < 4) {
+        const add = Math.min(4 - e.sets, targetSets - chestSets - addedSets);
+        e.sets += add; addedSets += add;
+        const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+        if (Array.isArray(e.workSets)) for (let k = 0; k < add; k++) e.workSets.push({ ...sample });
+      }
+    }
+    // 2) Если всё ещё мало — добавить ещё одно грудное упражнение (разные углы).
+    while (addedSets < targetSets - chestSets && chestNow.length + session.exercises.filter((e:any)=>!(e as any).warmupActivator).length < maxEx) {
+      const cand = EXERCISE_CATALOG.find((x: any) => {
+        if (trueMuscleOf(x) !== 'chest') return false;
+        if (usedNames.has(x.name)) return false;
+        if (session.exercises.some((e: any) => e.name === x.name)) return false;
+        if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+        return true;
+      });
+      if (!cand) break;
+      const wm = options.workMax?.chest || 100;
+      const sets = Math.min(4, targetSets - chestSets - addedSets);
+      session.exercises.push({
+        muscle: 'chest', name: cand.name, exerciseName: cand.name, role: 'accessory', character: heavyDay ? 'тяж' : 'памп',
+        sets, repsRange: heavyDay ? [8, 12] : [12, 15], rir: heavyDay ? 2 : 3, restSeconds: 90, warmupSets: [],
+        workSets: Array.from({ length: sets }, () => ({ reps: heavyDay ? 10 : 12, rir: heavyDay ? 2 : 3, weight: Math.round(wm * (heavyDay ? 0.7 : 0.5) * 10) / 10, restSeconds: 90 })),
+        rationale: 'Experienced enhanced: chest volume top-up (Upper/Push co-main)',
+      });
+      usedNames.add(cand.name);
+      addedSets += sets;
+    }
+  }
 }
 
 /** Гарантирует rear delt работу в Pull-дне (задняя дельта — тяговая мышца). */
@@ -2007,6 +2051,50 @@ for (const week of next.weeks) {
       });
       if (fitted.removed.length > 0) {
         next.rationale.push(`Fatigue budget: ${session.sessionTag || `день ${session.day}`} — удалено ${fitted.removed.length} вторичных упражнений, расчётная длительность ${Math.round(fitted.cost.timeSeconds / 60)} мин.`);
+      }
+    }
+  }
+  // Финальный инвариант груди (после fit): грудь в Upper/ChestBack/Push — со-главная
+  // со спиной, как и ноги/спина защищены от fit-резки. Добиваем грудь до target
+  // (14-18 сетов/сессию), иначе fit урезал её после diversify (спина 22, грудь 9).
+  if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
+    for (const week of next.weeks) {
+      if (isPrepControlled(week)) continue;
+      for (const session of week.sessions) {
+        if (!/^(Push|Chest|ChestBack|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) continue;
+        const donorSet = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
+        if (donorSet.has('chest') || donorSet.has('shoulders')) continue;
+        const chest = session.exercises.filter((e: any) => e.muscle === 'chest' && !(e as any).warmupActivator);
+        if (!chest.length) continue;
+        const targetSets = (options.trainingYears ?? 0) >= 6 ? 18 : 14;
+        const current = chest.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        if (current >= targetSets) continue;
+        const usedNames = new Set(chest.map((e: any) => e.name));
+        // 1) Добить сеты существующих жимов до 4.
+        let added = 0;
+        for (const e of chest) {
+          if (added >= targetSets - current) break;
+          if (/жим|press|отжим|брус/.test(e.name) && e.sets < 4) {
+            const add = Math.min(4 - e.sets, targetSets - current - added);
+            e.sets += add; added += add;
+            const sample = e.workSets?.[e.workSets.length - 1] || { reps: 10, rir: 2, weight: 0 };
+            if (Array.isArray(e.workSets)) for (let k = 0; k < add; k++) e.workSets.push({ ...sample });
+          }
+        }
+        // 2) Если всё ещё мало — добавить одно грудное упражнение.
+        if (added < targetSets - current) {
+          const cand = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === 'chest' && !usedNames.has(x.name) && !session.exercises.some((e: any) => e.name === x.name) && !options.excludedExercises?.includes(x.id) && !options.excludedExercises?.includes(x.name));
+          if (cand) {
+            const wm = options.workMax?.chest || 100;
+            const sets = Math.min(4, targetSets - current - added);
+            session.exercises.push({
+              muscle: 'chest', name: cand.name, exerciseName: cand.name, role: 'accessory', character: 'памп',
+              sets, repsRange: [10, 15], rir: 3, restSeconds: 90, warmupSets: [],
+              workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: Math.round(wm * 0.5 * 10) / 10, restSeconds: 90 })),
+              rationale: 'Experienced enhanced: chest co-main invariant (Upper/Push)',
+            });
+          }
+        }
       }
     }
   }

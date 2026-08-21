@@ -26,7 +26,7 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
   it('Generic enhanced 6+ (upper_lower_4, mass, AAS 500) — per-muscle объём', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, ...PED });
     expect(directVolume(plan)).toEqual({
-      abs: 16, back: 51, biceps: 4, calves: 10, chest: 18, forearms: 4, glutes: 10, hamstrings: 25, quads: 10, shoulders: 5, traps: 6, triceps: 4,
+      abs: 16, back: 51, biceps: 4, calves: 10, chest: 26, forearms: 4, glutes: 10, hamstrings: 25, quads: 10, shoulders: 5, traps: 6, triceps: 4,
     });
   });
 
