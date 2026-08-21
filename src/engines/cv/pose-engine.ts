@@ -163,3 +163,125 @@ export function interpretMetrics(m: PoseMetrics | null, lift: Lift): { label:str
   }
   return null;
 }
+
+// ── Воркер-обёртка: не морозит UI в Telegram WebView ──
+
+function canUseWorker(): boolean {
+  try { return typeof Worker !== 'undefined'; } catch { return false; }
+}
+
+/**
+ * Тот же анализ, но через WebWorker (не блокирует главный поток).
+ * Фолбэк на analyzeVideoElement если воркер недоступен / упал.
+ */
+export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift, onProgress?: (p:number)=>void): Promise<PoseMetrics | null> {
+  if (!canUseWorker()) return analyzeVideoElement(video, lift);
+  let worker: Worker | null = null;
+  try {
+    // Vite worker import
+    worker = new Worker(new URL('./pose-worker.ts', import.meta.url), { type: 'module' });
+  } catch {
+    return analyzeVideoElement(video, lift);
+  }
+  const duration = video.duration;
+  if (!duration || !isFinite(duration) || duration <= 0) { worker.terminate(); return null; }
+
+  const sampleCount = Math.min(40, Math.max(8, Math.floor(duration * 5)));
+  const w = 320, h = 240;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) { worker.terminate(); return analyzeVideoElement(video, lift); }
+  canvas.width = w; canvas.height = h;
+
+  const frames: { imageData: ImageData; ts: number }[] = [];
+  for (let i = 0; i < sampleCount; i++) {
+    const t = (duration * i) / sampleCount;
+    try {
+      video.currentTime = t;
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise<void>((res) => {
+        const onSeek = () => { video.removeEventListener('seeked', onSeek); res(); };
+        video.addEventListener('seeked', onSeek);
+        setTimeout(res, 350);
+      });
+      ctx.drawImage(video, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      frames.push({ imageData, ts: t });
+      onProgress?.(Math.round((i / sampleCount) * 40));
+    } catch { continue; }
+  }
+
+  // init worker
+  const ready = await new Promise<boolean>((res) => {
+    const to = setTimeout(()=>res(false), 4000);
+    const onMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'ready') { clearTimeout(to); worker!.removeEventListener('message', onMsg); res(true); }
+      if (e.data?.type === 'error') { clearTimeout(to); worker!.removeEventListener('message', onMsg); res(false); }
+    };
+    worker!.addEventListener('message', onMsg);
+    worker!.postMessage({ type:'init' });
+  });
+  if (!ready) { worker.terminate(); return analyzeVideoElement(video, lift); }
+
+  const elbowAngles: number[] = [];
+  const gripRatios: number[] = [];
+  const wristYs: number[] = [];
+  const timestamps: number[] = [];
+  let bridgeVotes = 0, bridgeTotal = 0;
+
+  for (let idx=0; idx<frames.length; idx++) {
+    const { imageData, ts } = frames[idx];
+    // eslint-disable-next-line no-await-in-loop
+    const lmks: any = await new Promise((res)=>{
+      const id = idx;
+      const handler = (e: MessageEvent)=>{
+        if (e.data?.type==='result' && e.data.id===id){
+          worker!.removeEventListener('message', handler);
+          res(e.data.landmarks);
+        }
+      };
+      worker!.addEventListener('message', handler);
+      worker!.postMessage({ type:'detect', id, imageData, timestamp: performance.now() }, [imageData.data.buffer.slice ? imageData.data.buffer : imageData.data as any]);
+      setTimeout(()=>{ worker!.removeEventListener('message', handler); res(null); }, 1200);
+    });
+    onProgress?.(40 + Math.round((idx / frames.length) * 60));
+    if (!lmks || lmks.length < 33) continue;
+    const lSh = lmks[11], rSh = lmks[12], lEl = lmks[13], rEl = lmks[14], lWr = lmks[15], rWr = lmks[16];
+    const lHip = lmks[23], rHip = lmks[24];
+    if (!lSh || !rSh || !lEl || !rEl || !lWr || !rWr) continue;
+    const vis = (p: any) => (p.visibility ?? 1) > 0.3;
+    if (![lSh,rSh,lEl,rEl,lWr,rWr].every(vis)) continue;
+    const leftAng = angle(lSh, lEl, lWr);
+    const rightAng = angle(rSh, rEl, rWr);
+    const avg = (leftAng + rightAng)/2;
+    if (avg > 10 && avg < 180) elbowAngles.push(avg);
+    const shoulderWidth = dist(lSh, rSh);
+    const gripWidth = dist(lWr, rWr);
+    if (shoulderWidth > 0.01) gripRatios.push(gripWidth / shoulderWidth);
+    wristYs.push((lWr.y + rWr.y)/2);
+    timestamps.push(ts);
+    if (lHip && rHip) {
+      bridgeTotal++;
+      if ((lHip.y + rHip.y)/2 < (lSh.y + rSh.y)/2 + 0.05) bridgeVotes++;
+    }
+  }
+  worker.terminate();
+  if (elbowAngles.length < 3) return null;
+  const elbowAvgDeg = Math.round(elbowAngles.reduce((a,b)=>a+b,0)/elbowAngles.length);
+  const gripRatio = gripRatios.length ? Math.round((gripRatios.reduce((a,b)=>a+b,0)/gripRatios.length)*100)/100 : null;
+  let barVelocity: number | null = null;
+  if (wristYs.length >= 4) {
+    let maxV = 0;
+    for (let i=1;i<wristYs.length;i++){
+      const dy = Math.abs(wristYs[i]-wristYs[i-1]);
+      const dt = (timestamps[i]-timestamps[i-1]) || 0.2;
+      const v = dy / dt;
+      if (v > maxV) maxV = v;
+    }
+    barVelocity = Math.round(maxV * 1.2 * 100)/100;
+    if (barVelocity < 0.1) barVelocity = null;
+  }
+  const bridge = bridgeTotal>0 ? (bridgeVotes/bridgeTotal > 0.6) : null;
+  if (lift === 'squat' || lift === 'deadlift' || lift === 'sumo') return { elbowAvgDeg: null, gripRatio: null, barVelocity, bridge };
+  return { elbowAvgDeg, gripRatio, barVelocity, bridge };
+}

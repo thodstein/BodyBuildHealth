@@ -109,10 +109,12 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
     setStream(null);
     if(videoRef.current) videoRef.current.srcObject=null;
   };
+  const [progress, setProgress] = useState<number>(0);
   const handleFile = async (f: File | null)=>{
     if(!f) return;
     setError(null);
     setAnalyzing(true);
+    setProgress(5);
     const url = URL.createObjectURL(f);
     const vid = document.createElement('video');
     vid.src = url;
@@ -125,18 +127,25 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
         vid.onerror = ()=> rej(new Error('Не удалось загрузить видео'));
         setTimeout(()=>rej(new Error('Таймаут загрузки видео')), 8000);
       });
-      // пробуем реальный CV
+      // пробуем реальный CV через воркер (не морозит UI)
       let out: VideoAnalysisResult | null = null;
       try{
-        const { analyzeVideoElement } = await import('../../../engines/cv/pose-engine');
-        const m = await analyzeVideoElement(vid as any, lift);
+        const { analyzeVideoWithWorker, analyzeVideoElement } = await import('../../../engines/cv/pose-engine');
+        // воркер с прогрессом, фолбэк на главный поток
+        let m: any = null;
+        try {
+          m = await analyzeVideoWithWorker(vid as any, lift, (p)=> setProgress(p));
+        } catch (e) {
+          console.warn('[video] worker failed, fallback', e);
+          m = await analyzeVideoElement(vid as any, lift);
+        }
         if (m && (m.elbowAvgDeg!=null || m.barVelocity!=null)) {
           out = {
             elbowAvgDeg: m.elbowAvgDeg ?? 0,
             gripRatio: m.gripRatio ?? 0,
             barVelocity: m.barVelocity ?? null,
             bridge: m.bridge ?? null,
-            note: m.elbowAvgDeg!=null ? 'CV-анализ BlazePose (локально, без сервера).' : 'Поза не распознана — использован мок.',
+            note: m.elbowAvgDeg!=null ? 'CV-анализ BlazePose (воркер, локально, блины — по запястьям; трекинг дисков — след. шаг).' : 'Поза не распознана — использован мок.',
           };
         }
       }catch(e){
@@ -158,6 +167,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
       onResult?.(r);
     }finally{
       setAnalyzing(false);
+      setProgress(0);
       URL.revokeObjectURL(url);
       vid.remove();
     }
@@ -199,7 +209,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
         </label>
         <button disabled={analyzing} onClick={()=>{ const r=mockAnalyze(lift); setResult(r); onResult?.(r); }} style={{ padding:'7px 12px', borderRadius:7, cursor: analyzing?'not-allowed':'pointer', background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.25)', fontWeight:700, fontSize:10, opacity: analyzing?0.6:1 }}>🧪 Демо-разбор</button>
       </div>
-      {analyzing && <div style={{ marginTop:6, fontSize:10, color:ACCENT, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', padding:'6px 8px', borderRadius:6 }}>⏳ Анализ видео… BlazePose грузит WASM (первый раз ~2-3с с CDN), затем 5 fps.</div>}
+      {analyzing && <div style={{ marginTop:6, fontSize:10, color:ACCENT, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', padding:'6px 8px', borderRadius:6 }}>⏳ Анализ видео… {progress>0?`${progress}% — `:''}BlazePose воркер (не морозит UI) — первый раз качает WASM ~2-3с.</div>}
       {error && <div style={{ marginTop:6, fontSize:10, color:'#f87171', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', padding:'6px 8px', borderRadius:6 }}>{error}</div>}
 
       {/* Preview */}
