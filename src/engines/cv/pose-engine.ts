@@ -241,7 +241,7 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
         }
       };
       worker!.addEventListener('message', handler);
-      worker!.postMessage({ type:'detect', id, imageData, timestamp: performance.now() }, [imageData.data.buffer.slice ? imageData.data.buffer : imageData.data as any]);
+      worker!.postMessage({ type:'detect', id, imageData, timestamp: performance.now() });
       setTimeout(()=>{ worker!.removeEventListener('message', handler); res(null); }, 1200);
     });
     onProgress?.(40 + Math.round((idx / frames.length) * 60));
