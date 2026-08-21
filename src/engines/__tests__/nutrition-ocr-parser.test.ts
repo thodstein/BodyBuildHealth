@@ -113,6 +113,31 @@ describe('nutrition-ocr-parser', () => {
       expect(items[0].p).toBe(20);
     });
 
+    it('parses the FatSecret Android diary layout with right-aligned calories', () => {
+      const text = [
+        'Жиры Углев Белк РСК ккал',
+        '3®: Завтрак +',
+        'Калории',
+        'ВорОгорз Кокосовое Масло — 180',
+        'для Кулинарии ›',
+        '20 г',
+        '19,98 0,00 0,00 6%',
+        'Гарнец Рисовая Манка 525 ‹',
+        '150 г',
+        '0,75 117,00 10,50 17%',
+        'Стоинг Яичный Протеин 90',
+        'Ваниль ›',
+        'З0 г',
+        '0,09 0,51 21,00 3%',
+      ].join('\n');
+      const items = parseNutritionText(text).flatMap(meal => meal.items);
+
+      expect(items).toHaveLength(3);
+      expect(items.map(item => item.qtyGrams)).toEqual([20, 150, 30]);
+      expect(items.map(item => item.kcal)).toEqual([900, 350, 300]);
+      expect(items.map(item => item.p)).toEqual([0, 7, 70]);
+    });
+
     it('keeps a food and its quantity when OCR has no calories row', () => {
       const items = parseNutritionText('Обед\nОгурец\n100 г').flatMap(meal => meal.items);
 

@@ -43,7 +43,7 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
 }
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
-  const texts: string[] = [];
+  const texts: Array<{ language: keyof typeof TESSERACT_LANG_PATHS; text: string }> = [];
   const errors: string[] = [];
 
   // FatSecret can be displayed in either Russian or English. Separate local
@@ -51,14 +51,28 @@ async function recognizeImage(buffer: Buffer): Promise<string> {
   for (const language of ['rus', 'eng'] as const) {
     try {
       const text = await recognizePass(buffer, language);
-      if (text.trim()) texts.push(text.trim());
+      if (text.trim()) texts.push({ language, text: text.trim() });
     } catch (error: any) {
       errors.push(`${language}: ${error?.message || String(error)}`);
     }
   }
 
-  if (texts.length > 0) return texts.join('\n');
+  if (texts.length > 0) {
+    return texts
+      .sort((left, right) => nutritionOcrScore(right.text, right.language) - nutritionOcrScore(left.text, left.language))[0]
+      .text;
+  }
   throw new Error(`OCR failed for all language passes: ${errors.join('; ')}`);
+}
+
+function nutritionOcrScore(text: string, language: keyof typeof TESSERACT_LANG_PATHS): number {
+  const labels = text.match(/жир|углев|белк|ккал|калори|fat|carb|protein|calor|завтрак|обед|ужин|breakfast|lunch|dinner/gi)?.length || 0;
+  const foodWords = text.match(/куриц|рис|манк|протеин|масло|chicken|rice|protein|oil|oat|beef|salmon/gi)?.length || 0;
+  const numericRows = text.split(/\r?\n/).filter(line => (line.match(/\d+(?:[.,]\d+)?/g)?.length || 0) >= 3).length;
+  const scriptWords = language === 'rus'
+    ? (text.match(/[А-Яа-яЁё]{3,}/g)?.length || 0)
+    : (text.match(/[A-Za-z]{3,}/g)?.length || 0);
+  return labels * 10 + foodWords * 8 + numericRows * 3 + scriptWords;
 }
 
 function decodeBase64(value: string): Buffer {

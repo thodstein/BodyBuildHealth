@@ -64,6 +64,111 @@ function reconstructFoodRows(lines: string[]): string[] {
   return result;
 }
 
+function normalizeFatSecretNumber(value: string): string {
+  return value.replace(/[Оо]/g, '0').replace(/[Зз]/g, '3').replace(/[Бб]/g, '8');
+}
+
+function fatSecretQuantityLine(line: string): string | null {
+  const match = line.trim().match(/^([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s*(г|g|r|мл|ml|шт|pcs?)$/i);
+  if (!match) return null;
+  const value = normalizeFatSecretNumber(match[1]).replace(',', '.');
+  const unit = /мл|ml/i.test(match[2]) ? 'мл' : /шт|pcs?/i.test(match[2]) ? 'шт' : 'г';
+  return `${value} ${unit}`;
+}
+
+function fatSecretMacroColumns(line: string): { f: number; c: number; p: number } | null {
+  const match = line.trim().replace(/[|;]/g, ' ').match(
+    /^([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s+([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s+([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s+\d{1,3}\s*%/i,
+  );
+  if (!match) return null;
+  const values = match.slice(1, 4).map(value => numberFrom(normalizeFatSecretNumber(value), NaN));
+  if (values.some(value => !Number.isFinite(value))) return null;
+  // FatSecret's diary columns are ordered: fat, carbohydrates, protein, RDA.
+  return { f: values[0], c: values[1], p: values[2] };
+}
+
+function fatSecretCaloriesFromLine(line: string): number | null {
+  const match = line.trim().match(/([0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?)\s*(?:ккал|kcal|cal)?\s*[›>‹<'"]?$/i);
+  if (!match) return null;
+  const value = numberFrom(normalizeFatSecretNumber(match[1]), NaN);
+  return Number.isFinite(value) ? value : null;
+}
+
+function isFatSecretMealHeading(line: string): boolean {
+  return /(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack|brunch)/i.test(line);
+}
+
+function isFatSecretNoiseLine(line: string): boolean {
+  const valueLabel = /^(?:total\s+)?(?:protein|fat|carbohydrates?|carbs?|calories?|белки?|белок|жиры?|жир|углеводы?|углевод|угл|натрий|sodium|калий|potassium|магний|magnesium|кальций|calcium|железо|iron|цинк|zinc|фосфор|phosphorus|клетчатка|fiber|витамин(?:\s+[a-z0-9]+)?)\s*[:\-]?\s*\d/i;
+  const exactUi = /^(?:сегодня|today|свернуть|калории|копировать|сохранить|показать|скрыть|жиры|углеводы?|белки?|рск|kcal|calories?|fat|carbs?|protein)$/i;
+  const header = /^(?:жиры|углев|белк|рск|fat|carb|protein)\s+(?:жиры|углев|белк|рск|ккал|calories?|fat|carb|protein)/i;
+  return valueLabel.test(line.trim()) || exactUi.test(line.trim()) || header.test(line.trim());
+}
+
+/** Rebuilds the diary-card layout used by FatSecret Android screenshots. */
+function reconstructFatSecretDiaryRows(lines: string[]): string[] {
+  const result: string[] = [];
+  for (let index = 0; index < lines.length;) {
+    let found: { quantityIndex: number; macroIndex: number; name: string; kcal: number; macros: { f: number; c: number; p: number }; heading?: string } | null = null;
+
+    for (let quantityIndex = index + 1; quantityIndex <= Math.min(lines.length - 2, index + 5); quantityIndex += 1) {
+      const quantity = fatSecretQuantityLine(lines[quantityIndex]);
+      if (!quantity) continue;
+      const macros = fatSecretMacroColumns(lines[quantityIndex + 1]);
+      if (!macros) continue;
+
+      const beforeQuantity = lines.slice(index, quantityIndex);
+      const calorieIndex = beforeQuantity.findIndex(line => fatSecretCaloriesFromLine(line) !== null);
+      const calorieLine = calorieIndex >= 0 ? beforeQuantity[calorieIndex] : '';
+      const kcal = calorieIndex >= 0 ? fatSecretCaloriesFromLine(calorieLine) : null;
+      if (kcal === null) continue;
+
+      const nameParts = beforeQuantity
+        .map((line, partIndex) => ({ line, partIndex }))
+        .filter(({ line }) => !isFatSecretMealHeading(line) && !isFatSecretNoiseLine(line))
+        .map(({ line, partIndex }) => {
+          if (partIndex !== calorieIndex) return line;
+          return line
+            .replace(/[0-9ОоЗз]+(?:[.,][0-9ОоЗз]+)?\s*(?:ккал|kcal|cal)?\s*[›>‹<'"]?$/i, '')
+            .replace(/[—–-]\s*$/, '')
+            .trim();
+        })
+        .map(line => line.replace(/[›>‹<'"]+/g, ' ').trim())
+        .filter(line => /[A-Za-zА-Яа-яЁё]/.test(line));
+      if (nameParts.length === 0) continue;
+
+      const name = nameParts.join(' ').replace(/\s+/g, ' ').trim();
+      // A second OCR language pass can join the totals/header columns with a
+      // food row. Real food names rarely contain several numeric columns or a
+      // percent sign, so reject those contaminated candidates and keep the
+      // clean pass instead.
+      if (!name || /%/.test(name) || /\d[^\s]*\s+\d/.test(name)) continue;
+
+      found = {
+        quantityIndex,
+        macroIndex: quantityIndex + 1,
+        name,
+        kcal,
+        macros,
+        heading: beforeQuantity.find(line => isFatSecretMealHeading(line)),
+      };
+      break;
+    }
+
+    if (!found) {
+      result.push(lines[index]);
+      index += 1;
+      continue;
+    }
+
+    if (found.heading && result[result.length - 1] !== found.heading) result.push(found.heading);
+    result.push(`${found.name} ${fatSecretQuantityLine(lines[found.quantityIndex])} ${found.kcal} ккал Б:${found.macros.p} Ж:${found.macros.f} У:${found.macros.c}`);
+    index = found.macroIndex + 1;
+  }
+  return result;
+}
+
+
 const VERTICAL_NUTRIENT_LABELS: Array<[RegExp, string, string]> = [
   [/белки?|протеин|protein|\bp\b/i, 'p', 'г'],
   [/жиры?|fat|\bf\b/i, 'f', 'г'],
@@ -215,7 +320,7 @@ const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'орехи': 'nuts_mix', 'грецкие орехи': 'nuts_mix', 'миндаль': 'nuts_mix',
   'авокадо': 'avocado', 'шпинат': 'spinach', 'огурец': 'cucumber',
   'помидор': 'tomato', 'томат': 'tomato', 'перец': 'pepper',
-  'масло оливковое': 'olive_oil', 'оливковое масло': 'olive_oil',
+  'масло оливковое': 'olive_oil', 'оливковое масло': 'olive_oil', 'кокосовое масло': 'coconut_oil',
   'сельдь': 'fish_oil_food', 'скумбрия': 'fish_oil_food',
   'протеин': 'whey_protein', 'сывороточный протеин': 'whey_protein',
   'казеин': 'casein', 'креатин': 'creatine',
@@ -238,7 +343,7 @@ const ENGLISH_FOOD_NAMES: Record<string, string> = {
   potato: 'potato_boiled', 'sweet potato': 'sweet_potato', 'rye bread': 'bread_rye', bread: 'bread_rye',
   kefir: 'kefir', milk: 'milk', cheese: 'cheese_hard', nuts: 'nuts_mix',
   walnuts: 'nuts_mix', almonds: 'nuts_mix', avocado: 'avocado', spinach: 'spinach',
-  cucumber: 'cucumber', tomato: 'tomato', pepper: 'pepper', 'olive oil': 'olive_oil',
+  cucumber: 'cucumber', tomato: 'tomato', pepper: 'pepper', 'olive oil': 'olive_oil', 'coconut oil': 'coconut_oil',
   protein: 'whey_protein', 'whey protein': 'whey_protein', casein: 'casein', creatine: 'creatine',
   turkey: 'turkey_breast', pork: 'pork_tenderloin', tuna: 'tuna_canned', berries: 'berries',
   'flax seeds': 'seeds', chia: 'seeds', butter: 'butter', yogurt: 'yogurt_greek',
@@ -510,7 +615,8 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
 
 export function parseNutritionScreenshot(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
-  const lines = reconstructFoodRows(text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2));
+  const sourceLines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 2);
+  const lines = reconstructFoodRows(reconstructFatSecretDiaryRows(sourceLines));
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];
@@ -648,7 +754,8 @@ function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | nul
 
 export function parseFatSecretText(text: string): ParsedMeal[] {
   if (typeof text !== 'string' || !text.trim()) return [];
-  const lines = reconstructFoodRows(text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1));
+  const sourceLines = text.split(/\r?\n/).map(l => normalizeOcrArtifacts(l)).filter(l => l.trim().length > 1);
+  const lines = reconstructFoodRows(reconstructFatSecretDiaryRows(sourceLines));
   const meals: ParsedMeal[] = [];
   let currentMeal: ParsedMeal | null = null;
   let microTableKeys: string[] = [];
