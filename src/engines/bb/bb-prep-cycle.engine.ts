@@ -23,6 +23,7 @@ import {
 } from './bb-specialization.engine';
 import type { Injury } from '../manual-plan-builder';
 import { computeBBNutritionMultiplier } from './bb-volume.engine';
+import { autoAssignIntensityTechniques } from './bb-finalize.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import {
@@ -409,6 +410,24 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
       cfg,
     ),
   );
+
+  // Дроп-техники/суперсеты назначаются ПОСЛЕ prep-оверлеев: каскад/тапер/пик могли
+  // срезать сеты, оставив метки техник на урезанных подходах. Пере-назначаем на
+  // ФИНАЛЬНЫЕ сеты. В пик-неделю убираем failure-протоколы (negative/RIR 0), но
+  // оставляем dropset/rest-pause/21s (гипертрофия допустима в финальной подготовке).
+  autoAssignIntensityTechniques(bbPlanPrep, cfg.level || 'intermediate', accent);
+  for (const week of bbPlanPrep.weeks) {
+    if ((week as any).contestPhase !== 'peak_week') continue;
+    for (const session of (week.sessions || [])) for (const ex of (session.exercises || [])) {
+      const ws = ex.workSets;
+      if (!Array.isArray(ws)) continue;
+      for (const s of ws) {
+        if (s.technique && /negative|негатив/i.test(String(s.technique))) s.technique = undefined;
+        if (Number(s.rir) <= 0) s.rir = 1;
+      }
+      if (ex.comment && /негатив/i.test(ex.comment)) ex.comment = ex.comment.replace(/[|] 💥[^|]*негатив[^|]*/i, '');
+    }
+  }
 
   const warnings = [...v.warnings];
   if (prepWeeks < 4) {

@@ -2646,7 +2646,7 @@ for (const week of next.weeks) {
  * Только для level >= intermediate. Только для accessory/памп упражнений.
  * Не более 1 техники на упражнение, не более 2-3 на сессию.
  */
-function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule): void {
+export function autoAssignIntensityTechniques(plan: BBPlan, level: string, priorityMuscles?: string[], schedule?: SpecializationSchedule): void {
   if (level === 'beginner') return; // новички не используют intensity techniques
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue; // deload — без intensity techniques
