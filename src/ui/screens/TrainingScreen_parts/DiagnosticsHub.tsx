@@ -15,20 +15,22 @@ import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 import { LimiterCalculatorCard } from './LimiterCalculatorCard';
 import { LiftMasterCard } from './LiftMasterCard';
 import { JointMasterCard } from './JointMasterCard';
+import { JointJsiCalculatorCard } from './JointJsiCalculatorCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'joint' | 'sticking' | 'rir' | 'mesocorr';
+type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'joint' | 'jsi' | 'sticking' | 'rir' | 'mesocorr';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
-  { m: 'master', label: 'Жим лёжа — единый инструмент', icon: '🏋️' },
-  { m: 'movement', label: 'Мёртвые точки → Слабые точки → Движение штанги', icon: '🎯' },
-  { m: 'limiter', label: 'Лимитирующие факторы движения', icon: '🧩' },
-  { m: 'joint', label: 'Суставно-связочный (поясница+)', icon: '🦴' },
-  { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
-  { m: 'rir', label: 'RIR-калибр.', icon: '🎯' },
-  { m: 'mesocorr', label: 'Коррекция мезо', icon: '🔧' },
+  { m: 'master', label: 'Жим — единый инструмент', icon: '🏋️' },
+  { m: 'movement', label: 'Мёртвые → Слабые → Бар', icon: '🎯' },
+  { m: 'limiter', label: 'Лимитирующие', icon: '🧩' },
+  { m: 'joint', label: 'Суставы (поясница+)', icon: '🦴' },
+  { m: 'jsi', label: 'AI-ортопед JSI', icon: '🧬' },
+  { m: 'sticking', label: 'Срывы', icon: '🔬' },
+  { m: 'rir', label: 'RIR', icon: '🎯' },
+  { m: 'mesocorr', label: 'Мезо', icon: '🔧' },
 ];
 
 export interface DiagnosticsHubProps {

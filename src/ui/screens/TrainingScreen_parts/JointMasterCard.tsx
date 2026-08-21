@@ -147,9 +147,15 @@ export const JointMasterCard: React.FC = () => {
         <VideoCaptureCard lift={lift as Lift} />
       </div>
 
+      {/* 0 JSI калькулятор — главный вход */}
+      <div style={{ marginTop:8 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e', marginBottom:4 }}>0 · AI-ортопед JSI — быстрый расчёт по цифрам</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Перейдите в <b style={{color:'#fff'}}>Диагностика → Суставно-связочный → JSI-калькулятор</b> (новый инструмент ниже) для ввода веса/темпа/геометрии и получения тепловой карты + тюнинга + нутрицевтиков. Здесь — сводка по суставу, там — цифры.</div>
+      </div>
+
       {/* план чистки */}
       <div style={{ marginTop:8, padding:9, borderRadius:8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)', color:'#fbbf24', fontSize:10, lineHeight:1.45 }}>
-        <b>План чистки старых калькуляторов:</b> если мастер покрывает — прячем вкладки `Orthopedic / Mobility Assessment / Mobility Protocol / Warmup Joints` (оставляем движки, помечаем `@deprecated`, удаляем через 1 релиз после проверки). Сейчас они доступны как эксперт, но основной путь — этот мастер.
+        <b>План чистки старых калькуляторов:</b> если мастер покрывает — прячем вкладки `Orthopedic / Mobility Assessment / Mobility Protocol / Warmup Joints` (оставляем движки, помечаем `@deprecated`, удаляем через 1 релиз после проверки). Сейчас они доступны как эксперт, но основной путь — этот мастер + JSI-калькулятор.
       </div>
     </div>
   );
