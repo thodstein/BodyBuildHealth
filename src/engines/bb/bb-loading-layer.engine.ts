@@ -1,6 +1,12 @@
 /**
  * bb-loading-layer.engine.ts — D3: loading layer для BB-auto.
  *
+ * ЭТО КАНОНИЧЕСКИЙ REFERENCE-СЛОЙ loading-модели (sets/reps/RIR/tempo/rest/weight).
+ * `buildSession` имеет inline-специализацию с контекстной логикой (бюджет-фит,
+ * DUP-волна, substitution, per-exercise weightMod), поэтому computeLoading не
+ * вызывается напрямую из builder — он служит эталоном loading-логики и покрыт
+ * тестами (bb-new-engines). Не удалять: это единственный чистый источник модели.
+ *
  * Разделяет ответственность:
  *  - Selection layer (bb-exercise-selection.engine.ts): КАКИЕ упражнения выбрать
  *  - Loading layer (этот файл): КАК их нагрузить (sets/reps/RIR/tempo/rest/weight)

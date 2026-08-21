@@ -1,6 +1,13 @@
 /**
  * bb-exercise-selection.engine.ts — извлечённая логика выбора упражнений для мышц.
  *
+ * ЭТО КАНОНИЧЕСКИЙ REFERENCE-СЛОЙ multi-angle-выбора: источник ANGLE_CLASSES и
+ * lengthenedBonus. `buildSession` использует ЭТИ ЖЕ ANGLE_CLASSES в своём inline-
+ * multi-angle цикле (оптимизированная специализация с _score/ротацией/фазами),
+ * поэтому selectDiverseExercises не вызывается напрямую из builder — он служит
+ * эталоном и покрыт тестами (bb-pro-quality-phase-c). Не удалять: это единственный
+ * документированный источник классификации углов.
+ *
  * FIX-C1: ранее ANGLE_CLASSES и lengthenedBonus были встроены в buildSession
  * (1700+ строк, 40+ параметров). Теперь выделены в отдельный engine для
  * независимого тестирования и переиспользования.
