@@ -149,7 +149,8 @@ function loadMaster(): MasterState {
   try {
     const raw = JSON.parse(localStorage.getItem(MASTER_KEY) || 'null');
     if (!isRecord(raw)) throw new Error('bad');
-    const lift: Lift = (raw.lift as Lift) === 'bench' ? 'bench' : 'bench';
+    const allowedLifts = Object.keys(WEAK_POINTS_BY_LIFT) as Lift[];
+    const lift: Lift = allowedLifts.includes(raw.lift as Lift) ? (raw.lift as Lift) : 'bench';
     const phases = (WEAK_POINTS_BY_LIFT[lift] ?? []) as string[];
     const phase = typeof raw.phase === 'string' && phases.includes(raw.phase) ? raw.phase as WeakPoint : '' as WeakPoint | '';
     const issues = Array.isArray(raw.issues) ? (raw.issues as BarPathIssue[]).filter(i => barPathIssuesForLift(lift).includes(i)) : [];
@@ -191,6 +192,7 @@ const ExerciseRow: React.FC<{ item: LimiterExerciseItem | any; selected:boolean;
 
 export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTemplate | null; sessions?: any[] }> = ({ dayCount=7, template=null, sessions=[] }) => {
   const initial = useMemo(loadMaster, []);
+  const [lift, setLift] = useState<Lift>(initial.lift);
   const [phase, setPhase] = useState<WeakPoint|''>(initial.phase);
   const [issues, setIssues] = useState<BarPathIssue[]>(initial.issues);
   const [selectedGeom, setSelectedGeom] = useState<Record<string,string[]>>(initial.selectedGeom);
@@ -203,8 +205,16 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
   const [vbtBest, setVbtBest] = useState(initial.vbtBest);
   const [vbtLast, setVbtLast] = useState(initial.vbtLast);
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
-
-  const lift: Lift = 'bench';
+  const [armSpanInput, setArmSpanInput] = useState('');
+  const [shoulderInput, setShoulderInput] = useState('');
+  useEffect(()=>{
+    try{
+      const raw = JSON.parse(localStorage.getItem('he_profile_v2')||'null');
+      const personal = raw?.personal ?? raw?.settings?.personal ?? {};
+      if (typeof personal.armSpanCm==='number') setArmSpanInput(String(personal.armSpanCm));
+      if (typeof personal.shoulderWidthCm==='number') setShoulderInput(String(personal.shoulderWidthCm));
+    }catch{}
+  }, []);
 
   useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight }); }, [phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight]);
 
@@ -353,9 +363,36 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
       </div>
       {anthroHint && (
         <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.25)', fontSize:10, color:'#a78bfa', lineHeight:1.4 }}>
-          {anthroHint} <span style={{ color:DIM }}>(задаётся в Профиле → Антропометрия; пока без видео — планируем VBT/видео-замер скорости и углов).</span>
+          {anthroHint} <span style={{ color:DIM }}>(задаётся ниже; пока без видео — планируем VBT/видео-замер скорости и углов).</span>
         </div>
       )}
+      {/* выбор движения */}
+      <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
+        {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
+      </div>
+      {/* антропометрия редактор */}
+      <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>📏 Антропометрия (для геометрии)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Размах рук и ширина плеч влияют на подсказки хвата/локтей. Сохраняется в профиль.</div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+          <label style={{ fontSize:10, color:DIM }}>Размах рук (см): <input value={armSpanInput} onChange={e=>setArmSpanInput(e.target.value)} placeholder="180" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Плечи (см): <input value={shoulderInput} onChange={e=>setShoulderInput(e.target.value)} placeholder="42" style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <button onClick={()=>{
+            try{
+              const raw = JSON.parse(localStorage.getItem('he_profile_v2')||'{}');
+              const personal = raw.personal ?? raw.settings?.personal ?? {};
+              const ns = parseFloat(armSpanInput); if(Number.isFinite(ns)&&ns>0) personal.armSpanCm=ns;
+              const sh = parseFloat(shoulderInput); if(Number.isFinite(sh)&&sh>0) personal.shoulderWidthCm=sh;
+              if(raw.personal) raw.personal=personal; else if(raw.settings?.personal) raw.settings.personal=personal; else raw.personal=personal;
+              localStorage.setItem('he_profile_v2', JSON.stringify(raw));
+              // force re-render hint
+              setArmSpanInput(''); setShoulderInput('');
+              location.reload();
+            }catch{}
+          }} style={{ ...btn, background:'rgba(167,139,250,0.15)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.3)' }}>💾 Сохранить</button>
+        </div>
+      </div>
 
       {/* ── 1. Слабые мышцы ── */}
       <div style={CARD}>
@@ -530,11 +567,35 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
         })()}
       </div>
 
+      {/* ── 6b. Видео (заглушка, план) ── */}
+      <div style={{ ...CARD, border:'1px dashed rgba(56,189,248,0.25)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>📹 Видео-анализ (скоро)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Загрузите видео подхода (боковая камера) — планируем авто-замер скорости штанги и углов локтей/ширины хвата. Пока ввод скорости вручную в блоке 6.</div>
+        <label style={{ display:'inline-block', marginTop:6, padding:'6px 10px', borderRadius:7, border:'1px solid rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.1)', color:'#38bdf8', fontSize:10, fontWeight:700, cursor:'pointer' }}>
+          📁 Выбрать видео (заглушка)
+          <input type="file" accept="video/*" style={{ display:'none' }} onChange={e=>{ const f=e.target.files?.[0]; if(f) alert(`Выбрано: ${f.name} — видео-анализ будет в следующем этапе (pose estimation). Пока используйте блок 6 VBT.`); }} />
+        </label>
+      </div>
+
       {/* ── 7. Дневник срывы (мини) ── */}
       <div style={CARD}>
         <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24' }}>7 · Дневник: срывы по фазам (RPE≥8)</div>
         <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Автоподсказка по тяжёлым подходам — не авто-выбор, проверьте.</div>
         {diag.weakMuscles.signals.length===0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:4 }}>Нет данных дневника или тренд стабилен.</div>}
+      </div>
+
+      {/* ── 8. Остальные лимитирующие (сжато) ── */}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>8 · Остальные лимитирующие факторы — для {LIFT_RU[lift]}</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Кроме геометрии — ещё 10 категорий (скорость/дожимы/стабилизация и т.д.). Краткий перечень; полный — в эксперт-режиме «Лимитирующие факторы».</div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
+          {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(c=>{
+            const cnt = limiterOptionsFor(c.id, lift).length;
+            const col = CATEGORY_COLOR[c.id];
+            return <span key={c.id} style={{ fontSize:9, padding:'3px 7px', borderRadius:7, border:`1px solid ${col.color}33`, background:col.bg, color:col.color }}>{c.icon} {c.label} · {cnt}</span>;
+          })}
+        </div>
+        <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Нажмите «Лимитирующие факторы движения» вверху для детального подбора по этим категориям — выбранная геометрия уже покрывает главный дефицит техники.</div>
       </div>
 
       {/* ── Footer ── */}

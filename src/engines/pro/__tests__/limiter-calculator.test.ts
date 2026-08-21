@@ -156,14 +156,15 @@ describe('limiter-calculator.engine: качество упражнений', () 
     expect(iso.protocol.holdSec).toBeGreaterThanOrEqual(3);
   });
 
-  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ базовых 10 категориях; bench дополнительно 11-я', () => {
+  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ базовых 10 категориях; 5 с геометрией → 11', () => {
     const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
+    const withGeom = new Set<Lift>(['bench','squat','deadlift','sumo','ohp']);
     for (const lift of core) {
       const cats = limiterCategoriesForLift(lift);
-      const expected = lift === 'bench' ? 11 : 10;
+      const expected = withGeom.has(lift) ? 11 : 10;
       expect(cats, `${lift}: не все категории (${cats.length}/${expected})`).toHaveLength(expected);
       for (const c of LIMITER_CATEGORIES) {
-        if (c.id === 'technique_geometry' && lift !== 'bench') continue;
+        if (c.id === 'technique_geometry' && !withGeom.has(lift)) continue;
         expect(limiterOptionsFor(c.id, lift).length, `${lift}/${c.id}`).toBeGreaterThanOrEqual(1);
       }
     }
@@ -248,9 +249,10 @@ describe('limiter-calculator.engine: качество упражнений', () 
 
   it('полная матрица 11×6: каждая опция имеет ≥1 упражнение (все клетки непустые)', () => {
     const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
+    const withGeom = new Set<Lift>(['bench','squat','deadlift','sumo','ohp']);
     for (const lift of core) {
       for (const c of LIMITER_CATEGORIES) {
-        if (c.id === 'technique_geometry' && lift !== 'bench') continue;
+        if (c.id === 'technique_geometry' && !withGeom.has(lift)) continue;
         for (const o of limiterOptionsFor(c.id, lift)) {
           const { items } = analyzeLimiterOption(o);
           expect(items.length, `${lift}/${c.id}/${o.id} без упражнений`).toBeGreaterThanOrEqual(1);
@@ -259,18 +261,26 @@ describe('limiter-calculator.engine: качество упражнений', () 
     }
   });
 
-  it('геометрия техники bench: 8 опций, все резолюятся точно, иконка 📐', () => {
+  it('геометрия техники bench: 9 опций, все резолвятся точно, иконка 📐', () => {
     expect(LIMITER_CATEGORIES.find(c => c.id === 'technique_geometry')?.icon).toBe('📐');
-    const geom = LIMITER_OPTIONS.filter(o => o.category === 'technique_geometry');
-    expect(geom.length).toBe(8);
-    expect(geom.every(o => o.lift === 'bench')).toBe(true);
-    const ids = geom.map(o => o.id);
-    expect(ids).toEqual(expect.arrayContaining(['bench_grip_narrow','bench_grip_wide','bench_elbow_tucked','bench_elbow_flared','bench_arch_scapula','bench_leg_drive','bench_wrist_bulldog','bench_touch_point']));
-    for (const o of geom) {
+    const geomBench = LIMITER_OPTIONS.filter(o => o.category === 'technique_geometry' && o.lift==='bench');
+    expect(geomBench.length).toBe(9);
+    const ids = geomBench.map(o => o.id);
+    expect(ids).toEqual(expect.arrayContaining(['bench_grip_narrow','bench_grip_wide','bench_elbow_tucked','bench_elbow_flared','bench_elbow_moderate','bench_arch_scapula','bench_leg_drive','bench_wrist_bulldog','bench_touch_point']));
+    for (const o of geomBench) {
       const { items } = analyzeLimiterOption(o);
       expect(items.length, `${o.id} без упражнений`).toBeGreaterThanOrEqual(1);
       expect(o.protocol.sets).toBeGreaterThanOrEqual(3);
       expect(o.protocol.pct).toBeGreaterThan(0.6);
     }
+  });
+
+  it('геометрия техники: покрытие всех движений (squat/dead/sumo/ohp)', () => {
+    const total = LIMITER_OPTIONS.filter(o => o.category === 'technique_geometry');
+    expect(total.length).toBe(24);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='squat').length).toBe(5);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='deadlift').length).toBe(4);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='sumo').length).toBe(3);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='ohp').length).toBe(3);
   });
 });
