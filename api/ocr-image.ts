@@ -1,25 +1,29 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
-
 const MAX_BYTES = 12 * 1024 * 1024;
 const OCR_TIMEOUT_MS = 240_000;
+
+const TESSERACT_WORKER_PATH = require.resolve('tesseract.js/src/worker-script/node/index.js');
+const TESSERACT_CORE_PATH = dirname(require.resolve('tesseract.js-core'));
+const TESSERACT_LANG_PATHS = {
+  rus: join(dirname(require.resolve('@tesseract.js-data/rus')), '4.0.0_best_int'),
+  eng: join(dirname(require.resolve('@tesseract.js-data/eng')), '4.0.0_best_int'),
+} as const;
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16mb' } },
 };
 
-async function recognizeImage(buffer: Buffer): Promise<string> {
+async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LANG_PATHS): Promise<string> {
   const { createWorker } = await import('tesseract.js');
-  const rus = require('@tesseract.js-data/rus');
-  const root = dirname(fileURLToPath(import.meta.url));
-  const worker = await createWorker('rus', 1, {
-    langPath: rus.langPath,
-    workerPath: join(root, '../node_modules/tesseract.js/dist/worker.min.js'),
-    corePath: join(root, '../node_modules/tesseract.js-core'),
+  const worker = await createWorker(language, 1, {
+    workerPath: TESSERACT_WORKER_PATH,
+    corePath: TESSERACT_CORE_PATH,
+    langPath: TESSERACT_LANG_PATHS[language],
+    cacheMethod: 'none',
     gzip: true,
   } as any);
   try {
@@ -32,10 +36,41 @@ async function recognizeImage(buffer: Buffer): Promise<string> {
       worker.recognize(buffer),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`OCR timeout after ${OCR_TIMEOUT_MS} ms`)), OCR_TIMEOUT_MS)),
     ]);
-    return result.data.text || '';
+    return typeof result.data.text === 'string' ? result.data.text : '';
   } finally {
     await worker.terminate();
   }
+}
+
+async function recognizeImage(buffer: Buffer): Promise<string> {
+  const texts: string[] = [];
+  const errors: string[] = [];
+
+  // FatSecret can be displayed in either Russian or English. Separate local
+  // passes avoid the missing-language-path problem of a single rus+eng worker.
+  for (const language of ['rus', 'eng'] as const) {
+    try {
+      const text = await recognizePass(buffer, language);
+      if (text.trim()) texts.push(text.trim());
+    } catch (error: any) {
+      errors.push(`${language}: ${error?.message || String(error)}`);
+    }
+  }
+
+  if (texts.length > 0) return texts.join('\n');
+  throw new Error(`OCR failed for all language passes: ${errors.join('; ')}`);
+}
+
+function decodeBase64(value: string): Buffer {
+  const normalized = value
+    .replace(/^data:[^;,]+;base64,/i, '')
+    .replace(/\s+/g, '')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) {
+    throw new Error('Image data must be valid base64');
+  }
+  return Buffer.from(normalized, 'base64');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -43,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const encoded = typeof req.body?.data === 'string' ? req.body.data : '';
     if (!encoded) return res.status(400).json({ ok: false, error: 'Image data is required' });
-    const buffer = Buffer.from(encoded, 'base64');
+    const buffer = decodeBase64(encoded);
     if (buffer.length === 0 || buffer.length > MAX_BYTES) {
       return res.status(413).json({ ok: false, error: 'Image must be between 1 byte and 12 MB' });
     }

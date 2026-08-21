@@ -339,10 +339,15 @@ async function serverOcrImage(file: File): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), 240_000);
   let response: Response;
   try {
-      response = await fetch('./api/ocr-image', {
+    response = await fetch('./api/ocr-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: btoa(binary) }),
+      body: JSON.stringify({
+        data: btoa(binary),
+        filename: file.name || 'nutrition-screenshot',
+        mimeType: file.type || 'application/octet-stream',
+        mode: 'fatsecret',
+      }),
       signal: controller.signal,
     });
   } catch (error: any) {

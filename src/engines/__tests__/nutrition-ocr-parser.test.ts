@@ -86,6 +86,33 @@ describe('nutrition-ocr-parser', () => {
       expect(items[1].kcal).toBe(130);
     });
 
+    it('parses the common FatSecret vertical food card', () => {
+      const text = [
+        'Завтрак',
+        'Куриная грудка',
+        '200 г',
+        '330 ккал',
+        'Белки 40 г',
+        'Жиры 10 г',
+        'Углеводы 0 г',
+      ].join('\n');
+      const item = parseNutritionText(text).flatMap(meal => meal.items)[0];
+
+      expect(item).toMatchObject({ name: 'Куриная грудка', qtyGrams: 200, kcal: 165, p: 20, f: 5, c: 0 });
+    });
+
+    it('merges Russian and English OCR passes for one FatSecret meal', () => {
+      const text = [
+        'Завтрак', 'Куриная грудка', '200 г', '330 ккал', 'Белки 40 г', 'Жиры 10 г', 'Углеводы 0 г',
+        'Breakfast', 'Chicken breast', '200 g', '330 kcal', 'Protein 40 g', 'Fat 10 g', 'Carbohydrates 0 g',
+      ].join('\n');
+      const items = parseNutritionText(text).flatMap(meal => meal.items);
+
+      expect(items).toHaveLength(1);
+      expect(items[0].foodId).toBe('chicken_breast');
+      expect(items[0].p).toBe(20);
+    });
+
     it('keeps a food and its quantity when OCR has no calories row', () => {
       const items = parseNutritionText('Обед\nОгурец\n100 г').flatMap(meal => meal.items);
 

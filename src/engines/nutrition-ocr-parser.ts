@@ -34,7 +34,8 @@ function normalizeOcrArtifacts(text: string): string {
 function reconstructFoodRows(lines: string[]): string[] {
   const result: string[] = [];
   const quantityOnly = /^\d+(?:[.,]\d+)?\s*(?:г|мл|g|ml|шт|pcs?|кус(?:ок|ка)?|порц(?:ия|ии)?|serving|slice|cup|tbsp|tsp|oz)$/i;
-  const nutritionOnly = /(?:\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal)|(?:белки?|жиры?|углевод|угл|protein|fat|carb|б|ж|у)\s*[:\-]?\s*\d)/i;
+  const nutritionOnly = /(?:\d+(?:[.,]\d+)?\s*(?:ккал|кал|kcal|cal|calories?)|(?:белки?|жиры?|углевод|угл|protein|fat|carbohydrates?|carbs?|carb|б|ж|у)\s*[:\-]?\s*\d)/i;
+  const macroOnly = /^(?:(?:total\s+)?(?:protein|fat|carbohydrates?|carbs?|carb)|белки?|жиры?|углеводы?|угл|б|ж|у)\s*[:\-]?\s*\d+(?:[.,]\d+)?(?:\s*(?:г|g))?$/i;
   const foodHeading = /^(?!завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack|итого|всего|total|натрий|калий|магний|кальций|железо|цинк|фосфор|витамин|sodium|potassium|magnesium|calcium|iron|zinc|phosphorus|fiber|клетчатка)[^\d]{2,}$/i;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -43,8 +44,14 @@ function reconstructFoodRows(lines: string[]): string[] {
     const afterNext = lines[index + 2]?.trim() || '';
 
     if (foodHeading.test(current) && quantityOnly.test(next) && nutritionOnly.test(afterNext)) {
-      result.push(`${current} ${next} ${afterNext}`);
-      index += 2;
+      const row = [current, next, afterNext];
+      let end = index + 3;
+      while (end < lines.length && row.length < 7 && macroOnly.test(lines[end])) {
+        row.push(lines[end].trim());
+        end += 1;
+      }
+      result.push(row.join(' '));
+      index = end - 1;
       continue;
     }
     if (foodHeading.test(current) && quantityOnly.test(next)) {
@@ -183,9 +190,9 @@ const FATSECRET_ITEM_REGEX = /^\s*(.+?)\s+(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(г|м�
 const FATSECRET_TOTAL_REGEX = /итого|всего|total|daily\s+total|сумма|итог/i;
 const FATSUCCESS_MACRO_LINE = /(\d+(?:[.,]\d+)?(?:\s+\d+)*)\s*(ккал|кал|kcal|белки?|жиры?|углевод|угл|жиры|бел|протеин|б|ж|у|carb|protein|fat|calori|cal|energy)/gi;
 const MFP_LINE_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(?:(?:г|мл|шт|oz|serving|srvg|slice|cup|tbsp|шт|кус|порц|ml|g|pcs)[,.]?\s*)?(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal|cal)/i;
-const INLINE_MACRO_REGEX = /(?:белки?|б|протеин|protein|p)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
-const INLINE_FAT_REGEX = /(?:жиры?|ж|fat|f)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
-const INLINE_CARB_REGEX = /(?:углевод|угл|у|carb|c|carbs)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
+const INLINE_MACRO_REGEX = /(?:total\s+)?(?:белки?|белок|протеин|protein|\bp\b|б)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
+const INLINE_FAT_REGEX = /(?:total\s+)?(?:жиры?|жир|fat|\bf\b|ж)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
+const INLINE_CARB_REGEX = /(?:углеводы?|углевод|угл|у|carbohydrates?|carbs?|carb|\bc\b)\s*[:\-]?\s*(\d+(?:\s+\d+)*(?:[.,]\d+)?)/i;
 const KCAL_FIRST_REGEX = /^\s*(\d+(?:[.,]\d+)?)\s*(ккал|кал|kcal)\s+(.+?)(?:\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|ml))?$/i;
 // FatSecret screenshots can lose the P/F/C captions and leave numeric macro
 // columns after calories: "Chicken 200 g 330 kcal 40 10 0".
@@ -221,10 +228,27 @@ const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'шаурма': 'shawarma', 'пицца': 'pizza_margherita', 'бургер': 'burger',
 };
 
+const ENGLISH_FOOD_NAMES: Record<string, string> = {
+  'chicken breast': 'chicken_breast', chicken: 'chicken_breast',
+  beef: 'beef_lean', steak: 'beef_lean', salmon: 'salmon', fish: 'salmon',
+  rice: 'rice_white', 'white rice': 'rice_white', 'brown rice': 'rice_brown',
+  buckwheat: 'buckwheat', oatmeal: 'oats', oats: 'oats', eggs: 'egg_whole', egg: 'egg_whole',
+  'egg white': 'egg_white', 'cottage cheese': 'cottage_cheese_5',
+  banana: 'banana', apple: 'apple', broccoli: 'broccoli', pasta: 'pasta_durum',
+  potato: 'potato_boiled', 'sweet potato': 'sweet_potato', 'rye bread': 'bread_rye', bread: 'bread_rye',
+  kefir: 'kefir', milk: 'milk', cheese: 'cheese_hard', nuts: 'nuts_mix',
+  walnuts: 'nuts_mix', almonds: 'nuts_mix', avocado: 'avocado', spinach: 'spinach',
+  cucumber: 'cucumber', tomato: 'tomato', pepper: 'pepper', 'olive oil': 'olive_oil',
+  protein: 'whey_protein', 'whey protein': 'whey_protein', casein: 'casein', creatine: 'creatine',
+  turkey: 'turkey_breast', pork: 'pork_tenderloin', tuna: 'tuna_canned', berries: 'berries',
+  'flax seeds': 'seeds', chia: 'seeds', butter: 'butter', yogurt: 'yogurt_greek',
+  shawarma: 'shawarma', pizza: 'pizza_margherita', burger: 'burger',
+};
+
 function matchRussianFood(text: string): string | null {
   const lower = normalizeFoodText(text);
-  for (const [ru, id] of Object.entries(RUSSIAN_FOOD_NAMES)) {
-    if (lower.includes(normalizeFoodText(ru))) return id;
+  for (const [name, id] of Object.entries({ ...RUSSIAN_FOOD_NAMES, ...ENGLISH_FOOD_NAMES })) {
+    if (lower.includes(normalizeFoodText(name))) return id;
   }
   return null;
 }
@@ -351,8 +375,12 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const confidence = food
     ? (hasMacros ? 0.9 : 0.7)
     : (hasMacros ? 0.5 : 0.3);
+  const displayName = name
+    .replace(/^(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack)\s*[:\-–—|,]?\s*/i, '')
+    .replace(/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*/, '')
+    .trim();
   return {
-    name: name || food?.name || 'Блюдо',
+    name: displayName || food?.name || 'Блюдо',
     qty,
     qtyGrams: Math.round(weight),
     kcal: hasMacros ? Math.round((kcal || (food?.kcal || 0) * multiplier) / multiplier) : food?.kcal || 0,
@@ -426,7 +454,7 @@ function parseDelimitedItem(line: string) {
 function dedupeMeals(meals: ParsedMeal[]): ParsedMeal[] {
   const grouped = new Map<string, ParsedMeal>();
   for (const meal of meals) {
-    const key = `${meal.date}|${normalizeFoodText(meal.mealType)}`;
+    const key = `${meal.date}|${mealTypeKey(meal.mealType)}`;
     const existing = grouped.get(key);
     if (existing) existing.items.push(...meal.items);
     else grouped.set(key, { ...meal, items: [...meal.items] });
@@ -445,6 +473,16 @@ function dedupeMeals(meals: ParsedMeal[]): ParsedMeal[] {
   })).filter(meal => meal.items.length > 0);
 }
 
+function mealTypeKey(value: string): string {
+  const raw = value.toLowerCase();
+  const normalized = normalizeFoodText(value);
+  if (/завтрак|breakfast/.test(raw) || /завтрак/.test(normalized)) return 'breakfast';
+  if (/обед|lunch/.test(raw) || /обед/.test(normalized)) return 'lunch';
+  if (/ужин|dinner/.test(raw) || /ужин/.test(normalized)) return 'dinner';
+  if (/перекус|snack|бранч|brunch|полдник/.test(raw) || /перекус|бранч|полдник/.test(normalized)) return 'snack';
+  return normalized;
+}
+
 function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: number; f: number; c: number } {
   const result = { kcal: 0, p: 0, f: 0, c: 0 };
   for (const pattern of patterns) {
@@ -460,6 +498,13 @@ function parseMacroValue(text: string, patterns: RegExp[]): { kcal: number; p: n
       else if (/угл|карб|у|carb/i.test(unit)) result.c = val;
     }
   }
+  // FatSecret often places the label before its value ("Protein 40 g"),
+  // while compact exports put the value first. Explicit labels win when both
+  // forms are present on one OCR line.
+  const labeled = parseMacroLabel(text);
+  if (INLINE_MACRO_REGEX.test(text)) result.p = labeled.p;
+  if (INLINE_FAT_REGEX.test(text)) result.f = labeled.f;
+  if (INLINE_CARB_REGEX.test(text)) result.c = labeled.c;
   return result;
 }
 
@@ -505,6 +550,8 @@ export function parseNutritionScreenshot(text: string): ParsedMeal[] {
     }
 
     if (attachMicros(currentMeal, line)) continue;
+    if (attachMacros(currentMeal, line)) continue;
+    if (currentMeal.items.length === 0 && isStandaloneNutritionValue(line)) continue;
 
     const unlabeledMacroItem = parseUnlabeledMacroRow(line);
     if (unlabeledMacroItem) {
@@ -573,6 +620,25 @@ function parseMacroLabel(text: string): { p: number; f: number; c: number } {
   };
 }
 
+function attachMacros(meal: ParsedMeal | null, line: string): boolean {
+  if (!meal || meal.items.length === 0 || /(?:ккал|кал|kcal|calories?)/i.test(line)) return false;
+  const parsed = parseMacroLabel(line);
+  const hasMacro = INLINE_MACRO_REGEX.test(line) || INLINE_FAT_REGEX.test(line) || INLINE_CARB_REGEX.test(line);
+  if (!hasMacro) return false;
+
+  const item = meal.items[meal.items.length - 1];
+  const portionFactor = item.qtyGrams && item.qtyGrams > 0 ? item.qtyGrams / 100 : 1;
+  const per100 = (value: number) => Math.round((value / portionFactor) * 10) / 10;
+  if (INLINE_MACRO_REGEX.test(line)) item.p = per100(parsed.p);
+  if (INLINE_FAT_REGEX.test(line)) item.f = per100(parsed.f);
+  if (INLINE_CARB_REGEX.test(line)) item.c = per100(parsed.c);
+  return true;
+}
+
+function isStandaloneNutritionValue(line: string): boolean {
+  return /^(?:total\s+)?(?:protein|fat|carbohydrates?|carbs?|calories?|белки?|белок|жиры?|жир|углеводы?|углевод|угл|натрий|sodium|калий|potassium|магний|magnesium|кальций|calcium|железо|iron|цинк|zinc|фосфор|phosphorus|клетчатка|fiber|витамин(?:\s+[a-z0-9]+)?)\s*[:\-]?\s*\d/i.test(line.trim());
+}
+
 function parseUnlabeledMacroRow(line: string): ParsedMeal['items'][number] | null {
   const match = line.match(UNLABELED_MACRO_ROW_REGEX);
   if (!match) return null;
@@ -616,6 +682,8 @@ export function parseFatSecretText(text: string): ParsedMeal[] {
     }
 
     if (attachMicros(currentMeal, line)) continue;
+    if (attachMacros(currentMeal, line)) continue;
+    if (currentMeal.items.length === 0 && isStandaloneNutritionValue(line)) continue;
 
     const unlabeledMacroItem = parseUnlabeledMacroRow(line);
     if (unlabeledMacroItem) {
