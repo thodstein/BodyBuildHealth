@@ -281,3 +281,224 @@ export function getPulseTrend(entries: BPEntry[]): { direction: 'up' | 'down' | 
   const delta = avg(recent) - avg(older);
   return { direction: delta > 2 ? 'up' : delta < -2 ? 'down' : 'stable', delta: Math.round(delta * 10) / 10 };
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   ПРОФ-АНАЛИТИКА ДНЕВНИКА АД (домашний мониторинг по ESC/ISH)
+   ════════════════════════════════════════════════════════════════════ */
+
+export interface OrthostaticPair {
+  date: string;
+  sitting: BPEntry;
+  standing: BPEntry;
+  dropS: number;
+  dropD: number;
+  isOrthostatic: boolean;
+}
+
+/**
+ * Парные ортостатические замеры «сидя → стоя» в ОДНОМ дне.
+ * В отличие от старого `checkOrthostatic` (который брал произвольные сидя/стоя
+ * из разных дней), здесь пары группируются по дате — это корректный протокол.
+ */
+export function getOrthostaticPairs(entries: BPEntry[]): OrthostaticPair[] {
+  const byDay = new Map<string, { sitting?: BPEntry; standing?: BPEntry }>();
+  for (const e of entries) {
+    if (e.position !== 'sitting' && e.position !== 'standing') continue;
+    const day = byDay.get(e.date) || {};
+    if (e.position === 'sitting') day.sitting = e;
+    else day.standing = e;
+    byDay.set(e.date, day);
+  }
+  const pairs: OrthostaticPair[] = [];
+  for (const [date, { sitting, standing }] of byDay) {
+    if (!sitting || !standing) continue;
+    const dropS = sitting.systolic - standing.systolic;
+    const dropD = sitting.diastolic - standing.diastolic;
+    pairs.push({ date, sitting, standing, dropS, dropD, isOrthostatic: dropS >= 20 || dropD >= 10 });
+  }
+  return pairs.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export interface HomeBPDay {
+  date: string;
+  morning: BPEntry | null;
+  evening: BPEntry | null;
+  readings: BPEntry[];
+  dailyAvgS: number;
+  dailyAvgD: number;
+}
+
+export interface HomeBPAdherence {
+  daysWindow: number;
+  days: HomeBPDay[];
+  completeDays: number;      // дни с утренним И вечерним замером
+  morningOnlyDays: number;
+  eveningOnlyDays: number;
+  anyDays: number;
+  completenessPct: number;   // доля дней с полной парой замеров
+  homeMeanS: number;         // среднее АД по ВСЕМ замерам окна
+  homeMeanD: number;
+  homeMeanHr: number;
+}
+
+/**
+ * Соблюдение протокола домашнего мониторинга АД (ESC/ISH):
+ * 7 дней × утро + вечер по 2–3 измерения, 1-й день отбрасывается.
+ * Возвращает по-дневную структуру и метрики полноты протокола.
+ */
+export function getHomeBPAdherence(entries: BPEntry[], daysWindow = 7): HomeBPAdherence {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(start.getDate() - (daysWindow - 1));
+
+  const byDay = new Map<string, BPEntry[]>();
+  for (const e of entries) {
+    if (e.date >= localIso(start)) {
+      const list = byDay.get(e.date) || [];
+      list.push(e);
+      byDay.set(e.date, list);
+    }
+  }
+
+  const days: HomeBPDay[] = [];
+  for (let i = 0; i < daysWindow; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const iso = localIso(d);
+    const list = byDay.get(iso) || [];
+    const morning = list.find((e) => e.timeOfDay === 'morning') || null;
+    const evening = list.find((e) => e.timeOfDay === 'evening') || null;
+    days.push({
+      date: iso, morning, evening, readings: list,
+      dailyAvgS: list.length ? Math.round(list.reduce((a, b) => a + b.systolic, 0) / list.length) : 0,
+      dailyAvgD: list.length ? Math.round(list.reduce((a, b) => a + b.diastolic, 0) / list.length) : 0,
+    });
+  }
+
+  const completeDays = days.filter((x) => x.morning && x.evening).length;
+  const morningOnlyDays = days.filter((x) => x.morning && !x.evening).length;
+  const eveningOnlyDays = days.filter((x) => !x.morning && x.evening).length;
+  const anyDays = days.filter((x) => x.readings.length > 0).length;
+  const allReadings = days.flatMap((x) => x.readings);
+
+  const mean = (k: 'systolic' | 'diastolic' | 'hr') =>
+    allReadings.length ? Math.round(allReadings.reduce((a, b) => a + Number(b[k] || 0), 0) / allReadings.length) : 0;
+
+  return {
+    daysWindow, days,
+    completeDays, morningOnlyDays, eveningOnlyDays, anyDays,
+    completenessPct: Math.round((completeDays / daysWindow) * 100),
+    homeMeanS: mean('systolic'), homeMeanD: mean('diastolic'), homeMeanHr: mean('hr'),
+  };
+}
+
+/**
+ * Классификация по ПОРОГАМ ДОМАШНЕГО измерения (ESC/ISH):
+ * дома АД в среднем ниже, чем в кабинете → пороги сдвинуты вниз (≥135/85).
+ */
+export function classifyHomeBP(systolic: number, diastolic: number): BPClassification {
+  if (systolic >= 180 || diastolic >= 120) return 'crisis';
+  if (systolic >= 135 || diastolic >= 85) return 'stage1';
+  if (systolic >= 130 || diastolic >= 80) return 'elevated';
+  return 'normal';
+}
+
+export type MorningEveningPattern = 'morning_surge' | 'evening_higher' | 'similar' | 'insufficient';
+
+export interface MorningEveningComparison {
+  morningS: number; morningD: number; morningCount: number;
+  eveningS: number; eveningD: number; eveningCount: number;
+  diffS: number;
+  pattern: MorningEveningPattern;
+}
+
+/** Сравнение утренних и вечерних средних — выявляет «утренний подъём» (morning surge). */
+export function getMorningEveningComparison(entries: BPEntry[], days = 7): MorningEveningComparison {
+  const cutoffDate = new Date();
+  cutoffDate.setHours(0, 0, 0, 0);
+  cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
+  const cutoff = localIso(cutoffDate);
+  const morning = entries.filter((e) => e.date >= cutoff && e.timeOfDay === 'morning');
+  const evening = entries.filter((e) => e.date >= cutoff && e.timeOfDay === 'evening');
+  const avg = (l: BPEntry[], k: 'systolic' | 'diastolic') => (l.length ? Math.round(l.reduce((a, b) => a + b[k], 0) / l.length) : 0);
+  const morningS = avg(morning, 'systolic');
+  const morningD = avg(morning, 'diastolic');
+  const eveningS = avg(evening, 'systolic');
+  const eveningD = avg(evening, 'diastolic');
+  const diffS = morningS - eveningS;
+  if (!morning.length || !evening.length) {
+    return { morningS, morningD, morningCount: morning.length, eveningS, eveningD, eveningCount: evening.length, diffS, pattern: 'insufficient' };
+  }
+  const pattern: MorningEveningPattern = diffS >= 10 ? 'morning_surge' : diffS <= -10 ? 'evening_higher' : 'similar';
+  return { morningS, morningD, morningCount: morning.length, eveningS, eveningD, eveningCount: evening.length, diffS, pattern };
+}
+
+function meanOver(entries: BPEntry[], days: number, k: 'systolic' | 'diastolic' | 'hr'): number {
+  const cutoffDate = new Date();
+  cutoffDate.setHours(0, 0, 0, 0);
+  cutoffDate.setDate(cutoffDate.getDate() - (days - 1));
+  const cutoff = localIso(cutoffDate);
+  const recent = entries.filter((e) => e.date >= cutoff);
+  if (!recent.length) return 0;
+  return Math.round(recent.reduce((s, e) => s + Number(e[k] || 0), 0) / recent.length);
+}
+
+export interface CardioRiskFactor {
+  label: string;
+  active: boolean;
+  detail?: string;
+}
+
+export interface CardioRiskProfile {
+  level: 'low' | 'moderate' | 'high';
+  points: number;
+  factors: CardioRiskFactor[];
+  summary: string;
+}
+
+/**
+ * Лёгкий ОЦЕНОЧНЫЙ профиль сердечно-сосудистого риска на основе дневника АД.
+ * Учитывает среднее АД (7д), вариабельность, BP Load, ЧСС покоя и возраст.
+ * Это НЕ диагноз и НЕ медицинский скрининг — инструмент самоконтроля.
+ */
+export function estimateCardioRisk(
+  entries: BPEntry[],
+  profile?: { age?: number; sex?: 'male' | 'female' | string; smoking?: boolean },
+): CardioRiskProfile | null {
+  if (!entries.length) return null;
+  const avgS = meanOver(entries, 7, 'systolic');
+  const avgD = meanOver(entries, 7, 'diastolic');
+  const avgHr = meanOver(entries, 7, 'hr');
+  if (!avgS && !avgD) return null;
+
+  const cls = classifyBP(avgS, avgD);
+  const variability = calcVariability(entries);
+  const load = calcBPLoad(entries);
+  const age = profile?.age ?? 0;
+  const smoking = profile?.smoking;
+
+  const factors: CardioRiskFactor[] = [];
+  let points = 0;
+  const add = (label: string, active: boolean, detail: string | undefined, w = 1) => {
+    factors.push({ label, active, detail });
+    if (active) points += w;
+  };
+
+  add(`Среднее АД (7д): ${avgS}/${avgD}`, cls === 'stage1' || cls === 'stage2' || cls === 'crisis', 'цель < 130/80 мм рт.ст.', 2);
+  add(`Вариабельность (SD систолы ${variability.sysSD.toFixed(1)})`, variability.sysSD > 15 || variability.diaSD > 10, 'высокая вариабельность связана с риском событий', 1);
+  add(`BP Load ${load}%`, load > 50, 'больше половины измерений выше цели', 1);
+  if (avgHr > 90) add(`ЧСС в покое ${avgHr}`, true, 'тахикардия покоя', 1);
+  if (age >= 55) add(`Возраст ${age} лет`, true, 'возрастной фактор риска', 1);
+  if (smoking) add('Курение', true, 'активное курение', 1);
+
+  const level: CardioRiskProfile['level'] = points >= 4 ? 'high' : points >= 2 ? 'moderate' : 'low';
+  const summary =
+    level === 'high'
+      ? 'Сочетание факторов — риск выше среднего. Рекомендуется регулярный контроль и консультация врача.'
+      : level === 'moderate'
+        ? 'Есть факторы риска. Рекомендуется их коррекция и регулярный контроль АД.'
+        : 'Выраженных факторов риска мало. Поддерживайте текущий контроль.';
+
+  return { level, points, factors, summary };
+}

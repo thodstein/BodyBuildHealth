@@ -24,6 +24,11 @@ import {
   commitBpEntries,
   getPulseDaypartAverages,
   getPulseTrend,
+  getOrthostaticPairs,
+  getHomeBPAdherence,
+  classifyHomeBP,
+  getMorningEveningComparison,
+  estimateCardioRisk,
 } from '../bp-hr-data';
 
 describe('bp-hr-data', () => {
@@ -450,6 +455,107 @@ describe('bp-hr-data', () => {
     it('getPulseTrend: учитывает только утренние замеры, <2 записей → null', () => {
       expect(getPulseTrend([mk(localIso(0), 'morning', 60)])).toBeNull();
       expect(getPulseTrend([mk(localIso(0), 'evening', 70), mk(localIso(1), 'evening', 72)])).toBeNull();
+    });
+  });
+
+  describe('Проф-аналитика домашнего мониторинга', () => {
+    const localIso = (offsetDays: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - offsetDays);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const mk = (date: string, timeOfDay: string, s: number, d: number, hr = 70, position?: string): BPEntry => ({
+      id: `x_${date}_${timeOfDay}_${s}`, date, systolic: s, diastolic: d, hr, timeOfDay, position,
+    });
+
+    it('getOrthostaticPairs: пары сидя/стоя группируются в одном дне', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 120, 80, 70, 'sitting'),
+        mk(localIso(0), 'morning', 95, 70, 80, 'standing'), // день 0 — падение систолы 25 → ортостатическая
+        mk(localIso(1), 'morning', 120, 80, 70, 'sitting'), // день 1 — только сидя, нет пары
+      ];
+      const pairs = getOrthostaticPairs(entries);
+      expect(pairs).toHaveLength(1);
+      expect(pairs[0].date).toBe(localIso(0));
+      expect(pairs[0].dropS).toBe(25);
+      expect(pairs[0].isOrthostatic).toBe(true);
+    });
+
+    it('getOrthostaticPairs: пары из разных дней не смешиваются', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 120, 80, 70, 'sitting'), // сидя сегодня
+        mk(localIso(2), 'morning', 120, 80, 70, 'standing'), // стоя 2 дня назад
+      ];
+      expect(getOrthostaticPairs(entries)).toHaveLength(0);
+    });
+
+    it('getHomeBPAdherence: полнота протокола утро+вечер', () => {
+      const entries: BPEntry[] = [];
+      for (let i = 0; i < 7; i++) {
+        entries.push(mk(localIso(i), 'morning', 120, 80));
+        entries.push(mk(localIso(i), 'evening', 122, 78));
+      }
+      const a = getHomeBPAdherence(entries, 7);
+      expect(a.completeDays).toBe(7);
+      expect(a.completenessPct).toBe(100);
+      expect(a.homeMeanS).toBeGreaterThan(0);
+      expect(a.homeMeanD).toBeGreaterThan(0);
+      expect(a.days).toHaveLength(7);
+    });
+
+    it('getHomeBPAdherence: частичное заполнение', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 120, 80),
+        mk(localIso(0), 'evening', 125, 82),
+        mk(localIso(1), 'morning', 118, 78), // только утро
+      ];
+      const a = getHomeBPAdherence(entries, 7);
+      expect(a.completeDays).toBe(1);
+      expect(a.morningOnlyDays).toBe(1);
+      expect(a.completenessPct).toBe(Math.round(1 / 7 * 100));
+    });
+
+    it('classifyHomeBP: домашние пороги ниже кабинетных', () => {
+      expect(classifyHomeBP(132, 84)).toBe('elevated');  // дома уже повышенное (≥130/80)
+      expect(classifyHomeBP(136, 86)).toBe('stage1');    // дома гипертензия (≥135/85)
+      expect(classifyHomeBP(128, 79)).toBe('normal');
+      expect(classifyHomeBP(185, 120)).toBe('crisis');
+    });
+
+    it('getMorningEveningComparison: утренний подъём', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 140, 85),
+        mk(localIso(0), 'evening', 125, 80),
+        mk(localIso(1), 'morning', 138, 84),
+        mk(localIso(1), 'evening', 124, 78),
+      ];
+      const c = getMorningEveningComparison(entries, 7);
+      expect(c.pattern).toBe('morning_surge');
+      expect(c.diffS).toBeGreaterThanOrEqual(10);
+    });
+
+    it('getMorningEveningComparison: недостаточно данных', () => {
+      expect(getMorningEveningComparison([mk(localIso(0), 'morning', 120, 80)], 7).pattern).toBe('insufficient');
+    });
+
+    it('estimateCardioRisk: высокий риск при стаже и плохом АД', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 155, 95, 100),
+        mk(localIso(1), 'morning', 150, 92, 95),
+        mk(localIso(2), 'morning', 152, 93, 98),
+      ];
+      const risk = estimateCardioRisk(entries, { age: 60 });
+      expect(risk).not.toBeNull();
+      expect(risk!.level).toBe('high');
+      expect(risk!.points).toBeGreaterThanOrEqual(4);
+      expect(risk!.factors.length).toBeGreaterThan(0);
+    });
+
+    it('estimateCardioRisk: нет записей → null', () => {
+      expect(estimateCardioRisk([])).toBeNull();
     });
   });
 });

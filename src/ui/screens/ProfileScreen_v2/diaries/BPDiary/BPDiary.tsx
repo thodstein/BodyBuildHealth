@@ -55,12 +55,18 @@ import {
   commitBpEntries,
   getPulseDaypartAverages,
   getPulseTrend,
+  getOrthostaticPairs,
+  getHomeBPAdherence,
+  classifyHomeBP,
+  getMorningEveningComparison,
+  estimateCardioRisk,
   type BPValidationError,
 } from '../../../../../core/bp-hr-data';
 import { BPChart } from './BPChart';
 import { useBPAlerts } from './useBPAlerts';
 import { calculateTrend } from './bp-trend-prediction';
 import { AnimatedCounter } from '@/ui/components/AnimatedCounter';
+import { getProfile } from '../../../../../core/profile-manager';
 
 const KEY = 'he_bp_diary';
 type BPForm = {
@@ -240,6 +246,20 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const defaultGoals = getDefaultGoals(bpClass);
   const trendSystolic = useMemo(() => calculateTrend(recentRows, 'systolic'), [recentRows]);
   const trendDiastolic = useMemo(() => calculateTrend(recentRows, 'diastolic'), [recentRows]);
+
+  // ── Проф-аналитика домашнего мониторинга ──
+  const homeAdherence = useMemo(() => getHomeBPAdherence(rows, 7), [rows]);
+  const orthoPairs = useMemo(() => getOrthostaticPairs(rows), [rows]);
+  const orthoLatest = orthoPairs[0];
+  const morningEvening = useMemo(() => getMorningEveningComparison(rows, 7), [rows]);
+  const homeClass = homeAdherence.homeMeanS && homeAdherence.homeMeanD ? classifyHomeBP(homeAdherence.homeMeanS, homeAdherence.homeMeanD) : null;
+  const homeClassLabel = homeClass ? getBpClassificationLabel(homeClass) : null;
+  const homeClassColor = homeClass ? getBpClassificationColor(homeClass) : '#888';
+  const cardioRisk = useMemo(() => {
+    const profile = getProfile();
+    const personal = profile.settings?.personal || {};
+    return estimateCardioRisk(rows, { age: Number(personal.age) || 0, sex: personal.sex });
+  }, [rows]);
 
   // ЧСС (утро/вечер) — ведётся в записях АД (поле hr)
   const pulseDayparts = useMemo(() => getPulseDaypartAverages(rows, 7), [rows]);
@@ -687,6 +707,81 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 <div>Недосточно данных с отметками о лекарствах.</div>
               )}
             </section>
+
+            <section style={{ ...infoCard, marginTop: 12 }}>
+              <h3>🏠 Протокол домашнего измерения АД (7 дней)</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
+                <div>Полные дни (утро+вечер): <b>{homeAdherence.completeDays}/{homeAdherence.daysWindow}</b></div>
+                <div>Только утро: <b>{homeAdherence.morningOnlyDays}</b> · только вечер: <b>{homeAdherence.eveningOnlyDays}</b></div>
+                <div>Дней с замерами: <b>{homeAdherence.anyDays}</b></div>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span>Полнота протокола</span><b>{homeAdherence.completenessPct}%</b></div>
+                <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 3 }}>
+                  <div style={{ height: '100%', width: `${homeAdherence.completenessPct}%`, background: homeAdherence.completenessPct >= 70 ? '#22c55e' : homeAdherence.completenessPct >= 40 ? '#f59e0b' : '#ef4444' }} />
+                </div>
+              </div>
+              {homeAdherence.days.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(76px,1fr))', gap: 6, marginTop: 8 }}>
+                  {homeAdherence.days.map(day => (
+                    <div key={day.date} style={{ padding: 8, borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: `1px solid ${day.morning && day.evening ? 'rgba(34,197,94,.35)' : day.readings.length ? 'rgba(245,158,11,.3)' : 'rgba(255,255,255,0.08)'}` }}>
+                      <small style={{ display: 'block', fontSize: 9, color: colors.textMuted }}>{day.date.slice(5)}</small>
+                      <strong style={{ display: 'block', fontSize: 12 }}>{day.dailyAvgS ? `${day.dailyAvgS}/${day.dailyAvgD}` : '—'}</strong>
+                      <small style={{ fontSize: 9, color: day.morning && day.evening ? '#22c55e' : day.readings.length ? '#f59e0b' : colors.textMuted }}>
+                        {day.morning && day.evening ? '✓✓' : day.morning ? '☀' : day.evening ? '🌆' : '·'}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>
+                ESC/ISH: 2–3 замера утром и вечером в течение ≥7 дней (1-й день отбрасывается). Домашние пороги ниже кабинетных — см. ниже.
+              </div>
+            </section>
+
+            <section style={{ ...card, marginTop: 12 }}>
+              <h3>🏠 Домашние vs кабинетные пороги</h3>
+              <div style={{ fontSize: 13, marginTop: 6 }}>
+                Среднее дома за 7 дней: <b style={{ color: homeClassColor }}>{homeAdherence.homeMeanS || '—'}/{homeAdherence.homeMeanD || '—'}</b>
+                {homeClassLabel ? <> · класс: <b style={{ color: homeClassColor }}>{homeClassLabel}</b></> : null}
+              </div>
+              <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>
+                Дома АД в среднем ниже, чем у врача («эффект белого халата»). Поэтому домашние пороги сдвинуты вниз:
+                повышенное ≥130/80, гипертензия ≥135/85. Кабинетная гипертензия — ≥140/90.
+              </div>
+            </section>
+
+            <section style={{ ...warnCard, marginTop: 12 }}>
+              <h3>🌅 Утро vs вечер (утренний подъём)</h3>
+              {morningEvening.pattern === 'insufficient' ? (
+                <div style={{ fontSize: 13 }}>Нужны и утренние, и вечерние замеры за 7 дней для сравнения.</div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
+                    <div style={{ padding: 10, borderRadius: 10, background: 'rgba(59,130,246,.1)', textAlign: 'center' }}>
+                      <small style={{ color: colors.textMuted }}>Утро ({morningEvening.morningCount} изм.)</small>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#3b82f6' }}>{morningEvening.morningS}/{morningEvening.morningD}</div>
+                    </div>
+                    <div style={{ padding: 10, borderRadius: 10, background: 'rgba(168,85,247,.1)', textAlign: 'center' }}>
+                      <small style={{ color: colors.textMuted }}>Вечер ({morningEvening.eveningCount} изм.)</small>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#a855f7' }}>{morningEvening.eveningS}/{morningEvening.eveningD}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 13 }}>
+                    Разница систолы: <b style={{ color: Math.abs(morningEvening.diffS) >= 10 ? '#f59e0b' : '#22c55e' }}>{morningEvening.diffS > 0 ? '+' : ''}{morningEvening.diffS}</b>
+                  </div>
+                  {morningEvening.pattern === 'morning_surge' && (
+                    <div style={{ color: '#f59e0b', marginTop: 6, fontSize: 13 }}>⚠ Утренний подъём АД (morning surge) — повышенный риск; уточните у врача.</div>
+                  )}
+                  {morningEvening.pattern === 'evening_higher' && (
+                    <div style={{ color: '#f59e0b', marginTop: 6, fontSize: 13 }}>Вечерние значения выше утренних — проверьте кофеин, стресс, сон.</div>
+                  )}
+                  {morningEvening.pattern === 'similar' && (
+                    <div style={{ color: '#22c55e', marginTop: 6, fontSize: 13 }}>Утро и вечер сопоставимы — стабильный суточный профиль.</div>
+                  )}
+                </>
+              )}
+            </section>
           </>
         )}
 
@@ -699,21 +794,56 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               </div>
             )}
             <section style={{ ...card, marginTop: 12 }}>
-              <h3>🩺 Ортостатический тест</h3>
-              {orthostatic.detected || recentRows.some(r => r.position === 'standing') ? (
+              <h3>🩺 Ортостатический тест (парные замеры одного дня)</h3>
+              {orthoPairs.length > 0 ? (
                 <>
-                  <div>Сидя → Стоя</div>
-                  <div>Систола: <b>{orthostatic.dropS > 0 ? '−' : '+'}{Math.abs(orthostatic.dropS)}</b> мм рт.ст.
-                    {orthostatic.dropS >= 20 && <span style={{ color: '#ef4444' }}> — ортостатическая гипотензия!</span>}
-                  </div>
-                  <div>Диастола: <b>{orthostatic.dropD > 0 ? '−' : '+'}{Math.abs(orthostatic.dropD)}</b> мм рт.ст.
-                    {orthostatic.dropD >= 10 && <span style={{ color: '#ef4444' }}> — ортостатическая гипотензия!</span>}
-                  </div>
-                  {!(orthostatic.dropS >= 20 || orthostatic.dropD >= 10) && <div style={{ color: '#22c55e' }}>В норме</div>}
+                  {orthoPairs.slice(0, 5).map(pair => (
+                    <div key={pair.date} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', marginBottom: 6, borderLeft: `3px solid ${pair.isOrthostatic ? '#ef4444' : '#22c55e'}` }}>
+                      <b>{pair.date}</b> · сидя {pair.sitting.systolic}/{pair.sitting.diastolic} → стоя {pair.standing.systolic}/{pair.standing.diastolic}
+                      <div style={{ fontSize: 12, color: pair.isOrthostatic ? '#ef4444' : colors.textMuted }}>
+                        Δ систолы {pair.dropS > 0 ? '−' : '+'}{Math.abs(pair.dropS)} мм рт.ст. · Δ диастолы {pair.dropD > 0 ? '−' : '+'}{Math.abs(pair.dropD)} мм рт.ст.
+                        {pair.isOrthostatic ? ' — ортостатическая гипотензия!' : ' — в пределах нормы'}
+                      </div>
+                    </div>
+                  ))}
+                  {orthoPairs.length > 5 && <div style={{ color: colors.textMuted, fontSize: 12 }}>… и ещё {orthoPairs.length - 5} пар.</div>}
                 </>
               ) : (
-                <div>Нет парных измерений (сидя и стоя в одном дне). Добавьте измерение стоя для проверки.</div>
+                <div>Нет парных измерений (сидя и стоя в ОДНОМ дне). Протокол: после 5 мин покоя измерьте сидя, затем встаньте и измерьте стоя в течение 3 мин.</div>
               )}
+            </section>
+
+            <section style={{ ...card, marginTop: 12 }}>
+              <h3>❤️ Оценочный сердечно-сосудистый профиль</h3>
+              {cardioRisk ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                    <span style={{
+                      padding: '4px 10px', borderRadius: 8, fontWeight: 800, fontSize: 13,
+                      background: cardioRisk.level === 'high' ? 'rgba(239,68,68,.18)' : cardioRisk.level === 'moderate' ? 'rgba(245,158,11,.18)' : 'rgba(34,197,94,.18)',
+                      color: cardioRisk.level === 'high' ? '#ef4444' : cardioRisk.level === 'moderate' ? '#f59e0b' : '#22c55e',
+                      border: `1px solid ${cardioRisk.level === 'high' ? '#ef4444' : cardioRisk.level === 'moderate' ? '#f59e0b' : '#22c55e'}44`,
+                    }}>
+                      {cardioRisk.level === 'high' ? 'Выше среднего' : cardioRisk.level === 'moderate' ? 'Умеренный' : 'Низкий'}
+                    </span>
+                    <span style={{ fontSize: 12, color: colors.textMuted }}>{cardioRisk.points} факт. фактора</span>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {cardioRisk.factors.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 8px', borderRadius: 6, background: f.active ? 'rgba(239,68,68,.07)' : 'rgba(255,255,255,0.02)', marginBottom: 3 }}>
+                        <span style={{ color: f.active ? '#ef4444' : colors.textMuted }}>{f.label}</span>
+                        <span>{f.active ? '⚠' : '✓'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 8, fontStyle: 'italic' }}>{cardioRisk.summary}</div>
+                </>
+              ) : (
+                <div>Добавьте записи для оценки.</div>
+              )}
+              <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 8 }}>
+                Оценочный профиль на основе дневника — НЕ диагноз и не заменяет консультацию врача.
+              </div>
             </section>
 
             <section style={{ ...card, marginTop: 12 }}>
