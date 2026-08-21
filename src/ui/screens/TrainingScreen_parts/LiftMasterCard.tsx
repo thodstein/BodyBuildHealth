@@ -28,6 +28,7 @@ import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
+import { VideoCaptureCard } from './VideoCaptureCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.55)';
@@ -569,15 +570,15 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
         })()}
       </div>
 
-      {/* ── 6b. Видео (заглушка, план) ── */}
-      <div style={{ ...CARD, border:'1px dashed rgba(56,189,248,0.25)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>📹 Видео-анализ (скоро)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Загрузите видео подхода (боковая камера) — планируем авто-замер скорости штанги и углов локтей/ширины хвата. Пока ввод скорости вручную в блоке 6.</div>
-        <label style={{ display:'inline-block', marginTop:6, padding:'6px 10px', borderRadius:7, border:'1px solid rgba(56,189,248,0.3)', background:'rgba(56,189,248,0.1)', color:'#38bdf8', fontSize:10, fontWeight:700, cursor:'pointer' }}>
-          📁 Выбрать видео (заглушка)
-          <input type="file" accept="video/*" style={{ display:'none' }} onChange={e=>{ const f=e.target.files?.[0]; if(f) alert(`Выбрано: ${f.name} — видео-анализ будет в следующем этапе (pose estimation). Пока используйте блок 6 VBT.`); }} />
-        </label>
-      </div>
+      {/* ── 6b. Видео + гид ── */}
+      <VideoCaptureCard lift={lift} onResult={r=>{
+        // автоподстановка в VBT поля для демо: скорость → best/last
+        if (r.barVelocity!=null) {
+          const v = r.barVelocity;
+          setVbtBest((v+0.15).toFixed(2));
+          setVbtLast(v.toFixed(2));
+        }
+      }} />
 
       {/* ── 7. Дневник срывы (мини) ── */}
       <div style={CARD}>
