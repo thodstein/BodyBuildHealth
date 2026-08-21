@@ -14,16 +14,18 @@ import { toDailyLoads, acuteChronicRatio, weeklyMonotony } from '../../../engine
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 import { LimiterCalculatorCard } from './LimiterCalculatorCard';
 import { LiftMasterCard } from './LiftMasterCard';
+import { JointMasterCard } from './JointMasterCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'sticking' | 'rir' | 'mesocorr';
+type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'joint' | 'sticking' | 'rir' | 'mesocorr';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
   { m: 'master', label: 'Жим лёжа — единый инструмент', icon: '🏋️' },
   { m: 'movement', label: 'Мёртвые точки → Слабые точки → Движение штанги', icon: '🎯' },
   { m: 'limiter', label: 'Лимитирующие факторы движения', icon: '🧩' },
+  { m: 'joint', label: 'Суставно-связочный (поясница+)', icon: '🦴' },
   { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
   { m: 'rir', label: 'RIR-калибр.', icon: '🎯' },
   { m: 'mesocorr', label: 'Коррекция мезо', icon: '🔧' },
@@ -78,7 +80,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        <b style={{ color: ACCENT }}>Новое: «Жим лёжа — единый инструмент»</b> — один экран на всё (слабые мышцы → слабые точки → мёртвые точки → движение штанги → геометрия техники (хват/локти/мост/ноги/кисть/траектория) → VBT → дневник). Остальные вкладки оставлены как эксперт-режимы.
+        <b style={{ color: ACCENT }}>Новое: «Жим — единый инструмент» + «Суставно-связочный (поясница+)»</b> — один экран на всё (слабые → мёртвые → bar-path → геометрия → VBT, и суставы L4-S1/плечо/колено). Старые калькуляторы помечены @deprecated — прячем через 1 релиз, пока доступны как эксперт.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -96,6 +98,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
       </div>
 
       {mode === 'master' && <LiftMasterCard sessions={sessions} />}
+      {mode === 'joint' && <JointMasterCard />}
       {mode === 'movement' && <PlDeadpointsBarPathCard sessions={sessions as any} />}
       {mode === 'limiter' && <LimiterCalculatorCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
