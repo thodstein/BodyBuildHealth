@@ -2561,6 +2561,29 @@ for (const week of next.weeks) {
   for (const week of next.weeks) for (const session of week.sessions) {
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : (['biceps', 'triceps', 'forearms'].includes(ex.muscle) ? annotateArmExercise(ex) : ex));
   }
+  // День-гард малых мышц: трапеции/предплечья — только в тяговых/верхних днях
+  // (Pull/Back/Upper/FullBody), икры — в ножных. В Push/Chest/Shoulders-only их НЕТ.
+  // Устраняет «шраги в день груди» (и stale-комментарии от slot-замены малой группы).
+  for (const week of next.weeks) {
+    for (const session of week.sessions) {
+      const tag = session.sessionTag || '';
+      const isUpperPull = /Pull|Back|Upper|FullBody|Torso/.test(tag);
+      const isLegsDay = /Legs|Lower/.test(tag);
+      session.exercises = session.exercises.filter(ex => {
+        if ((ex as any).warmupActivator) return true;
+        if (ex.muscle === 'traps' || ex.muscle === 'forearms') return isUpperPull;
+        if (ex.muscle === 'calves') return isLegsDay || /FullBody|Lower/.test(tag);
+        return true;
+      });
+      // Убрать stale-комментарий/инструкцию, если остался от чужой мышцы (slot-замена).
+      for (const ex of session.exercises) {
+        if (ex.comment && /Основное: (chest|back|quads|shoulders)/.test(ex.comment) && ex.muscle !== 'chest' && ex.muscle !== 'back' && ex.muscle !== 'quads' && ex.muscle !== 'shoulders') {
+          ex.comment = `⚡ ${ex.name} — вспомогательная работа (${ex.muscle}). См. паттерн/хват выше.`;
+          ex.executionProfile = undefined;
+        }
+      }
+    }
+  }
   const backQuality = next.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises.filter(e => e.muscle === 'back')).reduce((acc, e) => {
     const pattern = e.movementPattern || 'other';
     acc[pattern] = (acc[pattern] || 0) + e.sets;

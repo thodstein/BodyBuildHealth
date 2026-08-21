@@ -1513,6 +1513,10 @@ function buildSession(
       if (id.includes('incline') || n.includes('наклон')) score += 15;
       if (id.includes('hack') || n.includes('гакк')) score += 15;
       if (id.includes('smith') && id.includes('squat')) score += 10;
+      // Бодибилдинг-основы: наклонный жим (штанга) — главный для груди; широкий хват
+      // вертикальной тяги — для широчайших. Повышаем их приоритет.
+      if (muscle === 'chest' && /наклон|incline/.test(n) && /штанг|barbell|гантел|dumbbell/.test(n)) score += 12;
+      if (muscle === 'back' && /верхи|верхн.*блок|пуллдаун|pulldown|подтяг/.test(n) && /широк|wide/.test(n)) score += 12;
       // Меньше многосуставных (кнопка пользователя): машина/Смит/поддержанные выше,
       // свободные compound ниже — присед → гакк/жим ногами, тяга штанги → Смит и т.д.
       if (fewerCompound) {
