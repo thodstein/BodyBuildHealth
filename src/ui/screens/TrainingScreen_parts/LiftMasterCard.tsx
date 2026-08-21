@@ -313,23 +313,25 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
     // weakpoints apply
     const hasWeak = weakGroups.length>0 || plWeakPoints.length>0 || Object.keys(diagnosticExerciseMap).length>0;
     if (hasWeak) {
-      applyToPlanner({ kind:'weakpoints', label:`Мастер жима: слабые ${weakGroups.join(', ')||'—'} + фаза ${effectivePhase||'—'}`, data:{ groups: weakGroups, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap: daysDiag, weakGroupExerciseMap: {}, weakGroupDayMap:{} } });
+      applyToPlanner({ kind:'weakpoints', label:`Мастер ${LIFT_RU[lift]}: слабые ${weakGroups.join(', ')||'—'} + фаза ${effectivePhase||'—'}`, data:{ groups: weakGroups, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap: daysDiag, weakGroupExerciseMap: {}, weakGroupDayMap:{} } });
     }
-    // 2) геометрия как limiter
+    // 2) лимитеры (геометрия + остальные 10 категорий) — один kind limiter
     const limiterExerciseMap: Record<string,string[]> = { ...selectedGeom };
     const limiterProtocolMap: Record<string,{protocol:any; category:string}> = {};
     const limiterDayMap: Record<string,number[]> = { ...daysGeom };
-    for (const o of limiterOptionsFor('technique_geometry', lift)) {
+    for (const cat of LIMITER_CATEGORIES) for (const o of limiterOptionsFor(cat.id, lift)) {
       const k=geomKey(o);
       if ((limiterExerciseMap[k]||[]).length) limiterProtocolMap[k]={ protocol:o.protocol, category:o.category };
     }
-    const totalGeom = Object.values(limiterExerciseMap).reduce((s,n)=>s+n.length,0);
-    if (totalGeom>0) {
-      applyToPlanner({ kind:'limiter', label:`Мастер жима: геометрия ${totalGeom} упр.`, data:{ limiterExerciseMap, limiterProtocolMap, limiterDayMap } });
+    const totalLim = Object.values(limiterExerciseMap).reduce((s,n)=>s+n.length,0);
+    if (totalLim>0) {
+      const geomCnt = Object.keys(limiterExerciseMap).filter(k=>k.includes('|technique_geometry|')).reduce((s,k)=>s+(limiterExerciseMap[k]?.length||0),0);
+      const otherCnt = totalLim - geomCnt;
+      applyToPlanner({ kind:'limiter', label:`Мастер ${LIFT_RU[lift]}: геометрия ${geomCnt} + лимитеры ${otherCnt} = ${totalLim} упр.`, data:{ limiterExerciseMap, limiterProtocolMap, limiterDayMap } });
     }
-    if (!hasWeak && totalGeom===0) {
+    if (!hasWeak && totalLim===0) {
       // если ничего не выбрано — подсказка
-      applyToPlanner({ kind:'limiter', label:'Мастер жима: просмотр (ничего не выбрано)', data:{ limiterExerciseMap:{}, limiterProtocolMap:{}, limiterDayMap:{} } });
+      applyToPlanner({ kind:'limiter', label:`Мастер ${LIFT_RU[lift]}: просмотр (ничего не выбрано)`, data:{ limiterExerciseMap:{}, limiterProtocolMap:{}, limiterDayMap:{} } });
     }
   };
 
@@ -354,12 +356,12 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
 
   return (
     <div style={{ padding:12, color:'#fff' }}>
-      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🏋️ Жим лёжа — единый инструмент</div>
+      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🏋️ {LIFT_RU[lift]} — единый инструмент</div>
       <div style={{ fontSize:10, color:DIM, marginTop:3, lineHeight:1.45 }}>
-        Один экран — 8 блоков: слабые мышцы → слабые точки → мёртвые точки → движение штанги → геометрия техники (хват/локти/мост/ноги/кисть/траектория) → VBT → дневник. Старый калькулятор «Лимитирующие факторы» оставлен как эксперт-режим.
+        Один экран — 8 блоков: слабые мышцы → слабые точки → мёртвые точки → движение штанги → геометрия техники → VBT (+видео) → дневник → остальные лимитирующие. Старые калькуляторы оставлены как эксперт-режим.
       </div>
       <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', fontSize:10, color:'#38bdf8' }}>
-        📐 Геометрия техники — новая категория (8 параметров). {diag.limiter.techniqueGeometry.length} парам. для жима · {diag.headerHint}
+        📐 Геометрия техники — {diag.limiter.techniqueGeometry.length} парам. для {LIFT_RU[lift]} · {diag.headerHint}
       </div>
       {anthroHint && (
         <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.25)', fontSize:10, color:'#a78bfa', lineHeight:1.4 }}>
@@ -509,10 +511,10 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
         ))}
       </div>
 
-      {/* ── 5. Геометрия техники (8 параметров) ── */}
+      {/* ── 5. Геометрия техники — для выбранного движения ── */}
       <div style={{ ...CARD, border:'1px solid rgba(56,189,248,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>5 · Геометрия техники — 8 параметров жима</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Хват / локти / мост / ноги / кисть / траектория — частые лимитеры «на бумаге всё по плану, а жим не идёт». Каждая — метод + протокол + упражнения.</div>
+        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>5 · Геометрия техники — {geomRawOptions.length} парам. для {LIFT_RU[lift]}</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>{lift==='bench'?'Хват / локти / мост / ноги / кисть / траектория — частые лимитеры «на бумаге всё по плану, а жим не идёт»':'Геометрия постановки/хвата/трекинга/брейсинга для выбранного движения — то же, что для жима, но под его механику.'} Каждая — метод + протокол + упражнения.</div>
         {geomRawOptions.map(opt=>{
           const k=geomKey(opt); const an=analyzeLimiterOption(opt); const col=CATEGORY_COLOR[opt.category];
           return (
@@ -584,18 +586,39 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
         {diag.weakMuscles.signals.length===0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:4 }}>Нет данных дневника или тренд стабилен.</div>}
       </div>
 
-      {/* ── 8. Остальные лимитирующие (сжато) ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>8 · Остальные лимитирующие факторы — для {LIFT_RU[lift]}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Кроме геометрии — ещё 10 категорий (скорость/дожимы/стабилизация и т.д.). Краткий перечень; полный — в эксперт-режиме «Лимитирующие факторы».</div>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
-          {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(c=>{
-            const cnt = limiterOptionsFor(c.id, lift).length;
-            const col = CATEGORY_COLOR[c.id];
-            return <span key={c.id} style={{ fontSize:9, padding:'3px 7px', borderRadius:7, border:`1px solid ${col.color}33`, background:col.bg, color:col.color }}>{c.icon} {c.label} · {cnt}</span>;
-          })}
-        </div>
-        <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Нажмите «Лимитирующие факторы движения» вверху для детального подбора по этим категориям — выбранная геометрия уже покрывает главный дефицит техники.</div>
+      {/* ── 8. Остальные лимитирующие — ПОЛНЫЙ СПИСОК для выбранного движения ── */}
+      <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>8 · Остальные лимитирующие факторы — для {LIFT_RU[lift]} (все калькуляторы)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Кроме геометрии (блок 5) — ещё 10 категорий. Каждая — как в эксперт-режиме, но прямо здесь: выберите параметр → упражнения → дни. Один клик внизу добавит и геометрию, и эти.</div>
+        {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(cat=>{
+          const opts = limiterOptionsFor(cat.id, lift);
+          if (opts.length===0) return null;
+          const col = CATEGORY_COLOR[cat.id];
+          return (
+            <div key={cat.id} style={{ marginTop:10, padding:9, borderRadius:8, background:'rgba(167,139,250,0.04)', border:`1px solid ${col.color}22` }}>
+              <div style={{ fontSize:10, fontWeight:800, color:col.color }}>{cat.icon} {cat.label} · {opts.length} парам.</div>
+              <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.3 }}>{cat.description}</div>
+              {opts.map(opt=>{
+                const k=geomKey(opt); const an=analyzeLimiterOption(opt);
+                return (
+                  <div key={opt.id} style={{ marginTop:8, padding:8, borderRadius:7, background:'rgba(255,255,255,0.02)', border:`1px solid ${col.color}18` }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>{opt.label}</div>
+                    <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.3 }}>{opt.description}</div>
+                    <div style={{ fontSize:9, color:col.color, marginTop:3, lineHeight:1.3 }}>📋 {opt.method}</div>
+                    {an.items.map((it,idx)=> <ExerciseRow key={idx} item={it} selected={!!selectedGeom[k]?.includes(it.exercise.name)} onToggle={()=>toggleGeom(opt,it.exercise.name)} onAdd={()=>addGeom(opt,[it.exercise.name])} tag={cat.icon} />)}
+                    <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
+                      <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:col.bg, color:col.color, border:`1px solid ${col.color}40` }}>➕ Рекомендуемое</button>
+                      <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:DIM, border:'1px solid rgba(255,255,255,0.1)' }}>➕ Все</button>
+                      <span style={{ fontSize:9, color:DIM }}>Дни:</span>
+                      <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?col.bg:'transparent', color: !daysGeom[k]?.length?col.color:DIM }}>Авто</button>
+                      {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?col.bg:'transparent', color: daysGeom[k]?.includes(d)?col.color:DIM }}>Д{d}</button>)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Footer ── */}
