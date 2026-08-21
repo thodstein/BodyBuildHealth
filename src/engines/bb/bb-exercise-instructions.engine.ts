@@ -11,6 +11,8 @@ export interface ExerciseInstructionInput {
   role?: 'primary' | 'accessory';
   phase?: string;
   trainingFocus?: 'strength' | 'hypertrophy' | 'endurance';
+  /** Уровень спортсмена — адаптирует темп/технику (новичок: безопаснее, продвинутый: про-кью). */
+  level?: string;
   tempo?: string;
   restSeconds?: number;
   orderIndex?: number;
@@ -81,7 +83,10 @@ function catalogInstruction(input: ExerciseInstructionInput, id?: string) {
   };
 }
 
-function defaultTempo(focus?: ExerciseInstructionInput['trainingFocus']): string {
+function defaultTempo(focus?: ExerciseInstructionInput['trainingFocus'], level?: string): string {
+  const lvl = (level || '').toLowerCase();
+  // Новичок: более медленный, контролируемый темп (безопаснее). Продвинутый: стандарт.
+  if (lvl === 'beginner' || lvl === 'новичок') return focus === 'strength' ? '3-0-2-0' : focus === 'endurance' ? '3-0-3-0' : '3-1-2-1';
   return focus === 'strength' ? '2-0-1-0' : focus === 'endurance' ? '2-0-2-0' : '3-1-1-1';
 }
 
@@ -102,11 +107,14 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
   const cues = catalogCue
     ? [...labCues.filter(cue => cue !== catalogCue).slice(0, 4), catalogCue]
     : labCues.slice(0, 5);
-  const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus);
+  const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus, input.level);
   const order = orderLabel(input);
+  const lvl = (input.level || '').toLowerCase();
   const progression = input.trainingFocus === 'strength'
     ? 'Повышайте вес после выполнения всех сетов в верхней границе повторов при заданном RIR.'
-    : 'Сначала добавляйте повторы до верхней границы, затем повышайте вес минимальным шагом.';
+    : lvl === 'beginner' || lvl === 'новичок'
+      ? 'Сначала освойте технику (темп 3-1-2-1), затем добавляйте повторы до верхней границы, потом повышайте вес минимальным шагом.'
+      : 'Сначала добавляйте повторы до верхней границы, затем повышайте вес минимальным шагом.';
   const source = bio || target ? 'exercise-lab' : id || EXERCISE_CATALOG.some(e => e.name === input.exerciseName) ? 'catalog' : 'generic';
   return {
     pattern,
