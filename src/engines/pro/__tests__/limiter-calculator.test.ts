@@ -15,11 +15,12 @@ const ALL_LIFTS: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown
 const CORE_LIFTS: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
 
 describe('limiter-calculator.engine: структура', () => {
-  it('ровно 10 категорий с иконками/описаниями, идемпотентный индекс', () => {
-    expect(LIMITER_CATEGORIES).toHaveLength(10);
+  it('ровно 11 категорий с иконками/описаниями, идемпотентный индекс', () => {
+    expect(LIMITER_CATEGORIES).toHaveLength(11);
     expect(LIMITER_CATEGORIES.map(c => c.id)).toEqual([
       'speed_strength', 'partial_amplitude', 'stabilization', 'contraction_mode', 'limiter_hypertrophy',
       'anthropometry', 'start_specific', 'grip_stiffness', 'coordination', 'endurance_profile',
+      'technique_geometry',
     ]);
     for (const c of LIMITER_CATEGORIES) {
       expect(c.label.length).toBeGreaterThan(3);
@@ -31,7 +32,7 @@ describe('limiter-calculator.engine: структура', () => {
   it('MRV учитывается только для гипертрофии лимитирующих групп', () => {
     const byId = Object.fromEntries(LIMITER_CATEGORIES.map(c => [c.id, c]));
     expect(byId.limiter_hypertrophy.countsTowardMrv).toBe(true);
-    for (const id of ['speed_strength', 'partial_amplitude', 'stabilization', 'contraction_mode', 'anthropometry', 'start_specific', 'grip_stiffness', 'coordination', 'endurance_profile'] as LimiterCategory[]) {
+    for (const id of ['speed_strength', 'partial_amplitude', 'stabilization', 'contraction_mode', 'anthropometry', 'start_specific', 'grip_stiffness', 'coordination', 'endurance_profile', 'technique_geometry'] as LimiterCategory[]) {
       expect(byId[id].countsTowardMrv).toBe(false);
     }
   });
@@ -130,14 +131,16 @@ describe('limiter-calculator.engine: качество упражнений', () 
 
   it('анализ по движению возвращает все категории с непустыми/пустыми списками опций', () => {
     const full = analyzeLimiterForLift('bench');
-    expect(Object.keys(full).length).toBe(10);
+    expect(Object.keys(full).length).toBe(11);
     const speedCount = full.speed_strength.length;
     expect(speedCount).toBeGreaterThanOrEqual(2);
     const biceps = analyzeLimiterForLift('biceps');
-    // Полная матрица: у бицепса теперь есть опции во ВСЕХ 10 категориях.
-    expect(Object.keys(biceps).length).toBe(10);
+    // Полная матрица: у бицепса теперь есть опции во ВСЕХ категориях кроме technique_geometry (пилот только жим).
+    expect(Object.keys(biceps).length).toBe(11);
     expect(biceps.anthropometry.length).toBeGreaterThanOrEqual(1);
     expect(biceps.limiter_hypertrophy.length).toBeGreaterThan(0);
+    expect(biceps.technique_geometry.length).toBe(0);
+    expect(full.technique_geometry.length).toBeGreaterThanOrEqual(8);
   });
 
   it('специальные методы имеют свои протоколы (скорость 8×2, дожим 4×3, эксцентрика темп)', () => {
@@ -153,12 +156,14 @@ describe('limiter-calculator.engine: качество упражнений', () 
     expect(iso.protocol.holdSec).toBeGreaterThanOrEqual(3);
   });
 
-  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ 10 категориях', () => {
+  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ базовых 10 категориях; bench дополнительно 11-я', () => {
     const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
     for (const lift of core) {
       const cats = limiterCategoriesForLift(lift);
-      expect(cats, `${lift}: не все категории (${cats.length}/10)`).toHaveLength(10);
+      const expected = lift === 'bench' ? 11 : 10;
+      expect(cats, `${lift}: не все категории (${cats.length}/${expected})`).toHaveLength(expected);
       for (const c of LIMITER_CATEGORIES) {
+        if (c.id === 'technique_geometry' && lift !== 'bench') continue;
         expect(limiterOptionsFor(c.id, lift).length, `${lift}/${c.id}`).toBeGreaterThanOrEqual(1);
       }
     }
@@ -241,15 +246,31 @@ describe('limiter-calculator.engine: качество упражнений', () 
     expect(bad).toEqual([]);
   });
 
-  it('полная матрица 10×6: каждая опция имеет ≥1 упражнение (все клетки непустые)', () => {
+  it('полная матрица 11×6: каждая опция имеет ≥1 упражнение (все клетки непустые)', () => {
     const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
     for (const lift of core) {
       for (const c of LIMITER_CATEGORIES) {
+        if (c.id === 'technique_geometry' && lift !== 'bench') continue;
         for (const o of limiterOptionsFor(c.id, lift)) {
           const { items } = analyzeLimiterOption(o);
           expect(items.length, `${lift}/${c.id}/${o.id} без упражнений`).toBeGreaterThanOrEqual(1);
         }
       }
+    }
+  });
+
+  it('геометрия техники bench: 8 опций, все резолюятся точно, иконка 📐', () => {
+    expect(LIMITER_CATEGORIES.find(c => c.id === 'technique_geometry')?.icon).toBe('📐');
+    const geom = LIMITER_OPTIONS.filter(o => o.category === 'technique_geometry');
+    expect(geom.length).toBe(8);
+    expect(geom.every(o => o.lift === 'bench')).toBe(true);
+    const ids = geom.map(o => o.id);
+    expect(ids).toEqual(expect.arrayContaining(['bench_grip_narrow','bench_grip_wide','bench_elbow_tucked','bench_elbow_flared','bench_arch_scapula','bench_leg_drive','bench_wrist_bulldog','bench_touch_point']));
+    for (const o of geom) {
+      const { items } = analyzeLimiterOption(o);
+      expect(items.length, `${o.id} без упражнений`).toBeGreaterThanOrEqual(1);
+      expect(o.protocol.sets).toBeGreaterThanOrEqual(3);
+      expect(o.protocol.pct).toBeGreaterThan(0.6);
     }
   });
 });

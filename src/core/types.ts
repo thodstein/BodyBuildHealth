@@ -493,6 +493,17 @@ export interface UnifiedSettings {
     bicepCm?: number;
     thighCm?: number;
     forearmCm?: number;
+    /** Антропометрия для геометрии техники (жим: длинные руки → уже хват; короткие → шире) */
+    armSpanCm?: number;       // размах рук
+    shoulderWidthCm?: number; // ширина плеч (биакром.)
+    femurLengthCm?: number;   // длина бедра (для приседа/тяги)
+    torsoLengthCm?: number;   // длина торса
+    /** Предпочтения геометрии жима (перекрывают автоподсказку): 'auto' | 'narrow' | 'wide' etc. */
+    benchGeometryPrefs?: {
+      gripWidth?: 'auto' | 'narrow' | 'medium' | 'wide';
+      elbowFlare?: 'auto' | 'tucked' | 'moderate' | 'flared';
+      archLevel?: 'auto' | 'flat' | 'moderate' | 'high';
+    };
   };
 
   // ─────────── 2. ТРЕНИРОВКИ ───────────

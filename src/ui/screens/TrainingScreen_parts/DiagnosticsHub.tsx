@@ -13,13 +13,15 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 import { LimiterCalculatorCard } from './LimiterCalculatorCard';
+import { LiftMasterCard } from './LiftMasterCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-type DiagnosticsHubMode = 'movement' | 'limiter' | 'sticking' | 'rir' | 'mesocorr';
+type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'sticking' | 'rir' | 'mesocorr';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
+  { m: 'master', label: 'Жим лёжа — единый инструмент', icon: '🏋️' },
   { m: 'movement', label: 'Мёртвые точки → Слабые точки → Движение штанги', icon: '🎯' },
   { m: 'limiter', label: 'Лимитирующие факторы движения', icon: '🧩' },
   { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
@@ -42,7 +44,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
   sessions, tprofile, readinessRecovery, readinessFatigue,
   mesoWeeks, missedSessions, currentVolume, currentRir,
 }) => {
-  const [mode, setMode] = useState<DiagnosticsHubMode>('movement');
+  const [mode, setMode] = useState<DiagnosticsHubMode>('master');
 
   const acwrData = useMemo(() => {
     const s = loadSRPESessions();
@@ -76,9 +78,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        Единый калькулятор движения (мёртвые точки, слабые точки, bar-path), калькулятор лимитирующих
-        факторов (скорость/дожимы/стабилизация/режимы сокращения/хват/координация), анализ срывов из дневника,
-        RIR-калибровка и автоматическая коррекция мезоцикла.
+        <b style={{ color: ACCENT }}>Новое: «Жим лёжа — единый инструмент»</b> — один экран на всё (слабые мышцы → слабые точки → мёртвые точки → движение штанги → геометрия техники (хват/локти/мост/ноги/кисть/траектория) → VBT → дневник). Остальные вкладки оставлены как эксперт-режимы.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -95,7 +95,8 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
         ))}
       </div>
 
-      {mode === 'movement' && <PlDeadpointsBarPathCard />}
+      {mode === 'master' && <LiftMasterCard sessions={sessions} />}
+      {mode === 'movement' && <PlDeadpointsBarPathCard sessions={sessions as any} />}
       {mode === 'limiter' && <LimiterCalculatorCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
       {mode === 'rir' && <RIRCalibrationCard />}
