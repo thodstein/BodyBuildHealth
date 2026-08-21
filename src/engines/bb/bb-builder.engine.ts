@@ -2020,9 +2020,8 @@ function buildSession(
       // P1-4: минимум 2 сета на упражнение (1 сет = разминка, не рабочий объём для гипертрофии).
        // back target уже масштабирован на недельном prescription-уровне выше;
        // не умножаем каждый exercise повторно, иначе стаж давал бы двойной boost.
-       const setCap = (pl.muscle === 'back' && trainingYears !== undefined) ? 10
-         : (pl.muscle === 'back' && level === 'advanced') ? 8
-         : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && trainingYears !== undefined) ? 8
+       const setCap = (pl.muscle === 'back' && level === 'advanced' && !(trainingYears !== undefined && (trainingYears as number) >= 3)) ? 8
+         : (['quads', 'hamstrings', 'glutes'].includes(pl.muscle) && level === 'advanced' && !(trainingYears !== undefined && (trainingYears as number) >= 3)) ? 8
          : 5;
        const exSetsRaw = Math.round(Math.round(pl.sets / pl.exDatas.length) * vPct);
        // Минимум 3 сета на упражнение для enhanced 3+ — 2 сета недостаточно

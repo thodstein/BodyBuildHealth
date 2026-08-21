@@ -898,6 +898,32 @@ export function applyPrepVolumeCascade(
     }
   }
 
+  // Нормализация prep-кривой: buildBBPlan рамп-апит объём к финалу (×0.85→×1.10),
+  // а prep должен ДЕРЖАТЬ и нисходить к таперу. Якорим prep к ПЕРВОЙ prep-неделе
+  // и масштабируем последующие вниз по фазовому множителю (монотонная кривая).
+  const prepIdx = weeks.map((w, i) => [w, i] as const).filter(([w]) => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation');
+  if (prepIdx.length >= 2) {
+    const firstIdx = prepIdx[0][1];
+    const firstTotal = weeks[firstIdx].sessions.reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+    if (firstTotal > 0) {
+      for (const [, i] of prepIdx) {
+        if (i === firstIdx) continue;
+        const pv = prepVolumePhaseForWeek(vp, i + 1, prepWeeks);
+        const firstPv = prepVolumePhaseForWeek(vp, firstIdx + 1, prepWeeks);
+        const target = firstTotal * ((pv?.volumeMult ?? 1) / (firstPv?.volumeMult ?? 1));
+        const cur = weeks[i].sessions.reduce((a: number, s: any) => a + (s.exercises || []).filter((e: any) => !(e as any).warmupActivator).reduce((b: number, e: any) => b + (e.sets || 0), 0), 0);
+        if (cur <= 0) continue;
+        const scale = target / cur;
+        for (const s of weeks[i].sessions) for (const e of (s.exercises || [])) {
+          if ((e as any).warmupActivator) continue;
+          const newSets = Math.max(2, Math.round((e.sets || 0) * scale));
+          e.sets = newSets;
+          if (Array.isArray(e.workSets)) e.workSets = e.workSets.slice(0, newSets);
+        }
+      }
+    }
+  }
+
   // Нормализация тапера: якорь = средний объём финала подготовки × нисходящий фактор,
   // чтобы тапер гарантированно был ниже prep-финала (монотонная кривая к пику).
   const prepWk = weeks.filter((w: any) => w.contestPhase === 'preparation' || w.contestPhase === 'final_preparation');
