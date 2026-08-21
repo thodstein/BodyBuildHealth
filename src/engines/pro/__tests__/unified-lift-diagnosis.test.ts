@@ -14,13 +14,15 @@ describe('unified-lift-diagnosis', () => {
     expect(d.headerHint).toContain('Жим');
     expect(d.headerHint).toContain('геометрия');
   });
-  it('non-bench без геометрии кроме squat/dead/sumo/ohp', () => {
-    const dSquat = unifiedLiftDiagnosis({ lift: 'squat', sessions: [] });
-    expect(dSquat.limiter.techniqueGeometry.length).toBe(5);
-    const dDead = unifiedLiftDiagnosis({ lift: 'deadlift', sessions: [] });
-    expect(dDead.limiter.techniqueGeometry.length).toBe(4);
-    const dBiceps = unifiedLiftDiagnosis({ lift: 'biceps', sessions: [] });
-    expect(dBiceps.limiter.techniqueGeometry.length).toBe(0);
+  it('все 9 движений имеют геометрию (row/pulldown/incline/biceps тоже)', () => {
+    expect(unifiedLiftDiagnosis({ lift: 'squat', sessions: [] }).limiter.techniqueGeometry.length).toBe(5);
+    expect(unifiedLiftDiagnosis({ lift: 'deadlift', sessions: [] }).limiter.techniqueGeometry.length).toBe(4);
+    expect(unifiedLiftDiagnosis({ lift: 'sumo', sessions: [] }).limiter.techniqueGeometry.length).toBe(3);
+    expect(unifiedLiftDiagnosis({ lift: 'ohp', sessions: [] }).limiter.techniqueGeometry.length).toBe(3);
+    expect(unifiedLiftDiagnosis({ lift: 'row', sessions: [] }).limiter.techniqueGeometry.length).toBe(3);
+    expect(unifiedLiftDiagnosis({ lift: 'pulldown', sessions: [] }).limiter.techniqueGeometry.length).toBe(3);
+    expect(unifiedLiftDiagnosis({ lift: 'incline_press', sessions: [] }).limiter.techniqueGeometry.length).toBe(3);
+    expect(unifiedLiftDiagnosis({ lift: 'biceps', sessions: [] }).limiter.techniqueGeometry.length).toBe(3);
   });
   it('VBT диагностика появляется при вводе скоростей', () => {
     const d = unifiedLiftDiagnosis({ lift: 'bench', vbtBest:'0.6', vbtLast:'0.4', vbtWeight:'100', sessions:[] });

@@ -135,12 +135,12 @@ describe('limiter-calculator.engine: качество упражнений', () 
     const speedCount = full.speed_strength.length;
     expect(speedCount).toBeGreaterThanOrEqual(2);
     const biceps = analyzeLimiterForLift('biceps');
-    // Полная матрица: у бицепса теперь есть опции во ВСЕХ категориях кроме technique_geometry (пилот только жим).
+    // Полная матрица 11×9: у бицепса теперь есть геометрия тоже
     expect(Object.keys(biceps).length).toBe(11);
     expect(biceps.anthropometry.length).toBeGreaterThanOrEqual(1);
     expect(biceps.limiter_hypertrophy.length).toBeGreaterThan(0);
-    expect(biceps.technique_geometry.length).toBe(0);
-    expect(full.technique_geometry.length).toBeGreaterThanOrEqual(8);
+    expect(biceps.technique_geometry.length).toBe(3);
+    expect(full.technique_geometry.length).toBe(9);
   });
 
   it('специальные методы имеют свои протоколы (скорость 8×2, дожим 4×3, эксцентрика темп)', () => {
@@ -156,15 +156,12 @@ describe('limiter-calculator.engine: качество упражнений', () 
     expect(iso.protocol.holdSec).toBeGreaterThanOrEqual(3);
   });
 
-  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ базовых 10 категориях; 5 с геометрией → 11', () => {
+  it('ПОЛНАЯ МАТРИЦА: каждый из 6 движений имеет опции во ВСЕХ 11 категориях (полно 11×6)', () => {
     const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
-    const withGeom = new Set<Lift>(['bench','squat','deadlift','sumo','ohp']);
     for (const lift of core) {
       const cats = limiterCategoriesForLift(lift);
-      const expected = withGeom.has(lift) ? 11 : 10;
-      expect(cats, `${lift}: не все категории (${cats.length}/${expected})`).toHaveLength(expected);
+      expect(cats, `${lift}: не все категории (${cats.length}/11)`).toHaveLength(11);
       for (const c of LIMITER_CATEGORIES) {
-        if (c.id === 'technique_geometry' && !withGeom.has(lift)) continue;
         expect(limiterOptionsFor(c.id, lift).length, `${lift}/${c.id}`).toBeGreaterThanOrEqual(1);
       }
     }
@@ -249,10 +246,8 @@ describe('limiter-calculator.engine: качество упражнений', () 
 
   it('полная матрица 11×6: каждая опция имеет ≥1 упражнение (все клетки непустые)', () => {
     const core: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
-    const withGeom = new Set<Lift>(['bench','squat','deadlift','sumo','ohp']);
     for (const lift of core) {
       for (const c of LIMITER_CATEGORIES) {
-        if (c.id === 'technique_geometry' && !withGeom.has(lift)) continue;
         for (const o of limiterOptionsFor(c.id, lift)) {
           const { items } = analyzeLimiterOption(o);
           expect(items.length, `${lift}/${c.id}/${o.id} без упражнений`).toBeGreaterThanOrEqual(1);
@@ -275,12 +270,17 @@ describe('limiter-calculator.engine: качество упражнений', () 
     }
   });
 
-  it('геометрия техники: покрытие всех движений (squat/dead/sumo/ohp)', () => {
+  it('геометрия техники: покрытие всех движений (9/9, 11x9 полно)', () => {
     const total = LIMITER_OPTIONS.filter(o => o.category === 'technique_geometry');
-    expect(total.length).toBe(24);
+    expect(total.length).toBe(36);
     expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='squat').length).toBe(5);
     expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='deadlift').length).toBe(4);
     expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='sumo').length).toBe(3);
     expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='ohp').length).toBe(3);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='row').length).toBe(3);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='pulldown').length).toBe(3);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='incline_press').length).toBe(3);
+    expect(LIMITER_OPTIONS.filter(o=>o.category==='technique_geometry' && o.lift==='biceps').length).toBe(3);
+    expect(new Set(total.map(o=>o.lift)).size).toBe(9);
   });
 });
