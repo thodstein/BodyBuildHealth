@@ -26,7 +26,8 @@ import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { WeeklyTargetsCard, SectionHeader, DiaryEmptyState } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
-import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, type Discipline } from '../../../engines/pl-norms.engine';
+import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, getNormTable, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
+import { getProfile } from '../../../core/profile-manager';
 
 export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const {
@@ -308,13 +309,16 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   .filter(x => x.disc && x.rm > 0)
                   .slice(0, 3);
                 if (bw <= 0 || lifts.length === 0) return null;
-                const table = PL_NORM_TABLES.find(t => t.federation === 'wrpf_untested');
+                const sex: Sex = (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })();
+                const fedForDiary: any = 'wrpf_untested';
                 return (
                   <div style={style.card}>
-                    <div style={style.label}>🏅 Нормативы ПЛ (WRPF, raw · {bw} кг)</div>
+                    <div style={style.label}>🏅 Нормативы ПЛ ({sex === 'female' ? '♀ WRPF, женщины' : 'WRPF, raw'} · {bw} кг · {sex === 'female' ? '43-84+ кат.' : '60-140+ кат.'})</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории (WRPF без ДК). Пол берётся из профиля ({sex === 'female' ? 'женские пороги ~60% от мужских' : 'мужские'}). Для точного выбора федерации/категории — «Анализ силы → Единый».</div>
                     {lifts.map(({ id, rm, disc }) => {
-                      if (!table) return null;
-                      const cls = classifyTotal(table, bw, rm);
+                      const perTable = getNormTable(fedForDiary, disc as Discipline, sex);
+                      if (!perTable) return null;
+                      const cls = classifyTotal(perTable, bw, rm);
                       return (
                         <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, fontSize: 11 }}>
                           <span style={{ color: 'var(--text-dim)' }}>{EXERCISE_CATALOG.find(e => e.id === id)?.name || id}</span>

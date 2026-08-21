@@ -9,7 +9,7 @@ import { trainingLoadReport, toDailyLoads, acuteChronicRatio } from '../../../en
 import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { listSchemes, generateProgression } from '../../../engines/pro/progression-pro.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
-import { PL_NORM_TABLES, classifyTotal, findCategory, getNormTable, RANK_ORDER, RANK_LABELS, type ClassificationResult, type NormTable, type Federation, type Discipline } from '../../../engines/pl-norms.engine';
+import { PL_NORM_TABLES, classifyTotal, findCategory, getNormTable, RANK_ORDER, RANK_LABELS, NORM_EXPLANATIONS, CATEGORY_EXPLANATION, type ClassificationResult, type NormTable, type Federation, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
 import { getProfile } from '../../../core/profile-manager';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
@@ -67,11 +67,15 @@ export const ProMetricsPanel: React.FC = () => {
   const [federation, setFederation] = useState<Federation>('wrpf_untested');
   const [discipline, setDiscipline] = useState<Discipline>('total');
   const disciplineOptions = useMemo(() => {
-    const all = PL_NORM_TABLES.filter(t => t.federation === federation);
+    const all = PL_NORM_TABLES.filter(t => t.federation === federation && t.sex === sex);
     const labels: Record<Discipline, string> = { total: 'Троеборье', bench: 'Жим лёжа', deadlift: 'Становая тяга', squat: 'Присед' };
+    // Для ФПР мужчины только total, женщины total+bench — как в едином калькуляторе
+    if (federation === 'fpr_ipf' && sex === 'male') return [{ value: 'total' as Discipline, label: 'Троеборье' }];
+    if (federation === 'fpr_ipf' && sex === 'female') return [{ value: 'total' as Discipline, label: 'Троеборье' }, { value: 'bench' as Discipline, label: 'Жим лёжа' }]
+      .filter(o => all.some(t => t.discipline === o.value));
     return all.map(t => ({ value: t.discipline, label: labels[t.discipline] || t.discipline }));
-  }, [federation]);
-  const normTable = useMemo(() => getNormTable(federation, discipline) || PL_NORM_TABLES[0], [federation, discipline]);
+  }, [federation, sex]);
+  const normTable = useMemo(() => getNormTable(federation, discipline, sex) || PL_NORM_TABLES.find(t => t.sex === sex) || PL_NORM_TABLES[0], [federation, discipline, sex]);
   const liftValue = discipline === 'bench' ? bench : discipline === 'deadlift' ? deadlift : discipline === 'squat' ? squat : total;
   const classif = useMemo(() => classifyTotal(normTable, bw, liftValue), [normTable, bw, liftValue]);
 
@@ -82,7 +86,7 @@ export const ProMetricsPanel: React.FC = () => {
     deadlift: bw > 0 ? +(deadlift / bw).toFixed(2) : 0,
   }), [squat, bench, deadlift, bw]);
 
-  // Per-lift classification (WRPF only)
+  // Per-lift classification (WRPF only, с учётом пола)
   const liftClassifs = useMemo(() => {
     const lifts: { key: Discipline; value: number; label: string }[] = [
       { key: 'squat', value: squat, label: 'Присед' },
@@ -90,10 +94,10 @@ export const ProMetricsPanel: React.FC = () => {
       { key: 'deadlift', value: deadlift, label: 'Тяга' },
     ];
     return lifts.map(l => {
-      const t = getNormTable(federation, l.key);
+      const t = getNormTable(federation, l.key, sex);
       return t ? { ...l, classif: classifyTotal(t, bw, l.value) } : null;
     }).filter(Boolean) as { key: Discipline; value: number; label: string; classif: ClassificationResult }[];
-  }, [federation, bw, squat, bench, deadlift]);
+  }, [federation, bw, squat, bench, deadlift, sex]);
 
   // ── Монитор нагрузки (sRPE × длительность) ──
   // P12 wire: реальные sRPE-сессии из дневника (srpe-store); демо-массив как fallback, если <2 реальных.
@@ -178,14 +182,21 @@ export const ProMetricsPanel: React.FC = () => {
             );
           })}
         </div>
+        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.08)', fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+          <b style={{ color: '#fff' }}>Как читать график по движениям:</b> длина полосы — килограммы движения ÷ вес тела (×BW). Пороги для мужчин: присед 1.5/2.0/2.5, жим 1.0/1.3/1.6, тяга 2.0/2.5/3.0; для женщин — на ~30% ниже. Самая короткая полоса = отстающее движение (слабейшая группа). Переключатель пола выше меняет пороги и расчёт очков.
+        </div>
 
         <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Коэффициенты (тотал)</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Коэффициенты (тотал) — DOTS/Wilks/IPF GL + относительная</div>
           <div style={ROW}><span>Wilks</span><b style={{ color: '#fff' }}>{rs.wilks}</b></div>
           <div style={ROW}><span>DOTS</span><b style={{ color: ACCENT }}>{rs.dots} — {rs.classification.label}</b></div>
           <div style={ROW}><span>IPF GLI</span><b style={{ color: '#fff' }}>{rs.ipfGL}</b></div>
           <div style={ROW}><span>Allometric (×bw<sup>⅔</sup>)</span><b style={{ color: '#fff' }}>{rs.allometric}</b></div>
           <div style={ROW}><span>Относит. (тотал/вес)</span><b style={{ color: '#fff' }}>{rs.relative}×</b></div>
+        </div>
+        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+          <b style={{ color: '#fff' }}>Что это:</b> {NORM_EXPLANATIONS.points}<br />
+          <b style={{ color: '#fff' }}>Как читать:</b> DOTS/Wilks — полиномиальная компенсация веса (чем тяжелее, тем меньше очков за кг). IPF GL — 0-120 (100+ элита). Относительная — тотал/вес (простая, но игнорирует аллометрию). Все уже с учётом пола ({sex === 'female' ? 'женские коэффициенты' : 'мужские'}).
         </div>
       </div>
 
@@ -248,7 +259,7 @@ export const ProMetricsPanel: React.FC = () => {
         {/* Per-lift mini cards (when total is selected and WRPF has individual norms) */}
         {discipline === 'total' && liftClassifs.length > 0 && (
           <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>По движениям ({federation === 'wrpf_untested' ? 'WRPF без ДК' : federation === 'wrpf_tested' ? 'WRPF с ДК' : 'ФПР/IPF'}):</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>По движениям ({federation === 'wrpf_untested' ? 'WRPF без ДК' : federation === 'wrpf_tested' ? 'WRPF с ДК' : 'ФПР/IPF'} · {sex === 'female' ? '♀ женщины' : '♂ мужчины'}):</div>
             {liftClassifs.map(lc => (
               <div key={lc.key} style={{ marginBottom: 6, padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
@@ -266,6 +277,9 @@ export const ProMetricsPanel: React.FC = () => {
             ))}
           </div>
         )}
+        <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+          <b style={{ color: '#fff' }}>Как читать нормативы:</b> {NORM_EXPLANATIONS.howRank} {CATEGORY_EXPLANATION} Полоса прогресса — доля пути от текущего разряда к следующему. Ручной выбор категории (в «Едином» калькуляторе вкладки «Анализ силы») позволяет посмотреть «что если» без смены веса.
+        </div>
       </div>
 
       {/* Монитор нагрузки */}

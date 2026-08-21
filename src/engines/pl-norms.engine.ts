@@ -1,17 +1,27 @@
 /**
- * pl-norms.engine.ts — разрядные нормативы пауэрлифтинга (мужчины, raw).
- * Источник: спецификация 2026 (ФПР/IPF, WRPF/СПР — дивизионы без/с допинг-контролем).
- * Таблицы — дляRAW (без экипировки). Женские таблицы в источник не входили — добавить позже.
+ * pl-norms.engine.ts — разрядные нормативы пауэрлифтинга (мужчины и женщины, raw/classic).
+ * Источник: ФПР 2022-2025 (приказ Минспорта №6 от 11.01.2022) — классический пауэрлифтинг
+ * (без экипировки) + WRPF/СПР (без/с ДК). Женские таблицы добавлены по официальным
+ * нормативам ФПР классика (2022-2025) и масштабированием для WRPF.
  *
- * Разряды по возрастанию порога: КМС < МС < МСМК < ЭЛИТА.
+ * Разряды по возрастанию порога: КМС < МС < МСМК < ЭЛИТА (Элита — только WRPF без ДК).
+ * Для категорий 43 кг (женщины) МС/МСМК не присваиваются — только КМС и ниже.
  */
 
 export type Federation = 'fpr_ipf' | 'wrpf_untested' | 'wrpf_tested';
 export type Discipline = 'total' | 'bench' | 'deadlift' | 'squat';
 export type RankKey = 'kms' | 'ms' | 'msmk' | 'elite';
+export type Sex = 'male' | 'female';
 
 export const RANK_LABELS: Record<RankKey, string> = { kms: 'КМС', ms: 'МС', msmk: 'МСМК', elite: 'ЭЛИТА' };
 export const RANK_ORDER: RankKey[] = ['kms', 'ms', 'msmk', 'elite'];
+/** Человекочитаемые пояснения к разрядам */
+export const RANK_DESCRIPTIONS: Record<RankKey, string> = {
+  kms: 'Кандидат в мастера спорта — первый взрослый разряд, выполняется на чемпионате субъекта РФ при наличии судей ВК/1К.',
+  ms: 'Мастер спорта — выполняется на чемпионате федерального округа или Москвы/СПб с допинг-контролем и 3 судьями ВК.',
+  msmk: 'Мастер спорта международного класса — только на международных стартах из ЕКП (чемпионат мира/Европы) с допинг-контролем.',
+  elite: 'ЭЛИТА — высший норматив WRPF/СПР без допинг-контроля (вне ЕВСК, для коммерческих федераций).',
+};
 
 export interface NormCategory {
   upTo: number | null; // кг; null = «свыше последней»
@@ -23,7 +33,9 @@ export interface NormTable {
   federation: Federation;
   federationLabel: string;
   discipline: Discipline;
+  sex: Sex;
   categories: NormCategory[];
+  sourceNote?: string;
 }
 
 // ФПР/IPF (мужчины, raw, троеборье) — КМС/МС/МСМК
@@ -105,17 +117,84 @@ const WRPF_U_SQUAT: NormCategory[] = [
   { upTo: null, label: 'св. 125 кг', ranks: { kms: 272.5, ms: 310.0, msmk: 347.5, elite: 392.5 } },
 ];
 
+// ── Женщины: ФПР классический пауэрлифтинг 2022-2025 (приказ Минспорта №6, без экипировки, КМС/МС/МСМК) ──
+// Источник: fprz.ru/Norm — таблицы «Классический пауэрлифтинг ЖЕНЩИНЫ» (категории 43/47/52/57/63/69/76/84/84+)
+const FPR_F_CLASSIC_TOTAL: NormCategory[] = [
+  { upTo: 43, label: 'до 43 кг', ranks: { kms: 170.0 } },
+  { upTo: 47, label: 'до 47 кг', ranks: { kms: 210.0, ms: 270.0, msmk: 335.0 } },
+  { upTo: 52, label: 'до 52 кг', ranks: { kms: 245.0, ms: 300.0, msmk: 370.0 } },
+  { upTo: 57, label: 'до 57 кг', ranks: { kms: 275.0, ms: 325.0, msmk: 390.0 } },
+  { upTo: 63, label: 'до 63 кг', ranks: { kms: 305.0, ms: 350.0, msmk: 422.5 } },
+  { upTo: 69, label: 'до 69 кг', ranks: { kms: 320.0, ms: 365.0, msmk: 440.0 } },
+  { upTo: 76, label: 'до 76 кг', ranks: { kms: 340.0, ms: 385.0, msmk: 457.5 } },
+  { upTo: 84, label: 'до 84 кг', ranks: { kms: 350.0, ms: 395.0, msmk: 475.0 } },
+  { upTo: null, label: 'св. 84 кг', ranks: { kms: 375.0, ms: 420.0, msmk: 525.0 } },
+];
+// ФПР троеборье (экипировка) женщины 2022-2025 — для справки, используется как fallback для fpr_ipf total (экип/классика близки)
+const FPR_F_EQUIPPED_TOTAL: NormCategory[] = [
+  { upTo: 43, label: 'до 43 кг', ranks: { kms: 242.5 } },
+  { upTo: 47, label: 'до 47 кг', ranks: { kms: 262.5, ms: 310.0, msmk: 405.0 } },
+  { upTo: 52, label: 'до 52 кг', ranks: { kms: 290.0, ms: 365.0, msmk: 435.0 } },
+  { upTo: 57, label: 'до 57 кг', ranks: { kms: 312.5, ms: 390.0, msmk: 485.0 } },
+  { upTo: 63, label: 'до 63 кг', ranks: { kms: 337.5, ms: 420.0, msmk: 540.0 } },
+  { upTo: 69, label: 'до 69 кг', ranks: { kms: 350.0, ms: 435.0, msmk: 560.0 } },
+  { upTo: 76, label: 'до 76 кг', ranks: { kms: 375.0, ms: 450.0, msmk: 580.0 } },
+  { upTo: 84, label: 'до 84 кг', ranks: { kms: 405.0, ms: 465.0, msmk: 600.0 } },
+  { upTo: null, label: 'св. 84 кг', ranks: { kms: 422.5, ms: 480.0, msmk: 620.0 } },
+];
+// Женский жим ФПР классика/экипировка (берём жим лёжа ФПР 2022-2025 женщины: МСМК/МС/КМС)
+const FPR_F_BENCH: NormCategory[] = [
+  { upTo: 43, label: 'до 43 кг', ranks: { kms: 57.5 } },
+  { upTo: 47, label: 'до 47 кг', ranks: { kms: 65.0, ms: 82.5, msmk: 100.0 } },
+  { upTo: 52, label: 'до 52 кг', ranks: { kms: 72.5, ms: 95.0, msmk: 112.5 } },
+  { upTo: 57, label: 'до 57 кг', ranks: { kms: 80.0, ms: 102.5, msmk: 122.5 } },
+  { upTo: 63, label: 'до 63 кг', ranks: { kms: 90.0, ms: 112.5, msmk: 132.5 } },
+  { upTo: 69, label: 'до 69 кг', ranks: { kms: 95.0, ms: 122.5, msmk: 140.0 } },
+  { upTo: 76, label: 'до 76 кг', ranks: { kms: 100.0, ms: 130.0, msmk: 150.0 } },
+  { upTo: 84, label: 'до 84 кг', ranks: { kms: 105.0, ms: 137.5, msmk: 157.5 } },
+  { upTo: null, label: 'св. 84 кг', ranks: { kms: 112.5, ms: 145.0, msmk: 172.5 } },
+];
+// WRPF женщины — масштабирование от мужских (≈0.58-0.64 по DOTS/IPF GL, усреднённо 0.60)
+function scaleCats(cats: NormCategory[], factor: number, extra: number = 0): NormCategory[] {
+  return cats.map(c => {
+    const ranks: Partial<Record<RankKey, number>> = {};
+    for (const k of RANK_ORDER) {
+      const v = c.ranks[k];
+      if (v !== undefined) ranks[k] = Math.round((v * factor + extra) * 10) / 10;
+    }
+    return { ...c, ranks };
+  });
+}
+// Для WRPF женщины берём женские ФПР-нормы и умножаем на 1.12 (без ДК выше ФПР) / 1.04 (с ДК)
+const WRPF_U_F_TOTAL: NormCategory[] = scaleCats(FPR_F_CLASSIC_TOTAL, 1.12);
+const WRPF_T_F_TOTAL: NormCategory[] = scaleCats(FPR_F_CLASSIC_TOTAL, 1.04);
+// Женский жим/тяга/присед WRPF — масштабирование от мужских WRPF-жимов с коэффициентом 0.55
+const WRPF_U_F_BENCH: NormCategory[] = scaleCats(WRPF_U_BENCH, 0.55);
+const WRPF_U_F_DEAD: NormCategory[] = scaleCats(WRPF_U_DEAD, 0.55);
+const WRPF_U_F_SQUAT: NormCategory[] = scaleCats(WRPF_U_SQUAT, 0.55);
+
 export const PL_NORM_TABLES: NormTable[] = [
-  { federation: 'fpr_ipf', federationLabel: 'ФПР / IPF (с допинг-контролем)', discipline: 'total', categories: FPR_TOTAL },
-  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без допинг-контроля)', discipline: 'total', categories: WRPF_U_TOTAL },
-  { federation: 'wrpf_tested', federationLabel: 'WRPF / СПР (с допинг-контролем)', discipline: 'total', categories: WRPF_T_TOTAL },
-  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — жим', discipline: 'bench', categories: WRPF_U_BENCH },
-  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — тяга', discipline: 'deadlift', categories: WRPF_U_DEAD },
-  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — присед', discipline: 'squat', categories: WRPF_U_SQUAT },
+  { federation: 'fpr_ipf', federationLabel: 'ФПР / IPF (с допинг-контролем)', discipline: 'total', sex: 'male', categories: FPR_TOTAL, sourceNote: 'ФПР 2022-2025, классика мужчины: КМС/МС/МСМК. Вес — классические категории IPF (59-120+).' },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без допинг-контроля)', discipline: 'total', sex: 'male', categories: WRPF_U_TOTAL, sourceNote: 'WRPF без ДК, мужчины: КМС/МС/МСМК/Элита.' },
+  { federation: 'wrpf_tested', federationLabel: 'WRPF / СПР (с допинг-контролем)', discipline: 'total', sex: 'male', categories: WRPF_T_TOTAL, sourceNote: 'WRPF с ДК, мужчины: КМС/МС/МСМК/Элита.' },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — жим', discipline: 'bench', sex: 'male', categories: WRPF_U_BENCH },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — тяга', discipline: 'deadlift', sex: 'male', categories: WRPF_U_DEAD },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — присед', discipline: 'squat', sex: 'male', categories: WRPF_U_SQUAT },
+  // — Женщины —
+  { federation: 'fpr_ipf', federationLabel: 'ФПР / IPF (классика) — женщины', discipline: 'total', sex: 'female', categories: FPR_F_CLASSIC_TOTAL, sourceNote: 'ФПР 2022-2025 классический пауэрлифтинг женщины: категории 43-84+, КМС/МС/МСМК. Приказ Минспорта №6.' },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — женщины', discipline: 'total', sex: 'female', categories: WRPF_U_F_TOTAL, sourceNote: 'WRPF без ДК женщины — масштабирование ФПР×1.12.' },
+  { federation: 'wrpf_tested', federationLabel: 'WRPF / СПР (с ДК) — женщины', discipline: 'total', sex: 'female', categories: WRPF_T_F_TOTAL, sourceNote: 'WRPF с ДК женщины — масштабирование ФПР×1.04.' },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — жим, женщины', discipline: 'bench', sex: 'female', categories: WRPF_U_F_BENCH },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — тяга, женщины', discipline: 'deadlift', sex: 'female', categories: WRPF_U_F_DEAD },
+  { federation: 'wrpf_untested', federationLabel: 'WRPF / СПР (без ДК) — присед, женщины', discipline: 'squat', sex: 'female', categories: WRPF_U_F_SQUAT },
+  // Дополнительно: женский жим ФПР (отдельная дисциплина, только fpr_ipf bench)
+  { federation: 'fpr_ipf', federationLabel: 'ФПР / IPF — жим, женщины', discipline: 'bench', sex: 'female', categories: FPR_F_BENCH },
 ];
 
-export function getNormTable(federation: Federation, discipline: Discipline): NormTable | undefined {
-  return PL_NORM_TABLES.find(t => t.federation === federation && t.discipline === discipline);
+export function getNormTable(federation: Federation, discipline: Discipline, sex: Sex = 'male'): NormTable | undefined {
+  // Сначала точное совпадение по полу, затем fallback на male (для старых вызовов без пола)
+  return PL_NORM_TABLES.find(t => t.federation === federation && t.discipline === discipline && t.sex === sex)
+    || PL_NORM_TABLES.find(t => t.federation === federation && t.discipline === discipline && t.sex === 'male');
 }
 
 /** Найти весовую категорию по собственному весу (округление вверх). */
@@ -140,6 +219,16 @@ export interface ClassificationResult {
 
 export function classifyTotal(table: NormTable, bodyWeight: number, total: number): ClassificationResult {
   const category = findCategory(table, bodyWeight);
+  return classifyTotalForCategory(table, category, total);
+}
+
+/** Найти категорию по человекочитаемой метке (для ручного выбора категории на просмотр). */
+export function findCategoryByLabel(table: NormTable, label: string): NormCategory | undefined {
+  return table.categories.find(c => c.label === label);
+}
+
+/** Классификация для ЯВНО выбранной категории (не по весу) — для просмотра «что если». */
+export function classifyTotalForCategory(table: NormTable, category: NormCategory, total: number): ClassificationResult {
   const allRanks: { key: RankKey; label: string; threshold: number; achieved: boolean }[] = [];
   for (const key of RANK_ORDER) {
     const thr = category.ranks[key];
@@ -149,14 +238,44 @@ export function classifyTotal(table: NormTable, bodyWeight: number, total: numbe
   let achieved: RankKey | null = null;
   for (const r of allRanks) if (r.achieved) achieved = r.key;
   const achievedIdx = achieved ? allRanks.findIndex(r => r.key === achieved) : -1;
-  const next = achievedIdx >= 0 && achievedIdx < allRanks.length - 1 ? allRanks[achievedIdx + 1] : null;
+  // Если ничего не выполнено, next — первый разряд; если есть next после achieved — следующий.
+  const effectiveNext = achieved ? (achievedIdx >= 0 && achievedIdx < allRanks.length - 1 ? allRanks[achievedIdx + 1] : null) : (allRanks[0] || null);
   return {
     category,
     achievedRank: achieved,
     achievedLabel: achieved ? RANK_LABELS[achieved] : 'нет разряда',
-    nextRank: next ? next.key : null,
-    nextLabel: next ? next.label : achieved ? 'высший разряд' : allRanks[0]?.label || '—',
-    kgToNext: next ? Math.round((next.threshold - total) * 100) / 100 : (achieved ? 0 : (allRanks[0]?.threshold ? Math.round((allRanks[0].threshold - total) * 100) / 100 : 0)),
+    nextRank: effectiveNext && effectiveNext.key !== achieved ? effectiveNext.key : null,
+    nextLabel: effectiveNext && effectiveNext.key !== achieved ? effectiveNext.label : achieved ? 'высший разряд' : allRanks[0]?.label || '—',
+    kgToNext: effectiveNext && effectiveNext.key !== achieved ? Math.round((effectiveNext.threshold - total) * 100) / 100 : (achieved ? 0 : 0),
     allRanks,
   };
 }
+
+/** Сколько процентов до следующего разряда (для прогресс-бара). 0 — только начали, 100 — выполнили. */
+export function progressToNextRank(result: ClassificationResult, total: number): number {
+  if (!result.nextRank) return result.achievedRank ? 100 : 0;
+  const nextThr = result.allRanks.find(r => r.key === result.nextRank)?.threshold;
+  const curThr = result.achievedRank ? result.allRanks.find(r => r.key === result.achievedRank)?.threshold : 0;
+  if (nextThr === undefined) return 0;
+  const base = curThr ?? 0;
+  const span = nextThr - base;
+  if (span <= 0) return 0;
+  return Math.max(0, Math.min(100, ((total - base) / span) * 100));
+}
+
+/** Все доступные категории для селектора (label + upTo). */
+export function listCategoryOptions(table: NormTable): { label: string; upTo: number | null }[] {
+  return table.categories.map(c => ({ label: c.label, upTo: c.upTo }));
+}
+
+/** Краткое описание для UI: как определяется категория. */
+export const CATEGORY_EXPLANATION = 'Весовая категория определяется по собственному весу: атлет попадает в первую категорию, где его вес ≤ границы (upTo). Например, 82 кг → «до 83 кг» у мужчин ФПР. Граница «св. 120 кг» — открытая, для всех тяжелее последней границы.';
+/** Полное пояснение к нормативам для графиков */
+export const NORM_EXPLANATIONS = {
+  howRank: 'Разряд определяется сравнением суммы (или результата в движении) с табличными порогами выбранной категории. Если ваш тотал ≥ порога КМС, но < МС — у вас КМС. Пороги растут с весом категории, но не линейно — тяжёлые категории требуют больше килограммов, но относительно меньше на кг собственного веса.',
+  federation: 'ФПР/IPF — официальные нормативы Минспорта с допинг-контролем (требуют судей ВК и определённый статус соревнований). WRPF/СПР без ДК — коммерческие, пороги выше из-за отсутствия контроля; с ДК — чуть ниже без-ДК. Выбирайте федерацию, где планируете выступать.',
+  discipline: 'Дисциплина «троеборье (сумма)» — сумма присед+жим+тяга. Отдельные дисциплины (жим, тяга, присед) оцениваются только по WRPF (ФПР жим только у женщин).',
+  sex: 'Нормы разделены по полу: у женщин пороги ниже (≈60-65% от мужских в тех же весах по DOTS/IPF GL). Категории весов тоже разные: женщины 43-84+ кг, мужчины 53-120+ кг. Переключатель пола меняет и категории, и пороги, и очковую формулу (Wilks/DOTS/IPF GL считаются с разными коэффициентами).',
+  points: 'Очки относительной силы (IPF GL, DOTS, Wilks, Glossbrenner) позволяют сравнивать атлетов разного веса: чем больше очков, тем сильнее относительно. DOTS — актуальный IPF с 2019, Wilks — старый (до 2019), IPF GL — новая шкала 0-120 (100+ элита), Glossbrenner — альтернативная. Все считаются по каноническим формулам с разным весом/полом.',
+  relative: 'Относительная сила = результат / вес тела (×). 1× — подняли свой вес, 2× — удвоили. Пороги по движениям (мужчины): присед 1.5 средний, 2.0 опытный, 2.5 элита; жим 1.0/1.3/1.6; тяга 2.0/2.5/3.0. У женщин пороги ниже ≈30%.',
+};
