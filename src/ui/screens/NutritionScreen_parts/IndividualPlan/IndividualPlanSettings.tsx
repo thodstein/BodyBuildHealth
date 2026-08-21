@@ -81,6 +81,7 @@ export const IndividualPlanSettings: React.FC = () => {
     wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime,
     workFood, setWorkFood, mealsCount, setMealsCount,
+    morningTrainLoad, setMorningTrainLoad,
     allergens, toggleAllergen,
     healthIssues, setHealthIssues, toggleHealthIssue,
     eveningLowCarb, setEveningLowCarb,
@@ -446,6 +447,17 @@ export const IndividualPlanSettings: React.FC = () => {
             >
               ⚙ Настроить
             </button>
+            {bbPrepConfig && (
+              <button
+                onClick={() => applyBBPeakToPlan(null)}
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444',
+                }}
+              >
+                ✕ Отключить тапер
+              </button>
+            )}
           </div>
         </GlassCard>
       )}
@@ -1323,6 +1335,17 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
             <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
             {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
             {pickerModal('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setWorkFood, showWorkFoodPicker, setShowWorkFoodPicker)}
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <button
+              onClick={() => setMorningTrainLoad(!morningTrainLoad)}
+              style={{ width:'100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, textAlign:'left', background: morningTrainLoad ? 'rgba(59,130,246,0.12)' : '#202023', border:`1px solid ${morningTrainLoad ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.1)'}`, color: morningTrainLoad ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}
+            >
+              🌅 Загрузка под утреннюю тренировку: {morningTrainLoad ? 'ВКЛ' : 'ВЫКЛ'}
+            </button>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.35 }}>
+              При утренней тренировке (старт до 14:00) вечером — много углеводов, минимум жиров, умеренный белок (гликоген к утренней сессии).
+            </div>
           </div>
         </div>
         <div>
