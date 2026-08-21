@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BbAutoConstructor.tsx — PRO-ББ АВТО-КОНСТРУКТОР (профессиональный тренерский подход).
  *
  * Ключевые улучшения против базового:
@@ -509,6 +509,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [allowStrengthLifts, setAllowStrengthLifts] = useState<boolean>(false);
   const [rotationMode, setRotationMode] = useState<'forbid' | 'strict' | 'variety'>('variety');
   const [avoidAxialLoadUi, setAvoidAxialLoadUi] = useState<boolean>(false);
+  const [intensityLevel, setIntensityLevel] = useState<'light' | 'moderate' | 'high'>('moderate');
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
@@ -1366,6 +1367,7 @@ export const BbAutoConstructor: React.FC = () => {
           fewerCompound,
           allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
           rotationMode,
+          intensityLevel,
           equipment: bbEquipment,
           peds,
            pedDoses,
@@ -1418,6 +1420,7 @@ export const BbAutoConstructor: React.FC = () => {
           fewerCompound,
           allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
           rotationMode,
+          intensityLevel,
            volumeGoal: bbVolGoal as any,
             specialization: specializationMode,
             specializationSchedule: buildSpecBlocks,
@@ -1468,6 +1471,7 @@ export const BbAutoConstructor: React.FC = () => {
         fewerCompound,
         allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
         rotationMode,
+        intensityLevel,
         intensityTechnique: intensityTech,
         autoDeload,
         deloadType,
@@ -2458,6 +2462,11 @@ export const BbAutoConstructor: React.FC = () => {
             { id:'forbid', label:'🚫 Запрет — одни и те же упражнения' },
             { id:'strict', label:'📅 Строгий — смена раз в 4 недели' },
             { id:'variety', label:'🎨 Разнообразие — смена при 2 тренировках/мышцу' },
+          ]} />
+          <PopupSelect label="🔥 Интенсивность тренинга" value={intensityLevel} onChange={v => setIntensityLevel(v as any)} hint="Управляет отдыхом/плотностью/восстановлением. Лёгкая: отдых +20% (низкая плотность). Высокая: отдых −20% (больше метаболического стресса)." options={[
+            { id:'light', label:'🌿 Лёгкая — отдых +20%' },
+            { id:'moderate', label:'⚖️ Умеренная — стандарт' },
+            { id:'high', label:'🔥 Высокая — отдых −20%' },
           ]} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>

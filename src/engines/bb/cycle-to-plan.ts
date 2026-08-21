@@ -413,6 +413,8 @@ export interface CycleToPlanInput {
   allowStrengthLifts?: boolean;
   /** Режим вариативности упражнений (запрет/строгий/разнообразие). */
   rotationMode?: 'forbid' | 'strict' | 'variety';
+  /** Интенсивность тренинга (light/moderate/high) — модулирует отдых. */
+  intensityLevel?: 'light' | 'moderate' | 'high';
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   /** Lab-based MRV multiplier. */
@@ -1363,6 +1365,8 @@ export interface ProgramToBBPlanOpts {
   allowStrengthLifts?: boolean;
   /** Режим вариативности упражнений (запрет/строгий/разнообразие). */
   rotationMode?: 'forbid' | 'strict' | 'variety';
+  /** Интенсивность тренинга (light/moderate/high) — модулирует отдых. */
+  intensityLevel?: 'light' | 'moderate' | 'high';
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   labMrvMultiplier?: number;

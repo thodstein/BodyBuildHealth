@@ -114,6 +114,11 @@ export interface BBBuilderInput {
    *  - strict (строгий): смена раз в 4 недели;
    *  - variety (разнообразие): смена упражнения между сессиями, сохраняя нагрузку и паттерн. */
   rotationMode?: 'forbid' | 'strict' | 'variety';
+  /** Интенсивность тренинга — управляет отдыхом/плотностью/восстановлением:
+   *  - light: отдых +20% (низкая плотность, больше восстановление);
+   *  - moderate: ×1.0 (стандарт);
+   *  - high: отдых −20% (высокая плотность). */
+  intensityLevel?: 'light' | 'moderate' | 'high';
   /** Разрешить силовые лифты (становая/сумо/жим стоя/армейский) — ТОЛЬКО в
    *  силовом цикле (goal=strength_mass) и только по кнопке пользователя. */
   allowStrengthLifts?: boolean;
@@ -1071,8 +1076,11 @@ function buildSession(
   fewerCompound?: boolean,
   allowStrengthLifts?: boolean,
   rotationMode?: 'forbid' | 'strict' | 'variety',
+  intensityLevel?: 'light' | 'moderate' | 'high',
 ): BBSession {
   const character = sched.character as DayCharacter;
+  // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
+  const intensityRestMult = intensityLevel === 'light' ? 1.2 : intensityLevel === 'high' ? 0.8 : 1.0;
   // В режиме «запрет» используем константную неделю для отбора упражнений —
   // строго те же упражнения каждую неделю.
   const selWeek = rotationMode === 'forbid' ? 1 : week;
@@ -2033,9 +2041,11 @@ function buildSession(
       // как RIR drift. Ранее week=9 → restProgression=120с → baseRest-120=0 → clamped to 60
       // на всей фазе intensification. Теперь phaseWeek=1-4 → max 45s сокращения.
       const restProgression = phase === 'deload' ? -30 : Math.max(0, (phaseWeek - 1) * 15);
-      const exRest = phase === 'deload'
+      const exRestBase = phase === 'deload'
         ? Math.min(180, (pl.role === 'accessory' ? baseRest : baseRest + 30) - restProgression)
         : Math.max(60, (pl.role === 'accessory' ? Math.max(45, baseRest - 30) : baseRest) - restProgression);
+      // Интенсивность тренинга: light → больше отдыха, high → меньше (плотность).
+      const exRest = Math.round(exRestBase * intensityRestMult);
       if (remainingBudget < cost) {
         const reduced = Math.max(2, Math.floor(remainingBudget / ((exData as any)?.fatigueCost || 5)));
         const adjustedSets = Math.min(exSets, reduced);
@@ -2601,7 +2611,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weekSpec.weak, weekSpec.focus || undefined, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability, input.fewerCompound, input.allowStrengthLifts, input.rotationMode);
+       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weekSpec.weak, weekSpec.focus || undefined, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability, input.fewerCompound, input.allowStrengthLifts, input.rotationMode, input.intensityLevel);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
