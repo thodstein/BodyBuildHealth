@@ -35,8 +35,8 @@ const Silhouette: React.FC<{ perJoint: Record<JointId,{level:string}> }> = ({ pe
       <line x1="50" y1="68" x2="34" y2="96" stroke="rgba(255,255,255,0.25)" strokeWidth={2.5} />
       <line x1="50" y1="68" x2="66" y2="96" stroke="rgba(255,255,255,0.25)" strokeWidth={2.5} />
       {JOINTS.map(j=>{
-        const p = pos[j]; const lvl = (perJoint as any)[j]?.level ?? 'green';
-        const color = JSI_LEVEL_COLOR[lvl as any] ?? '#22c55e';
+        const p = pos[j]; const lvl = ((perJoint as any)[j]?.level ?? 'green') as keyof typeof JSI_LEVEL_COLOR;
+        const color = JSI_LEVEL_COLOR[lvl] ?? '#22c55e';
         return <g key={j}><circle cx={p.x} cy={p.y} r={6} fill={color} opacity={0.9} stroke="#fff" strokeWidth={1} /><text x={p.x} y={p.y+10} fontSize={5} fill={DIM} textAnchor="middle">{j}</text></g>;
       })}
     </svg>
@@ -220,10 +220,11 @@ export const JointJsiCalculatorCard: React.FC = () => {
             {JOINTS.map(j=>{
               const pj = (result.perJoint as any)[j] as any;
               if (!pj || pj.kBase===0) return null;
+              const lvl = pj.level as keyof typeof JSI_LEVEL_COLOR;
               return (
-                <div key={j} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px', borderRadius:6, background: JSI_LEVEL_BG[pj.level as any], border:`1px solid ${JSI_LEVEL_COLOR[pj.level as any]}55` }}>
+                <div key={j} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 6px', borderRadius:6, background: JSI_LEVEL_BG[lvl], border:`1px solid ${JSI_LEVEL_COLOR[lvl]}55` }}>
                   <span style={{ fontSize:10, color:'#fff' }}>{JSI_JOINT_RU[j]} {pj.jsi}</span>
-                  <span style={{ fontSize:8, color:JSI_LEVEL_COLOR[pj.level as any], fontWeight:700 }}>{pj.level}</span>
+                  <span style={{ fontSize:8, color:JSI_LEVEL_COLOR[lvl], fontWeight:700 }}>{pj.level}</span>
                 </div>
               );
             })}
