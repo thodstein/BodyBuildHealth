@@ -9,7 +9,7 @@ import { trainingLoadReport, toDailyLoads, acuteChronicRatio } from '../../../en
 import { autoRegulate } from '../../../engines/pro/autoregulation-pro.engine';
 import { listSchemes, generateProgression } from '../../../engines/pro/progression-pro.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
-import { PL_NORM_TABLES, classifyTotal, findCategory, getNormTable, RANK_ORDER, RANK_LABELS, NORM_EXPLANATIONS, CATEGORY_EXPLANATION, type ClassificationResult, type NormTable, type Federation, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
+import { PL_NORM_TABLES, classifyTotal, findCategory, findCategoryByLabel, classifyTotalForCategory, getNormTable, RANK_ORDER, RANK_LABELS, NORM_EXPLANATIONS, CATEGORY_EXPLANATION, type ClassificationResult, type NormTable, type Federation, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
 import { getProfile } from '../../../core/profile-manager';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
@@ -66,18 +66,26 @@ export const ProMetricsPanel: React.FC = () => {
   // ── Нормативы по весовой категории ──
   const [federation, setFederation] = useState<Federation>('wrpf_untested');
   const [discipline, setDiscipline] = useState<Discipline>('total');
+  const [manualCat, setManualCat] = useState<string>(''); // пусто = авто по весу
   const disciplineOptions = useMemo(() => {
     const all = PL_NORM_TABLES.filter(t => t.federation === federation && t.sex === sex);
     const labels: Record<Discipline, string> = { total: 'Троеборье', bench: 'Жим лёжа', deadlift: 'Становая тяга', squat: 'Присед' };
-    // Для ФПР мужчины только total, женщины total+bench — как в едином калькуляторе
     if (federation === 'fpr_ipf' && sex === 'male') return [{ value: 'total' as Discipline, label: 'Троеборье' }];
     if (federation === 'fpr_ipf' && sex === 'female') return [{ value: 'total' as Discipline, label: 'Троеборье' }, { value: 'bench' as Discipline, label: 'Жим лёжа' }]
       .filter(o => all.some(t => t.discipline === o.value));
     return all.map(t => ({ value: t.discipline, label: labels[t.discipline] || t.discipline }));
   }, [federation, sex]);
   const normTable = useMemo(() => getNormTable(federation, discipline, sex) || PL_NORM_TABLES.find(t => t.sex === sex) || PL_NORM_TABLES[0], [federation, discipline, sex]);
+  const autoCat = useMemo(() => findCategory(normTable, bw), [normTable, bw]);
+  const effectiveCat = useMemo(() => {
+    if (manualCat) {
+      const f = findCategoryByLabel(normTable, manualCat);
+      if (f) return f;
+    }
+    return autoCat;
+  }, [normTable, manualCat, autoCat]);
   const liftValue = discipline === 'bench' ? bench : discipline === 'deadlift' ? deadlift : discipline === 'squat' ? squat : total;
-  const classif = useMemo(() => classifyTotal(normTable, bw, liftValue), [normTable, bw, liftValue]);
+  const classif = useMemo(() => classifyTotalForCategory(normTable, effectiveCat, liftValue), [normTable, effectiveCat, liftValue]);
 
   // Per-lift relative strength
   const liftRel = useMemo(() => ({
@@ -203,10 +211,10 @@ export const ProMetricsPanel: React.FC = () => {
       {/* ── Нормативы по весовой категории ── */}
       <div style={CARD}>
         <div style={{ ...SEC, borderLeftColor: '#f59e0b' }}>📋 Разрядные нормативы (весовая категория)</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
           <div>
             <div style={LABEL}>Федерация</div>
-            <select style={IN} value={federation} onChange={e => { setFederation(e.target.value as Federation); setDiscipline('total'); }}>
+            <select style={IN} value={federation} onChange={e => { setFederation(e.target.value as Federation); setDiscipline('total'); setManualCat(''); }}>
               {(['fpr_ipf', 'wrpf_untested', 'wrpf_tested'] as Federation[]).map(f => {
                 const t = PL_NORM_TABLES.find(x => x.federation === f);
                 return <option key={f} value={f}>{t?.federationLabel || f}</option>;
@@ -215,14 +223,21 @@ export const ProMetricsPanel: React.FC = () => {
           </div>
           <div>
             <div style={LABEL}>Дисциплина</div>
-            <select style={IN} value={discipline} onChange={e => setDiscipline(e.target.value as Discipline)}>
+            <select style={IN} value={discipline} onChange={e => { setDiscipline(e.target.value as Discipline); setManualCat(''); }}>
               {disciplineOptions.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
           </div>
-          <div>
-            <div style={LABEL}>Категория</div>
-            <div style={{ ...IN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: ACCENT, fontSize: 12 }}>{classif.category.label}</div>
-          </div>
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          <div style={LABEL}>Весовая категория (просмотр)</div>
+          <select style={IN} value={manualCat || '__auto'} onChange={e => setManualCat(e.target.value === '__auto' ? '' : e.target.value)}>
+            <option value="__auto">Авто: {autoCat.label} (по {bw} кг)</option>
+            {normTable.categories.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
+          </select>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 3, lineHeight: 1.3 }}>Авто — по вашему весу ({bw} кг → {autoCat.label}). Выберите любую для просмотра «что если» без смены веса. Подробный просмотр всех категорий — в «Анализ силы → Единый».</div>
+          {manualCat && manualCat !== autoCat.label && (
+            <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#f59e0b' }}>Просмотр «{manualCat}» ≠ авто «{autoCat.label}». На помосте зачёт по фактической категории взвешивания.</div>
+          )}
         </div>
         <div style={ROW}>
           <span>{discipline === 'total' ? 'Тотал' : disciplineOptions.find(d => d.value === discipline)?.label || discipline}</span>

@@ -85,6 +85,10 @@ export const RelativeStrengthCalcTab: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
+      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', marginBottom: 10, fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45 }}>
+        <b style={{ color: '#a855f7' }}>🔀 Единый калькулятор:</b> вся информация этого экрана теперь собрана в <b style={{ color: '#fff' }}>«Анализ силы → Единый»</b> (PlNormsCalcTab): пол, весовые категории (авто + ручной просмотр), DOTS/Wilks/IPF GL, прогресс-бары, пояснения к каждому графику + режим «по движениям». Этот таб оставлен для совместимости и детального разбора ×BW по трём движениям.<br />
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Итоговое решение по чистке: если «Единый» покрывает все сценарии (что сейчас так — проверьте режим «по движениям»), этот таб можно скрыть из навигации, оставив только «Единый» как канон. Код deduplicated через общие движки <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 4 }}>pl-norms.engine</code>/<code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 4 }}>relative-strength.engine</code>.</span>
+      </div>
       <div style={{ fontSize: 15, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>🏋️ Калькулятор «сила / масса тела» — относительная сила и нормативы</div>
       <div style={{ fontSize: 11, color: DIM, marginBottom: 10, lineHeight: 1.45, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 8, padding: 8 }}>
         <b style={{ color: '#fff' }}>Зачем:</b> абсолютный тотал не показывает, кто сильнее относительно веса. Этот калькулятор считает <b>относительную силу</b> (тотал/вес, ×BW), <b>DOTS/Wilks/IPF GL</b> с учётом пола, и сразу показывает разряд в весовой категории. Все графики ниже снабжены подробными пояснениями — как читать и что делать с результатом.
