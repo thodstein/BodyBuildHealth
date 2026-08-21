@@ -57,9 +57,21 @@ async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
 async function prepareImageForServer(file: File): Promise<Blob> {
   if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
   try {
-    const bitmap = await createImageBitmap(file);
-    const maxSide = 1800;
-    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    // Decode with a resize hint first. Mobile WebViews may otherwise decode a
+    // 12-48 MP camera photo at full size and get killed before the OCR request
+    // is sent. The pixel cap below protects browsers that ignore the hint.
+    const maxSide = 1600;
+    const maxPixels = 2_200_000;
+    const bitmap = await createImageBitmap(file, {
+      resizeWidth: maxSide,
+      resizeHeight: maxSide,
+      resizeQuality: 'high',
+    });
+    const scale = Math.min(
+      1,
+      maxSide / Math.max(bitmap.width, bitmap.height),
+      Math.sqrt(maxPixels / Math.max(1, bitmap.width * bitmap.height)),
+    );
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
@@ -70,7 +82,7 @@ async function prepareImageForServer(file: File): Promise<Blob> {
     }
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const compressed = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+    const compressed = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78));
     // Keep the JSON/base64 request below Vercel's body limit. A 12 MB binary
     // becomes roughly 16 MB after base64 encoding plus JSON overhead.
     return compressed && (compressed.size < file.size || file.size > 9 * 1024 * 1024) ? compressed : file;
@@ -336,7 +348,7 @@ async function serverOcrImage(file: File): Promise<string> {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 240_000);
+  const timeout = setTimeout(() => controller.abort(), 90_000);
   let response: Response;
   try {
     response = await fetch('./api/ocr-image', {
@@ -351,7 +363,7 @@ async function serverOcrImage(file: File): Promise<string> {
       signal: controller.signal,
     });
   } catch (error: any) {
-    if (error?.name === 'AbortError') throw new Error('Серверный OCR превысил лимит 240 секунд. Попробуйте более компактный скриншот.');
+    if (error?.name === 'AbortError') throw new Error('Серверный OCR превысил лимит 90 секунд. Попробуйте более компактный скриншот.');
     throw error;
   } finally {
     clearTimeout(timeout);

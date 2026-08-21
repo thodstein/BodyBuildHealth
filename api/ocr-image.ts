@@ -43,24 +43,28 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
 }
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
-  const texts: Array<{ language: keyof typeof TESSERACT_LANG_PATHS; text: string }> = [];
   const errors: string[] = [];
 
-  // FatSecret can be displayed in either Russian or English. Separate local
-  // passes avoid the missing-language-path problem of a single rus+eng worker.
-  for (const language of ['rus', 'eng'] as const) {
-    try {
-      const text = await recognizePass(buffer, language);
-      if (text.trim()) texts.push({ language, text: text.trim() });
-    } catch (error: any) {
-      errors.push(`${language}: ${error?.message || String(error)}`);
-    }
+  // Most users have the Russian FatSecret UI. Return a good Russian result
+  // immediately so a mobile request does not wait for a second full WASM OCR
+  // pass. English is retained as a fallback for English-only screenshots.
+  try {
+    const russianText = (await recognizePass(buffer, 'rus')).trim();
+    if (russianText && nutritionOcrScore(russianText, 'rus') >= 18) return russianText;
+    if (russianText) errors.push('rus: low confidence');
+  } catch (error: any) {
+    errors.push(`rus: ${error?.message || String(error)}`);
   }
 
-  if (texts.length > 0) {
-    return texts
-      .sort((left, right) => nutritionOcrScore(right.text, right.language) - nutritionOcrScore(left.text, left.language))[0]
-      .text;
+  try {
+    const englishText = (await recognizePass(buffer, 'eng')).trim();
+    if (englishText) return englishText;
+  } catch (error: any) {
+    errors.push(`eng: ${error?.message || String(error)}`);
+  }
+
+  if (errors.length === 0) {
+    throw new Error('OCR returned empty text');
   }
   throw new Error(`OCR failed for all language passes: ${errors.join('; ')}`);
 }
