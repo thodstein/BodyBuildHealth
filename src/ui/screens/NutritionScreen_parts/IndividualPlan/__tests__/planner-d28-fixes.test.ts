@@ -58,6 +58,33 @@ describe('D-28: завтрак по спортивной диетологии', 
     const b = p.meals.find(m => m.type === 'breakfast')!;
     expect(b.items.some(i => i.id === 'rice_cream')).toBe(true);
   });
+
+  it('D-28 П10: овощи НЕ на завтраке (маркер обеда/ужина)', () => {
+    for (let s = 0; s < 4; s++) {
+      const p = buildDayPlan(base({ randomSalt: s }));
+      const b = p.meals.find(m => m.type === 'breakfast')!;
+      expect(b.items.filter(i => i.role === 'veg').length, `salt ${s}`).toBe(0);
+    }
+  });
+
+  it('D-28 П10: овсяная основа для стилей porridge/flakes (не гречка-первая)', () => {
+    for (const style of ['porridge', 'flakes'] as const) {
+      for (let s = 0; s < 4; s++) {
+        const p = buildDayPlan(base({ breakfastStyle: style, randomSalt: s }));
+        const b = p.meals.find(m => m.type === 'breakfast')!;
+        const carb = b.items.find(i => i.role === 'carb_slow')!;
+        const name = (carb.name || '').toLowerCase() + ' ' + (carb.id || '');
+        // Углеводная основа — овсяное семейство (овсянка/хлопья/отруби/мюсли/рисовый крем).
+        expect(name, `${style} salt ${s}`).toMatch(/овсян|oats|хлопья|мюсли|muesli|rice_cream|рисовый крем|cereal|отруб/);
+      }
+    }
+  });
+
+  it('D-28 П10: омега-3 семена (чиа/льняное) в завтраке', () => {
+    const p = buildDayPlan(base({}));
+    const b = p.meals.find(m => m.type === 'breakfast')!;
+    expect(b.items.some(i => /чиа|chia|льн|flax/.test((i.name || '') + ' ' + (i.id || '')))).toBe(true);
+  });
 });
 
 describe('D-28: любимые продукты не монополизируют план', () => {
