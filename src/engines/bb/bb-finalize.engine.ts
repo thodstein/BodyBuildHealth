@@ -1543,6 +1543,8 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
         let remaining = cfg.target;
         for (const ex of exs) {
           if (remaining <= 0) break;
+          // FST-7/GVT/8×8 дают target сетов на мышцу, распределяя по упражнениям
+          // с капом 5 сетов/упражнение (инвариант). FST-7: 5+2, GVT: 5+5.
           const sets = Math.min(5, remaining);
           if (sets < 2) break;
           if (sets !== ex.sets || (ex.repsRange && ex.repsRange[0] !== cfg.reps[0])) {

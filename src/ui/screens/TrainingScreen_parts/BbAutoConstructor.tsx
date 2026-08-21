@@ -26,6 +26,7 @@ import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { computeRegimeMrvMult } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
@@ -1125,8 +1126,10 @@ export const BbAutoConstructor: React.FC = () => {
   const specChipDisabled = (targets: string[], id: string, on: boolean) =>
     !!on ? false : targets.length >= 2 || targets.some(t => isRegionConflict(t, id));
   const pedAdapt = useMemo(() => adaptForPEDs(peds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [peds, allLandmarks, pedDoses, courseIntensity]);
-
-  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, pedAdapt.combinedMrvMultiplier) : null, [builtPlan, pedAdapt]);
+  // Режим-множитель (×2 на курсе) — масштабирует MRV-капы в карточке muscle volume
+  // под реальный режим (а не натуральный), чтобы карточка совпадала с планом.
+  const regimeMrvMult = computeRegimeMrvMult({ onCourse: peds.length > 0, courseIntensity });
+  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, Math.max(1, pedAdapt.combinedMrvMultiplier, regimeMrvMult)) : null, [builtPlan, pedAdapt, regimeMrvMult]);
   const safetyScore = useMemo<PlanSafetyScore | null>(() => {
     if (!builtPlan) return null;
     const personal = linked.profile?.settings?.personal;
