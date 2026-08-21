@@ -181,3 +181,56 @@ describe('планировщик: еда на работе и копирован
     expect(bodyHas(/Завтрак/)).toBe(true);
   }, 60000);
 });
+
+describe('планировщик: рецепты (D-28 П7)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+  afterEach(() => { try { cleanup(); } catch {} });
+
+  it('«🍳 Рецепт» открывает выбор приёма, выбор открывает модалку рецептов', async () => {
+    await generateAndOpenPlan();
+    clickBtn(/Рецепт/);
+    await waitFor(() => { expect(bodyHas(/Заменить приём рецептом/)).toBe(true); }, { timeout: 5000 });
+    const mealBtn = Array.from(document.querySelectorAll('button')).find(b => /ккал/.test(b.textContent || '') && !/Отмена/.test(b.textContent || ''));
+    if (!mealBtn) throw new Error('meal list button not found');
+    fireEvent.click(mealBtn);
+    await waitFor(() => { expect(bodyHas(/Заменить «.*» рецептом/)).toBe(true); }, { timeout: 5000 });
+  }, 60000);
+
+  it('«🍳 Создать свой рецепт» открывает модалку создания', async () => {
+    await generateAndOpenPlan();
+    clickBtn(/Создать свой рецепт/);
+    await waitFor(() => { expect(bodyHas(/Создать рецепт/)).toBe(true); }, { timeout: 5000 });
+  }, 60000);
+});
+
+describe('планировщик: спецприём-замена из настроек (D-28 П7)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+  afterEach(() => { try { cleanup(); } catch {} });
+
+  it('включить спецприём → заменить приём «Завтрак» → план показывает замена', async () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    // 1. Включить спецприём: клик по ПОСЛЕДНЕМУ «Выкл» (спецприём в DOM после «Периодизации»).
+    const vklButtons = Array.from(document.querySelectorAll<HTMLElement>('button')).filter(b => (b.textContent || '').trim() === 'Выкл');
+    if (vklButtons.length === 0) throw new Error('«Выкл» toggle not found');
+    fireEvent.click(vklButtons[vklButtons.length - 1]);
+    // 2. Открыть настройку спецприёма: клик по ПОСЛЕДНЕМУ «Настроить» (спецприём в DOM последним).
+    await waitFor(() => { expect(findBtn(/Настроить/)).toBeTruthy(); }, { timeout: 5000 });
+    const nastrButtons = Array.from(document.querySelectorAll<HTMLElement>('button')).filter(b => (b.textContent || '').includes('Настроить'));
+    fireEvent.click(nastrButtons[nastrButtons.length - 1]);
+    await waitFor(() => { expect(bodyHas(/Настройка спецприёма/)).toBe(true); }, { timeout: 5000 });
+    // 3. Выбрать «Заменить приём».
+    clickBtn(/Заменить приём/);
+    await waitFor(() => { expect(bodyHas(/Настройка спецприёма/)).toBe(true); }, { timeout: 5000 });
+    // 4. Точный матч опции попапа «Завтрак» (без иконки, чтобы не зацепить кнопку «Время приёма»).
+    const opt = Array.from(document.querySelectorAll<HTMLElement>('div,span,button')).find(b => (b.textContent || '').trim() === 'Завтрак');
+    if (!opt) throw new Error('replace popup option «Завтрак» not found');
+    fireEvent.click(opt);
+    // 5. Закрыть модалку спецприёма.
+    clickBtn(/✓ Готово/);
+    // 6. Сгенерировать план.
+    clickBtn(/✨ Сгенерировать план питания/);
+    await waitFor(() => { expect(bodyHas(/Завтрак/)).toBe(true); }, { timeout: 25000 });
+    // 7. В карточке спецприёма видна замена.
+    await waitFor(() => { expect(bodyHas(/Спецприём \(замена: Завтрак\)/)).toBe(true); }, { timeout: 10000 });
+  }, 120000);
+});
