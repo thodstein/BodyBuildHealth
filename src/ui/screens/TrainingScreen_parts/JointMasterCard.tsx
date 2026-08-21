@@ -14,6 +14,8 @@ import { JOINTS, JOINT_OPTIONS, jointLoadDiagnosis, JOINT_MAP, type JointId } fr
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { VideoCaptureCard } from './VideoCaptureCard';
+import { distributeWeeklyLoad } from '../../../engines/orthopedic-load-engines';
+import { applyToPlanner } from './planner-bridge';
 
 const CARD: React.CSSProperties = { padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px solid rgba(255,255,255,0.08)', marginTop:8 };
 const DIM='rgba(255,255,255,0.55)', ACCENT='#f43f5e';
@@ -23,9 +25,12 @@ export const JointMasterCard: React.FC = () => {
   const [joint, setJoint] = useState<JointId>('spine'); // поясница по умолчанию — самая опасная
   const [lift, setLift] = useState<Lift>('squat');
   const [phasePain, setPhasePain] = useState<string>('');
+  const [selected, setSelected] = useState<Record<string,string[]>>({});
+  const [weekGoal, setWeekGoal] = useState<'strength'|'hypertrophy'|'rehab'>('strength');
 
   const diag = useMemo(()=> jointLoadDiagnosis({ joint, lifts:[lift], currentPain: phasePain ? [phasePain] : [] }), [joint,lift,phasePain]);
   const opts = diag.options;
+  const weekPlan = useMemo(()=> distributeWeeklyLoad({ weeklySessions: 4, goal: weekGoal, volumeCapacity: 1, intensityCapacity: 1, priScore: 0.5, riskLevel: diag.phase==='acute'?'high': diag.phase==='subacute'?'medium':'low' }), [weekGoal, diag.phase]);
 
   return (
     <div style={{ padding:12, color:'#fff' }}>
@@ -66,15 +71,47 @@ export const JointMasterCard: React.FC = () => {
       {/* 3 геометрия → сустав */}
       <div style={CARD}>
         <div style={{ fontSize:11, fontWeight:800, color:JOINT_COLOR[joint] }}>3 · Геометрия → нагрузка на {diag.joint.label}</div>
-        {opts.length===0 ? <div style={{ fontSize:10, color:DIM }}>Нет специфичных опций — используйте технику из JointMaster жима/приседа.</div> : opts.map(o=>(
+        {opts.length===0 ? <div style={{ fontSize:10, color:DIM }}>Нет специфичных опций — используйте технику из JointMaster жима/приседа.</div> : opts.map(o=>{
+          const sel = selected[o.id] ?? [];
+          return (
           <div key={o.id} style={{ marginTop:8, padding:8, borderRadius:7, background:'rgba(255,255,255,0.02)', border:`1px solid ${JOINT_COLOR[joint]}18` }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>{o.label} <span style={{ fontSize:8, color: o.level==='critical'?'#ef4444': o.level==='high'?'#f97316':DIM, border:`1px solid ${o.level==='critical'?'#ef4444':'rgba(255,255,255,0.1)'}`, padding:'1px 5px', borderRadius:4, marginLeft:6 }}>{o.level}</span></div>
             <div style={{ fontSize:9, color:DIM, marginTop:2 }}>{o.description}</div>
             <div style={{ fontSize:9, color:JOINT_COLOR[joint], marginTop:3 }}>📋 {o.method}</div>
             <div style={{ fontSize:9, color:DIM, marginTop:2 }}>🧠 {o.rationale}</div>
-            <div style={{ fontSize:9, color:DIM, marginTop:4 }}>Помощь: {o.assistance.join(' · ')}</div>
+            <div style={{ marginTop:6, display:'flex', gap:4, flexWrap:'wrap' }}>
+              {o.assistance.map(name=>{
+                const on = sel.includes(name);
+                return <button key={name} onClick={()=>{
+                  setSelected(cur=>{
+                    const curSel = cur[o.id] ?? [];
+                    const next = on ? curSel.filter(x=>x!==name) : [...curSel, name];
+                    return { ...cur, [o.id]: next };
+                  });
+                }} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: on?`1px solid ${JOINT_COLOR[joint]}`:'1px solid rgba(255,255,255,0.1)', background: on?`${JOINT_COLOR[joint]}22`:'transparent', color: on? JOINT_COLOR[joint]:DIM }}>{name}{on?' ✓':''}</button>;
+              })}
+            </div>
           </div>
-        ))}
+        );})}
+        <button onClick={()=>{
+          const map: Record<string,string[]> = {}; let total=0;
+          for (const [k,v] of Object.entries(selected)) if (v.length) { map[k]=v; total+=v.length; }
+          if (total===0) { // если ничего не выбрано — берём первую помощь каждой опции
+            for (const o of opts) map[o.id]=[o.assistance[0]];
+            total = opts.length;
+          }
+          // используем limiter канал: joint-коррективы как limiiter с протоколом опции
+          const limiterExerciseMap: Record<string,string[]> = {};
+          const limiterProtocolMap: Record<string,{protocol:any; category:string}> = {};
+          for (const o of opts) if (map[o.id]?.length) {
+            const k = `${o.joint}|joint|${o.id}`;
+            limiterExerciseMap[k]=map[o.id];
+            limiterProtocolMap[k]={ protocol: o.protocol as any, category:'joint' };
+          }
+          applyToPlanner({ kind:'limiter', label:`Сустав ${diag.joint.label}: ${total} корр.`, data:{ limiterExerciseMap, limiterProtocolMap, limiterDayMap:{} } as any });
+        }} style={{ marginTop:8, width:'100%', minHeight:36, border:'none', borderRadius:8, cursor:'pointer', background: ACCENT, color:'#000', fontWeight:800, fontSize:11 }}>
+          🛠 Добавить коррекции в PL-авто ({Object.values(selected).reduce((a,b)=>a+b.length,0) || opts.length} авт.)
+        </button>
       </div>
 
       {/* 4 прехаб */}
@@ -83,6 +120,26 @@ export const JointMasterCard: React.FC = () => {
         <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Тесты: {diag.mobilityTests.map(t=>t.title).join(', ') || '—'}</div>
         <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Слабые (последняя оценка): {diag.weakest.map(w=>`${w.test.title} ${w.score}/2`).join(', ') || 'нет данных — пройдите оценку в «Мобильность»'}</div>
         <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Потоки: {diag.flows.map(f=>f.name).join(', ') || '—'}</div>
+      </div>
+
+      {/* 4b недельный план нагрузки (orthopedic-load) */}
+      <div style={CARD}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>4b · Недельный план (нагрузка)</div>
+          <div style={{ display:'flex', gap:4 }}>
+            {(['strength','hypertrophy','rehab'] as const).map(g=>{ const on=weekGoal===g; return <button key={g} onClick={()=>setWeekGoal(g)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM}}>{g}</button>; })}
+          </div>
+        </div>
+        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Фаза: <b style={{color:ACCENT}}>{diag.phase}</b> · Риск: {weekPlan.warnings.join(' · ') || 'нет'} · Hard дней: {weekPlan.hardDays}</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginTop:6 }}>
+          {weekPlan.weekPlan.map(d=>(
+            <div key={d.day} style={{ padding:'6px 4px', borderRadius:6, background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(251,191,36,0.12)': d.difficulty==='light'?'rgba(56,189,248,0.12)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
+              <div style={{ fontSize:8, color:DIM }}>Д{d.day}</div>
+              <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{d.difficulty==='off'?'—':`V${d.volumeTarget}`}</div>
+              <div style={{ fontSize:8, color:DIM }}>{d.focus}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 5 видео гид для сустава */}

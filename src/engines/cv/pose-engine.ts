@@ -57,6 +57,53 @@ function dist(a: {x:number;y:number}, b: {x:number;y:number}): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+/** RGB → HSV (h 0-360, s 0-1, v 0-1). Быстро для детекта тёмных блинов. */
+function rgbToHsv(r: number, g: number, b: number): { h:number; s:number; v:number } {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  const d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  const s = max === 0 ? 0 : d / max;
+  const v = max;
+  return { h, s, v };
+}
+
+/**
+ * Уточнённая Y грифа по тёмной горизонтали между запястьями (блины).
+ * Сканит полосу ±10px вокруг avgWristY на ширине между wrists, ищет
+ * самый тёмный ряд (V минимален, S низкая — чёрные блины или тень штанги).
+ * Возвращает null если не нашлось — фолбэк на avgWristY.
+ */
+function refinedBarY(imageData: ImageData, lWr: {x:number;y:number}, rWr: {x:number;y:number}, w: number, h: number): number | null {
+  const avgY = (lWr.y + rWr.y) / 2;
+  const ax = Math.round(Math.min(lWr.x, rWr.x) * w);
+  const bx = Math.round(Math.max(lWr.x, rWr.x) * w);
+  const y0 = Math.max(2, Math.round(avgY * h) - 10);
+  const y1 = Math.min(h-3, Math.round(avgY * h) + 10);
+  if (bx - ax < 12) return null;
+  let bestY = -1, bestScore = Infinity;
+  for (let y = y0; y <= y1; y++) {
+    let sumV = 0, cnt = 0;
+    for (let x = ax + 4; x < bx - 4; x += 2) {
+      const idx = (y * w + x) * 4;
+      const { s, v } = rgbToHsv(imageData.data[idx], imageData.data[idx+1], imageData.data[idx+2]);
+      // тёмный металл/тень: V 0.05-0.45, S <0.5 — самый тёмный
+      if (v > 0.04 && v < 0.55) { sumV += v + s*0.5; cnt++; }
+    }
+    if (cnt < 3) continue;
+    const avgV = sumV / cnt;
+    if (avgV < bestScore) { bestScore = avgV; bestY = y; }
+  }
+  if (bestY < 0 || bestScore > 0.55) return null;
+  return bestY / h;
+}
+
 /**
  * Анализ видео-элемента: семплирует кадры (5 fps, до 40 кадров) и считает метрики.
  * Возвращает PoseMetrics или null если поза не найдена.
@@ -109,8 +156,18 @@ export async function analyzeVideoElement(video: HTMLVideoElement, lift: Lift): 
       const shoulderWidth = dist(lSh, rSh);
       const gripWidth = dist(lWr, rWr);
       if (shoulderWidth > 0.01) gripRatios.push(gripWidth / shoulderWidth);
-      const avgWristY = (lWr.y + rWr.y)/2;
-      wristYs.push(avgWristY);
+      // bar — уточняем по тёмной полосе блинов (HSV), фолбэк на запястья
+      const rawY = (lWr.y + rWr.y) / 2;
+      let barY: number = rawY;
+      try {
+        const img = ctx.getImageData(0, 0, w, h);
+        const refined = refinedBarY(img, lWr, rWr, w, h);
+        if (refined != null && Math.abs(refined - rawY) < 0.08) {
+          // бленд 70% блины /30% запястья — устойчивее чем чистые запястья
+          barY = refined * 0.7 + rawY * 0.3;
+        }
+      } catch { /* ignore — оставляем rawY */ }
+      wristYs.push(barY);
       timestamps.push(t);
       if (lHip && rHip) {
         // мост: таз выше плеч? y меньше = выше
@@ -258,7 +315,11 @@ export async function analyzeVideoWithWorker(video: HTMLVideoElement, lift: Lift
     const shoulderWidth = dist(lSh, rSh);
     const gripWidth = dist(lWr, rWr);
     if (shoulderWidth > 0.01) gripRatios.push(gripWidth / shoulderWidth);
-    wristYs.push((lWr.y + rWr.y)/2);
+    const rawY = (lWr.y + rWr.y) / 2;
+    let barY: number = rawY;
+    const refined = refinedBarY(imageData, lWr, rWr, w, h);
+    if (refined != null && Math.abs(refined - rawY) < 0.08) barY = refined * 0.7 + rawY * 0.3;
+    wristYs.push(barY);
     timestamps.push(ts);
     if (lHip && rHip) {
       bridgeTotal++;

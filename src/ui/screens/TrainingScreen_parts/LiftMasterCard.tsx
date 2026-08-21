@@ -397,10 +397,32 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
         </div>
       </div>
 
-      {/* ── 1. Слабые мышцы ── */}
+      {/* ── 1. Слабые мышцы + BB-грануляр ── */}
       <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#4ade80' }}>1 · Слабые мышцы</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Основные жим/присед/тяга не дублируются.</div>
+        <div style={{ fontSize:11, fontWeight:800, color:'#4ade80' }}>1 · Слабые мышцы · BB-грануляр (головки)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) — точечно по головкам.</div>
+        <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)' }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:6 }}>💎 BB-грануляр — 12 изолятов по головкам</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+            {[
+              {id:'bb_cable_upper', label:'Верх груди (ключичная)'}, {id:'bb_cable_mid', label:'Середина груди'}, {id:'bb_cable_lower', label:'Низ груди'},
+              {id:'bb_lateral_mid', label:'Средняя дельта'}, {id:'bb_rear_cable', label:'Задняя дельта'}, {id:'bb_front_raise', label:'Передняя дельта'},
+              {id:'bb_triceps_long', label:'Трицепс длинная'}, {id:'bb_triceps_lateral', label:'Трицепс латер.'}, {id:'bb_triceps_medial', label:'Трицепс медиал.'},
+              {id:'bb_biceps_long', label:'Бицепс длинная'}, {id:'bb_biceps_short', label:'Бицепс короткая'}, {id:'bb_brachialis', label:'Брахиалис'},
+            ].map(g=>{
+              const k = `bb|${g.id}`; const on = selectedDiag[k]?.length>0;
+              return <button key={g.id} onClick={()=>{
+                const name = (()=>{
+                  const m: Record<string,string> = { bb_cable_upper:'Сведение в кроссовере с верхнего блока (верх груди)', bb_cable_mid:'Сведение в кроссовере (середина груди)', bb_cable_lower:'Сведение в кроссовере с нижнего блока (низ груди)', bb_lateral_mid:'Махи в стороны с задержкой (средняя дельта)', bb_rear_cable:'Отведение на заднюю дельту в кроссовере', bb_front_raise:'Подъём гантелей перед собой (передняя дельта)', bb_triceps_long:'Французский жим с гантелью над головой (длинная головка трицепса)', bb_triceps_lateral:'Разгибание с канатной рукоятью (латеральная головка)', bb_triceps_medial:'Разгибание обратным хватом (медиальная головка)', bb_biceps_long:'Подъём гантели на наклонной (длинная головка бицепса)', bb_biceps_short:'Подъём на скамье Скотта (короткая головка бицепса)', bb_brachialis:'Молот с канатной рукоятью (брахиалис)' };
+                  return m[g.id] ?? g.id;
+                })();
+                if (on) setSelectedDiag(cur=>{ const n={...cur}; delete n[k]; return n; });
+                else addDiag(k, [name]);
+              }} style={{ padding:'4px 8px', borderRadius:7, cursor:'pointer', fontSize:9, border: on?'1px solid #ec4899':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(236,72,153,0.12)':'rgba(255,255,255,0.02)', color: on?'#ec4899':DIM, fontWeight:700 }}>{g.label}{on?' ✓':''}</button>;
+            })}
+          </div>
+          <div style={{ fontSize:9, color:DIM, marginTop:6, lineHeight:1.3 }}>Клик — добавить/убрать изолят (протокол гипертрофии блока 8: 3×10 @65% RIR2, дни Авто). Точная головка — из EXERCISE_CATALOG bb_*.</div>
+        </div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
           {WEAK_MUSCLE_DETAIL.map(d=>{ const on=weakMuscleGroups.includes(d.id); return <button key={d.id} onClick={()=>toggleWeakGroup(d.id)} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid #4ade80':'1px solid rgba(255,255,255,0.08)', background: on?'rgba(74,222,128,0.15)':'transparent', color: on?'#4ade80':DIM, fontWeight:700, fontSize:10 }}>{d.label}{on?' ✓':''}</button>; })}
         </div>
