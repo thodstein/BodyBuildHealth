@@ -144,3 +144,48 @@ describe('D-28: предупреждения о распределении', () 
     expect(p.notes.some(n => /Большой интервал \d+ ч между/.test(n))).toBe(true);
   });
 });
+
+describe('D-28 П6: распределение приёмов — нет 6-часовых провалов и перекосов КБЖУ', () => {
+  const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const maxGapH = (p: any): number => {
+    const times = p.meals.map((m: any) => toMin(m.time)).sort((a: number, b: number) => a - b);
+    let mx = 0;
+    for (let i = 1; i < times.length; i++) mx = Math.max(mx, times[i] - times[i - 1]);
+    return mx / 60;
+  };
+
+  it('5-8 приёмов (день отдыха): максимальный промежуток ≤ 5.5 ч', () => {
+    for (const mc of [5, 6, 7, 8]) {
+      for (let s = 0; s < 3; s++) {
+        const p = buildDayPlan(base({ mealsCount: mc, randomSalt: s }));
+        expect(maxGapH(p), `meals=${mc} salt=${s}`).toBeLessThanOrEqual(5.5);
+      }
+    }
+  });
+
+  it('тренировочный день с peri-приёмами: нет 6-часовых провалов между основными приёмами', () => {
+    const p = buildDayPlan(base({ isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 90, mealsCount: 7, allowIntraWorkout: true }));
+    expect(maxGapH(p)).toBeLessThanOrEqual(5.5);
+  });
+
+  it('ни один приём не превышает 50% дневных ккал (нет «обед 1400 / ужин 300»)', () => {
+    for (const ov of [
+      base({}),
+      base({ isTrainingDay: true, trainStartMin: 18 * 60, trainDurationMin: 90, mealsCount: 7, allowIntraWorkout: true }),
+      base({ mealsCount: 4 }),
+    ]) {
+      const p = buildDayPlan(ov);
+      p.meals.forEach((m: any) => {
+        const share = (m.totals.kcal / Math.max(1, p.totals.kcal)) * 100;
+        expect(share, `${m.label}: ${m.totals.kcal} kcal`).toBeLessThanOrEqual(50);
+      });
+    }
+  });
+
+  it('белок приёма не превышает 60 г (нет сливания всего дневного белка в один приём)', () => {
+    const p = buildDayPlan(base({}));
+    p.meals.forEach((m: any) => {
+      expect(m.totals.p, m.label).toBeLessThanOrEqual(60);
+    });
+  });
+});

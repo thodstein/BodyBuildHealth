@@ -1944,8 +1944,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (_times.length >= 2) {
       let minGap = Infinity, maxGap = 0, maxGapFrom = '', maxGapTo = '';
       for (let i = 1; i < _times.length; i++) { const g = _times[i] - _times[i - 1]; if (g > 0) { if (g > maxGap) { maxGap = g; maxGapFrom = meals[_times.indexOf(_times[i - 1])]?.label || ''; maxGapTo = meals[_times.indexOf(_times[i])]?.label || ''; } minGap = Math.min(minGap, g); } }
-      // D-28 fix (жалоба «6 часов между приёмами»): порог снижен с 5ч до 4.5ч, имя промежутка добавлено.
-      if (maxGap > 4.5 * 60) {
+      // D-28 fix (жалоба «6 часов между приёмами»): порог >5ч (5ч — верх MPS-окна 3–5ч,
+      // штатный расклад завтрак→обед), имя промежутка добавлено.
+      if (maxGap > 5 * 60) {
         notes.push(`⏱ Большой интервал ${Math.round(maxGap / 60)} ч между «${maxGapFrom}» и «${maxGapTo}» — белок распределён неравномерно. Увеличьте число приёмов (сейчас ${input.mealsCount}) или сдвиньте время обеда/ужина, чтобы интервалы были 3–5 ч.`);
       }
       if (minGap < 60 && minGap !== Infinity) {

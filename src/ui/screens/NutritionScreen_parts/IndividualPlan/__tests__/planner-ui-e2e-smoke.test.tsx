@@ -155,3 +155,29 @@ describe('планировщик: месяц и компоновщик (D-28 П5
     await waitFor(() => { expect(bodyHas(/Сгенерировать отчёт/)).toBe(true); }, { timeout: 10000 });
   }, 60000);
 });
+
+describe('планировщик: еда на работе и копирование (D-28 П6)', () => {
+  beforeEach(() => { try { localStorage.clear(); } catch {} });
+  afterEach(() => { try { cleanup(); } catch {} });
+
+  it('«Только порошок/хлопья/протеин» фильтрует план (нет макарон/супов)', async () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    // Пикер «Еда на работе» показывает текущее значение («Любая (можно разогреть)»).
+    clickBtn(/Любая \(можно разогреть\)/);
+    await waitFor(() => { expect(bodyHas(/Только порошок\/хлопья\/протеин/)).toBe(true); }, { timeout: 10000 });
+    clickBtn(/Только порошок\/хлопья\/протеин/);
+    clickBtn(/✨ Сгенерировать план питания/);
+    await waitFor(() => { expect(bodyHas(/Завтрак/)).toBe(true); }, { timeout: 25000 });
+    // В приёмах не должно быть не-портативных продуктов.
+    const mealArea = document.body.textContent || '';
+    expect(mealArea).not.toMatch(/Макароны|макарон|Суп |суп |Пицца|пицца|Жареный картофель/);
+  }, 120000);
+
+  it('«📤 Копировать» не падает без clipboard API', async () => {
+    await generateAndOpenPlan();
+    // jsdom: navigator.clipboard отсутствует — код должен мягко пройти (optional chaining).
+    clickBtn(/📤 Копировать/);
+    await new Promise<void>(r => setTimeout(() => r(), 200));
+    expect(bodyHas(/Завтрак/)).toBe(true);
+  }, 60000);
+});
