@@ -2472,19 +2472,60 @@ export const BbAutoConstructor: React.FC = () => {
             { id:'high', label:'🔥 Высокая — отдых −20%' },
           ]} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.8)' }}>
-            <input type="checkbox" checked={avoidAxialLoadUi} onChange={e => setAvoidAxialLoadUi(e.target.checked)} />
-            🚫 Исключить осевую нагрузку
-          </label>
-          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.8)' }}>
-            <input type="checkbox" checked={fewerCompound} onChange={e => setFewerCompound(e.target.checked)} />
-            🏗️ Меньше многосуставных (замены на машины)
-          </label>
-          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.8)' }}>
-            <input type="checkbox" checked={allowStrengthLifts} onChange={e => setAllowStrengthLifts(e.target.checked)} disabled={bbGoal !== 'strength_mass'} />
-            🏋️ Становая/жим стоя (только силовой цикл)
-          </label>
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Подбор упражнений</div>
+          {[
+            {
+              icon: '🚫', title: 'Исключить осевую нагрузку',
+              desc: 'Убрать упражнения с нагрузкой на позвоночник (приседы, тяги со штангой)',
+              on: avoidAxialLoadUi, set: setAvoidAxialLoadUi, accent: '#ef4444', enabled: true,
+            },
+            {
+              icon: '🏗️', title: 'Меньше многосуставных',
+              desc: 'Больше замен на тренажёры и изолирующие упражнения',
+              on: fewerCompound, set: setFewerCompound, accent: '#f59e0b', enabled: true,
+            },
+            {
+              icon: '🏋️', title: 'Становая / жим стоя',
+              desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя в план' : 'Доступно в цели «Сила + Масса»',
+              on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass',
+            },
+          ].map(t => {
+            const active = t.enabled && t.on;
+            return (
+              <button
+                key={t.title}
+                type="button"
+                onClick={() => t.enabled && t.set(!t.on)}
+                aria-pressed={!!active}
+                aria-disabled={!t.enabled}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
+                  padding: '10px 12px', borderRadius: 12, cursor: t.enabled ? 'pointer' : 'not-allowed',
+                  textAlign: 'left', boxSizing: 'border-box', fontFamily: 'inherit',
+                  background: active ? `linear-gradient(135deg, ${t.accent}1e, rgba(24,24,27,0.35))` : 'rgba(255,255,255,0.03)',
+                  border: active ? `1px solid ${t.accent}66` : '1px solid rgba(255,255,255,0.08)',
+                  opacity: t.enabled ? 1 : 0.45,
+                  transition: 'all .15s',
+                }}
+              >
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{t.icon}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: active ? t.accent : 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>{t.title}</span>
+                  <span style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>{t.desc}</span>
+                </span>
+                <span style={{
+                  marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative',
+                  background: active ? t.accent : 'rgba(255,255,255,0.15)', transition: 'background .2s',
+                }}>
+                  <span style={{
+                    position: 'absolute', top: 2, left: active ? 18 : 2, width: 16, height: 16, borderRadius: '50%',
+                    background: '#fff', transition: 'left .2s',
+                  }} />
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
           <PopupExerciseList
@@ -2520,12 +2561,33 @@ export const BbAutoConstructor: React.FC = () => {
           {loadStrategy === 'rpe_based' && 'Для опытных: вес подбирается по ощущению (RPE). Авто-регуляция под текущее состояние.'}
         </div>
       </div>
-      <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:8 }}>
-        <label style={{ fontSize:11, color:'rgba(255,255,255,0.6)', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
-          <input type="checkbox" checked={autoDeload} onChange={e => setAutoDeload(e.target.checked)} style={{ accentColor: ACCENT }} />
-          Авто-разгрузка при ACWR {`>`} 1.3
-        </label>
-      </div>
+      <button
+        type="button"
+        onClick={() => setAutoDeload(v => !v)}
+        aria-pressed={autoDeload}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 10, marginTop: 8,
+          padding: '11px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', boxSizing: 'border-box', fontFamily: 'inherit',
+          background: autoDeload ? `linear-gradient(135deg, ${ACCENT}1e, rgba(24,24,27,0.35))` : 'rgba(255,255,255,0.03)',
+          border: autoDeload ? `1px solid ${ACCENT}66` : '1px solid rgba(255,255,255,0.08)',
+          transition: 'all .15s',
+        }}
+      >
+        <span style={{ fontSize: 16, flexShrink: 0 }}>🛡️</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: autoDeload ? ACCENT : 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Авто-разгрузка при ACWR {`>`} 1.3</span>
+          <span style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3, marginTop: 2 }}>Автоматически вставить разгрузочную неделю при перегрузке (ACWR &gt; 1.3)</span>
+        </span>
+        <span style={{
+          marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative',
+          background: autoDeload ? ACCENT : 'rgba(255,255,255,0.15)', transition: 'background .2s',
+        }}>
+          <span style={{
+            position: 'absolute', top: 2, left: autoDeload ? 18 : 2, width: 16, height: 16, borderRadius: '50%',
+            background: '#fff', transition: 'left .2s',
+          }} />
+        </span>
+      </button>
       {savedPlans.length > 0 && (
         <div style={{ marginTop:8, display:'flex', alignItems:'center', gap:8 }}>
           <label style={{ fontSize:11, color:'rgba(255,255,255,0.6)', fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
