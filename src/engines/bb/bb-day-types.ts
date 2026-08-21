@@ -29,11 +29,11 @@ export interface BBDay {
 }
 
 /** Per-group блокировка: группа всегда только тяж (никогда чистый памп).
- *  P0-4 (audit 2026-07): убраны quads/hamstrings/glutes/calves — оставлены только
- *  forearms+traps. Ноги теперь МОГУТ быть памп-днём (leg-press 4×20, leg-curl 4×15,
- *  hip-thrust 4×15, calf-raise 4×25 — стандарт BB metabolic work, особенно при
- *  суставных проблемах). forearms/traps — нет метаболического стимула, всегда тяж. */
-export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['forearms', 'traps']);
+ *  forearms/traps — нет метаболического стимула, всегда тяж.
+ *  НОГИ всегда тяжёлые (модель пользователя): главная мышца ножного дня
+ *  (quads/hamstrings/glutes) не уходит в чистый памп — вторая мышца ног получает
+ *  памп-нагрузку (8-10), а главная всегда тяж. */
+export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['forearms', 'traps', 'quads', 'hamstrings', 'glutes']);
 
 /** FIX-8: Единый источник sessionTag→мышцы для bb-builder + bb-selector.
  *  Ранее дублировался в двух файлах (bb-selector без LegsBiceps). */

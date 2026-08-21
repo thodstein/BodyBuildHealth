@@ -1,7 +1,7 @@
 import type { BBPlan, BBSession } from './bb-builder.engine';
 import { trueMuscleOf } from '../movement-pattern';
 import { estimateBBSessionCost } from './bb-fatigue.engine';
-import { aggregateBBVolume } from './bb-volume.engine';
+import { aggregateBBVolume, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -36,11 +36,11 @@ export interface BBPlanValidationOptions {
 }
 
 /** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18 (3+ лет)
- *  и 40/14 (1-2 года) — синхронизировано с maxEx/maxWorkingSets builder. */
+ *  и 40/14 (1-2 года) — делегирует в централизованный sessionLimitsFor (bb-volume),
+ *  чтобы не дублировать логику в 13 местах. */
 export function sessionLimitsFor(options: BBPlanValidationOptions): { maxExercises: number; maxWorkingSets: number } {
-  if (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) return { maxExercises: 18, maxWorkingSets: 60 };
-  if (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1) return { maxExercises: 14, maxWorkingSets: 40 };
-  return { maxExercises: 10, maxWorkingSets: 24 };
+  const l = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears });
+  return { maxExercises: l.maxExercises, maxWorkingSets: l.maxWorkingSets };
 }
 
 /** Синхронизирует агрегированное число sets с фактическими рабочими сетами. */

@@ -1,7 +1,7 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises } from './bb-session-order.engine';
-import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions } from './bb-volume.engine';
+import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -1350,8 +1350,9 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
           );
           if (target) {
             const working = target.exercises.filter((e: any) => !(e as any).warmupActivator);
-            const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
-            const maxSessionSets = options.maxWorkingSets ?? (options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 60 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 40 : 24);
+            const centralizedLimits = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears });
+            const maxEx = options.maxExercises ?? centralizedLimits.maxExercises;
+            const maxSessionSets = options.maxWorkingSets ?? centralizedLimits.maxWorkingSets;
             const sessionSets = working.reduce((a: number, e: any) => a + (e.sets || 0), 0);
             const cap = (plan as any).mrvByMuscle?.[focusMuscle];
             const weekDirect = week.sessions.flatMap(s => s.exercises).filter((e: any) => e.muscle === focusMuscle && !(e as any).warmupActivator).reduce((a: number, e: any) => a + (e.sets || 0), 0);

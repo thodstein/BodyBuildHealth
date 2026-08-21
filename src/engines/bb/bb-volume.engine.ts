@@ -24,6 +24,157 @@ export function normalizeBBMuscle(muscle: string | null | undefined): string {
   return ALIASES[value] || value;
 }
 
+/**
+ * Мышцы, которые НЕ входят в общий недельный бюджет восстановления и MRV-кап.
+ * Они программируются своим минимумом, но не конкурируют за системную нагрузку.
+ * (икры/пресс/предплечья/шея).
+ */
+export const IGNORE_BUDGET_MUSCLES: ReadonlySet<string> = new Set(['calves', 'abs', 'forearms', 'neck']);
+
+/**
+ * Вторичные мышцы — фиксированные бэнды, НЕ масштабируются ×2 на курсе.
+ * По модели пользователя это именно ТРАПЕЦИЯ (5 сетов/сессию). Дельты/руки —
+ * полноценные мышцы, они масштабируются режимом.
+ */
+export const SECONDARY_FIXED_MUSCLES: ReadonlySet<string> = new Set(['traps']);
+
+/**
+ * Единый множитель режима (ПЕД/курс).
+ * - натурал: ×1.0
+ * - на курсе: ×2.0 на ГЛАВНЫЕ мышцы + недельный бюджет (одно применение, без стэкинга)
+ * Вторичные мышцы (SECONDARY_FIXED_MUSCLES) и игнор-мышцы НЕ умножаются.
+ */
+export function computeRegimeMrvMult(input: {
+  onCourse?: boolean;
+  peds?: string[];
+  courseIntensity?: string;
+}): number {
+  const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
+  if (!onCourse) return 1.0;
+  // Базовый ×2. Тяжёлая интенсивность курса — чуть выше (×2.05-2.1).
+  const intensity = input.courseIntensity === 'heavy' ? 1.06 : input.courseIntensity === 'mild' ? 0.98 : 1.0;
+  return Math.min(2.15, Math.max(1.9, 2.0 * intensity));
+}
+
+export function regimeMrvMultFor(muscle: string, regimeMult: number): number {
+  const m = normalizeBBMuscle(muscle);
+  if (IGNORE_BUDGET_MUSCLES.has(m)) return 1.0;
+  if (SECONDARY_FIXED_MUSCLES.has(m)) return 1.0;
+  return regimeMult;
+}
+
+/**
+ * Единая оценка восстановления (0–100) из данных пользователя.
+ * Неизвестные сигналы — нейтрально (не штрафуют).
+ */
+export function computeBBRecoveryScore(input: {
+  bodyFat?: number;
+  leanMass?: number;
+  hrvMs?: number;
+  hrvBaseline?: number;
+  sleepHours?: number;
+  sleepQuality?: number;
+  stressLevel?: number;
+  subjectiveReadiness?: number;
+  age?: number;
+}): number {
+  let score = 100;
+  if (Number.isFinite(input.hrvMs)) {
+    if (Number.isFinite(input.hrvBaseline) && (input.hrvBaseline as number) > 0) {
+      const ratio = (input.hrvMs as number) / (input.hrvBaseline as number);
+      if (ratio <= 0.8) score -= 20;
+      else if (ratio <= 0.9) score -= 10;
+    } else if ((input.hrvMs as number) > 70) score += 5;
+    else if ((input.hrvMs as number) < 50) score -= 12;
+  }
+  if (Number.isFinite(input.sleepHours)) {
+    const s = input.sleepHours as number;
+    if (s >= 7) score += 5;
+    else if (s >= 6) score -= 5;
+    else score -= 15;
+  }
+  if (Number.isFinite(input.sleepQuality)) score += (input.sleepQuality as number >= 7 ? 3 : input.sleepQuality as number < 4 ? -5 : 0);
+  if (Number.isFinite(input.stressLevel)) {
+    const st = input.stressLevel as number;
+    if (st >= 7) score -= 15;
+    else if (st >= 4) score -= 5;
+  }
+  if (Number.isFinite(input.subjectiveReadiness)) {
+    const r = input.subjectiveReadiness as number;
+    if (r < 4) score -= 20;
+    else if (r < 6) score -= 10;
+  }
+  if (Number.isFinite(input.bodyFat) && (input.bodyFat as number) > 25) score -= 8;
+  if (Number.isFinite(input.leanMass) && (input.leanMass as number) < 60) score -= 8;
+  if (Number.isFinite(input.age) && (input.age as number) >= 45) score -= 8;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/** Множитель восстановления из скора (0.6 – 1.3). */
+export function recoveryScoreToMult(score: number): number {
+  if (score >= 90) return 1.1;
+  if (score >= 80) return 1.0;
+  if (score >= 65) return 0.95;
+  if (score >= 50) return 0.85;
+  return 0.7;
+}
+
+/**
+ * НЕДЕЛЬНЫЙ БЮДЖЕТ ВОССТАНОВЛЕНИЯ (общий кап, первичный).
+ * база по режиму (натурал ~110 / курс ~220) × recovery × nutrition × lab.
+ * Применяется ко ВСЕМ путям ББ-авто (кроме faithful-программы).
+ */
+export function computeBBWeeklyBudget(input: {
+  onCourse?: boolean;
+  peds?: string[];
+  courseIntensity?: string;
+  recoveryScore?: number;
+  calorieSurplus?: number;
+  proteinPerKg?: number;
+  labMrvMultiplier?: number;
+}): number {
+  const regime = computeRegimeMrvMult(input);
+  // База: натурал ~112, на курсе ~220 (× ~2). Вторичные/игнор-мышцы вне этого бюджета.
+  const base = Math.round(112 * Math.max(1.0, regime));
+  const rec = recoveryScoreToMult(input.recoveryScore ?? 80);
+  const nutrition = computeBBNutritionMultiplier({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
+  const lab = input.labMrvMultiplier ?? 1;
+  return Math.round(base * rec * nutrition * lab);
+}
+
+/**
+ * По-цикловые капы: НЕДЕЛЬНЫЙ бюджет общий, ПО-СЕССИОННЫЕ капы — производные от
+ * сплита. Централизует 13 дублированных тернарников (24/40/60 сетов, 10/14/18
+ * упражнений) в один источник. Значения по-сессионных капов сохранены (инварианты:
+ * натурал ≤24/≤10, enhanced 60/18), чтобы не ломать существующие планы; недельный
+ * бюджет — новое поле (общее восстановление).
+ */
+export function sessionLimitsFor(
+  input: {
+    onCourse?: boolean;
+    peds?: string[];
+    courseIntensity?: string;
+    recoveryScore?: number;
+    calorieSurplus?: number;
+    proteinPerKg?: number;
+    labMrvMultiplier?: number;
+    level?: string;
+    trainingYears?: number;
+  },
+  split?: { id?: string; sessionGroups?: number },
+): { weeklyWorkingSets: number; maxWorkingSets: number; maxExercises: number } {
+  const weeklyWorkingSets = computeBBWeeklyBudget(input);
+  const level = input.level || 'intermediate';
+  const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
+  const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
+  // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18).
+  let maxWorkingSets: number; let maxExercises: number;
+  if (level === 'enhanced' || (onCourse && years >= 3)) { maxWorkingSets = 60; maxExercises = 18; }
+  else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
+  else { maxWorkingSets = 24; maxExercises = 10; }
+  return { weeklyWorkingSets, maxWorkingSets, maxExercises };
+}
+
 /** Shared recovery soft-cap used by every BB source. */
 export function computeBBRecoveryMultiplier(input: {
   bodyFat?: number;

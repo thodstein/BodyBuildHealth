@@ -85,8 +85,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
-import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, peakTrainingProfile, buildPrepProgression, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
-import { buildPrepProcess, PREP_PROCEDURES } from '../../../engines/bb/bb-prep-process.engine';
+import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
   PREP_ACCENT_OPTIONS, PREP_MINIMAL_OPTIONS, type PrepMinimalMode,
@@ -99,6 +98,7 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
+import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
@@ -504,6 +504,11 @@ export const BbAutoConstructor: React.FC = () => {
     (linked?.profile?.settings?.nutrition as any)?.calorieSurplus ?? 0,
   );
   const [eccentricMult, setEccentricMult] = useState<number>(1.0);
+  // Кнопки/опции пользователя (передаются в engine).
+  const [fewerCompound, setFewerCompound] = useState<boolean>(false);
+  const [allowStrengthLifts, setAllowStrengthLifts] = useState<boolean>(false);
+  const [rotationMode, setRotationMode] = useState<'forbid' | 'strict' | 'variety'>('variety');
+  const [avoidAxialLoadUi, setAvoidAxialLoadUi] = useState<boolean>(false);
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
@@ -1357,7 +1362,10 @@ export const BbAutoConstructor: React.FC = () => {
           autoRegResult: autoRegPayload,
           favoriteExercises: bbFavEx,
           excludedExercises: bbExclEx,
-          avoidAxialLoad: prof.avoidAxialLoad || false,
+          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
+          fewerCompound,
+          allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
+          rotationMode,
           equipment: bbEquipment,
           peds,
            pedDoses,
@@ -1406,7 +1414,10 @@ export const BbAutoConstructor: React.FC = () => {
           autoRegResult: autoRegPayload,
           favoriteExercises: bbFavEx,
           excludedExercises: bbExclEx,
-          avoidAxialLoad: prof.avoidAxialLoad || false,
+          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
+          fewerCompound,
+          allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
+          rotationMode,
            volumeGoal: bbVolGoal as any,
             specialization: specializationMode,
             specializationSchedule: buildSpecBlocks,
@@ -1453,7 +1464,10 @@ export const BbAutoConstructor: React.FC = () => {
         planStartWeek: new Date().toISOString().slice(0, 10),
         favoriteExercises: bbFavEx,
         excludedExercises: bbExclEx,
-        avoidAxialLoad: prof.avoidAxialLoad || false,
+        avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
+        fewerCompound,
+        allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
+        rotationMode,
         intensityTechnique: intensityTech,
         autoDeload,
         deloadType,
@@ -1538,7 +1552,7 @@ export const BbAutoConstructor: React.FC = () => {
         label: 'Нед' + w.week + ' Д' + (si+1),
         exercises: s.exercises.map(e => {
            const targetSets = (e.workSets || []).map(ws => ({ weight: ws.weight || 0, reps: ws.reps || 0, rir: ws.rir ?? e.rir ?? 2, technique: ws.technique }));
-          return { name: e.name, muscleGroup: e.muscle, notes: [e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '', targetSets, restSec: e.restSeconds || 90 };
+          return { name: e.name, muscleGroup: muscleLabel(e.muscle), notes: [exerciseTargetNote(e), e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '', targetSets, restSec: e.restSeconds || 90 };
         }),
       })));
       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
@@ -1864,7 +1878,7 @@ export const BbAutoConstructor: React.FC = () => {
           return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.muscle)}${sub ? ' · ' + esc(sub) : ''}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(feat ? '💥 ' + feat : '')}${esc(e.comment || '')}</td></tr>`;
         }).join('');
         const restNote = s.exercises.length === 0 ? `<p style="font-size:11px;color:#888;margin:6px 0">😴 Полный отдых — позирование, растяжка, сон 8–9 ч.${(s as any).comment ? ' ' + esc((s as any).comment) : ''}</p>` : '';
-        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(s.sessionTag) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
+        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(sessionTagLabel(s.sessionTag)) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
       }).join('');
       const peakNote = (wk as any).peakWeek === true ? ` — 🎭 ПИК-НЕДЕЛЯ (тапер ББ)` : '';
       const prepNote = (wk as any).prepProtocol ? `<p style="font-size:10px;color:#888;margin:2px 0">${esc((wk as any).prepProtocol)}</p>` : '';
@@ -2439,7 +2453,26 @@ export const BbAutoConstructor: React.FC = () => {
            { id:'1.1', label:'1.1 — Лёгкий eccentric overload (+10%)' },
            { id:'1.2', label:'1.2 — Выраженный eccentric overload (+20%)' },
          ]} />
-         <PopupNumber label="🍽️ Профицит калорий (ккал/день)" value={calorieSurplus} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10% MRV. Дефицит <-200 → -20% MRV. 0 = нейтрально (Helms 2022)." />
+          <PopupNumber label="🍽️ Профицит калорий (ккал/день)" value={calorieSurplus} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10% MRV. Дефицит <-200 → -20% MRV. 0 = нейтрально (Helms 2022)." />
+          <PopupSelect label="🔄 Вариативность упражнений" value={rotationMode} onChange={v => setRotationMode(v as any)} hint="Запрет: строго одни и те же упражнения. Строгий: смена раз в 4 недели. Разнообразие: смена упражнения между сессиями, сохраняя нагрузку и паттерн." options={[
+            { id:'forbid', label:'🚫 Запрет — одни и те же упражнения' },
+            { id:'strict', label:'📅 Строгий — смена раз в 4 недели' },
+            { id:'variety', label:'🎨 Разнообразие — смена при 2 тренировках/мышцу' },
+          ]} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.8)' }}>
+            <input type="checkbox" checked={avoidAxialLoadUi} onChange={e => setAvoidAxialLoadUi(e.target.checked)} />
+            🚫 Исключить осевую нагрузку
+          </label>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.8)' }}>
+            <input type="checkbox" checked={fewerCompound} onChange={e => setFewerCompound(e.target.checked)} />
+            🏗️ Меньше многосуставных (замены на машины)
+          </label>
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'rgba(255,255,255,0.8)' }}>
+            <input type="checkbox" checked={allowStrengthLifts} onChange={e => setAllowStrengthLifts(e.target.checked)} disabled={bbGoal !== 'strength_mass'} />
+            🏋️ Становая/жим стоя (только силовой цикл)
+          </label>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
           <PopupExerciseList
@@ -2942,6 +2975,37 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
+        {builtPlan.expandedSummary && (() => {
+          const sum = builtPlan.expandedSummary;
+          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
+          const entries = Object.entries(sum.byMuscle).sort((a, b) => b[1].workingSets - a[1].workingSets);
+          return (
+            <ExpandableCard title="📋 Недельная сводка сетов" icon="📋"
+              short={`${entries.length} групп · ${sum.totalWorkingSets} раб. сетов/нед`}
+              full={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {entries.map(([m, v]) => (
+                    <div key={m} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
+                        {MUSCLE_RU[m] || m} — {v.sessionsPerWeek} тренировок/нед · {v.workingSets} раб. · {v.warmupSets} разм.
+                      </div>
+                      {v.bySession.map((sess, idx) => (
+                        <div key={idx} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                          тренировка: {sess.working} раб., {sess.warmup} разм.
+                        </div>
+                      ))}
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                        паттерн: {Object.entries(v.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'} · direct {v.directSets} · косв. {Math.round(v.indirectSets)}
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>Итого: {sum.totalWorkingSets} рабочих сетов/нед</div>
+                </div>
+              }
+            />
+          );
+        })()}
+
         {builtPlan.rotationReport && (() => {
           const report = builtPlan.rotationReport;
           const primaryCount = Object.keys(report.primaryByMuscle).length;
@@ -3275,7 +3339,7 @@ export const BbAutoConstructor: React.FC = () => {
                       {PHASE_LABELS[currentPhase]}
                     </span>
                     <span style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.45)' }}>
-                      {s.character} · {s.sessionTag || ''}
+                      {s.character} · {sessionTagLabel(s.sessionTag)}
                     </span>
                   </span>
                 ),
@@ -3382,7 +3446,7 @@ export const BbAutoConstructor: React.FC = () => {
                           <Chip label="Вес" value={edit.weight + ' кг'} color="#60a5fa" />
                           {e.workSets[0]?.tempo && <Chip label="Темп" value={e.workSets[0].tempo} color="#a855f7" />}
                           {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.55)" />}
-                          <Chip label="Группа" value={e.muscle} color="rgba(255,255,255,0.55)" />
+                          <Chip label="Группа" value={muscleLabel(e.muscle)} color="rgba(255,255,255,0.55)" />
                         </div>
 
                         {/* Разбивка по подходам (включая дроп-цепочки финального сета) */}
@@ -4126,7 +4190,7 @@ export const BbAutoConstructor: React.FC = () => {
                   const editBadges = exerciseFeatureBadges(e, dupMode);
                   const { lines: editSetLines, chain: editSetChain } = planSetsBreakdown(e, edit);
                   return <div key={ei} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ fontWeight:700, fontSize:11, color:'#fff', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color:'rgba(255,255,255,0.4)' }}>({e.muscle})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
+                    <div style={{ fontWeight:700, fontSize:11, color:'#fff', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color:'rgba(255,255,255,0.4)' }}>({muscleLabel(e.muscle)})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
                       {(e as any).warmupActivator && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', marginLeft:6 }}>🔥 Разминка</span>}
                       {e.muscle === 'back' && backSubgroupLabel((e as any).backSubgroup) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(45,212,191,0.15)', color:'#2dd4bf', marginLeft:6 }}>{backSubgroupLabel((e as any).backSubgroup)}</span>}
                       {['biceps', 'triceps', 'forearms'].includes(e.muscle) && armHeadLabel((e as any).movementPattern) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(232,121,249,0.15)', color:'#e879f9', marginLeft:6 }}>{armHeadLabel((e as any).movementPattern)}</span>}
@@ -5513,64 +5577,6 @@ export const BbAutoConstructor: React.FC = () => {
                       <div>🏃 Кардио-расход: ~{np.cardioKcalPerWeek} ккал/нед</div>
                       {np.femaleNotes.map((f, i) => <div key={i} style={{ color: '#f9a8d4' }}>👩 {f}</div>)}
                     </div>
-                  </div>
-                );
-              } catch { return null; }
-            })()}
-
-            {/* 📈 Прогрессия нагрузки (по неделям) */}
-            {(() => {
-              try {
-                const pg = buildPrepProgression(prepResult.prepPlan, prepResult.config);
-                return (
-                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.18)' }}>
-                    <div style={{ fontWeight: 800, color: '#fbbf24', marginBottom: 4 }}>📈 Прогрессия нагрузки (по неделям)</div>
-                    <div style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{pg.principle}</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {pg.weeks.map(w => (
-                        <span key={w.week} title={`${w.weightNote} · повторы ${w.repsRange[0]}-${w.repsRange[1]} · RIR ${w.rir[0]}-${w.rir[1]}`} style={{ padding: '3px 7px', borderRadius: 7, fontSize: 8.5, fontWeight: 700, background: w.phase === 'peak_week' ? 'rgba(236,72,153,0.12)' : w.phase === 'taper' ? 'rgba(245,158,11,0.14)' : 'rgba(251,191,36,0.1)', border: `1px solid ${w.phase === 'taper' ? 'rgba(245,158,11,0.4)' : 'rgba(251,191,36,0.3)'}`, color: w.phase === 'peak_week' ? '#f472b6' : w.phase === 'taper' ? '#fbbf24' : '#fde68a' }}>
-                          н{w.week} {w.phase === 'preparation' ? 'prep' : w.phase === 'final_preparation' ? 'финал' : w.phase === 'taper' ? 'тапер' : 'пик'} · {w.repsRange[0]}-{w.repsRange[1]} повт · RIR {w.rir[0]}-{w.rir[1]}
-                        </span>
-                      ))}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{pg.note}</div>
-                  </div>
-                );
-              } catch { return null; }
-            })()}
-
-            {/* 🏋️ Пик-тренировка (категорийная) */}
-            {(() => {
-              try {
-                const pt = peakTrainingProfile(prepResult.config);
-                return (
-                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(236,72,153,0.05)', border: '1px solid rgba(236,72,153,0.18)' }}>
-                    <div style={{ fontWeight: 800, color: '#f472b6', marginBottom: 4 }}>🏋️ Пик-тренировка: {pt.type}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>Деплеция ~{pt.minutesPerDepleteDay} мин/день · памп backstage ~{pt.pumpBackstageMinutes} мин</div>
-                    {pt.notes.map((n, i) => <div key={i} style={{ color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{n}</div>)}
-                  </div>
-                );
-              } catch { return null; }
-            })()}
-
-            {/* 🩺 Медицинский процесс подготовки */}
-            {(() => {
-              try {
-                const pr = buildPrepProcess(prepResult.config, prepResult.prepPlan);
-                const rec = PREP_PROCEDURES.filter(p => pr.recommendedProcedures.includes(p.id));
-                return (
-                  <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.18)' }}>
-                    <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🩺 Медицинский процесс подготовки (мониторинг + процедуры под контролем врача)</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-                      {pr.steps.map(s => (
-                        <span key={s.id} title={s.title} style={{ padding: '3px 8px', borderRadius: 8, fontSize: 8.5, fontWeight: 700, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)', color: '#93c5fd' }}>{s.title.split(' ').slice(0, 2).join(' ')}</span>
-                      ))}
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.7)' }}>🧪 Анализы: {pr.labPanel.map(l => l.name).join(' · ')}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>💧 {pr.hydrationGuidelines[0]} {pr.hydrationGuidelines[1]}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>🩸 Процедуры (под контролем врача): {rec.map(p => p.name).join(' · ')}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>🔄 {pr.postShow.phase}: {pr.postShow.details[0]}</div>
-                    {pr.warnings.map((w, i) => <div key={i} style={{ color: '#fbbf24', marginTop: 2 }}>{w}</div>)}
                   </div>
                 );
               } catch { return null; }

@@ -22,6 +22,7 @@ import {
   canonicalMuscle, type SpecializationBlock, type SpecializationSchedule,
 } from './bb-specialization.engine';
 import type { Injury } from '../manual-plan-builder';
+import { computeBBNutritionMultiplier } from './bb-volume.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import {
@@ -822,7 +823,7 @@ export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVol
     Math.round(10 * athleteMult),
     Math.round(15 * athleteMult),
   ];
-  const note = `объём ≈ обычного ББ-авто (MAV) · база 10–15 сетов/группу/нед → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)}`;
+  const note = `объём ≈ обычного ББ-авто (MAV) · база 10–15 сетов/группу/нед → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)}${cfg.calorieSurplus != null && cfg.calorieSurplus < 0 ? ` · дефицит питания уже учтён в buildBBPlan (nutrition ×${computeBBNutritionMultiplier({ calorieSurplus: cfg.calorieSurplus, proteinPerKg: cfg.proteinPerKg }).toFixed(2)})` : ''}`;
   return {
     phases,
     deficitMult,

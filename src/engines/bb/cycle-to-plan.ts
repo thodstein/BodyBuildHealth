@@ -12,6 +12,7 @@ import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exer
 import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
+import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { adaptForPEDs, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, applyDeloadToWeek, DELOAD_PROTOCOLS, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
@@ -406,6 +407,12 @@ export interface CycleToPlanInput {
   proteinPerKg?: number;
   /** Eccentric overload multiplier (1.0=норма, 1.1-1.2=overload). Schoenfeld 2021. */
   eccentricMult?: number;
+  /** Меньше многосуставных (кнопка): машина/Смит/поддержанные выше. */
+  fewerCompound?: boolean;
+  /** Разрешить силовые лифты (становая/жим стоя) — только в силовом цикле по кнопке. */
+  allowStrengthLifts?: boolean;
+  /** Режим вариативности упражнений (запрет/строгий/разнообразие). */
+  rotationMode?: 'forbid' | 'strict' | 'variety';
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   /** Lab-based MRV multiplier. */
@@ -953,6 +960,20 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
           const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
           if (rep) { finalExName = rep.name; }
         }
+        // Проверка: силовые лифты (становая/жим стоя) — только при allowStrengthLifts
+        if (input.allowStrengthLifts !== true && /становая|сумо|армейск|жим стоя|швунг/.test(bbExName.toLowerCase())) {
+          const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
+          if (rep) { finalExName = rep.name; } else { return null as any; }
+        }
+        // Проверка: меньше многосуставных (fewerCompound) → сместить к машинам/Смит/поддержанным
+        if (input.fewerCompound) {
+          const cat = EXERCISE_CATALOG.find(e => e.name === finalExName);
+          const n = (finalExName || '').toLowerCase();
+          if (cat && (/присед|squat|тяга.*штанг|тяга.*наклон|жим.*штанг/.test(n))) {
+            const rep = findReplacementForCycle(finalExName, muscleGroupFromExName(finalExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
+            if (rep && /гакк|смит|жим ногами|тренаж|поддержан|на лавке|chest.?supported/.test(rep.name.toLowerCase())) finalExName = rep.name;
+          }
+        }
         // PRO: mobility restrictions — замена упражнений по биомеханике
         if (input.mobilityRestrictions && catEntry && isMobilityRestricted(catEntry, input.mobilityRestrictions)) {
           const rep = findReplacementForCycle(bbExName, muscleGroupFromExName(bbExName, EXERCISE_CATALOG), favNames, favIdSet, seenNames);
@@ -1206,8 +1227,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         mrvByMuscle: tradeoffMrvByMuscle,
         workMax,
         equipment,
-        maxExercisesPerSession: capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10,
-        maxWorkingSetsPerSession: capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : capLevel === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24,
+        maxExercisesPerSession: centralizedSessionLimits({ level: capLevel, trainingYears: input.trainingYears }).maxExercises,
+        maxWorkingSetsPerSession: centralizedSessionLimits({ level: capLevel, trainingYears: input.trainingYears }).maxWorkingSets,
       },
     );
     for (const report of tradeoffReports) {
@@ -1241,8 +1262,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     specializationSchedule: specSchedule,
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     mrvMultiplier: mrvMult,
-    maxWorkingSets: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 60 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 40 : 24,
-    maxExercises: level === 'enhanced' && (input.trainingYears ?? 0) >= 3 ? 18 : level === 'enhanced' && (input.trainingYears ?? 0) >= 1 ? 14 : 10,
+    maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears }).maxWorkingSets,
+    maxExercises: centralizedSessionLimits({ level, trainingYears: input.trainingYears }).maxExercises,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: input.mobilityRestrictions,
   }, {
@@ -1336,6 +1357,12 @@ export interface ProgramToBBPlanOpts {
   proteinPerKg?: number;
   /** Eccentric overload multiplier (1.0=норма, 1.1-1.2=overload). Schoenfeld 2021. */
   eccentricMult?: number;
+  /** Меньше многосуставных (кнопка): машина/Смит/поддержанные выше. */
+  fewerCompound?: boolean;
+  /** Разрешить силовые лифты (становая/жим стоя) — только в силовом цикле по кнопке. */
+  allowStrengthLifts?: boolean;
+  /** Режим вариативности упражнений (запрет/строгий/разнообразие). */
+  rotationMode?: 'forbid' | 'strict' | 'variety';
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   labMrvMultiplier?: number;
@@ -2041,8 +2068,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         mrvByMuscle: tradeoffMrvByMuscle,
         workMax,
         equipment: eqList,
-        maxExercisesPerSession: capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 18 : capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 14 : 10,
-        maxWorkingSetsPerSession: capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 60 : capLevel === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 40 : 24,
+        maxExercisesPerSession: centralizedSessionLimits({ level: capLevel, trainingYears: opts.trainingYears }).maxExercises,
+        maxWorkingSetsPerSession: centralizedSessionLimits({ level: capLevel, trainingYears: opts.trainingYears }).maxWorkingSets,
       },
     );
     for (const report of tradeoffReports) {
@@ -2060,8 +2087,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     specializationSchedule: specSchedule,
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     mrvMultiplier: pedMrvMult,
-    maxWorkingSets: String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 60 : String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 40 : 24,
-    maxExercises: String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 3 ? 18 : String(opts.level ?? levelForLandmarks) === 'enhanced' && (opts.trainingYears ?? 0) >= 1 ? 14 : 10,
+    maxWorkingSets: centralizedSessionLimits({ level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears }).maxWorkingSets,
+    maxExercises: centralizedSessionLimits({ level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears }).maxExercises,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: opts.mobilityRestrictions,
   }, {
