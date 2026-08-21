@@ -1829,18 +1829,37 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // Приоритет источников: единый план (goals.bbContestPrepPlan, покрывает и подготовку)
         // → legacy конфиг (goals.bbPeakConfig, только пик-неделя).
         const _prepDate = isoAddDays(isoToday(), offset);
-        // D-28 fix (жалоба «рефид не работает»): дата-рефиды из календаря спец-приёмов
-        // (he_special_meals, тип 'refeed') теперь реально перестраивают план на эту дату —
+        // D-28 fix (жалоба «рефид/читмил/фастинг не работают»): спец-приёмы из календаря
+        // (he_special_meals: refeed/cheat_meal/fast) теперь реально перестраивают план на дату —
         // раньше записи только показывались в календаре, но не влияли на генерацию.
-        if (!isRefeedDay) {
-          try {
-            const _sm = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
-            if (Array.isArray(_sm) && _sm.some((m: any) => m && m.type === 'refeed' && m.date === _prepDate)) {
-              isRefeedDay = true;
-              dayKcalMod = 1.12; dayCarbMod = 2.2;
+        const _specialNotes: string[] = [];
+        let _fastingDay = false;
+        try {
+          const _sm = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
+          if (Array.isArray(_sm)) {
+            const _todaySpecial = _sm.filter((m: any) => m && m.date === _prepDate);
+            if (!isRefeedDay) {
+              const _rf = _todaySpecial.find((m: any) => m.type === 'refeed');
+              if (_rf) {
+                isRefeedDay = true;
+                dayKcalMod = 1.12; dayCarbMod = 2.2;
+                _specialNotes.push('🔄 Рефид по расписанию: углеводы ×2.2, жиры снижены — восстановление гликогена и лептина.');
+              }
             }
-          } catch {}
-        }
+            const _cm = _todaySpecial.find((m: any) => m.type === 'cheat_meal');
+            if (_cm && !isRefeedDay) {
+              dayKcalMod = Math.max(dayKcalMod, 1.12);
+              _specialNotes.push('🍔 Читмил по расписанию: калорийность дня повышена, один приём — свободный выбор (до 1500 ккал). Не компенсировать на следующий день.');
+            }
+            const _fast = _todaySpecial.find((m: any) => m.type === 'fast');
+            if (_fast) {
+              _fastingDay = true;
+              dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7);
+              _specialNotes.push('⏳ Фастинг по расписанию: калорийность снижена, приёмов меньше, первый приём позже (окно ~8 ч, напр. 12:00–20:00).');
+            }
+          }
+        } catch {}
+        const _effMealsCount = _fastingDay ? Math.max(3, (opts?.overrides?.mealsCount ?? mealsCount) - 1) : (opts?.overrides?.mealsCount ?? mealsCount);
         const _inPrepWindow = bbPrepPlan ? prepPhaseForDate(bbPrepPlan, _prepDate) !== null : false;
         // 🗓 Годовой план: активный блок на дату (для подсказки про contest prep).
         const _annualPhase = annualPlan ? annualPlanPhaseForDate(annualPlan, _prepDate) : null;
@@ -1878,7 +1897,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
-          mealsCount: opts?.overrides?.mealsCount ?? mealsCount, isTrainingDay: isTrainDay(offset),
+          mealsCount: _effMealsCount, isTrainingDay: isTrainDay(offset),
           trainStartMin: linkToTraining && isTrainDay(offset) ? toMin(trainStart) : undefined,
           allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
@@ -1927,6 +1946,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _hungerNote: string | undefined = hungerLevel >= 8 ? '🔥 Высокий голод: +белок (сытость), добавлены объхмные овощи/клетчатка. Если хронически — refeed/повышение калорий.' : hungerLevel >= 6 ? '🔥 Повышенный голод: акцент на объхмную плотность.' : undefined;
         const _redSNote: string | undefined = _ea.note || undefined;
         const rawV2 = buildDayPlanV2(input);
+        // D-28 П3: заметки спец-приёмов по дате (рефид/читмил/фастинг) — в proNotes плана.
+        if (_specialNotes.length > 0 && rawV2 && Array.isArray(rawV2.notes)) {
+          rawV2.notes = [...rawV2.notes, ..._specialNotes];
+        }
         const v2: any = {
           ...rawV2,
           meals: Array.isArray(rawV2?.meals) ? rawV2.meals : [],
@@ -2069,7 +2092,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       setGenerated(true);
       try { setPlanTab('plan'); } catch {}
        try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations failed:', e); } catch {} }
-       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+       // P2-audit fix: guard scrollIntoView (jsdom/старые браузеры без API — uncaught TypeError).
+       setTimeout(() => { try { if (resultsRef.current && typeof resultsRef.current.scrollIntoView === 'function') resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {} }, 100);
        return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
       } catch (v2Err: any) {
         // Bug-2 fix: Pro упал — РЕАЛЬНЫЙ фоллбэк на классический движок (раньше был return = тупик без плана и ложное сообщение «переключитесь вручную»).

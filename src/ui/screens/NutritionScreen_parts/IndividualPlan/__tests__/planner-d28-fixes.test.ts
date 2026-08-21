@@ -70,6 +70,22 @@ describe('D-28: любимые продукты не монополизирую�
     const salmonMeals = p.meals.filter(m => m.items.some(i => i.id === 'salmon')).length;
     expect(salmonMeals).toBeLessThanOrEqual(2);
   });
+
+  it('D-28 П4: любимые овощи/жиры/фрукты fresh-first (не в каждом приёме)', () => {
+    const p = buildDayPlan(base({ preferredIds: new Set(['broccoli', 'avocado', 'banana']) }));
+    const vegOcc = p.meals.filter(m => m.items.some(i => i.id === 'broccoli')).length;
+    expect(vegOcc).toBeLessThanOrEqual(2);
+    const fatOcc = p.meals.filter(m => m.items.some(i => i.id === 'avocado')).length;
+    expect(fatOcc).toBeLessThanOrEqual(2);
+    const fruitOcc = p.meals.filter(m => m.items.some(i => i.id === 'banana')).length;
+    expect(fruitOcc).toBeLessThanOrEqual(2);
+  });
+
+  it('D-28 П4: любимый продукт присутствует в плане хотя бы раз', () => {
+    const p = buildDayPlan(base({ preferredIds: new Set(['broccoli', 'avocado']) }));
+    expect(p.meals.some(m => m.items.some(i => i.id === 'broccoli'))).toBe(true);
+    expect(p.meals.some(m => m.items.some(i => i.id === 'avocado'))).toBe(true);
+  });
 });
 
 describe('D-28: peri-workout сыворотка не ужимается', () => {

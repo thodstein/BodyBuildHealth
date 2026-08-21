@@ -156,7 +156,10 @@ export const IndividualPlanSettings: React.FC = () => {
   const [showSpecialMealPopup, setShowSpecialMealPopup] = useState(false);
   const [showReplaceMealPopup, setShowReplaceMealPopup] = useState(false);
   const [specialMealType, setSpecialMealType] = useState<'cheat_meal' | 'refeed' | 'fast'>('cheat_meal');
-  const [specialMealDate, setSpecialMealDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // D-28 П3 fix: ЛОКАЛЬНАЯ дата (не UTC toISOString) — иначе календарь спец-приёмов не совпадал
+  // с isoToday() движка (в UTC+3..+12 вечером toISOString уходил на предыдущий день).
+  const _toLocalIso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const [specialMealDate, setSpecialMealDate] = useState(() => _toLocalIso(new Date()));
   const [specialMealNotes, setSpecialMealNotes] = useState('');
   const [selectedMealToReplace, setSelectedMealToReplace] = useState('');
   const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => {
@@ -2612,7 +2615,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 {DAY_LABELS.map((label, idx) => {
                   const now = new Date(); const curr = now.getDay() - 1; const dayOff = (idx - curr + 7) % 7;
                   const target = new Date(now); target.setDate(now.getDate() + dayOff);
-                  const dateStr = target.toISOString().split('T')[0];
+                  const dateStr = _toLocalIso(target);
                   const sel = specialMealDate === dateStr;
                   return (
                     <button key={idx} onClick={() => setSpecialMealDate(dateStr)} style={{

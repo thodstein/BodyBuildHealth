@@ -963,10 +963,12 @@ function buildWholeMeal(
     const vegColorPool = colorVegIds ? pool.vegColor.filter(f => colorVegIds.has(f.id)) : pool.vegColor;
     const fallbackGreen = vegGreenPool.length > 0 ? vegGreenPool : pool.vegGreen;
     const fallbackColor = vegColorPool.length > 0 ? vegColorPool : pool.vegColor;
-    const prefVegGreen = preferredIds && preferredIds.size > 0 ? fallbackGreen.filter(f => preferredIds.has(f.id)) : [];
-    const prefVegColor = preferredIds && preferredIds.size > 0 ? fallbackColor.filter(f => preferredIds.has(f.id)) : [];
+    // D-28 П4: любимые овощи fresh-first (не брокколи в КАЖДОМ приёме).
+    const prefVegGreen = preferredIds && preferredIds.size > 0 ? fallbackGreen.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
+    const prefVegColor = preferredIds && preferredIds.size > 0 ? fallbackColor.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
     const vegSource = pickPriority(prefVegGreen.length > 0 ? prefVegGreen : fallbackGreen, seed + 2, { lockedIds, recentIds, hardRecentIds }) || pickPriority(prefVegColor.length > 0 ? prefVegColor : fallbackColor, seed + 3, { lockedIds, recentIds, hardRecentIds });
     if (vegSource) {
+      if (preferredIds?.has(vegSource.id)) dayUsedPreferredIds?.add(vegSource.id);
       // Этап 5/7: на рефид-дне или пик-дне с низким лимитом клетчатки овощи легче
       // (меньше клетчатки — больше места углеводам загрузки).
       const _lightVeg = refeedDay || (typeof fiberCapG === 'number' && fiberCapG < 35);
@@ -982,9 +984,11 @@ function buildWholeMeal(
     // D-28 fix: не дублируем фрукт, уже добавленный в этот приём (E5-добивка могла его взять).
     const usedFruitIds = new Set(items.map(i => i.id));
     const freshFruit = fruitPool.filter((f: any) => !usedFruitIds.has(f.id));
-    const prefFruit = preferredIds && preferredIds.size > 0 ? freshFruit.filter(f => preferredIds.has(f.id)) : [];
+    // D-28 П4: любимые фрукты fresh-first (не банан в каждом приёме).
+    const prefFruit = preferredIds && preferredIds.size > 0 ? freshFruit.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
     const fSrc = pickPriority(prefFruit.length > 0 ? prefFruit : freshFruit.length > 0 ? freshFruit : fruitPool, seed + 4, { lockedIds, recentIds, hardRecentIds });
     if (fSrc && !usedFruitIds.has(fSrc.id)) {
+      if (preferredIds?.has(fSrc.id)) dayUsedPreferredIds?.add(fSrc.id);
       // D-28 fix: фрукт закрывает остаток углеводов приёма (remC), а не переполняет его —
       // раньше 80-140 г фрукта могли выбить завтрак/перекус далеко за углеводный бюджет.
       const fPer100 = fSrc.carbs || 15;
@@ -998,9 +1002,11 @@ function buildWholeMeal(
   // 5. Жиры: остаточный принцип (если remF > 5) (предпочтение — preferred)
   if (remF > 5) {
     const fatSourcePool = (snack && _snackNuts && _snackNuts.length > 0) ? _snackNuts : pool.fats;
-    const prefFat = preferredIds && preferredIds.size > 0 ? fatSourcePool.filter(f => preferredIds.has(f.id)) : [];
+    // D-28 П4: любимые жиры fresh-first (не авокадо/миндаль в каждом приёме).
+    const prefFat = preferredIds && preferredIds.size > 0 ? fatSourcePool.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
     const fatSource = pickPriority(prefFat.length > 0 ? prefFat : fatSourcePool, seed + 6, { lockedIds, recentIds, hardRecentIds });
     if (fatSource) {
+      if (preferredIds?.has(fatSource.id)) dayUsedPreferredIds?.add(fatSource.id);
       const grams = gramsForMacro(fatSource, remF, 'fat');
       if (grams > 0) {
         const item = makeItem(fatSource, grams, 'fat');
