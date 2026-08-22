@@ -112,19 +112,17 @@ export function buildBBPlanReportText(plan: BBPlan): string {
       if (patterns) lines.push(`    паттерн: ${patterns}`);
       const byEx = Object.entries((m as any).byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
       if (byEx) lines.push(`    упражнения: ${byEx}`);
-      // Подгруппы для ВСЕХ мышц (display-only): паттерн + пояснения (чем хорошо/как работает) — без влияния на капы
+      // Подгруппы для ВСЕХ мышц (display-only, без капа) — только суть, без «чем хорошо/как работает» в тексте (UI показывает в тултипе)
       const sg = (m as any).subGroups as Record<string, any> | undefined;
       if (sg && Object.keys(sg).length) {
         for (const [subId, sub] of Object.entries(sg)) {
-          const expl = (sub as any).explanation as { labelRu?: string; patternRu?: string; why?: string; how?: string } | undefined;
+          const expl = (sub as any).explanation as { labelRu?: string; patternRu?: string } | undefined;
           const label = expl?.labelRu || subId;
           lines.push(`    └ ${label}: ${sub.workingSets} сетов`);
           const subPat = Object.entries(sub.byPattern || {}).map(([p, v]) => `${p} ${v}`).join(', ');
           if (subPat) lines.push(`       паттерн: ${subPat}${expl?.patternRu ? ` (${expl.patternRu})` : ''}`);
           const subEx = Object.entries(sub.byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
           if (subEx) lines.push(`       упражнения: ${subEx}`);
-          if (expl?.why) lines.push(`       чем хорошо: ${expl.why}`);
-          if (expl?.how) lines.push(`       как работает: ${expl.how}`);
         }
       }
     }
