@@ -60,6 +60,20 @@ import { SRC2_GUSENITSA } from './src2/src2-gusenitsa';
 import { SRC2_VOLNA } from './src2/src2-volna';
 import { SRC2_DPSM } from './src2/src2-dpsm';
 import { SRC2_BAZOVAYA } from './src2/src2-bazovaya';
+import { SRC2_HATFIELD_12 } from './src2/src2-hatfield-12';
+import { SRC2_WASHINGTON_5X5 } from './src2/src2-washington-5x5';
+import { SRC2_COAN_BENCH } from './src2/src2-coan-bench';
+import { SRC2_MCCULLOUGH_DL } from './src2/src2-mccullough-dl';
+import { SRC2_VERKHOSHANSKY_PEAK } from './src2/src2-verkhoshansky-peak';
+import { SRC2_MURAVJEV_BENCH } from './src2/src2-muravjev-bench';
+import { SRC2_BUTENKO_BASE } from './src2/src2-butenko-base';
+import { SRC2_BUTENKO_PEAK } from './src2/src2-butenko-peak';
+import { SRC2_RUSSIAN_CYCLE } from './src2/src2-russian-cycle';
+import { SRC2_SHEIKO_SHORT_16 } from './src2/src2-sheiko-short-16';
+import { SRC2_SHEIKO_PREP } from './src2/src2-sheiko-prep';
+import { SRC2_SHEIKO_COMP } from './src2/src2-sheiko-comp';
+import { SRC2_COAN_PL } from './src2/src2-coan-pl';
+import { SRC2_PETRUSHIN_SQUAT } from './src2/src2-petrushin-squat';
 
 export const LMS_CYCLES: SRCycleTemplate[] = [
  CYCLE_01,
@@ -104,19 +118,33 @@ export const LMS_CYCLES: SRCycleTemplate[] = [
   CYCLE_BB_10,
   CYCLE_BB_11,
   CYCLE_BB_12,
-  // СРЦ2
-  SRC2_MURAVYOV_16,
-  SRC2_SOLOVYOV_BENCH_28,
-  SRC2_PTBAZ_8,
-  SRC2_PT12TA,
-  SRC2_PERSPEKTIVA,
-  SRC2_REKORD,
-  SRC2_SISTEMY_1I2,
-  SRC2_SHEIKO_13,
-  SRC2_GUSENITSA,
-  SRC2_VOLNA,
-  SRC2_DPSM,
-  SRC2_BAZOVAYA,
+   // СРЦ2
+   SRC2_MURAVYOV_16,
+   SRC2_SOLOVYOV_BENCH_28,
+   SRC2_PTBAZ_8,
+   SRC2_PT12TA,
+   SRC2_PERSPEKTIVA,
+   SRC2_REKORD,
+   SRC2_SISTEMY_1I2,
+   SRC2_SHEIKO_13,
+   SRC2_GUSENITSA,
+   SRC2_VOLNA,
+   SRC2_DPSM,
+   SRC2_BAZOVAYA,
+   SRC2_HATFIELD_12,
+   SRC2_WASHINGTON_5X5,
+   SRC2_COAN_BENCH,
+   SRC2_MCCULLOUGH_DL,
+   SRC2_VERKHOSHANSKY_PEAK,
+   SRC2_MURAVJEV_BENCH,
+   SRC2_BUTENKO_BASE,
+   SRC2_BUTENKO_PEAK,
+   SRC2_RUSSIAN_CYCLE,
+   SRC2_SHEIKO_SHORT_16,
+   SRC2_SHEIKO_PREP,
+   SRC2_SHEIKO_COMP,
+   SRC2_COAN_PL,
+   SRC2_PETRUSHIN_SQUAT,
 ];
 
 export function getCycleById(id: string): SRCycleTemplate | undefined {

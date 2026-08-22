@@ -1,0 +1,61 @@
+import type { SRCycleTemplate, SRDaySpec, SRSetSpec, SRExerciseSpec } from '../lms-types';
+
+const s = (pct:number,reps:number,sets=1):SRSetSpec=>({pct,reps,sets});
+const ex = (name:string,group:string,coef:number,sets:SRSetSpec[]):SRExerciseSpec=>({name,group,coef,mnosz:1,sets});
+const day = (...exercises:SRExerciseSpec[]):SRDaySpec=>({exercises});
+
+// Washington 5x5 — 14 недель волна. Источник washington_university_5_x_5.xls
+// Опорные ПМ: жим 100, присед 125, тяга 150. Каждая тренировка — 5 подходов по 5 повторений с весами 35-100%.
+// 2 тренировки в неделю. В файле 29 тренировок, берём 24 = 12 недель.
+const b = [
+ [35,40,45,50,55],[40,45,50,55,60],[45,50,55,60,65],[40,45,50,55,60],[45,50,55,60,65],
+ [50,55,60,65,70],[45,50,55,60,65],[50,55,60,65,70],[55,60,65,70,75],[50,55,60,65,70],
+ [55,60,65,70,75],[60,65,70,75,80],
+];
+const sq = [
+ [43.75,50,56.25,62.5,68.75],[50,56.25,62.5,68.75,75],[56.25,62.5,68.75,75,81.25],[50,56.25,62.5,68.75,75],[56.25,62.5,68.75,75,81.25],
+ [62.5,68.75,75,81.25,87.5],[56.25,62.5,68.75,75,81.25],[62.5,68.75,75,81.25,87.5],[68.75,75,81.25,87.5,93.75],[62.5,68.75,75,81.25,87.5],
+ [68.75,75,81.25,87.5,93.75],[75,81.25,87.5,93.75,100],
+];
+const dl = [
+ [52.5,60,67.5,75,82.5],[60,67.5,75,82.5,90],[67.5,75,82.5,90,97.5],[60,67.5,75,82.5,90],[67.5,75,82.5,90,97.5],
+ [75,82.5,90,97.5,105],[67.5,75,82.5,90,97.5],[75,82.5,90,97.5,105],[82.5,90,97.5,105,112.5],[75,82.5,90,97.5,105],
+ [82.5,90,97.5,105,112.5],[90,97.5,105,112.5,120],
+];
+
+const weeks: SRDaySpec[][] = [];
+for (let w=0; w<12; w++) {
+  const days: SRDaySpec[] = [];
+  for (let d=0; d<2; d++) {
+    const idx = w*2 + d;
+    if (idx >= b.length) break;
+    const bSets = b[idx].map(v=> s(Math.round(v)/100,5,1));
+    const sSets = sq[idx].map(v=> s(Math.round(v*100/125)/100,5,1));
+    const dSets = dl[idx].map(v=> s(Math.round(v*100/150)/100,5,1));
+    days.push(day(
+      ex('Жим лёжа','Грудь',1.0,bSets),
+      ex('Присед','Ноги',1.2,sSets),
+      ex('Становая тяга','Спина',1.4,dSets),
+    ));
+  }
+  weeks.push(days);
+}
+
+export const SRC2_WASHINGTON_5X5: SRCycleTemplate = {
+  meta: {
+    id: 'src2-washington-5x5',
+    title: 'Washington 5x5 (12 недель волна)',
+    direction: 'powerlifting',
+    level: 'novice',
+    period: 'strength',
+    sessionsPerWeek: 2,
+    weeks: 12,
+    correctionPct: 0,
+    sourceWeeks: true,
+    description: 'Волновая программа Университета Вашингтона 5x5: 2 тренировки в неделю, 5 подходов по 5 повторений, веса 35%->100% с делодами.',
+    howItWorks: 'Каждая тренировка 5x5 с прогрессией 5кг. Волна: 3 недели рост, 1 неделя делод (снижение 10%). К концу 100% 5x5, затем проходка.',
+    conditions: ['Для новичков', '2 тренировки в неделю', 'Простая линейка, нужна разминка'],
+  },
+  week1: weeks[0],
+  weeks,
+};
