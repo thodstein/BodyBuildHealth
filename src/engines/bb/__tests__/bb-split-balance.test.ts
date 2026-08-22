@@ -16,9 +16,9 @@ describe('BB корректность распределения в разных
   it('upper/lower: грудь не голодает против спины (co-main в Upper)', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 8, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'heavy' });
     const d = weeklyDirect(plan);
-    // Грудь — со-главная со спиной: не менее ~50% объёма спины (не 18 при спине 51).
+    // Грудь — со-главная со спиной: не менее ~45% объёма спины (после фикса vertical_push: жим сидя → shoulders, грудь -2).
     expect(d.back).toBeGreaterThanOrEqual(d.chest);
-    expect(d.chest).toBeGreaterThanOrEqual(Math.round(d.back * 0.5));
+    expect(d.chest).toBeGreaterThanOrEqual(Math.round(d.back * 0.45));
     // Бицепс не голодает (минимум ~4)
     expect(d.biceps).toBeGreaterThanOrEqual(4);
   });
