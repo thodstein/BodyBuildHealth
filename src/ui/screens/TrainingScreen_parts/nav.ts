@@ -59,9 +59,9 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     subtitle: 'Персональный пульс-контроль: показатели, качество плана, инструменты сборки, периодизация',
     tabs: [
       'strength_analysis', 'load_management', 'quality_diagnostics', 'periodization_hub',
-      'exercise_lab', 'load_safety', 'split_gen', 'pri_reppat',
-      'calc_plates', 'volume',
-      'training_mix_hub', 'mix_presets', 'tonnage', 'bb_foundation',
+      'exercise_lab', 'load_safety', 'volume_hub', 'pri_reppat',
+      'calc_plates', 'rir_calibration', 'readiness_forecast', 'taper_planner',
+      'training_mix_hub', 'mix_presets', 'bb_foundation',
     ],
   },
   library: {
@@ -102,6 +102,10 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 // алиасы для депрекейтнутых дублей (удалены из ZONES.tabs, но должны резолвиться)
 (TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['calc_quality'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['taper_planner'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['volume'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['tonnage'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['split_gen'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';

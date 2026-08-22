@@ -37,6 +37,7 @@ import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
 import { BBFoundationCard } from './TrainingScreen_parts/BBFoundationCard';
 import { QualityDiagnosticsHub } from './TrainingScreen_parts/QualityDiagnosticsHub';
+import { VolumeHub } from './TrainingScreen_parts/VolumeHub';
 
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
@@ -675,9 +676,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_hub','exercise_lab','calc_plates','volume','split_gen','pri_reppat','tonnage','training_mix_hub','mix_presets','bb_foundation']);
-        // алиасы депрекейтнутых дублей → единый хаб
-        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const : tab;
+        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','taper_planner']);
+        // алиасы депрекейтнутых дублей → единые хабы
+        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
           // Показываем конкретный инструмент с кнопкой назад
@@ -690,11 +691,12 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
             {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
-            {tab === 'volume' && <InfoErrorBoundary label="Расчёт объёма"><VolumeOptimizerTab /></InfoErrorBoundary>}
-            {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
+            {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub /></InfoErrorBoundary>}
             {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
-            {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
             {tab === 'bb_foundation' && <InfoErrorBoundary label="Основа ББ"><BBFoundationCard /></InfoErrorBoundary>}
+            {effectiveTab === 'rir_calibration' && <InfoErrorBoundary label="RIR калибратор"><RIRCalibrationCard /></InfoErrorBoundary>}
+            {effectiveTab === 'readiness_forecast' && <InfoErrorBoundary label="Прогноз готовности"><ReadinessForecastCard /></InfoErrorBoundary>}
+            {effectiveTab === 'taper_planner' && <InfoErrorBoundary label="Планировщик тейпера"><TaperPlannerTab /></InfoErrorBoundary>}
             {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
             {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}
           </>);

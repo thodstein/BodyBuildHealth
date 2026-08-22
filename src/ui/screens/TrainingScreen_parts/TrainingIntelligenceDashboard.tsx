@@ -49,6 +49,8 @@ export default function TrainingIntelligenceDashboard(p: Props) {
           badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
         { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио', tab: 'load_management',
           badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
+        { icon: '🎯', label: 'RIR калибратор', desc: 'Калибровка RIR/RPE, история, точность', tab: 'rir_calibration' as any },
+        { icon: '🔮', label: 'Прогноз готовности', desc: 'Readiness forecast: сон, HRV, ACWR → веса', tab: 'readiness_forecast' as any },
       ],
     },
     {
@@ -60,18 +62,17 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '🛠', label: 'Инструменты сборки', color: '#22c55e',
       tools: [
-        { icon: '🧩', label: 'Генератор сплитов', desc: '9 типов сплитов под цель и уровень', tab: 'split_gen' },
+        { icon: '📐', label: 'Объём-хаб', desc: 'Единый: MEV/MAV/MRV + тоннаж/КПШ + 9 сплитов', tab: 'volume_hub' as any },
         { icon: '🏋️', label: 'Лаборатория упражнений', desc: 'Каталог, биомеханика, подбор по группе', tab: 'exercise_lab' },
-        { icon: '⚖️', label: 'Тоннаж и КПШ', desc: 'Калькулятор нагрузки, УОИ, интенсивность', tab: 'tonnage' },
         { icon: '🔄', label: 'PRI и схема повторов', desc: 'Готовность, RIR, паттерн, сложность', tab: 'pri_reppat' },
         { icon: '🥞', label: 'Калькулятор блинов', desc: 'Гриф, блины, %1RM, разминка', tab: 'calc_plates' },
-        { icon: '📐', label: 'Расчёт объёма', desc: 'MEV/MAV/MRV, оптимизация по группам', tab: 'volume' },
       ],
     },
     {
       icon: '⚕', label: 'Периодизация', color: '#f59e0b',
       tools: [
         { icon: '📅', label: 'Фазы и циклы', desc: 'Дизайнер периодизации, делод, прогрессия', tab: 'periodization_hub' },
+        { icon: '📉', label: 'Планировщик тейпера', desc: 'Taper 7-14д, пик, суперкомпенсация', tab: 'taper_planner' as any },
       ],
     },
     {
