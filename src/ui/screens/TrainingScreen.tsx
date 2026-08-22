@@ -35,6 +35,7 @@ import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
 import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
 import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
 import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
+import { BBFoundationCard } from './TrainingScreen_parts/BBFoundationCard';
 
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
@@ -691,6 +692,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {tab === 'split_gen' && <InfoErrorBoundary label="Генератор сплитов"><SplitGenCard /></InfoErrorBoundary>}
             {tab === 'pri_reppat' && <InfoErrorBoundary label="PRI/схема повт"><PriRepPatternCard /></InfoErrorBoundary>}
             {tab === 'tonnage' && <InfoErrorBoundary label="Тоннаж"><TonnageCalcTab /></InfoErrorBoundary>}
+            {tab === 'bb_foundation' && <InfoErrorBoundary label="Основа ББ"><BBFoundationCard /></InfoErrorBoundary>}
               {tab === 'calc_quality' && <InfoErrorBoundary label="Качество программы"><CalcQualityTab onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
             {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
             {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}

@@ -61,7 +61,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
       'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
       'exercise_lab', 'load_safety', 'split_gen', 'pri_reppat',
       'calc_plates', 'calc_quality', 'volume',
-      'training_mix_hub', 'mix_presets', 'tonnage',
+      'training_mix_hub', 'mix_presets', 'tonnage', 'bb_foundation',
     ],
   },
   library: {

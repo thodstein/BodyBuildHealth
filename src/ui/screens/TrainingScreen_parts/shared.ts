@@ -45,7 +45,7 @@ export type TrainingTab =
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
-  | 'training_mix_hub' | 'mix_presets' | 'warmup' | 'cooldown';
+  | 'training_mix_hub' | 'mix_presets' | 'warmup' | 'cooldown' | 'bb_foundation';
 export type TrainingPage = 'hero' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
@@ -102,6 +102,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   training_mix_hub: '🧪 Тренировочные миксы',
   mix_presets: '🧪 Пресеты здоровья',
   tonnage: '📦 Тоннаж калькулятор',
+  bb_foundation: '🏛 Основа ББ',
 
 };
 
