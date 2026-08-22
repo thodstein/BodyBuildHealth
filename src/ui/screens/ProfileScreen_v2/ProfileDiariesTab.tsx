@@ -164,7 +164,8 @@ const DiaryCard: React.FC<{
   onAdd: () => void;
   onOpen: () => void;
   extra?: string;
-}> = ({ diaryKey, count, last, daysSinceLast, loggedToday, onAdd, onOpen, extra }) => {
+  history?: { date: string }[];
+}> = ({ diaryKey, count, last, daysSinceLast, loggedToday, onAdd, onOpen, extra, history }) => {
   const meta = DIARY_META[diaryKey];
   const stale = daysSinceLast !== null && daysSinceLast >= 3 && !loggedToday;
   const staleColor =
@@ -299,6 +300,20 @@ const DiaryCard: React.FC<{
           'Нет записей'
         )}
       </div>
+      {history && (
+        <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
+          {(() => {
+            const set = new Set(history.map(h => h.date));
+            const today = new Date(); today.setHours(0,0,0,0);
+            return Array.from({ length: 7 }, (_, idx) => {
+              const d = new Date(today); d.setDate(today.getDate() - (6 - idx));
+              const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+              const has = set.has(iso);
+              return <div key={iso} title={iso + (has ? ' ✓' : ' —')} style={{ flex: 1, height: 6, borderRadius: 3, background: has ? meta.color : 'rgba(255,255,255,0.08)', opacity: has ? 0.9 : 0.35, transition: 'background 0.2s' }} />;
+            });
+          })()}
+        </div>
+      )}
       {extra && (
         <div style={{ fontSize: 9.5, color: meta.color, lineHeight: 1.35, marginTop: -4 }}>{extra}</div>
       )}
@@ -564,17 +579,18 @@ const QuickLinkRow: React.FC<{ links: QuickLink[]; ariaLabel: string; onNavigate
           background: `${link.color}14`,
           border: `1px solid ${link.color}55`,
           color: colors.text,
+          boxShadow: '0 1px 6px rgba(0,0,0,0.18)',
           transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
           position: 'relative',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-1px)';
-          e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.3)';
+          e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.35)';
           e.currentTarget.style.background = `${link.color}22`;
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = 'none';
+          e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.18)';
           e.currentTarget.style.background = `${link.color}14`;
         }}
       >
@@ -1574,6 +1590,7 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                     last={d.last}
                     daysSinceLast={daysSinceLast(getEntryArray(d.key))}
                     loggedToday={todayEntry(getEntryArray(d.key))}
+                    history={getEntryArray(d.key)}
                     extra={
                       d.key === 'health' && healthEntries[0]
                         ? (() => {
