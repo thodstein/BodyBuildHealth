@@ -1,5 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import type { BBBalanceReport } from './bb-balance.engine';
+import { trueMuscleOf } from '../movement-pattern';
 
 export interface BBPlanReport {
   pattern: string;
@@ -74,6 +75,100 @@ function phaseSummary(plan: BBPlan): string {
   return seq.map(s => `${PHASE_RU[s.phase] || s.phase}: нед ${s.from}${s.to !== s.from ? '-' + s.to : ''}${(plan.weeks.find(w => w.week === s.to) as any)?.deload ? ' (делод)' : ''}`).join(' · ');
 }
 
+/** Покрытие функций сложных мышц (evidence: разные функции требуют разных паттернов —
+ *  спина ≥3 функций (ширина/толщина/задняя дельта), грудь (верх/середина/низ) и т.д.). */
+const FUNCTION_REQ: Record<string, { sub: string; labelRu: string }[]> = {
+  back: [
+    { sub: 'back_width', labelRu: 'ширина (вертикальная тяга)' },
+    { sub: 'back_thickness', labelRu: 'толщина (горизонтальная тяга)' },
+    { sub: 'rear_delts', labelRu: 'задняя дельта' },
+  ],
+  chest: [
+    { sub: 'chest_upper', labelRu: 'верх (наклон 30°)' },
+    { sub: 'chest_mid', labelRu: 'середина (горизонтальный жим)' },
+    { sub: 'chest_lower', labelRu: 'низ (брусья)' },
+  ],
+  hamstrings: [
+    { sub: 'ham_hip', labelRu: 'таз (RDL/шарнир)' },
+    { sub: 'ham_knee', labelRu: 'колено (сгибания)' },
+  ],
+  triceps: [
+    { sub: 'triceps_long', labelRu: 'длинная (overhead)' },
+    { sub: 'triceps_push', labelRu: 'латеральная (блок)' },
+  ],
+};
+
+/** Проверить покрытие функций сложных мышц по подгруппам сводки. Возвращает RU-issues. */
+export function checkBBFunctionCoverage(plan: BBPlan): string[] {
+  const sum = plan.expandedSummary;
+  if (!sum) return [];
+  // Задняя дельта технически живёт в группе shoulders, но в ББ-программировании
+  // относится к функции спины — проверяем её по паттерну упражнения (не по подгруппе).
+  const hasRearDelt = plan.weeks.some(w => (w.sessions || []).some(s => (s.exercises || []).some(e =>
+    !(e as any).warmupActivator && /задн.*дельт|обратн.*свед|face.?pull|тяга к лиц|rear.?delt/i.test(e.name || ''))));
+  const issues: string[] = [];
+  for (const [muscle, reqs] of Object.entries(FUNCTION_REQ)) {
+    const m = sum.byMuscle[muscle];
+    if (!m || m.workingSets === 0) continue;
+    const covered = new Set(Object.keys(m.subGroups || {}).filter(k => (m.subGroups as any)[k].workingSets > 0));
+    const missing = reqs.filter(r => {
+      if (r.sub === 'rear_delts' && hasRearDelt) return false;
+      return !covered.has(r.sub);
+    });
+    if (missing.length) {
+      issues.push(`${muscle === 'back' ? 'Спина' : muscle === 'chest' ? 'Грудь' : muscle === 'hamstrings' ? 'Бицепс бедра' : 'Трицепс'}: не покрыта функция — ${missing.map(r => r.labelRu).join(', ')}.`);
+    }
+  }
+  return issues;
+}
+
+/** Проверить адекватность выбранных упражнений: жимы в decline (низкая ценность для
+ *  гипертрофии) и кросс-мышечные несоответствия (упражнение тренирует не ту мышцу,
+ *  что в слоте плана — напр. пуловер с group='chest', но trueMuscleOf='back'). */
+export function checkBBExerciseAppropriateness(plan: BBPlan): string[] {
+  const issues: string[] = [];
+  for (const week of plan.weeks) for (const s of week.sessions || []) for (const ex of s.exercises || []) {
+    if ((ex as any).warmupActivator) continue;
+    const n = ex.name || '';
+    // Decline-жим: низкая практическая ценность (горизонталь+наклон покрывают грудь).
+    if (/отриц|decline|отрицательн/.test(n)) {
+      issues.push(`Жим в негативном наклоне «${n}» — низкая ценность для гипертрофии груди (лучше заменить на горизонтальный/наклонный жим).`);
+      continue;
+    }
+    // Кросс-мышечное несоответствие: trueMuscleOf ≠ слот плана.
+    const tm = trueMuscleOf({ name: ex.name, muscle: ex.muscle } as any);
+    if (tm && tm !== ex.muscle) {
+      issues.push(`«${n}» поставлен в слот «${ex.muscle}», но реально тренирует «${tm}» (проверьте соответствие).`);
+    }
+  }
+  return issues;
+}
+
+/** Прогрессия нагрузки: средний прирост рабочего веса от недели 1 к пиковой неделе. */
+function progressionSummary(plan: BBPlan): string {
+  const byName = new Map<string, { w1: number; pk: number; muscle: string }>();
+  for (const week of plan.weeks) {
+    const isPeak = week.week === plan.report?.peakWeek || week.week === plan.weeks.length;
+    for (const s of week.sessions || []) for (const ex of s.exercises || []) {
+      if ((ex as any).warmupActivator || ex.role !== 'primary') continue;
+      const w = ex.workSets?.[0]?.weight ?? 0;
+      if (!w) continue;
+      const key = ex.name;
+      const cur = byName.get(key);
+      if (week.week === 1) byName.set(key, { w1: w, pk: w, muscle: ex.muscle });
+      else if (isPeak && cur) byName.set(key, { ...cur, pk: w });
+    }
+  }
+  const rows = [...byName.values()].filter(r => r.w1 > 0 && r.pk > 0);
+  if (!rows.length) return '';
+  const gains = rows.map(r => (r.pk / r.w1 - 1) * 100);
+  const avg = gains.reduce((a, b) => a + b, 0) / gains.length;
+  const peakWeek = plan.report?.peakWeek || plan.weeks.length;
+  if (Math.abs(avg) < 0.5) return `Прогрессия: веса стабильны (нед 1 → пик нед ${peakWeek}, Δ ~0%)`;
+  const dir = avg > 0 ? '↑' : '↓';
+  return `Прогрессия: рабочие веса ${dir} ~${Math.abs(Math.round(avg))}% к пику (нед 1 → нед ${peakWeek}, ${rows.length} первичных упражнений)`;
+}
+
 /** Полный текстовый отчёт ББ-плана (сводка/баланс/фазы/нагрузка). */
 export function buildBBPlanReportText(plan: BBPlan): string {
   const lines: string[] = [];
@@ -125,6 +220,21 @@ export function buildBBPlanReportText(plan: BBPlan): string {
     const v = plan.validation;
     if (v.valid) lines.push('✅ Валидация: план валиден (0 ошибок).');
     else lines.push(`❌ Валидация: ${(v.issues || []).filter(i => i.level === 'error').length} ошибок, ${(v.issues || []).filter(i => i.level === 'warning').length} предупреждений.`);
+  }
+  // Покрытие функций сложных мышц — что не закрыто по паттернам (практическая ценность).
+  const coverage = checkBBFunctionCoverage(plan);
+  if (coverage.length) {
+    lines.push('🧩 Покрытие функций:');
+    for (const c of coverage) lines.push(`  ⚠ ${c}`);
+  }
+  // Прогрессия нагрузки к пику.
+  const prog = progressionSummary(plan);
+  if (prog) lines.push(prog);
+  // Адекватность упражнений (низкоценные/кросс-мышечные) — для информации пользователю.
+  const approx = checkBBExerciseAppropriateness(plan);
+  if (approx.length) {
+    lines.push('🧹 Адекватность упражнений:');
+    for (const a of approx) lines.push(`  ⚠ ${a}`);
   }
   lines.push('');
   lines.push('📋 Недельная сводка сетов:');

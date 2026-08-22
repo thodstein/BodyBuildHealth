@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
-import { buildBBPlanReportText } from '../bb-report.engine';
+import { buildBBPlanReportText, checkBBFunctionCoverage } from '../bb-report.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -35,5 +35,19 @@ describe('BB отчёт качества (без мусора/дублей, с �
     expect(settings).not.toContain('Режим объёма');
     expect(settings).not.toContain('MRV×');
     expect(text).not.toContain('Меньше базы: да');
+  });
+
+  it('отчёт содержит прогрессию нагрузки к пику', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 8, workMax: WM });
+    const text = buildBBPlanReportText(plan);
+    expect(text).toMatch(/Прогрессия:/);
+  });
+
+  it('покрытие функций сложных мышц проверяется (спина требует ширину/толщину/заднюю дельту)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
+    const issues = checkBBFunctionCoverage(plan);
+    // в корректно собранном PPL спина покрывает функции → нет issue про спину
+    const backIssue = issues.find(i => i.startsWith('Спина'));
+    expect(backIssue).toBeUndefined();
   });
 });

@@ -1574,7 +1574,11 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string): void {
       weekDirect[e.muscle] = (weekDirect[e.muscle] || 0) + (e.sets || 0);
     }
     const schemeApplied = new Set<string>();
-    for (const session of week.sessions) {
+    // Схемы объёма (FST-7/GVT/8×8) — это памп/метаболический стиль: применяем их
+    // в ПАМП-сессиях в первую очередь (если мышца тренируется и в тяж, и в памп,
+    // памп-день несёт схему, а не «крадёт» первый попавшийся тяж-день).
+    const sessionsByPref = [...week.sessions.filter(s => s.character === 'памп'), ...week.sessions.filter(s => s.character !== 'памп')];
+    for (const session of sessionsByPref) {
       const byMuscle: Record<string, any[]> = {};
       for (const ex of session.exercises) {
         if ((ex as any).warmupActivator) continue;
