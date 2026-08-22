@@ -1549,6 +1549,42 @@ export const BbAutoConstructor: React.FC = () => {
       trainingYears: bbTrainingYears,
       courseIntensity,
       level: bbLevel,
+      inputSnapshot: {
+        level: bbLevel,
+        goal: bbGoal,
+        trainingVolumeMode,
+        volumeGoal: effectiveVolGoal,
+        trainingFocus: bbTrainingFocus,
+        methodology: bbMethodology,
+        supersetMode,
+        volumeScheme: effectiveVolumeScheme,
+        dupMode,
+        trainingYears: bbTrainingYears,
+        courseIntensity,
+        fewerCompound,
+        rotationMode,
+        intensityLevel,
+        avoidAxialLoad: avoidAxialLoadUi || (prof as any).avoidAxialLoad,
+        equipment: bbEquipment,
+        injuries,
+        mobilityRestrictions,
+        favoriteExercises: bbFavEx,
+        excludedExercises: bbExclEx,
+        autoDeload,
+        deloadType,
+        loadStrategy,
+        eccentricMult,
+        calorieSurplus,
+        proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+        labMrvMultiplier: labAdjust.mrvMultiplier,
+        bodyFat: linked.profile.settings.personal.bodyFat,
+        leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+        hrvMs: linked.profile.settings.lifestyle.morningHRV,
+        sleepHours: linked.profile.settings.lifestyle.sleepHours,
+        stressLevel: linked.profile.settings.lifestyle.stressLevel,
+        weakPoints,
+        focusGroup: '',
+      },
       rationale: [...plan.rationale,
         `📌 Источник: ${modeLabel}`,
         `📈 Стратегия: ${loadStrategy}`,
@@ -3151,6 +3187,23 @@ export const BbAutoConstructor: React.FC = () => {
                     Сплит <b>{(builtPlan as any).pattern?.name}</b> · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises} · PED {(builtPlan as any).pedAdaptation?.activePEDs?.length ? (builtPlan as any).pedAdaptation.activePEDs.join(', ') + ' ×' + (builtPlan as any).pedAdaptation.combinedMrvMultiplier?.toFixed(2) : 'нет'} · Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}
                     {(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0,3).join(', ')}` : ''}
                   </div>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', color:'rgba(255,255,255,0.7)', lineHeight:1.4, fontSize:10 }}>
+                    {(() => {
+                      const s = (builtPlan as any).inputSnapshot;
+                      if (!s) return 'Доп. фильтры: нет';
+                      const parts: string[] = [];
+                      if (s.fewerCompound) parts.push('Меньше базы: да');
+                      if (s.rotationMode) parts.push(`Ротация: ${s.rotationMode}`);
+                      if (s.intensityLevel) parts.push(`Интенс: ${s.intensityLevel}`);
+                      if (s.avoidAxialLoad) parts.push('Без осевой');
+                      if (s.equipment?.length) parts.push(`Оборуд: ${s.equipment.slice(0,3).join(',')}${s.equipment.length>3?'…':''}`);
+                      if (s.injuries?.length) parts.push(`Травм: ${s.injuries.length}`);
+                      if (s.mobilityRestrictions?.length) parts.push(`Мобильн: ${s.mobilityRestrictions.join(',')}`);
+                      if (s.autoDeload != null) parts.push(`Авто-делод: ${s.autoDeload ? 'да' : 'нет'}`);
+                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Ecc×${s.eccentricMult}`);
+                      return parts.length ? parts.join(' · ') : 'Доп. фильтры: нет';
+                    })()}
+                  </div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
                     <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация<br/><b>{report.sessionsPerWeek} сессий</b></div>
                     <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Пик объёма<br/><b>неделя {report.peakWeek}</b></div>
@@ -3166,6 +3219,17 @@ export const BbAutoConstructor: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                  {(builtPlan as any).expandedSummary?.byMuscle?.back?.subGroups && (
+                    <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)', fontSize:10, color:'rgba(255,255,255,0.7)' }}>
+                      <b>Спина по подгруппам (широчайшая/толщина):</b>
+                      {Object.entries((builtPlan as any).expandedSummary.byMuscle.back.subGroups).map(([k, v]: any) => (
+                        <div key={k} style={{ marginTop:3 }}>
+                          <b>{k === 'back_width' ? 'Широчайшая (ширина)' : k === 'back_thickness' ? 'Толщина (ромб/середина)' : k === 'upper_back' ? 'Верх спины' : k === 'rear_delts' ? 'Задняя дельта' : k === 'traps' ? 'Трапеции' : k}: </b>
+                          {v.workingSets}с · {Object.entries(v.byPattern).map(([p,n]: any)=> `${p} ${n}`).join(', ')} · {Object.entries(v.byExercise).map(([e,n]: any)=> `${e} ${n}`).join(', ')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               }
             />
