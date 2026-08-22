@@ -342,6 +342,42 @@ export interface BBPlan {
   dupMode?: string;
   trainingYears?: number;
   courseIntensity?: string;
+  inputSnapshot?: {
+    level?: string;
+    goal?: string;
+    trainingVolumeMode?: 'standard' | 'high';
+    volumeGoal?: string;
+    trainingFocus?: string;
+    methodology?: string;
+    supersetMode?: string;
+    volumeScheme?: string;
+    dupMode?: string;
+    trainingYears?: number;
+    courseIntensity?: string;
+    fewerCompound?: boolean;
+    rotationMode?: string;
+    intensityLevel?: string;
+    avoidAxialLoad?: boolean;
+    equipment?: string[];
+    injuries?: any[];
+    mobilityRestrictions?: string[];
+    favoriteExercises?: string[];
+    excludedExercises?: string[];
+    autoDeload?: boolean;
+    deloadType?: string;
+    loadStrategy?: string;
+    eccentricMult?: number;
+    calorieSurplus?: number;
+    proteinPerKg?: number;
+    labMrvMultiplier?: number;
+    bodyFat?: number;
+    leanMass?: number;
+    hrvMs?: number;
+    sleepHours?: number;
+    stressLevel?: number;
+    weakPoints?: string[];
+    focusGroup?: string;
+  };
 }
 
 /**
@@ -3412,6 +3448,52 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     maxExercises: sessLimits.maxExercises,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: input.mobilityRestrictions,
+    trainingVolumeMode: input.trainingVolumeMode || 'standard',
+    volumeGoal: input.volumeGoal,
+    goal: input.goal,
+    trainingFocus: input.trainingFocus,
+    methodology: input.methodology,
+    supersetMode: input.supersetMode,
+    volumeScheme: input.volumeScheme,
+    dupMode: (input as any).dupMode,
+    trainingYears: input.trainingYears,
+    courseIntensity: input.courseIntensity || pedAdapt?.courseIntensity,
+    inputSnapshot: {
+      level: input.level,
+      goal: input.goal,
+      trainingVolumeMode: input.trainingVolumeMode || 'standard',
+      volumeGoal: input.volumeGoal,
+      trainingFocus: input.trainingFocus,
+      methodology: input.methodology,
+      supersetMode: input.supersetMode,
+      volumeScheme: input.volumeScheme,
+      dupMode: (input as any).dupMode,
+      trainingYears: input.trainingYears,
+      courseIntensity: input.courseIntensity || pedAdapt?.courseIntensity,
+      fewerCompound: input.fewerCompound,
+      rotationMode: input.rotationMode,
+      intensityLevel: input.intensityLevel,
+      avoidAxialLoad: input.avoidAxialLoad,
+      equipment: input.equipment,
+      injuries: input.injuries,
+      mobilityRestrictions: input.mobilityRestrictions,
+      favoriteExercises: input.favoriteExercises,
+      excludedExercises: input.excludedExercises,
+      autoDeload: input.autoDeload,
+      deloadType: input.deloadType,
+      loadStrategy: input.loadStrategy,
+      eccentricMult: input.eccentricMult,
+      calorieSurplus: input.calorieSurplus,
+      proteinPerKg: input.proteinPerKg,
+      labMrvMultiplier: input.labMrvMultiplier,
+      bodyFat: input.bodyFat,
+      leanMass: input.leanMass,
+      hrvMs: input.hrvMs,
+      sleepHours: input.sleepHours,
+      stressLevel: input.stressLevel,
+      weakPoints,
+      focusGroup,
+    },
   };
   syncBBPlanSetShape(output);
   const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears });

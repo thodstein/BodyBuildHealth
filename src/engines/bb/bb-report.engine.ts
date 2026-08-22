@@ -85,6 +85,18 @@ export function buildBBPlanReportText(plan: BBPlan): string {
     const t = p.priorityMuscles?.join(', ') || '';
     settings.push(`Специализация: ${t}`);
   }
+  // Доп. кнопки — чтобы отчёт не был «от новичка» когда выбран объёмный/спец/травмы
+  const snap = p.inputSnapshot || {};
+  if (snap.fewerCompound) settings.push('Меньше базы: да');
+  if (snap.rotationMode) settings.push(`Ротация: ${snap.rotationMode}`);
+  if (snap.intensityLevel) settings.push(`Интенсивность: ${snap.intensityLevel}`);
+  if (snap.avoidAxialLoad) settings.push('Без осевой: да');
+  if (snap.equipment?.length) settings.push(`Оборудование: ${snap.equipment.join(', ')}`);
+  if (snap.injuries?.length) settings.push(`Травмы: ${snap.injuries.length}`);
+  if (snap.mobilityRestrictions?.length) settings.push(`Мобильность: ${snap.mobilityRestrictions.join(', ')}`);
+  if (snap.autoDeload != null) settings.push(`Авто-делод: ${snap.autoDeload ? 'да' : 'нет'}${snap.deloadType ? ` (${snap.deloadType})` : ''}`);
+  if (snap.loadStrategy) settings.push(`Прогрессия: ${snap.loadStrategy}`);
+  if (snap.eccentricMult && snap.eccentricMult !== 1) settings.push(`Ecc×${snap.eccentricMult}`);
   if (settings.length) {
     lines.push(`Настройки: ${settings.join(' · ')}`);
     lines.push('');
