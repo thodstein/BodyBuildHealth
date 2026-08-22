@@ -123,6 +123,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         <h3 style={{ margin: 0, color: '#fff', fontSize: 18 }}>📷 Сканировать продукт</h3>
         <button onClick={() => { stopScanner(); onClose(); }} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer' }}>✕</button>
       </div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:8, lineHeight:1.4 }}>Без ключа • Работает в РФ через ru.openfoodfacts.org • Кэш 7 дней + оффлайн из FOOD_DB</div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button onClick={() => setMode('manual')} style={mode === 'manual' ? btnStyle : btnSecondary}>Штрихкод</button>

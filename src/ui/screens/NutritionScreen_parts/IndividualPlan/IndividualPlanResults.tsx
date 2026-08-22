@@ -83,6 +83,7 @@ export const IndividualPlanResults: React.FC = () => {
     annualPhase,
     setErrorMsg,
     setPlanTab,
+    addPlanToDiary,
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
@@ -1023,13 +1024,30 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {generated && (
-        <button onClick={saveCurrentPlan} style={{
-          ...greenBtn, background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)',
-          fontSize: 13, padding: 12,
-          boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
-        }}>
-          💾 Сохранить в мои планы
-        </button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={saveCurrentPlan} style={{
+            ...greenBtn, background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)',
+            fontSize: 13, padding: 12, flex:1,
+            boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
+          }}>
+            💾 Сохранить в мои планы
+          </button>
+          <button onClick={() => {
+            const ok = addPlanToDiary();
+            if (ok) {
+              const msg = planDays === 7 ? `📒 Неделя (${weekPlan?.days?.length || 7} дн) → дневник` : planDays === 3 ? '📒 3 дня → дневник' : '📒 День → дневник';
+              // @ts-ignore
+              if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, 'success');
+              else alert(msg);
+            }
+          }} style={{
+            flex:1, padding:12, borderRadius:14, border:'none', cursor:'pointer',
+            background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000',
+            fontWeight:700, fontSize:13, boxShadow:'0 4px 16px rgba(0,230,138,0.2)',
+          }}>
+            {planDays === 7 ? '📒 В дневник (неделя)' : planDays === 3 ? '📒 В дневник (3 дня)' : '📒 В дневник'}
+          </button>
+        </div>
       )}
 
       {generated && (

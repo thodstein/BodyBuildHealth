@@ -20,6 +20,7 @@ import { AddFoodPanel } from './diary/AddFoodPanel';
 import { DayMealsList } from './diary/DayMealsList';
 import { QualityInsights } from './diary/QualityInsights';
 import { WeekView } from './diary/WeekView';
+import { FrequentFoodsPanel } from './diary/FrequentFoodsPanel';
 
 type FoodItemLike = { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; fiber?: number; category?: string; tier?: string; description?: string; isVegetarian?: boolean; isGlutenFree?: boolean; isDairyFree?: boolean };
 export type { FoodItemLike };
@@ -491,6 +492,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       
       {/* Tab content */}
       {tab === 'add' && (
+        <>
         <AddFoodPanel
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
@@ -541,7 +543,17 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           onAddCustomFood={addCustomFood}
           ocrFileRef={ocrFileRef} ocrCameraRef={ocrCameraRef}
         />
-      )}
+        {/* FatSecret-уровень: частые продукты 1-клик */}
+        <FrequentFoodsPanel diary={diaryData} onAddFood={(food, mealType) => {
+          const data = { ...diaryData };
+          if (!data[selectedDate]) data[selectedDate] = { meals: {} };
+          if (!data[selectedDate].meals[mealType]) data[selectedDate].meals[mealType] = [];
+          data[selectedDate].meals[mealType].push({ ...food });
+          saveDiary(data);
+          showToast(`⚡ ${food.name} → ${mealType}`);
+        }} />
+        </>
+       )}
 
       {tab === 'day' && (
         <>
