@@ -1,30 +1,25 @@
-/** ExerciseLabMerged.tsx — ПРОФЕССИОНАЛЬНАЯ лаборатория упражнений.
- *  Объединяет: Лабораторию упражнений (6 режимов) + ББ-инструменты (темп/техники/слабые/демография).
- *  Единый инструмент тренера: подбор → техника → сравнение → ПРО-анализ → замена → каталог → ББ-параметры.
+/** ExerciseLabMerged.tsx — ЕДИНЫЙ инструмент лаборатории упражнений (без дублей).
+ *  4 шага мастера: 1) Подбор (нагрузка + блины + тоннаж + 1RM + VBT + ББ-темп/техники — внутри),
+ *  2) Техника (BodyMap + разбор), 3) ПРО+Замена, 4) Сравнение.
+ *  Каталог — drawer выбора, а не вкладка. Все вычисления через единый контекст.
  *  
- *  Поддерживает опциональный режим выбора: при передаче onSelectExercise добавляет кнопки выбора
- *  в каталог и автоматически переключается в режим 'catalog'. */
-import React, { useState, useCallback, useEffect } from 'react';
+ *  Поддерживает onSelectExercise — режим выбора (drawer). */
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { ACCENT, DIM, LabMode } from './ExerciseLabShared';
 import PrescriptionTab from './ExerciseLabPrescription';
 import TechniqueTab from './ExerciseLabTechnique';
 import CompareTab from './ExerciseLabCompare';
-import ProAnalysisTab from './ExerciseLabPro';
-import ExerciseLabSubstitute from './ExerciseLabSubstitute';
+import ProSubstituteTab from './ExerciseLabProSubstitute';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
-import { BbToolsCard } from './BbToolsCard';
 import type { Exercise } from '../../../core/types';
 
-export type LabProMode = LabMode | 'bb_tools';
+export type LabProMode = LabMode | 'bb_tools' | 'pro_substitute';
 
 const MODE_DEFS: Array<{ m: LabProMode; label: string; icon: string; desc: string; color?: string }> = [
-  { m: 'prescription', label: 'Подбор', icon: '📐', desc: 'Подбор упражнений, расчёт нагрузки, 1RM, прогрессия, PRO-анализ группы.' },
-  { m: 'technique', label: 'Техника', icon: '🔬', desc: 'Полный разбор техники: биомеханика, подсказки, ошибки, темп, безопасность, регионы.' },
-  { m: 'compare', label: 'Сравнение', icon: '⚖️', desc: 'Сравнение двух упражнений бок о бок: техника, нагрузка, рекомендация.' },
-  { m: 'pro', label: 'ПРО-анализ', icon: '🔮', desc: 'Force-векторы, stretch-лидеры, покрытие подрегионов, синергетические пары.' },
-  { m: 'substitute', label: 'Замена', icon: '🔄', desc: 'Поиск замены упражнения: разрешённые/запрещённые, альтернативы по группе.' },
-  { m: 'catalog', label: 'Каталог', icon: '📚', desc: 'Полный каталог ~500 упражнений с фильтрами и детальными карточками.' },
-  { m: 'bb_tools', label: 'ББ-инструменты', icon: '💪', desc: 'Темп/отдых по характеру дня, техники интенсификации, слабые группы, демография.', color: '#00e68a' },
+  { m: 'prescription', label: '1 Подбор', icon: '📐', desc: 'Подбор + нагрузка + блины + тоннаж + 1RM + VBT + ББ-темп/техники (внутри). Выбор упражнения → расчёт.' },
+  { m: 'technique', label: '2 Техника', icon: '🔬', desc: 'Разбор техники выбранного упражнения: биомеханика, подсказки, ошибки, темп, безопасность.' },
+  { m: 'pro_substitute', label: '3 ПРО+Замена', icon: '🔮', desc: 'Force-векторы, stretch-лидеры, покрытие подрегионов, синергия + замены (разрешено/запрещено).' },
+  { m: 'compare', label: '4 Сравнение', icon: '⚖️', desc: 'Сравнение двух упражнений бок о бок (если выбраны).' },
 ];
 
 const ExerciseLabMerged: React.FC<{
@@ -33,11 +28,13 @@ const ExerciseLabMerged: React.FC<{
 }> = ({ onSelectExercise, onClose }) => {
   const [mode, setMode] = useState<LabProMode>('prescription');
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
-  // При наличии onSelectExercise автоматически переключаемся в режим каталога
+  // При наличии onSelectExercise — открываем drawer каталога (а не вкладку)
   useEffect(() => {
     if (onSelectExercise) {
-      setMode('catalog');
+      setCatalogOpen(true);
     }
   }, [onSelectExercise]);
 
@@ -48,12 +45,20 @@ const ExerciseLabMerged: React.FC<{
       return [...prev, id];
     });
   }, []);
+  const handleSelectExercise = useCallback((ex: Exercise) => {
+    setSelectedId(ex.id);
+    setCatalogOpen(false);
+    if (onSelectExercise) onSelectExercise(ex);
+  }, [onSelectExercise]);
+
+  // Вычисляем шаги для прогресс-линии
+  const stepIndex = useMemo(() => MODE_DEFS.findIndex(d => d.m === mode), [mode]);
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>🧬 Лаборатория упражнений</span>
-        <span style={{ fontSize: 10, color: DIM, background: 'rgba(0,230,138,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>PRO</span>
+        <span style={{ fontSize: 10, color: DIM, background: 'rgba(0,230,138,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>PRO · ЕДИНЫЙ</span>
         {onSelectExercise && (
           <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700, marginLeft: 'auto' }}>
             Режим выбора
@@ -65,43 +70,40 @@ const ExerciseLabMerged: React.FC<{
           </button>
         )}
       </div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        Профессиональный инструмент тренера: подбор нагрузки, анализ техники, сравнение, ПРО-анализ, замена упражнений, полный каталог и ББ-инструменты — всё в одном месте.
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>
+        Единый инструмент без дублей: подбор + блины + тоннаж + 1RM + VBT + ББ-темп/техники — внутри Шага 1; техника — Шаг 2; ПРО+замена — Шаг 3; сравнение — Шаг 4. Каталог — drawer.
         {onSelectExercise && ' Выберите упражнение из каталога.'}
       </div>
-
-      {/* Row 1: основные режимы */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-        {MODE_DEFS.slice(0, 5).map(({ m, label, icon, desc }) => {
-          const active = mode === m;
-          return (
-            <button key={m} onClick={() => setMode(m)} title={desc}
-              style={{
-                padding: '7px 14px', borderRadius: 9,
-                border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
-                background: active ? 'rgba(0,230,138,0.12)' : 'rgba(0,0,0,0.3)',
-                color: active ? ACCENT : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5,
-              }}
-            >
-              {icon} {label}
-            </button>
-          );
-        })}
+      {/* Прогресс-линия 4 шагов */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+        {MODE_DEFS.map((d, i) => (
+          <div key={d.m} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= stepIndex ? ACCENT : 'rgba(255,255,255,0.08)' }} />
+        ))}
       </div>
-      {/* Row 2: каталог + ББ-инструменты */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-        {MODE_DEFS.slice(5).map(({ m, label, icon, desc, color }) => {
+
+      {/* Единая шапка: выбор упражнения + глобальные действия */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={() => setCatalogOpen(true)} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.08)', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+          📚 Каталог {selectedId ? '· выбрано' : ''}
+        </button>
+        {selectedId && <span style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.04)', padding: '4px 8px', borderRadius: 6 }}>ID: {selectedId}</span>}
+        <button onClick={() => setCompareIds(prev => prev.length ? [] : prev)} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 10 }}>
+          Сброс сравнения {compareIds.length > 0 ? `(${compareIds.length})` : ''}
+        </button>
+      </div>
+
+      {/* 4 шага */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+        {MODE_DEFS.map(({ m, label, icon, desc }) => {
           const active = mode === m;
-          const accent = color || ACCENT;
           return (
             <button key={m} onClick={() => setMode(m)} title={desc}
               style={{
-                padding: '7px 14px', borderRadius: 9,
-                border: active ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
-                background: active ? `${accent}14` : 'rgba(0,0,0,0.3)',
-                color: active ? accent : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 700,
-                transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 5,
+                flex: '1 1 auto', padding: '8px 10px', borderRadius: 10,
+                border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
+                background: active ? 'rgba(0,230,138,0.14)' : 'rgba(0,0,0,0.25)',
+                color: active ? ACCENT : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 800,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
               {icon} {label}
@@ -113,13 +115,30 @@ const ExerciseLabMerged: React.FC<{
         })}
       </div>
 
-      {mode === 'prescription' && <PrescriptionTab />}
-      {mode === 'technique' && <TechniqueTab onSelectForCompare={handleSelectForCompare} />}
-      {mode === 'compare' && <CompareTab initialId1={compareIds[0] || ''} initialId2={compareIds[1] || ''} />}
-      {mode === 'pro' && <ProAnalysisTab />}
-      {mode === 'substitute' && <ExerciseLabSubstitute />}
-      {mode === 'catalog' && <ExerciseLabCatalog onSelectExercise={onSelectExercise} />}
-      {mode === 'bb_tools' && <BbToolsCard />}
+      {mode === 'prescription' && <PrescriptionTab selectedId={selectedId} onSelectExercise={handleSelectExercise} />}
+      {mode === 'technique' && <TechniqueTab selectedId={selectedId} onSelectForCompare={handleSelectForCompare} />}
+      {mode === 'pro_substitute' && <ProSubstituteTab selectedId={selectedId} />}
+      {mode === 'compare' && (
+        compareIds.length >= 1 || selectedId ? (
+          <CompareTab initialId1={compareIds[0] || selectedId || ''} initialId2={compareIds[1] || ''} />
+        ) : (
+          <div style={{ textAlign: 'center', padding: 20, color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>
+            Выберите упражнения для сравнения: в Шаге 2 нажмите ⇆ или выберите в каталоге. Пока выбрано: {compareIds.length}
+          </div>
+        )
+      )}
+
+      {/* Drawer каталога */}
+      {catalogOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '12px 8px', overflowY: 'auto' }}>
+          <div style={{ width: '100%', maxWidth: 760, background: '#18181b', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button onClick={() => setCatalogOpen(false)} style={{ position: 'sticky', top: 8, right: 8, float: 'right', margin: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 11, zIndex: 1 }}>✕ Закрыть каталог</button>
+            <div style={{ paddingTop: 8 }}>
+              <ExerciseLabCatalog onSelectExercise={handleSelectExercise} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

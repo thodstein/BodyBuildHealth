@@ -13,11 +13,16 @@ import {
   REGION_MAP, getExerciseRegion, getResistanceProfile, getDifficultyScaler,
   SUBREGION_DEFS, calcTechniqueScore, getRiskColor,
 } from './ExerciseLabShared';
+import { calculatePlates } from '../../../engines/gym-competition.engine';
+import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
+import { velocityForPct, pctForVelocity, estimate1RMFromVelocity } from '../../../engines/pro/vbt.engine';
+import { tempoFor, tutForSet } from '../../../engines/bb/bb-tempo-rest';
+import { techniquesFor } from '../../../engines/bb/bb-intensity-techniques';
 
-const PrescriptionTab: React.FC = () => {
+const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?: (ex: any) => void }> = ({ selectedId, onSelectExercise }) => {
   const { profile } = useDataLink();
   const [group, setGroup] = useState('chest');
-  const [exId, setExId] = useState('');
+  const [exId, setExId] = useState(selectedId || '');
   const [oneRM, setOneRM] = useState(0);
   const [goal, setGoal] = useState('strength');
   const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('intermediate');
@@ -33,6 +38,8 @@ const PrescriptionTab: React.FC = () => {
   const [genLevel, setGenLevel] = useState('intermediate');
   const [genCount, setGenCount] = useState(5);
   const [genResult, setGenResult] = useState<Array<{ name: string; group: string; type: string; equipment: string; sets: number; reps: string; rir: number; rest: number; weight: number; pct: number }> | null>(null);
+
+  useEffect(() => { if (selectedId) setExId(selectedId); }, [selectedId]);
 
   useEffect(() => {
     if (!profile) return;
@@ -235,70 +242,7 @@ const PrescriptionTab: React.FC = () => {
     return { list: scored, currentScore, currentRank: rank === -1 ? scored.length + 1 : rank + 1, total: scored.length + 1 };
   }, [ex, goal, level, week, totalWeeks, resistanceProfile]);
 
-  // ── Pro Analysis (group-level) ──
-  const [showProAnalysis, setShowProAnalysis] = useState(false);
-
-  const proGroupExercises = useMemo(() =>
-    EXERCISE_CATALOG.filter(e => e.group === group).map(ex => ({
-      exercise: ex,
-      rp: getResistanceProfile(ex),
-      fv: forceVector(ex.group, ex.type, ex.name),
-      score: calcTechniqueScore(ex),
-      safety: assessSafety(ex.id, [], calcTechniqueScore(ex).total / 100),
-      lp: lengthenedPartials(ex.group),
-    })).sort((a, b) => b.rp.score - a.rp.score),
-  [group]);
-
-  const proFvDist = useMemo(() => {
-    const map: Record<string, number> = {};
-    proGroupExercises.forEach(g => { map[g.fv] = (map[g.fv] || 0) + 1; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [proGroupExercises]);
-
-  const proStretchLeaders = useMemo(() => proGroupExercises.filter(g => g.rp.curve === 'stretch_mediated').slice(0, 5), [proGroupExercises]);
-
-  const proSynergyPairs = useMemo(() => {
-    const pairs: Array<{ a: string; b: string; type: string; reason: string }> = [];
-    const seen = new Set<string>();
-    const antagonistMap: Record<string, string[]> = {
-      horizontal_push: ['horizontal_pull'], horizontal_pull: ['horizontal_push'],
-      vertical_push: ['vertical_pull'], vertical_pull: ['vertical_push'],
-      knee_dominant: ['hip_dominant'], hip_dominant: ['knee_dominant'],
-      core_anti: [], other: [],
-    };
-    proGroupExercises.forEach(a => {
-      proGroupExercises.forEach(b => {
-        if (a.exercise.id === b.exercise.id) return;
-        const key = [a.exercise.id, b.exercise.id].sort().join('|');
-        if (seen.has(key)) return;
-        const agn = antagonistMap[a.fv] || [];
-        if (agn.includes(b.fv)) {
-          seen.add(key);
-          pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'антагонист', reason: `${a.fv} ↔ ${b.fv} — суперсет без перекрёстного утомления` });
-        }
-        if (a.fv === b.fv && a.rp.curve !== b.rp.curve) {
-          seen.add(key);
-          pairs.push({ a: a.exercise.name, b: b.exercise.name, type: 'вариация', reason: `один вектор (${a.fv}), разные кривые: ${a.rp.label} vs ${b.rp.label}` });
-        }
-      });
-    });
-    return pairs.slice(0, 10);
-  }, [proGroupExercises]);
-
-  const proRegionalCoverage = useMemo(() => {
-    const regions = SUBREGION_DEFS[group] || [];
-    const covered: string[] = [];
-    const uncovered: string[] = [];
-    regions.forEach(r => {
-      const has = proGroupExercises.some(g => {
-        const tm = (g.exercise.targetMuscle || '').toLowerCase();
-        return r.keywords.some(kw => tm.includes(kw.toLowerCase()));
-      });
-      if (has) covered.push(r.name);
-      else uncovered.push(r.name);
-    });
-    return { covered, uncovered, total: regions.length };
-  }, [group, proGroupExercises]);
+  // PRO-анализ группы вынесён в Шаг 3 (ProSubstituteTab) — без дублей.
 
   const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; goal: string; level: string; week: number; oneRM: number; reps: string; sets: number; rir: number; rest: number; weight: number; date: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'); } catch { return []; } });
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -321,11 +265,7 @@ const PrescriptionTab: React.FC = () => {
     if (fatigueAnalysis) lines.push(`ЦНС: ${fatigueAnalysis.cnsLoad}/10 · Мышцы: ${fatigueAnalysis.muscularLoad}/10 · Восст.: ${fatigueAnalysis.recoveryHours}ч`);
     if (metabolicCost) lines.push(`Метаболизм: ${metabolicCost.totalCal} ккал · Гликоген: ${metabolicCost.glycogen}г · EPOC: +${metabolicCost.epoc} ккал`);
     if (oneRMProjection) lines.push(`Прогноз 1ПМ: ${oneRMProjection.projected} кг (+${oneRMProjection.pctGain}%) через ${oneRMProjection.progressionWeeks} нед`);
-    lines.push('--- PRO-анализ группы ---');
-    lines.push(`Force-векторы: ${proFvDist.map(([fv, c]) => `${fv.replace(/_/g, ' ')}:${c}`).join(', ')}`);
-    lines.push(`Подрегионы: ${proRegionalCoverage.covered.length}/${proRegionalCoverage.total} покрыто`);
-    if (proRegionalCoverage.uncovered.length > 0) lines.push(`Непокрытые: ${proRegionalCoverage.uncovered.join(', ')}`);
-    if (proStretchLeaders.length > 0) lines.push(`Stretch-лидеры: ${proStretchLeaders.map(g => g.exercise.name).join(', ')}`);
+    lines.push('--- Единый инструмент: ПРО+Замена в Шаге 3 ---');
     navigator.clipboard?.writeText(lines.join('\n')).catch(() => {});
   };
 
@@ -543,65 +483,67 @@ const PrescriptionTab: React.FC = () => {
           </div>
         )}
 
-        {/* PRO ANALYSIS — group-level */}
-        <div onClick={() => setShowProAnalysis(v => !v)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, marginBottom: 8, fontSize: 12, fontWeight: 700, color: '#a855f7' }}>
-          <span>{showProAnalysis ? '▲' : '▼'}</span> 📊 PRO-анализ группы «{GROUP_RU[group]}»
-        </div>
-        {showProAnalysis && (<>
-          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 6 }}>📐 Распределение force-векторов</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-              {proFvDist.map(([fv, count]) => (
-                <div key={fv} style={{ padding: '5px 10px', borderRadius: 6, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.12)', textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#c084fc' }}>{fv.replace(/_/g, ' ')}</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#c084fc' }}>{count}</div>
-                  <div style={{ fontSize: 10, color: DIM }}>упр.</div>
+        {/* ВСТРОЕННЫЕ МИНИ-ИНСТРУМЕНТЫ (втянуты без дублей, раньше — отдельные вкладки/карточки) */}
+        {ex && presc && workWeight > 0 && (
+          <>
+            {/* 1RM консенсус + плиты */}
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(0,230,138,0.12)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🧮 1RM + Блины (втянуто)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: DIM }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ fontWeight: 700, color: '#fff' }}>Консенсус 1RM</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{(() => { try { const c = estimate1RMConsensus(oneRM, parseInt(presc.reps) || 5); return Math.round((c.mean || oneRM) * 10) / 10; } catch { return oneRM; } })()} кг</div>
+                  <div style={{ fontSize: 10, color: DIM }}>среднее по 7 формулам (Epley/Brzycki…)</div>
                 </div>
-              ))}
+                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ fontWeight: 700, color: '#fff' }}>Блины на сторону</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>{(() => { const pl = calculatePlates(workWeight, 20, 'kg'); return pl.platesPerSide.length ? pl.platesPerSide.map(p => `${p.plate}×${p.count}`).join(' + ') : 'гриф'; })()}</div>
+                  <div style={{ fontSize: 10, color: DIM }}>гриф 20 кг · {workWeight} кг рабочий</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>В полной версии — `PlateCalcTab` модалка с SVG и разминкой.</div>
             </div>
-          </div>
 
-          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(34,197,94,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>🏆 Stretch-mediated лидеры (топ-5)</div>
-            {proStretchLeaders.length > 0 ? proStretchLeaders.map((g, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', borderRadius: 4, marginBottom: 2, background: i === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)', fontSize: 10 }}>
-                <span style={{ fontWeight: 600 }}>#{i + 1} {g.exercise.name}</span>
-                <span style={{ color: '#22c55e' }}>{g.rp.score}/10</span>
-                <span style={{ color: DIM, fontSize: 10 }}>{g.exercise.type === 'compound' ? 'База' : 'Изол.'}</span>
-              </div>
-            )) : <div style={{ fontSize: 10, color: DIM, padding: 6 }}>Нет stretch-mediated упражнений в этой группе.</div>}
-          </div>
-
-          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(59,130,246,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📍 Покрытие подрегионов: {proRegionalCoverage.covered.length}/{proRegionalCoverage.total}</div>
-            {proRegionalCoverage.covered.length > 0 && (
-              <div style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 600, marginBottom: 2 }}>✅ Покрыты:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {proRegionalCoverage.covered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, background: 'rgba(34,197,94,0.08)', color: '#22c55e' }}>{r}</span>)}
+            {/* VBT */}
+            <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(96,165,250,0.14)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>⚡ VBT (скорость штанги)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10 }}>
+                <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ color: DIM }}>Скорость для {pct}% 1RM</div><div style={{ fontWeight: 800, color: '#60a5fa', fontSize: 13 }}>{(() => { try { return velocityForPct(ex.id as any, pct / 100) ?? '—'; } catch { return '—'; } })()} м/с</div>
+                </div>
+                <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ color: DIM }}>e1RM по скорости</div><div style={{ fontWeight: 800, color: '#60a5fa', fontSize: 12 }}>{(() => { try { const v = velocityForPct(ex.id as any, pct / 100) as any; const e = typeof v === 'number' ? estimate1RMFromVelocity(ex.id as any, v, workWeight) : null; return e ? `${Math.round(e as any)} кг` : '—'; } catch { return '—'; } })()}</div>
                 </div>
               </div>
-            )}
-            {proRegionalCoverage.uncovered.length > 0 && (
-              <div>
-                <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>❌ Не покрыты:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                  {proRegionalCoverage.uncovered.map(r => <span key={r} style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{r}</span>)}
+              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Оценивает %1RM по скорости и наоборот. Полная VBT — в `VBTCalcTab`.</div>
+            </div>
+
+            {/* Тоннаж */}
+            <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(245,158,11,0.14)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>📦 Тоннаж/КПШ мини</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10, textAlign: 'center' as const }}>
+                <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>Тоннаж</div><div style={{ fontWeight: 800, fontSize: 13, color: '#f59e0b' }}>{volumeLoad.toLocaleString()} кг</div></div>
+                <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>КПШ</div><div style={{ fontWeight: 800, fontSize: 13 }}>{presc.sets * (parseInt(presc.reps) || 5)}</div></div>
+                <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>УОИ</div><div style={{ fontWeight: 800, fontSize: 13 }}>{pct}%</div></div>
+              </div>
+            </div>
+
+            {/* ББ темп/техники */}
+            <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(168,85,247,0.14)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>💪 ББ темп/техники (втянуто)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10 }}>
+                <div style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ color: DIM }}>Темп/отдых</div><div style={{ fontWeight: 700 }}>{(() => { const t = tempoFor(ex.type === 'compound' ? 'тяж' as any : 'памп' as any); return `${t.notation} · ${tutForSet(parseInt(presc.reps) || 8, ex.type === 'compound' ? 'тяж' as any : 'памп' as any)}с TUT`; })()}</div>
+                </div>
+                <div style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ color: DIM }}>Техники</div><div style={{ fontWeight: 700, fontSize: 10 }}>{techniquesFor(ex.type === 'compound' ? 'тяж' as any : 'памп' as any, level).slice(0, 2).map(t => t.name).join(', ') || '—'}</div>
                 </div>
               </div>
-            )}
-          </div>
-
-          <div style={{ ...CARD, marginBottom: 10, border: '1px solid rgba(251,146,60,0.2)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#fb923c', marginBottom: 6 }}>🔗 Сила синергии: лучшие пары</div>
-            {proSynergyPairs.length > 0 ? proSynergyPairs.map((p, i) => (
-              <div key={i} style={{ padding: '5px 6px', borderRadius: 4, marginBottom: 3, background: 'rgba(251,146,60,0.03)', border: '1px solid rgba(251,146,60,0.08)', fontSize: 10 }}>
-                <div style={{ fontWeight: 700, color: '#fff', marginBottom: 1 }}>{p.a} + {p.b}</div>
-                <div style={{ color: DIM }}>{p.type}: {p.reason}</div>
-              </div>
-            )) : <div style={{ fontSize: 10, color: DIM, padding: 6 }}>Нет явных синергетических пар в этой группе.</div>}
-          </div>
-        </>)}
+              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Детально — Шаг 1 остаётся без дублей; полный разбор — в `BbToolsCard`.</div>
+            </div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 6, textAlign: 'center' }}>ℹ️ PRO-анализ группы теперь в Шаге 3 «ПРО+Замена» — без дублирования.</div>
+          </>
+        )}
 
         {ex && presc && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>

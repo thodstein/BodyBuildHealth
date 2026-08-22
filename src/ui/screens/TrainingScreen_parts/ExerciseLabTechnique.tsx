@@ -20,10 +20,23 @@ const COLLAPSED_HEIGHT = 42;
 
 interface TechniqueTabProps {
   onSelectForCompare?: (id: string) => void;
+  selectedId?: string | null;
 }
 
-const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare }) => {
-  const [group, setGroup] = useState('chest');
+const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selectedId }) => {
+  const [group, setGroup] = useState(() => {
+    if (selectedId) {
+      const found = EXERCISE_CATALOG.find(e => e.id === selectedId);
+      if (found) return found.group;
+    }
+    return 'chest';
+  });
+  useEffect(() => {
+    if (selectedId) {
+      const found = EXERCISE_CATALOG.find(e => e.id === selectedId);
+      if (found) { setGroup(found.group); setExpandedEx(selectedId); }
+    }
+  }, [selectedId]);
   const [viewMode, setViewMode] = useState<'subregion' | 'list'>('subregion');
   const [expandedEx, setExpandedEx] = useState<string | null>(null);
   const [expandedRegion, setExpandedRegion] = useState<string | null>(null);
