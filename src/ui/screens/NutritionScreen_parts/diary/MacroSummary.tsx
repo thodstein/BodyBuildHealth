@@ -15,7 +15,10 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
     { l: 'Углев.', v: Math.round(dayTotals.c), t: t.carbs, u: 'г', c: '#f97316', icon: '🍞', bg: 'rgba(249,115,22,0.08)' },
   ];
 
+  const remainingKcal = t.kcal - dayTotals.kcal;
+  const isOverKcal = remainingKcal < 0;
   return (
+    <>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
       {items.map(m => {
         const pct = m.t > 0 ? Math.min(100, Math.round(m.v / m.t * 100)) : 0;
@@ -40,5 +43,10 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
         );
       })}
     </div>
+    <div style={{ marginTop:6, padding:'6px 10px', borderRadius:10, background: isOverKcal ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.06)', border:`1px solid ${isOverKcal ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.12)'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+      <span style={{ fontSize:10, color: isOverKcal ? '#ef4444' : '#00e68a', fontWeight:700 }}>{isOverKcal ? `Перебор ${Math.abs(remainingKcal)} ккал` : `Осталось ${remainingKcal} ккал`}</span>
+      <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{isOverKcal ? '˃ цель' : `${Math.round(remainingKcal/t.kcal*100)}% от цели`}</span>
+    </div>
+    </>
   );
 };

@@ -175,7 +175,24 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         </div>
       )}
 
-      {error && <div style={{ color: '#ef4444', fontSize: 13, marginTop: 10 }}>{error}</div>}
+      {error && (
+        <div style={{ marginTop:10, padding:10, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}>
+          <div style={{ color: '#ef4444', fontSize: 12, marginBottom:8 }}>{error}</div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            <button onClick={() => {
+              const name = prompt('Название продукта с этикетки:');
+              if (!name) return;
+              const kcal = Number(prompt('Ккал на 100г:', '100') || 100);
+              const p = Number(prompt('Белки г/100г:', '5') || 0);
+              const f = Number(prompt('Жиры г/100г:', '5') || 0);
+              const c = Number(prompt('Углеводы г/100г:', '10') || 0);
+              const bc = barcode || 'custom_' + Date.now();
+              onProductFound({ id: bc, barcode: bc, name, kcal: isNaN(kcal)?100:kcal, protein: isNaN(p)?0:p, fat: isNaN(f)?0:f, carbs: isNaN(c)?0:c, fiber:0, servingSize:'100 г', cachedAt: Date.now() } as any);
+            }} style={{ ...btnStyle, background:'#00e68a', color:'#000', fontSize:12 }}>➕ Создать свою еду (оффлайн)</button>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', alignSelf:'center' }}>Без сети — сохранится в кэш</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
