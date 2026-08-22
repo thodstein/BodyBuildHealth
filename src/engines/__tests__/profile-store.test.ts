@@ -13,6 +13,7 @@ import {
   WEIGHT_LOG_KEY,
   type WeightEntry,
 } from '../profile-store';
+import { memoryStore } from '../weight-photo-store';
 
 const KEY = WEIGHT_LOG_KEY;
 const ARCHIVE = 'he_weight_log_archive';
@@ -26,6 +27,7 @@ const daysAgo = (n: number): string => {
 
 beforeEach(() => {
   localStorage.clear();
+  memoryStore.clear();
 });
 
 describe('getWeightLog — нормализация и фильтр', () => {
@@ -81,8 +83,8 @@ describe('getWeightLog — нормализация и фильтр', () => {
 });
 
 describe('saveWeightLog — дедуп, сортировка, архив', () => {
-  it('дедуплицирует по дате (побеждает последняя запись)', () => {
-    saveWeightLog([
+  it('дедуплицирует по дате (побеждает последняя запись)', async () => {
+    await saveWeightLog([
       { date: '2026-01-01', weight: 82 },
       { date: '2026-01-01', weight: 82.4 },
       { date: '2026-01-02', weight: 83 },
@@ -92,8 +94,8 @@ describe('saveWeightLog — дедуп, сортировка, архив', () =>
     expect(log.find((e) => e.date === '2026-01-01')?.weight).toBe(82.4);
   });
 
-  it('отбрасывает записи без даты и с NaN-весом при сохранении', () => {
-    saveWeightLog([
+  it('отбрасывает записи без даты и с NaN-весом при сохранении', async () => {
+    await saveWeightLog([
       { date: '2026-01-01', weight: 82 },
       { date: '', weight: 90 },
       { date: '2026-01-02', weight: NaN },
@@ -104,31 +106,29 @@ describe('saveWeightLog — дедуп, сортировка, архив', () =>
     expect(log[0].date).toBe('2026-01-01');
   });
 
-  it('при >365 записях в архив уходят СТАРЫЕ, в логе остаются свежие (входной порядок не важен)', () => {
+  it('при >365 записях в архив уходят СТАРЫЕ, в логе остаются свежие (входной порядок не важен)', async () => {
     const entries: WeightEntry[] = [];
     for (let i = 0; i < 370; i++) entries.push({ date: daysAgo(i), weight: 80 + i * 0.01 });
-    const desc = [...entries].sort((a, b) => b.date.localeCompare(a.date)); // как WeightDiary.commit
-    saveWeightLog(desc);
+    const desc = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+    await saveWeightLog(desc);
     const log = getWeightLog();
     const archive = getWeightLogArchived();
     expect(log).toHaveLength(365);
     expect(archive).toHaveLength(5);
-    // В логе — самые свежие даты
     expect(log.every((e) => e.date >= daysAgo(364))).toBe(true);
-    // В архиве — самые старые
     expect(archive.every((e) => e.date < daysAgo(364))).toBe(true);
-    expect(new Set([...log, ...archive].map((e) => e.date)).size).toBe(370); // ничего не потеряно
+    expect(new Set([...log, ...archive].map((e) => e.date)).size).toBe(370);
   });
 
-  it('не создаёт архив при <=365 записях', () => {
+  it('не создаёт архив при <=365 записях', async () => {
     const entries: WeightEntry[] = [];
     for (let i = 0; i < 365; i++) entries.push({ date: daysAgo(i), weight: 80 });
-    saveWeightLog(entries);
+    await saveWeightLog(entries);
     expect(getWeightLogArchived()).toEqual([]);
     expect(getWeightLog()).toHaveLength(365);
   });
 
-  it('мержит новые вытесненные записи в существующий архив без дублей', () => {
+  it('мержит новые вытесненные записи в существующий архив без дублей', async () => {
     localStorage.setItem(
       ARCHIVE,
       JSON.stringify([
@@ -138,12 +138,12 @@ describe('saveWeightLog — дедуп, сортировка, архив', () =>
     );
     const entries: WeightEntry[] = [];
     for (let i = 0; i < 366; i++) entries.push({ date: daysAgo(i), weight: 80 });
-    saveWeightLog(entries);
+    await saveWeightLog(entries);
     const archive = getWeightLogArchived();
     const dates = new Set(archive.map((e) => e.date));
     expect(dates.has(daysAgo(400))).toBe(true);
     expect(dates.has(daysAgo(401))).toBe(true);
-    expect(dates.size).toBe(archive.length); // без дублей
+    expect(dates.size).toBe(archive.length);
   });
 });
 
@@ -165,18 +165,18 @@ describe('getWeightLogArchived — нормализация', () => {
 });
 
 describe('migrateWeightLogLegacy — слияние без потерь', () => {
-  it('legacy-запись без веса не затирает канонический вес/замеры, но дополняет пустые поля', () => {
+  it('legacy-запись без веса не затирает канонический вес/замеры, но дополняет пустые поля', async () => {
     localStorage.setItem(KEY, JSON.stringify([{ date: '2026-01-01', weight: 82, waistCm: 79 }]));
     localStorage.setItem('he_measurements', JSON.stringify([{ date: '2026-01-01', weightKg: 0, waistCm: 85, chestCm: 102 }]));
-    migrateWeightLogLegacy();
+    await migrateWeightLogLegacy();
     const log = getWeightLog();
     expect(log).toHaveLength(1);
-    expect(log[0].weight).toBe(82); // вес не потерян
-    expect(log[0].waistCm).toBe(79); // канонический замер имеет приоритет
-    expect(log[0].chestCm).toBe(102); // пустое поле дополнено из legacy
+    expect(log[0].weight).toBe(82);
+    expect(log[0].waistCm).toBe(79);
+    expect(log[0].chestCm).toBe(102);
   });
 
-  it('маппит плечи и предплечья L/R из he_measurements', () => {
+  it('маппит плечи и предплечья L/R из he_measurements', async () => {
     localStorage.setItem(
       'he_measurements',
       JSON.stringify([
@@ -191,14 +191,14 @@ describe('migrateWeightLogLegacy — слияние без потерь', () => 
         },
       ]),
     );
-    migrateWeightLogLegacy();
+    await migrateWeightLogLegacy();
     const log = getWeightLog();
     expect(log[0].shoulderCm).toBe(122);
     expect(log[0].forearmLeftCm).toBe(30);
     expect(log[0].forearmRightCm).toBe(30.5);
   });
 
-  it('сливает все 4 legacy-хранилища по датам и удаляет мигрированные ключи', () => {
+  it('сливает все 4 legacy-хранилища по датам и удаляет мигрированные ключи', async () => {
     localStorage.setItem('he_measurements', JSON.stringify([{ date: '2026-01-01', weightKg: 81, waistCm: 80 }]));
     localStorage.setItem(
       'he_body_comp',
@@ -209,7 +209,7 @@ describe('migrateWeightLogLegacy — слияние без потерь', () => 
       'he_nutrition_v2',
       JSON.stringify({ weightHistory: [{ date: '2026-01-04', kg: 84 }] }),
     );
-    migrateWeightLogLegacy();
+    await migrateWeightLogLegacy();
     const log = getWeightLog();
     expect(log).toHaveLength(4);
     expect(log.find((e) => e.date === '2026-01-02')?.bodyFat).toBe(15);
@@ -219,19 +219,19 @@ describe('migrateWeightLogLegacy — слияние без потерь', () => 
     expect(localStorage.getItem(MIGRATED)).toBe('1');
   });
 
-  it('идемпотентен — второй запуск ничего не меняет', () => {
+  it('идемпотентен — второй запуск ничего не меняет', async () => {
     localStorage.setItem(KEY, JSON.stringify([{ date: '2026-01-01', weight: 82 }]));
-    migrateWeightLogLegacy();
+    await migrateWeightLogLegacy();
     const first = JSON.stringify(getWeightLog());
     localStorage.setItem('he_measurements', JSON.stringify([{ date: '2026-01-02', weightKg: 83 }]));
-    migrateWeightLogLegacy(); // флаг уже стоит
+    await migrateWeightLogLegacy(); // флаг уже стоит
     expect(JSON.stringify(getWeightLog())).toBe(first);
   });
 
-  it('каноническая запись имеет приоритет над legacy на той же дате', () => {
+  it('каноническая запись имеет приоритет над legacy на той же дате', async () => {
     localStorage.setItem(KEY, JSON.stringify([{ date: '2026-01-01', weight: 90 }]));
     localStorage.setItem('he_measurements', JSON.stringify([{ date: '2026-01-01', weightKg: 81 }]));
-    migrateWeightLogLegacy();
+    await migrateWeightLogLegacy();
     expect(getWeightLog()[0].weight).toBe(90);
   });
 });
@@ -251,9 +251,9 @@ describe('deprecated-обёртки measurements', () => {
     expect(ms[0].shoulderCm).toBe(120);
   });
 
-  it('saveMeasurementsLog мержит в существующие записи', () => {
+  it('saveMeasurementsLog мержит в существующие записи', async () => {
     localStorage.setItem(KEY, JSON.stringify([{ date: '2026-01-01', weight: 82, waistCm: 80 }]));
-    saveMeasurementsLog([
+    await saveMeasurementsLog([
       { date: '2026-01-01', waistCm: 79, chestCm: 100, hipCm: 0, bicepCm: 0, thighCm: 0, neckCm: 0, forearmCm: 0, bodyFat: 0 },
     ]);
     const log = getWeightLog();

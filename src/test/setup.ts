@@ -56,4 +56,39 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
   });
 }
 
+// Mock indexedDB for weight-photo-store
+const createIDBMock = () => {
+  const stores: Record<string, Map<string, any>> = {};
+  return {
+    open: (name: string, version: number) => {
+      const db = {
+        objectStoreNames: { contains: (s: string) => stores[s] !== undefined },
+        createObjectStore: (s: string) => { stores[s] = new Map(); },
+        transaction: (storeNames: string | string[], mode: string) => {
+          const name = Array.isArray(storeNames) ? storeNames[0] : storeNames;
+          const store = stores[name] || new Map();
+          return {
+            objectStore: () => ({
+              put: (val: any) => { store.set(val.date || val.key, val); },
+              get: (key: string) => store.get(key),
+              delete: (key: string) => { store.delete(key); },
+              clear: () => { store.clear(); },
+              getAllKeys: () => Array.from(store.keys()),
+              getAll: () => Array.from(store.values()),
+            }),
+            oncomplete: null,
+            onerror: null,
+          };
+        },
+        onupgradeneeded: null,
+      };
+      return Promise.resolve(db);
+    },
+  };
+};
+
+if (typeof indexedDB === 'undefined') {
+  (global as any).indexedDB = createIDBMock();
+}
+
 export {};

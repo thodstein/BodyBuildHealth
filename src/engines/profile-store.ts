@@ -4,6 +4,14 @@
  * Diary-данные (вес, замеры, давление) остаются в отдельных localStorage.
  */
 
+import {
+  saveWeightPhotos,
+  getWeightPhotos,
+  deleteWeightPhotos,
+  cleanupOldWeightPhotos,
+  migrateWeightPhotosFromLocalStorage,
+} from './weight-photo-store';
+
 /* ── localStorage keys (diary only) ── */
 const KEYS = {
   weight: 'he_weight_log',
@@ -92,12 +100,25 @@ export function getWeightLog(): WeightEntry[] {
   } catch { return []; }
 }
 
+/** Асинхронная версия: подгружает фото из IndexedDB. */
+export async function getWeightLogWithPhotos(): Promise<WeightEntry[]> {
+  const entries = getWeightLog();
+  for (const entry of entries) {
+    if (entry.date) {
+      const photos = await getWeightPhotos(entry.date);
+      if (photos && photos.length > 0) entry.photos = photos;
+    }
+  }
+  return entries;
+}
+
 /**
  * Сохранение лога: дедупликация по дате, сортировка по дате (asc),
  * обрезка до 365 самых СВЕЖИХ записей; старшие уходят в архив.
+ * Фото хранятся в IndexedDB (weight-photo-store), в localStorage — только метаданные.
  * Устойчив к любому порядку входящего массива.
  */
-export function saveWeightLog(log: WeightEntry[]) {
+export async function saveWeightLog(log: WeightEntry[]): Promise<void> {
   const byDate = new Map<string, WeightEntry>();
   for (const e of log) {
     const n = normalizeWeightEntry(e);
@@ -105,6 +126,8 @@ export function saveWeightLog(log: WeightEntry[]) {
   }
   const deduped = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   const trimmed = deduped.slice(-365);
+
+  // Архив старших записей
   if (trimmed.length < deduped.length) {
     const overflow = deduped.slice(0, deduped.length - 365);
     try {
@@ -114,25 +137,23 @@ export function saveWeightLog(log: WeightEntry[]) {
       localStorage.setItem(KEYS.weightArchive, JSON.stringify([...arcByDate.values()]));
     } catch { /* quota — silent */ }
   }
-  const totalPhotos = trimmed.reduce((sum, e) => sum + (e.photos?.length || 0), 0);
-  let estimatedSize = new Blob([JSON.stringify(trimmed)]).size;
-  if (estimatedSize > 4 * 1024 * 1024) {
-    console.warn(`[profile-store] weight log size ${(estimatedSize / 1024 / 1024).toFixed(1)}MB — removing old photos`);
-    // Автоочистка фото: убираем фото из СТАРЫХ записей (кроме 30 новейших),
-    // пока размер не войдёт в лимит 4MB. Фото освобождают место быстрее всего.
-    const newest30 = new Set(trimmed.slice(-30).map((e) => e.date));
-    const stripped = trimmed.map((e) => {
-      if (newest30.has(e.date) || !e.photos || e.photos.length === 0) return e;
-      return { ...e, photos: undefined };
-    });
-    const resized = new Blob([JSON.stringify(stripped)]).size;
-    if (resized < estimatedSize) {
-      trimmed.length = 0;
-      trimmed.push(...stripped);
-      estimatedSize = resized;
+
+  // Сохраняем фото в IndexedDB, в localStorage — записи БЕЗ фото
+  const datesToKeep = new Set(trimmed.map(e => e.date));
+  for (const entry of trimmed) {
+    if (entry.photos && entry.photos.length > 0) {
+      await saveWeightPhotos(entry.date, entry.photos);
     }
   }
-  localStorage.setItem(KEYS.weight, JSON.stringify(trimmed));
+  // Удаляем фото для дат, которых больше нет в trimmed (старше 365 дней)
+  await cleanupOldWeightPhotos(datesToKeep);
+
+  // Записываем в localStorage записи БЕЗ фото
+  const forStorage = trimmed.map(e => {
+    const { photos, ...rest } = e;
+    return rest;
+  });
+  localStorage.setItem(KEYS.weight, JSON.stringify(forStorage));
 }
 
 /** Записи старше 365 дней, вынесенные из основного лога (без фото-раздувания). */
@@ -151,10 +172,10 @@ export function getWeightLogArchived(): WeightEntry[] {
  * Выполняется один раз (флаг he_weight_log_migrated_v1), приоритет — уже
  * существующие канонические записи. Чистые функции без React.
  */
-export function migrateWeightLogLegacy(): void {
+export async function migrateWeightLogLegacy(): Promise<void> {
   try {
     if (localStorage.getItem(KEYS.weightMigrated)) return;
-    const log = getWeightLog();
+    const log = await getWeightLog();
     const byDate = new Map<string, Partial<WeightEntry>>();
     for (const e of log) if (e && e.date) byDate.set(e.date, { ...e });
 
@@ -290,7 +311,7 @@ export function getMeasurementsLog(): MeasurementEntry[] {
     }));
 }
 /** @deprecated Use saveWeightLog() instead. Merges measurements into weight log. */
-export function saveMeasurementsLog(log: MeasurementEntry[]) {
+export async function saveMeasurementsLog(log: MeasurementEntry[]): Promise<void> {
   const weightLog = getWeightLog();
   const byDate = new Map(weightLog.map(e => [e.date, e]));
   for (const m of log) {
@@ -298,16 +319,16 @@ export function saveMeasurementsLog(log: MeasurementEntry[]) {
     if (!existing) continue;
     byDate.set(m.date, {
       ...existing,
-      waistCm: m.waistCm || existing.waistCm,
-      chestCm: m.chestCm || existing.chestCm,
-      hipCm: m.hipCm || existing.hipCm,
-      bicepCm: m.bicepCm || existing.bicepCm,
-      thighCm: m.thighCm || existing.thighCm,
-      neckCm: m.neckCm || existing.neckCm,
-      forearmCm: m.forearmCm || existing.forearmCm,
-      bodyFat: m.bodyFat || existing.bodyFat,
+      waistCm: m.waistCm ?? existing.waistCm,
+      chestCm: m.chestCm ?? existing.chestCm,
+      hipCm: m.hipCm ?? existing.hipCm,
+      bicepCm: m.bicepCm ?? existing.bicepCm,
+      thighCm: m.thighCm ?? existing.thighCm,
+      neckCm: m.neckCm ?? existing.neckCm,
+      forearmCm: m.forearmCm ?? existing.forearmCm,
+      bodyFat: m.bodyFat ?? existing.bodyFat,
     });
   }
-  saveWeightLog([...byDate.values()]);
+  await saveWeightLog([...byDate.values()]);
 }
 

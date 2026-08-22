@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { colors } from '../../ui';
 import { DiaryHeader } from '../DiaryHeader';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
-import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, normalizeWeightEntry, type WeightEntry } from '../../../../../engines/profile-store';
+import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, getWeightLogWithPhotos, normalizeWeightEntry, type WeightEntry } from '../../../../../engines/profile-store';
+import { migrateWeightPhotosFromLocalStorage } from '../../../../../engines/weight-photo-store';
 import { updateSection } from '../../../../../core/profile-manager';
 import { strengthDiary } from '../../../../../engines/strength-diary.engine';
 import { generateInsights, type DiarySession, type DiarySet } from '../../../../../engines/diary-insights.engine';
@@ -345,11 +346,17 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     );
   useEffect(() => {
     if (!open) return;
-    // Единый порядок: DESC (новейшая первая) — совпадает с commit() и
-    // ожиданиями всего UI (rows[0] = последняя запись).
-    migrateWeightLogLegacy();
-    setRows([...getWeightLog()].sort((a, b) => b.date.localeCompare(a.date)));
-    setArchiveRows(getWeightLogArchived());
+    let mounted = true;
+    (async () => {
+      await migrateWeightLogLegacy();
+      await migrateWeightPhotosFromLocalStorage();
+      if (!mounted) return;
+      const rows = await getWeightLogWithPhotos();
+      rows.sort((a, b) => b.date.localeCompare(a.date));
+      setRows(rows);
+      setArchiveRows(getWeightLogArchived());
+    })();
+    return () => { mounted = false; };
     try {
       const stored = Number(JSON.parse(localStorage.getItem('he_diary_goals') || '{}').weightKg);
       setGoal(Number.isFinite(stored) && stored > 0 ? stored : goals?.weightKg || 0);
@@ -362,16 +369,22 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       let height: number | undefined;
       let sex: 'male' | 'female' | undefined;
       if (unifiedRaw) {
-        const unified = JSON.parse(unifiedRaw);
-        if (Number(unified?.personal?.height) > 0) height = Number(unified.personal.height);
-        if (unified?.personal?.sex) sex = unified.personal.sex === 'female' ? 'female' : 'male';
+        const unified = JSON.parse(unifiedRaw as string);
+        const h = unified?.personal?.height;
+        const hNum = typeof h === 'number' ? h : typeof h === 'string' ? Number(h) : NaN;
+        if (Number.isFinite(hNum) && hNum > 0) height = hNum;
+        const s = unified?.personal?.sex;
+        if (typeof s === 'string') sex = s === 'female' ? 'female' : 'male';
       }
       if (!height) {
         const raw = localStorage.getItem('he_training_profile');
         if (raw) {
-          const profile = JSON.parse(raw);
-          if (profile.bodyHeightCm) height = Number(profile.bodyHeightCm);
-          if (profile.sex) sex = profile.sex;
+          const profile = JSON.parse(raw as string);
+          const h2 = profile.bodyHeightCm;
+          const h2Num = typeof h2 === 'number' ? h2 : typeof h2 === 'string' ? Number(h2) : NaN;
+          if (Number.isFinite(h2Num)) height = h2Num;
+          const s2 = profile.sex;
+          if (typeof s2 === 'string') sex = s2;
         }
       }
       if (height) setProfileHeight(height);
