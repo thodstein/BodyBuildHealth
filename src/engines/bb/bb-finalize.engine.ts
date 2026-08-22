@@ -1135,10 +1135,10 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
 }
 
 /** Маппинг целевой группы сессии → разминочное лёгкое изолирующее движение. */
-const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /пуловер.*(блок|канат|cable)|тяга.*прям.*рук|straight.?arm/i,
-  chest: /сведен.*(кроссовер|блок)|кроссовер|crossover|сведен.*тренаж/i,
-  quads: /разгибан.*ног|leg.?extension/i,
-  hamstrings: /сгибан.*ног|leg.?curl/i,
+const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /тяга.*одной|single.?arm|тяга.*гантел.*одной/i,
+  chest: /брус|dip|отжим.*брус/i,
+  quads: /сисси|sissy/i,
+  hamstrings: /норд|nordic|ghr/i,
   glutes: /отведен.*бедр|abduction|kick.?back|ягодичн.*отвед/i,
   calves: /подъём.*носк|подъем.*носк|calf.?raise/i,
   shoulders: /мах|raise|lateral|отведен.*рук/i,
@@ -1202,13 +1202,13 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
   });
 }
 
-/** Целевая группа дня (по sessionTag). */
+/** Целевая группа дня (по sessionTag) — выбираем мышцу, где warmup не дублирует основной паттерн (чтобы не было 3 пуловера/3 разгибания). */
 const WARMUP_LEAD: Record<string, string> = {
   Chest: 'chest', Back: 'back', Shoulders: 'shoulders', Arms: 'biceps',
-  Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
-  Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
-  Torso: 'chest', Legs: 'quads', Lower: 'quads', LowerPower: 'quads', LowerHyp: 'quads',
-  Glutes: 'glutes', GlutesHams: 'glutes', LegsBiceps: 'quads', Limbs: 'quads',
+  Push: 'shoulders', Pull: 'traps', ChestBack: 'shoulders', ShouldersArms: 'shoulders',
+  Upper: 'shoulders', UpperPower: 'shoulders', UpperHyp: 'shoulders',
+  Torso: 'chest', Legs: 'glutes', Lower: 'glutes', LowerPower: 'glutes', LowerHyp: 'glutes',
+  Glutes: 'glutes', GlutesHams: 'glutes', LegsBiceps: 'glutes', Limbs: 'glutes',
 };
 
 /**
