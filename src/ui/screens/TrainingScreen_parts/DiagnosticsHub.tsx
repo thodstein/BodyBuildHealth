@@ -22,9 +22,9 @@ type DiagnosticsHubMode = 'master' | 'joint' | 'sticking' | 'rir' | 'mesocorr';
 type LegacyMode = 'movement' | 'limiter' | 'jsi';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
-  { m: 'master', label: 'Мастер жима лёжа', icon: '🏋️' },
+  { m: 'master', label: 'Мастер движения', icon: '🏋️' },
   { m: 'joint', label: 'Суставы + AI-ортопед', icon: '🦴' },
-  { m: 'sticking', label: 'Срывы', icon: '🔬' },
+  { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
   { m: 'rir', label: 'RIR', icon: '🎯' },
   { m: 'mesocorr', label: 'Мезо', icon: '🔧' },
 ];
@@ -81,7 +81,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        <b style={{ color: ACCENT }}>Новое: Мастер жима лёжа + Суставы с AI-ортопедом внутри</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. Старые помечены @deprecated.
+        <b style={{ color: ACCENT }}>Новое: Мастер движения (9 лифтов) + Суставы с AI-ортопедом внутри</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. «Срывы» — авто-анализ дневника (RPE≥8), не ручной ввод. Старые помечены @deprecated.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -98,7 +98,17 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
         ))}
       </div>
 
-      {mode === 'master' && <LiftMasterCard sessions={sessions} />}
+      {mode === 'master' && (
+        <>
+          <LiftMasterCard sessions={sessions} />
+          <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: DIM, marginBottom: 4 }}>🔬 Срывы (из дневника) — кратко; полный анализ в отдельной вкладке</div>
+            <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, marginBottom: 6 }}>Авто-детект тяжёлых подходов RPE≥8 (фаза по phaseForReps, ≥6 повт. = неопределена). Ручной ввод фаз — в блоке выше; срывы — только факт дневника.</div>
+            <StickingPointAnalysisCard sessions={sessions} />
+            <button onClick={() => setMode('sticking')} style={{ marginTop: 8, width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: DIM, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>Открыть полный режим «Срывы (дневник)» →</button>
+          </div>
+        </>
+      )}
       {mode === 'joint' && <JointMasterCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
       {mode === 'rir' && <RIRCalibrationCard />}

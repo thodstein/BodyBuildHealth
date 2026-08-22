@@ -1,5 +1,5 @@
 /** QualityDiagnosticsHub.tsx — ЕДИНЫЙ хаб «Качество + Диагностика» без дублей.
- *  Объединяет CalcQualityTab (оценка плана 0-100, MEV/MAV/MRV) и DiagnosticsHub (мастер жима, суставы AI, срывы, RIR, мезо).
+ *  Объединяет CalcQualityTab (оценка плана 0-100, MEV/MAV/MRV) и DiagnosticsHub (мастер движения 9 лифтов, суставы AI, срывы, RIR, мезо).
  *  Внутри — 2 подвкладки, общий хедер с пояснениями. Полные инструменты сохранены, дубли убраны.
  *  Старые tab ID calc_quality / diagnostics остаются алиасами → quality_diagnostics.
  */
@@ -16,7 +16,7 @@ type HubMode = 'quality' | 'diagnostics';
 
 const MODE_DEFS: Array<{ m: HubMode; label: string; icon: string; desc: string }> = [
   { m: 'quality', label: 'Качество', icon: '⭐', desc: 'Оценка плана 0-100: MEV/MAV/MRV по группам, PED/лаб коррекция' },
-  { m: 'diagnostics', label: 'Диагностика', icon: '🔬', desc: 'Мастер жима + суставы AI + срывы + RIR + мезо-коррекция' },
+  { m: 'diagnostics', label: 'Диагностика', icon: '🔬', desc: 'Мастер движения (9 лифтов) + суставы AI + срывы (дневник RPE≥8) + RIR + мезо-коррекция' },
 ];
 
 export interface QualityDiagnosticsHubProps {
@@ -38,10 +38,10 @@ export const QualityDiagnosticsHub: React.FC<QualityDiagnosticsHubProps> = (prop
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🎯 Качество и диагностика — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: слева — <b style={{ color: '#fff' }}>оценка плана</b> (0-100, объём по группам), справа — <b style={{ color: '#fff' }}>диагностика</b> (мастер жима, суставы AI-ортопед, срывы, RIR, мезо). Полные инструменты сохранены, переключение без потери контекста.
+        Без дублей: слева — <b style={{ color: '#fff' }}>оценка плана</b> (0-100, объём по группам), справа — <b style={{ color: '#fff' }}>диагностика</b> (мастер движения 9 лифтов, суставы AI-ортопед, срывы дневник, RIR, мезо). Полные инструменты сохранены, переключение без потери контекста.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
-        <b style={{ color: '#fff' }}>Как читать:</b> «Качество» — полоса 0-100 (≥80 зел/≥50 жёлт), ниже — группы: сеты vs MEV/MAV/MRV, % от MRV, статус low/high/over. «Диагностика» — 5 подвкладок: мастер (вес×объём×темп×анатомия→тепловая карта), суставы (JSI), срывы (дневник), RIR (калибровка), мезо (ACWR/монотония). Все графики с пояснениями внутри.
+        <b style={{ color: '#fff' }}>Как читать:</b> «Качество» — полоса 0-100 (≥80 зел/≥50 жёлт), ниже — группы: сеты vs MEV/MAV/MRV, % от MRV, статус low/high/over. «Диагностика» — 5 подвкладок: мастер движения (9 лифтов: вес×объём×темп×анатомия→тепловая карта), суставы (JSI — вес×темп×геометрия×фарма×боль), срывы (авто из дневника RPE≥8, не ручной ввод), RIR (калибровка), мезо (ACWR/монотония). Все графики с пояснениями внутри.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>

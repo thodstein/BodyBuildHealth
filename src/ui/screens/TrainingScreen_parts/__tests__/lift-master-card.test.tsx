@@ -6,10 +6,10 @@ import { LiftMasterCard } from '../LiftMasterCard';
 
 afterEach(()=>{ cleanup(); localStorage.removeItem('he_lift_master_v1'); });
 
-describe('LiftMasterCard — единый инструмент жима', () => {
+describe('LiftMasterCard — единый инструмент движения (универсальный)', () => {
   it('рендерится 8 блоков заголовков', () => {
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
-    expect(html).toContain('Жим лёжа — единый инструмент');
+    expect(html).toContain('— единый инструмент');
     expect(html).toContain('1 · Слабые мышцы');
     expect(html).toContain('2 · Слабые точки');
     expect(html).toContain('3 · Мёртвые точки');

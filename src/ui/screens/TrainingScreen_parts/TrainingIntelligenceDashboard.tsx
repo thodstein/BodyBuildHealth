@@ -47,7 +47,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '🏋️', label: 'Сила', desc: '1RM, VBT, нормативы, относительная сила, аналитика', tab: 'strength_analysis',
           badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
-        { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио', tab: 'load_safety' as any,
+        { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, суставы (8 блоков + JSI), sRPE/ACWR/Banister, авторегуляция, восстановление, кардио — объём в Объём-хабе', tab: 'load_safety' as any,
           badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
         { icon: '🎯', label: 'RIR + Прогноз', desc: 'Единый хаб: RIR bias/калибровка + Хольт-прогноз готовности — аналог Микс-хаба', tab: 'rir_forecast_hub' as any },
       ],
@@ -55,7 +55,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
       tools: [
-        { icon: '🎯', label: 'Качество + Суставы', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер жима/срывы + суставы JSI/8 блоков — аналог Объём-хаба', tab: 'quality_joint_hub' as any },
+        { icon: '🎯', label: 'Качество + Диагностика', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер движения (9 лифтов)/срывы (дневник) + суставы JSI/8 блоков — аналог Объём-хаба', tab: 'quality_joint_hub' as any },
       ],
     },
     {

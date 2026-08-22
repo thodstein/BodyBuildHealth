@@ -20,15 +20,16 @@ const props = {
 describe('DiagnosticsHub: единый инструмент (дедуп)', () => {
   it('есть чипы единых мастеров (дедуп старых movement/limiter/jsi)', () => {
     const html = renderToStaticMarkup(<DiagnosticsHub {...props} />);
-    expect(html).toContain('Мастер жима лёжа');
+    expect(html).toContain('Мастер движения');
     expect(html).toContain('Суставы + AI-ортопед');
+    expect(html).toContain('Срывы (дневник)');
     expect(html).not.toContain('Лимитирующие факторы движения');
     expect(html).not.toContain('Мёртвые → Слабые → Бар');
   });
 
   it('переключение на мастер показывает единый инструмент, точечные калькуляторы на месте', () => {
     render(<DiagnosticsHub {...props} />);
-    fireEvent.click(screen.getByRole('button', { name: /Мастер жима лёжа/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Мастер движения/ }));
     expect(screen.getByText(/единый инструмент/)).toBeTruthy();
     expect(screen.getAllByText(/Срывы/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /RIR/ })).toBeTruthy();
