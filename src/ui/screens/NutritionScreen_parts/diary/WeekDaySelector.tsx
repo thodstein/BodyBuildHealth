@@ -9,9 +9,30 @@ interface WeekDaySelectorProps {
 
 export const WeekDaySelector: React.FC<WeekDaySelectorProps> = ({ weekDays, selectedDate, onSelectDate, diaryData }) => {
   const today = new Date().toISOString().slice(0, 10);
+  const shiftWeek = (dir: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + dir * 7);
+    const iso = d.toISOString().slice(0,10);
+    onSelectDate(iso);
+  };
+  const weekLabel = (() => {
+    try {
+      const a = new Date(weekDays[0]); const b = new Date(weekDays[6]);
+      const fmt = (d:Date) => d.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+      return `${fmt(a)} – ${fmt(b)}`;
+    } catch { return ''; }
+  })();
   
   return (
     <div style={{ padding: 12, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 12px rgba(0,0,0,0.12)' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+        <div style={{ display:'flex', gap:4 }}>
+          <button onClick={()=>shiftWeek(-1)} aria-label="Пред. неделя" style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:12 }}>‹</button>
+          <button onClick={()=>shiftWeek(1)} aria-label="След. неделя" style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:12 }}>›</button>
+        </div>
+        <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:600 }}>{weekLabel}</span>
+        <button onClick={()=>onSelectDate(today)} aria-label="Сегодня" style={{ padding:'4px 8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background: selectedDate===today ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(0,230,138,0.08)', color: selectedDate===today ? '#000' : '#00e68a', fontSize:9, fontWeight:700, cursor:'pointer' }}>Сегодня</button>
+      </div>
       <div style={{ display: 'flex', gap: 3, marginBottom: 6 }}>
         {weekDays.map((ds, i) => {
           const isToday = ds === today;
