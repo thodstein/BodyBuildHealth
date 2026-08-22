@@ -19,6 +19,7 @@ import { applyToPlanner } from './planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { LMS_CYCLES, getCyclesByTrainingDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { AGE_GROUPS, eligibleRanksForAge, ageEligibilityNote, type AgeGroup, type Federation, type Sex } from '../../../engines/pl-norms.engine';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -77,9 +78,21 @@ export const TaperPlannerTab: React.FC = () => {
   const [fatigueNum, setFatigueNum] = useState(7);
   const [strategy, setStrategy] = useState<AttemptStrategy>('balanced');
   const [saved, setSaved] = useState(false);
-  // Весовая категория
-  const [bw, setBw] = useState(80);
+  // Весовая категория + унификация возраст/пол/федерация (pl-norms)
+  const [bw, setBw] = useState(() => { try { return Number((getProfile().settings as any)?.personal?.weight) || 80; } catch { return 80; } });
   const [fed, setFed] = useState('IPF');
+  const [taperSex, setTaperSex] = useState<Sex>(() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } });
+  const [taperFed, setTaperFed] = useState<Federation>('fpr_ipf');
+  const [taperAgeGroup, setTaperAgeGroup] = useState<AgeGroup>(() => {
+    try {
+      const age = Number((getProfile().settings as any)?.personal?.age) || 25;
+      if (age >= 40) return 'masters_40plus';
+      if (age >= 19 && age <= 23) return 'junior_19_23';
+      if (age >= 14 && age <= 18) return 'youth_14_18';
+      if (age >= 12 && age <= 13) return 'youth_12_13';
+      return 'open';
+    } catch { return 'open'; }
+  });
   // Таймлайн
   const [weighIn, setWeighIn] = useState('08:00');
   const [start, setStart] = useState('11:00');
@@ -97,6 +110,21 @@ export const TaperPlannerTab: React.FC = () => {
   const bbCycles = useMemo(() => getCyclesByTrainingDirection('bodybuilding').slice(0, 20), []);
   const selectedPlCycleData = useMemo(() => plCycles.find(c => c.meta.id === selectedPlCycle), [plCycles, selectedPlCycle]);
   const selectedBbCycleData = useMemo(() => bbCycles.find(c => c.meta.id === selectedBbCycle), [bbCycles, selectedBbCycle]);
+  const baseTaperWeeks = useMemo(() => taperWeeksForFatigue(fatigue * 10), [fatigue]);
+  const adjustedTaperWeeks = useMemo(() => {
+    if (taperAgeGroup === 'youth_12_13') return Math.min(baseTaperWeeks, 1);
+    if (taperAgeGroup === 'youth_14_18') return Math.min(baseTaperWeeks, 2);
+    if (taperAgeGroup === 'masters_40plus') return Math.min(3, baseTaperWeeks + 1);
+    return baseTaperWeeks;
+  }, [baseTaperWeeks, taperAgeGroup]);
+  const ageTaperNote = useMemo(() => {
+    if (adjustedTaperWeeks !== baseTaperWeeks) {
+      if (taperAgeGroup === 'masters_40plus') return `👴 Мастера 40+: +1 нед к базовому taper (${baseTaperWeeks}→${adjustedTaperWeeks} нед) — дольше восстановление`;
+      if (taperAgeGroup === 'youth_12_13') return `🧒 12-13 лет: taper ограничен 1 нед (базовый ${baseTaperWeeks}→${adjustedTaperWeeks}) — юношеские нагрузки`;
+      if (taperAgeGroup === 'youth_14_18') return `🧑‍🎓 14-18 лет: taper ограничен 2 нед (базовый ${baseTaperWeeks}→${adjustedTaperWeeks}) — КМС доступно с 14`;
+    }
+    return null;
+  }, [adjustedTaperWeeks, baseTaperWeeks, taperAgeGroup]);
   const [pmAutoNote, setPmAutoNote] = useState<string | null>(null);
 
   const applyProfilePMs = React.useCallback(() => {
@@ -124,7 +152,7 @@ export const TaperPlannerTab: React.FC = () => {
         setSquat1RM(p.squat);
         setBench1RM(p.bench);
         setDeadlift1RM(p.dead);
-        setPmAutoNote(`↗ Цикл «${c.meta.title}» (${c.meta.weeks} нед) — ПМ из профиля: ${p.squat}/${p.bench}/${p.dead} кг → taper ${taperWeeksForFatigue(fatigue * 10)} нед`);
+        setPmAutoNote(`↗ Цикл «${c.meta.title}» (${c.meta.weeks} нед) — ПМ из профиля: ${p.squat}/${p.bench}/${p.dead} кг → taper ${adjustedTaperWeeks} нед (база ${baseTaperWeeks} + возраст ${AGE_GROUPS.find(a => a.id === taperAgeGroup)?.label})`);
         setTimeout(() => setPmAutoNote(null), 4000);
       } else if (c) {
         setPmAutoNote(`Цикл «${c.meta.title}» (${c.meta.weeks} нед) — заполните ПМ вручную или из профиля`);
@@ -133,7 +161,7 @@ export const TaperPlannerTab: React.FC = () => {
     } else {
       setPmAutoNote(null);
     }
-  }, [plCycles, fatigue]);
+  }, [plCycles, adjustedTaperWeeks, baseTaperWeeks, taperAgeGroup]);
 
   // ── Расчёты PL ──
   const plan: TaperPlan | null = useMemo(() => {
@@ -148,9 +176,9 @@ export const TaperPlannerTab: React.FC = () => {
   }, [meetDate]);
 
   const cls = useMemo(() => {
-    const sex: 'male' | 'female' = (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })();
-    return selectWeightClassForSex(sex, bw, fed);
-  }, [bw, fed]);
+    return selectWeightClassForSex(taperSex, bw, fed);
+  }, [taperSex, bw, fed]);
+  const taperFedLabel = useMemo(() => ({ fpr_ipf: 'ФПР/IPF', wrpf_untested: 'WRPF без ДК', wrpf_tested: 'WRPF с ДК' }[taperFed] || taperFed), [taperFed]);
   const timeline = useMemo(() => generateCompetitionTimeline(weighIn, start), [weighIn, start]);
   const recovery = useMemo(() => getRecoveryProtocols(), []);
   const mental = useMemo(() => getMentalRoutines(), []);
@@ -266,6 +294,35 @@ export const TaperPlannerTab: React.FC = () => {
         )}
       </div>
 
+      {/* ── Унификация возраст/пол/федерация (как в PlNormsCalcTab) — влияет на taper и весовую категорию ── */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>👤 Возраст / Пол / Федерация — унифицировано</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>Как в <b style={{ color: '#fff' }}>Едином нормативе</b> (pl-norms): возраст влияет на допустимые разряды и на длительность taper (юноши — короче, мастера — дольше), пол — на весовую категорию и DOTS/Wilks, федерация — на категории и пороги.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <PopupSelect label="Возрастная группа" value={taperAgeGroup} options={AGE_GROUPS.map(a => ({ id: a.id, label: a.label, desc: a.desc }))} onChange={v => setTaperAgeGroup(v as AgeGroup)} />
+          <PopupSelect label="Пол" value={taperSex} options={[{ id: 'male', label: '♂ Мужчина', desc: '59-120 кг' }, { id: 'female', label: '♀ Женщина', desc: '43-84 кг' }]} onChange={v => setTaperSex(v as Sex)} />
+          <PopupSelect label="Федерация" value={taperFed} options={[{ id: 'fpr_ipf', label: 'ФПР / IPF', desc: 'с ДК' }, { id: 'wrpf_tested', label: 'WRPF с ДК', desc: 'с ДК' }, { id: 'wrpf_untested', label: 'WRPF без ДК', desc: 'без ДК' }]} onChange={v => { const nf = v as Federation; setTaperFed(nf); setFed(nf === 'fpr_ipf' ? 'IPF' : 'other'); }} />
+          <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
+            <div style={{ fontSize: 10, color: DIM, lineHeight: 1.3 }}>
+              Весовая: <b style={{ color: '#fff' }}>{taperSex === 'female' ? '♀' : '♂'} {taperFedLabel}</b> · Категория до <b style={{ color: ACCENT }}>{cls.weightClass} кг</b><br />
+              Допустимые разряды: <b style={{ color: ACCENT }}>{eligibleRanksForAge(taperAgeGroup).join(', ') || '— (только юношеские)'}</b>
+            </div>
+          </div>
+        </div>
+        {ageTaperNote && (
+          <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10, color: '#f59e0b', lineHeight: 1.4 }}>{ageTaperNote}</div>
+        )}
+        {(() => {
+          const note = ageEligibilityNote(taperAgeGroup, 'ms' as any);
+          // показываем общую справку по возрасту, если есть ограничение
+          const anyNote = taperAgeGroup !== 'open' ? (taperAgeGroup === 'youth_12_13' ? 'В 12-13 лет взрослые разряды не присваиваются — доступны только юношеские/I-III.' : taperAgeGroup === 'youth_14_18' ? 'В 14-18 лет доступен только КМС (МС с 16, МСМК с 17).' : null) : null;
+          return anyNote ? <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)', fontSize: 10, color: '#f87171', lineHeight: 1.4 }}>⛔ {anyNote}</div> : null;
+        })()}
+        <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+          Taper: база <b style={{ color: '#fff' }}>{baseTaperWeeks} нед</b> (по усталости {fatigue*10}) → с учётом возраста <b style={{ color: ACCENT }}>{adjustedTaperWeeks} нед</b> · Пол/федерация из профиля подставляют ПМ и категорию автоматически.
+        </div>
+      </div>
+
       {/* ════════════════ PL ════════════════ */}
       {kind === 'pl' && (<>
         {/* Параметры */}
@@ -290,11 +347,11 @@ export const TaperPlannerTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Сводка taper */}
+        {/* Сводка taper — с учётом возраста/пола (унифицировано с нормами) */}
         {plan && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
             {[
-              { title: 'Длительность', val: plan.taperWeeks + ' нед', sub: taperWeeksForFatigue(fatigue * 10) + ' нед по усталости', clr: ACCENT },
+              { title: 'Длительность', val: adjustedTaperWeeks + ' нед', sub: baseTaperWeeks === adjustedTaperWeeks ? baseTaperWeeks + ' нед по усталости' : `${baseTaperWeeks} баз. → ${adjustedTaperWeeks} с возр.`, clr: ACCENT },
               { title: 'Тотал (имп.)', val: String(squat1RM + bench1RM + deadlift1RM), sub: 'сум 3 движ.', clr: ACCENT },
               { title: 'Цель 3rd SQ', val: plan.attempts.squat.third + ' кг', sub: plan.attempts.squat.rpeNote, clr: '#f59e0b' },
               { title: 'Цель 3rd DL', val: plan.attempts.deadlift.third + ' кг', sub: plan.attempts.deadlift.rpeNote, clr: '#f59e0b' },

@@ -47,7 +47,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '🏋️', label: 'Сила', desc: '1RM, VBT, нормативы, относительная сила, аналитика', tab: 'strength_analysis',
           badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
-        { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио', tab: 'load_management',
+        { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио', tab: 'load_safety' as any,
           badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
         { icon: '🎯', label: 'RIR калибратор', desc: 'Калибровка RIR/RPE, история, точность', tab: 'rir_calibration' as any },
         { icon: '🔮', label: 'Прогноз готовности', desc: 'Readiness forecast: сон, HRV, ACWR → веса', tab: 'readiness_forecast' as any },
@@ -72,8 +72,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '⚕', label: 'Периодизация', color: '#f59e0b',
       tools: [
-        { icon: '📅', label: 'Фазы и циклы', desc: 'Дизайнер периодизации, делод, прогрессия', tab: 'periodization_hub' },
-        { icon: '📉', label: 'Планировщик тейпера', desc: 'Taper 7-14д, пик, суперкомпенсация', tab: 'taper_planner' as any },
+        { icon: '🔄', label: 'Периодизация + Тейпер', desc: 'Единый хаб: дизайнер/прогрессия/трекер/микро/делод + тейпер/пик (ПЛ/ББ циклы, возраст, пол) — аналог Объём-хаба', tab: 'periodization_taper_hub' as any },
       ],
     },
     {
