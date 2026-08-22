@@ -129,6 +129,7 @@ export function selectDiverseExercises(
   const diverse: Exercise[] = [];
   const usedIdsLocal = new Set(usedIds);
 
+  const usedClassIdx = new Set<number>();
   for (let ci = 0; ci < classes.length; ci++) {
     const ac = classes[ci];
     if (diverse.length >= exerciseCount) break;
@@ -140,15 +141,19 @@ export function selectDiverseExercises(
     if (pick) {
       diverse.push(pick);
       usedIdsLocal.add((pick as any).id);
+      usedClassIdx.add(ci);
     }
   }
-  // Добрать до exerciseCount если не хватило
+  // Добрать до exerciseCount если не хватило — только из неиспользованных классов (не дублируем угол)
   for (const e of pool) {
     if (diverse.length >= exerciseCount) break;
-    if (!diverse.some(d => (d as any).id === (e as any).id) && !usedIdsLocal.has((e as any).id)) {
-      diverse.push(e);
-      usedIdsLocal.add((e as any).id);
-    }
+    if (diverse.some(d => (d as any).id === (e as any).id) || usedIdsLocal.has((e as any).id)) continue;
+    // проверить, что угол ещё не занят — иначе это дубль паттерна
+    const clsIdx = classes.findIndex(c => c.match(e));
+    if (clsIdx >= 0 && usedClassIdx.has(clsIdx)) continue;
+    diverse.push(e);
+    usedIdsLocal.add((e as any).id);
+    if (clsIdx >= 0) usedClassIdx.add(clsIdx);
   }
   return diverse.slice(0, exerciseCount);
 }

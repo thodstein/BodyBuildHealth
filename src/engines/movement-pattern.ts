@@ -51,10 +51,13 @@ export function derivePattern(ex: any): string {
     if (g === 'arms' || g === 'forearms') return 'isolation_arms';
     if (g === 'legs') {
       if (/икронож|икры|calf|камбалов/.test(hay)) return 'isolation_calves';
-      if (/квад|quad|разгиб|присед|выпрям/.test(hay)) return 'isolation_legs_quad';
+      if (/квад|quad|разгиб|присед|выпрям.*ног| squat/.test(hay)) return 'isolation_legs_quad';
       if (/бедр|сгибани|ham/.test(hay)) return 'isolation_legs_ham';
       return /квад|quad/.test(tgt) ? 'isolation_legs_quad' : 'isolation_legs_ham';
     }
+    if (g === 'quads') return 'isolation_legs_quad';
+    if (g === 'hamstrings') return 'isolation_legs_ham';
+    if (g === 'glutes') return 'glute_squat';
     if (g === 'calves') return 'isolation_calves';
     if (g === 'core') return 'core';
     return 'core';

@@ -499,6 +499,16 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
         // Оба штанга или оба гантели → слишком похожи
         return true;
       }
+      // Оба жимы на наклонной → слишком похожи (любой снаряд — один наклонный жим достаточно)
+      const exIsIncline = exName.includes('наклон') && exName.includes('жим');
+      const sIsIncline = sName.includes('наклон') && sName.includes('жим');
+      if (exIsIncline && sIsIncline) return true;
+      // Оба разведения/кроссоверы/сведения/бабочка/пек-дек → один изолирующий паттерн груди
+      const isFlyLike = (n: string) => /развод|fly|кроссов|crossover|сведен|пек.?дек|бабоч|butterfly/i.test(n);
+      if (isFlyLike(exName) && isFlyLike(sName)) return true;
+      // Оба пуловера / тяга прямыми руками → один паттерн широчайших
+      const isPullover = (n: string) => /пуловер|pullover|пулов|прям.*рук|straight.*pull/i.test(n);
+      if (isPullover(exName) && isPullover(sName)) return true;
       // Обе тяги блока одинаковые
       const exIsPulldown = (exName.includes('тяга') && exName.includes('блок')) || exName.includes('pulldown');
       const sIsPulldown = (sName.includes('тяга') && sName.includes('блок')) || sName.includes('pulldown');
@@ -507,7 +517,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
         const sWide = sName.includes('широк') || sName.includes('за голов');
         if (exWide === sWide) return true; // одинаковый вариант
       }
-      // Обе разгибания/сгибания ног
+      // Обе разгибания/сгибания ног — любой вариант считается дублем (изоляция квадров/хамсов — 1 достаточно)
       if ((exName.includes('разгиб') && sName.includes('разгиб')) ||
           (exName.includes('сгибан') && sName.includes('сгибан'))) return true;
       // BUG-B17: доп. детекторы похожести —
@@ -530,6 +540,9 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       const exIsLateralRaise = (exName.includes('мах') || exName.includes('разведен')) && exName.includes('в сторон') || exName.includes('lateral raise');
       const sIsLateralRaise = (sName.includes('мах') || sName.includes('разведен')) && sName.includes('в сторон') || sName.includes('lateral raise');
       if (exIsLateralRaise && sIsLateralRaise) return true;
+      // (4) Оба — тяги штанги/гантели в наклоне (горизонтальные тяги) → один паттерн
+      const isHorRow = (n: string) => /тяга.*(штанги|гантел|т-?гриф|йейтс|пендл|мэдоус|seal)/i.test(n);
+      if (isHorRow(exName) && isHorRow(sName)) return true;
     }
     return false;
   }
@@ -539,10 +552,12 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (usedIds.has(ex.id)) continue;
     if (usedNames.has(ex.name)) continue;
 
-    // Разнообразие: не больше 2 упражнений из одной substitutionGroup
+    // Разнообразие: изоляция — 1 на группу, база — 2 (диверсификация углов)
     const sg = (ex as any).substitutionGroup || '';
     const sgCount = usedSubGroups.get(sg) || 0;
-    if (sg && sgCount >= 2) continue;
+    const isIsoGroup = sg.includes('iso') || sg === 'lat_iso' || sg === 'dip_push';
+    const sgLimit = isIsoGroup ? 1 : 2;
+    if (sg && sgCount >= sgLimit) continue;
 
     // Диверсификация оборудования: не более 2 тросовых/блочных в сессии
     // (пока есть ещё нетросовые кандидаты для добора)
@@ -562,15 +577,22 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (isCableExercise(ex)) cableCount++;
   }
 
-  // Если не набрали нужное количество — добираем по скору
+  // Если не набрали — добираем, но сохраняем защиту от дублей (не тупое добавление)
   if (result.length < count) {
     for (const ex of scored) {
       if (result.length >= count) break;
       if (usedIds.has(ex.id)) continue;
       if (usedNames.has(ex.name)) continue;
+      const sg2 = (ex as any).substitutionGroup || '';
+      const sgCount2 = usedSubGroups.get(sg2) || 0;
+      const isIsoGroup2 = sg2.includes('iso') || sg2 === 'lat_iso';
+      const sgLimit2 = isIsoGroup2 ? 1 : 2;
+      if (sg2 && sgCount2 >= sgLimit2) continue;
+      if (isTooSimilar(ex, result)) continue;
       result.push(ex);
       usedIds.add(ex.id);
       usedNames.add(ex.name);
+      if (sg2) usedSubGroups.set(sg2, sgCount2 + 1);
     }
   }
 

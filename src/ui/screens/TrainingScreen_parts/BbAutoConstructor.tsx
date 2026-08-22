@@ -1503,7 +1503,6 @@ export const BbAutoConstructor: React.FC = () => {
           supersetMode,
           volumeScheme: effectiveVolumeScheme,
           trainingVolumeMode,
-          dupMode,
         }, pedAdapt);
     }
 

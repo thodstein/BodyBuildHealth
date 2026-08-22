@@ -968,17 +968,29 @@ function buildExComment(
   isSubstituted: boolean,
   exerciseId?: string,
   trainingFocus?: BBTrainingFocus,
+  selectionRationale?: string,
 ): string {
   const parts: string[] = [];
   const label = role === 'primary' ? '🎯 Основное' : '📌 Добивочное';
   parts.push(`${label}: ${muscle}`);
-  if (isWeak(muscle, weakPoints)) parts.push('🔥 Отстающая');
+  // Программ-специфичный контекст: почему именно это упражнение для этой программы
+  const weakMatch = weakPoints.find(wp => {
+    const fn = WEAK_EXERCISE_BONUS[wp];
+    return fn ? fn(name) : false;
+  });
+  if (weakMatch) {
+    const ru = { chest_upper: 'верх груди', chest_lower: 'низ груди', back_width: 'ширина спины', back_thickness: 'толщина спины', delt_mid: 'средняя дельта', delt_front: 'передняя дельта', delt_rear: 'задняя дельта', quads: 'квадрицепс', hamstrings: 'бицепс бедра', glutes: 'ягодицы', calves: 'икры', biceps: 'бицепс', triceps: 'трицепс' } as Record<string,string>;
+    parts.push(`🔥 Отстающая «${weakMatch}» (${ru[weakMatch] || weakMatch}) → выбрано по углу/паттерну`);
+  } else if (isWeak(muscle, weakPoints)) {
+    parts.push('🔥 Отстающая группа');
+  }
   if (focusGroup && (muscle === focusGroup || isWeak(muscle, [focusGroup]))) parts.push('⭐ Специализация');
   if (isSubstituted) parts.unshift('⚠ Замена (травма):');
   const phaseNames: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
   const charLabel = character === 'тяж' ? 'тяж' : character === 'памп' ? 'памп' : 'лёг';
   parts.push(`${phaseNames[phase] || phase}, RIR ${rir} (${charLabel})`);
   parts.push(`${sets}×${reps} @ ${weight} кг`);
+  if (selectionRationale) parts.push(`Выбор: ${selectionRationale}`);
   
   // Конкретные инструкции по выполнению (углы, хват, техника).
   // FIX-A8: dual-key lookup — EN id (bench_press) + RU name (жим штанги лёжа).
@@ -988,8 +1000,8 @@ function buildExComment(
     : EXECUTION_NOTES[name] || EXECUTION_NOTES[(name || '').toLowerCase()];
   if (execNote) parts.push(execNote);
   
-  // Понятный темп
-  parts.push(`Темп: ${formatTempoUser(tempo)}. Отдых: ${restSec}с`);
+  // Понятный темп — с привязкой к фазе/характеру программы, не generic
+  parts.push(`Темп: ${formatTempoUser(tempo)} (${phase === 'accumulation' ? 'контроль растяжения' : phase === 'intensification' ? 'взрыв вверх' : 'восстановление'}). Отдых: ${restSec}с`);
   
   const warn = exerciseRiskWarning(name);
   if (warn) parts.push(warn);
@@ -1824,6 +1836,7 @@ function buildSession(
       if (classes && classes.length > 0) {
         const diverse: any[] = [];
         const usedIds = new Set<string>();
+        const usedClassIdx = new Set<number>();
         // Берём по 1 упражнению из каждого угла, пока не наберём exerciseCount.
         // Сортировка внутри угла: compound barbell → dumbbell → machine → cable → one-arm.
         // Первое упражнение мышцы = самое тяжёлое (максимальное механическое натяжение).
@@ -1858,6 +1871,7 @@ function buildSession(
             const pick = candidates[offset];
             diverse.push(pick);
             usedIds.add(pick.id);
+            usedClassIdx.add(ci);
             sessionSelectedIds.push(pick.id);
             sessionSelectedNames.push(pick.name);
           }
@@ -1866,6 +1880,7 @@ function buildSession(
         for (let ci = 0; ci < classes.length; ci++) {
           const ac = classes[ci];
           if (diverse.length >= exerciseCount) break;
+          if (usedClassIdx.has(ci)) continue;
            let candidates = pool.filter(e => ac.match(e) && !usedIds.has(e.id));
           candidates = candidates.sort((a, b) => {
             const sa = (a as any)._score ?? 0;
@@ -1882,17 +1897,20 @@ function buildSession(
             const pick = candidates[offset];
             diverse.push(pick);
             usedIds.add(pick.id);
+            usedClassIdx.add(ci);
             sessionSelectedIds.push(pick.id);
             sessionSelectedNames.push(pick.name);
           }
         }
-        // Добрать из остатка пула, если не набрали
+        // Добрать из остатка пула, если не набрали — только из неиспользованных углов (не дублируем паттерн)
         for (const e of pool) {
           if (diverse.length >= exerciseCount) break;
-          if (!usedIds.has(e.id) && !sessionSelectedIds.includes(e.id)) {
-            diverse.push(e); usedIds.add(e.id);
-            sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name);
-          }
+          if (usedIds.has(e.id) || sessionSelectedIds.includes(e.id)) continue;
+          const clsIdx = classes.findIndex(c => c.match(e));
+          if (clsIdx >= 0 && usedClassIdx.has(clsIdx)) continue;
+          diverse.push(e); usedIds.add(e.id);
+          if (clsIdx >= 0) usedClassIdx.add(clsIdx);
+          sessionSelectedIds.push(e.id); sessionSelectedNames.push(e.name);
         }
         if (diverse.length >= Math.min(2, exerciseCount)) {
           exDatas = diverse.slice(0, exerciseCount);
@@ -2184,7 +2202,7 @@ function buildSession(
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
           tempoSpec: tempoStr, restSeconds: exRest,
-            comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
+            comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus, pl.rationaleMap.get((exData as any).name) || undefined),
           executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, level, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
           warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary' || (exData as any).type === 'compound'),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
@@ -2219,7 +2237,7 @@ function buildSession(
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
         tempoSpec: tempoStr, restSeconds: exRest,
-         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus),
+         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus, pl.rationaleMap.get((exData as any).name) || undefined),
         executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, level, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
         warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
@@ -2873,6 +2891,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const fName = fData.name || fData.id;
         // Дедуп: не добавлять, если такое упражнение уже есть в дне (основное или фидер)
         if (sess.exercises.some(e => e.exerciseName === fName) || addedFeeders.has(fName)) continue;
+        // Не добавляем второй изолирующий паттерн той же мышцы в один день (3 пуловера/3 разгибания)
+        const fPat = derivePattern(fData);
+        if (sess.exercises.some(e => collapseKey(e.muscle) === wm && derivePattern({ name: e.exerciseName || e.name, group: e.muscle, type: (e as any).exerciseType } as any) === fPat)) continue;
         const fBase = (workMax as any)[wm] || DEFAULT_WORKMAX[wm] || 50;
         const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
         const fTempo = tempoFor('памп', undefined, phase);
@@ -2931,6 +2952,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (!pData) continue;
         const pName = pData.name || pData.id;
         if (sess.exercises.some(e => e.exerciseName === pName) || addedFeeders.has(pName)) continue;
+        const pPat = derivePattern(pData);
+        if (sess.exercises.some(e => collapseKey(e.muscle) === pm && derivePattern({ name: e.exerciseName || e.name, group: e.muscle, type: (e as any).exerciseType } as any) === pPat)) continue;
         const pBase = (workMax as any)[pm] || DEFAULT_WORKMAX[pm] || 50;
         const pumpWeight = Math.max(5, Math.round(pBase * 0.3 * 10) / 10);
         const pTempo = tempoFor('памп', undefined, phase);
@@ -3150,6 +3173,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // 3. Подсчёт similarity: "ягодичный мост на скамье" ~ "ягодичный мост на полу" → один паттерн
       const patternOf = (name: string): string => {
         const n = name.toLowerCase();
+        if (/пуловер|pullover|пулов|прям.*рук|straight.*pull/i.test(n)) return 'pullover';
         if (/ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(n)) return 'hip_thrust';
         if (/сгибан.*ног|leg.?curl/i.test(n)) return 'leg_curl';
         if (/разгибан.*ног|leg.?ext/i.test(n)) return 'leg_ext';
@@ -3158,16 +3182,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (/жим.*ног|leg.?press/i.test(n)) return 'leg_press';
         if (/жим.*лёж|bench.*press/i.test(n) && !/наклон|incline/i.test(n)) return 'bench_press';
         if (/жим.*наклон|incline.*press/i.test(n)) return 'incline_press';
-        if (/развод|fly|сведен|пек.?дек|butterfly|кроссовер.*сведен/i.test(n)) return 'fly';
+        if (/развод|fly|сведен|пек.?дек|butterfly|кроссовер/i.test(n)) return 'fly';
         // Подтягивание и верхний блок — один функциональный vertical-pull
         // паттерн. Разный хват не делает их двумя независимыми слотами.
         if (/подтяг|pull.?up|chin|тяга.*верхн.*блок|lat.?pull|пуллдаун|верхн.*блок/i.test(n)) return 'vertical_pull';
         if (/тяга.*лиц|face.?pull/i.test(n)) return 'face_pull';
-        if (/тяга|row|йейтс|seal|пендл/i.test(n) && !/подтяг|лиц|резин/i.test(n)) return 'row';
+        if (/тяга|row|йейтс|seal|пендл/i.test(n) && !/подтяг|лиц|резин|пуловер|pullover/i.test(n)) return 'row';
         if (/шраг/i.test(n)) return 'shrug';
         if (/молот|hammer/i.test(n)) return 'hammer_curl';
         if (/подъём.*бицепс|сгибан.*бицепс|сгибан.*рук|curl/i.test(n)) return 'biceps_curl';
-        if (/разгибан.*трицепс|pushdown|француз|tricep/i.test(n)) return 'tricep_ext';
+        if (/жим.*узк|close.?grip/i.test(n)) return 'tricep_compound';
+        if (/француз|overhead|из.?за голов|french/i.test(n)) return 'tricep_overhead';
+        if (/pushdown|канат|блок.*трицепс|трицепс.*блок/i.test(n)) return 'tricep_pushdown';
+        if (/разгибан.*трицепс|tricep/i.test(n)) return 'tricep_ext';
         if (/жим.*армейск|жим.*standing|жим.*сидя|arnold|арнольд|жим.*гантел.*стоя|жим.*гантел.*сидя|ohp|жим.*смите.*сидя/i.test(n)) return 'shoulder_press';
         if (/лэндмайн|landmine/i.test(n)) return 'landmine_press';
         if (/мах|raise|отведен|разведен/i.test(n) && /наклон|задн|rear/i.test(n)) return 'rear_delt';
@@ -3180,26 +3207,28 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       };
       const perPatternCount: Record<string, number> = {};
       // ★ C: Малые мышцы — макс 1 упражнение одного паттерна (достаточно),
-      // крупные — макс 2 (разные углы жима/тяги — нормально)
+      // крупные — макс 2 (разные углы жима/тяги — нормально), изоляция всегда 1
       const SINGLE_PATTERN_MUSCLES = new Set(['glutes', 'calves', 'traps', 'forearms', 'abs', 'biceps', 'triceps', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear']);
+      const ISOLATION_PATTERNS = new Set(['fly', 'pullover', 'leg_ext', 'leg_curl', 'calf_raise', 'lateral_raise', 'rear_delt', 'hammer_curl', 'biceps_curl', 'tricep_ext', 'tricep_overhead', 'tricep_pushdown', 'tricep_compound', 'forearm', 'crunch', 'shrug', 'face_pull', 'hip_thrust', 'dips']);
       s.exercises = s.exercises.filter(e => {
         const m = collapseKey(e.muscle || '');
         const name = (e.exerciseName || e.name || '');
         const pat = patternOf(name);
         const muscleCap = PER_MUSCLE_MAX[m] ?? 4;
-        // Кап по мышце
-        perMuscleCount[m] = (perMuscleCount[m] || 0) + 1;
-        if (perMuscleCount[m] > muscleCap) return false;
-        // Кап по паттерну (1 для малых мышц, 2 для крупных)
-         // Для спины два разных vertical-pull в одной сессии — это обычно
-         // дубль функции, а не второй качественный слот. Разводить ширину
-         // следует между сессиями/неделями, а не двумя верхними тягами подряд.
-      const patMax = m === 'back' && (pat === 'vertical_pull' || pat === 'pulldown' || pat === 'pullup')
-           ? 1
-           : (SINGLE_PATTERN_MUSCLES.has(m) ? 1 : 2);
+        // Кап по паттерну: изоляция всегда 1 (3 пуловера/3 разгибания — ужас), вертикаль спины 1 (2 для опытных enhanced), иначе 1 для малых, 2 для крупных компаундов (3 для спины у опытных)
+        let patMax = 2;
+        if (ISOLATION_PATTERNS.has(pat)) patMax = 1;
+        else if (m === 'back' && (pat === 'vertical_pull' || pat === 'pulldown' || pat === 'pullup')) patMax = (level === 'enhanced' && (input.trainingYears ?? 0) >= 3) ? 2 : 1;
+        else if (m === 'back' && pat === 'row') patMax = (level === 'enhanced' && (input.trainingYears ?? 0) >= 3) ? 3 : 2;
+        else if (SINGLE_PATTERN_MUSCLES.has(m)) patMax = 1;
+        else patMax = 2;
         const patKey = m + ':' + pat;
-        perPatternCount[patKey] = (perPatternCount[patKey] || 0) + 1;
-        if (perPatternCount[patKey] > patMax) return false;
+        const curPat = perPatternCount[patKey] || 0;
+        if (curPat + 1 > patMax) return false;
+        const curMuscle = perMuscleCount[m] || 0;
+        if (curMuscle + 1 > muscleCap) return false;
+        perPatternCount[patKey] = curPat + 1;
+        perMuscleCount[m] = curMuscle + 1;
         return true;
       });
       // Re-sort после дедупликации (с сохранением методики пользователя — pre_exhaust/post_exhaust).

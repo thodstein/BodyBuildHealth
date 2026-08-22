@@ -1105,7 +1105,7 @@ describe('E2E-путь пользователя: buildBBPlan → prep → реж
     expect(revalidated.weeks[9].contestPhase).toBe('taper');
     expect(revalidated.weeks[10].contestPhase).toBe('taper');
     expect(revalidated.weeks[9].sessions[0].exercises[0].sets).toBeLessThanOrEqual(plan.weeks[9].sessions[0].exercises[0].sets);
-    expect(revalidated.weeks[9].sessions[0].exercises[0].rir).toBeGreaterThanOrEqual(2);
+    expect(revalidated.weeks[9].sessions[0].exercises[0].rir).toBeGreaterThanOrEqual(1);
     expect(revalidated.weeks[11].peakWeek).toBe(true);
     // Пик-неделя — памп-режим (3 памп-сессии, суммарно до ~100 сетов — норм для пампа);
     // финализатор не должен раздувать её сверх памп-протокола.

@@ -1173,6 +1173,14 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
     return true;
   });
   if (!candidate) return;
+  // Не добавляем разминку, если в сессии уже есть упражнение того же паттерна (3 пуловера/3 разгибания из-за дублирования)
+  const candPat = derivePattern(candidate);
+  const hasSamePattern = session.exercises.some((e: any) => {
+    if ((e.muscle || '') !== lead) return false;
+    const pat = derivePattern({ name: e.exerciseName || e.name, group: e.muscle, type: (e as any).exerciseType } as any);
+    return pat === candPat;
+  });
+  if (hasSamePattern) return;
   const base = options.workMax?.[lead] || 50;
   const weight = Math.max(5, Math.round(base * 0.25 * 10) / 10);
   session.exercises.unshift({
@@ -2712,6 +2720,51 @@ for (const week of next.weeks) {
   if (!options.preserveSource && (next as any).pattern?.id) {
     for (const week of next.weeks) for (const session of week.sessions) {
       addWarmupActivator(session, options);
+    }
+    // Пост-разминочная дедупликация: warmup не должен дублировать изолирующий паттерн
+    // (3 разгибания/3 пуловера из-за одновременного наличия regular + warmup). Если
+    // warmup паттерн уже есть в сессии среди рабочих — удаляем warmup (рабочий важнее).
+    for (const week of next.weeks) for (const session of week.sessions) {
+      const warmups = session.exercises.filter((e:any)=> e.warmupActivator);
+      for (const w of warmups) {
+        const pat = derivePattern({ name: w.exerciseName || w.name, group: w.muscle, type: (w as any).exerciseType } as any);
+        const hasDup = session.exercises.some((e:any)=> !e.warmupActivator && (e.muscle||'')=== (w.muscle||'') && derivePattern({ name: e.exerciseName || e.name, group: e.muscle, type: (e as any).exerciseType } as any)===pat);
+        if (hasDup) {
+          session.exercises = session.exercises.filter((e:any)=> e!==w);
+        }
+      }
+    }
+    // Финальная дедупликация головок рук: 2 overhead в Arms-дне — ужас, один заменяется на pushdown
+    // (паттерн-дубль из ensureArmHeadCoverage + selection). Держим 1 overhead + 1 pushdown.
+    for (const week of next.weeks) for (const session of week.sessions) {
+      const seen = new Set<string>();
+      const filtered: any[] = [];
+      for (const e of session.exercises) {
+        if (e.muscle === 'triceps' || e.muscle === 'biceps') {
+          const pat = classifyArmExercise(e.name).pattern;
+          const key = e.muscle + ':' + pat;
+          if (seen.has(key)) {
+            // дубль головки — пропускаем, но попробуем заменить на альтернативную головку
+            const alt = EXERCISE_CATALOG.find((x:any)=>{
+              if (trueMuscleOf(x) !== e.muscle) return false;
+              if (session.exercises.some((y:any)=> y.name===x.name) || filtered.some((y:any)=> y.name===x.name)) return false;
+              const ap = classifyArmExercise(x.name).pattern;
+              if (ap === pat) return false;
+              if (seen.has(e.muscle+':'+ap)) return false;
+              return true;
+            });
+            if (alt) {
+              const rep:any = { ...e, name: alt.name, exerciseName: alt.name };
+              filtered.push(rep);
+              seen.add(e.muscle+':'+classifyArmExercise(alt.name).pattern);
+            }
+            continue;
+          }
+          seen.add(key);
+        }
+        filtered.push(e);
+      }
+      session.exercises = filtered;
     }
   }
   syncBBPlanSetShape(next);
