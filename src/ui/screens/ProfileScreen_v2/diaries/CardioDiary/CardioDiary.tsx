@@ -321,20 +321,24 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         </div>
       </div>
 
-      {weeklyHistogram.length > 0 && (
-        <div style={{ ...glassCard, padding: 12, marginBottom: 12 }}>
-          <div style={{ ...labelStyle, marginBottom: 6 }}>📊 Недельная гистограмма (мин/нед)</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {weeklyHistogram.slice(-8).map(w => (
-              <div key={w.weekStart} style={{ flex: '1 1 80px', textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 10, color: colors.textMuted }}>{w.weekStart.slice(5)}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{w.mean.toFixed(0)}</div>
-                <div style={{ fontSize: 10, color: colors.textMuted }}>{w.count} сесс</div>
-              </div>
-            ))}
+      {weeklyHistogram.length > 0 && (() => {
+        const maxMean = Math.max(...weeklyHistogram.map(x => x.mean), 1);
+        return (
+          <div style={{ ...glassCard, padding: 12, marginBottom: 12 }}>
+            <div style={{ ...labelStyle, marginBottom: 6 }}>📊 Недельная гистограмма (мин/нед)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              {weeklyHistogram.slice(-8).map(w => (
+                <div key={w.weekStart} title={`${w.weekStart}: ${w.mean.toFixed(0)} мин, ${w.count} сесс`} style={{ flex: '1 1 80px', textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 62 }}>
+                  <div style={{ height: `${Math.max(8, (w.mean / maxMean) * 30)}px`, background: `linear-gradient(180deg, ${ACCENT}, #16a34a)`, borderRadius: 4, marginBottom: 4, opacity: 0.9 }} />
+                  <div style={{ fontSize: 10, color: colors.textMuted }}>{w.weekStart.slice(5)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{w.mean.toFixed(0)}</div>
+                  <div style={{ fontSize: 10, color: colors.textMuted }}>{w.count} сесс</div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {(distribution || streak.current > 0) && (
         <div style={{ ...glassCard, padding: 12, marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {distribution && (

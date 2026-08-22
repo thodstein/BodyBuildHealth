@@ -1470,17 +1470,21 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
             return (
               <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>🔗 Кросс-аналитика (последние записи)</div>
-                {hist.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {hist.slice(-6).map(h => (
-                      <div key={h.weekStart} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10 }}>
-                        <div style={{ color: colors.textMuted }}>{h.weekStart.slice(5)}</div>
-                        <div style={{ fontWeight: 700, color: '#a78bfa' }}>{h.mean.toFixed(1)}</div>
-                        <div style={{ color: colors.textMuted }}>{h.count}д</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {hist.length > 0 && (() => {
+                  const maxMean = Math.max(...hist.map(x => x.mean), 1);
+                  return (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'flex-end' }}>
+                      {hist.slice(-6).map(h => (
+                        <div key={h.weekStart} title={`${h.weekStart}: ${h.mean.toFixed(1)} ч, ${h.count}д`} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 56 }}>
+                          <div style={{ height: `${Math.max(8, (h.mean / maxMean) * 28)}px`, background: 'linear-gradient(180deg, #a78bfa, #7c3aed)', borderRadius: 4, marginBottom: 4, opacity: 0.9, transition: 'height 0.3s' }} />
+                          <div style={{ color: colors.textMuted }}>{h.weekStart.slice(5)}</div>
+                          <div style={{ fontWeight: 700, color: '#a78bfa' }}>{h.mean.toFixed(1)}</div>
+                          <div style={{ color: colors.textMuted }}>{h.count}д</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {corrs.length > 0 ? (
                   <div style={{ fontSize: 11, color: colors.textMuted }}>
                     {corrs.slice(0, 3).map(c => (
