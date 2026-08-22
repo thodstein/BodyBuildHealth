@@ -65,6 +65,9 @@ export default defineConfig(({ command }) => ({
     port: 3000,
     open: true
   },
+  worker: {
+    format: 'es',
+  },
   build: {
     sourcemap: false,
     rollupOptions: {
