@@ -16,6 +16,7 @@ import {
 import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
 import { buildPLTaperCurve, TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../../engines/lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { CARD, SMALL, H, IN, BTN, BTN_GHOST } from '../TrainingScreen_parts/training-ui';
 import { PL_PHASE_VISUAL, BB_PHASE_VISUAL, COMPETITION_PRIORITY_VISUAL } from '../TrainingScreen_parts/phase-visual-tokens';
 import { PopupNumber, PopupSelect } from './TrainingPopups';
@@ -1436,7 +1437,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
               }).map(cyc => ({
                 id: cyc.meta.id,
                 label: cyc.meta.title,
-                desc: `${cyc.meta.level} · ${cyc.meta.sessionsPerWeek} д/нед · ${cyc.meta.weeks} нед · период «${cyc.meta.period}»`,
+                desc: `${cyc.meta.level} · ${cyc.meta.sessionsPerWeek} д/нед · ${cyc.meta.weeks} нед · период «${periodLabelRu(cyc.meta.period)}»`,
               })),
             ];
             const chosenCycles = slots.filter(Boolean).length || (c.cycleId ? 1 : 0);
@@ -1821,7 +1822,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                     {cyc ? (
                       <>
                         <div><b style={{ color: '#fff' }}>Цикл:</b> «{cyc.meta.title}»</div>
-                        <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.5)' }}>{cyc.meta.sessionsPerWeek} дн/нед · {cyc.meta.level} · {cyc.meta.period}</div>
+                        <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.5)' }}>{cyc.meta.sessionsPerWeek} дн/нед · {cyc.meta.level} · {periodLabelRu(cyc.meta.period)}</div>
                         {cyc.meta.howItWorks && <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.45)', fontSize: 10 }}>{cyc.meta.howItWorks.slice(0, 160)}{cyc.meta.howItWorks.length > 160 ? '…' : ''}</div>}
                       </>
                     ) : <div style={{ color: '#ef4444' }}>Цикл {activeBlock.cycleId} не найден</div>}

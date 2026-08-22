@@ -35,6 +35,7 @@ import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/
 import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
+import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
@@ -1481,7 +1482,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
           {cycle ? (
             <div style={{ fontSize: 11, color: DIM_STRONG }}>
               <div style={{ fontWeight: 700 }}>{cycle.meta.title}</div>
-              <div style={{ fontSize: 10, color: DIM }}>{cycle.meta.sessionsPerWeek}д/нед · {cycle.meta.weeks} нед · {cycle.meta.level} · {cycle.meta.period} · корректировка {((cycle.meta.correctionPct || 0) * 100).toFixed(1)}%/нед</div>
+              <div style={{ fontSize: 10, color: DIM }}>{cycle.meta.sessionsPerWeek}д/нед · {cycle.meta.weeks} нед · {cycle.meta.level} · {periodLabelRu(cycle.meta.period)} · корректировка {((cycle.meta.correctionPct || 0) * 100).toFixed(1)}%/нед</div>
               <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Процентки/сеты/повторения цикла не редактируются — это профессиональная методика. Ниже — ваш оверлей.</div>
               <button
                 style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, marginTop: 6, minHeight: 44, color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}

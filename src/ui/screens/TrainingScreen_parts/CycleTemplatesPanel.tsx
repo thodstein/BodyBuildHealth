@@ -13,6 +13,7 @@ import { distributePhases } from './phase-periodization';
 import { CARD, BTN, BTN_GHOST, DIM, DIM_STRONG, ACCENT } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
 import { applyPhaseModulation } from '../../../engines/manual-constructor';
+import { periodLabelRu, directionLabelRu } from '../../../data/lms-cycles/period-labels';
 
 interface Props {
   program: UserProgram;
@@ -226,7 +227,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
                     {recommended && <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', background: 'rgba(167,139,250,0.15)', padding: '2px 6px', borderRadius: 6 }}>★ Рекомендуем</span>}
                     <span style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level}</span>
                   </div>
-                  <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{c.meta.direction} · {c.meta.period} {c.meta.correctionPct ? '· ' + (c.meta.correctionPct*100).toFixed(1) + '%/нед' : ''}</div>
+                  <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{directionLabelRu(c.meta.direction)} · {periodLabelRu(c.meta.period)} {c.meta.correctionPct ? '· ' + (c.meta.correctionPct*100).toFixed(1) + '%/нед' : ''}</div>
                 </div>
                 <button onClick={() => applyPlCycle(c)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, whiteSpace: 'nowrap', borderColor: isActive ? 'rgba(167,139,250,0.35)' : 'rgba(255,255,255,0.12)', color: isActive ? '#a78bfa' : ACCENT }}>{isActive ? '✓ Подключён' : 'Подключить'}</button>
               </div>

@@ -7,6 +7,7 @@
  */
 import { LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
+import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 
 export type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed';
 export type UserLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'intermediate';
@@ -74,10 +75,10 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     // период/цель
     if (acceptablePeriods.includes(m.period)) {
       score += 40;
-      rationale.push(`период «${m.period}» соответствует цели «${input.goal}»`);
+      rationale.push(`период «${periodLabelRu(m.period)}» соответствует цели «${input.goal}»`);
     } else {
       score -= 25;
-      warnings.push(`период «${m.period}» не идеален для цели «${input.goal}»`);
+      warnings.push(`период «${periodLabelRu(m.period)}» не идеален для цели «${input.goal}»`);
     }
 
     // направление
@@ -85,13 +86,13 @@ export function rankCycles(input: LMSSelectorInput): LMSRankedCycle[] {
     const cycleDirection = normalizeCycleDirection(m.direction);
     if (input.direction && m.direction === input.direction) {
       score += 25;
-      rationale.push(`направление «${m.direction}» совпадает`);
+      rationale.push(`направление «${directionLabelRu(m.direction)}» совпадает`);
     } else if (input.direction && requestedDirection === cycleDirection) {
       score += 12;
-      rationale.push(`направление «${m.direction}» совместимо с «${input.direction}»`);
+      rationale.push(`направление «${directionLabelRu(m.direction)}» совместимо с «${directionLabelRu(input.direction)}»`);
     } else if (input.direction) {
       score -= 15;
-      warnings.push(`направление «${m.direction}» отличается от запрошенного «${input.direction}»`);
+      warnings.push(`направление «${directionLabelRu(m.direction)}» отличается от запрошенного «${directionLabelRu(input.direction)}»`);
     } else {
       score += 5;
     }

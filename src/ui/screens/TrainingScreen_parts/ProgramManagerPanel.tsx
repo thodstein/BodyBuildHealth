@@ -86,6 +86,7 @@ import { detectLift } from '../../../engines/lms/lms-to-pl';
 import { ManualProgramWizard, type WizardStep, type WizardDirection } from './ManualProgramWizard';
 import { buildBBUserProgramFromProfile } from './auto-fill-draft';
 import { sessionDayOfWeek } from './program-editor-logic';
+import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 
 const GOAL_OPTS = [
   { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
@@ -904,7 +905,7 @@ export const ProgramManagerPanel: React.FC = () => {
               {plCycles.map(c => (
                 <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', minHeight: 44 }}>
                   <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
-                  <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {c.meta.period}</div>
+                  <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {periodLabelRu(c.meta.period)}</div>
                 </button>
               ))}
             </div>
@@ -1235,7 +1236,7 @@ export const ProgramManagerPanel: React.FC = () => {
             {plCycles.map(c => (
               <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', minHeight: 44 }}>
                 <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
-                <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {c.meta.period}</div>
+                <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {periodLabelRu(c.meta.period)}</div>
               </button>
             ))}
           </div>

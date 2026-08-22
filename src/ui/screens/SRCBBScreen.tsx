@@ -63,6 +63,7 @@ import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarP
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
 import { PLSeasonBuilder, type SeasonBuildInfo } from './SRCBBScreen_parts/PLSeasonBuilder';
 import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
+import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 import { loadSessions } from '../../engines/workout-logger.engine';
 
 const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepTempoOutput => {
@@ -1493,7 +1494,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {plSeasonMode !== 'season' && (
             <>
               <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
-              <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${({ powerlifting: 'Троеборье', bench: 'Жим лёжа', deadlift_bench: 'Тяга+Жим', armwrestling: 'Армрестлинг' } as Record<string,string>)[c.meta.direction] || c.meta.direction} · ${c.meta.period} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
+              <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
               {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
             </>
           )}

@@ -73,7 +73,7 @@ function weeksBucket(w: number): string {
   return 'w13';
 }
 const WEEKS_LABELS: Record<string, string> = { w8: '≤ 8 нед', w12: '9–12 нед', w13: '13+ нед' };
-const PERIOD_LABELS: Record<string, string> = { strength: 'Сила', peak: 'Пик', mass: 'Масса', endurance: 'Выносливость', mixed: 'Смешанный' };
+const PERIOD_LABELS: Record<string, string> = { strength: 'Сила', peak: 'Выход на пик', mass: 'Масса', endurance: 'Выносливость', mixed: 'Смешанный' };
 
 // ── Просмотр раскладки цикла (дни → упражнения → подходы/повторы/%ПМ) ──
 export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle }) => {
