@@ -70,10 +70,11 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     color: '#f59e0b',
     subtitle: 'Каталог процессов: циклы, программы, методики, пик-протоколы, упражнения',
     // «Мои тренировки» перенесены в Дневник (подвкладка TrainingDiaryHub).
-    tabs: ['library', 'programs', 'methods', 'peaking', 'calc_taper', 'exercises'],
+    // calc_taper перенесён в Интеллект → taper_planner (алиас сохранён, дубль убран)
+    tabs: ['library', 'programs', 'methods', 'peaking', 'exercises'],
     categories: [
       { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs'] },
-      { label: 'Знания и методики', icon: '🧠', tabs: ['methods', 'peaking', 'calc_taper', 'exercises'] },
+      { label: 'Знания и методики', icon: '🧠', tabs: ['methods', 'peaking', 'exercises'] },
     ],
   },
 };
@@ -102,10 +103,10 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 // алиасы для депрекейтнутых дублей (удалены из ZONES.tabs, но должны резолвиться)
 (TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['calc_quality'] = 'calculators';
-(TAB_TO_ZONE as Record<string, TrainingZone>)['taper_planner'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['volume'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['tonnage'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['split_gen'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['calc_taper'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';

@@ -678,7 +678,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {zone === 'calculators' && (() => {
         const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','taper_planner']);
         // алиасы депрекейтнутых дублей → единые хабы
-        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const : tab;
+        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const : tab === 'calc_taper' ? 'taper_planner' as const : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
           // Показываем конкретный инструмент с кнопкой назад
