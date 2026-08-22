@@ -17,6 +17,8 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
 
   const remainingKcal = t.kcal - dayTotals.kcal;
   const isOverKcal = remainingKcal < 0;
+  const kcalPct = t.kcal>0 ? Math.min(100, Math.round(dayTotals.kcal / t.kcal *100)) : 0;
+  const r=14; const circ=2*Math.PI*r; const dash = circ * kcalPct/100;
   return (
     <>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
@@ -47,8 +49,17 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
       })}
     </div>
     <div style={{ marginTop:6, padding:'6px 10px', borderRadius:10, background: isOverKcal ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.06)', border:`1px solid ${isOverKcal ? 'rgba(239,68,68,0.2)' : 'rgba(0,230,138,0.12)'}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-      <span style={{ fontSize:10, color: isOverKcal ? '#ef4444' : '#00e68a', fontWeight:700 }}>{isOverKcal ? `Перебор ${Math.abs(remainingKcal)} ккал` : `Осталось ${remainingKcal} ккал`}</span>
-      <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{isOverKcal ? '˃ цель' : `${Math.round(remainingKcal/t.kcal*100)}% от цели`}</span>
+      <div style={{ display:'flex', flexDirection:'column' }}>
+        <span style={{ fontSize:10, color: isOverKcal ? '#ef4444' : '#00e68a', fontWeight:700 }}>{isOverKcal ? `Перебор ${Math.abs(remainingKcal)} ккал` : `Осталось ${remainingKcal} ккал`}</span>
+        <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>{isOverKcal ? '˃ цель' : `${Math.round(remainingKcal/t.kcal*100)}% от цели`}</span>
+      </div>
+      <div style={{ position:'relative', width:36, height:36, flexShrink:0 }}>
+        <svg width={36} height={36} style={{ transform:'rotate(-90deg)' }}>
+          <circle cx={18} cy={18} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={3} />
+          <circle cx={18} cy={18} r={r} fill="none" stroke={isOverKcal ? '#ef4444' : '#00e68a'} strokeWidth={3} strokeLinecap="round" strokeDasharray={`${dash} ${circ - dash}`} style={{ transition:'stroke-dasharray 0.5s' }} />
+        </svg>
+        <span style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800, color: isOverKcal ? '#ef4444' : '#00e68a' }}>{kcalPct}%</span>
+      </div>
     </div>
     </>
   );
