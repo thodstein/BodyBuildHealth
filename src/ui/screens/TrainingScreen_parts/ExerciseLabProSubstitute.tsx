@@ -90,6 +90,9 @@ const ProSubstituteTab: React.FC<{ selectedId?: string | null }> = ({ selectedId
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+        <b style={{ color: '#fff' }}>Как читать графики Шага 3:</b> Force-векторы — направление нагрузки (гориз./верт. жим/тяга, колено/доминант). Stretch-лидеры — где пик в растянутой фазе (лучше для роста). Подрегионы — какие части мышцы покрыты упражнениями группы. Синергия — пары для суперсетов (антагонисты). Замена — зелёные `canReplace` безопасны, жёлтые проверить, красные запрещены. Таблица — свод всех упр. группы с профилем/техникой/безопасностью.
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
         <PopupSelect label="Группа (ПРО)" value={proGroup} options={GROUPS.filter(g => g !== 'all').map(g => ({ id: g, label: `${GROUP_ICON[g] || ''} ${GROUP_RU[g]}` }))} onChange={v => setProGroup(v)} />
         <PopupSelect label="Упражнение для замены" value={subExId} options={EXERCISE_CATALOG.filter(e => e.group === proGroup).map(e => ({ id: e.id, label: e.name }))} hint="Выберите" onChange={v => setSubExId(v)} />

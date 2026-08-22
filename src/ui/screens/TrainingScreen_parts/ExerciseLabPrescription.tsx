@@ -16,7 +16,7 @@ import {
 import { calculatePlates } from '../../../engines/gym-competition.engine';
 import { estimate1RMConsensus } from '../../../engines/pro/estimate1rm.engine';
 import { velocityForPct, pctForVelocity, estimate1RMFromVelocity } from '../../../engines/pro/vbt.engine';
-import { tempoFor, tutForSet } from '../../../engines/bb/bb-tempo-rest';
+import { tempoFor, tutForSet, REST_BY_CHARACTER } from '../../../engines/bb/bb-tempo-rest';
 import { techniquesFor } from '../../../engines/bb/bb-intensity-techniques';
 
 const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?: (ex: any) => void }> = ({ selectedId, onSelectExercise }) => {
@@ -243,6 +243,9 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
   }, [ex, goal, level, week, totalWeeks, resistanceProfile]);
 
   // PRO-анализ группы вынесён в Шаг 3 (ProSubstituteTab) — без дублей.
+  const [vbtVel, setVbtVel] = useState<number>(0);
+  const [plateBar, setPlateBar] = useState<number>(20);
+  const [show1RMTable, setShow1RMTable] = useState(false);
 
   const [savedCalcs, setSavedCalcs] = useState<Array<{ id: number; name: string; goal: string; level: string; week: number; oneRM: number; reps: string; sets: number; rir: number; rest: number; weight: number; date: string }>>(() => { try { return JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'); } catch { return []; } });
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -351,6 +354,9 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
           <MetricCard title="Отдых" icon="⏱" accent={ACCENT}><div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{presc?.rest ?? '-'}</div><div style={{ ...SMALL }}>сек</div></MetricCard>
           <MetricCard title="Объём" icon="📊" accent="#60a5fa"><div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{(volumeLoad / 1000).toFixed(1)}k</div><div style={{ ...SMALL }}>кг (с×п×в)</div></MetricCard>
           <MetricCard title="Утомление" icon="⚡" accent="#f59e0b"><div style={{ fontSize: 18, fontWeight: 800, color: fatigueScore > 12 ? '#ef4444' : fatigueScore > 8 ? '#f59e0b' : '#22c55e' }}>{fatigueScore}</div><div style={{ ...SMALL }}>из 20</div></MetricCard>
+        </div>
+        <div style={{ ...CARD, marginTop: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: DIM, lineHeight: 1.5 }}>
+          <b style={{ color: '#fff' }}>Как читать графики Шага 1:</b> Вес — % от 1RM (pct), RIR 0-1 = отказ, 2-3 = тяжко, 4+ = легко; RPE = 10−RIR; Объём = сеты×репы×вес; Утомление 0-20 = ЦНС+мышцы (≥12 — много). Все графики внизу раскрывают эти цифры: TUT — время под нагрузкой, AMRAP — запас повторов, Профиль — где пик нагрузки (stretch лучше для роста), Шкала сложности — упростить/усложнить, Частота — скок раз/нед качать, Прогрессия — 4нед план, Утомление — ЦНС vs мышцы. Мини-инструменты внизу — свёрнутые версии Plate/Tonnage/1RM/VBT/ББ без дублей.
         </div>
 
         {tutInfo && (
@@ -483,63 +489,139 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
           </div>
         )}
 
-        {/* ВСТРОЕННЫЕ МИНИ-ИНСТРУМЕНТЫ (втянуты без дублей, раньше — отдельные вкладки/карточки) */}
+        {/* ВСТРОЕННЫЕ ИНСТРУМЕНТЫ — полные, без дублей (втянуты из PlateCalc/Tonnage/1RM/VBT/BB) */}
         {ex && presc && workWeight > 0 && (
           <>
-            {/* 1RM консенсус + плиты */}
-            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(0,230,138,0.12)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🧮 1RM + Блины (втянуто)</div>
+            {/* 1RM + таблица % */}
+            <div style={{ ...CARD, marginTop: 10, border: '1px solid rgba(0,230,138,0.14)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT }}>🧮 1RM — консенсус 7 формул</div>
+                <button onClick={() => setShow1RMTable(v => !v)} style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.2)', background: show1RMTable ? 'rgba(0,230,138,0.12)' : 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 10 }}>{show1RMTable ? '▲ Скрыть таблицу' : '▼ Таблица %1RM'}</button>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: DIM }}>
-                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ fontWeight: 700, color: '#fff' }}>Консенсус 1RM</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{(() => { try { const c = estimate1RMConsensus(oneRM, parseInt(presc.reps) || 5); return Math.round((c.mean || oneRM) * 10) / 10; } catch { return oneRM; } })()} кг</div>
-                  <div style={{ fontSize: 10, color: DIM }}>среднее по 7 формулам (Epley/Brzycki…)</div>
+                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px' }}>
+                  <div style={{ fontWeight: 700, color: '#fff', fontSize: 11 }}>Консенсус 1RM</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{(() => { try { const c = estimate1RMConsensus(oneRM, parseInt(presc.reps) || 5); return Math.round((c.mean || oneRM) * 10) / 10; } catch { return oneRM; } })()} кг</div>
+                  <div style={{ fontSize: 10, color: DIM, lineHeight: 1.3 }}>Epley · Brzycki · Lander · Lombardi · Mayhew · O'Conner · Wathen. Среднее = консенсус.<br/>Ввод 1RM: {oneRM} кг — корректирует %.</div>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ fontWeight: 700, color: '#fff' }}>Блины на сторону</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>{(() => { const pl = calculatePlates(workWeight, 20, 'kg'); return pl.platesPerSide.length ? pl.platesPerSide.map(p => `${p.plate}×${p.count}`).join(' + ') : 'гриф'; })()}</div>
-                  <div style={{ fontSize: 10, color: DIM }}>гриф 20 кг · {workWeight} кг рабочий</div>
+                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '8px' }}>
+                  <div style={{ fontWeight: 700, color: '#fff', fontSize: 11 }}>Быстрые %1RM</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    {[100, 90, 85, 80, 75, 70].map(p => {
+                      const c = (() => { try { const c = estimate1RMConsensus(oneRM, parseInt(presc.reps) || 5); return Math.round((c.mean || oneRM) * p / 100); } catch { return Math.round(oneRM * p / 100); } })();
+                      return <span key={p} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.08)', color: ACCENT, fontSize: 10, fontWeight: 700 }}>{p}% → {c} кг</span>;
+                    })}
+                  </div>
                 </div>
               </div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>В полной версии — `PlateCalcTab` модалка с SVG и разминкой.</div>
+              {show1RMTable && (
+                <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, fontSize: 10, textAlign: 'center' as const }}>
+                  {[95, 90, 85, 80, 75, 70, 65, 60, 55, 50].map(p => {
+                    const w = (() => { try { const c = estimate1RMConsensus(oneRM, parseInt(presc.reps) || 5); const v = (c.mean || oneRM) * p / 100; return Math.round(v); } catch { return Math.round(oneRM * p / 100); } })();
+                    const repsEst = Math.max(1, Math.round(30 * ((oneRM ? ( (() => { try { const c = estimate1RMConsensus(oneRM, parseInt(presc.reps) || 5); return (c.mean || oneRM); } catch { return oneRM; } })() / w) : 1) - 1)));
+                    return <div key={p} style={{ background: p >= 80 ? 'rgba(239,68,68,0.08)' : p >= 70 ? 'rgba(245,158,11,0.07)' : 'rgba(34,197,94,0.07)', borderRadius: 6, padding: '4px 2px' }}><div style={{ fontWeight: 700, color: p >= 80 ? '#ef4444' : p >= 70 ? '#f59e0b' : '#22c55e' }}>{p}%</div><div style={{ fontWeight: 700 }}>{w} кг</div><div style={{ color: DIM, fontSize: 9 }}>~{repsEst} повт</div></div>;
+                  })}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: DIM, marginTop: 6, lineHeight: 1.4 }}><b style={{ color: '#fff' }}>Как читать:</b> консенсус — среднее 7 формул, точнее одной. Таблица %1RM — вес для заданного процента от консенсуса. Используется для Шага 1 (вес {workWeight} кг = {pct}% 1RM).</div>
             </div>
 
-            {/* VBT */}
+            {/* Блины + SVG */}
+            <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(59,130,246,0.14)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🏋️ Блины — раскладка + визуализация</div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: DIM }}>Гриф</span>
+                {[15, 20].map(w => (
+                  <button key={w} onClick={() => setPlateBar(w)} style={{ padding: '4px 8px', borderRadius: 6, border: plateBar === w ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)', background: plateBar === w ? 'rgba(59,130,246,0.12)' : 'transparent', color: plateBar === w ? '#60a5fa' : DIM, cursor: 'pointer', fontSize: 10, fontWeight: 700 }}>{w} кг</button>
+                ))}
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>Рабочий {workWeight} кг</span>
+              </div>
+              {(() => {
+                const pl = calculatePlates(workWeight, plateBar, 'kg');
+                if (!pl.platesPerSide.length) return <div style={{ fontSize: 11, color: DIM, textAlign: 'center', padding: 6 }}>Вес ≤ грифа — блины не нужны.</div>;
+                return (
+                  <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6, justifyContent: 'center' }}>
+                      {pl.platesPerSide.map((p, i) => (
+                        <span key={i} style={{ padding: '4px 8px', borderRadius: 6, background: p.plate >= 20 ? 'rgba(239,68,68,0.12)' : p.plate >= 10 ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.12)', color: p.plate >= 20 ? '#ef4444' : p.plate >= 10 ? '#f59e0b' : '#60a5fa', fontWeight: 700, fontSize: 11 }}>{p.plate}×{p.count}</span>
+                      ))}
+                      <span style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.08)', color: ACCENT, fontSize: 10 }}>на сторону · всего {pl.totalPlates * 2} блинов</span>
+                    </div>
+                    <svg width="100%" height="36" viewBox="0 0 320 36" style={{ display: 'block', background: 'rgba(0,0,0,0.15)', borderRadius: 6 }}>
+                      {(() => {
+                        const barW = 180, barH = 4, cx = 160, cy = 18;
+                        const plates = pl.platesPerSide;
+                        const col = (p: number) => p >= 20 ? '#ef4444' : p >= 10 ? '#f59e0b' : '#60a5fa';
+                        const wmap = (p: number) => p >= 25 ? 9 : p >= 15 ? 7 : 5;
+                        const els: any[] = [];
+                        els.push(<rect key="bar" x={cx - barW / 2} y={cy - barH / 2} width={barW} height={barH} fill="rgba(255,255,255,0.25)" rx={1} />);
+                        let xl = cx - barW / 2, xr = cx + barW / 2;
+                        plates.forEach((p, idx) => {
+                          const w = wmap(p.plate);
+                          for (let j = 0; j < p.count; j++) { xl -= w; els.push(<rect key={`l-${idx}-${j}`} x={xl} y={cy - 10} width={w} height={20} fill={col(p.plate)} rx={1} />); xr += w; els.push(<rect key={`r-${idx}-${j}`} x={xr - w} y={cy - 10} width={w} height={20} fill={col(p.plate)} rx={1} />); }
+                        });
+                        return els;
+                      })()}
+                    </svg>
+                    <div style={{ fontSize: 10, color: DIM, marginTop: 4, textAlign: 'center' }}>Формула: {workWeight} = гриф {plateBar} + {(workWeight - plateBar) / 2} /сторону → {pl.platesPerSide.map(p => `${p.plate}×${p.count}`).join(' + ')} = {pl.platesPerSide.reduce((s, p) => s + p.plate * p.count, 0)} · факт {pl.actualWeight} кг (откл. {pl.deviation > 0 ? '+' : ''}{pl.deviation.toFixed(1)})</div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* VBT интерактив */}
             <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(96,165,250,0.14)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>⚡ VBT (скорость штанги)</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>⚡ VBT — скорость штанги (интерактив)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10 }}>
-                <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ color: DIM }}>Скорость для {pct}% 1RM</div><div style={{ fontWeight: 800, color: '#60a5fa', fontSize: 13 }}>{(() => { try { return velocityForPct(ex.id as any, pct / 100) ?? '—'; } catch { return '—'; } })()} м/с</div>
+                <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '8px' }}>
+                  <div style={{ color: DIM, marginBottom: 4 }}>Скорость для {pct}% 1RM (LVP)</div><div style={{ fontWeight: 800, color: '#60a5fa', fontSize: 16 }}>{(() => { try { const v = velocityForPct(ex.id as any, pct / 100); return v != null ? `${(v as number).toFixed(2)} м/с` : '—'; } catch { return '—'; } })()}</div>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ color: DIM }}>Ввод скорости</span><input type="number" step={0.05} min={0} max={2} value={vbtVel || ''} onChange={e => setVbtVel(parseFloat(e.target.value) || 0)} placeholder="напр. 0.5" style={{ width: 70, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 6px', fontSize: 11 }} />
+                    <span style={{ color: DIM }}>м/с → e1RM {(() => { try { return vbtVel > 0 ? `${Math.round(estimate1RMFromVelocity(ex.id as any, vbtVel, workWeight) as any)} кг` : '—'; } catch { return '—'; } })()}</span>
+                  </div>
                 </div>
-                <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ color: DIM }}>e1RM по скорости</div><div style={{ fontWeight: 800, color: '#60a5fa', fontSize: 12 }}>{(() => { try { const v = velocityForPct(ex.id as any, pct / 100) as any; const e = typeof v === 'number' ? estimate1RMFromVelocity(ex.id as any, v, workWeight) : null; return e ? `${Math.round(e as any)} кг` : '—'; } catch { return '—'; } })()}</div>
+                <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '8px' }}>
+                  <div style={{ color: DIM }}>e1RM по таб. скорости при {pct}%</div><div style={{ fontWeight: 800, color: '#60a5fa', fontSize: 13 }}>{(() => { try { const v = velocityForPct(ex.id as any, pct / 100) as any; const e = typeof v === 'number' ? estimate1RMFromVelocity(ex.id as any, v, workWeight) : null; return e ? `${Math.round(e as any)} кг` : '—'; } catch { return '—'; } })()}</div>
+                  <div style={{ fontSize: 10, color: DIM, marginTop: 4, lineHeight: 1.3 }}>LVP: %1RM ↔ скорость. Полная VBT — `VBTCalcTab`.</div>
                 </div>
               </div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Оценивает %1RM по скорости и наоборот. Полная VBT — в `VBTCalcTab`.</div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 6, lineHeight: 1.4 }}><b style={{ color: '#fff' }}>Как читать:</b> чем выше %1RM, тем ниже скорость. Введите измеренную скорость — получите e1RM. Таблица LVP — по движению.</div>
             </div>
 
-            {/* Тоннаж */}
+            {/* Тоннаж с зонами */}
             <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(245,158,11,0.14)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>📦 Тоннаж/КПШ мини</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10, textAlign: 'center' as const }}>
-                <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>Тоннаж</div><div style={{ fontWeight: 800, fontSize: 13, color: '#f59e0b' }}>{volumeLoad.toLocaleString()} кг</div></div>
-                <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>КПШ</div><div style={{ fontWeight: 800, fontSize: 13 }}>{presc.sets * (parseInt(presc.reps) || 5)}</div></div>
-                <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>УОИ</div><div style={{ fontWeight: 800, fontSize: 13 }}>{pct}%</div></div>
-              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>📦 Тоннаж/КПШ — зоны интенсивности</div>
+              {(() => {
+                const zone = pct < 60 ? 'light' : pct <= 80 ? 'medium' : 'heavy';
+                const zoneLabel = zone === 'light' ? 'Легкая (<60%)' : zone === 'medium' ? 'Средняя (60-80%)' : 'Тяжёлая (>80%)';
+                const zoneColor = zone === 'light' ? '#22c55e' : zone === 'medium' ? '#f59e0b' : '#ef4444';
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10, textAlign: 'center' as const }}>
+                      <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>Тоннаж</div><div style={{ fontWeight: 800, fontSize: 13, color: '#f59e0b' }}>{volumeLoad.toLocaleString()} кг</div><div style={{ color: DIM, fontSize: 9 }}>сеты×репы×вес</div></div>
+                      <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: 6, padding: '6px 4px' }}><div style={{ color: DIM }}>КПШ</div><div style={{ fontWeight: 800, fontSize: 13 }}>{presc.sets * (parseInt(presc.reps) || 5)}</div><div style={{ color: DIM, fontSize: 9 }}>подъёмов</div></div>
+                      <div style={{ background: `${zoneColor}14`, borderRadius: 6, padding: '6px 4px', border: `1px solid ${zoneColor}33` }}><div style={{ color: DIM }}>УОИ</div><div style={{ fontWeight: 800, fontSize: 13, color: zoneColor }}>{pct}%</div><div style={{ color: zoneColor, fontSize: 9 }}>{zoneLabel}</div></div>
+                    </div>
+                    <div style={{ marginTop: 6, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
+                      <div style={{ flex: pct < 60 ? 1 : 0.3, background: pct < 60 ? '#22c55e' : 'rgba(255,255,255,0.04)' }} /><div style={{ flex: pct >= 60 && pct <= 80 ? 1 : 0.3, background: pct >= 60 && pct <= 80 ? '#f59e0b' : 'rgba(255,255,255,0.04)' }} /><div style={{ flex: pct > 80 ? 1 : 0.3, background: pct > 80 ? '#ef4444' : 'rgba(255,255,255,0.04)' }} />
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* ББ темп/техники */}
             <div style={{ ...CARD, marginTop: 8, border: '1px solid rgba(168,85,247,0.14)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>💪 ББ темп/техники (втянуто)</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>💪 ББ темп/техники — втянуто</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10 }}>
                 <div style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ color: DIM }}>Темп/отдых</div><div style={{ fontWeight: 700 }}>{(() => { const t = tempoFor(ex.type === 'compound' ? 'тяж' as any : 'памп' as any); return `${t.notation} · ${tutForSet(parseInt(presc.reps) || 8, ex.type === 'compound' ? 'тяж' as any : 'памп' as any)}с TUT`; })()}</div>
+                  <div style={{ color: DIM }}>Темп/отдых/TUT</div><div style={{ fontWeight: 700, marginTop: 2 }}>{(() => { const char = ex.type === 'compound' ? 'тяж' as const : 'памп' as const; const t = tempoFor(char); return `${t.notation} · ${tutForSet(parseInt(presc.reps) || 8, char)}с TUT · отдых ${REST_BY_CHARACTER[char]}с`; })()}</div>
                 </div>
                 <div style={{ background: 'rgba(168,85,247,0.06)', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ color: DIM }}>Техники</div><div style={{ fontWeight: 700, fontSize: 10 }}>{techniquesFor(ex.type === 'compound' ? 'тяж' as any : 'памп' as any, level).slice(0, 2).map(t => t.name).join(', ') || '—'}</div>
+                  <div style={{ color: DIM }}>Техники (под цель)</div><div style={{ fontWeight: 700, fontSize: 10, marginTop: 2 }}>{techniquesFor(ex.type === 'compound' ? 'тяж' as any : 'памп' as any, level).slice(0, 3).map(t => t.name).join(' · ') || '—'}</div>
                 </div>
               </div>
-              <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>Детально — Шаг 1 остаётся без дублей; полный разбор — в `BbToolsCard`.</div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 6, lineHeight: 1.4 }}><b style={{ color: '#fff' }}>Как читать:</b> темп `эксц-пауза-конц-пауза` (напр. 3-1-1-0) + TUT сета + отдых. Техники — под характер дня и уровень.</div>
             </div>
             <div style={{ fontSize: 10, color: DIM, marginTop: 6, textAlign: 'center' }}>ℹ️ PRO-анализ группы теперь в Шаге 3 «ПРО+Замена» — без дублирования.</div>
           </>
