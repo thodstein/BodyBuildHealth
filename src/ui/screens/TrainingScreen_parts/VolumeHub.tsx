@@ -18,8 +18,8 @@ const MODE_DEFS: Array<{ m: HubMode; label: string; icon: string; desc: string }
   { m: 'splits', label: 'Сплиты', icon: '🧩', desc: '9 сплитов, календарь, сравнение, объём' },
 ];
 
-export const VolumeHub: React.FC = () => {
-  const [mode, setMode] = useState<HubMode>('volume');
+export const VolumeHub: React.FC<{ initialMode?: HubMode }> = ({ initialMode }) => {
+  const [mode, setMode] = useState<HubMode>(initialMode ?? 'volume');
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>

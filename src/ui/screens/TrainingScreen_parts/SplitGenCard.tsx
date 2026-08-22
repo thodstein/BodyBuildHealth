@@ -8,6 +8,7 @@ import {
   generateStrongmanSplit, generateWeightliftingSplit, generateCrossFitSplit, generateRehabSplit,
   generateSplit, type SplitGoal, type SplitInput, type SplitOutput, type SessionTemplate,
 } from '../../../engines/split-engines';
+import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { loadTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
 
@@ -48,11 +49,16 @@ const SPLIT_CATALOG = [
 
 const GOAL_OPTIONS: SplitGoal[] = ['strength','hypertrophy','powerbuilding','weightlifting','crossfit','conditioning','technique','rehab'];
 
-// MEV/MAV/MRV per group (средние значения для intermediate)
-const VOLUME_NORMS: Record<string, { mev:number; mav:number; mrv:number }> = {
-  chest:{mev:8,mav:16,mrv:22}, back:{mev:10,mav:18,mrv:25}, legs:{mev:8,mav:16,mrv:22},
-  shoulders:{mev:6,mav:14,mrv:20}, arms:{mev:6,mav:14,mrv:20}, core:{mev:4,mav:8,mrv:12},
-};
+// MEV/MAV/MRV per group — канон volume-landmarks.engine (intermediate), без дубля хардкода
+const VOLUME_NORMS: Record<string, { mev:number; mav:number; mrv:number }> = (() => {
+  const groups = ['chest','back','legs','shoulders','arms','core'] as const;
+  const out: Record<string, { mev:number; mav:number; mrv:number }> = {} as any;
+  for (const g of groups) {
+    const lm = getVolumeLandmarks('intermediate', g);
+    out[g] = lm ? { mev: lm.mev, mav: lm.mav, mrv: lm.mrv } : { mev: 6, mav: 12, mrv: 20 };
+  }
+  return out;
+})();
 
 // ── Утилиты ──
 function estimateSetsPerGroup(sessions: SessionTemplate[]): Record<string, number> {
