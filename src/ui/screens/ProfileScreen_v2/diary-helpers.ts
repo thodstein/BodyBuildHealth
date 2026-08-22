@@ -655,6 +655,62 @@ export const laggedCorrelation = (
   return { r: res.r, n: res.n, positive: res.r > 0, strength };
 };
 
+/** Расширенная корреляция между парой дневников с интерпретацией. */
+export interface CrossCorrResult {
+  aKey: DiaryKey;
+  bKey: DiaryKey;
+  r: number;
+  n: number;
+  positive: boolean;
+  strength: 'weak' | 'moderate' | 'strong';
+  label: string;
+  interpretation: string;
+}
+
+/** Предопределённые пары дневников для корреляционного анализа. */
+export const CORRELATION_PAIRS: { a: DiaryKey; b: DiaryKey; label: string; description: string }[] = [
+  { a: 'sleep', b: 'weight', label: 'Сон ↔ Вес', description: 'Недосып повышает кортизол → удержание воды/аппетит' },
+  { a: 'sleep', b: 'bp', label: 'Сон ↔ АД', description: 'Мало сна → повышение систолического/диастолического' },
+  { a: 'sleep', b: 'bp', label: 'Сон ↔ Пульс', description: 'Дефицит сна → повышение пульса в покое (HRV ↓)' },
+  { a: 'sleep', b: 'pain', label: 'Сон ↔ Боль', description: 'Плохой сон → снижение порога боли / хроническая боль → бессонница' },
+  { a: 'sleep', b: 'neuro', label: 'Сон ↔ Нейро', description: 'Качество сна ↔ когнитивная нагрузка / настроение' },
+  { a: 'weight', b: 'bp', label: 'Вес ↔ АД', description: 'Избыточный вес → гипертензия; потеря веса → нормализация' },
+  { a: 'weight', b: 'cardio', label: 'Вес ↔ Кардио', description: 'Кардио облегчает дефицит калорий → потеря веса' },
+  { a: 'bp', b: 'cardio', label: 'АД ↔ Кардио', description: 'Регулярное кардио → снижение АД (пост-эффект)' },
+  { a: 'sleep', b: 'cardio', label: 'Сон ↔ Кардио', description: 'Кардио улучшает качество сна; но позднее — может мешать' },
+  { a: 'weight', b: 'pain', label: 'Вес ↔ Боль', description: 'Избыточный вес → нагрузка на суставы/поясницу' },
+  { a: 'injection', b: 'pain', label: 'Инъекции ↔ Боль', description: 'Частые уколы в одной зоне → локальная воспаленность/боль' },
+  { a: 'injection', b: 'health', label: 'Инъекции ↔ Здоровье', description: 'Побочные эффекты препаратов → симптомы здоровья' },
+];
+
+/** Вычисляет все заданные корреляции между дневниками. */
+export const computeAllCorrelations = (
+  diaries: Record<DiaryKey, { date: string; value: number }[]>,
+  pairs: { a: DiaryKey; b: DiaryKey; label: string; description: string }[] = CORRELATION_PAIRS
+): CrossCorrResult[] => {
+  return pairs
+    .map(({ a, b, label, description }) => {
+      const dataA = diaries[a];
+      const dataB = diaries[b];
+      if (!dataA?.length || !dataB?.length) return null;
+      const corr = crossCorrelation(dataA, dataB);
+      if (!corr) return null;
+      let interpretation = description;
+      if (corr.strength === 'strong') interpretation += '. ' + (corr.positive ? 'Прямая связь' : 'Обратная связь') + ' (сильная)';
+      else if (corr.strength === 'moderate') interpretation += '. ' + (corr.positive ? 'Прямая' : 'Обратная') + ' связь (умеренная)';
+      else interpretation += '. Связь слабая / незначительна';
+      return { ...corr, aKey: a, bKey: b, label, interpretation };
+    })
+    .filter((x): x is CrossCorrResult => x !== null && 'label' in x);
+};
+
+/** Группирует корреляции по силе для удобного отображения. */
+export const groupCorrelationsByStrength = (corrs: CrossCorrResult[]): Record<'strong' | 'moderate' | 'weak', CrossCorrResult[]> => ({
+  strong: corrs.filter(c => c.strength === 'strong'),
+  moderate: corrs.filter(c => c.strength === 'moderate'),
+  weak: corrs.filter(c => c.strength === 'weak'),
+});
+
 // ─── Заполненность дневников за сегодня ──────────────────────────────────
 
 export const dailyCompletion = (
