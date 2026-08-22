@@ -22,6 +22,16 @@ describe('BB: порядок/схемы объёма и адекватность
     expect(fstOf(heavyPush).length).toBe(0);
   });
 
+  it('same_muscle суперсет: компаунд+памп-изоляция одной группы («пробить»)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'advanced', goal: 'mass', weeks: 1, workMax: WM, supersetMode: 'same_muscle' });
+    const pairs = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).filter((e: any) => e.supersetWith);
+    expect(pairs.length).toBeGreaterThan(0);
+    // Каждая пара — одна группа: компаунд + изоляция
+    for (const p of pairs) {
+      expect(p.comment).toMatch(/одна группа/);
+    }
+  });
+
   it('отчёт выявляет низкоценные и кросс-мышечные упражнения (decline, пуловер в груди)', () => {
     const plan = buildBBPlan({ patternId: 'fullbody_3', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const issues = checkBBExerciseAppropriateness(plan);

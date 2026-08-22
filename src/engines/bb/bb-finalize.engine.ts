@@ -1,6 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { tidySessionExercises, orderSessionExercises } from './bb-session-order.engine';
+import { tidySessionExercises, orderSessionExercises, isCompoundEx } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { analyzeBBRotation } from './bb-rotation.engine';
@@ -1352,7 +1352,7 @@ export interface BBFinalizeOptions {
     assistedPullUpLoad?: number;
   };
   /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
-  supersetMode?: 'none' | 'antagonist';
+  supersetMode?: 'none' | 'antagonist' | 'same_muscle';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
 }
@@ -1529,8 +1529,7 @@ const ANTAGONIST_PAIRS: Array<[string, string]> = [
   ['chest', 'back'], ['back', 'chest'],
   ['biceps', 'triceps'], ['triceps', 'biceps'],
   ['quads', 'hamstrings'], ['hamstrings', 'quads'],
-];
-export function markAntagonistSupersets(plan: BBPlan): void {
+];export function markAntagonistSupersets(plan: BBPlan): void {
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue;
     for (const session of week.sessions) {
@@ -1548,6 +1547,36 @@ export function markAntagonistSupersets(plan: BBPlan): void {
         paired.add(ex); paired.add(mate);
         pairs++;
         if (pairs >= 3) break;
+      }
+    }
+  }
+}
+
+/** Суперсеты на ОДНУ группу («пробить»): компаунд + памп-изоляция той же мышцы
+ *  без отдыха — пред-истощение базы изоляцией усиливает пампинг/метаболический
+ *  стресс целевой группы. Парные compound (primary) ↔ памп-изоляция (accessory).
+ *  Максимум 2 пары/сессию, не в deload. Лимиты/объём не меняются. */
+export function markSameMuscleSupersets(plan: BBPlan): void {
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue;
+    for (const session of week.sessions) {
+      const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      const paired = new Set<any>();
+      const byMuscle: Record<string, any[]> = {};
+      for (const ex of working) (byMuscle[ex.muscle] ||= []).push(ex);
+      let pairs = 0;
+      for (const exs of Object.values(byMuscle)) {
+        if (pairs >= 2) break;
+        // compound (primary) этой мышцы + её памп-изоляция
+        const compound = exs.find(e => !paired.has(e) && isCompoundEx(e));
+        const iso = exs.find(e => !paired.has(e) && e !== compound && e.role === 'accessory' && e.character === 'памп');
+        if (!compound || !iso) continue;
+        compound.supersetWith = iso.name;
+        iso.supersetWith = compound.name;
+        compound.comment = (compound.comment || '') + (compound.comment ? ' · ' : '') + `🔗 Суперсет с «${iso.name}» (одна группа — добить)`;
+        iso.comment = (iso.comment || '') + (iso.comment ? ' · ' : '') + `🔗 Суперсет с «${compound.name}» (одна группа — пробить)`;
+        paired.add(compound); paired.add(iso);
+        pairs++;
       }
     }
   }
@@ -2524,6 +2553,7 @@ for (const week of next.weeks) {
 
   if (!options.preserveSource && (next as any).pattern?.id) {
     if (options.supersetMode === 'antagonist') markAntagonistSupersets(next);
+    else if (options.supersetMode === 'same_muscle') markSameMuscleSupersets(next);
     if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
   }
   if (!options.preserveSource && (next as any).pattern?.id) {

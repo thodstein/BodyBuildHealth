@@ -483,7 +483,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbMethodology, setBbMethodology] = useState<SessionMethodology>('compound_first');
   // Проф-методики (Библиотека → Методики): DUP, суперсеты-антагонисты, схемы объёма памп-дней
   const [dupMode, setDupMode] = useState<DUPMode>('none');
-  const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist'>('none');
+  const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist' | 'same_muscle'>('none');
   const [volumeScheme, setVolumeScheme] = useState<'standard' | 'gvt' | 'fst7' | 'gironda'>('standard');
 
   // P-ext: calorieSurplus (ккал/день) и eccentricMult (1.0=норма, 1.1-1.2=eccentric overload).
@@ -2311,11 +2311,12 @@ export const BbAutoConstructor: React.FC = () => {
                     <PopupSelect
                       label='🔗 Суперсеты'
                       value={supersetMode}
-                      onChange={v => setSupersetMode(v as 'none' | 'antagonist')}
-                      hint='Пары антагонистов: грудь↔спина, бицепс↔трицепс, квадры↔хамсы'
+                      onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle')}
+                      hint='Антагонисты (грудь↔спина, бицепс↔трицепс) или «пробить» — компаунд+изоляция одной группы'
                       options={[
                         { id: 'none', label: 'Выкл' },
                         { id: 'antagonist', label: 'Антагонисты (пары)' },
+                        { id: 'same_muscle', label: 'Одна группа (пробить)' },
                       ]}
                     />
                     <PopupSelect
@@ -2466,11 +2467,12 @@ export const BbAutoConstructor: React.FC = () => {
           <PopupSelect
             label='🔗 Суперсеты'
             value={supersetMode}
-            onChange={v => setSupersetMode(v as 'none' | 'antagonist')}
-            hint='Пары антагонистов: грудь↔спина, бицепс↔трицепс, квадры↔хамсы'
+            onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle')}
+            hint='Антагонисты (грудь↔спина, бицепс↔трицепс) или «пробить» — компаунд+изоляция одной группы'
             options={[
               { id: 'none', label: 'Выкл' },
               { id: 'antagonist', label: 'Антагонисты (пары)' },
+              { id: 'same_muscle', label: 'Одна группа (пробить)' },
             ]}
           />
           <PopupSelect

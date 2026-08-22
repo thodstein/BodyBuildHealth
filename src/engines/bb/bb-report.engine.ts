@@ -1,6 +1,7 @@
 import type { BBPlan } from './bb-builder.engine';
 import type { BBBalanceReport } from './bb-balance.engine';
 import { trueMuscleOf } from '../movement-pattern';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 export interface BBPlanReport {
   pattern: string;
@@ -136,7 +137,12 @@ export function checkBBExerciseAppropriateness(plan: BBPlan): string[] {
       continue;
     }
     // Кросс-мышечное несоответствие: trueMuscleOf ≠ слот плана.
-    const tm = trueMuscleOf({ name: ex.name, muscle: ex.muscle } as any);
+    // Резолвим через каталог (полные group/type/movementPattern), иначе пуловер
+    // (каталог-group 'chest', но по имени 'back') давал ложное срабатывание.
+    const catalogEx = EXERCISE_CATALOG.find(c => c.name === ex.name || c.id === (ex as any).exerciseName);
+    const tm = catalogEx
+      ? trueMuscleOf({ name: ex.name, muscle: ex.muscle, group: (catalogEx as any).group, type: (catalogEx as any).type, movementPattern: (catalogEx as any).movementPattern, targetMuscle: (catalogEx as any).targetMuscle } as any)
+      : trueMuscleOf({ name: ex.name, muscle: ex.muscle } as any);
     if (tm && tm !== ex.muscle) {
       issues.push(`«${n}» поставлен в слот «${ex.muscle}», но реально тренирует «${tm}» (проверьте соответствие).`);
     }
@@ -145,8 +151,7 @@ export function checkBBExerciseAppropriateness(plan: BBPlan): string[] {
 }
 
 /** Прогрессия нагрузки: средний прирост рабочего веса от недели 1 к пиковой неделе. */
-function progressionSummary(plan: BBPlan): string {
-  const byName = new Map<string, { w1: number; pk: number; muscle: string }>();
+function progressionSummary(plan: BBPlan): string {  const byName = new Map<string, { w1: number; pk: number; muscle: string }>();
   for (const week of plan.weeks) {
     const isPeak = week.week === plan.report?.peakWeek || week.week === plan.weeks.length;
     for (const s of week.sessions || []) for (const ex of s.exercises || []) {
@@ -167,6 +172,47 @@ function progressionSummary(plan: BBPlan): string {
   if (Math.abs(avg) < 0.5) return `Прогрессия: веса стабильны (нед 1 → пик нед ${peakWeek}, Δ ~0%)`;
   const dir = avg > 0 ? '↑' : '↓';
   return `Прогрессия: рабочие веса ${dir} ~${Math.abs(Math.round(avg))}% к пику (нед 1 → нед ${peakWeek}, ${rows.length} первичных упражнений)`;
+}
+
+/** Сводка применённых методик (памп/дропы/суперсеты/схемы объёма/DUP/порядок) —
+ *  чтобы пользователь видел, что реально включено в план. */
+function methodologySummary(plan: BBPlan): string[] {
+  const out: string[] = [];
+  const p: any = plan as any;
+  // Порядок упражнений (методика pre/post-exhaust / compound_first).
+  const methodLabel: Record<string, string> = { compound_first: 'базы → изоляция', pre_exhaust: 'изоляция → база (пред-истощение)', post_exhaust: 'база → изоляция' };
+  if (p.methodology && p.methodology !== 'compound_first') out.push(`Порядок: ${methodLabel[p.methodology] || p.methodology}`);
+  // Суперсеты: антагонисты vs одна группа.
+  let samePairs = 0, antaPairs = 0;
+  for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
+    if (!(ex as any).supersetWith) continue;
+    if (/(одна группа|пробить|добить)/.test(ex.comment || '')) samePairs++;
+    else antaPairs++;
+  }
+  if (antaPairs > 0) out.push(`Суперсеты (антагонисты): ${antaPairs} упражнений в парах`);
+  if (samePairs > 0) out.push(`Суперсеты (одна группа — «пробить»): ${samePairs} упражнений в парах`);
+  // Интенсивные техники (дропы/rest-pause/myo-reps/21s) на последнем подходе.
+  let techCount = 0;
+  const techNames = new Set<string>();
+  for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
+    const c = ex.comment || '';
+    const m = c.match(/💥\s*(.+?)\s*на последнем/);
+    const wsTech = (ex.workSets || []).some((ws: any) => ws.technique);
+    if (wsTech || m) { techCount++; if (m) techNames.add(m[1].trim()); }
+  }
+  if (techCount > 0) out.push(`Интенсивные техники (${[...techNames].join(', ') || 'дропы/rest-pause'}): ${techCount} упражнений, на последнем подходе`);
+  // Схемы объёма памп-дней.
+  const schemeMap: Record<string, string> = { gvt: 'GVT 10×10', fst7: 'FST-7', gironda: '8×8 Gironda' };
+  let schemeCount = 0; let schemeLabel = '';
+  for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
+    const c = ex.comment || '';
+    const m = c.match(/(GVT 10×10|FST-7|8×8 Gironda)/);
+    if (m) { schemeCount++; schemeLabel = schemeLabel || m[1]; }
+  }
+  if (schemeCount > 0) out.push(`Схема объёма памп-дней: ${schemeLabel} на ${schemeCount} упражнениях`);
+  // DUP.
+  if (p.dupMode && p.dupMode !== 'none') out.push(`DUP: ${p.dupMode}`);
+  return out;
 }
 
 /** Полный текстовый отчёт ББ-плана (сводка/баланс/фазы/нагрузка). */
@@ -204,6 +250,11 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   if (settings.length) {
     lines.push(`Настройки: ${settings.join(' · ')}`);
     lines.push('');
+  }
+  // Применённые методики (памп/дропы/суперсеты/схемы/DUP/порядок).
+  const methods = methodologySummary(plan);
+  if (methods.length) {
+    lines.push(`🧩 Методики: ${methods.join(' · ')}`);
   }
   // Фазы — чего ждать по неделям (практическая ценность: делод/пик видны заранее).
   const phases = phaseSummary(plan);
