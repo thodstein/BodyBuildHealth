@@ -73,7 +73,10 @@ export const StrengthAnalyticsCard: React.FC = () => {
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>💪 Аналитика силы</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
-        Процентиль силы, уровень, соотношения присед/жим/тяга, дисбалансы и объёмные ориентиры (MEV/MAV/MRV). ПМ — из профиля.
+        Процентиль силы, уровень, соотношения присед/жим/тяга, дисбалансы и объёмные ориентиры (MEV/MAV/MRV). ПМ — из профиля. Источники: процентили — Rippetoe/Kilgore Practical Programming (2009) + StrengthLevel.com; соотношения — Helms et al. 2016 (присед/тяга 0.9, жим/присед 0.65); MEV/MAV/MRV — Israetel et al. (Renaissance Periodization), Helms 2019 — без выдумок.
+      </div>
+      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+        <b style={{ color: '#60a5fa' }}>Как читать:</b> Процентиль — место среди атлетов вашего веса (70% = сильнее 70%). Уровень: Нетренир.→Мировой (по процентилю). Соотношения: присед к тяге норма 90-100%, жим к приседу 60-70%; выход за 15% — дисбаланс. MEV — минимум для роста, MAV — оптимум, MRV — максимум восстановления. Прогноз: по стажу {prof.level} ожидаемый прирост — без выдумок, линейно.
       </div>
 
       <div style={CARD}>

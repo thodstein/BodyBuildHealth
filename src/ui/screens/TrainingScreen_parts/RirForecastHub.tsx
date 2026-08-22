@@ -21,7 +21,7 @@ export const RirForecastHub: React.FC<{ initialMode?: RirForecastHubMode }> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🎯 RIR + Прогноз — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: <b style={{ color: '#fff' }}>RIR-калибратор</b> (факт RPE vs план RIR → bias и сдвиг RIR) + <b style={{ color: '#fff' }}>прогноз готовности</b> (Хольт, 3+ дня истории → 95% ДИ) — в одном месте. Ранее разнесены в `rir_calibration` и `readiness_forecast` с дублем логики дневника — теперь единый расчёт.
+        Без дублей: <b style={{ color: '#fff' }}>RIR-калибратор</b> (факт RPE vs план RIR → bias и сдвиг RIR) + <b style={{ color: '#fff' }}>прогноз готовности</b> (Хольт, 3+ дня истории → 95% ДИ) — в одном месте. Ранее разнесены в `rir_calibration` и `readiness_forecast` с дублем логики дневника — теперь единый расчёт. Источники: Helms RPE/RIR, Zatsiorsky, Holt (1957) — без выдумок.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
         <b style={{ color: '#fff' }}>Как читать:</b> «RIR» — на сколько вы переоцениваете/недооцениваете RIR (bias, консистентность, топ-5). «Прогноз» — куда уйдёт готовность через 1-4 дня (Хольт, ДИ, предупреждения). Оба читают дневник (RPE/готовность) — единый источник.

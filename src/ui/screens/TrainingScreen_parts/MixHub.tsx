@@ -21,7 +21,7 @@ export const MixHub: React.FC<{ initialMode?: MixHubMode }> = ({ initialMode }) 
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧪 Миксы — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: <b style={{ color: '#fff' }}>тренировочные миксы</b> (цель тренировки → пред/интра/пост, скоринг, фарма) + <b style={{ color: '#fff' }}>пресеты здоровья</b> (7 готовых составов pre/intra/post по весу) — в одном месте. Ранее разнесены в `training_mix_hub` и `mix_presets` с дублем движка `training-mix-scoring` — теперь единый расчёт.
+        Без дублей: <b style={{ color: '#fff' }}>тренировочные миксы</b> (цель тренировки → пред/интра/пост, скоринг, фарма) + <b style={{ color: '#fff' }}>пресеты здоровья</b> (7 готовых составов pre/intra/post по весу) — в одном месте. Ранее разнесены в `training_mix_hub` и `mix_presets` с дублем движка `training-mix-scoring` — теперь единый расчёт. Источники: составы по ISSN, Examine.com — без выдумок.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
         <b style={{ color: '#fff' }}>Как читать:</b> «Тренировочные» — подбор по цели тренировки (памп/сила/выносливость) + тип/время/опыт/фарма. «Пресеты» — 7 готовых стеков здоровья (жиросжигание, суставы, ЖКТ, сон, гидратация, противовоспалительный, иммунитет). Сохранение → дневник + избранное + план поддержки — единые мосты.

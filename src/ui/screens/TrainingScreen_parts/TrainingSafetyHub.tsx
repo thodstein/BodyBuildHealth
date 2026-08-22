@@ -11,27 +11,21 @@ import { ExerciseSafetyPanel } from '../SRCBBScreen_parts/ExerciseSafetyPanel';
 import { LoadSafetyCard } from './LoadSafetyCard';
 import { TrainingLoadCalculator } from './TrainingLoadCalculator';
 import { FatigueIndexTab } from './FatigueIndexTab';
-import { MRVEstimatorTab } from './MRVEstimatorTab';
-import { VolumeOptimizerTab } from './VolumeOptimizerTab';
 import { AutoregPanel } from '../SRCBBScreen_parts/AutoregPanel';
 import { RecoveryPanel } from '../SRCBBScreen_parts/RecoveryPanel';
 import { CheckinMetricsCard } from './CheckinMetricsCard';
 import { WhatIfCard } from './WhatIfCard';
 import { PriRepPatternCard } from './PriRepPatternCard';
-import { DeloadSchedulerTab } from './DeloadSchedulerTab';
-import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 import type { WorkoutLog } from '../../../core/types';
 
-type SectionId = 'safety' | 'load' | 'volume' | 'autoreg' | 'recovery' | 'cardio' | 'deload';
+type SectionId = 'safety' | 'load' | 'autoreg' | 'recovery' | 'cardio';
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: string; desc: string }> = [
   { id: 'safety', label: 'Безопасность', icon: '🛡', desc: 'Оценка упражнений, суставной стресс, ортопедические ограничения' },
   { id: 'load', label: 'Нагрузка', icon: '📊', desc: 'sRPE/ACWR/Banister, индекс усталости, монотонность' },
-  { id: 'volume', label: 'Объём', icon: '🎯', desc: 'MRV-оценщик и оптимизатор объёма (MEV/MAV/MRV)' },
   { id: 'autoreg', label: 'Авторегуляция', icon: '⚙️', desc: 'RPE/e1RM, готовность, PRI, рабочий вес' },
-  { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'Сон, HRV, готовность, чек-ин, what-if' },
+  { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'Сон, HRV, готовность, чек-ин, сценарий «что-если»' },
   { id: 'cardio', label: 'Кардио', icon: '🏃', desc: 'Кардио-план по цели, весу и доступным дням' },
-  { id: 'deload', label: 'Разгрузка', icon: '🧘', desc: 'Планировщик разгрузочных недель' },
 ];
 
 export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?: WorkoutLog[] }> = ({ initialSection = 'safety', sessions = [] }) => {
@@ -41,7 +35,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
     <div style={{ color: '#fff', padding: 4 }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 2 }}>🛡 Безопасность и нагрузка</div>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 12, lineHeight: 1.4 }}>
-        Единый инструмент: безопасность упражнений и плана, тренировочная нагрузка, объём, авторегуляция, восстановление, кардио и разгрузка.
+        Единый инструмент: безопасность, нагрузка, авторегуляция, восстановление, кардио. Объём → <b style={{ color: '#fff' }}>Объём-хаб</b> (MEV/MAV/MRV), разгрузка → <b style={{ color: '#fff' }}>Периодизация-хаб</b> — без дублей, источники Foster/Banister/Helms.
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -76,15 +70,6 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
           <FatigueIndexTab />
         </>
       )}
-      {section === 'volume' && (
-        <>
-          <MRVEstimatorTab />
-          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '10px 0' }} />
-          <VolumeOptimizerTab />
-          <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '10px 0' }} />
-          <VolumeRecoveryCorrelationCard sessions={sessions} />
-        </>
-      )}
       {section === 'autoreg' && (
         <>
           <AutoregPanel />
@@ -104,7 +89,6 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
         </>
       )}
       {section === 'cardio' && <LoadSafetyCard initialSubTab="cardio" />}
-      {section === 'deload' && <DeloadSchedulerTab />}
     </div>
   );
 };

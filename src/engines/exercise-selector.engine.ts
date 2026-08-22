@@ -499,10 +499,11 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
         // Оба штанга или оба гантели → слишком похожи
         return true;
       }
-      // Оба жимы на наклонной → слишком похожи (любой снаряд — один наклонный жим достаточно)
-      const exIsIncline = exName.includes('наклон') && exName.includes('жим');
-      const sIsIncline = sName.includes('наклон') && sName.includes('жим');
-      if (exIsIncline && sIsIncline) return true;
+      // Оба жимы на наклонной → слишком похожи, но incline vs decline — разные углы
+      const isIncline = (n: string) => n.includes('наклон') && n.includes('жим') && !n.includes('отриц') && !n.includes('сниз') && !n.includes('decline');
+      const isDecline = (n: string) => n.includes('наклон') && n.includes('жим') && (n.includes('отриц') || n.includes('сниз') || n.includes('decline'));
+      if (isIncline(exName) && isIncline(sName)) return true;
+      if (isDecline(exName) && isDecline(sName)) return true;
       // Оба разведения/кроссоверы/сведения/бабочка/пек-дек → один изолирующий паттерн груди
       const isFlyLike = (n: string) => /развод|fly|кроссов|crossover|сведен|пек.?дек|бабоч|butterfly/i.test(n);
       if (isFlyLike(exName) && isFlyLike(sName)) return true;

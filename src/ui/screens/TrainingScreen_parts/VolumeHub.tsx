@@ -25,7 +25,7 @@ export const VolumeHub: React.FC = () => {
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>📐 Объём — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: <b style={{ color: '#fff' }}>объём</b> (MEV/MAV/MRV) + <b style={{ color: '#fff' }}>тоннаж</b> (КПШ/УОИ) + <b style={{ color: '#fff' }}>сплиты</b> (9 типов) — в одном месте. Ранее объём считался в 3 местах (Volume/Tonnage/SplitGen) с разными формулами — теперь единый расчёт.
+        Без дублей: <b style={{ color: '#fff' }}>объём</b> (MEV/MAV/MRV) + <b style={{ color: '#fff' }}>тоннаж</b> (КПШ/УОИ) + <b style={{ color: '#fff' }}>сплиты</b> (9 типов) — в одном месте. Ранее объём считался в 3 местах (Volume/Tonnage/SplitGen) с разными формулами — теперь единый расчёт. Источники: Israetel MEV/MAV/MRV, Helms 2019, Schoenfeld 2017, Prilepin 1974 (КПШ) — без выдумок.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
         <b style={{ color: '#fff' }}>Как читать:</b> «Объём» — по мышцам (сеты vs MEV/MAV/MRV, % от MRV, частота). «Тоннаж» — вес×репы×сеты + КПШ (подъёмы) + УОИ (ср.вес/1RM) + зоны &lt;60/60-80/&gt;80%. «Сплиты» — календарь недели + объём по группам + сравнение A−B.

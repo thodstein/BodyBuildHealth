@@ -23,7 +23,7 @@ export const ToolsHub: React.FC<{ initialMode?: ToolsHubMode }> = ({ initialMode
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🛠 Инструменты сборки — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: <b style={{ color: '#fff' }}>PRI/паттерн</b> (готовность → объём/RIR) + <b style={{ color: '#fff' }}>блины</b> (гриф/блины/1RM) + <b style={{ color: '#fff' }}>основа ББ</b> (5 пилларов, MEV/MAV/MRV) — в одном месте. Ранее разнесены в `pri_reppat`/`calc_plates`/`bb_foundation` с дублем логики — теперь единый хаб.
+        Без дублей: <b style={{ color: '#fff' }}>PRI/паттерн</b> (готовность → объём/RIR) + <b style={{ color: '#fff' }}>блины</b> (гриф/блины/1RM) + <b style={{ color: '#fff' }}>основа ББ</b> (5 пилларов, MEV/MAV/MRV) — в одном месте. Ранее разнесены в `pri_reppat`/`calc_plates`/`bb_foundation` с дублем логики — теперь единый хаб. Источники: PRI (Masuda), Helms/RPE/RIR, Schoenfeld/Israetel — без выдумок.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
         <b style={{ color: '#fff' }}>Как читать:</b> «PRI» — ввод восстановления/усталости/DOMS/сна/стресса → PRI и порог + авто-рекомендации. «Блины» — подбор блинов под гриф/вес, 1RM-% пресеты, SVG. «Основа» — пиллары гипертрофии, объёмные ориентиры по уровню, RIR/темп/отдых.

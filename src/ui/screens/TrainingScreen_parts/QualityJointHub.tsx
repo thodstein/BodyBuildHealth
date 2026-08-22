@@ -24,7 +24,7 @@ export const QualityJointHub: React.FC<QualityDiagnosticsHubProps & { initialMod
         Без дублей: <b style={{ color: '#fff' }}>качество и диагностика</b> (0-100, объём, мастер жима/срывы) + <b style={{ color: '#fff' }}>суставы + AI</b> (JSI, 8 блоков, FMS) — в одном месте. Ранее разнесены в `quality_diagnostics` и `joint_health` с дублем теплокарты — теперь единый хаб.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
-        <b style={{ color: '#fff' }}>Как читать:</b> «Качество» — оценка плана 0-100 и диагностика объёма/техники. «Суставы» — 8 блоков на сустав (анатомия→нагрузка→геометрия→прехаб→FMS→замены). Все графики с пояснениями внутри.
+        <b style={{ color: '#fff' }}>Как читать:</b> «Качество» — оценка плана 0-100 и диагностика объёма/техники. «Суставы» — 8 блоков на сустав (анатомия→нагрузка→геометрия→прехаб→FMS→замены). Все графики с пояснениями внутри. Источники: объём — Israetel MEV/MAV/MRV, Helms 2019; диагностика — lift-assistance, joint-load-master (Baechle & Earle 2008), FMS Cook 2010, JSI — без выдумок.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
