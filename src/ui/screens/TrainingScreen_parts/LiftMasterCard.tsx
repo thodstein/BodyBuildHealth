@@ -29,6 +29,10 @@ import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-build
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { VideoCaptureCard } from './VideoCaptureCard';
+import StickingPointAnalysisCard from './StickingPointAnalysisCard';
+import { RIRCalibrationCard } from './RIRCalibrationCard';
+import MesoCorrectionCard from './MesoCorrectionCard';
+import type { TrainingProfile } from './training-profile';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.55)';
@@ -191,7 +195,15 @@ const ExerciseRow: React.FC<{ item: LimiterExerciseItem | any; selected:boolean;
   </div>
 );
 
-export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTemplate | null; sessions?: any[] }> = ({ dayCount=7, template=null, sessions=[] }) => {
+export const LiftMasterCard: React.FC<{
+  dayCount?: number; template?: SRCycleTemplate | null; sessions?: any[];
+  profile?: TrainingProfile;
+  acwr?: number; monotony?: number;
+  readinessRecovery?: number; readinessFatigue?: number;
+  mesoWeeks?: number; missedSessions?: number;
+  currentVolume?: number; currentRir?: number;
+  exercises?: Array<{ name: string; e1rmBefore: number; e1rmAfter: number }>;
+}> = ({ dayCount=7, template=null, sessions=[], profile, acwr, monotony, readinessRecovery=70, readinessFatigue=30, mesoWeeks=12, missedSessions=0, currentVolume=18, currentRir=2, exercises=[] }) => {
   const initial = useMemo(loadMaster, []);
   const [lift, setLift] = useState<Lift>(initial.lift);
   const [phase, setPhase] = useState<WeakPoint|''>(initial.phase);
@@ -602,16 +614,42 @@ export const LiftMasterCard: React.FC<{ dayCount?: number; template?: SRCycleTem
         }
       }} />
 
-      {/* ── 7. Дневник срывы (мини) ── */}
+      {/* ── 7. Дневник срывы ── */}
       <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24' }}>7 · Дневник: срывы по фазам (RPE≥8)</div>
-        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Автоподсказка по тяжёлым подходам — не авто-выбор, проверьте.</div>
-        {diag.weakMuscles.signals.length===0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:4 }}>Нет данных дневника или тренд стабилен.</div>}
+        <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24' }}>7 · Срывы (из дневника, RPE≥8)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Авто-детект тяжёлых подходов (фаза по phaseForReps, ≥6 повт. = неопределена). «Слабые мышцы → планировщик» — одним кликом.</div>
+        <StickingPointAnalysisCard sessions={sessions} />
       </div>
 
-      {/* ── 8. Остальные лимитирующие — ПОЛНЫЙ СПИСОК для выбранного движения ── */}
+      {/* ── 8. RIR-калибровка ── */}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>8 · RIR-калибровка (bias из дневника)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Насколько вы пере-/недооцениваете RIR. «Применить калибровку к плану» — сдвиг RIR одним кликом.</div>
+        <RIRCalibrationCard />
+      </div>
+
+      {/* ── 9. Коррекция мезоцикла ── */}
+      {profile && (
+        <div style={CARD}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>9 · Коррекция мезоцикла (объём/RIR/делод)</div>
+          <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>По ACWR, монотонности, готовности и дневнику — рекомендованный объём, RIR и частота делода. «Применить» — в планировщик.</div>
+          <MesoCorrectionCard
+            profile={profile}
+            acwr={acwr ?? 1}
+            monotony={monotony ?? 1}
+            avgReadiness={readinessRecovery}
+            mesoWeeks={mesoWeeks}
+            missedSessions={missedSessions}
+            exercises={exercises}
+            currentVolume={currentVolume}
+            currentRir={currentRir}
+          />
+        </div>
+      )}
+
+      {/* ── 10. Остальные лимитирующие — ПОЛНЫЙ СПИСОК для выбранного движения ── */}
       <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>8 · Остальные лимитирующие факторы — для {LIFT_RU[lift]} (все калькуляторы)</div>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>10 · Остальные лимитирующие факторы — для {LIFT_RU[lift]} (все калькуляторы)</div>
         <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Кроме геометрии (блок 5) — ещё 10 категорий. Каждая — как в эксперт-режиме, но прямо здесь: выберите параметр → упражнения → дни. Один клик внизу добавит и геометрию, и эти.</div>
         {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(cat=>{
           const opts = limiterOptionsFor(cat.id, lift);

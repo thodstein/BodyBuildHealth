@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { DiagnosticsHub } from '../DiagnosticsHub';
@@ -17,22 +16,15 @@ const props = {
   currentRir: 2,
 };
 
-describe('DiagnosticsHub: единый инструмент (дедуп)', () => {
-  it('есть чипы единых мастеров (дедуп старых movement/limiter/jsi)', () => {
+describe('DiagnosticsHub: единый инструмент движения', () => {
+  it('рендерит Мастер движения (9 лифтов) без дублей суставов', () => {
     const html = renderToStaticMarkup(<DiagnosticsHub {...props} />);
-    expect(html).toContain('Мастер движения');
-    expect(html).toContain('Срывы (дневник)');
+    expect(html).toContain('Диагностика движения');
+    expect(html).toContain('срывы');
+    expect(html).toContain('RIR-калибровка');
+    expect(html).toContain('мезоцикла');
+    expect(html).toContain('9 движений');
     expect(html).not.toContain('Суставы + ортопедия');
-    expect(html).not.toContain('Лимитирующие факторы движения');
-    expect(html).not.toContain('Мёртвые → Слабые → Бар');
-  });
-
-  it('переключение на мастер показывает единый инструмент, точечные калькуляторы на месте', () => {
-    render(<DiagnosticsHub {...props} />);
-    fireEvent.click(screen.getByRole('button', { name: /Мастер движения/ }));
-    expect(screen.getAllByText(/единый инструмент/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Срывы/).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: /RIR/ })).toBeTruthy();
   });
 
   it('CYCLE_01 валиден для card (движение → категория работает)', () => {

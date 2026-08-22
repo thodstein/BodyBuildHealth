@@ -7,7 +7,7 @@ import { LiftMasterCard } from '../LiftMasterCard';
 afterEach(()=>{ cleanup(); localStorage.removeItem('he_lift_master_v1'); });
 
 describe('LiftMasterCard — единый инструмент движения (универсальный)', () => {
-  it('рендерится 8 блоков заголовков', () => {
+  it('рендерится 8+ блоков заголовков', () => {
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
     expect(html).toContain('— единый инструмент');
     expect(html).toContain('1 · Слабые мышцы');
@@ -16,7 +16,9 @@ describe('LiftMasterCard — единый инструмент движения 
     expect(html).toContain('4 · Движение штанги');
     expect(html).toContain('5 · Геометрия техники');
     expect(html).toContain('6 · VBT');
-    expect(html).toContain('7 · Дневник');
+    expect(html).toContain('7 · Срывы');
+    expect(html).toContain('8 · RIR-калибровка');
+    expect(html).toContain('10 · Остальные лимитирующие');
   });
   it('геометрия показывает 8 параметров (разведение локтей и т.д.)', () => {
     const html = renderToStaticMarkup(<LiftMasterCard sessions={[]} />);
