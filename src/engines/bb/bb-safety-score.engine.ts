@@ -14,7 +14,9 @@
  */
 import type { BBPlan } from './bb-types';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
-import { analyzeBBBalance } from './bb-balance.engine';
+import { analyzeBBBalance, type BBBalanceReport } from './bb-balance.engine';
+import { aggregateBBVolume } from './bb-volume.engine';
+import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 
 export interface PlanSafetyScore {
   score: number;
@@ -51,13 +53,15 @@ export function calculatePlanSafetyScore(
     sleepHours?: number;
     stressLevel?: number;
     injuryCount?: number;
+    balanceReport?: BBBalanceReport | null;
+    stressAnalysis?: ReturnType<typeof analyzePlanStress> | null;
   } = {},
 ): PlanSafetyScore {
   const issues: string[] = [];
   const recommendations: string[] = [];
 
-  // 1. Joint Stress Score
-  const stressAnalysis = analyzePlanStress(plan);
+  // 1. Joint Stress Score — reuse if passed (убираем дубль analyzePlanStress)
+  const stressAnalysis = options.stressAnalysis ?? analyzePlanStress(plan);
   const jointStressScore = Math.max(0, Math.min(SCORE_WEIGHTS.jointStress,
     SCORE_WEIGHTS.jointStress - (stressAnalysis.overallRisk === 'high' ? SCORE_WEIGHTS.jointStress :
       stressAnalysis.overallRisk === 'moderate' ? SCORE_WEIGHTS.jointStress / 2 : 0)
@@ -113,20 +117,14 @@ export function calculatePlanSafetyScore(
     issues.push(`${injuryCount} активных травм — план адаптирован.`);
   }
 
-  // 5. Volume Compliance (MRV) — приоритет mrvByMuscle (enhanced скорректированный), fallback landmarks
+  // 5. Volume Compliance (MRV) — единый источник: aggregateBBVolume(effective) + BB_MRV_TOLERANCE 1.15 (было 1.1 + direct — расходилось с bb-validator)
   let volumeViolations = 0;
   for (const w of plan.weeks) {
-    if (w.phase === 'deload') continue;
-    const muscleSets: Record<string, number> = {};
-    for (const s of w.sessions) {
-      for (const ex of s.exercises) {
-        if ((ex as any).warmupActivator) continue;
-        muscleSets[ex.muscle] = (muscleSets[ex.muscle] || 0) + ex.sets;
-      }
-    }
-    for (const [muscle, sets] of Object.entries(muscleSets)) {
+    if ((w as any).phase === 'deload') continue;
+    const volume = aggregateBBVolume(w.sessions);
+    for (const [muscle, values] of Object.entries(volume)) {
       const cap = (plan as any).mrvByMuscle?.[muscle] ?? plan.volumeLandmarks?.find(l => l.group === muscle)?.mrv;
-      if (cap && sets > cap * 1.1) volumeViolations++;
+      if (cap && values.effectiveSets > cap * BB_MRV_TOLERANCE) volumeViolations++;
     }
   }
   let volumeScore = SCORE_WEIGHTS.volumeCompliance;
@@ -156,11 +154,11 @@ export function calculatePlanSafetyScore(
     recommendations.push('Рассмотрите распределение объёма малых мышц минимум на 2 сессии в неделю.');
   }
 
-  // 6. Balance
+  // 6. Balance — единый источник: reuse balanceReport если передан (убираем дубль analyzeBBBalance)
   let balanceScore = SCORE_WEIGHTS.balance;
   try {
-    const balance = analyzeBBBalance(plan);
-    if (balance.issues.length > 0) {
+    const balance = options.balanceReport !== undefined ? options.balanceReport : analyzeBBBalance(plan);
+    if (balance && balance.issues.length > 0) {
       balanceScore = Math.max(0, SCORE_WEIGHTS.balance - balance.issues.length * 2);
       issues.push(...balance.issues.slice(0, 3));
     }

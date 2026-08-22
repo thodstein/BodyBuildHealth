@@ -1131,6 +1131,7 @@ export const BbAutoConstructor: React.FC = () => {
       sleepHours: lifestyle?.sleepHours,
       stressLevel: lifestyle?.stressLevel,
       injuryCount: injuries.length,
+      balanceReport: (builtPlan as any).balanceReport || null,
     });
   }, [builtPlan, linked.profile, injuries.length]);
   // FIX-6: Единый источник качества — validatePlanQuality (канонический движок)

@@ -22,6 +22,8 @@ export interface BBPlanValidationResult {
   issues: BBPlanValidationIssue[];
 }
 
+export const BB_MRV_TOLERANCE = 1.15;
+
 export interface BBPlanValidationOptions {
   level?: string;
   mrvMultiplier?: number;
@@ -193,7 +195,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
         const actualCap = plan.mrvByMuscle?.[muscle];
         const lm = getVolumeLandmarks(options.level, muscle);
         const cap = actualCap ?? (lm ? Math.round(lm.mrv * (options.mrvMultiplier ?? 1)) : 0);
-        if (cap > 0 && values.effectiveSets > cap * 1.15) {
+        if (cap > 0 && values.effectiveSets > cap * BB_MRV_TOLERANCE) {
           issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${muscle}: effective ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}.`, week: week.week });
         }
       }
