@@ -674,15 +674,15 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_management','diagnostics','periodization_hub','exercise_lab','calc_plates','volume','load_safety','split_gen','pri_reppat','tonnage','calc_quality','training_mix_hub','mix_presets','bb_foundation']);
-        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab; // дедуп: load_management → load_safety
-        const isCalcTab = CALC_TABS.has(tab) || tab==='load_management';
+        const CALC_TABS = new Set(['strength_analysis','load_safety','diagnostics','periodization_hub','exercise_lab','calc_plates','volume','split_gen','pri_reppat','tonnage','calc_quality','training_mix_hub','mix_presets','bb_foundation']);
+        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab; // алиас старых ссылок load_management → load_safety (дедуп)
+        const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
           // Показываем конкретный инструмент с кнопкой назад
           const backBtnStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)', cursor: 'pointer', marginBottom: 6 };
           return (<>
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
-            {(tab === 'load_management' || tab === 'load_safety') && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
+            {effectiveTab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {tab === 'diagnostics' && <InfoErrorBoundary label="Диагностика"><DiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} /></InfoErrorBoundary>}
             {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}

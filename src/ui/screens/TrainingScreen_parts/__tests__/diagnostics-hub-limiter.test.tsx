@@ -17,19 +17,21 @@ const props = {
   currentRir: 2,
 };
 
-describe('DiagnosticsHub: режим «Лимитирующие факторы»', () => {
-  it('есть чип режима «Лимитирующие факторы движения»', () => {
+describe('DiagnosticsHub: единый инструмент (дедуп)', () => {
+  it('есть чипы единых мастеров (дедуп старых movement/limiter/jsi)', () => {
     const html = renderToStaticMarkup(<DiagnosticsHub {...props} />);
-    expect(html).toContain('Лимитирующие факторы движения');
+    expect(html).toContain('Мастер жима лёжа');
+    expect(html).toContain('Суставы + AI-ортопед');
+    expect(html).not.toContain('Лимитирующие факторы движения');
+    expect(html).not.toContain('Мёртвые → Слабые → Бар');
   });
 
-  it('переключение на режим показывает калькулятор лимитирующих факторов', () => {
+  it('переключение на мастер показывает единый инструмент, точечные калькуляторы на месте', () => {
     render(<DiagnosticsHub {...props} />);
-    fireEvent.click(screen.getAllByText(/Лимитирующие факторы движения/)[0]);
-    expect(screen.getByText(/Калькулятор лимитирующих факторов движения/)).toBeTruthy();
-    // Исходные режимы диагностики на месте
-    expect(screen.getByText(/Мёртвые точки → Слабые точки → Движение штанги/)).toBeTruthy();
-    expect(screen.getByText(/Срывы \(дневник\)/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Мастер жима лёжа/ }));
+    expect(screen.getByText(/единый инструмент/)).toBeTruthy();
+    expect(screen.getAllByText(/Срывы/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /RIR/ })).toBeTruthy();
   });
 
   it('CYCLE_01 валиден для card (движение → категория работает)', () => {

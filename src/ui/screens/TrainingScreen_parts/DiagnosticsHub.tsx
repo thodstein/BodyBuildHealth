@@ -11,23 +11,19 @@ import type { WorkoutLog } from '../../../core/types';
 import type { TrainingProfile } from './training-profile';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony } from '../../../engines/pro/training-load.engine';
-import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
-import { LimiterCalculatorCard } from './LimiterCalculatorCard';
 import { LiftMasterCard } from './LiftMasterCard';
 import { JointMasterCard } from './JointMasterCard';
-import { JointJsiCalculatorCard } from './JointJsiCalculatorCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'joint' | 'jsi' | 'sticking' | 'rir' | 'mesocorr';
+// Дедуп: единый инструмент покрывает старые movement/limiter/jsi — они скрыты, остались как алиасы для совместимости
+type DiagnosticsHubMode = 'master' | 'joint' | 'sticking' | 'rir' | 'mesocorr';
+type LegacyMode = 'movement' | 'limiter' | 'jsi';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
   { m: 'master', label: 'Мастер жима лёжа', icon: '🏋️' },
-  { m: 'movement', label: 'Мёртвые → Слабые → Бар', icon: '🎯' },
-  { m: 'limiter', label: 'Лимитирующие', icon: '🧩' },
   { m: 'joint', label: 'Суставы + AI-ортопед', icon: '🦴' },
-  { m: 'jsi', label: 'AI-ортопед JSI', icon: '🧬' },
   { m: 'sticking', label: 'Срывы', icon: '🔬' },
   { m: 'rir', label: 'RIR', icon: '🎯' },
   { m: 'mesocorr', label: 'Мезо', icon: '🔧' },
@@ -48,7 +44,10 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
   sessions, tprofile, readinessRecovery, readinessFatigue,
   mesoWeeks, missedSessions, currentVolume, currentRir,
 }) => {
-  const [mode, setMode] = useState<DiagnosticsHubMode>('master');
+  const [modeRaw, setModeRaw] = useState<DiagnosticsHubMode | LegacyMode>('master');
+  // алиас старых режимов на единый инструмент
+  const mode: DiagnosticsHubMode = modeRaw === 'movement' || modeRaw === 'limiter' ? 'master' : modeRaw === 'jsi' ? 'joint' : modeRaw as DiagnosticsHubMode;
+  const setMode = (m: DiagnosticsHubMode | LegacyMode) => setModeRaw(m);
 
   const acwrData = useMemo(() => {
     const s = loadSRPESessions();
@@ -101,9 +100,6 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
 
       {mode === 'master' && <LiftMasterCard sessions={sessions} />}
       {mode === 'joint' && <JointMasterCard />}
-      {mode === 'jsi' && <JointJsiCalculatorCard />}
-      {mode === 'movement' && <PlDeadpointsBarPathCard sessions={sessions as any} />}
-      {mode === 'limiter' && <LimiterCalculatorCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
       {mode === 'rir' && <RIRCalibrationCard />}
       {mode === 'mesocorr' && (
