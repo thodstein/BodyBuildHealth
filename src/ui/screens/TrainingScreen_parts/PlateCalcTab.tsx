@@ -33,12 +33,12 @@ const BAR_TYPES: Record<Unit, { id: string; label: string; weight: number }[]> =
     { id: 'swiss_bar', label: 'Swiss/Multi-grip (15 кг)', weight: 15 },
   ],
   imperial: [
-    { id: 'men_olympic', label: "Men's Olympic (45 lb)", weight: 45 },
-    { id: 'women_olympic', label: "Women's Olympic (35 lb)", weight: 35 },
-    { id: 'ez_curl', label: 'EZ-Curl Bar (15 lb)', weight: 15 },
-    { id: 'technique', label: 'Technique Bar (10 lb)', weight: 10 },
-    { id: 'standard', label: 'Standard Bar (15 lb)', weight: 15 },
-    { id: 'trap_bar', label: 'Trap/Hex Bar (55 lb)', weight: 55 },
+    { id: 'men_olympic', label: 'Мужской олимпийский (45 фн)', weight: 45 },
+    { id: 'women_olympic', label: 'Женский олимпийский (35 фн)', weight: 35 },
+    { id: 'ez_curl', label: 'EZ-гриф (15 фн)', weight: 15 },
+    { id: 'technique', label: 'Технический гриф (10 фн)', weight: 10 },
+    { id: 'standard', label: 'Стандартный гриф (15 фн)', weight: 15 },
+    { id: 'trap_bar', label: 'Трэп/Хекс-гриф (55 фн)', weight: 55 },
   ],
 };
 
@@ -59,7 +59,7 @@ function lbToKg(lb: number) { return Math.round(lb / KG_TO_LB * 10) / 10; }
 
 const unitOpts = [
   { id: 'metric', label: 'Метрические (кг)', desc: 'кг · блины 25/20/15/10/5/2.5/1.25 кг' },
-  { id: 'imperial', label: 'Имперские (lb)', desc: 'lb · блины 45/35/25/10/5/2.5 lb' },
+  { id: 'imperial', label: 'Имперские (фн)', desc: 'фн · блины 45/35/25/10/5/2.5 фн' },
 ];
 
 export interface PlateCalcTabProps {
@@ -104,7 +104,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
     [unit, customPlates]
   );
 
-  const barOptions = useMemo(() => BAR_TYPES[unit].map(b => ({ id: b.id, label: b.label, desc: `${b.weight} ${unit === 'metric' ? 'кг' : 'lb'}` })), [unit]);
+  const barOptions = useMemo(() => BAR_TYPES[unit].map(b => ({ id: b.id, label: b.label, desc: `${b.weight} ${unit === 'metric' ? 'кг' : 'фн'}` })), [unit]);
 
   const applyBar = (id: string) => {
     setBarId(id);
@@ -122,10 +122,10 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   const plates = useMemo(() => calculatePlates(targetWeight, barWeight, wUnit, availablePlates), [targetWeight, barWeight, wUnit, availablePlates]);
   const order = useMemo(() => getPlateLoadingOrder(targetWeight, barWeight, wUnit), [targetWeight, barWeight, wUnit]);
   const warmup = useMemo(() => warmupPlateSequence(targetWeight, barWeight, wUnit, availablePlates), [targetWeight, barWeight, wUnit, availablePlates]);
-  const displayAlt = unit === 'metric' ? `${kgToLb(targetWeight)} lb` : `${lbToKg(targetWeight)} кг`;
+  const displayAlt = unit === 'metric' ? `${kgToLb(targetWeight)} фн` : `${lbToKg(targetWeight)} кг`;
   const deviation = Math.abs(plates.deviation);
   const devColor = deviation < 0.5 ? ACCENT : deviation > 2 ? '#ef4444' : '#f59e0b';
-  const unitLabel = unit === 'metric' ? 'кг' : 'lb';
+  const unitLabel = unit === 'metric' ? 'кг' : 'фн';
   const sideWeight = Math.round(((targetWeight - barWeight) / 2) * 10) / 10;
   const platesPerSideSum = plates.platesPerSide.reduce((s, p) => s + p.plate * p.count, 0);
 
@@ -340,7 +340,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
             const lines: string[] = [];
             lines.push('=== Калькулятор блинов — Отчёт ===');
             lines.push(`Дата: ${new Date().toLocaleDateString('ru-RU')}`);
-            lines.push(`Система: ${unit === 'metric' ? 'Метрические (кг)' : 'Имперские (lb)'}`);
+            lines.push(`Система: ${unit === 'metric' ? 'Метрические (кг)' : 'Имперские (фн)'}`);
             lines.push(`Гриф: ${barWeight} ${unitLabel}`);
             lines.push(`Целевой вес: ${targetWeight} ${unitLabel} (≈ ${displayAlt})`);
             lines.push(`Фактический вес: ${plates.actualWeight} ${unitLabel}`);
@@ -367,7 +367,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
                   if (p.plates) setCustomPlates(p.plates);
                 }} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 11 }}>
                   <strong style={{ color: ACCENT }}>{p.name}</strong>
-                  <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{p.targetWeight} {p.unit === 'metric' ? 'кг' : 'lb'} · гриф {p.barWeight}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{p.targetWeight} {p.unit === 'metric' ? 'кг' : 'фн'} · гриф {p.barWeight}</span>
                 </button>
                 <button onClick={() => {
                   const arr = savedPresets.filter(x => x.id !== p.id);

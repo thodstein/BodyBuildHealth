@@ -36,14 +36,14 @@ const LIFT_RU: Record<Lift, string> = { squat: 'Присед', bench: 'Жим л
 const LIFT_COLOR: Record<Lift, string> = { squat: '#ef4444', bench: '#3b82f6', deadlift: '#f59e0b' };
 
 const fatigueOpts = [
-  { id: 'low', label: 'Низкая (8-9)', desc: 'Лёгкий taper 1 неделя' },
-  { id: 'med', label: 'Средняя (5-7)', desc: 'Taper 2 недели' },
-  { id: 'high', label: 'Высокая (>8)', desc: 'Длительный taper 3 недели' },
+  { id: 'low', label: 'Низкая (8-9)', desc: 'Лёгкий тейпер 1 неделя' },
+  { id: 'med', label: 'Средняя (5-7)', desc: 'Тейпер 2 недели' },
+  { id: 'high', label: 'Высокая (>8)', desc: 'Длительный тейпер 3 недели' },
 ];
 const strategyOpts: { id: AttemptStrategy; label: string; desc: string }[] = [
-  { id: 'conservative', label: 'Консервативная', desc: 'Опенер 90%, 2nd 95.5%, 3rd 100%' },
-  { id: 'balanced', label: 'Сбалансированная', desc: 'Опенер 92%, 2nd 96%, 3rd 102%' },
-  { id: 'aggressive', label: 'Агрессивная', desc: 'Опенер 93%, 2nd 97%, 3rd 105%' },
+  { id: 'conservative', label: 'Консервативная', desc: 'Опенер 90%, 2-я 95,5%, 3-я 100%' },
+  { id: 'balanced', label: 'Сбалансированная', desc: 'Опенер 92%, 2-я 96%, 3-я 102%' },
+  { id: 'aggressive', label: 'Агрессивная', desc: 'Опенер 93%, 2-я 97%, 3-я 105%' },
 ];
 
 const addDays = (n: number): string => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
