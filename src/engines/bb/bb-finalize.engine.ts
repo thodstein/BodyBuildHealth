@@ -11,6 +11,7 @@ import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
+import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
@@ -2766,6 +2767,27 @@ for (const week of next.weeks) {
         filtered.push(e);
       }
       session.exercises = filtered;
+    }
+  }
+  // Enrich: каждое упражнение — executionProfile/comment/tempo не пустые (качество подбора, вкладки)
+  for (const week of next.weeks) for (const session of week.sessions) for (const ex of session.exercises) {
+    if (!(ex as any).executionProfile) {
+      try {
+        (ex as any).executionProfile = buildExerciseInstructions({ exerciseName: ex.name, exerciseId: (ex as any).exerciseName, muscle: ex.muscle, role: ex.role, level: options.level, trainingFocus: (options as any).trainingFocus as any, tempo: (ex as any).tempoSpec, restSeconds: ex.restSeconds } as any);
+      } catch {}
+    }
+    if (!ex.comment || ex.comment.trim().length < 10) {
+      const prof = (ex as any).executionProfile;
+      if (prof?.cues?.[0]) ex.comment = (ex.comment ? ex.comment + ' · ' : '') + prof.cues[0];
+      else if (prof?.pattern) ex.comment = (ex.comment ? ex.comment + ' · ' : '') + `Паттерн: ${prof.pattern} — ${prof.order}`;
+      else ex.comment = (ex.comment || '') + ` · ${ex.muscle} — ${ex.name}`;
+    }
+    if (!ex.workSets?.[0]?.tempo && !(ex as any).tempoSpec) {
+      const prof = (ex as any).executionProfile;
+      if (prof?.tempo) {
+        for (const ws of ex.workSets || []) if (!(ws as any).tempo) (ws as any).tempo = prof.tempo;
+        (ex as any).tempoSpec = prof.tempo;
+      }
     }
   }
   syncBBPlanSetShape(next);

@@ -3,6 +3,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getExerciseBio, type ExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getMappedBioId, getMappedIds } from '../../data/exercise-id-mapping';
 import { getTargetMuscleForExercise, TARGET_MUSCLE_DB, type TargetMuscleEntry } from '../../data/target-muscle-db';
+import { derivePattern } from '../movement-pattern';
 
 export interface ExerciseInstructionInput {
   exerciseId?: string;
@@ -101,12 +102,20 @@ function orderLabel(input: ExerciseInstructionInput): string {
 export function buildExerciseInstructions(input: ExerciseInstructionInput): ExerciseInstructionProfile {
   const { bio, target, id } = findBio(input);
   const catalog = catalogInstruction(input, id);
-  const pattern = PATTERN_RU[bio?.pattern || ''] || PATTERN_RU[catalog?.pattern || ''] || bio?.pattern || catalog?.pattern || input.muscle || 'силовой паттерн';
+  const derived = derivePattern({ name: input.exerciseName, group: input.muscle, type: 'compound', targetMuscle: input.muscle } as any);
+  const pattern = PATTERN_RU[bio?.pattern || ''] || PATTERN_RU[catalog?.pattern || ''] || PATTERN_RU[derived || ''] || bio?.pattern || catalog?.pattern || derived || input.muscle || 'силовой паттерн';
   const labCues = [...(bio?.techniqueCues || []), ...(target?.techniqueCues || [])].filter((cue, i, all) => all.indexOf(cue) === i);
   const catalogCue = catalog?.cues?.[0];
-  const cues = catalogCue
+  let cues = catalogCue
     ? [...labCues.filter(cue => cue !== catalogCue).slice(0, 4), catalogCue]
     : labCues.slice(0, 5);
+  if (cues.length === 0) {
+    // Fallback: generic cue по паттерну, чтобы вкладка не была пустой
+    if (pattern.includes('жим')) cues = ['Контроль траектории, без отбива, лопатки сведены.'];
+    else if (pattern.includes('тяга')) cues = ['Тяните локтями, сводите лопатки, без рывков.'];
+    else if (pattern.includes('присед')) cues = ['Глубина ниже параллели, колени по носкам, грудь вверх.'];
+    else cues = ['Контролируйте технику, без рывков, полная амплитуда.'];
+  }
   const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus, input.level);
   const order = orderLabel(input);
   const lvl = (input.level || '').toLowerCase();
