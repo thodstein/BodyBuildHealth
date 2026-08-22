@@ -390,6 +390,8 @@ export interface CycleToPlanInput {
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   /** Training focus для RIR-корректировки (Schoenfeld 2021, Roberts 2022). */
   trainingFocus?: BBTrainingFocus;
+  /** Объёмный vs обычный — для отчёта и выбора MRV */
+  trainingVolumeMode?: 'standard' | 'high';
   /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
   sex?: 'male' | 'female';
   /** Recovery-метрики → MRV soft-cap (Helms 2022, Plews 2022, Watson 2022). */
@@ -1289,6 +1291,47 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
   });
+  (finalized as any).trainingVolumeMode = (input as any).trainingVolumeMode || 'standard';
+  (finalized as any).volumeGoal = input.volumeGoal;
+  (finalized as any).goal = input.goal;
+  (finalized as any).trainingFocus = input.trainingFocus;
+  (finalized as any).methodology = input.methodology;
+  (finalized as any).trainingYears = input.trainingYears;
+  (finalized as any).courseIntensity = input.courseIntensity;
+  (finalized as any).inputSnapshot = {
+    level: input.level,
+    goal: input.goal,
+    trainingVolumeMode: (input as any).trainingVolumeMode || 'standard',
+    volumeGoal: input.volumeGoal,
+    trainingFocus: input.trainingFocus,
+    methodology: input.methodology,
+    trainingYears: input.trainingYears,
+    courseIntensity: input.courseIntensity,
+    fewerCompound: input.fewerCompound,
+    rotationMode: input.rotationMode,
+    intensityLevel: input.intensityLevel,
+    avoidAxialLoad: input.avoidAxialLoad,
+    equipment: input.equipment,
+    injuries: input.injuries,
+    mobilityRestrictions: input.mobilityRestrictions,
+    favoriteExercises: input.favoriteExercises,
+    excludedExercises: input.excludedExercises,
+    autoDeload: input.autoDeload,
+    deloadType: input.deloadType,
+    loadStrategy: input.loadStrategy,
+    eccentricMult: input.eccentricMult,
+    calorieSurplus: input.calorieSurplus,
+    proteinPerKg: input.proteinPerKg,
+    labMrvMultiplier: input.labMrvMultiplier,
+    bodyFat: input.bodyFat,
+    leanMass: input.leanMass,
+    hrvMs: input.hrvMs,
+    sleepHours: input.sleepHours,
+    stressLevel: input.stressLevel,
+    weakPoints: input.weakPoints,
+    focusGroup: input.focusGroup,
+    specialization: input.specialization,
+  };
   return finalized;
 }
 
@@ -1318,6 +1361,7 @@ export interface ProgramToBBPlanOpts {
   courseIntensity?: CourseIntensity;
   level?: string;
   trainingYears?: number;
+  trainingVolumeMode?: 'standard' | 'high';
   /** Способность к bodyweight-упражнениям (подтягивания при отсутствии → pulldown). */
   bodyweightCapability?: {
     pullUpsStrict?: number;
@@ -2107,6 +2151,47 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     trainingYears: opts.trainingYears,
     bodyweightCapability: opts.bodyweightCapability,
   });
+  (finalized as any).trainingVolumeMode = (opts as any).trainingVolumeMode || 'standard';
+  (finalized as any).volumeGoal = opts.volumeGoal;
+  (finalized as any).goal = (opts as any).goal;
+  (finalized as any).trainingFocus = opts.trainingFocus;
+  (finalized as any).methodology = opts.methodology;
+  (finalized as any).trainingYears = opts.trainingYears;
+  (finalized as any).courseIntensity = opts.courseIntensity;
+  (finalized as any).inputSnapshot = {
+    level: opts.level,
+    goal: (opts as any).goal,
+    trainingVolumeMode: (opts as any).trainingVolumeMode || 'standard',
+    volumeGoal: opts.volumeGoal,
+    trainingFocus: opts.trainingFocus,
+    methodology: opts.methodology,
+    trainingYears: opts.trainingYears,
+    courseIntensity: opts.courseIntensity,
+    fewerCompound: opts.fewerCompound,
+    rotationMode: opts.rotationMode,
+    intensityLevel: opts.intensityLevel,
+    avoidAxialLoad: opts.avoidAxialLoad,
+    equipment: opts.equipment,
+    injuries: opts.injuries,
+    mobilityRestrictions: opts.mobilityRestrictions,
+    favoriteExercises: opts.favoriteExercises,
+    excludedExercises: opts.excludedExercises,
+    autoDeload: opts.autoDeload,
+    deloadType: opts.deloadType,
+    loadStrategy: opts.loadStrategy,
+    eccentricMult: opts.eccentricMult,
+    calorieSurplus: opts.calorieSurplus,
+    proteinPerKg: opts.proteinPerKg,
+    labMrvMultiplier: opts.labMrvMultiplier,
+    bodyFat: opts.bodyFat,
+    leanMass: opts.leanMass,
+    hrvMs: opts.hrvMs,
+    sleepHours: opts.sleepHours,
+    stressLevel: opts.stressLevel,
+    weakPoints: opts.weakPoints,
+    focusGroup: opts.focusGroup,
+    specialization: opts.specialization,
+  };
   return finalized;
 }
 
