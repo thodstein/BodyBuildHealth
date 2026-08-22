@@ -1134,16 +1134,16 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   }
 }
 
-/** Маппинг целевой группы сессии → разминочное лёгкое изолирующее движение. */
-const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /тяга.*одной|single.?arm|тяга.*гантел.*одной/i,
-  chest: /брус|dip|отжим.*брус/i,
-  quads: /сисси|sissy/i,
-  hamstrings: /норд|nordic|ghr/i,
-  glutes: /отведен.*бедр|abduction|kick.?back|ягодичн.*отвед/i,
+/** Маппинг целевой группы сессии → разминочное лёгкое движение (RESEARCH: лёгкая активация 25% 3×12, Schoenfeld warm-up, Helms). */
+const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /тяга.*верхн.*блок|pulldown|тяга.*блок/i,
+  chest: /жим.*гантел.*лёж|жим.*тренаж|сведен.*тренаж|машин.*груд/i,
+  quads: /жим.*ног|leg.?press|разгибан.*ног/i,
+  hamstrings: /сгибан.*ног|leg.?curl/i,
+  glutes: /отведен.*бедр|abduction|ягодичн.*мост/i,
   calves: /подъём.*носк|подъем.*носк|calf.?raise/i,
   shoulders: /мах.*сторон|lateral.*raise|отведен.*сторон/i,
   traps: /шраг|shrug/i,
-  biceps: /сгибан.*(блок|кабель|cable)|сгибан.*рук.*блок/i,
+  biceps: /сгибан.*блок|cable.*curl/i,
   triceps: /разгибан.*блок|pushdown/i,
   abs: /скручиван|crunch/i,
   forearms: /сгибан.*запяст|wrist.?curl/i,
