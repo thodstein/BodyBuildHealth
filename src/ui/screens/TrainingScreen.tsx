@@ -678,15 +678,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
         const CALC_TABS = new Set(['strength_analysis','load_safety','quality_joint_hub','periodization_taper_hub','exercise_lab','volume_hub','tools_hub','rir_forecast_hub','mix_hub']);
-        // алиасы депрекейтнутых дублей → единые хабы (периодизация+тейпер, миксы, RIR+прогноз, инструменты, качество+суставы — аналоги VolumeHub)
+        // алиасы депрекейтнутых дублей → единые хабы (9 хабов — аналоги VolumeHub, без дублей формул)
         const effectiveTab = tab === 'load_management' ? 'load_safety' as const
           : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_joint_hub' as const
           : tab === 'quality_diagnostics' || tab === 'joint_health' ? 'quality_joint_hub' as const
-          : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const
+          : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' || tab === 'calc_mrv' ? 'volume_hub' as const
           : tab === 'periodization_hub' || tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'periodization_taper_hub' as const
           : tab === 'training_mix_hub' || tab === 'mix_presets' ? 'mix_hub' as const
           : tab === 'rir_calibration' || tab === 'readiness_forecast' ? 'rir_forecast_hub' as const
           : tab === 'pri_reppat' || tab === 'calc_plates' || tab === 'bb_foundation' ? 'tools_hub' as const
+          : tab === 'calc_1rm' || tab === 'calc_vbt' || tab === 'rel_strength' || tab === 'pl_norms' || tab === 'strength' || tab === 'calc_fatigue' ? 'strength_analysis' as const
           : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
@@ -694,7 +695,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           const backBtnStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)', cursor: 'pointer', marginBottom: 6 };
           return (<>
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
-            {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
+            {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'relstr' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
             {effectiveTab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {effectiveTab === 'quality_joint_hub' && <InfoErrorBoundary label="Качество + Суставы — единый хаб"><QualityJointHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} onBuildPlan={() => goPlannerManual()} initialMode={tab === 'joint_health' ? 'joints' : 'quality'} /></InfoErrorBoundary>}
             {effectiveTab === 'periodization_taper_hub' && <InfoErrorBoundary label="Периодизация + Тейпер"><PeriodizationHub initialMode={tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'taper' : 'designer'} /></InfoErrorBoundary>}

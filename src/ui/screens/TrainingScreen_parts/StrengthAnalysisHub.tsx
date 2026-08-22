@@ -20,15 +20,14 @@ const MODE_DEFS: Array<{ m: StrengthAnalysisHubMode; label: string; icon: string
   { m: 'analytics', label: 'Аналитика', icon: '📊', desc: 'Процентили, объёмы' }
 ];
 
-export const StrengthAnalysisHub: React.FC = () => {
-  const [mode, setMode] = useState<StrengthAnalysisHubMode>('1rm');
+export const StrengthAnalysisHub: React.FC<{ initialMode?: StrengthAnalysisHubMode }> = ({ initialMode }) => {
+  const [mode, setMode] = useState<StrengthAnalysisHubMode>(initialMode ?? '1rm');
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🏋️ Анализ силы — единый центр</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Оценка максимума, скорость штанги, относительная сила, нормативы и аналитика. <b style={{ color: '#fff' }}>Вкладка «Единый»</b> — главный калькулятор разрядных нормативов: собраны все инструменты из приложения (нормативы по полу/категории/федерации + DOTS/Wilks/IPF GL + прогресс-бары + пояснения к каждому графику). Остальные вкладки — детализация той же модели (VBT, 1RM, аналитика).
-        <span style={{ display: 'inline-block', marginTop: 4, padding: '2px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.16)', color: '#f59e0b', fontSize: 9 }}>План: если «Единый» покрывает все сценарии, старые разрозненные калькуляторы (Отн. сила отдельно, Нормативы отдельно) будут убраны — решение по итогу тестирования.</span>
+        Без дублей: <b style={{ color: '#fff' }}>1RM</b> (7 формул, консенсус) + <b style={{ color: '#fff' }}>VBT</b> (скорость штанги) + <b style={{ color: '#fff' }}>Отн. сила</b> (×BW + DOTS/Wilks/IPF GL) + <b style={{ color: '#fff' }}>Единый</b> (нормативы по полу/категории/федерации + очки + прогресс) + <b style={{ color: '#fff' }}>Аналитика</b> — один расчёт, детализация той же модели (канон <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 3 }}>estimate1rm + relative-strength + pl-norms</code>).
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
