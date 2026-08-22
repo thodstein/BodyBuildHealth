@@ -74,6 +74,19 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     return [...internal.slice(0, 5), ...usda.slice(0, 10)].slice(0, 15);
   }, [debouncedSearch, usdaFoods]);
 
+  const [history, setHistory] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_search_history') || '[]'); return Array.isArray(v) ? v.filter((x:any)=>typeof x==='string').slice(0,5) : []; } catch { return []; } });
+  useEffect(() => {
+    if (debouncedSearch.trim() && foodSearchResults.length>0) {
+      const q = debouncedSearch.trim();
+      setHistory(prev => {
+        if (prev[0]===q) return prev;
+        const next = [q, ...prev.filter(x=>x!==q)].slice(0,5);
+        try { localStorage.setItem('he_search_history', JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
+  }, [debouncedSearch, foodSearchResults.length]);
+
   const [editingIdx, setEditingIdx] = useState<number>(-1);
   const [editName, setEditName] = useState('');
   const [editQty, setEditQty] = useState(100);
@@ -138,6 +151,18 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {debouncedSearch.trim() && foodSearchResults.length===0 && (
+          <div style={{ marginTop:8, fontSize:10, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Ничего не найдено — попробуйте другое написание или создайте <span style={{ color:'#8b5cf6' }}>свою еду</span></div>
+        )}
+        {!debouncedSearch.trim() && history.length>0 && (
+          <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+            <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)' }}>История:</span>
+            {history.map(h=>(
+              <button key={h} onClick={()=>onFoodSearchChange(h)} style={{ padding:'4px 8px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>{h}</button>
+            ))}
+            <button onClick={()=>{ setHistory([]); try{localStorage.removeItem('he_search_history');}catch{} }} style={{ fontSize:9, color:'rgba(255,255,255,0.3)', background:'none', border:'none', cursor:'pointer' }}>✕</button>
           </div>
         )}
 
