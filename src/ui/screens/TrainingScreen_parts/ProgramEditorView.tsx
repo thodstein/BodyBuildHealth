@@ -816,6 +816,19 @@ return (
       {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: пошаговые секции (профиль / анализ / обратная связь / инструменты) ═════════ */}
       {isPro && estep === 'profile' && (
       <>
+      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>👤 Профиль — основа качества</div>
+        <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.5 }}>
+          Веса (ПМ/workMax) → точные веса в подходах · Оборудование → подбор упражнений под зал · Травмы/осанка → исключения и щадящие замены · Уровень/стаж → MEV/MAV/MRV и RIR. Заполните один раз — авто-сборка и подсказки станут точными.
+        </div>
+        <div style={{ fontSize: 10, color: DIM, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <span>✓ ПМ: {tprofile.pmSquat}/{tprofile.pmBench}/{tprofile.pmDead} кг</span>
+          <span>·</span>
+          <span>Оборудование: {(tprofile.equipment?.length ?? 0)} шт</span>
+          <span>·</span>
+          <span>Слабые: {(tprofile.weakPoints?.length ?? 0)} шт</span>
+        </div>
+      </div>
       <TrainingProfileCard profile={tprofile} update={updateTProfile} compact />
       </>
       )}

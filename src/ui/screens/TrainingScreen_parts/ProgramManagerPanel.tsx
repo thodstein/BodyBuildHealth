@@ -583,6 +583,25 @@ export const ProgramManagerPanel: React.FC = () => {
               </div>
             );
           })()}
+          {dir === 'pl' && p.pl && (() => {
+            const isCustom = !p.pl!.sourceCycleId && !!p.pl!.customWeeks?.length;
+            if (isCustom) {
+              const w1 = p.pl!.customWeeks![0];
+              const days = (w1?.days ?? []).map((d, i) => `${d.name || 'День ' + (i+1)} (${(d.exercises ?? []).filter(e=> e.name).length} упр.)`);
+              if (days.length===0) return null;
+              return (<div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}><b style={{ color: DIM_STRONG }}>🗓 Неделя 1 (PL):</b>{days.map((d,i)=><span key={i} style={finalBadge('rgba(167,139,250,0.08)','rgba(167,139,250,0.15)','rgba(167,139,250,0.9)')}>{d}</span>)}</div>);
+            }
+            const cyc = p.pl!.sourceCycleId ? `Цикл ${p.pl!.sourceCycleId}` : 'Цикл не выбран';
+            const wm = p.pl!.workMax;
+            return (<div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5 }}><b style={{ color: DIM_STRONG }}>🏆 {cyc}</b> · ПМ {wm.squat ?? '—'}/{wm.bench ?? '—'}/{wm.dead ?? '—'} кг · {p.pl!.schedule.length} сессий</div>);
+          })()}
+          {dir === 'hybrid' && p.hybrid && (() => {
+            const bb = p.hybrid!.bbWeeks?.[0];
+            const pl = p.hybrid!.plRef?.sourceCycleId ? `ПЛ ${p.hybrid!.plRef.sourceCycleId}` : 'ПЛ —';
+            if (!bb) return (<div style={{ fontSize: 10, color: DIM, marginTop: 8 }}><b style={{ color: DIM_STRONG }}>⚡ Hybrid:</b> {pl} · ББ недель {p.hybrid!.bbWeeks?.length ?? 0}</div>);
+            const days = bb.sessions.map((s,i)=> `${s.name || 'День '+(i+1)} (${(s.blocks??[]).filter(b=> b.exerciseName).length} упр.)`);
+            return (<div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}><b style={{ color: DIM_STRONG }}>⚡ Hybrid Неделя 1:</b> {pl} · {days.map((d,i)=><span key={i} style={finalBadge('rgba(59,130,246,0.08)','rgba(59,130,246,0.15)','rgba(59,130,246,0.9)')}>{d}</span>)}</div>);
+          })()}
         </div>
 
         {/* Валидация */}
