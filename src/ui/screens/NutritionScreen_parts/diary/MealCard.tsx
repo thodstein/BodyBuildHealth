@@ -15,25 +15,41 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
   const mealP = items.reduce((s: number, i: any) => s + (i.p || 0), 0);
   const mealF = items.reduce((s: number, i: any) => s + (i.f || 0), 0);
   const mealC = items.reduce((s: number, i: any) => s + (i.c || 0), 0);
+  const accent = (() => {
+    const n = mealName.toLowerCase();
+    if (n.includes('завтрак')) return { bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.15)', color:'#f59e0b', dot:'#f59e0b' };
+    if (n.includes('обед')) return { bg:'rgba(0,230,138,0.08)', border:'rgba(0,230,138,0.15)', color:'#00e68a', dot:'#00e68a' };
+    if (n.includes('ужин')) return { bg:'rgba(139,92,246,0.08)', border:'rgba(139,92,246,0.15)', color:'#a78bfa', dot:'#a78bfa' };
+    if (n.includes('перекус') || n.includes('полдник')) return { bg:'rgba(59,130,246,0.07)', border:'rgba(59,130,246,0.15)', color:'#60a5fa', dot:'#60a5fa' };
+    if (n.includes('трениров')) return { bg:'rgba(236,72,153,0.07)', border:'rgba(236,72,153,0.15)', color:'#ec4899', dot:'#ec4899' };
+    return { bg:'rgba(0,230,138,0.06)', border:'rgba(0,230,138,0.1)', color:'#00e68a', dot:'#00e68a' };
+  })();
 
   return (
     <div style={{ 
-      marginBottom: 8, borderRadius: 16, background: '#18181b', 
-      border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' 
+      marginBottom: 10, borderRadius: 16, background: '#18181b', 
+      border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
     }}>
       <div style={{ 
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-        padding: '10px 12px', background: 'rgba(0,230,138,0.06)', borderBottom: '1px solid rgba(0,230,138,0.1)' 
+        padding: '10px 12px', background: accent.bg, borderBottom: `1px solid ${accent.border}`,
+        borderLeft: `3px solid ${accent.dot}`,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 700, fontSize: 12, color: '#00e68a' }}>{mealName}</span>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{items.length} поз.</span>
+          <span style={{ width:8, height:8, borderRadius:4, background: accent.dot, boxShadow:`0 0 6px ${accent.dot}60` }} />
+          <span style={{ fontWeight: 700, fontSize: 12, color: accent.color }}>{mealName}</span>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:6 }}>{items.length} поз.</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginRight: 4 }}>
-            Б{Math.round(mealP)} Ж{Math.round(mealF)} У{Math.round(mealC)}
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginRight: 2, display:'flex', gap:4 }}>
+            <span style={{ color:'#60a5fa' }}>Б{Math.round(mealP)}</span>
+            <span style={{ color:'rgba(255,255,255,0.2)' }}>·</span>
+            <span style={{ color:'#f59e0b' }}>Ж{Math.round(mealF)}</span>
+            <span style={{ color:'rgba(255,255,255,0.2)' }}>·</span>
+            <span style={{ color:'#f97316' }}>У{Math.round(mealC)}</span>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{Math.round(mealKcal)}</span>
+          <span style={{ fontSize: 14, fontWeight: 800, color: accent.color }}>{Math.round(mealKcal)}</span>
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>ккал</span>
         </div>
       </div>

@@ -27,7 +27,10 @@ export const MacroSummary: React.FC<MacroSummaryProps> = ({ dayTotals, targets }
           <div key={m.l} style={{ 
           padding: '10px 8px', borderRadius: 14, background: m.bg, 
           border: `1px solid ${isOver ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`, 
-          display: 'flex', flexDirection: 'column', gap: 4, minHeight: 44,
+          display: 'flex', flexDirection: 'column', gap: 4, minHeight: 56,
+          boxShadow: isOver ? '0 4px 12px rgba(239,68,68,0.15)' : '0 2px 8px rgba(0,0,0,0.15)',
+          backdropFilter: 'blur(6px)',
+          transition: 'transform 0.15s, box-shadow 0.15s',
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 10, color: m.c, fontWeight: 600 }}>{m.icon} {m.l}</span>

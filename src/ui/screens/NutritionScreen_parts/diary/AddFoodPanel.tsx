@@ -109,28 +109,32 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {/* Search */}
       <div style={{ padding: 14, borderRadius: 18, background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
-        <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)} 
-          aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов..." autoFocus
-          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: '#202023', 
-            border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 14, boxSizing: 'border-box', 
-            outline: 'none', minHeight: 44 }} />
+        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+          <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)} 
+            aria-label="Поиск продуктов" placeholder="🔍 Поиск продуктов... (начните вводить 2 буквы)" autoFocus
+            style={{ flex:1, padding: '12px 14px', borderRadius: 12, background: '#202023', 
+              border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 14, boxSizing: 'border-box', 
+              outline: 'none', minHeight: 44 }} />
+          {foodSearch && <button onClick={() => onFoodSearchChange('')} aria-label="Очистить поиск" style={{ width:36, height:36, borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:14 }}>✕</button>}
+        </div>
         
         {foodSearchResults.length > 0 && (
-          <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8, borderRadius: 10, background: '#202023' }}>
+          <div style={{ maxHeight: 240, overflowY: 'auto', marginTop: 8, borderRadius: 10, background: '#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
             {foodSearchResults.map(f => (
-              <div key={f.id} onClick={() => onAddFoodFromDB(f)} role="button" 
-                aria-label={`Добавить ${f.name}`}
-                style={{ padding: '10px 12px', cursor: 'pointer', fontSize: 11, borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 44 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
-                  <span style={{ fontWeight: 500 }}>{f.name}</span>
+              <div key={f.id} style={{ padding: '8px 10px', fontSize: 11, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 44, transition:'background 0.12s' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.03)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <div onClick={() => onAddFoodFromDB(f)} role="button" aria-label={`Добавить ${f.name}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex:1, cursor:'pointer' }}>
+                  <span style={{ fontSize: 16, width:20, textAlign:'center' }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
+                  <span style={{ fontWeight: 600, flex:1, lineHeight:1.2 }}>{f.name}</span>
+                  <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.7)', flexShrink:0 }}>
+                    <span style={{ color: '#00e68a', fontWeight: 700 }}>{f.kcal}</span>
+                    <span style={{ color: '#3b82f6' }}>Б{f.protein}</span>
+                    <span style={{ color: '#f59e0b' }}>Ж{f.fat}</span>
+                    <span style={{ color: '#f97316' }}>У{f.carbs}</span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
-                  <span style={{ color: '#00e68a', fontWeight: 700 }}>{f.kcal}</span>
-                  <span style={{ color: '#3b82f6' }}>Б{f.protein}</span>
-                  <span style={{ color: '#f59e0b' }}>Ж{f.fat}</span>
-                  <span style={{ color: '#f97316' }}>У{f.carbs}</span>
+                <div style={{ display:'flex', gap:4, marginLeft:8, flexShrink:0 }}>
+                  <button onClick={() => onAddFoodFromDB(f)} title="В очередь (потом Сохранить)" style={{ padding:'5px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontSize:10, cursor:'pointer', minHeight:28 }}>＋</button>
+                  {onDirectAdd && <button onClick={() => onDirectAdd(f)} title={`Сразу в ${mealType || 'дневник'} 100г`} style={{ padding:'5px 9px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700, cursor:'pointer', minHeight:28, boxShadow:'0 2px 8px rgba(0,230,138,0.2)' }}>⚡ 100г</button>}
                 </div>
               </div>
             ))}
