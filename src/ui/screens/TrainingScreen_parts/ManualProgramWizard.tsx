@@ -44,8 +44,23 @@ export const ManualProgramWizard: React.FC<Props> = ({
   onClose, onStep, onDirection, onGoal, onLevel, onDays, onWeeks, onCreate,
 }) => {
   if (!open) return null;
+  const STEP_TITLES = ['Тип', 'Цель', 'Формат', 'Каркас'] as const;
   const content = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Stepper */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+        {([1,2,3,4] as WizardStep[]).map(s => {
+          const active = s === step;
+          const done = s < step;
+          return (
+            <div key={s} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 22, height: 22, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.08)', color: active || done ? '#fff' : 'rgba(255,255,255,0.5)', border: active ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)' }}>{done ? '✓' : s}</div>
+              <div style={{ fontSize: 10, color: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.4)', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' }}>{STEP_TITLES[s-1]}</div>
+              {s < 4 && <div style={{ flex: 1, height: 2, background: s < step ? '#22c55e' : 'rgba(255,255,255,0.08)', borderRadius: 1, marginLeft: 4 }} />}
+            </div>
+          );
+        })}
+      </div>
       {step === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 1 из 4: что вы тренируете?</div>
         <div style={{ fontSize: 10, color: DIM }}>Выберите основной тип программы. Его можно будет редактировать после создания.</div>

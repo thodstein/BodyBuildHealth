@@ -788,23 +788,31 @@ export const ProgramManagerPanel: React.FC = () => {
           <button style={{ ...BTN_GHOST, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}>🪄 Визард (пошагово)</button>
         </div>
 
-        {/* P15: Шаблоны быстрого старта — в обоих режимах (в pro с пометкой PRO) */}
-        {(manualMode === 'standard' || manualMode === 'pro') && (
+        {/* P15: Шаблоны быстрого старта — в обоих режимах + подсветка по профилю */}
+        {(manualMode === 'standard' || manualMode === 'pro') && (() => {
+          const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', daysPerWeek: 4 } as any; } })();
+          const isRecommended = (tpl: typeof QUICK_TEMPLATES[0]) => tpl.days === prof.daysPerWeek && tpl.level === prof.level;
+          return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🚀 Быстрый старт (шаблоны)</div>
+            <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🚀 Быстрый старт (шаблоны) <span style={{ fontSize: 10, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— 1 клик до качественной программы</span></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
-              {QUICK_TEMPLATES.map(tpl => (
-                <button key={tpl.id} className="editor-chip" onClick={() => applyQuickTemplate(tpl)} style={{ padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', background: tpl.color + '08', border: '1px solid ' + tpl.color + '25', color: DIM_STRONG, display: 'flex', flexDirection: 'column', gap: 3, minHeight: 70 }}>
+              {QUICK_TEMPLATES.map(tpl => {
+                const rec = isRecommended(tpl);
+                return (
+                <button key={tpl.id} className="editor-chip" onClick={() => applyQuickTemplate(tpl)} style={{ padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', background: rec ? tpl.color + '18' : tpl.color + '08', border: rec ? '2px solid ' + tpl.color : '1px solid ' + tpl.color + '25', color: DIM_STRONG, display: 'flex', flexDirection: 'column', gap: 3, minHeight: 70, boxShadow: rec ? '0 0 0 1px ' + tpl.color + '30' : 'none', position: 'relative' }}>
+                  {rec && <span style={{ position: 'absolute', top: 6, right: 6, fontSize: 9, fontWeight: 800, color: tpl.color, background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 6 }}>★ Рекомендуем</span>}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span style={{ fontSize: 16 }}>{tpl.icon}</span>
                     <span style={{ fontSize: 12, fontWeight: 800, color: tpl.color }}>{tpl.title}</span>
                   </div>
                   <div style={{ fontSize: 10, color: DIM }}>{tpl.desc}</div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </div>
-        )}
+          );
+        })()}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки</div>

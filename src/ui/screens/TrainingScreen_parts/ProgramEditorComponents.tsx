@@ -213,6 +213,8 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   const [volWeekIdx, setVolWeekIdx] = useState<number | null>(null);
   const [expandedWeekIdx, setExpandedWeekIdx] = useState(0);
   const [noteWeekIdx, setNoteWeekIdx] = useState<number | null>(null);
+  const [howCollapsed, setHowCollapsed] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_how_collapsed') === '1'; } catch { return false; } });
+  const [showAllWeeks, setShowAllWeeks] = useState(false);
   const { confirm } = useConfirmDialog();
   React.useEffect(() => {
     setExpandedWeekIdx(current => body.weeks.length === 0 ? -1 : Math.min(Math.max(current, 0), body.weeks.length - 1));
@@ -313,14 +315,24 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa' }}>
-        <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>Как собрать программу</div>
-        <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.5, marginTop: 4 }}>
-          1. В каждой неделе добавьте тренировочные дни. 2. Назначьте каждому дню Пн–Вс и задайте фокус. 3. Внутри дня добавьте упражнения, затем настройте подходы, повторы, RIR и вес.
+      <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: howCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #60a5fa' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', flex: 1 }}>Как собрать программу</div>
+          <button onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem('he_bb_how_collapsed', v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
         </div>
-        <div style={{ fontSize: 10, color: DIM, marginTop: 5 }}>Неделя = период прогрессии · день = отдельная тренировка · упражнение = движение · сет = один подход.</div>
+        {!howCollapsed && (
+          <>
+            <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.5, marginTop: 4 }}>
+              1. В каждой неделе добавьте тренировочные дни. 2. Назначьте каждому дню Пн–Вс и задайте фокус. 3. Внутри дня добавьте упражнения, затем настройте подходы, повторы, RIR и вес.
+            </div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 5 }}>Неделя = период прогрессии · день = отдельная тренировка · упражнение = движение · сет = один подход.</div>
+          </>
+        )}
       </div>
-      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</span>
+        <span style={{ fontSize: 10, color: DIM }}>{body.weeks.length > 0 ? '— редактируйте расписание и упражнения ниже' : '— добавьте первую неделю'}</span>
+      </div>
       {body.weeks.length > 1 && (
         <div className="editor-week-bulk-actions">
           <span>Навигация по неделям:</span>
@@ -328,16 +340,16 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             <EditorPopupSelect
               value={expandedWeekIdx < 0 ? '' : String(expandedWeekIdx)}
               options={[{ id: '', label: 'Выбрать' }, ...body.weeks.map((week, index) => ({ id: String(index), label: `Неделя ${week.week}` }))]}
-              onChange={v => setExpandedWeekIdx(v === '' ? -1 : Number(v))}
+              onChange={v => { setShowAllWeeks(false); setExpandedWeekIdx(v === '' ? -1 : Number(v)); }}
               ariaLabel="Перейти к неделе"
               title="Неделя для редактирования"
               placeholder="Выбрать"
             />
           </label>
-          <button type="button" onClick={() => setExpandedWeekIdx(current => Math.max(0, current - 1))} disabled={expandedWeekIdx <= 0}>← Предыдущая</button>
-          <button type="button" onClick={() => setExpandedWeekIdx(current => Math.min(body.weeks.length - 1, Math.max(0, current + 1)))} disabled={expandedWeekIdx < 0 || expandedWeekIdx >= body.weeks.length - 1}>Следующая →</button>
-          <button type="button" onClick={() => setExpandedWeekIdx(0)}>Открыть первую</button>
-          <button type="button" onClick={() => setExpandedWeekIdx(-1)}>Свернуть все</button>
+          <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(current => Math.max(0, current - 1)); }} disabled={expandedWeekIdx <= 0}>← Предыдущая</button>
+          <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(current => Math.min(body.weeks.length - 1, Math.max(0, current + 1))); }} disabled={expandedWeekIdx < 0 || expandedWeekIdx >= body.weeks.length - 1}>Следующая →</button>
+          <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(0); }}>Открыть первую</button>
+          <button type="button" onClick={() => { setShowAllWeeks(showAllWeeks ? false : true); if (!showAllWeeks) setExpandedWeekIdx(-1); }}>{showAllWeeks ? 'Свернуть все' : 'Развернуть все'}</button>
         </div>
       )}
       {/* 🎯 Быстрое добавление упражнений для слабых групп из профиля */}
@@ -427,8 +439,10 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </div>
         );
       })()}
-      {body.weeks.map((w, wi) => (
-        <div className={`editor-week-card${expandedWeekIdx === wi ? ' is-open' : ''}`}
+      {body.weeks.map((w, wi) => {
+        const isOpen = showAllWeeks || expandedWeekIdx === wi;
+        return (
+        <div className={`editor-week-card${isOpen ? ' is-open' : ''}`}
           key={wi}
           draggable
           onDragStart={e => { weekDragRef.current = wi; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(wi)); }}
@@ -445,11 +459,11 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             <button
               className="editor-week-toggle"
               type="button"
-              aria-expanded={expandedWeekIdx === wi}
-              aria-label={`${expandedWeekIdx === wi ? 'Свернуть' : 'Открыть'} неделю ${w.week}`}
-              onClick={() => setExpandedWeekIdx(expandedWeekIdx === wi ? -1 : wi)}
+              aria-expanded={isOpen}
+              aria-label={`${isOpen ? 'Свернуть' : 'Открыть'} неделю ${w.week}`}
+              onClick={() => { if (showAllWeeks) { setShowAllWeeks(false); setExpandedWeekIdx(wi); } else setExpandedWeekIdx(expandedWeekIdx === wi ? -1 : wi); }}
             >
-              {expandedWeekIdx === wi ? '▼' : '▶'}
+              {isOpen ? '▼' : '▶'}
             </button>
             {(() => {
               const pc = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase];
@@ -534,7 +548,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               />
             </div>
           )}
-          {expandedWeekIdx === wi && volWeekIdx === wi && (
+          {isOpen && volWeekIdx === wi && (
             <div style={{ marginBottom: 8 }}>
               {volMetrics
                 ? <VolumeBudgetCard metrics={volMetrics} />
@@ -544,14 +558,14 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               }
             </div>
           )}
-          {expandedWeekIdx === wi && (
+          {isOpen && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Шаг 2: тренировочные дни этой недели</div>
               <SessionList sessions={w.sessions} phase={w.phase} onChange={(sessions) => updateWeek(wi, { sessions })} />
             </div>
           )}
         </div>
-      ))}
+        ); })}
       {/* P0-1: Ротация — упражнения старше 4 недель */}
       {body.weeks.length >= 4 && (() => {
         const exAge: Record<string, { weeks: number; muscle: string }> = {};

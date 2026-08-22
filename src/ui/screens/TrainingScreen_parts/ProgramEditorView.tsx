@@ -47,7 +47,7 @@ import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, cloneFromLibrary, createBlank, createFromBuild, deleteRevision } from '../../../engines/user-program/program-store';
-import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor } from '../../../engines/manual-constructor';
+import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
 import { resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex, moveWeekScheduleDay, resetScheduleToRecommended, sessionUsesRecommendedDay } from './program-editor-logic';
 import { BulkApplyCard } from './BulkApplyCard';
@@ -1357,6 +1357,38 @@ return (
         <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />
         {/* Live-качество — в шаге Недели для всех режимов (раньше только в Анализе pro) */}
         <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
+        {/* Compact фикс недобора — 1 клик, доступен всем (standard тоже) */}
+        {(() => {
+          try {
+            const q = computePlanQualityFor(program, program.meta.level, { onCourse: tprofile.onCourse ?? false, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier });
+            const lows = q.perMuscle.filter(m => m.status === 'low').slice(0, 3);
+            if (lows.length === 0) return null;
+            const prof = loadTrainingProfile();
+            const addFor = (muscle: string) => {
+              if (!program.bb?.weeks[0]?.sessions[0]) return;
+              const exs = suggestExercisesForGroup(muscle, program.meta.level, 1, (prof.equipment ?? []) as any, [], [], (prof as any).avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as any, (prof.excludedExercises ?? []) as any);
+              const w = (prof.workMax ?? {} as any)[muscle] ?? 40;
+              const sets = makeSetsFromTemplate(muscleAwareSets(muscle, program.meta.level) as any, w);
+              const nb: any = { id: newId('blk'), type: 'accessory' as const, exerciseName: exs[0]?.name ?? '', muscle, role: 'accessory' as const, sets: sets.length ? sets : [{ reps: 10, rir: 2, weight: w, restSec: 90 }] };
+              const updated: any = { ...program, bb: { ...program.bb!, weeks: (program.bb!.weeks as any).map((wk: any, wi: number) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s: any, si: number) => si === 0 ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
+              onChange(updated);
+              showToast('➕ ' + (GROUP_RU[muscle] ?? muscle) + ' → ' + (exs[0]?.name ?? 'упражнение'));
+            };
+            return (
+              <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⬇ Быстрый фикс объёма — 1 клик</div>
+                <div style={{ fontSize: 10, color: DIM }}>Недобор до MEV — добавьте упражнение прямо отсюда (в день 1, вес из профиля):</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {lows.map(l => (
+                    <button key={l.muscle} onClick={() => addFor(l.muscle)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(59,130,246,0.3)', color: '#60a5fa' }}>
+                      + {GROUP_RU[l.muscle] ?? l.muscle} ({l.avgSets}/{l.mev})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          } catch { return null; }
+        })()}
         </>
       )}
       {estep === 'weeks' && dir === 'pl' && program.pl && (
