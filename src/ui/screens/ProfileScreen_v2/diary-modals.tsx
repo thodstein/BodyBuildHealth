@@ -1135,3 +1135,4 @@ export { AddBPModal, bpCategory } from './bp-diary-modal';
 export { AddBodyMeasurementsModal, AddWeightModal } from './body-measurements-modal';
 export { AddInjectionModal } from './injection-diary-modal';
 export { AddHealthModal } from './health-diary-modal';
+export { AddCardioModal } from './cardio-diary-modal';

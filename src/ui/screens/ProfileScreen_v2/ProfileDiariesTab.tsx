@@ -24,11 +24,12 @@ import { InjectionDiary } from './diaries/InjectionDiary/InjectionDiary';
 import { HealthDiary } from './diaries/HealthDiary/HealthDiary';
 import { CardioDiary } from './diaries/CardioDiary/CardioDiary';
 import {
-  AddSleepModal,
+AddSleepModal,
   AddBPModal,
   AddBodyMeasurementsModal,
   AddInjectionModal,
   AddHealthModal,
+  AddCardioModal,
   PAIN_ZONES,
   NEURO_SYMPTOMS,
   ACNE_AREAS,
@@ -45,8 +46,8 @@ import {
   migrateLegacyRoutine,
   type ActiveRoutine,
   type UndoAction,
+  AddWeightModal,
 } from './diary-modals';
-import { AddWeightModal } from './diary-modals';
 import {
   getUnifiedHealthEntries,
   saveUnifiedHealthEntries,
@@ -59,7 +60,7 @@ import {
   generateEntryId,
   type BPEntry as CoreBPEntry,
 } from '../../../core/bp-hr-data';
-import { loadCardioLog, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, saveCardioLogEntry, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { type WeightEntry } from '../../../engines/profile-store';
 
 /* ── Типы для встроенных дневников ── */
@@ -690,6 +691,7 @@ export const ProfileDiariesTab: React.FC<{
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
   const [addWeightOpen, setAddWeightOpen] = useState(false);
+  const [addCardioOpen, setAddCardioOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [fabOpen, setFabOpen] = useState(false);
   const [undoQueue, setUndoQueue] = useState<UndoAction[]>([]);
@@ -2034,6 +2036,25 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
               if (routine?.step === 'health') advanceRoutine();
             }}
           />
+          <AddCardioModal
+            open={addCardioOpen}
+            onClose={() => setAddCardioOpen(false)}
+            onSave={(e: any) => {
+              const prev = loadCardioLog() || [];
+              const updated = [...prev.filter((x: any) => x.date !== e.date), e].sort((a: any, b: any) =>
+                a.date.localeCompare(b.date),
+              );
+              saveCardioLogEntry(e);
+              setCardioLog(updated);
+              pushUndo(
+                routine?.step === 'weight' ? routineUndoLabel('кардио записана') : 'Кардио-сессия добавлена',
+                () => {
+                  localStorage.setItem('he_cardio_sessions', JSON.stringify(prev));
+                  setCardioLog(prev);
+                },
+              );
+            }}
+          />
         </>
       )}
 
@@ -2073,7 +2094,7 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                 ['⚖️ Вес', () => { setFabOpen(false); setAddWeightOpen(true); }],
                 ['💉 Инъекция', () => { setFabOpen(false); setAddInjectionOpen(true); }],
                 ['🩺 Здоровье', () => { setFabOpen(false); setAddHealthOpen(true); }],
-                ['❤️ Кардио', () => { setFabOpen(false); setActiveDiary('cardio'); }],
+                ['❤️ Кардио', () => { setFabOpen(false); setAddCardioOpen(true); }],
               ] as const).map(([label, onClick]) => (
                 <button key={label} onClick={onClick} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: colors.text, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   {label}
