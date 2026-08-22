@@ -197,6 +197,16 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     } catch {}
   }, []);
 
+  const handleDirectAdd = useCallback((food: FoodItemLike) => {
+    const data = { ...diaryData };
+    if (!data[selectedDate]) data[selectedDate] = { meals: {} };
+    const mt = mealType || 'Перекус';
+    if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
+    (data[selectedDate].meals[mt] as any).push({ name: food.name, qty: '100 г', kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, category: food.category, foodId: (food as any).id });
+    saveDiary(data);
+    showToast(`⚡ ${food.name} → ${mt} 100г`);
+  }, [diaryData, selectedDate, mealType, saveDiary, showToast]);
+
   const handleBarcodeProduct = useCallback((product: OFFProduct) => { 
     setShowBarcode(false); 
     const item = productToFoodItem(product); 
@@ -499,7 +509,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         <AddFoodPanel
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
-          allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB}
+          allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB} onDirectAdd={handleDirectAdd}
           customMealInput={customMealInput} onCustomMealInputChange={setCustomMealInput} onAddCustomMeal={addCustomMeal}
           onShowBarcode={() => setShowBarcode(true)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
           onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading}

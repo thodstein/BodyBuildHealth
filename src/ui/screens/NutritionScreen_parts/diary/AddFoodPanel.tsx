@@ -16,6 +16,7 @@ interface AddFoodPanelProps {
   onMealTypeChange: (v: string) => void;
   allMealTypes: string[];
   onAddFoodFromDB: (food: FoodItemLike) => void;
+  onDirectAdd?: (food: FoodItemLike) => void;
   customMealInput: string;
   onCustomMealInputChange: (value: string) => void;
   onAddCustomMeal: () => void;
@@ -57,7 +58,7 @@ interface AddFoodPanelProps {
 
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
-  allMealTypes, onAddFoodFromDB, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, showBarcode, onBarcodeProduct, onOcrFile,
+  allMealTypes, onAddFoodFromDB, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, showBarcode, onBarcodeProduct, onOcrFile,
   ocrFileLoading, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, onOcrClose,
   parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
   onFixAllLowConfidence,
