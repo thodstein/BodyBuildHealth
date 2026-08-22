@@ -794,7 +794,7 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
     // BUG-B8: для малых мышц (forearms/calves/abs) cap = 6 — они не требуют
     // большого объёма за одно упражнение (Schoenfeld: small muscles 4-6 сетов/упр).
     // P1-4: per-exercise FLOOR — минимум 2 сета (1 сет = разминка, не рабочий объём).
-    const perExCap = (m === 'forearms' || m === 'calves' || m === 'abs') ? 6 : 8;
+    const perExCap = 5; // унификация: perExCap triple 8/6/5 -> 5 (freeze, паритет с finalize cap 5)
     const floor = isDeload ? 1 : 2; // C6: deload floor=1, рабочая неделя floor=2
     for (const ex of info.exs) {
       if (ex.sets > perExCap) ex.sets = perExCap;
@@ -1020,6 +1020,54 @@ function getTagPrimaryMuscles(dayInRotation: number, highVolumeLegs = false): Re
     Glutes: new Set(['glutes', 'hamstrings']),
     GlutesHams: new Set(['glutes', 'hamstrings']),
   };
+}
+
+export interface BuildSessionParams {
+  sched: ScheduleDay; dayInRotation: number; week: number;
+  muscleVolumeRotation: Record<string, number>;
+  muscleSessionCount: Record<string, number>;
+  musclePrimaryAssigned: Set<string>;
+  workMax: Record<string, number>; weakPoints: string[]; focusGroup?: string;
+  pedAdapt?: PEDAdaptation;
+  dailyCap?: number;
+  level?: string;
+  injuryProfile?: string[];
+  injuredMuscles?: Set<string>;
+  excludedMuscles?: Set<string>;
+  gradedInjuries?: Injury[];
+  today?: string;
+  phase?: BBPhase;
+  phaseWeek?: number;
+  mrvRot?: number;
+  preSelectedIds?: string[];
+  preSelectedNames?: string[];
+  rotationBlockIds?: string[];
+  favoriteIds?: string[];
+  excludeIds?: string[];
+  avoidAxialLoad?: boolean;
+  equipmentList?: string[];
+  methodology?: SessionMethodology;
+  isFemale?: boolean;
+  intensityTechnique?: IntensityTechnique;
+  autoDeload?: boolean;
+  loadStrategy?: LoadStrategy;
+  autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number };
+  specialization?: boolean;
+  pedDoses?: Record<string, number>;
+  courseIntensity?: CourseIntensity;
+  onCourse?: boolean;
+  sex?: 'male' | 'female';
+  weekLocalUsed?: Map<string, Set<string>>;
+  primaryBySlot?: Map<string, string>;
+  trainingFocus?: BBTrainingFocus;
+  eccentricMult?: number;
+  mobilityRestrictions?: string[];
+  trainingYears?: number;
+  bodyweightCapability?: BBBuilderInput['bodyweightCapability'];
+  fewerCompound?: boolean;
+  allowStrengthLifts?: boolean;
+  rotationMode?: 'forbid' | 'strict' | 'variety';
+  intensityLevel?: 'light' | 'moderate' | 'high';
 }
 
 function buildSession(
@@ -2239,6 +2287,26 @@ function buildSession(
   return { day: dayInRotation, weekOffset: 0, character, sessionTag: sched.sessionTag, exercises };
 }
 
+/** Обёртка с типизированным объектом — решает P0-2 (47 positional args → type-safe). Старый вызов оставлен для совместимости. */
+export function buildSessionWithParams(p: BuildSessionParams): BBSession {
+  return buildSession(
+    p.sched, p.dayInRotation, p.week,
+    p.muscleVolumeRotation, p.muscleSessionCount, p.musclePrimaryAssigned,
+    p.workMax, p.weakPoints, p.focusGroup,
+    p.pedAdapt, p.dailyCap, p.level,
+    p.injuryProfile, p.injuredMuscles, p.excludedMuscles, p.gradedInjuries,
+    p.today, p.phase, p.phaseWeek, p.mrvRot,
+    p.preSelectedIds, p.preSelectedNames, p.rotationBlockIds,
+    p.favoriteIds, p.excludeIds,
+    p.avoidAxialLoad, p.equipmentList, p.methodology, p.isFemale,
+    p.intensityTechnique, p.autoDeload, p.loadStrategy, p.autoRegResult,
+    p.specialization, p.pedDoses, p.courseIntensity, p.onCourse, p.sex,
+    p.weekLocalUsed, p.primaryBySlot, p.trainingFocus, p.eccentricMult,
+    p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
+    p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel,
+  );
+}
+
 /** Разминочное упражнение на целевую группу: 3×10-15 лёгких повторений (~25% workMax). */
 function todayStr(): string {
   const d = new Date();
@@ -2272,6 +2340,43 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // F0 guard: weeks clamp 1-52 — капы freeze, только валидация входа (не меняет лимиты)
   if (!Number.isFinite(input.weeks) || input.weeks < 1 || input.weeks > 52) {
     console.warn(`[bb-builder] buildBBPlan: weeks=${input.weeks} некорректно — используется ${Math.max(1, Math.min(52, Math.round(Number(input.weeks) || 8)))}`);
+  }
+  // Числовые гарды — защита от NaN/экстремалей без сдвига капов (только clamp + warn)
+  const numWarn = (name: string, v: any, min: number, max: number) => {
+    if (v == null) return;
+    if (!Number.isFinite(v) || v < min || v > max) console.warn(`[bb-builder] ${name}=${v} вне диапазона [${min},${max}], clamp`);
+  };
+  numWarn('bodyFat', input.bodyFat, 3, 60);
+  numWarn('leanMass', input.leanMass, 20, 150);
+  numWarn('hrvMs', input.hrvMs, 10, 200);
+  numWarn('sleepHours', input.sleepHours, 0, 12);
+  numWarn('stressLevel', input.stressLevel, 0, 10);
+  numWarn('labMrvMultiplier', input.labMrvMultiplier, 0.5, 1.5);
+  numWarn('eccentricMult', input.eccentricMult, 0.8, 1.5);
+  numWarn('calorieSurplus', input.calorieSurplus, -2000, 2000);
+  numWarn('proteinPerKg', input.proteinPerKg, 0, 5);
+  if (input.workMax) {
+    for (const [k, v] of Object.entries(input.workMax)) {
+      if (!Number.isFinite(v as number) || (v as number) < 0 || (v as number) > 500) {
+        console.warn(`[bb-builder] workMax[${k}]=${v} вне [0,500], fallback`);
+      }
+    }
+  }
+  // Clamp для предотвращения NaN-пропагации (не меняет капы, только вход)
+  if (Number.isFinite(input.bodyFat)) input.bodyFat = Math.max(3, Math.min(60, input.bodyFat as number));
+  if (Number.isFinite(input.leanMass)) input.leanMass = Math.max(20, Math.min(150, input.leanMass as number));
+  if (Number.isFinite(input.hrvMs)) input.hrvMs = Math.max(10, Math.min(200, input.hrvMs as number));
+  if (Number.isFinite(input.sleepHours)) input.sleepHours = Math.max(0, Math.min(12, input.sleepHours as number));
+  if (Number.isFinite(input.stressLevel)) input.stressLevel = Math.max(0, Math.min(10, input.stressLevel as number));
+  if (Number.isFinite(input.labMrvMultiplier)) input.labMrvMultiplier = Math.max(0.5, Math.min(1.5, input.labMrvMultiplier as number));
+  if (Number.isFinite(input.eccentricMult)) input.eccentricMult = Math.max(0.8, Math.min(1.5, input.eccentricMult as number));
+  if (Number.isFinite(input.calorieSurplus)) input.calorieSurplus = Math.max(-2000, Math.min(2000, input.calorieSurplus as number));
+  if (Number.isFinite(input.proteinPerKg)) input.proteinPerKg = Math.max(0, Math.min(5, input.proteinPerKg as number));
+  if (input.workMax) {
+    for (const [k, v] of Object.entries(input.workMax)) {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0 || n > 500) delete (input.workMax as any)[k];
+    }
   }
   const foundPattern = getPattern(input.patternId);
   if (!foundPattern) {
@@ -2631,7 +2736,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-        const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weekSpec.weak, weekSpec.focus || undefined, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, weekLocalUsed, primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability, input.fewerCompound, input.allowStrengthLifts, input.rotationMode, input.intensityLevel);
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {

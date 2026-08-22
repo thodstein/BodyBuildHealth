@@ -2340,7 +2340,17 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>📦 Объёмный тренинг <span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>капы от уровня — новичок без фармы 60 сетов недоступно</span></div>
             <div style={{ display:'flex', gap:6 }}>
               <button onClick={() => setTrainingVolumeMode('standard')} style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11, border: trainingVolumeMode==='standard' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='standard' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='standard' ? '#3b82f6' : 'rgba(255,255,255,0.6)' }}>Обычный</button>
-              <button onClick={() => setTrainingVolumeMode('high')} style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11, border: trainingVolumeMode==='high' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='high' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='high' ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}>Объёмный</button>
+              {(() => {
+                const highDisabled = bbLevel === 'beginner' && peds.length === 0;
+                return (
+                  <button
+                    disabled={highDisabled}
+                    title={highDisabled ? 'Новичок без фармы: объёмный 60 сетов недоступен — капы от уровня (24/10). Смените уровень или добавьте фарму.' : 'Объёмный: MRV + GVT/FST-7, капы те же от уровня'}
+                    onClick={() => { if (highDisabled) { flash('Объёмный недоступен для новичка без фармы — капы от уровня (24/10).'); return; } setTrainingVolumeMode('high'); }}
+                    style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor: highDisabled ? 'default' : 'pointer', opacity: highDisabled ? 0.45 : 1, fontWeight:700, fontSize:11, border: trainingVolumeMode==='high' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='high' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='high' ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}
+                  >Объёмный</button>
+                );
+              })()}
             </div>
             <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.5 }}>
               {trainingVolumeMode==='standard' ? (

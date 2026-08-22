@@ -44,11 +44,13 @@ function getJointStress(exercise: BBExercise): number {
   if (!catalog) return 5;
   const stressMap: Record<string, number> = { low: 3, med: 6, high: 10 };
   const base = stressMap[catalog.jointStress || 'med'] || 6;
-  const rir = Math.max(0, Math.min(5, exercise.rir ?? 2));
+  const rawRir = exercise.rir ?? 2;
+  const rir = Number.isFinite(rawRir) ? Math.max(0, Math.min(5, rawRir)) : 2;
   const proximityMultiplier = 1 + Math.max(0, 2 - rir) * 0.15;
   // Весовой фактор: суставная нагрузка растёт с рабочим весом (не только с
   // числом сетов). <60 кг — база; 200+ кг — ×1.5 (тяжёлые compound-нагрузки).
-  const weight = Number(exercise.workSets?.[0]?.weight) || 0;
+  const rawW = exercise.workSets?.[0]?.weight;
+  const weight = Number.isFinite(Number(rawW)) ? Number(rawW) : 0;
   const intensityMultiplier = weight > 0 ? 1 + Math.min(0.5, Math.max(0, (weight - 60) / 200)) : 1;
   return base * exercise.sets * proximityMultiplier * intensityMultiplier;
 }
@@ -176,7 +178,8 @@ export function analyzePlanStress(plan: BBPlan): {
     | { combinedMrvMultiplier?: number; combinedRecoveryMultiplier?: number; activePEDs?: string[]; pedDoses?: Record<string, number> }
     | undefined;
   if (ped && (ped.combinedMrvMultiplier ?? 1) >= 1.3) {
-    const aasDose = Number(ped.pedDoses?.AAS) || 0;
+    const rawAas = ped.pedDoses?.AAS as any;
+    const aasDose = typeof rawAas === 'string' ? parseFloat(String(rawAas).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) : Number(rawAas) || 0;
     const dryJoints = aasDose >= 750 ? ' Высокие дозы ААС + эстрадиол-супрессия → сухость суставов; рассмотрите дозированный AI и добавки (коллаген/Омега-3/UC-II).' : '';
     allIssues.push(`⚠ PED-интенсификация объёма ×${(ped.combinedMrvMultiplier ?? 1).toFixed(2)}: сухожилия/связки не успевают за мышечным ростом — контролируйте боли в суставах, при появлении — снижайте объём/веса (особенно на френч/жимах узким/тягах).${dryJoints}`);
   }

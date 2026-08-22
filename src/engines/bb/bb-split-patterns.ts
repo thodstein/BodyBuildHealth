@@ -485,5 +485,36 @@ export function sessionsOf(p: SplitPattern): ScheduleDay[] {
 
 /** Циклический индекс дня ротации (для генерации нескольких недель). */
 export function dayOfRotation(p: SplitPattern, absoluteDayIndex: number): ScheduleDay {
+  if (!Number.isFinite(absoluteDayIndex) || absoluteDayIndex < 0) {
+    console.warn(`[bb-split-patterns] dayOfRotation: invalid absoluteDayIndex=${absoluteDayIndex}, fallback 0`);
+    absoluteDayIndex = 0;
+  }
   return p.schedule[absoluteDayIndex % p.rotationDays];
 }
+
+/** Валидация инвариантов SPLIT_PATTERNS — schedule.length === rotationDays и training count === sessionsPerRotation */
+export function validateSplitPatterns(): string[] {
+  const errors: string[] = [];
+  for (const p of SPLIT_PATTERNS) {
+    if (p.schedule.length !== p.rotationDays) {
+      errors.push(`${p.id}: schedule.length ${p.schedule.length} !== rotationDays ${p.rotationDays}`);
+    }
+    const training = p.schedule.filter(d => d.kind === 'тренировка').length;
+    if (training !== p.sessionsPerRotation) {
+      errors.push(`${p.id}: training ${training} !== sessionsPerRotation ${p.sessionsPerRotation}`);
+    }
+    if (training === 0) errors.push(`${p.id}: no training days`);
+    // уровень должен содержать хотя бы один валидный токен
+    const validLevels = new Set(['beginner','novice','intermediate','advanced','enhanced','II-KMS','KMS-MS']);
+    if (!p.level.some(l => validLevels.has(l))) {
+      errors.push(`${p.id}: level ${p.level.join(',')} не содержит валидных токенов`);
+    }
+  }
+  return errors;
+}
+
+// Dev-time assert — в проде только warn, не бросает
+try {
+  const errs = validateSplitPatterns();
+  if (errs.length > 0) console.warn(`[bb-split-patterns] Инвариант нарушен:\n` + errs.join('\n'));
+} catch {}
