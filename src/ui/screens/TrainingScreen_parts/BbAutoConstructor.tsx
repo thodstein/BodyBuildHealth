@@ -3183,34 +3183,41 @@ export const BbAutoConstructor: React.FC = () => {
 
         {builtPlan.report && (() => {
           const report = builtPlan.report;
-          const REPORT_MUSCLE_RU: Record<string, string> = { chest:'Грудь', back:'Спина', shoulders:'Плечи', quads:'Квадрицепс', hamstrings:'Бицепс бедра', glutes:'Ягодицы', calves:'Икры', biceps:'Бицепс', triceps:'Трицепс', forearms:'Предплечье', abs:'Пресс', traps:'Трапеции' };
           return (
             <ExpandableCard title="📋 Итоговый отчёт программы" icon="📋"
               short={`${report.weeks} нед · ${report.totalDirectSets} direct-сетов · пик Н${report.peakWeek}`}
               full={
                 <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
-                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>
-                    <b>Настройки:</b> Уровень {(builtPlan as any).level || '—'} · Цель {(builtPlan as any).goal || '—'} · Объём {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (MRV + ' + ((builtPlan as any).volumeScheme || 'gvt') + ', кап 5)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'mav') + ')'} · Фокус {(builtPlan as any).trainingFocus || '—'} · Методика {(builtPlan as any).methodology || '—'}
-                  </div>
-                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', color:'rgba(255,255,255,0.75)', lineHeight:1.4 }}>
-                    Сплит <b>{(builtPlan as any).pattern?.name}</b> · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises} · PED {(builtPlan as any).pedAdaptation?.activePEDs?.length ? (builtPlan as any).pedAdaptation.activePEDs.join(', ') + ' ×' + (builtPlan as any).pedAdaptation.combinedMrvMultiplier?.toFixed(2) : 'нет'} · Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}
-                    {(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0,3).join(', ')}` : ''}
-                  </div>
-                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', color:'rgba(255,255,255,0.7)', lineHeight:1.4, fontSize:10 }}>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'rgba(255,255,255,0.8)', lineHeight:1.45 }}>
+                    <b>Настройки:</b> Уровень {(builtPlan as any).level || '—'} · Цель {(builtPlan as any).goal || '—'} · Фокус {(builtPlan as any).trainingFocus || '—'} · Методика {(builtPlan as any).methodology || '—'} · Объём {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (' + ((builtPlan as any).volumeScheme || 'MRV') + ', кап 5)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'MAV') + ')'} · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises}
+                    {((builtPlan as any).supersetMode || (builtPlan as any).dupMode || (builtPlan as any).priorityMuscles?.length) && (
+                      <><br/>Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}{(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}` : ''}</>
+                    )}
                     {(() => {
                       const s = (builtPlan as any).inputSnapshot;
-                      if (!s) return 'Доп. фильтры: нет';
+                      if (!s) return null;
                       const parts: string[] = [];
-                      if (s.fewerCompound) parts.push('Меньше базы: да');
                       if (s.rotationMode) parts.push(`Ротация: ${s.rotationMode}`);
                       if (s.intensityLevel) parts.push(`Интенс: ${s.intensityLevel}`);
                       if (s.avoidAxialLoad) parts.push('Без осевой');
-                      if (s.equipment?.length) parts.push(`Оборуд: ${s.equipment.slice(0,3).join(',')}${s.equipment.length>3?'…':''}`);
+                      if (s.equipment?.length) parts.push(`Оборуд: ${s.equipment.slice(0, 3).join(',')}${s.equipment.length > 3 ? '…' : ''}`);
                       if (s.injuries?.length) parts.push(`Травм: ${s.injuries.length}`);
                       if (s.mobilityRestrictions?.length) parts.push(`Мобильн: ${s.mobilityRestrictions.join(',')}`);
                       if (s.autoDeload != null) parts.push(`Авто-делод: ${s.autoDeload ? 'да' : 'нет'}`);
-                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Ecc×${s.eccentricMult}`);
-                      return parts.length ? parts.join(' · ') : 'Доп. фильтры: нет';
+                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Эксцентрик ×${s.eccentricMult}`);
+                      return parts.length ? <><br/>{parts.join(' · ')}</> : null;
+                    })()}
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.65)', lineHeight:1.45 }}>
+                    <b>Фазы:</b> {(() => {
+                      const ru: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+                      const seq: Array<{ p: string; from: number; to: number }> = [];
+                      for (const wk of (builtPlan as any).weeks || []) {
+                        const ph = String(wk.phase || '').toLowerCase();
+                        const last = seq[seq.length - 1];
+                        if (last && last.p === ph) last.to = wk.week; else seq.push({ p: ph, from: wk.week, to: wk.week });
+                      }
+                      return seq.map(s => `${ru[s.p] || s.p}: нед ${s.from}${s.to !== s.from ? '-' + s.to : ''}${(builtPlan as any).weeks.find((w: any) => w.week === s.to)?.deload ? ' (делод)' : ''}`).join(' · ');
                     })()}
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
@@ -3221,24 +3228,6 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ color:'rgba(255,255,255,0.65)' }}>
                     Максимум за сессию: {report.maxSessionMinutes} мин · axial cost: {report.maxAxialCost.toFixed(1)} · muscle leakage: {report.sessionLeakWarnings}
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                    {Object.entries(report.peakVolume as Record<string, { directSets: number; effectiveSets: number; fatigueWeightedSets: number }>).map(([muscle, volume]) => (
-                      <div key={muscle} style={{ color:'rgba(255,255,255,0.7)' }}>
-                         {REPORT_MUSCLE_RU[muscle] || muscle}: direct {volume.directSets}, effective {Math.round(volume.effectiveSets * 10) / 10}, fatigue {Math.round(volume.fatigueWeightedSets * 10) / 10}
-                      </div>
-                    ))}
-                  </div>
-                  {(builtPlan as any).expandedSummary?.byMuscle?.back?.subGroups && (
-                    <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)', fontSize:10, color:'rgba(255,255,255,0.7)' }}>
-                      <b>Спина по подгруппам (широчайшая/толщина):</b>
-                      {Object.entries((builtPlan as any).expandedSummary.byMuscle.back.subGroups).map(([k, v]: any) => (
-                        <div key={k} style={{ marginTop:3 }}>
-                          <b>{k === 'back_width' ? 'Широчайшая (ширина)' : k === 'back_thickness' ? 'Толщина (ромб/середина)' : k === 'upper_back' ? 'Верх спины' : k === 'rear_delts' ? 'Задняя дельта' : k === 'traps' ? 'Трапеции' : k}: </b>
-                          {v.workingSets}с · {Object.entries(v.byPattern).map(([p,n]: any)=> `${p} ${n}`).join(', ')} · {Object.entries(v.byExercise).map(([e,n]: any)=> `${e} ${n}`).join(', ')}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               }
             />
