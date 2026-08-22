@@ -64,8 +64,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '📐', label: 'Объём-хаб', desc: 'Единый: MEV/MAV/MRV + тоннаж/КПШ + 9 сплитов', tab: 'volume_hub' as any },
         { icon: '🏋️', label: 'Лаборатория упражнений', desc: 'Каталог, биомеханика, подбор по группе', tab: 'exercise_lab' },
-        { icon: '🔄', label: 'PRI и схема повторов', desc: 'Готовность, RIR, паттерн, сложность', tab: 'pri_reppat' },
-        { icon: '🥞', label: 'Калькулятор блинов', desc: 'Гриф, блины, %1RM, разминка', tab: 'calc_plates' },
+        { icon: '🛠', label: 'Инструменты', desc: 'Единый хаб: PRI/паттерн + блины + основа ББ (5 пилларов)', tab: 'tools_hub' as any },
       ],
     },
     {

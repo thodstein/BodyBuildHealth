@@ -57,12 +57,11 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '⚡',
     color: '#3b82f6',
     subtitle: 'Персональный пульс-контроль: показатели, качество плана, инструменты сборки, периодизация',
-    // хабы единые (аналог VolumeHub): periodization_taper_hub (2→1), mix_hub (2→1), rir_forecast_hub (2→1)
+    // хабы единые (аналог VolumeHub): periodization_taper_hub (2→1), mix_hub (2→1), rir_forecast_hub (2→1), tools_hub (3→1)
     tabs: [
       'strength_analysis', 'load_management', 'quality_diagnostics', 'periodization_taper_hub',
-      'exercise_lab', 'load_safety', 'volume_hub', 'pri_reppat',
-      'calc_plates', 'rir_forecast_hub', 'joint_health',
-      'mix_hub', 'bb_foundation',
+      'exercise_lab', 'load_safety', 'volume_hub', 'tools_hub',
+      'rir_forecast_hub', 'joint_health', 'mix_hub',
     ],
   },
   library: {
@@ -117,6 +116,10 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 (TAB_TO_ZONE as Record<string, TrainingZone>)['rir_calibration'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['readiness_forecast'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['rir_forecast_hub'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['pri_reppat'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['calc_plates'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['bb_foundation'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['tools_hub'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';
