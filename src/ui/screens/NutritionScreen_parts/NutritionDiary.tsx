@@ -816,6 +816,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           </span>
         )}
       </div>
+      {tab !== 'add' && (
+        <button onClick={()=>setTab('add')} aria-label="Быстро добавить" style={{ position:'fixed', bottom:20, right:20, width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', boxShadow:'0 6px 20px rgba(0,230,138,0.35)', fontSize:26, cursor:'pointer', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:700 }}>＋</button>
+      )}
     </div>
   );
 };
