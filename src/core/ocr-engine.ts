@@ -58,9 +58,15 @@ async function prepareImageForServer(file: File): Promise<Blob> {
   if (typeof document === 'undefined') return file;
   const maxSide = 1600;
   const maxPixels = 2_200_000;
+  const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> => Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
 
-  const encodeCanvas = async (canvas: HTMLCanvasElement): Promise<Blob | null> => (
-    new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78))
+  const encodeCanvas = async (canvas: HTMLCanvasElement): Promise<Blob | null> => withTimeout(
+    new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78)),
+    10_000,
+    'image encode timeout',
   );
 
   try {
@@ -68,11 +74,11 @@ async function prepareImageForServer(file: File): Promise<Blob> {
     // 12-48 MP camera photo at full size and get killed before the OCR request
     // is sent. The pixel cap below protects browsers that ignore the hint.
     const bitmap = typeof createImageBitmap === 'function'
-      ? await createImageBitmap(file, {
+      ? await withTimeout(createImageBitmap(file, {
         resizeWidth: maxSide,
         resizeHeight: maxSide,
         resizeQuality: 'high',
-      })
+      }), 15_000, 'image decode timeout')
       : null;
     if (!bitmap) throw new Error('createImageBitmap unavailable');
     const scale = Math.min(
