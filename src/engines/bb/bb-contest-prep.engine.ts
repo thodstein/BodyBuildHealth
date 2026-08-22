@@ -974,6 +974,8 @@ export function applyTrainingTaperToBBPlan(
   // в первую неделю тапера их объём режется дополнительно.
   const LEG_MUSCLES = ['quads', 'hamstrings', 'glutes', 'calves'];
 
+  // F0 fix: кэшируем исходные объёмы до мутирования — иначе isDeload сравнивает с уже порезанным
+  const origVolumes = weeks.map(w => { try { return weekVolume(w as any); } catch { return 0; } });
   for (let i = 0; i < windowLen; i++) {
     const idx = startIdx + i;
     const wk = weeks[idx];
@@ -996,7 +998,7 @@ export function applyTrainingTaperToBBPlan(
 
     // Guard: не резать уже разгруженные недели (anti-двойное снижение, как PL-taper).
     const isDeload = wk.deload === true || wk.phase === 'deload'
-      || (idx > 0 && weekVolume(wk) < weekVolume(weeks[idx - 1]) * 0.6);
+      || (idx > 0 && origVolumes[idx] < origVolumes[idx - 1] * 0.6);
     if (isDeload) {
       wk.phase = wk.phase ?? 'deload';
       wk.taper = true;

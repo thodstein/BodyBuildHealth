@@ -48,7 +48,9 @@ export function syncBBPlanSetShape(plan: BBPlan): BBPlan {
   for (const week of plan.weeks) {
     for (const session of week.sessions) {
     for (const exercise of session.exercises) {
-        const target = Math.max(0, exercise.sets || 0);
+        // F0 guard: NaN sets → 0 (капы freeze, только защита от NaN)
+        const rawSets = Number(exercise.sets);
+        const target = Number.isFinite(rawSets) ? Math.max(0, rawSets) : 0;
         const current = Array.isArray(exercise.workSets) ? exercise.workSets : [];
         if (current.length > target) {
           exercise.workSets = current.slice(0, target);
@@ -110,7 +112,7 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
     if (canonical && canonical !== exercise.muscle && !(canonical === 'shoulders' && /^delt_/.test(exercise.muscle)) && !isIsolation) {
       issues.push({ level: 'warning', code: 'muscle_attribution', message: `${exercise.name}: muscle=${exercise.muscle}, каталог определяет ${canonical}.`, week, session: sessionIndex, exercise: exercise.name });
     }
-    if (exercise.workSets.some(ws => ws.weight < 0 || ws.reps <= 0 || ws.rir < 0 || ws.rir > 5)) {
+    if (exercise.workSets.some(ws => !Number.isFinite(ws.weight) || !Number.isFinite(ws.reps) || !Number.isFinite(ws.rir) || ws.weight < 0 || ws.reps <= 0 || ws.rir < 0 || ws.rir > 5)) {
       issues.push({ level: 'error', code: 'invalid_work_set', message: `${exercise.name}: некорректные weight/reps/RIR.`, week, session: sessionIndex, exercise: exercise.name });
     }
     if (options.excludedExercises?.includes(exercise.name) || options.excludedExercises?.includes(exercise.exerciseName || '')) issues.push({ level: 'error', code: 'excluded_exercise_present', message: `${exercise.name}: упражнение находится в excludedExercises.`, week, session: sessionIndex, exercise: exercise.name });

@@ -2269,6 +2269,10 @@ function computeAcwr(): number {
 }
 
 export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BBPlan {
+  // F0 guard: weeks clamp 1-52 — капы freeze, только валидация входа (не меняет лимиты)
+  if (!Number.isFinite(input.weeks) || input.weeks < 1 || input.weeks > 52) {
+    console.warn(`[bb-builder] buildBBPlan: weeks=${input.weeks} некорректно — используется ${Math.max(1, Math.min(52, Math.round(Number(input.weeks) || 8)))}`);
+  }
   const foundPattern = getPattern(input.patternId);
   if (!foundPattern) {
     console.warn(`[bb-builder] buildBBPlan: patternId="${input.patternId}" не найден — fallback на SPLIT_PATTERNS[0] (${SPLIT_PATTERNS[0].id}). Проверьте, что передаёте patternId (не split).`);
@@ -2307,7 +2311,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Единый множитель режима (ПЕД/курс): натурал ×1.0, на курсе ×2.0 на главные мышцы.
   // Заменяет стэкинг backProfile×legProfile×torsoProfile (×2.2/1.8/1.6) + pedAdapt.
   const onCourse = (!!(pedAdapt && pedAdapt.activePEDs && pedAdapt.activePEDs.length > 0))
-    || Object.values(input.pedDoses || {}).some(d => Number(d) > 0);
+    || Object.values(input.pedDoses || {}).some(d => {
+      const v = typeof d === 'string' ? parseFloat(String(d).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) : Number(d);
+      return Number.isFinite(v) && v > 0;
+    });
   const regimeMult = computeRegimeMrvMult({
     onCourse,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
@@ -2572,6 +2579,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     weekWeakPatterns.clear();
     const musclePrimaryAssigned = new Set<string>(); // ← сбрасывается КАЖДУЮ неделю
     const weekUsedByMuscle = new Map<string, Set<string>>(); // muscle →Set<name> внутри недели
+    const weekLocalUsed = new Map<string, Set<string>>(); // F0 fix: shared per-week dedup for buildSession
     const weekSessions: BBSession[] = [];
     const phase = phaseByWeek.get(w) || 'accumulation';
     phaseWeekCounter[phase] = (phaseWeekCounter[phase] || 0) + 1;
@@ -2622,8 +2630,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekDate = input.planStartWeek ? addDaysISO(input.planStartWeek, (w - 1) * 7) : today;
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
-      const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-       const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weekSpec.weak, weekSpec.focus || undefined, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, new Map(), primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability, input.fewerCompound, input.allowStrengthLifts, input.rotationMode, input.intensityLevel);
+       const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
+        const sess = buildSession(s, i + 1, w, scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weekSpec.weak, weekSpec.focus || undefined, pedAdapt, sessDailyCap, level, weekInjuryProfile, new Set(weekInjuryProfile), weekExcluded, weekGraded, weekDate, phase, phaseWeek, mrvRot, isFB ? fbUsedIds : [], [...(isFB ? fbUsedNames : []), ...rotationNames], rotationIds, favIds, exclIds, avAxial, eqList, input.methodology, input.sex === 'female', undefined, undefined, undefined, undefined, undefined, undefined, undefined, false, input.sex, weekLocalUsed, primaryBySlot, input.trainingFocus, input.eccentricMult, input.mobilityRestrictions, input.trainingYears, input.bodyweightCapability, input.fewerCompound, input.allowStrengthLifts, input.rotationMode, input.intensityLevel);
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {

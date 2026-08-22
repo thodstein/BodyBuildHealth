@@ -169,7 +169,7 @@ export function sessionLimitsFor(
   const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18).
   let maxWorkingSets: number; let maxExercises: number;
-  if (level === 'enhanced' || (onCourse && years >= 3)) { maxWorkingSets = 60; maxExercises = 18; }
+  if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) { maxWorkingSets = 60; maxExercises = 18; }
   else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
   else { maxWorkingSets = 24; maxExercises = 10; }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };

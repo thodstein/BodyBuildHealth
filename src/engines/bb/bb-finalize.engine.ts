@@ -1894,7 +1894,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // в «Коррекции») НЕ должна перестраивать состав/объём — только форма.
   // Ручные правки пользователя применяются ДО revalidate (exerciseEdits →
   // applyEditsToPlan), поэтому ранний return их не теряет.
-  if (next.weeks.some((w: any) => w.peakWeek === true || w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || typeof w.prepProtocol === 'string')) {
+  if (next.weeks.some((w: any) => w.peakWeek === true || w.contestPhase === 'taper' || w.contestPhase === 'peak_week' || (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')))) {
     syncBBPlanSetShape(next);
     return next;
   }
@@ -1904,7 +1904,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   // иначе leg-target/feeders/back-аллокации «раздувают» taper обратно.
   const isPrepControlled = (w: any): boolean =>
     w.contestPhase === 'taper' || w.contestPhase === 'peak_week'
-    || typeof w.prepProtocol === 'string' || w.peakWeek === true;
+    || (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) || w.peakWeek === true;
   const planHasPrep = next.weeks.some(isPrepControlled);
   // Final hard invariant for adaptive high-volume leg sessions. This is kept
   // after every other pass so fatigue/rotation cannot silently turn a major

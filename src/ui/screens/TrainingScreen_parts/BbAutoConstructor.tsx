@@ -26,7 +26,7 @@ import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
-import { computeRegimeMrvMult } from '../../../engines/bb/bb-volume.engine';
+import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
@@ -397,6 +397,7 @@ export const BbAutoConstructor: React.FC = () => {
   }, []);
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
+  const [trainingVolumeMode, setTrainingVolumeMode] = useState<'standard' | 'high'>('standard');
   // 📅 Многоблочная специализация: список блоков (3-6 нед каждый), у каждого
   // блока цели 1-2, режим доноров и мышцы-доноры. Остаток плана — баланс.
   interface UISpecBlock {
@@ -458,7 +459,10 @@ export const BbAutoConstructor: React.FC = () => {
     const used = specBlocks.reduce((sum, b) => sum + Math.max(3, Math.min(6, Math.round(b.weeks || 5))), 0);
     const remain = bbWeeks - used;
     if (remain < 3) { flash('Недостаточно недель: остаток меньше 3 — это баланс/переход'); return; }
-    setSpecBlocks(prev => [...prev, { id: `spec-block-${prev.length + 1}`, weeks: Math.min(5, remain), targets: [], tradeoffMode: 'none', donors: [] }]);
+    setSpecBlocks(prev => {
+      const maxId = prev.reduce((m, b) => Math.max(m, parseInt(b.id.split('-')[2] || '0') || 0), 0);
+      return [...prev, { id: `spec-block-${maxId + 1}`, weeks: Math.min(5, remain), targets: [], tradeoffMode: 'none', donors: [] }];
+    });
   };
   const updateSpecBlock = (id: string, patch: Partial<UISpecBlock>) => {
     setSpecBlocks(prev => prev.map(b => (b.id === id ? { ...b, ...patch } : b)));
@@ -514,6 +518,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
   const [autoRegOn, setAutoRegOn] = useState(false);
+  const [isBuilding, setIsBuilding] = useState(false);
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
@@ -1323,6 +1328,8 @@ export const BbAutoConstructor: React.FC = () => {
   }, [subTarget, builtPlan, bbWeekSel, bbWorkMax]);
 
   const buildBb = () => {
+    if (isBuilding) return;
+    setIsBuilding(true);
     let plan: BBPlan;
 
     // AutoReg-пейлоад (для buildBBPlan → applyPostPhaseProcessing)
@@ -1331,6 +1338,9 @@ export const BbAutoConstructor: React.FC = () => {
       topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
       rirShift: autoRegResult.rirShift,
     } : undefined;
+    // Объёмный режим: high → цель MRV, капы те же от уровня (дефолт 24 с фармой — норма)
+    const effectiveVolGoal = (trainingVolumeMode === 'high' ? 'mrv' : bbVolGoal) as any;
+    const effectiveVolumeScheme = (trainingVolumeMode === 'high' && volumeScheme === 'standard' ? 'gvt' as const : volumeScheme) as any;
 
     try {
 
@@ -1362,7 +1372,7 @@ export const BbAutoConstructor: React.FC = () => {
             level: bbLevel,
             trainingYears: bbTrainingYears,
             bodyweightCapability: prof.bodyweightCapability,
-           volumeGoal: bbVolGoal as any,
+           volumeGoal: effectiveVolGoal,
           specialization: specializationMode,
            mode: bbAdaptMode,
            methodology: bbMethodology,
@@ -1380,8 +1390,11 @@ export const BbAutoConstructor: React.FC = () => {
             labMrvMultiplier: labAdjust.mrvMultiplier,
             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
            });
-         if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
-        if (bbWeeks !== customProgram.durationWeeks) setBbWeeks(customProgram.durationWeeks);
+          if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
+         if (bbWeeks !== customProgram.durationWeeks) {
+           const clamped = Math.max(4, Math.min(24, Math.round(Number(customProgram.durationWeeks) || 8)));
+           if (Number.isFinite(clamped)) setBbWeeks(clamped);
+         }
       } else if (selectedCycleId || customCycle) {
         // BB-цикл путь (SRCycleTemplate → convertCycleToBBPlan)
         const cycle = customCycle || (getCycleById(selectedCycleId) as SRCycleTemplate | undefined);
@@ -1404,10 +1417,10 @@ export const BbAutoConstructor: React.FC = () => {
           avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
           fewerCompound,
           allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
-          rotationMode,
-          intensityLevel,
-           volumeGoal: bbVolGoal as any,
-            specialization: specializationMode,
+           rotationMode,
+           intensityLevel,
+            volumeGoal: effectiveVolGoal,
+             specialization: specializationMode,
             specializationSchedule: buildSpecBlocks,
             focusGroup: '',
             level: bbLevel,
@@ -1431,59 +1444,62 @@ export const BbAutoConstructor: React.FC = () => {
              labMrvMultiplier: labAdjust.mrvMultiplier,
              previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
         });
-        const cycleWeeks = cycle.meta.sessionsPerWeek;
-        if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
-        if (bbWeeks !== cycle.meta.weeks) setBbWeeks(cycle.meta.weeks);
+         const cycleWeeks = cycle.meta.sessionsPerWeek;
+         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
+         if (bbWeeks !== cycle.meta.weeks) {
+           const clamped = Math.max(4, Math.min(24, Math.round(Number(cycle.meta.weeks) || 8)));
+           if (Number.isFinite(clamped)) setBbWeeks(clamped);
+         }
       } else {
         return; // нет ни программы, ни цикла — нельзя строить (защита)
       }
     } else {
       const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
       if (!pattern) return;
-       plan = buildBBPlan({
-         patternId: selectedSplitId, level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, weeks: bbWeeks,
-         bodyweightCapability: prof.bodyweightCapability,
-         workMax: bbWorkMax, weakPoints, focusGroup: '', volumeGoal: bbVolGoal as any,
-         specialization: specializationMode,
-         specializationSchedule: buildSpecBlocks,
-        injuries,
-        planStartWeek: new Date().toISOString().slice(0, 10),
-        favoriteExercises: bbFavEx,
-        excludedExercises: bbExclEx,
-        avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
-        fewerCompound,
-        allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
-        rotationMode,
-        intensityLevel,
-        intensityTechnique: intensityTech,
-        autoDeload,
-        deloadType,
-        loadStrategy,
-        autoRegResult: autoRegPayload,
-        pedDoses,
-        courseIntensity,
-        equipment: bbEquipment,
-        methodology: bbMethodology,
-        sex: linked.profile?.settings?.personal?.sex,
-        // P0-5: лабораторная коррекция MRV
-        labMrvMultiplier: labAdjust.mrvMultiplier,
-         labWarnings: labAdjust.warnings,
-         labIntensityNote: labAdjust.intensityNote,
-         trainingFocus: bbTrainingFocus,
-         bodyFat: linked.profile.settings.personal.bodyFat,
-         leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-         hrvMs: linked.profile.settings.lifestyle.morningHRV,
-         sleepHours: linked.profile.settings.lifestyle.sleepHours,
-         stressLevel: linked.profile.settings.lifestyle.stressLevel,
-         proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
-         calorieSurplus,
-         eccentricMult,
-         mobilityRestrictions,
-         // PRO: cross-mesocycle continuity — передаём последний сохранённый план
-         previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
-         supersetMode,
-         volumeScheme,
-       }, pedAdapt);
+        plan = buildBBPlan({
+          patternId: selectedSplitId, level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, weeks: bbWeeks,
+          bodyweightCapability: prof.bodyweightCapability,
+          workMax: bbWorkMax, weakPoints, focusGroup: '', volumeGoal: effectiveVolGoal,
+          specialization: specializationMode,
+          specializationSchedule: buildSpecBlocks,
+         injuries,
+         planStartWeek: new Date().toISOString().slice(0, 10),
+         favoriteExercises: bbFavEx,
+         excludedExercises: bbExclEx,
+         avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
+         fewerCompound,
+         allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
+         rotationMode,
+         intensityLevel,
+         intensityTechnique: intensityTech,
+         autoDeload,
+         deloadType,
+         loadStrategy,
+         autoRegResult: autoRegPayload,
+         pedDoses,
+         courseIntensity,
+         equipment: bbEquipment,
+         methodology: bbMethodology,
+         sex: linked.profile?.settings?.personal?.sex,
+         // P0-5: лабораторная коррекция MRV
+         labMrvMultiplier: labAdjust.mrvMultiplier,
+          labWarnings: labAdjust.warnings,
+          labIntensityNote: labAdjust.intensityNote,
+          trainingFocus: bbTrainingFocus,
+          bodyFat: linked.profile.settings.personal.bodyFat,
+          leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
+          hrvMs: linked.profile.settings.lifestyle.morningHRV,
+          sleepHours: linked.profile.settings.lifestyle.sleepHours,
+          stressLevel: linked.profile.settings.lifestyle.stressLevel,
+          proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
+          calorieSurplus,
+          eccentricMult,
+          mobilityRestrictions,
+          // PRO: cross-mesocycle continuity — передаём последний сохранённый план
+          previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
+          supersetMode,
+          volumeScheme: effectiveVolumeScheme,
+        }, pedAdapt);
     }
 
     if (bbAnnualMacrocycle) {
@@ -1501,8 +1517,9 @@ export const BbAutoConstructor: React.FC = () => {
     }
     if (planMode === 'bb_cycle') {
       if (supersetMode === 'antagonist') markAntagonistSupersets(plan);
-      if (volumeScheme !== 'standard') applyVolumeScheme(plan, volumeScheme);
+      if (effectiveVolumeScheme !== 'standard') applyVolumeScheme(plan, effectiveVolumeScheme);
     }
+    // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
 
     const modeLabel = bbAnnualMacrocycle
       ? `Годовой BB-макроцикл (${bbAnnualMacrocycle.totalWeeks} нед)`
@@ -1552,6 +1569,8 @@ export const BbAutoConstructor: React.FC = () => {
       console.error('[BB-auto] Ошибка генерации плана:', e);
       flash('Ошибка при генерации плана: ' + (e?.message || String(e)) + '. Проверьте параметры и попробуйте снова.');
       return;
+    } finally {
+      setIsBuilding(false);
     }
   };
 
@@ -2315,9 +2334,23 @@ export const BbAutoConstructor: React.FC = () => {
         <PopupNumber label="Стаж" value={bbTrainingYears} min={0} max={50} step={0.5} suffix=" лет" onChange={v => { setBbTrainingYears(v); syncProf({ trainingYears: v }); }} />
         <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass','Мышечная масса'],['cut','Сушка'],['recomp','Рекомпозиция'],['maintenance','Поддержание'],['strength_mass','Сила + Масса']].map(([id,label]) => ({ id, label }))} />
         <PopupNumber label="Дней/нед" value={bbDays} min={3} max={6} onChange={v => setBbDays(v)} />
-        <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
-         <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
-         <PopupSelect label="🎯 Фокус тренировки" value={bbTrainingFocus} onChange={v => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[
+         <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
+          <PopupSelectSmart label="Цель объёма" value={bbVolGoal} onChange={onUserVolGoal} suggestedIds={bbSuggest.volumeGoal} suggestionReason="По цели и уровню" options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
+          <div style={{ gridColumn:'1 / span 2', padding:'10px 12px', borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.18)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>📦 Объёмный тренинг <span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.45)' }}>капы от уровня — новичок без фармы 60 сетов недоступно</span></div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={() => setTrainingVolumeMode('standard')} style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11, border: trainingVolumeMode==='standard' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='standard' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='standard' ? '#3b82f6' : 'rgba(255,255,255,0.6)' }}>Обычный</button>
+              <button onClick={() => setTrainingVolumeMode('high')} style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11, border: trainingVolumeMode==='high' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='high' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='high' ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}>Объёмный</button>
+            </div>
+            <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.5 }}>
+              {trainingVolumeMode==='standard' ? (
+                <>Обычный: цель MAV, без GVT/FST-7, капы по уровню. Лимит: {(() => { try { const l=sessionLimitsFor({level:bbLevel, trainingYears:bbTrainingYears, onCourse:peds.length>0}); return `${l.maxWorkingSets} сетов / ${l.maxExercises} упр.`; } catch { return '24/10'; } })()} (дефолт 24 с фармой — норма). </>
+              ) : (
+                <>Объёмный: цель MRV + памп-схемы (GVT 10×10/FST-7 — кап 5/упр сохраняется). Капы те же от уровня: новичок 24/10 недоступно 60; enhanced 3г+ 60/18. ACWR/дефицит — отдельной кнопкой Авто-делод.</>
+              )}
+            </div>
+          </div>
+          <PopupSelect label="🎯 Фокус тренировки" value={bbTrainingFocus} onChange={v => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[
            { id:'strength', label:'Сила: RIR 1-2' },
            { id:'hypertrophy', label:'Гипертрофия: RIR 2-3' },
            { id:'endurance', label:'Выносливость: RIR 3-4' },
@@ -2678,7 +2711,7 @@ export const BbAutoConstructor: React.FC = () => {
           {bestSplit.rationale.slice(0, 3).map((x,i) => <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>✓ {x}</div>)}
           <div style={{ display:'flex', gap:8, marginTop:8 }}>
             <button onClick={() => { setSelectedSplitId(bestSplit.pattern.id); }} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(250,204,21,0.15)', border:'1px solid rgba(250,204,21,0.3)', color:'#facc15' }}>✅ Применить</button>
-            <button onClick={buildBb} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>⚡ Собрать план</button>
+            <button onClick={buildBb} disabled={isBuilding} style={{ padding:'6px 16px', borderRadius:10, fontSize:11, fontWeight:700, cursor: isBuilding ? 'default' : 'pointer', opacity: isBuilding ? 0.6 : 1, background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>{isBuilding ? '⏳ Сборка…' : '⚡ Собрать план'}</button>
           </div>
         </div>
       )}
@@ -2705,7 +2738,7 @@ export const BbAutoConstructor: React.FC = () => {
         })}
       </div>
       <div style={{ display:'flex', gap:8, marginTop:12 }}>
-        <button style={{ ...BTN, flex:1 }} onClick={buildBb}>✅ Собрать план ({bbWeeks} нед, фазовая периодизация)</button>
+        <button style={{ ...BTN, flex:1, opacity: isBuilding ? 0.6 : 1 }} disabled={isBuilding} onClick={buildBb}>{isBuilding ? '⏳ Сборка…' : `✅ Собрать план (${bbWeeks} нед, фазовая периодизация)`}</button>
         <button style={BTN_GHOST} onClick={() => setStep('ped')}>← Назад</button>
       </div>
     </div>
