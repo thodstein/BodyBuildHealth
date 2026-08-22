@@ -18,6 +18,7 @@ import {
   type DiaryKey,
   type WeeklyHistogramGoal,
 } from './diary-helpers';
+import { buildDiariesExportHtml } from './diary-pdf-export';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
 import { BPDiary } from './diaries/BPDiary/BPDiary';
 import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
@@ -995,20 +996,66 @@ export const ProfileDiariesTab: React.FC<{
     if ((window as any).showToast) (window as any).showToast('📦 Все дневники экспортированы в JSON');
   };
 
-  const exportAllDiariesPdf = () => {
-    const esc = (v: unknown) =>
-      String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
-    const table = (title: string, headers: string[], rowsArr: string[][]) =>
-      rowsArr.length
-        ? `<h2>${esc(title)}</h2><table><tr>${headers.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${rowsArr
-            .map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`)
-            .join('')}</table>`
-        : '';
-    const sortedDesc = <T extends { date: string }>(arr: T[]) => [...arr].sort((a, b) => b.date.localeCompare(a.date));
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Все дневники</title>
-<style>body{font:12px 'Segoe UI',Arial,sans-serif;padding:20px;color:#111}h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:6px}h2{color:#0f766e;margin-top:18px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #ccc;padding:4px;text-align:left;font-size:11px}th{background:#e6f4f1}.meta{color:#666;font-size:11px}@media print{body{padding:8px}}</style></head><body>
-<h1>📓 Все дневники</h1>
-<p class="meta">Экспорт: ${new Date().toLocaleDateString('ru-RU')} · Записей: ${sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length}</p>
+const exportAllDiariesPdf = () => {
+    const html = buildDiariesExportHtml({
+      sleepEntries,
+      bpEntries,
+      weights,
+      injectionEntries,
+      healthEntries,
+      cardioLog,
+    });
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 120);
+  };
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Все дневники — PDF экспорт</title>
+<style>
+  body{font:12px 'Segoe UI',Arial,sans-serif;padding:20px;color:#111}
+  h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:6px}
+  h2{color:#0f766e;margin-top:18px}
+  table{border-collapse:collapse;width:100%;margin:8px 0}
+  td,th{border:1px solid #ccc;padding:4px;text-align:left;font-size:11px}
+  th{background:#e6f4f1}
+  .meta{color:#666;font-size:11px}
+  .cover{page-break-after:always;text-align:center;padding:40px 20px}
+  .cover h1{font-size:28px;margin-bottom:8px}
+  .cover .subtitle{color:#666;font-size:14px;margin-bottom:24px}
+  .cover .stats{display:flex;justify-content:center;gap:24px;margin:24px 0;flex-wrap:wrap}
+  .cover .stat{background:#f0fdfa;border:1px solid #14b8a6;border-radius:8px;padding:12px 20px;min-width:120px}
+  .cover .stat .label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5}
+  .cover .stat .value{font-size:20px;font-weight:700;color:#0f766e}
+  .trend-up{color:#22c55e}.trend-down{color:#ef4444}.trend-neutral{color:#666}
+  .qr{float:right;margin-left:20px}
+  @media print{
+    body{padding:8px}
+    .no-print{display:none}
+    .cover{page-break-after:always}
+  }
+</style></head><body>
+<!-- COVER PAGE -->
+<div class="cover">
+  <h1>📓 Все дневники — Экспорт</h1>
+  <div class="subtitle">Полный отчёт по встроенным дневникам Профиля</div>
+  <div class="stats">
+    <div class="stat"><div class="label">Всего записей</div><div class="value">${totalEntries}</div></div>
+    <div class="stat"><div class="label">Период</div><div class="value">${esc(dateRange)}</div></div>
+    <div class="stat"><div class="label">Сон</div><div class="value">${sleepTrend} <span class="${sleepTrend.startsWith('▲') ? 'trend-up' : sleepTrend.startsWith('▼') ? 'trend-down' : 'trend-neutral'}">${sleepTrend}</span></div></div>
+    <div class="stat"><div class="label">Вес</div><div class="value">${weightTrend} <span class="${weightTrend.startsWith('▲') ? 'trend-up' : weightTrend.startsWith('▼') ? 'trend-down' : 'trend-neutral'}">${weightTrend}</span></div></div>
+    <div class="stat"><div class="label">АД (сист.)</div><div class="value">${bpSysTrend} <span class="${bpSysTrend.startsWith('▲') ? 'trend-up' : bpSysTrend.startsWith('▼') ? 'trend-down' : 'trend-neutral'}">${bpSysTrend}</span></div></div>
+  </div>
+  <div style="margin-top:32px"><img src="${qrDataUri}" alt="QR код экспорта" width="120" height="120"/></div>
+  <div style="margin-top:12px;color:#999;font-size:11px">Сканируйте для быстрого доступа к данным</div>
+  <div class="meta" style="margin-top:24px">Сгенерировано: ${new Date().toLocaleString('ru-RU')} · BodyBuildHealth</div>
+</div>
+
+<!-- DATA TABLES -->
+<h1>📓 Все дневники — Детали</h1>
+<p class="meta">Экспорт: ${new Date().toLocaleDateString('ru-RU')} · Записей: ${totalEntries}</p>
 ${table('💤 Сон', ['Дата', 'Часы', 'Качество', 'Пробуждений', 'Легли', 'Подъём', 'Заметки'],
   sortedDesc(sleepEntries).map((e) => [e.date, String(e.hours), String(e.quality), String(e.awakenings), e.bedtime, e.wakeTime, e.notes || '']))}
 ${table('❤️ Давление (с ЧСС)', ['Дата', 'Систола', 'Диастола', 'Пульс', 'Время', 'Лекарство', 'Заметки'],
