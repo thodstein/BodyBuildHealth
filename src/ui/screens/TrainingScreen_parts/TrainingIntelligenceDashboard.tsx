@@ -54,8 +54,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
       tools: [
-        { icon: '⭐', label: 'Качество программы', desc: 'Оценка плана, MRV, рекомендации', tab: 'calc_quality' },
-        { icon: '🔬', label: 'Диагностика', desc: 'Анализ плана, слабые места, погрешности', tab: 'diagnostics' },
+        { icon: '🎯', label: 'Качество+Диагностика', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер жима/суставы/срывы', tab: 'quality_diagnostics' as any },
       ],
     },
     {

@@ -58,9 +58,9 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     color: '#3b82f6',
     subtitle: 'Персональный пульс-контроль: показатели, качество плана, инструменты сборки, периодизация',
     tabs: [
-      'strength_analysis', 'load_management', 'diagnostics', 'periodization_hub',
+      'strength_analysis', 'load_management', 'quality_diagnostics', 'periodization_hub',
       'exercise_lab', 'load_safety', 'split_gen', 'pri_reppat',
-      'calc_plates', 'calc_quality', 'volume',
+      'calc_plates', 'volume',
       'training_mix_hub', 'mix_presets', 'tonnage', 'bb_foundation',
     ],
   },
@@ -99,6 +99,9 @@ export const ZONE_ORDER: TrainingZone[] = ['planner', 'training', 'diary', 'calc
 /** Карта: какая вкладка в какой зоне живёт (для внешней навигации по имени вкладки). */
 const TAB_TO_ZONE: Partial<Record<TrainingTab, TrainingZone>> = {};
 for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
+// алиасы для депрекейтнутых дублей (удалены из ZONES.tabs, но должны резолвиться)
+(TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['calc_quality'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';

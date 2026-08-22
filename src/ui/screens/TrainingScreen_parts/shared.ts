@@ -44,7 +44,7 @@ export type TrainingTab =
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
-  | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub'
+  | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub' | 'quality_diagnostics'
   | 'training_mix_hub' | 'mix_presets' | 'warmup' | 'cooldown' | 'bb_foundation';
 export type TrainingPage = 'hero' | 'tabs';
 
@@ -99,6 +99,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   load_management: '📊 Управление нагрузкой',
   diagnostics: '🔬 Диагностика',
   periodization_hub: '🔄 Периодизация',
+  quality_diagnostics: '🎯 Качество+Диагностика',
   training_mix_hub: '🧪 Тренировочные миксы',
   mix_presets: '🧪 Пресеты здоровья',
   tonnage: '📦 Тоннаж калькулятор',
