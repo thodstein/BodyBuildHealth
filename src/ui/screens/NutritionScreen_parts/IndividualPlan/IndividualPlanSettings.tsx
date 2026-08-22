@@ -362,11 +362,14 @@ export const IndividualPlanSettings: React.FC = () => {
               HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
               ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
               TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
-              POTASSIUM: 'potassium', SODIUM: 'sodium', MAGNESIUM: 'magnesium',
               TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
               LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin',
               CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
               INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
+              // ВАЖНО (units-fix): POTASSIUM/SODIUM/MAGNESIUM НЕ импортируем — эти ключи
+              // в v2Labs означают ДНЕВНЫЕ пищевые цели электролитов (мг), а не сывороточные
+              // концентрации (ммоль/л). Импорт сыворотки сюда искажал карточку «Электролиты»
+              // и давал ложные гиперкалиемию/гипернатриемию в диетической коррекции.
             };
             labPoints.forEach(lp => {
               const field = codeMap[lp.code];
@@ -535,11 +538,11 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
                 ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
                 TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
-                POTASSIUM: 'potassium', SODIUM: 'sodium', MAGNESIUM: 'magnesium',
                 TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
                 LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin',
                 CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
                 INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
+                // POTASSIUM/SODIUM/MAGNESIUM — НЕ импортируем (пищевые цели в мг, не сыворотка).
               };
               labPoints.forEach(lp => {
                 const field = codeMap[lp.code];

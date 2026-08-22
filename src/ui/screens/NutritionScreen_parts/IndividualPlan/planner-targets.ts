@@ -60,24 +60,26 @@ export interface PlannerTargets {
 // ─── Диетологический потолок углеводов (П.4/П.1, Aug 22 2026) ─────────────
 // Цель углеводов НЕ должна раздуваться множителями уровня/циклинга до абсурда
 // (жалоба «120 кг на курсе → 900/814 г углеводов»). Межсезонный диапазон для набора
-// массы — 4–6 г/кг (Helms 2014, Slater 2019). Берём верхнюю границу 6 г/кг.
+// массы — 4–6 г/кг (Helms 2014, Slater 2019). Берём 5 г/кг — средняя граница, которую
+// РЕАЛЬНО можно съесть (1 гарнир на приём, без абсурдных 500-граммовых порций), т.е.
+// без «разбега» между целью в карточке и собранным планом.
 // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, но не более 8 г/кг) —
 // иначе высокие дозы не были бы обеспечены углеводами. Чистая функция: тестируемая.
 export function computeDieteticCarbTarget(opts: {
   weightKg: number;
   rawCarbsG: number;
   insulinTotalUnits?: number;
-  carbGPerKg?: number;      // потолок г/кг (по умолчанию 6)
+  carbGPerKg?: number;      // потолок г/кг (по умолчанию 5)
   maxCarbGPerKg?: number;   // верхний предел при инсулине (по умолчанию 8)
   minCarbG?: number;        // нижний этаж (по умолчанию 50)
 }): number {
   const w = Math.max(1, opts.weightKg || 0);
-  const carbGPerKg = opts.carbGPerKg ?? 6;
+  const carbGPerKg = opts.carbGPerKg ?? 5;
   const maxCarbGPerKg = opts.maxCarbGPerKg ?? 8;
   const minCarbG = opts.minCarbG ?? 50;
   const insulinTotal = Math.max(0, opts.insulinTotalUnits || 0);
   const insulinFloor = Math.round(insulinTotal * 10); // ~10 г на 1 ЕД
-  // потолок: 6 г/кг, но не ниже инсулин-флора; при инсулине до 8 г/кг
+  // потолок: 5 г/кг, но не ниже инсулин-флора; при инсулине до 8 г/кг
   const ceiling = Math.max(Math.round(w * carbGPerKg), Math.min(insulinFloor, Math.round(w * maxCarbGPerKg)), minCarbG);
   return Math.max(insulinFloor, Math.min(Math.max(opts.rawCarbsG || 0, minCarbG), ceiling));
 }

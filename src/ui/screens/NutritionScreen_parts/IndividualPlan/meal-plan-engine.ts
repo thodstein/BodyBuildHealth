@@ -282,14 +282,20 @@ function computeLabDietAdjustment(input: MealPlanInput): LabDietAdjustment {
     });
   };
 
-  // 🔴 POTASSIUM HIGH (hyperkalemia risk) — restrict K-rich foods
-  if (labs.POTASSIUM !== undefined && labs.POTASSIUM > 5.0) {
+  // 🔴 POTASSIUM HIGH (hyperkalemia risk) — restrict K-rich foods.
+  // units-guard (Aug 22 2026): ключ POTASSIUM может нести ЛИБО сывороточный K (ммоль/л, ~3.5–6),
+  // ЛИБО дневную пищевую цель в мг (напр. 4500 мг). Реагируем ТОЛЬКО на сывороточный диапазон,
+  // иначе дневная цель 4500 мг давала ложную «гиперкалиемию» (резала авокадо/бананы/картофель).
+  const _K = labs.POTASSIUM;
+  if (_K !== undefined && _K >= 2.5 && _K <= 10 && _K > 5.0) {
     restrictByKeyword('avocado', 'potato', 'spinach', 'banana', 'tomato', 'salmon', 'mackerel', 'yogurt', 'coconut', 'dried', 'beet');
     notes.push('⚠️ Калий >5.0 ммоль/л: ограничены авокадо, картофель, шпинат, бананы, помидоры, лосось, сухофрукты');
   }
 
-  // 🔴 SODIUM HIGH / HYPERTENSION — restrict Na-rich foods
-  if (labs.SODIUM !== undefined && labs.SODIUM > 145) {
+  // 🔴 SODIUM HIGH / HYPERTENSION — restrict Na-rich foods.
+  // units-guard: реагируем только на сывороточный Na (ммоль/л, ~130–160), не на дневную цель в мг.
+  const _Na = labs.SODIUM;
+  if (_Na !== undefined && _Na >= 100 && _Na <= 200 && _Na > 145) {
     restrictByKeyword('salt', 'soy_sauce', 'pickles', 'olives', 'cheese', 'sausage', 'bacon', 'ham', 'canned', 'bouillon', 'processed');
     notes.push('⚠️ Натрий >145 ммоль/л: исключены соль, соевый соус, консервы, колбасы, сыры, оливки');
   }

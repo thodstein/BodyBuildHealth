@@ -1816,20 +1816,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
       // 🧪 Собираем lab values из v2Labs (строки → числа) для диетической коррекции.
       // ВАЖНО (units-fix): v2Labs содержит и СЫВОРОТОЧНЫЕ анализы (ALT/AST/LDL/гематокрит/…),
-      // и ЦЕЛЕВЫЕ дневные электролиты питания (Натрий/Калий/Магний в мг, поля «sodium/
-      // potassium/magnesium»). Движок computeLabDietAdjustment трактует значения как сывороточные
-      // концентрации (K >5.0 ммоль/л, Na >145 ммоль/л) — подача 4500 мг калия в эту логику
-      // ВСЕГДА давала ложную «гиперкалиемию» и резала авокадо/бананы/картофель, а 3500 мг натрия
-      // — ложную «гипернатриемию». Пропускаем только настоящие коды сывороточных анализов.
+      // и ЦЕЛЕВЫЕ дневные электролиты питания (Натрий/Калий/Магний в мг). Движок
+      // computeLabDietAdjustment трактует Na/K как сывороточные (K >5.0 ммоль/л, Na >145 ммоль/л);
+      // unit-guard в движке реагирует ТОЛЬКО на сывороточный диапазон (K 2.5–10, Na 100–200),
+      // поэтому дневные 4500 мг калия не дают ложную «гиперкалиемию». Передаём всё (uppercase),
+      // а решение о применимости — в движке.
       const SERUM_LAB_KEYS = new Set([
         'glucose', 'insulin', 'homa_ir', 'alt', 'ast', 'ggt', 'creatinine', 'urea',
         'hematocrit', 'hemoglobin', 'hdl', 'ldl', 'apob', 'tsh', 'vitamin_d', 'ferritin',
         'homocysteine', 'crp', 'testosterone', 'estradiol', 'prolactin', 'hba1c', 'glycated_hemoglobin',
+        'sodium', 'potassium', 'magnesium',
       ]);
       const labValuesForPlan: Record<string, number> = {};
       Object.entries(v2Labs).forEach(([key, val]) => {
         const k = (key || '').toLowerCase();
-        if (!SERUM_LAB_KEYS.has(k)) return; // sodium/potassium/magnesium — пищевые цели, не сыворотка
+        if (!SERUM_LAB_KEYS.has(k)) return; // прочие ключи (рецепты/настройки) не анализы
         const num = parseFloat(val as string);
         if (!isNaN(num) && num > 0) labValuesForPlan[k.toUpperCase()] = num;
       });

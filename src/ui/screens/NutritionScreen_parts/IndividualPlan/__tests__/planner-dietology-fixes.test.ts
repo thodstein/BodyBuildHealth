@@ -168,29 +168,29 @@ describe('P3: завтрак-шаблон ЗАМЕНЯЕТ пуловый зав
 });
 
 describe('D4/D5: диетологический потолок углеводов (computeDieteticCarbTarget)', () => {
-  it('120 кг → цель углеводов не выше 6 г/кг (720 г), даже если база 817', () => {
+  it('120 кг → цель углеводов не выше 5 г/кг (600 г), даже если база 817', () => {
     const r = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
-    expect(r).toBe(720); // 120 * 6
+    expect(r).toBe(600); // 120 * 5
   });
 
   it('с инсулином 20 ЕД потолок не ниже инсулин-флора (200 г)', () => {
     const r = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817, insulinTotalUnits: 20 });
-    // потолок = max(720, min(200, 960)) = 720; целе = min(max(817,200),720) = 720
-    expect(r).toBe(720);
+    // потолок = max(600, min(200, 960)) = 600; целе = min(max(817,200),600) = 600
+    expect(r).toBe(600);
   });
 
   it('с большой дозой инсулина 100 ЕД углеводы НЕ режутся ниже флора 1000 г', () => {
     const r = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817, insulinTotalUnits: 100 });
-    // floor=1000, ceiling=max(720, min(1000,960))=960, target=min(max(817,50),960)=960 (не меньше флора 1000? → clamp к floor 1000)
+    // floor=1000, ceiling=max(600, min(1000,960))=960, target=min(max(817,50),960)=960 (не меньше флора 1000? → clamp к floor 1000)
     expect(r).toBe(1000);
   });
 
   it('не режет разумную цель: 90 кг / 320 г → 320 г', () => {
     const r = computeDieteticCarbTarget({ weightKg: 90, rawCarbsG: 320 });
-    expect(r).toBe(320); // min(320, 540)=320
+    expect(r).toBe(320); // min(320, 450)=320
   });
 
-  it('итог: 120 кг / база 817 → план генерирует ~720 г (не 900/814), разбег мал', () => {
+  it('итог: 120 кг / база 817 → план генерирует ~600 г (не 900/814), разбег мал', () => {
     const target = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
     const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: target, goalKcal: 5000, goalProteinG: 360, goalFatG: 135, mealsCount: 6 }));
     expect(plan.totals.c).toBeLessThanOrEqual(target * 1.06); // в пределах ~6% (без абсурда 814+)
