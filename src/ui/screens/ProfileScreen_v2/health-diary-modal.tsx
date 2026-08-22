@@ -11,6 +11,7 @@ import { colors } from './ui';
 import { todayIso } from './diary-helpers';
 import { loadSessions, type WorkoutExercise } from '../../../engines/workout-logger.engine';
 import type { UnifiedHealthEntry } from '../../../engines/health-diary.engine';
+import { mergeHealthEntry } from '../../../engines/health-diary.engine';
 import {
   DiaryModalShell,
   SectionCard,
@@ -194,8 +195,11 @@ export const AddHealthModal: React.FC<{
       notes: notes.trim() || undefined,
     };
 
+    // Merge with existing entry for the same date
+    const merged = mergeHealthEntry(existingHealth as any, entry);
+
     onSave({
-      ...entry,
+      ...merged,
       id: '',
       createdAt: '',
       updatedAt: '',
