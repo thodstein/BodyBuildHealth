@@ -64,6 +64,7 @@ import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { completeAnnualBlockImport } from './planner-bridge-handlers';
 import { calcBBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { designerToUserWeeks, applyDesignPhasesToWeeks } from '../../../engines/periodization/designer-to-program';
 import { macrocycleToBBProgram } from '../../../engines/lms/macrocycle-to-bb';
@@ -616,6 +617,35 @@ export const ProgramManagerPanel: React.FC = () => {
               {issues.length > 8 && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>…и ещё {issues.length - 8}</div>}
             </div>
           );
+        })()}
+
+        {/* Чек-лист качества — что нужно для качественного итога (видно всем, 1 клик — вернуться в Редактор) */}
+        {(() => {
+          try {
+            const q = computePlanQualityFor(p, p.meta.level);
+            const hasTitle = !!(p.meta.title && p.meta.title.trim().length >= 3);
+            const hasWeeks = (p.bb?.weeks.length ?? 0) >= 1 || (p.pl?.customWeeks?.length ?? 0) >= 1 || !!p.pl?.sourceCycleId || (p.hybrid?.bbWeeks?.length ?? 0) >= 1;
+            const hasEmpty = (() => { if (p.bb) return p.bb.weeks.some(w=> w.sessions.some(s=> !(s.blocks??[]).some(b=> b.exerciseName?.trim()))); if (p.pl?.customWeeks) return p.pl.customWeeks.some(w=> w.days.some(d=> !(d.exercises??[]).some(e=> e.name?.trim()))); return false; })();
+            const hasDeload = p.meta.weeks < 6 || (p.bb?.weeks.some(w=> w.deload) ?? false) || (p.pl?.customWeeks?.some(w=> w.deload) ?? false);
+            const daysOk = !p.bb || (p.bb.weeks[0]?.sessions.length ?? 0) === p.meta.daysPerWeek;
+            const volumeOk = q ? q.perMuscle.every(m=> m.status==='ok' || m.status==='high') : true;
+            const checks = [
+              { ok: hasTitle, label: 'Название', hint: hasTitle ? '✓' : 'Укажите название' },
+              { ok: hasWeeks && !hasEmpty, warn: hasEmpty, label: 'Наполнение', hint: !hasWeeks ? 'Нет недель' : hasEmpty ? 'Есть пустые тренировки' : 'Все тренировки заполнены' },
+              { ok: volumeOk, label: 'Объём', hint: q ? `${q.score}/100 ${q.grade}` : 'Нет данных' },
+              { ok: hasDeload, label: 'Делод', hint: hasDeload ? 'Есть' : 'Рекомендуется для '+p.meta.weeks+' нед' },
+              { ok: daysOk, label: 'Дни', hint: daysOk ? '✓ ' + p.meta.daysPerWeek + 'д/нед' : '⚠ ' + p.meta.daysPerWeek + 'д/нед ↔ ' + (p.bb?.weeks[0]?.sessions.length ?? 0) },
+            ];
+            const okCnt = checks.filter(c=> (c as any).ok).length;
+            const pct = Math.round(okCnt/checks.length*100);
+            const col = pct>=80 ? '#22c55e' : pct>=50 ? '#f59e0b' : '#ef4444';
+            return (
+              <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${col}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: col }}>✅ Чек-лист качества — {okCnt}/{checks.length} · {pct}%</span><span style={{ fontSize: 10, color: DIM }}>{pct>=80 ? 'готово' : 'вернитесь в Редактор чтобы исправить'}</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{checks.map(c=> (<div key={(c as any).label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: (c as any).ok ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${(c as any).ok ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`}}><span style={{ width: 16, height: 16, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: (c as any).ok ? '#22c55e' : '#ef4444', color: '#fff' }}>{(c as any).ok ? '✓' : '✕'}</span><span style={{ fontSize: 11, fontWeight: 700, color: (c as any).ok ? '#22c55e' : '#ef4444', minWidth: 70 }}>{(c as any).label}</span><span style={{ fontSize: 11, color: DIM_STRONG, flex: 1 }}>{(c as any).hint}</span></div>))}</div>
+              </div>
+            );
+          } catch { return null; }
         })()}
 
         {/* Действия */}

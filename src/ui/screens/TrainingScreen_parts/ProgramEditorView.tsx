@@ -60,6 +60,7 @@ import { ProgramTimeline } from './ProgramTimeline';
 import { RirWaveChart, QualityScorePanel, PlanStatsPanel } from './ProgramEditorPanels2';
 import type { ManualMode } from './ProgramManagerPanel';
 import { CycleTemplatesPanel } from './CycleTemplatesPanel';
+import { QualityChecklistCard } from './QualityChecklistCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
@@ -1424,13 +1425,14 @@ return (
             </div>
           );
         })()}
+        <QualityChecklistCard program={program} onChange={onChange as any} showToast={showToast} tprofile={tprofile} labMrv={labAdjust.mrvMultiplier} />
         </>
       )}
       {estep === 'weeks' && dir === 'pl' && program.pl && (
-        <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
+        <><QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} /><QualityChecklistCard program={program} onChange={onChange as any} showToast={showToast} tprofile={tprofile} labMrv={labAdjust.mrvMultiplier} /></>
       )}
       {estep === 'weeks' && dir === 'hybrid' && program.hybrid && (
-        <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
+        <><QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} /><QualityChecklistCard program={program} onChange={onChange as any} showToast={showToast} tprofile={tprofile} labMrv={labAdjust.mrvMultiplier} /></>
       )}
 
 
@@ -1535,9 +1537,24 @@ return (
                 }} />
            </label>
         </div>
-      </div>
+       </div>
+       {/* Подсказка по цели/уровню — что влияет на качество */}
+       <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa', display: 'flex', flexDirection: 'column', gap: 4 }}>
+         <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>💡 Цель и уровень — как влияет на цикл</div>
+         <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.5 }}>
+           {program.meta.goal === 'hypertrophy' && 'Масса: объём 65–85% MEV→MAV, RIR 2–3 → 1, делод каждую 4 нед.'}
+           {program.meta.goal === 'powerlifting' && 'Сила: интенсивность 75–90% 1RM, RIR 3→1, пик + делод перед тестом.'}
+           {program.meta.goal === 'cut' && 'Сушка: объём −15%, RIR 3, упор на сохранение силы, делод чаще.'}
+           {program.meta.goal === 'recomp' && 'Рекомпозиция: умеренный объём, RIR 2–3, баланс.'}
+           {program.meta.goal === 'peaking' && 'Пик: объём ↓, интенсивность ↑, RIR 1→0, тейпер.'}
+           {!['hypertrophy','powerlifting','cut','recomp','peaking'].includes(program.meta.goal) && 'Цель влияет на фазы, RIR и объём — выберите ближе к вашей задаче.'}
+         </div>
+         <div style={{ fontSize: 10, color: DIM }}>
+           Уровень <b style={{ color: DIM_STRONG }}>{program.meta.level}</b> · {program.meta.level === 'beginner' ? 'MEV ниже, RIR выше, техника в приоритете' : program.meta.level === 'intermediate' ? 'Стандарт MEV/MAV, RIR 2' : program.meta.level === 'advanced' ? 'MAV выше, RIR 1–2, можно специализацию' : 'Enhanced: MRV +15–30%, RIR 1, объём выше'} · {program.meta.daysPerWeek}д/нед × {program.meta.weeks} нед
+         </div>
+       </div>
 
-      {/* F2.5: тренерские заметки (отображаются в PDF) */}
+       {/* F2.5: тренерские заметки (отображаются в PDF) */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📝 Заметки тренера</span>
         <span style={{ fontSize: 10, color: DIM }}>Видно в PDF и при отправке к выполнению</span>
