@@ -49,8 +49,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
           badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
         { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио', tab: 'load_safety' as any,
           badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
-        { icon: '🎯', label: 'RIR калибратор', desc: 'Калибровка RIR/RPE, история, точность', tab: 'rir_calibration' as any },
-        { icon: '🔮', label: 'Прогноз готовности', desc: 'Readiness forecast: сон, HRV, ACWR → веса', tab: 'readiness_forecast' as any },
+        { icon: '🎯', label: 'RIR + Прогноз', desc: 'Единый хаб: RIR bias/калибровка + Хольт-прогноз готовности — аналог Микс-хаба', tab: 'rir_forecast_hub' as any },
       ],
     },
     {
