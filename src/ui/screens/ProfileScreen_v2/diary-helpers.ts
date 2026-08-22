@@ -839,9 +839,28 @@ export const classifyValue = (key: DiaryKey, value: number): 'normal' | 'warn' |
 
 // ─── Гистограмма по неделям ────────────────────────────────────────────────
 
+export interface WeeklyHistogramGoal {
+  key: DiaryKey;
+  target: number;
+  label: string;
+  color: string;
+}
+
+export interface WeeklyHistogramEntry {
+  weekStart: string;
+  count: number;
+  sum: number;
+  mean: number;
+  min: number;
+  max: number;
+  goal?: WeeklyHistogramGoal;
+  goalStatus?: 'above' | 'below' | 'met' | 'exceeded';
+}
+
 export const buildWeeklyHistogram = (
-  values: { date: string; value: number }[]
-): { weekStart: string; count: number; sum: number; mean: number; min: number; max: number }[] => {
+  values: { date: string; value: number }[],
+  goals?: WeeklyHistogramGoal[]
+): WeeklyHistogramEntry[] => {
   if (values.length === 0) return [];
   const groups: Record<string, number[]> = {};
   for (const v of values) {
@@ -855,17 +874,28 @@ export const buildWeeklyHistogram = (
     if (!groups[key]) groups[key] = [];
     if (Number.isFinite(v.value)) groups[key].push(v.value);
   }
-  const result: { weekStart: string; count: number; sum: number; mean: number; min: number; max: number }[] = [];
+  const result: WeeklyHistogramEntry[] = [];
   for (const k of Object.keys(groups).sort()) {
     const arr = groups[k];
     if (arr.length === 0) continue;
+    const mean = arr.reduce((s, v) => s + v, 0) / arr.length;
+    const goal = goals?.find(g => g.key === 'weight' || g.key === 'sleep' || g.key === 'bp' || g.key === 'cardio');
+    let goalStatus: WeeklyHistogramEntry['goalStatus'] = undefined;
+    if (goal && Number.isFinite(mean)) {
+      if (mean >= goal.target * 1.1) goalStatus = 'exceeded';
+      else if (mean >= goal.target) goalStatus = 'met';
+      else if (mean >= goal.target * 0.8) goalStatus = 'below';
+      else goalStatus = 'below';
+    }
     result.push({
       weekStart: k,
       count: arr.length,
       sum: arr.reduce((s, v) => s + v, 0),
-      mean: arr.reduce((s, v) => s + v, 0) / arr.length,
+      mean,
       min: Math.min(...arr),
       max: Math.max(...arr),
+      goal,
+      goalStatus,
     });
   }
   return result;

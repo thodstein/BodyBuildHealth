@@ -16,6 +16,7 @@ import {
   buildWeeklyHistogram,
   crossCorrelation,
   type DiaryKey,
+  type WeeklyHistogramGoal,
 } from './diary-helpers';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
 import { BPDiary } from './diaries/BPDiary/BPDiary';
@@ -1561,7 +1562,8 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
               { label: 'Сон↔Вес', r: crossCorrelation(sleepPoints as any, weightPoints as any) },
               { label: 'Сон↔Боль', r: crossCorrelation(sleepPoints as any, painPoints as any) },
             ].filter(c => c.r && c.r.n >= 3) as { label: string; r: { r: number; n: number; strength: string } }[];
-            const hist = buildWeeklyHistogram(sleepPoints);
+            const sleepGoal: WeeklyHistogramGoal = { key: 'sleep', target: 8, label: 'Сон ≥ 8ч', color: '#a78bfa' };
+            const hist = buildWeeklyHistogram(sleepPoints, [sleepGoal]);
             const hasData = sleepPoints.length + bpPoints.length + weightPoints.length > 0;
             if (!hasData) return null;
             return (
@@ -1572,8 +1574,15 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                   return (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'flex-end' }}>
                       {hist.slice(-6).map(h => (
-                        <div key={h.weekStart} title={`${h.weekStart}: ${h.mean.toFixed(1)} ч, ${h.count}д`} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 56 }}>
-                          <div style={{ height: `${Math.max(8, (h.mean / maxMean) * 28)}px`, background: 'linear-gradient(180deg, #a78bfa, #7c3aed)', borderRadius: 4, marginBottom: 4, opacity: 0.9, transition: 'height 0.3s' }} />
+                        <div key={h.weekStart} title={`${h.weekStart}: ${h.mean.toFixed(1)} ч, ${h.count}д${h.goal ? ` (цель ${h.goal.target}ч)` : ''}`} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 56 }}>
+                          <div style={{ 
+                            height: `${Math.max(8, (h.mean / maxMean) * 28)}px`, 
+                            background: h.goalStatus === 'met' ? 'linear-gradient(180deg, #22c55e, #16a34a)' : 
+                                      h.goalStatus === 'exceeded' ? 'linear-gradient(180deg, #4ade80, #22c55e)' :
+                                      h.goalStatus === 'below' ? 'linear-gradient(180deg, #f59e0b, #d97706)' :
+                                      'linear-gradient(180deg, #a78bfa, #7c3aed)', 
+                            borderRadius: 4, marginBottom: 4, opacity: 0.9, transition: 'height 0.3s' }} />
+                          {h.goal && <div style={{ fontSize: 8, color: h.goalStatus === 'met' || h.goalStatus === 'exceeded' ? '#22c55e' : '#f59e0b', marginBottom: 2, fontWeight: 700 }}>🎯 {h.goal.target}ч</div>}
                           <div style={{ color: colors.textMuted }}>{h.weekStart.slice(5)}</div>
                           <div style={{ fontWeight: 700, color: '#a78bfa' }}>{h.mean.toFixed(1)}</div>
                           <div style={{ color: colors.textMuted }}>{h.count}д</div>
