@@ -22,6 +22,8 @@ import {
   TodayChip,
   RepeatLastChip,
   daysSince,
+  btnPrimary,
+  btnGhost,
 } from './diary-modals';
 
 /* ── Модалка веса и замеров ── */
@@ -384,6 +386,147 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
           )}
         </div>
       </SectionCard>
+    </DiaryModalShell>
+  );
+};
+
+/* ── Быстрый ввод ТОЛЬКО веса (упрощённая модалка) ── */
+export const AddWeightModal: React.FC<{ open: boolean; onClose: () => void; onSave: (e: any) => void }> = ({
+  open,
+  onClose,
+  onSave,
+}) => {
+  const initial = (): WeightDraft => {
+    const last = lastEntryOf(getWeightLog() as { date?: string }[]);
+    let fallbackWeight = '80';
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      if (raw) {
+        const profile = JSON.parse(raw);
+        const pw = Number(profile?.personal?.weight);
+        if (Number.isFinite(pw) && pw > 0) fallbackWeight = String(pw);
+      }
+    } catch { /* ignore */ }
+    return {
+      date: todayIso(),
+      values: { weight: last && typeof (last as Record<string, unknown>).weight === 'number' ? String((last as Record<string, unknown>).weight) : fallbackWeight },
+      notes: '',
+      photos: [],
+      timeOfDay: 'morning',
+    };
+  };
+  const [draft, setDraft, resetDraft] = useDiaryDraft<WeightDraft>('he_draft_weight_quick', initial);
+
+  const prev = useMemo(() => {
+    try {
+      const log = getWeightLog();
+      if (!log.length) return null;
+      const sorted = [...log].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      return sorted[0] as unknown as Record<string, unknown> | null;
+    } catch {
+      return null;
+    }
+  }, [open]);
+
+  const weightNum = Number(draft.values.weight);
+  const prevWeight = typeof prev?.weight === 'number' ? prev.weight : null;
+  const weightDelta = Number.isFinite(weightNum) && prevWeight !== null ? weightNum - prevWeight : null;
+  const weightInvalid = draft.values.weight === '' || !Number.isFinite(weightNum) || weightNum <= 0;
+
+  const handleSave = () => {
+    if (weightInvalid) return;
+    const entry = { date: draft.date, weight: weightNum, notes: draft.notes, timeOfDay: draft.timeOfDay };
+    onSave(entry);
+    resetDraft();
+    onClose();
+  };
+
+  const spark = useMemo(
+    () => getWeightLog().slice(-7).map((e) => (typeof e.weight === 'number' ? e.weight : null)),
+    [open],
+  );
+
+  const lastDate = prev?.date ? String(prev.date) : undefined;
+  const existing = useMemo(
+    () => findByDate(getWeightLog() as { date?: string }[], draft.date),
+    [open, draft.date],
+  );
+
+  return (
+    <DiaryModalShell
+      open={open}
+      onClose={onClose}
+      title="Быстрый ввод веса"
+      icon="⚖️"
+      color="#22c55e"
+      subtitle={existing ? `Запись за ${existing.date} будет заменена` : 'Только вес, дата, время, заметка'}
+      width={400}
+      onSubmit={handleSave}
+      spark={{ data: spark, color: '#22c55e' }}
+      stale={lastDate ? { days: daysSince(lastDate) ?? 0 } : null}
+      fill={{ current: weightInvalid ? 0 : 1, total: 1 }}
+    >
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, alignItems: 'stretch' }}>
+        <div style={{ flex: 1 }}>
+          <TextField label="Дата" value={draft.date} onChange={(v) => setDraft((p) => ({ ...p, date: v }))} type="date" />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <span style={{ ...fieldLabel, marginBottom: 4 }}>Время</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['morning', 'evening'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setDraft((p) => ({ ...p, timeOfDay: t }))}
+                aria-pressed={draft.timeOfDay === t}
+                style={{
+                  border: `1px solid ${draft.timeOfDay === t ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
+                  background: draft.timeOfDay === t ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
+                  color: draft.timeOfDay === t ? '#4ade80' : '#d4d4d8',
+                  borderRadius: 10,
+                  padding: '7px 9px',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  lineHeight: 1,
+                  fontWeight: 700,
+                }}
+              >
+                {t === 'morning' ? '🌅 Утро' : '🌙 Вечер'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <TextField
+        label="Вес (кг)"
+        value={draft.values.weight}
+        onChange={(v) => setDraft((p) => ({ ...p, values: { ...p.values, weight: v } }))}
+        type="number"
+        step={0.1}
+        min={1}
+        placeholder="80"
+      />
+
+      {weightInvalid && <FormBanner tone="error">Вес обязателен — введите число больше 0</FormBanner>}
+
+      {weightDelta !== null && (
+        <div style={{ marginTop: 8, fontSize: 12, color: weightDelta > 0 ? '#ef4444' : weightDelta < 0 ? '#22c55e' : '#d4d4d8' }}>
+          {weightDelta > 0 ? '+' : ''}{weightDelta.toFixed(1)} кг от прошлого замера
+        </div>
+      )}
+
+      <TextField
+        label="Заметка"
+        value={draft.notes}
+        onChange={(v) => setDraft((p) => ({ ...p, notes: v }))}
+        placeholder="Комментарий..."
+      />
+
+      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+        <button type="submit" style={{ ...btnPrimary('#22c55e'), flex: 1 }}>Сохранить</button>
+        <button type="button" onClick={onClose} style={{ ...btnGhost, flex: 1 }}>Отмена</button>
+      </div>
     </DiaryModalShell>
   );
 };

@@ -46,6 +46,7 @@ import {
   type ActiveRoutine,
   type UndoAction,
 } from './diary-modals';
+import { AddWeightModal } from './diary-modals';
 import {
   getUnifiedHealthEntries,
   saveUnifiedHealthEntries,
@@ -93,7 +94,18 @@ interface InjectionEntry {
   date: string;
   substance: string;
   dose: string;
-  site: string;
+  zone: string;
+  side: 'left' | 'right';
+  volumeMl: number;
+  needleGauge: string;
+  technique: string;
+  painLevel: number;
+  pipLevel: number;
+  swelling: number;
+  redness: boolean;
+  lump: boolean;
+  bruise: boolean;
+  fever?: boolean;
   notes?: string;
 }
 const SYMPTOMS_DIARY_KEY = 'he_symptoms_diary';
@@ -676,6 +688,7 @@ export const ProfileDiariesTab: React.FC<{
   const [addInjectionOpen, setAddInjectionOpen] = useState(false);
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
+  const [addWeightOpen, setAddWeightOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [fabOpen, setFabOpen] = useState(false);
   const [undoQueue, setUndoQueue] = useState<UndoAction[]>([]);
@@ -999,7 +1012,7 @@ ${table('❤️ Давление (с ЧСС)', ['Дата', 'Систола', '�
 ${table('⚖️ Вес', ['Дата', 'Вес', 'Жир %', 'Мышцы', 'Талия', 'Заметки'],
   sortedDesc(weights).map((e) => [e.date, String(e.weight), e.bodyFat !== undefined ? String(e.bodyFat) : '', e.muscleMass !== undefined ? String(e.muscleMass) : '', e.waistCm !== undefined ? String(e.waistCm) : '', e.notes || '']))}
 ${table('💉 Инъекции', ['Дата', 'Препарат', 'Доза', 'Зона', 'Сторона', 'Боль', 'PIP', 'Заметки'],
-  sortedDesc(injectionEntries).map((e) => [e.date, e.substance, e.dose, e.site || '', e.notes || '', '', '', e.notes || '']))}
+  sortedDesc(injectionEntries).map((e) => [e.date, e.substance, e.dose, e.zone || '', e.side || '', String(e.painLevel ?? ''), String(e.pipLevel ?? ''), e.notes || '']))}
 ${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', 'Нейро', 'Акне', 'Гемат', 'Заметки'],
   sortedDesc(healthEntries).map((e) => [
     e.date,
@@ -1088,8 +1101,10 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
           try { localStorage.setItem('he_sleep_goals', JSON.stringify(diaries['he_sleep_goals'])); } catch {}
         }
         if (data.goals && typeof data.goals === 'object') {
-          setGoals({ ...goals, ...data.goals });
-          localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, ...data.goals }));
+          const merge = window.confirm('Объединить цели с импортированными?\n• OK = объединить (сохранить свои, добавить недостающие)\n• Отмена = полностью заменить на импортированные');
+          const newGoals = merge ? { ...goals, ...data.goals } : data.goals;
+          setGoals(newGoals);
+          localStorage.setItem(GOALS_KEY, JSON.stringify(newGoals));
         }
         if ((window as any).showToast) (window as any).showToast('📥 Дневники импортированы');
       } catch (e) {
@@ -1868,6 +1883,31 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
               if (routine?.step === 'weight') advanceRoutine();
             }}
           />
+          <AddWeightModal
+            open={addWeightOpen}
+            onClose={() => setAddWeightOpen(false)}
+            onSave={(e) => {
+              const prev = getWeightLog() || [];
+              const replaced = prev.some((x) => x.date === e.date);
+              const updated = [...prev.filter((x) => x.date !== e.date), e].sort((a, b) =>
+                a.date.localeCompare(b.date),
+              );
+              saveWeightLog(updated);
+              setWeights(updated);
+              pushUndo(
+                routine?.step === 'weight'
+                  ? routineUndoLabel('вес записан')
+                  : replaced
+                    ? 'Запись веса обновлена'
+                    : 'Запись веса добавлена',
+                () => {
+                  saveWeightLog(prev);
+                  setWeights(prev);
+                },
+              );
+              if (routine?.step === 'weight') advanceRoutine();
+            }}
+          />
           <AddInjectionModal
             open={addInjectionOpen}
             onClose={() => setAddInjectionOpen(false)}
@@ -1976,6 +2016,13 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
           100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
         }
       `}</style>
+      {fabOpen && !activeDiary && (
+        <div
+          onClick={() => setFabOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+          aria-hidden="true"
+        />
+      )}
       {!activeDiary && (
         <div style={{ position: 'fixed', right: 16, bottom: 88, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           {fabOpen && (
@@ -1983,7 +2030,7 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
               {([
                 ['💤 Сон', () => { setFabOpen(false); setAddSleepOpen(true); }],
                 ['❤️ Давление', () => { setFabOpen(false); setAddBPOpen(true); }],
-                ['⚖️ Вес', () => { setFabOpen(false); setAddBodyMeasurementsOpen(true); }],
+                ['⚖️ Вес', () => { setFabOpen(false); setAddWeightOpen(true); }],
                 ['💉 Инъекция', () => { setFabOpen(false); setAddInjectionOpen(true); }],
                 ['🩺 Здоровье', () => { setFabOpen(false); setAddHealthOpen(true); }],
                 ['❤️ Кардио', () => { setFabOpen(false); setActiveDiary('cardio'); }],

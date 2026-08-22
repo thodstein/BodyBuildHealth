@@ -35,7 +35,7 @@ export const pushUndoAction = (queue: UndoAction[], label: string, undo: () => v
 export const topUndo = (queue: UndoAction[]): UndoAction | null => (queue.length ? queue[queue.length - 1] : null);
 export const dismissTopUndo = (queue: UndoAction[]): UndoAction[] => queue.slice(0, -1);
 
-/** Следующий шаг утреннего рутинга: сон → давление → вес → конец. */
+/** @deprecated Используй routineNextStep(kind, step) — v2 рутинг с evening/health шагами. */
 export const nextRoutineStep = (r: 'sleep' | 'bp' | 'weight'): 'sleep' | 'bp' | 'weight' | null =>
   r === 'sleep' ? 'bp' : r === 'bp' ? 'weight' : null;
 
@@ -1132,6 +1132,6 @@ export const RepeatLastChip: React.FC<{ label: string; onClick: () => void }> = 
 
 export { AddSleepModal } from './sleep-diary-modal';
 export { AddBPModal, bpCategory } from './bp-diary-modal';
-export { AddBodyMeasurementsModal } from './body-measurements-modal';
+export { AddBodyMeasurementsModal, AddWeightModal } from './body-measurements-modal';
 export { AddInjectionModal } from './injection-diary-modal';
 export { AddHealthModal } from './health-diary-modal';
