@@ -392,16 +392,17 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </div>
         );
       })()}
-      {/* ⚡ Пустые тренировки — 1-клик заполнение качественными упражнениями */}
+      {/* ⚡ Пустые тренировки — 1-клик заполнение качественными упражнениями (ловит и пустые имена) */}
       {(() => {
-        const hasEmpty = body.weeks.some(w => w.sessions.some(s => (s.blocks ?? []).length === 0));
+        const isEmptySession = (s: UserSession) => !(s.blocks ?? []).some(b => b.exerciseName && b.exerciseName.trim());
+        const hasEmpty = body.weeks.some(w => w.sessions.some(isEmptySession));
         if (!hasEmpty) return null;
         const fillEmpty = () => {
           const prof = loadTrainingProfile();
           const updated = body.weeks.map(w => ({
             ...w,
             sessions: w.sessions.map(s => {
-              if ((s.blocks ?? []).length > 0) return s;
+              if (!isEmptySession(s)) return s;
               const focusMuscles = (s.focus || '').toLowerCase().split(/[,/+&]/).map(x => x.trim()).filter(Boolean);
               // маппим фокус-строку к ключам GROUP_RU
               const focusToKey = (txt: string): string | null => {
@@ -716,7 +717,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
               style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44, marginBottom: 6 }}
             />
           )}
-          <BlockList blocks={s.blocks} phase={phase} onChange={(blocks) => updateSession(si, { blocks })} />
+          <BlockList blocks={s.blocks} phase={phase} sessionFocus={s.focus} sessionName={s.name} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
         );
       })}
@@ -734,9 +735,32 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
   );
 };
 
-const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, onChange }) => {
+const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sessionFocus?: string; sessionName?: string; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, sessionFocus, sessionName, onChange }) => {
   const { confirm } = useConfirmDialog();
-  const addBlock = () => onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
+  const inferMuscleFromSession = (focus?: string, name?: string): string => {
+    const txt = (focus || name || '').toLowerCase();
+    if (txt.includes('грудь') || txt.includes('груд')) return 'chest';
+    if (txt.includes('спин')) return 'back';
+    if (txt.includes('ног') || txt.includes('бедр') || txt.includes('квадр')) return 'legs';
+    if (txt.includes('плеч') || txt.includes('дельт')) return 'shoulders';
+    if (txt.includes('рук') || txt.includes('биц') || txt.includes('триц')) return 'arms';
+    if (txt.includes('кор') || txt.includes('пресс')) return 'core';
+    return '';
+  };
+  const addBlock = () => {
+    const inferred = inferMuscleFromSession(sessionFocus, sessionName);
+    if (inferred) {
+      try {
+        const prof = loadTrainingProfile();
+        const tmpl = muscleAwareSets(inferred, prof.level || 'intermediate');
+        const w = (prof.workMax ?? {} as any)[inferred] ?? 40;
+        const sets = makeSetsFromTemplate(tmpl as any, w);
+        onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: inferred, role: 'accessory', sets: sets.length ? sets : [{ reps: 10, rir: 2, weight: w, restSec: 90 } as any] }]);
+        return;
+      } catch {}
+    }
+    onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
+  };
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
   // P0-3: быстрый старт — группа мышц → упражнения из движка подбора
   const [quickGroup, setQuickGroup] = useState<string | null>(null);
@@ -1594,13 +1618,14 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
           ))}
         </div>
         {(() => {
-          const hasEmpty = (body.customWeeks ?? []).some(w => w.days.some(d => (d.exercises ?? []).length === 0));
+          const isEmptyDay = (d: PLDay) => !(d.exercises ?? []).some(e => e.name && e.name.trim());
+          const hasEmpty = (body.customWeeks ?? []).some(w => w.days.some(isEmptyDay));
           if (!hasEmpty) return null;
           const fillEmptyPL = () => {
             const weeks = (bodyRef.current.customWeeks ?? []).map(w => ({
               ...w,
               days: w.days.map(d => {
-                if ((d.exercises ?? []).length > 0) return d;
+                if (!isEmptyDay(d)) return d;
                 const name = (d.name || '').toLowerCase();
                 let tpl = PL_DAY_TEMPLATES[0];
                 if (name.includes('жим')) tpl = PL_DAY_TEMPLATES[1];

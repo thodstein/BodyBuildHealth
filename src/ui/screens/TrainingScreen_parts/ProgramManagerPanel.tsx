@@ -217,7 +217,14 @@ export const ProgramManagerPanel: React.FC = () => {
     try { return localStorage.getItem('he_manual_onboarding_done') !== '1'; } catch { return true; }
   });
   const [quickTplCollapsed, setQuickTplCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('he_manual_quick_collapsed') === '1'; } catch { return false; }
+    try {
+      const v = localStorage.getItem('he_manual_quick_collapsed');
+      if (v === '1') return true;
+      if (v === '0') return false;
+      // По умолчанию свёрнут в списке с программами, развёрнут в пустом
+      const hasStoredPrograms = (() => { try { const raw = localStorage.getItem('he_user_programs'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) && arr.length > 0; } catch { return false; } })();
+      return hasStoredPrograms;
+    } catch { return false; }
   });
   useEffect(() => { try { localStorage.setItem('he_manual_quick_collapsed', quickTplCollapsed ? '1' : '0'); } catch {} }, [quickTplCollapsed]);
 

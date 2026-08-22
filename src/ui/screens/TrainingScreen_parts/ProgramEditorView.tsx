@@ -1634,22 +1634,53 @@ return (
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ — редактируйте ПЛ и ББ части независимо. Баланс дней: {program.hybrid.plRef?.sessionIndices?.length ?? 2} ПЛ + {Math.max(1, program.meta.daysPerWeek - (program.hybrid.plRef?.sessionIndices?.length ?? 2))} ББ = {program.meta.daysPerWeek}д/нед × {program.meta.weeks} нед.</div>
           </div>
-          {(program.hybrid.bbWeeks?.length ?? 0) === 0 && (
+          {(() => {
+            const isEmptyHybridBb = (bbw: any[]) => bbw.length===0 || bbw.some(w=> (w.sessions??[]).length===0 || w.sessions.some((s:any)=> !(s.blocks??[]).some((b:any)=> b.exerciseName && b.exerciseName.trim())));
+            if (!isEmptyHybridBb(program.hybrid.bbWeeks ?? [])) return null;
+            const hasNoWeeks = (program.hybrid.bbWeeks?.length ?? 0) === 0;
+            return (
             <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>⚡ Пустая ББ-часть — 1 клик</span>
-              <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Добавит ББ-недели по сплиту (с учётом дней/нед и уровня)</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{hasNoWeeks ? '⚡ Пустая ББ-часть — 1 клик' : '⚡ Пустые ББ-дни — 1 клик'}</span>
+              <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>{hasNoWeeks ? 'Добавит ББ-недели по сплиту (с учётом дней/нед и уровня)' : 'Заполнит пустые ББ-дни базовыми упражнениями'}</span>
               <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={() => {
-                const bbDays = Math.max(1, (program.meta.daysPerWeek ?? 4) - (program.hybrid!.plRef?.sessionIndices?.length ?? 2));
-                const weeks = Math.max(1, program.meta.weeks ?? 4);
-                const pattern = SPLIT_PATTERNS.find(pp => pp.sessionsPerRotation === bbDays && pp.schedule.some(d => d.kind === 'тренировка')) ?? [...SPLIT_PATTERNS].sort((a,b)=>Math.abs(a.sessionsPerRotation-bbDays)-Math.abs(b.sessionsPerRotation-bbDays))[0] ?? SPLIT_PATTERNS[0];
-                if (!pattern) { showToast('⚠ Сплит не найден'); return; }
-                const sessions = pattern.schedule.filter(d=>d.kind==='тренировка').map((d,si)=>({ id: newId('ses'), name: 'День '+(si+1), dayOfWeek: si as any, focus: (d as any).sessionTag ?? '', blocks: [] as any }));
-                const bbWeeks = Array.from({ length: weeks }, (_,wi)=>({ week: wi+1, phase: 'accumulation' as const, deload: false, sessions: sessions.map(s=>({ ...s, id: newId('ses') })) }));
-                update({ hybrid: { ...program.hybrid!, bbWeeks } });
-                showToast('⚡ ББ-часть создана: ' + weeks + ' нед × ' + bbDays + 'д — заполните упражнения ниже');
-              }}>⚡ Заполнить ББ-часть</button>
+                if (hasNoWeeks) {
+                  const bbDays = Math.max(1, (program.meta.daysPerWeek ?? 4) - (program.hybrid!.plRef?.sessionIndices?.length ?? 2));
+                  const weeks = Math.max(1, program.meta.weeks ?? 4);
+                  const pattern = SPLIT_PATTERNS.find(pp => pp.sessionsPerRotation === bbDays && pp.schedule.some(d => d.kind === 'тренировка')) ?? [...SPLIT_PATTERNS].sort((a,b)=>Math.abs(a.sessionsPerRotation-bbDays)-Math.abs(b.sessionsPerRotation-bbDays))[0] ?? SPLIT_PATTERNS[0];
+                  if (!pattern) { showToast('⚠ Сплит не найден'); return; }
+                  const sessions = pattern.schedule.filter(d=>d.kind==='тренировка').map((d,si)=>({ id: newId('ses'), name: 'День '+(si+1), dayOfWeek: si as any, focus: (d as any).sessionTag ?? '', blocks: [] as any }));
+                  const bbWeeks = Array.from({ length: weeks }, (_,wi)=>({ week: wi+1, phase: 'accumulation' as const, deload: false, sessions: sessions.map(s=>({ ...s, id: newId('ses') })) }));
+                  update({ hybrid: { ...program.hybrid!, bbWeeks } });
+                  showToast('⚡ ББ-часть создана: ' + weeks + ' нед × ' + bbDays + 'д — заполните упражнения ниже');
+                } else {
+                  const prof = loadTrainingProfile();
+                  const updated = (program.hybrid!.bbWeeks ?? []).map(w=> ({
+                    ...w,
+                    sessions: w.sessions.map(s=> {
+                      if ((s.blocks??[]).some((b:any)=> b.exerciseName && b.exerciseName.trim())) return s;
+                      const focusTxt = (s.focus || s.name || '').toLowerCase();
+                      let ms: string[] = [];
+                      if (focusTxt.includes('грудь')) ms = ['chest','triceps'];
+                      else if (focusTxt.includes('спин')) ms = ['back','biceps'];
+                      else if (focusTxt.includes('ног')) ms = ['legs','shoulders'];
+                      else if (focusTxt.includes('плеч')) ms = ['shoulders','arms'];
+                      else ms = ['chest','back'];
+                      const blocks = ms.slice(0,2).map(m=> {
+                        const exs = suggestExercisesForGroup(m, program.meta.level, 1, (prof.equipment ?? []) as any, [], [], (prof as any).avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as any, (prof.excludedExercises ?? []) as any);
+                        const wgt = (prof.workMax ?? {} as any)[m] ?? 40;
+                        const sets = makeSetsFromTemplate(muscleAwareSets(m, program.meta.level) as any, wgt);
+                        return { id: newId('blk'), type: (exs[0]?.type === 'compound' ? 'compound' : 'accessory') as const, exerciseName: exs[0]?.name ?? '', muscle: m, role: (exs[0]?.type === 'compound' ? 'primary' : 'accessory') as const, sets: sets.length ? sets : [{ reps: 10, rir: 2 } as any] };
+                      });
+                      return { ...s, blocks };
+                    }),
+                  }));
+                  update({ hybrid: { ...program.hybrid!, bbWeeks: updated as any } });
+                  showToast('⚡ Пустые ББ-дни заполнены — проверьте упражнения');
+                }
+              }}>{hasNoWeeks ? '⚡ Заполнить ББ-часть' : '⚡ Заполнить пустые дни'}</button>
             </div>
-          )}
+            );
+          })()}
           <HybridPlanPanel program={program} onChange={(hybrid) => update({ hybrid })} onSave={onSave} />
         </>
       )}
