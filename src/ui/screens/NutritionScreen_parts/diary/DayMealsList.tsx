@@ -25,10 +25,16 @@ export const DayMealsList: React.FC<DayMealsListProps> = ({
 
   if (!hasData) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px 20px', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>🍽</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 8, fontWeight: 500 }}>Нет записей на этот день</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Переключитесь на «➕ Добавить», чтобы внести продукты</div>
+      <div style={{ textAlign: 'center', padding: '32px 20px 28px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(24,24,27,0.9))', border: '1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
+        <div style={{ width:56, height:56, borderRadius:16, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.15)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 12px', fontSize:28 }}>🍽</div>
+        <div style={{ fontSize: 13, color: '#fff', marginBottom: 6, fontWeight: 700 }}>Пока пусто — начните день</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom:14, lineHeight:1.5 }}>Добавьте завтрак, обед или перекус — поиск, штрихкод, фото чека или план</div>
+        <div style={{ display:'flex', gap:6, justifyContent:'center', flexWrap:'wrap' }}>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>🔍 Поиск</span>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>📱 Штрихкод</span>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>📸 Фото</span>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:8, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>📥 Из плана</span>
+        </div>
       </div>
     );
   }

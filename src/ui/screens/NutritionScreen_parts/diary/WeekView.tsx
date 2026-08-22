@@ -58,50 +58,56 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Weekly summary */}
-      <div style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10 }}>📊 Итоги недели</div>
+      {/* Weekly summary — визуально как MacroSummary */}
+      <div style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.2)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:8, height:8, borderRadius:4, background:'#00e68a', boxShadow:'0 0 8px #00e68a66' }} />📊 Итоги недели</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {[
-            { l: 'Ккал/день', v: avgKcal, t: targets.kcal, c: '#00e68a' },
-            { l: 'Белки/день', v: avgP, t: targets.protein, c: '#3b82f6', u: 'г' },
-            { l: 'Жиры/день', v: avgF, t: targets.fats, c: '#f59e0b', u: 'г' },
-            { l: 'Угл./день', v: avgC, t: targets.carbs, c: '#f97316', u: 'г' },
+            { l: 'Ккал/день', v: avgKcal, t: targets.kcal, c: '#00e68a', bg:'rgba(0,230,138,0.08)' },
+            { l: 'Белки/день', v: avgP, t: targets.protein, c: '#3b82f6', bg:'rgba(59,130,246,0.08)', u: 'г' },
+            { l: 'Жиры/день', v: avgF, t: targets.fats, c: '#f59e0b', bg:'rgba(245,158,11,0.08)', u: 'г' },
+            { l: 'Угл./день', v: avgC, t: targets.carbs, c: '#f97316', bg:'rgba(249,115,22,0.08)', u: 'г' },
           ].map(m => {
             const pct = m.t > 0 ? Math.min(100, Math.round((m.v || 0) / m.t * 100)) : 0;
+            const isLow = pct < 70;
             return (
-              <div key={m.l} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: 'rgba(255,255,255,0.03)' }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: m.c, lineHeight: 1 }}>
-                  {m.v}{m.u || ''}
-                </div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{m.l}</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>{pct}% от цели</div>
+              <div key={m.l} style={{ textAlign: 'center', padding: '10px 4px', borderRadius: 12, background: m.bg, border:`1px solid ${isLow ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.06)'}`, boxShadow:'0 2px 8px rgba(0,0,0,0.12)' }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: m.c, lineHeight: 1 }}>{m.v}{m.u || ''}</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginTop: 2, fontWeight:600 }}>{m.l}</div>
+                <div style={{ fontSize: 8, color: pct>=90 ? '#22c55e' : isLow ? '#f59e0b' : 'rgba(255,255,255,0.35)', fontWeight:600 }}>{pct}% от цели</div>
+                <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', marginTop:4, overflow:'hidden' }}><div style={{ height:'100%', width:`${Math.min(100,pct)}%`, background:m.c, transition:'width 0.4s' }} /></div>
               </div>
             );
           })}
         </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)' }}>
+        <div style={{ display: 'flex', gap: 12, marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)' }}>
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>📅 {weeklyTotals.days}/7 дней с записями</span>
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>🍽 {weeklyTotals.meals} приёмов</span>
-          <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 600 }}>∑ {Math.round(weeklyTotals.kcal)} ккал</span>
+          <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 700, marginLeft:'auto' }}>∑ {Math.round(weeklyTotals.kcal)} ккал · ср {avgKcal}</span>
         </div>
       </div>
 
       {/* Day-by-day breakdown */}
-      <div style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10 }}>📅 По дням</div>
+      <div style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:8, height:8, borderRadius:4, background:'#a78bfa' }} />📅 По дням</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {daysData.map(d => {
             const isToday = d.date === today;
+            const isEmpty = d.meals===0;
             const pct = targets.kcal > 0 ? Math.min(100, Math.round(d.kcal / targets.kcal * 100)) : 0;
             const isOver = pct > 100;
             
             return (
               <div key={d.date} style={{ 
                 padding: '10px 12px', borderRadius: 12, 
-                background: isToday ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isToday ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)'}`,
-              }}>
+                background: isToday ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.02))' : isEmpty ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isToday ? 'rgba(0,230,138,0.2)' : isEmpty ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)'}`,
+                borderLeft: isToday ? '3px solid #00e68a' : isEmpty ? '3px solid transparent' : '3px solid rgba(255,255,255,0.06)',
+                opacity: isEmpty ? 0.65 : 1,
+                transition:'transform 0.12s, background 0.12s',
+              }}
+                onMouseEnter={e=>{ if(!isEmpty) e.currentTarget.style.transform='translateX(2px)'; }}
+                onMouseLeave={e=>e.currentTarget.style.transform='translateX(0)'}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: isToday ? '#00e68a' : '#fff' }}>
