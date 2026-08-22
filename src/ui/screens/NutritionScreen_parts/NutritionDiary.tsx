@@ -513,20 +513,20 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {/* Week day selector */}
       <WeekDaySelector weekDays={weekDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} diaryData={diaryData} />
 
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 3, padding: '2px 0' }}>
+      {/* Tab bar — улучшена: бейджи + скруглённый контейнер */}
+      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)' }}>
         {([
-          { key: 'add', label: '➕ Добавить', icon: true },
-          { key: 'day', label: '📋 День', icon: true },
-          { key: 'week', label: '📊 Неделя', icon: true },
+          { key: 'add', label: '➕ Добавить', badge: parsedItems.length>0 ? parsedItems.length : null },
+          { key: 'day', label: '📋 День', badge: Object.values(dayMeals).flat().length || null },
+          { key: 'week', label: '📊 Неделя', badge: Object.keys(diaryData).length || null },
         ] as const).map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} aria-label={t.label} style={{
-            flex: 1, padding: '10px', borderRadius: 12, cursor: 'pointer', fontSize: 11, fontWeight: tab === t.key ? 800 : 500,
-            border: tab === t.key ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-            background: tab === t.key ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-            color: tab === t.key ? '#000' : 'rgba(255,255,255,0.6)', minHeight: 44, transition: 'all 0.15s',
+          <button key={t.key} onClick={() => setTab(t.key as any)} aria-label={t.label} style={{
+            flex: 1, padding: '10px 6px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: tab === t.key ? 800 : 600, position:'relative',
+            border: tab === t.key ? 'none' : '1px solid transparent',
+            background: tab === t.key ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'transparent',
+            color: tab === t.key ? '#000' : 'rgba(255,255,255,0.6)', minHeight: 40, transition: 'all 0.15s', boxShadow: tab === t.key ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
           }}>
-            {t.label}
+            {t.label}{t.badge ? <span style={{ marginLeft:4, fontSize:9, background: tab===t.key ? 'rgba(0,0,0,0.15)' : 'rgba(0,230,138,0.15)', color: tab===t.key ? '#000' : '#00e68a', padding:'1px 5px', borderRadius:6, fontWeight:700 }}>{t.badge}</span> : null}
           </button>
         ))}
       </div>
