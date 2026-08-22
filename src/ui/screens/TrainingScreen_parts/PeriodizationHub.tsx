@@ -27,8 +27,13 @@ export const PeriodizationHub: React.FC = () => {
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔄 Периодизация</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>Дизайнер макроцикла, прогрессия мезо, трекер, микроциклы, делод, пик-протокол.</div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔄 Периодизация — единый хаб</div>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
+        Без дублей: дизайнер макроцикла + прогрессия мезо + трекер + микроциклы + делод + пик-протокол — в одном месте. Ранее делод/пик дублировались в `TaperPlannerTab` — теперь единый расчёт.
+      </div>
+      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
+        <b style={{ color: '#fff' }}>Как читать:</b> «Дизайнер» — блоки макроцикла (недели/фаза/объём). «Прогрессия» — кривая объёма/интенсивности по неделям. «Трекер» — факт vs план. «Микроциклы» — недельный план. «Делод» — снижение объёма 40-60% для восстановления. «Пик» — taper 7-14д + суперкомпенсация. Все графики с пояснениями внутри.
+      </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {MODE_DEFS.map(({ m, label, icon }) => (
