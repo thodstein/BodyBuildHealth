@@ -2360,6 +2360,18 @@ export const BbAutoConstructor: React.FC = () => {
               )}
             </div>
           </div>
+          <div style={{ gridColumn:'1 / span 2', marginTop:2, padding:'6px 10px', borderRadius:10, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', fontSize:10, color:'rgba(255,255,255,0.6)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            {(() => {
+              try {
+                const srpe: any = (loadSRPESessions as any)();
+                if (!srpe || srpe.length < 2) return <><span>📊 ACWR: нет данных sRPE (нужно ≥2 сессии)</span><span style={{ color:'rgba(255,255,255,0.35)' }}>дефицит/восстановление — кнопкой Авто-делод</span></>;
+                const acwr = (acuteChronicRatio as any)((toDailyLoads as any)(srpe));
+                const ratio = acwr?.ratio ?? 1;
+                const zone = ratio > 1.5 ? '🔴 опасно' : ratio > 1.3 ? '🟡 осторожность' : ratio < 0.8 ? '🔵 недогруз' : '🟢 норма';
+                return <><span>📊 ACWR {ratio.toFixed(2)} — {zone}</span><span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>дефицит/восстановление — Авто-делод</span></>;
+              } catch { return <span>📊 ACWR: —</span>; }
+            })()}
+          </div>
           <PopupSelect label="🎯 Фокус тренировки" value={bbTrainingFocus} onChange={v => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[
            { id:'strength', label:'Сила: RIR 1-2' },
            { id:'hypertrophy', label:'Гипертрофия: RIR 2-3' },

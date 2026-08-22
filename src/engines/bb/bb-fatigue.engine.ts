@@ -29,17 +29,21 @@ function catalogType(exercise: BBExercise): string {
 
 export function estimateBBExerciseCost(exercise: BBExercise): BBExerciseCost {
   const name = String(exercise.name || '').toLowerCase();
-  const sets = Math.max(0, exercise.sets || exercise.workSets?.length || 0);
-  const reps = Math.max(1, exercise.workSets?.[0]?.reps || exercise.repsRange?.[0] || 8);
-  const rir = Math.max(0, Math.min(5, exercise.rir ?? 2));
+  const rawSets = exercise.sets ?? exercise.workSets?.length ?? 0;
+  const sets = Number.isFinite(Number(rawSets)) ? Math.max(0, Number(rawSets)) : 0;
+  const rawReps = exercise.workSets?.[0]?.reps ?? exercise.repsRange?.[0] ?? 8;
+  const reps = Number.isFinite(Number(rawReps)) ? Math.max(1, Number(rawReps)) : 8;
+  const rawRir = exercise.rir ?? 2;
+  const rir = Number.isFinite(Number(rawRir)) ? Math.max(0, Math.min(5, Number(rawRir))) : 2;
   const isolation = catalogType(exercise) === 'isolation' || /curl|сгибан|разгибан|raise|мах|fly|развод|шраг|pushdown|crunch|скручив/i.test(name);
   const axial = /присед|squat|станов|deadlift|румын|rdl|good.?morning|гудморнинг|тяга.*наклон/i.test(name) ? sets * 2 : 0;
   const systemicBase = isolation ? 1.0 : 2.0;
   const proximity = 1 + Math.max(0, 2 - rir) * 0.2;
   const local = sets * (isolation ? 1 : 1.25) * proximity;
   const systemic = sets * systemicBase * proximity;
-  const joint = sets * (isolation ? 0.8 : 1.2) * (/француз|behind|за голов|upright|подбород/i.test(name) ? 1.35 : 1);
-  const rest = exercise.restSeconds || (exercise.character === 'тяж' ? 180 : exercise.character === 'памп' ? 60 : 90);
+  const joint = sets * (isolation ? 0.8 : 1.2) * (/француз|behind neck|за голов|upright|подбород/i.test(name) ? 1.35 : 1);
+  const rawRest = exercise.restSeconds;
+  const rest = Number.isFinite(Number(rawRest)) ? Number(rawRest) : (exercise.character === 'тяж' ? 180 : exercise.character === 'памп' ? 60 : 90);
   const timeSeconds = sets * (Math.max(20, reps * 4) + rest) + 60;
   return { systemic, axial, joint, local, timeSeconds };
 }
