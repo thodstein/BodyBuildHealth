@@ -1253,6 +1253,29 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                     <div style={{ fontSize: 14, fontWeight: 700, color: colors.text, marginTop: 2 }}>
                       Заполнено {completion.filled} из {completion.total} дневников
                     </div>
+                    {/* Enhanced Today metrics */}
+                    <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', fontSize: 12 }}>
+                      {(() => {
+                        const bp = bpEntries.find(e => e.date === todayIso());
+                        if (bp) return <span style={{ color: bp.systolic >= 140 || bp.diastolic >= 90 ? '#ef4444' : '#22c55e' }}>❤️ {bp.systolic}/{bp.diastolic} · {bp.hr} уд/мин</span>;
+                        return <span style={{ color: colors.textMuted }}>❤️ АД: —</span>;
+                      })()}
+                      {(() => {
+                        const w = weights.find(e => e.date === todayIso());
+                        if (w) return <span>⚖️ {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
+                        return <span style={{ color: colors.textMuted }}>⚖️ Вес: —</span>;
+                      })()}
+                      {(() => {
+                        const s = sleepEntries.find(e => e.date === todayIso());
+                        if (s) return <span>💤 {s.hours}ч · {s.quality}/5</span>;
+                        return <span style={{ color: colors.textMuted }}>💤 Сон: —</span>;
+                      })()}
+                      {(() => {
+                        const c = cardioLog.filter(e => e.date === todayIso() && e.completed);
+                        if (c.length) return <span>❤️ Кардио: {c.length} ({c.reduce((a,b)=>a+b.durationMin,0)} мин)</span>;
+                        return <span style={{ color: colors.textMuted }}>❤️ Кардио: —</span>;
+                      })()}
+                    </div>
                     {completion.missing.length > 0 && (
                       <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>
                         Не заполнено: {completion.missing.map((k) => DIARY_META[k as DiaryKey].title).join(', ')}
