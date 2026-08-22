@@ -2024,8 +2024,27 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                 ['💉 Инъекция', () => { setFabOpen(false); setAddInjectionOpen(true); }],
                 ['🩺 Здоровье', () => { setFabOpen(false); setAddHealthOpen(true); }],
                 ['❤️ Кардио', () => { setFabOpen(false); setAddCardioOpen(true); }],
-              ] as const).map(([label, onClick]) => (
-                <button key={label} onClick={onClick} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: colors.text, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              ] as const).map(([label, onClick], index) => (
+                <button
+                  key={label}
+                  onClick={onClick}
+                  style={{
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: colors.text,
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    opacity: fabOpen ? 1 : 0,
+                    transform: fabOpen ? 'translateX(0)' : 'translateX(20px)',
+                    transition: `all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 30}ms`,
+                  }}
+                  title={label}
+                  aria-label={label}
+                >
                   {label}
                 </button>
               ))}
