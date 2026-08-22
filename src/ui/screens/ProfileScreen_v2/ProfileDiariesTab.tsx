@@ -661,6 +661,7 @@ export const ProfileDiariesTab: React.FC<{
   const [addHealthOpen, setAddHealthOpen] = useState(false);
   const [addBodyMeasurementsOpen, setAddBodyMeasurementsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [fabOpen, setFabOpen] = useState(false);
   const [undoQueue, setUndoQueue] = useState<UndoAction[]>([]);
 
   const ROUTINE_KEY = 'he_routine_active';
@@ -1958,6 +1959,49 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
           100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
         }
       `}</style>
+      {!activeDiary && (
+        <div style={{ position: 'fixed', right: 16, bottom: 88, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          {fabOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, borderRadius: 12, background: 'rgba(28,28,34,0.97)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)', minWidth: 160 }}>
+              {([
+                ['💤 Сон', () => { setFabOpen(false); setAddSleepOpen(true); }],
+                ['❤️ Давление', () => { setFabOpen(false); setAddBPOpen(true); }],
+                ['⚖️ Вес', () => { setFabOpen(false); setAddBodyMeasurementsOpen(true); }],
+                ['💉 Инъекция', () => { setFabOpen(false); setAddInjectionOpen(true); }],
+                ['🩺 Здоровье', () => { setFabOpen(false); setAddHealthOpen(true); }],
+                ['❤️ Кардио', () => { setFabOpen(false); setActiveDiary('cardio'); }],
+              ] as const).map(([label, onClick]) => (
+                <button key={label} onClick={onClick} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: colors.text, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setFabOpen(v => !v)}
+            aria-label={fabOpen ? 'Закрыть меню' : 'Быстро добавить запись'}
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius: 16,
+              background: fabOpen ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg, #00e68a, #00c478)',
+              border: fabOpen ? '1px solid rgba(255,255,255,0.2)' : 'none',
+              color: fabOpen ? colors.text : '#04120c',
+              fontSize: 28,
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 0.18s, background 0.18s',
+              transform: fabOpen ? 'rotate(45deg)' : 'none',
+            }}
+          >
+            +
+          </button>
+        </div>
+      )}
       <Snackbar action={topUndo(undoQueue)} onUndo={applyTopUndo} onDismiss={dismissTopUndoAction} />
     </div>
   );
