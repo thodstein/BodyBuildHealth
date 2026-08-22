@@ -232,10 +232,18 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
     const w2 = bodyRef.current.weeks.map((w, i) => i === wi ? { ...w, ...patch } : w);
     setWeeks(w2);
   };
-  const resizeWeek = (wi: number, count: number) => {
+  const resizeWeek = async (wi: number, count: number) => {
     const current = bodyRef.current;
     const week = current.weeks[wi];
     if (!week) return;
+    if (count < week.sessions.length) {
+      const willDelete = week.sessions.slice(count);
+      const hasContent = willDelete.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim()));
+      if (hasContent) {
+        const ok = await confirm({ title: `Уменьшить до ${count} тренировок?`, message: `Последние ${week.sessions.length - count} дней с упражнениями будут удалены из недели ${week.week}. Продолжить?`, confirmLabel: 'Удалить', danger: true });
+        if (!ok) return;
+      }
+    }
     const sessions = resizeTrainingSessions(week.sessions, count, week.deload);
     setWeeks(current.weeks.map((w, index) => index === wi ? { ...w, sessions } : w));
   };
@@ -839,12 +847,18 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
       <style>{`@media (max-width: 640px) {
         .bb-block-list > div { overflow: hidden; }
         .bb-block-list input, .bb-block-list select { max-width: 100%; }
-        .bb-block-list .bb-set-editor { width: 100%; overflow-x: auto; }
+        .bb-block-list .bb-set-editor { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .bb-block-list .bb-set-editor > div > div { flex-wrap: wrap; gap: 6px !important; }
         .bb-block-row { padding: 8px 0 !important; }
         .bb-block-row > div:first-of-type { width: 100%; }
         .bb-block-expand { display: inline-flex; }
         .bb-block-row:not(.is-expanded) .bb-set-editor { display: none; }
         .bb-block-row:not(.is-expanded) > div:not(:first-of-type) { display: none; }
+        .editor-exercise-card { border-radius: 10px !important; }
+      }
+      @media (max-width: 380px) {
+        .bb-set-editor input[type="number"] { width: 38px !important; }
+        .editor-exercise-card .editor-exercise-heading { flex-direction: column; align-items: flex-start !important; gap: 4px !important; }
       }
       .bb-block-expand {
         display: none;
@@ -884,7 +898,41 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           )}
         </div>
       )}
-      {blocks.length > 0 && <div className="editor-exercise-list-heading"><span>УПРАЖНЕНИЯ</span><span>{blocks.length} шт.</span></div>}
+      {blocks.length > 0 && (
+        <>
+          <div className="editor-exercise-list-heading"><span>УПРАЖНЕНИЯ</span><span>{blocks.length} шт.</span></div>
+          {/* Быстрое добавление — компактная панель даже когда список не пуст */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center', padding: '6px 0', borderBottom: '1px dashed rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 10, color: DIM, fontWeight: 700, marginRight: 2 }}>+ Быстро:</span>
+            {Object.keys(GROUP_RU).map(g => (
+              <button
+                key={g}
+                onClick={() => setQuickGroup(quickGroup === g ? null : g)}
+                aria-label={`Быстрое добавление: ${GROUP_RU[g]}`}
+                title={`Показать упражнения для ${GROUP_RU[g]}`}
+                style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', minHeight: 32, background: quickGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${quickGroup === g ? 'rgba(0,230,138,0.5)' : 'rgba(255,255,255,0.1)'}`, color: quickGroup === g ? '#00e68a' : '#fff', fontWeight: 600 }}>
+                {GROUP_RU[g]}
+              </button>
+            ))}
+          </div>
+          {quickGroup && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', padding: '4px 0 6px', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: DIM }}>{GROUP_RU[quickGroup]}:</span>
+              {quickExercises.length === 0 && <span style={{ fontSize: 10, color: DIM, fontStyle: 'italic' }}>нет упражнений — выберите из каталога</span>}
+              {quickExercises.map(ex => (
+                <button
+                  key={ex.id}
+                  onClick={() => addQuickBlock(ex)}
+                  title={`Добавить «${ex.name}»`}
+                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', minHeight: 32, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontWeight: 700 }}>
+                  + {ex.name}
+                </button>
+              ))}
+              <button onClick={() => setQuickGroup(null)} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'transparent', color: DIM, cursor: 'pointer' }}>✕</button>
+            </div>
+          )}
+        </>
+      )}
       {blocks.map((b, bi) => (
         <div
           key={b.id}
@@ -903,12 +951,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
           onDragEnd={() => { dragSrcRef.current = null; setOverIdx(null); }}
           onTouchStart={onTouchStart(bi)}
           onTouchMove={onTouchMove}
-          className={`bb-block-row editor-exercise-card${expandedBlock === bi ? ' is-expanded' : ''}`}
-          style={{
+           className={`bb-block-row editor-exercise-card${expandedBlock === bi ? ' is-expanded' : ''}${!b.exerciseName ? ' is-empty' : ''}`}
+           style={{
             display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px',
-            borderTop: overIdx === bi ? '2px solid #00e68a' : '2px solid transparent',
+            borderTop: overIdx === bi ? '2px solid #00e68a' : (!b.exerciseName ? '2px solid rgba(245,158,11,0.35)' : '2px solid transparent'),
+            borderLeft: !b.exerciseName ? '2px solid rgba(245,158,11,0.25)' : '2px solid transparent',
             transition: 'border-color 0.1s',
-            background: touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
+            background: !b.exerciseName ? 'rgba(245,158,11,0.04)' : touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
             borderRadius: 8,
           }}
         >

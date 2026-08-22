@@ -412,35 +412,56 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     }
     return false;
   }, [program, onSave]);
+  // Ctrl+S — быстрое сохранение (как в BB-авто)
+  useEffect(() => {
+    const onSaveKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (handleSave('Ручная правка (Ctrl+S)')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); }
+      }
+    };
+    window.addEventListener('keydown', onSaveKey);
+    return () => window.removeEventListener('keydown', onSaveKey);
+  }, [handleSave]);
 
   // P5: «⚡ Заполнить автоматически» — реальная интеллектуальная сборка через
   // buildBBPlan (BB) + LMS-cycles (PL). Пользователь получает рабочую программу
   // с реальными упражнениями и весами, а не пустую заготовку.
    // Читает единый профиль тренированности (equipment, weakPoints, avoidAxialLoad,
    // workMax, onCourse, favoriteExercises, excludedExercises) + лаб. коррекцию.
-   const autoFillDraft = useCallback(() => {
-     // P0-4: extracted to auto-fill-draft.ts for per-direction testability
-     const prof = tprofile;
-     const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
-     updateMeta({ title: '[Черновик] ' + (program.meta.title || 'Моя программа') });
-     const profData = linked.profile?.settings?.personal;
-     const lifeData = linked.profile?.settings?.lifestyle;
-     const ctx: AutoFillCtx = {
-       program, prof, days,
-       bodyFat: profData?.bodyFat,
-       leanMass: (profData?.weight && profData?.bodyFat != null) ? Math.round(profData.weight * (1 - profData.bodyFat / 100)) : undefined,
-       hrvMs: lifeData?.morningHRV,
-       sleepHours: lifeData?.sleepHours,
-       stressLevel: lifeData?.stressLevel,
-       labMrvMultiplier: labAdjust.mrvMultiplier,
-       update, showToast,
-     };
-     setIsAutoFilling(true);
-     window.setTimeout(() => {
-       try { autoFillDraftDispatch(ctx); }
-       finally { setIsAutoFilling(false); }
-     }, 0);
-   }, [program, tprofile, linked.profile, labAdjust.mrvMultiplier, update, showToast]);
+    const hasProgramContent = useCallback(() => {
+      if (program.bb?.weeks?.some(w => w.sessions.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())))) return true;
+      if (program.pl?.customWeeks?.some(w => w.days.some(d => d.exercises.some(e => e.name && e.name.trim())))) return true;
+      if (program.hybrid?.bbWeeks?.some(w => w.sessions?.some(s => (s.blocks ?? []).some(b => b.exerciseName && b.exerciseName.trim())))) return true;
+      return false;
+    }, [program]);
+    const autoFillDraft = useCallback(async () => {
+      // Защита от случайной потери данных: если программа уже заполнена — спросить подтверждение
+      if (hasProgramContent()) {
+        const ok = await confirm({ title: 'Перезаписать программу?', message: 'Авто-сборка заменит текущие недели и упражнения. Несохранённые правки будут потеряны. Продолжить?', confirmLabel: 'Перезаписать', cancelLabel: 'Отмена', danger: true });
+        if (!ok) return;
+      }
+      const prof = tprofile;
+      const days = Math.max(2, Math.min(7, program.meta.daysPerWeek || 4));
+      updateMeta({ title: '[Черновик] ' + (program.meta.title || 'Моя программа') });
+      const profData = linked.profile?.settings?.personal;
+      const lifeData = linked.profile?.settings?.lifestyle;
+      const ctx: AutoFillCtx = {
+        program, prof, days,
+        bodyFat: profData?.bodyFat,
+        leanMass: (profData?.weight && profData?.bodyFat != null) ? Math.round(profData.weight * (1 - profData.bodyFat / 100)) : undefined,
+        hrvMs: lifeData?.morningHRV,
+        sleepHours: lifeData?.sleepHours,
+        stressLevel: lifeData?.stressLevel,
+        labMrvMultiplier: labAdjust.mrvMultiplier,
+        update, showToast,
+      };
+      setIsAutoFilling(true);
+      window.setTimeout(() => {
+        try { autoFillDraftDispatch(ctx); }
+        finally { setIsAutoFilling(false); }
+      }, 0);
+    }, [program, tprofile, linked.profile, labAdjust.mrvMultiplier, update, showToast, hasProgramContent, confirm]);
 
 
   // «🚚 К выполнению» — поддерживает BB и PL.
@@ -667,26 +688,35 @@ return (
           </span>
           {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button style={{ ...BTN, padding: '8px 14px', fontSize: 11, minHeight: 40 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу">
+            <button style={{ ...BTN, padding: '8px 14px', fontSize: 11, minHeight: 40 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу (Ctrl+S)">
               {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
             </button>
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 40 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты">⋯ Ещё</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 40 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты" aria-expanded={showMore}>⋯ Ещё</button>
           </div>
         </div>
-        {showMore && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4 }}>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Редактор' : 'Таблица плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
-            {(dir === 'bb' || dir === 'pl') && (
-              <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4, minHeight: 40 }}>
+        {/* Быстрые действия — всегда видны (undo/redo/таблица/PDF/выполнение) */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4, alignItems: 'center' }}>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Переключить в редактор' : 'Показать таблицу плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36 }} onClick={undo} title="Отменить (Ctrl+Z)">↩</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36 }} onClick={redo} title="Повторить (Ctrl+Shift+Z)">↪</button>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
+          {(dir === 'bb' || dir === 'pl') && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 2 }}>
+              <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 3 }}>
                 Нед
-                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 50, minHeight: 40, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя выполнения" inputMode="numeric" />
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 32, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя для выполнения" inputMode="numeric" />
               </label>
-            )}
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40 }} onClick={undo} title="Отменить последнее изменение (Ctrl+Z)">↩</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40 }} onClick={redo} title="Повторить отменённое изменение (Ctrl+Shift+Z)">↪</button>
-            {dir === 'bb' && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить к выполнению (he_pl_runtime)">🚚 К выполнению</button>}
-            {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-цикл к выполнению (he_pl_runtime)">🚚 К выполнению</button>}
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / сохранить в PDF">🖨 PDF</button>
+              {dir === 'bb' && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить неделю к выполнению">🚚 К вып.</button>}
+              {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-неделю к выполнению">🚚 К вып.</button>}
+            </span>
+          )}
+          <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {isDirty ? <span style={{ color: '#f59e0b', fontWeight: 700 }}>● не сохранено</span> : <span style={{ color: '#22c55e' }}>✓ сохранено</span>}
+            <span style={{ opacity: 0.6 }}>| Ctrl+Z отмена</span>
+          </span>
+        </div>
+        {showMore && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             {isPro && (
               <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
             )}
@@ -1370,52 +1400,66 @@ return (
             title="Уровень подготовки"
             buttonStyle={{ flex: 1 }}
           />
-          <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Дней/нед
-            {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks */}
-             <input aria-label="Дней тренировок в неделю" type="number" inputMode="numeric" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
-               onChange={e => {
-                 const parsed = Number(e.target.value);
-                 if (!Number.isFinite(parsed)) return;
-                 const v = Math.max(1, Math.min(7, Math.round(parsed)));
-                 const newMeta = { ...program.meta, daysPerWeek: v };
-                 let newProgram = { ...program, meta: newMeta };
-                 // Каскад на bb.weeks: выровнять кол-во сессий
-                  if (program.bb) {
-                    const weeks = program.bb.weeks;
-                    const updated = weeks.map(w => {
-                      const target = v;
-                      return { ...w, sessions: resizeTrainingSessions(w.sessions, target, w.deload) };
-                   });
-                   newProgram = { ...newProgram, bb: { ...program.bb, weeks: updated } };
-                 }
-                 onChangeWithUndo(newProgram);
-               }} />
-          </label>
-          <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+            {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks; при уменьшении с контентом — подтверждение */}
+              <input aria-label="Дней тренировок в неделю" type="number" inputMode="numeric" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
+                onChange={async e => {
+                  const parsed = Number(e.target.value);
+                  if (!Number.isFinite(parsed)) return;
+                  const v = Math.max(1, Math.min(7, Math.round(parsed)));
+                  if (v < program.meta.daysPerWeek && program.bb) {
+                    const willDeleteContent = program.bb.weeks.some(w => w.sessions.slice(v).some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())));
+                    if (willDeleteContent) {
+                      const ok = await confirm({ title: `Уменьшить до ${v} дн/нед?`, message: `Последние ${program.meta.daysPerWeek - v} тренировочных дней с упражнениями будут удалены во всех неделях. Продолжить?`, confirmLabel: 'Удалить', danger: true });
+                      if (!ok) { e.target.value = String(program.meta.daysPerWeek); return; }
+                    }
+                  }
+                  const newMeta = { ...program.meta, daysPerWeek: v };
+                  let newProgram = { ...program, meta: newMeta };
+                  // Каскад на bb.weeks: выровнять кол-во сессий
+                   if (program.bb) {
+                     const weeks = program.bb.weeks;
+                     const updated = weeks.map(w => {
+                       const target = v;
+                       return { ...w, sessions: resizeTrainingSessions(w.sessions, target, w.deload) };
+                    });
+                    newProgram = { ...newProgram, bb: { ...program.bb, weeks: updated } };
+                  }
+                  onChangeWithUndo(newProgram);
+                }} />
+           </label>
+           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Недель
-            {/* U3: meta.weeks каскад — при изменении добавляет/удаляет недели в bb.weeks */}
-             <input aria-label="Количество недель программы" type="number" inputMode="numeric" style={IN} value={program.meta.weeks} min={1} max={24}
-               onChange={e => {
-                 const parsed = Number(e.target.value);
-                 if (!Number.isFinite(parsed)) return;
-                 const v = Math.max(1, Math.min(24, Math.round(parsed)));
-                 const newMeta = { ...program.meta, weeks: v };
-                 let newProgram = { ...program, meta: newMeta };
-                 if (program.bb) {
-                   const weeks = [...program.bb.weeks];
-                   while (weeks.length < v) {
-                     const n = weeks.length + 1;
-                     const template = weeks[0]?.sessions ?? [];
-                     const progression = 1 + (n - 1) * 0.025;
-                     weeks.push({ week: n, phase: 'accumulation', deload: n % 4 === 0, sessions: template.map(s => ({ ...s, id: newId('ses'), blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st, weight: st.weight ? Math.round(st.weight * progression / 2.5) * 2.5 : st.weight })) })) })) });
-                   }
-                   while (weeks.length > v) weeks.pop();
-                   newProgram = { ...newProgram, bb: { ...program.bb, weeks } };
-                 }
-                 onChangeWithUndo(newProgram);
-               }} />
-          </label>
+            {/* U3: meta.weeks каскад — при изменении добавляет/удаляет недели в bb.weeks; при уменьшении с контентом — подтверждение */}
+              <input aria-label="Количество недель программы" type="number" inputMode="numeric" style={IN} value={program.meta.weeks} min={1} max={24}
+                onChange={async e => {
+                  const parsed = Number(e.target.value);
+                  if (!Number.isFinite(parsed)) return;
+                  const v = Math.max(1, Math.min(24, Math.round(parsed)));
+                  if (v < program.meta.weeks && program.bb) {
+                    const willDeleteContent = program.bb.weeks.slice(v).some(w => w.sessions.some(s => s.blocks.some(b => b.exerciseName && b.exerciseName.trim())));
+                    if (willDeleteContent) {
+                      const ok = await confirm({ title: `Сократить до ${v} нед?`, message: `Последние ${program.meta.weeks - v} недели с упражнениями будут удалены. Продолжить?`, confirmLabel: 'Удалить', danger: true });
+                      if (!ok) { e.target.value = String(program.meta.weeks); return; }
+                    }
+                  }
+                  const newMeta = { ...program.meta, weeks: v };
+                  let newProgram = { ...program, meta: newMeta };
+                  if (program.bb) {
+                    const weeks = [...program.bb.weeks];
+                    while (weeks.length < v) {
+                      const n = weeks.length + 1;
+                      const template = weeks[0]?.sessions ?? [];
+                      const progression = 1 + (n - 1) * 0.025;
+                      weeks.push({ week: n, phase: 'accumulation', deload: n % 4 === 0, sessions: template.map(s => ({ ...s, id: newId('ses'), blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st, weight: st.weight ? Math.round(st.weight * progression / 2.5) * 2.5 : st.weight })) })) })) });
+                    }
+                    while (weeks.length > v) weeks.pop();
+                    newProgram = { ...newProgram, bb: { ...program.bb, weeks } };
+                  }
+                  onChangeWithUndo(newProgram);
+                }} />
+           </label>
         </div>
       </div>
 
@@ -1580,16 +1624,19 @@ return (
           </div>
         </div>
       )}
-    {/* Липкая нижняя навигация шагов — «← Назад» и «Далее →» всегда под рукой */}
+    {/* Липкая нижняя навигация шагов — «← Назад» / сохранение / «Далее →» всегда под рукой */}
       <div className="editor-bottomnav" style={{ position: 'sticky', bottom: 0, zIndex: 40, display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 -6px 18px rgba(0,0,0,0.35)' }}>
         {estepIdx > 0 && (
-          <button style={{ ...BTN_GHOST, padding: '10px 16px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep} title="Предыдущий шаг">
+          <button style={{ ...BTN_GHOST, padding: '10px 16px', fontSize: 12, minHeight: 44 }} onClick={goPrevStep} title="Предыдущий шаг (←)">
             ← Назад: {EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx - 1]]}
           </button>
         )}
+        <button style={{ ...BTN_GHOST, padding: '8px 14px', fontSize: 11, minHeight: 40, borderColor: isDirty ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)', color: isDirty ? '#f59e0b' : DIM }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title={isDirty ? 'Сохранить изменения' : 'Все изменения сохранены'}>
+          {savedFlash ? '✓ Сохранено' : isDirty ? '💾 Сохранить' : '✓ Сохранено'}
+        </button>
         <span style={{ flex: 1 }} />
         {onNext && (
-          <button style={{ ...BTN, padding: '10px 20px', fontSize: 12, minHeight: 44 }} onClick={goNextStep} title="Следующий шаг">
+          <button style={{ ...BTN, padding: '10px 20px', fontSize: 12, minHeight: 44 }} onClick={goNextStep} title="Следующий шаг (→)">
             Далее: {isLastEditorStep ? 'Итог' : EDITOR_STEP_BTN_LABELS[editorSteps[estepIdx + 1]]} →
           </button>
         )}

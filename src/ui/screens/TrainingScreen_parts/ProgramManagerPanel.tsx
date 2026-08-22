@@ -764,8 +764,8 @@ export const ProgramManagerPanel: React.FC = () => {
           <button style={{ ...BTN_GHOST, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}>🪄 Визард (пошагово)</button>
         </div>
 
-        {/* P15: Шаблоны быстрого старта — только в стандартном режиме */}
-        {manualMode === 'standard' && (
+        {/* P15: Шаблоны быстрого старта — в обоих режимах (в pro с пометкой PRO) */}
+        {(manualMode === 'standard' || manualMode === 'pro') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🚀 Быстрый старт (шаблоны)</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
@@ -865,17 +865,17 @@ export const ProgramManagerPanel: React.FC = () => {
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.3, color: DIM_STRONG, textTransform: 'uppercase', flex: 1 }}>
             Сохранённые ({filteredPrograms().length}{filteredPrograms().length !== programs.length ? ` из ${programs.length}` : ''})
           </span>
-          {/* P1-6: JSON экспорт/импорт */}
+          {/* P1-6: JSON экспорт/импорт — иконки исправлены: 📤 экспорт, 📥 импорт */}
           <button style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 44 }} onClick={() => {
             const json = JSON.stringify(programs, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = 'bodybuildhealth-programs-' + new Date().toISOString().slice(0,10) + '.json';
             a.click(); URL.revokeObjectURL(url);
-            flash('📥 Экспортировано ' + programs.length + ' программ');
-          }} title="Экспорт всех программ в JSON">📥 JSON</button>
+            flash('📤 Экспортировано ' + programs.length + ' программ');
+          }} title="Экспорт всех программ в JSON">📤 Экспорт</button>
           <label style={{ ...BTN_GHOST, padding: '3px 8px', fontSize: 10, minHeight: 44, cursor: 'pointer', position: 'relative' }}>
-            📤 JSON
+            📥 Импорт
             <input type="file" accept=".json" style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} onChange={e => {
               const file = e.target.files?.[0];
               if (!file) return;
@@ -894,7 +894,7 @@ export const ProgramManagerPanel: React.FC = () => {
                     added++;
                   }
                   refresh();
-                  flash('📤 Импортировано: ' + added + ' новых программ');
+                  flash('📥 Импортировано: ' + added + ' новых программ');
                 } catch { flash('⚠ Ошибка: неверный формат JSON'); }
               };
               reader.readAsText(file);
@@ -902,13 +902,19 @@ export const ProgramManagerPanel: React.FC = () => {
             }} />
           </label>
         </div>
-        {/* P2.6: поиск + фильтр по direction + сортировка */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-          <input
-            type="text" placeholder="🔍 Поиск..." value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ ...IN, flex: 2, minWidth: 100, fontSize: 11, padding: '6px 8px' }}
-          />
+        {/* P2.6: поиск + фильтр по direction + сортировка — добавлена кнопка сброса */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 2, minWidth: 100, display: 'flex', alignItems: 'center' }}>
+            <input
+              type="text" placeholder="🔍 Поиск по названию..." value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ ...IN, flex: 1, fontSize: 11, padding: '6px 28px 6px 8px' }}
+              aria-label="Поиск программ по названию"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} aria-label="Очистить поиск" style={{ position: 'absolute', right: 4, width: 24, height: 24, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.08)', color: DIM, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            )}
+          </div>
           <EditorPopupSelect
             value={filterDir}
             options={[
@@ -938,7 +944,12 @@ export const ProgramManagerPanel: React.FC = () => {
             <div style={{ fontSize: 11, color: DIM }}>Создайте программу с нуля или клонируйте из библиотеки.</div>
           </div>
         )}
-        {filteredPrograms().length === 0 && programs.length > 0 && <div style={{ fontSize: 11, color: DIM, padding: '12px 0' }}>Ничего не найдено по фильтру.</div>}
+        {filteredPrograms().length === 0 && programs.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0' }}>
+            <span style={{ fontSize: 11, color: DIM }}>Ничего не найдено по фильтру.</span>
+            <button style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 32 }} onClick={() => { setSearch(''); setFilterDir('all'); setSortBy('updated'); }}>Сбросить фильтры</button>
+          </div>
+        )}
         {filteredPrograms().map(p => {
           const dc = DIR_COLOR[p.meta.direction];
           const goalLabel = GOAL_OPTS.find(g => g.id === p.meta.goal)?.label ?? p.meta.goal;
@@ -956,7 +967,7 @@ export const ProgramManagerPanel: React.FC = () => {
                   <span style={chip}>🎯 {goalLabel}</span>
                   <span style={chip}>📶 {levelLabel}</span>
                   <span style={chip}>🗓 {p.meta.daysPerWeek}д × {p.meta.weeks}н</span>
-                  {p.meta.updatedAt && <span style={chip}>🕒 {timeAgo(p.meta.updatedAt)}</span>}
+                  {p.meta.updatedAt && <span style={chip} title={new Date(p.meta.updatedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}>🕒 {timeAgo(p.meta.updatedAt)}</span>}
                   {(() => {
                     const issues = validateProgram(p);
                     const errs = issues.filter(i => i.level === 'error').length;
@@ -1013,7 +1024,7 @@ export const ProgramManagerPanel: React.FC = () => {
                     refresh();
                     flash('📋 Клонировано: ' + clone.meta.title);
                   }} title="Клонировать">⧉</button>
-                  <button style={iconBtn} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title="Сравнить">⚖</button>
+                  <button style={{ ...iconBtn, background: compareIds.includes(p.meta.id) ? 'rgba(245,158,11,0.18)' : iconBtn.background, borderColor: compareIds.includes(p.meta.id) ? 'rgba(245,158,11,0.4)' : (iconBtn as any).borderColor, color: compareIds.includes(p.meta.id) ? '#f59e0b' : (iconBtn as any).color }} onClick={() => { setCompareIds(prev => prev.includes(p.meta.id) ? prev.filter(x => x !== p.meta.id) : prev.length < 2 ? [...prev, p.meta.id] : [prev[1], p.meta.id]); }} title={compareIds.includes(p.meta.id) ? 'Убрать из сравнения' : 'Сравнить'}>⚖</button>
                   <button style={iconBtn} onClick={() => copyProgramToClipboard(p)} title="Скопировать в буфер">📋</button>
                   <button style={{ ...iconBtn, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeProgram(p.meta.id)} title="Удалить">✕</button>
                 </div>
