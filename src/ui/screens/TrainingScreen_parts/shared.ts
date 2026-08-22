@@ -45,7 +45,7 @@ export type TrainingTab =
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'volume_hub'
-  | 'training_mix_hub' | 'mix_presets' | 'warmup' | 'cooldown' | 'bb_foundation' | 'rir_calibration' | 'readiness_forecast' | 'taper_planner' | 'joint_health';
+  | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'bb_foundation' | 'rir_calibration' | 'readiness_forecast' | 'taper_planner' | 'joint_health';
 export type TrainingPage = 'hero' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
@@ -102,8 +102,9 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   periodization_taper_hub: '🔄 Периодизация + Тейпер',
   quality_diagnostics: '🎯 Качество+Диагностика',
   volume_hub: '📐 Объём-хаб',
-  training_mix_hub: '🧪 Тренировочные миксы',
-  mix_presets: '🧪 Пресеты здоровья',
+  training_mix_hub: '🧪 Тренировочные миксы (→ микс-хаб)',
+  mix_presets: '🧪 Пресеты здоровья (→ микс-хаб)',
+  mix_hub: '🧪 Миксы — единый хаб',
   tonnage: '📦 Тоннаж калькулятор',
   bb_foundation: '🏛 Основа ББ',
   rir_calibration: '🎯 RIR калибратор',

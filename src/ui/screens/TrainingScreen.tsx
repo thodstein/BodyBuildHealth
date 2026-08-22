@@ -677,12 +677,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_taper_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','joint_health']);
-        // алиасы депрекейтнутых дублей → единые хабы (периодизация+тейпер объединены как periodization_taper_hub, аналог VolumeHub)
+        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_taper_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','mix_hub','bb_foundation','rir_calibration','readiness_forecast','joint_health']);
+        // алиасы депрекейтнутых дублей → единые хабы (периодизация+тейпер, миксы — аналоги VolumeHub)
         const effectiveTab = tab === 'load_management' ? 'load_safety' as const
           : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const
           : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const
           : tab === 'periodization_hub' || tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'periodization_taper_hub' as const
+          : tab === 'training_mix_hub' || tab === 'mix_presets' ? 'mix_hub' as const
           : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
@@ -702,8 +703,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'rir_calibration' && <InfoErrorBoundary label="RIR калибратор"><RIRCalibrationCard /></InfoErrorBoundary>}
             {effectiveTab === 'readiness_forecast' && <InfoErrorBoundary label="Прогноз готовности"><ReadinessForecastCard /></InfoErrorBoundary>}
             {effectiveTab === 'joint_health' && <InfoErrorBoundary label="Суставы + AI"><JointMasterCard /></InfoErrorBoundary>}
-            {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
-            {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}
+            {effectiveTab === 'mix_hub' && <InfoErrorBoundary label="Миксы — единый хаб"><MixHub initialMode={tab === 'mix_presets' ? 'health' : 'training'} /></InfoErrorBoundary>}
           </>);
         }
         return <TrainingIntelligenceDashboard
@@ -765,6 +765,7 @@ import { TrainingCalendarTab } from './TrainingScreen_parts/TrainingCalendarTab'
 import { PlateCalcTab } from './TrainingScreen_parts/PlateCalcTab';
 import { TonnageCalcTab } from './TrainingScreen_parts/TonnageCalcTab';
 import { RIRCalibrationCard } from './TrainingScreen_parts/RIRCalibrationCard';
+import { MixHub } from './TrainingScreen_parts/MixHub';
 import MesoCorrectionCard from './TrainingScreen_parts/MesoCorrectionCard';
 import MMCTrackingCard from './TrainingScreen_parts/MMCTrackingCard';
 import { loadRirCalibrationStats } from '../../engines/meso-correction.engine';
