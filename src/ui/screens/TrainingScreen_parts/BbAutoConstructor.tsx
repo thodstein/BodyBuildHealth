@@ -26,6 +26,7 @@ import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
 import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../../../engines/bb/bb-finalize.engine';
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
+import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
 import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
@@ -483,7 +484,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbMethodology, setBbMethodology] = useState<SessionMethodology>('compound_first');
   // Проф-методики (Библиотека → Методики): DUP, суперсеты-антагонисты, схемы объёма памп-дней
   const [dupMode, setDupMode] = useState<DUPMode>('none');
-  const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist' | 'same_muscle'>('none');
+  const [supersetMode, setSupersetMode] = useState<'none' | 'antagonist' | 'same_muscle' | 'giant'>('none');
   const [volumeScheme, setVolumeScheme] = useState<'standard' | 'gvt' | 'fst7' | 'gironda'>('standard');
 
   // P-ext: calorieSurplus (ккал/день) и eccentricMult (1.0=норма, 1.1-1.2=eccentric overload).
@@ -2311,12 +2312,13 @@ export const BbAutoConstructor: React.FC = () => {
                     <PopupSelect
                       label='🔗 Суперсеты'
                       value={supersetMode}
-                      onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle')}
-                      hint='Антагонисты (грудь↔спина, бицепс↔трицепс) или «пробить» — компаунд+изоляция одной группы'
+                      onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle' | 'giant')}
+                      hint='Антагонисты, «пробить» (компаунд+изоляция одной группы) или гигант-сет (3 упражнения одной группы, для опытных)'
                       options={[
                         { id: 'none', label: 'Выкл' },
                         { id: 'antagonist', label: 'Антагонисты (пары)' },
                         { id: 'same_muscle', label: 'Одна группа (пробить)' },
+                        { id: 'giant', label: 'Гигант-сет (3 упр. одной группы)' },
                       ]}
                     />
                     <PopupSelect
@@ -2467,12 +2469,13 @@ export const BbAutoConstructor: React.FC = () => {
           <PopupSelect
             label='🔗 Суперсеты'
             value={supersetMode}
-            onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle')}
-            hint='Антагонисты (грудь↔спина, бицепс↔трицепс) или «пробить» — компаунд+изоляция одной группы'
+            onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle' | 'giant')}
+            hint='Антагонисты, «пробить» (компаунд+изоляция одной группы) или гигант-сет (3 упражнения одной группы, для опытных)'
             options={[
               { id: 'none', label: 'Выкл' },
               { id: 'antagonist', label: 'Антагонисты (пары)' },
               { id: 'same_muscle', label: 'Одна группа (пробить)' },
+              { id: 'giant', label: 'Гигант-сет (3 упр. одной группы)' },
             ]}
           />
           <PopupSelect
@@ -3137,6 +3140,19 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>Итого: {sum.totalWorkingSets} рабочих сетов/нед</div>
                 </div>
               }
+            />
+          );
+        })()}
+
+        {builtPlan && (() => {
+          const methods = buildBBMethodologySummary(builtPlan);
+          if (methods.length === 0) return null;
+          return (
+            <ExpandableCard title="🧩 Применённые методики" icon="🧩"
+              short={`${methods.length} методик · ${methods[0]}`}
+              full={<div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11 }}>
+                {methods.map((m, i) => <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)' }}>✓ {m}</div>)}
+              </div>}
             />
           );
         })()}

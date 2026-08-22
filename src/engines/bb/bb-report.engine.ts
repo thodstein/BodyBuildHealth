@@ -176,21 +176,31 @@ function progressionSummary(plan: BBPlan): string {  const byName = new Map<stri
 
 /** Сводка применённых методик (памп/дропы/суперсеты/схемы объёма/DUP/порядок) —
  *  чтобы пользователь видел, что реально включено в план. */
-function methodologySummary(plan: BBPlan): string[] {
+export function buildBBMethodologySummary(plan: BBPlan): string[] {
   const out: string[] = [];
   const p: any = plan as any;
   // Порядок упражнений (методика pre/post-exhaust / compound_first).
   const methodLabel: Record<string, string> = { compound_first: 'базы → изоляция', pre_exhaust: 'изоляция → база (пред-истощение)', post_exhaust: 'база → изоляция' };
   if (p.methodology && p.methodology !== 'compound_first') out.push(`Порядок: ${methodLabel[p.methodology] || p.methodology}`);
-  // Суперсеты: антагонисты vs одна группа.
+  // Суперсеты: антагонисты vs одна группа (только 🔗 Суперсет; пре/гигант — отдельно).
   let samePairs = 0, antaPairs = 0;
   for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
     if (!(ex as any).supersetWith) continue;
-    if (/(одна группа|пробить|добить)/.test(ex.comment || '')) samePairs++;
+    if (!((ex.comment || '').includes('🔗 Суперсет'))) continue;
+    if ((ex.comment || '').includes('одна группа')) samePairs++;
     else antaPairs++;
   }
   if (antaPairs > 0) out.push(`Суперсеты (антагонисты): ${antaPairs} упражнений в парах`);
   if (samePairs > 0) out.push(`Суперсеты (одна группа — «пробить»): ${samePairs} упражнений в парах`);
+  // Pre-exhaust-пары и гигант-сеты.
+  let preCount = 0, giantCount = 0;
+  for (const w of plan.weeks) for (const s of w.sessions || []) for (const ex of s.exercises || []) {
+    const c = ex.comment || '';
+    if (c.includes('⚡ Пред-истощение')) preCount++;
+    if (c.includes('🔄 Гигант-сет')) giantCount++;
+  }
+  if (preCount > 0) out.push(`Pre-exhaust (изоляция → база без отдыха): ${preCount} упражнений в паре`);
+  if (giantCount > 0) out.push(`Гигант-сет (3 упражнения одной группы): ${giantCount} упражнений`);
   // Интенсивные техники (дропы/rest-pause/myo-reps/21s) на последнем подходе.
   let techCount = 0;
   const techNames = new Set<string>();
@@ -252,7 +262,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
     lines.push('');
   }
   // Применённые методики (памп/дропы/суперсеты/схемы/DUP/порядок).
-  const methods = methodologySummary(plan);
+  const methods = buildBBMethodologySummary(plan);
   if (methods.length) {
     lines.push(`🧩 Методики: ${methods.join(' · ')}`);
   }

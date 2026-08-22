@@ -32,6 +32,24 @@ describe('BB: порядок/схемы объёма и адекватность
     }
   });
 
+  it('pre_exhaust: изоляция → база как пара (пред-истощение)', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'advanced', goal: 'mass', weeks: 1, workMax: WM, methodology: 'pre_exhaust' });
+    const pairs = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).filter((e: any) => (e.comment || '').includes('⚡ Пред-истощение'));
+    expect(pairs.length).toBeGreaterThan(0);
+    // пара существует: изоляция имеет supersetWith на компаунд
+    const iso = pairs.find((e: any) => (e.comment || '').includes('без отдыха →'));
+    expect(iso).toBeDefined();
+    expect(iso.supersetWith).toBeTruthy();
+  });
+
+  it('giant superset: 3 упражнения одной группы (гигант-сет)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'enhanced', trainingYears: 8, goal: 'mass', weeks: 1, workMax: WM, supersetMode: 'giant' });
+    const giants = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).filter((e: any) => (e.comment || '').includes('🔄 Гигант-сет'));
+    expect(giants.length).toBeGreaterThan(0);
+    // гигант-сет — 3 упражнения одной группы (кратно 3)
+    expect(giants.length % 3).toBe(0);
+  });
+
   it('отчёт выявляет низкоценные и кросс-мышечные упражнения (decline, пуловер в груди)', () => {
     const plan = buildBBPlan({ patternId: 'fullbody_3', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const issues = checkBBExerciseAppropriateness(plan);

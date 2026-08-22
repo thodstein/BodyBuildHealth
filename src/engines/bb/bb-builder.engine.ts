@@ -178,7 +178,7 @@ export interface BBBuilderInput {
    *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
   previousPlan?: BBPlan;
   /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
-  supersetMode?: 'none' | 'antagonist' | 'same_muscle';
+  supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
   /** Объёмный vs обычный — кнопка с пояснением, капы от уровня */

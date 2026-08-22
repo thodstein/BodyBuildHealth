@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
-import { buildBBPlanReportText, checkBBFunctionCoverage, checkBBExerciseAppropriateness } from '../bb-report.engine';
+import { buildBBPlanReportText, checkBBFunctionCoverage, checkBBExerciseAppropriateness, buildBBMethodologySummary } from '../bb-report.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -55,6 +55,14 @@ describe('BB отчёт качества (без мусора/дублей, с �
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'advanced', trainingYears: 5, goal: 'mass', weeks: 1, workMax: WM, supersetMode: 'antagonist' });
     const text = buildBBPlanReportText(plan);
     expect(text).toContain('🧩 Методики');
+  });
+
+  it('методики-сводка детектирует пре-истощение/гигант-сет/суперсеты', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'enhanced', trainingYears: 8, goal: 'mass', weeks: 1, workMax: WM, supersetMode: 'giant' });
+    const sum = buildBBMethodologySummary(plan);
+    expect(Array.isArray(sum)).toBe(true);
+    // гигант-сет виден в сводке
+    expect(sum.some(s => s.includes('Гигант-сет'))).toBe(true);
   });
 
   it('адекватность флагует decline-жим как низкоценный', () => {

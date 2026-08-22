@@ -1351,8 +1351,8 @@ export interface BBFinalizeOptions {
     weightedPullUpLoad?: number;
     assistedPullUpLoad?: number;
   };
-  /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
-  supersetMode?: 'none' | 'antagonist' | 'same_muscle';
+  /** Суперсеты-антагонисты / одна группа / гигант-сет. */
+  supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
 }
@@ -1577,6 +1577,58 @@ export function markSameMuscleSupersets(plan: BBPlan): void {
         iso.comment = (iso.comment || '') + (iso.comment ? ' · ' : '') + `🔗 Суперсет с «${compound.name}» (одна группа — пробить)`;
         paired.add(compound); paired.add(iso);
         pairs++;
+      }
+    }
+  }
+}
+
+/** Pre-exhaust как НАСТОЯЩАЯ пара: изоляция целевой мышцы → её компаунд без отдыха.
+ *  Методология pre_exhaust уже ставит изоляцию ПЕРВОЙ (tier -1); здесь помечаем
+ *  пару, чтобы пользователь выполнял их подряд (пробить группу пред-истощением). */
+export function markPreExhaustPairs(plan: BBPlan): void {
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue;
+    for (const session of week.sessions) {
+      const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      if (working.length < 2) continue;
+      // Целевой компаунд дня = первый primary+тяж compound.
+      const compound = working.find(e => e.role === 'primary' && e.character === 'тяж' && isCompoundEx(e));
+      if (!compound) continue;
+      const muscle = compound.muscle;
+      // Изоляция той же мышцы, идущая ПЕРЕД компаундом (pre-exhaust).
+      const iso = working.find(e => e !== compound && e.muscle === muscle && !isCompoundEx(e) && working.indexOf(e) < working.indexOf(compound) && !e.supersetWith);
+      if (!iso) continue;
+      iso.supersetWith = compound.name;
+      compound.supersetWith = iso.name;
+      iso.comment = (iso.comment || '') + (iso.comment ? ' · ' : '') + `⚡ Пред-истощение: без отдыха → «${compound.name}»`;
+      compound.comment = (compound.comment || '') + (compound.comment ? ' · ' : '') + `⚡ Сразу после «${iso.name}» (пред-истощение) — пробить группу`;
+    }
+  }
+}
+
+/** Гигант-сет: 3 упражнения ОДНОЙ группы (компаунд + 2 изоляции) подряд без отдыха.
+ *  Метод для опытных (advanced/enhanced). Максимум 1 гигант-сет/сессию, не в deload.
+ *  Только помечаем комментарием — объём/лимиты не меняются. */
+export function markGiantSets(plan: BBPlan): void {
+  for (const week of plan.weeks) {
+    if (week.phase === 'deload') continue;
+    for (const session of week.sessions) {
+      const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      const byMuscle: Record<string, any[]> = {};
+      for (const ex of working) (byMuscle[ex.muscle] ||= []).push(ex);
+      let done = false;
+      for (const exs of Object.values(byMuscle)) {
+        if (done) break;
+        if (exs.length < 3) continue;
+        const compound = exs.find(e => isCompoundEx(e));
+        const isos = exs.filter(e => e !== compound && !isCompoundEx(e));
+        if (!compound || isos.length < 2) continue;
+        const members = [compound, isos[0], isos[1]];
+        const label = members.map(e => e.name).join(' → ');
+        for (const m of members) {
+          m.comment = (m.comment || '') + (m.comment ? ' · ' : '') + `🔄 Гигант-сет: ${label} — 3 упражнения одной группы без отдыха`;
+        }
+        done = true;
       }
     }
   }
@@ -2554,6 +2606,8 @@ for (const week of next.weeks) {
   if (!options.preserveSource && (next as any).pattern?.id) {
     if (options.supersetMode === 'antagonist') markAntagonistSupersets(next);
     else if (options.supersetMode === 'same_muscle') markSameMuscleSupersets(next);
+    else if (options.supersetMode === 'giant') markGiantSets(next);
+    if (options.methodology === 'pre_exhaust') markPreExhaustPairs(next);
     if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
   }
   if (!options.preserveSource && (next as any).pattern?.id) {
