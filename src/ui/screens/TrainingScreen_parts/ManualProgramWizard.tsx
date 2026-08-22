@@ -86,13 +86,13 @@ export const ManualProgramWizard: React.FC<Props> = ({
       </div>}
       {step === 4 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 4 из 4: проверьте каркас</div>
-        <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}><div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div><div style={{ fontSize: 11, color: DIM }}>Цель: {goal} · уровень: {level}</div><div style={{ fontSize: 11, color: DIM }}>{days} тренировок в неделю × {weeks} нед.</div><div style={{ fontSize: 10, color: DIM, marginTop: 5, lineHeight: 1.45 }}>Программа будет пустой: после создания откройте неделю → добавьте тренировочный день → выберите Пн–Вс → добавьте упражнения → настройте подходы.</div></div>
+        <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}><div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div><div style={{ fontSize: 11, color: DIM }}>Цель: {goal} · уровень: {level}</div><div style={{ fontSize: 11, color: DIM }}>{days} тренировок в неделю × {weeks} нед.</div><div style={{ fontSize: 10, color: DIM, marginTop: 5, lineHeight: 1.45 }}>{pro ? 'Выберите: пустой каркас (заполните вручную) или авто-сборка качественной программы в 1 клик.' : '💡 Рекомендуем «⚡ Создать и заполнить» — качественная программа в 1 клик по вашему профилю (уровень, оборудование, слабые группы). Пустой каркас — для ручной сборки с нуля.'}</div></div>
       </div>}
-      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
         {step > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => onStep(Math.max(1, step - 1) as WizardStep)}>← Назад</button>}
         {step < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => onStep(Math.min(4, step + 1) as WizardStep)}>Далее →</button>}
-         {step === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => onCreate(false)}>Создать пустой каркас</button>}
-         {step === 4 && pro && <button style={{ ...BTN, flex: 1, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }} onClick={() => onCreate(true)}>Создать и заполнить автоматически</button>}
+         {step === 4 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44, minWidth: 140 }} onClick={() => onCreate(false)} title="Создать пустую структуру: недели/дни без упражнений — заполните вручную">📄 Пустой каркас</button>}
+         {step === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44, minWidth: 160, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }} onClick={() => onCreate(true)} title={pro ? "Авто-сборка по профилю (уровень, оборудование, слабые группы) + прогрессия" : "⚡ Рекомендуемый способ — качественная программа в 1 клик"}>⚡ Создать и заполнить{pro ? '' : ' (рекомендуется)'}</button>}
       </div>
     </div>
   );

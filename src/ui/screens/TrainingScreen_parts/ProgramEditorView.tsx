@@ -717,9 +717,8 @@ return (
         </div>
         {showMore && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {isPro && (
-              <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title="Заполнить черновик на основе цели/уровня/дней (требует профиль тренированности)">{isAutoFilling ? '⏳ Создание...' : '⚡ Авто-черновик'}</button>
-            )}
+            {/* Авто-сборка — доступна в обоих режимах, в standard с подсказкой про профиль */}
+            <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title={isPro ? "Заполнить черновик на основе цели/уровня/дней и профиля тренированности" : "⚡ Быстро собрать качественную программу — 1 клик (использует ваш профиль: уровень, оборудование, слабые группы)"}>{isAutoFilling ? '⏳ Создание...' : isPro ? '⚡ Авто-черновик' : '⚡ Собрать качественно — 1 клик'}</button>
             <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
               onClick={() => { if (dir === 'bb') setEditorLibOpen('bb'); else if (dir === 'pl') setEditorLibOpen('pl'); }}
               title="Загрузить программу или цикл из библиотеки для редактирования"
@@ -1356,7 +1355,15 @@ return (
           <span style={{ fontSize: 10, color: DIM }}>Объём, RIR и нагрузка по неделям</span>
         </div>
         <PlanStatsPanel program={program} execWeek={execWeek} onCourse={tprofile.onCourse ?? false} />
+        {/* Live-качество — в шаге Недели для всех режимов (раньше только в Анализе pro) */}
+        <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
         </>
+      )}
+      {estep === 'weeks' && dir === 'pl' && program.pl && (
+        <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
+      )}
+      {estep === 'weeks' && dir === 'hybrid' && program.hybrid && (
+        <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
       )}
 
 

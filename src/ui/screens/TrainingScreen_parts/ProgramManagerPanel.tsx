@@ -331,6 +331,30 @@ export const ProgramManagerPanel: React.FC = () => {
     p.meta.level = wizardLevel;
     p.meta.daysPerWeek = wizardDays;
     p.meta.weeks = wizardWeeks;
+    // Быстрый скелет без авто-сборки: заполняем структуру по выбранным дням/неделям, чтобы не было рассинхрона meta ↔ weeks
+    if (!autoFill) {
+      if (wizardDir === 'bb' && p.bb) {
+        p.bb.weeks = buildBBSkeleton(wizardDays, wizardWeeks);
+      } else if (wizardDir === 'pl' && p.pl) {
+        // PL-скелет: wizardWeeks недель, каждая с wizardDays днями (присед/жим/тяга по очереди)
+        const lifts: Array<'squat'|'bench'|'dead'> = ['squat','bench','dead'];
+        const dayNames = ['Присед','Жим','Тяга','Подсобка','Подсобка 2','Подсобка 3','Подсобка 4'];
+        p.pl.customWeeks = Array.from({ length: wizardWeeks }, (_, wi) => ({
+          week: wi + 1,
+          phase: (wi % 4 === 3 ? 'deload' : 'accumulation') as const,
+          deload: wi % 4 === 3,
+          days: Array.from({ length: wizardDays }, (_, di) => ({
+            name: dayNames[di % dayNames.length] + (wizardDays > 3 && di >= 3 ? ` ${di+1}` : ''),
+            dayOfWeek: di % 7,
+            exercises: [{ name: '', lift: lifts[di % lifts.length], muscle: lifts[di % lifts.length] === 'squat' ? 'legs' : lifts[di % lifts.length] === 'bench' ? 'chest' : 'back', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }],
+          })),
+        }));
+        p.pl.schedule = Array.from({ length: wizardDays }, (_, i) => ({ sessionIdx: i, dayOfWeek: i % 7 }));
+      } else if (wizardDir === 'hybrid' && p.hybrid) {
+        p.hybrid.bbWeeks = buildBBSkeleton(Math.max(1, wizardDays - 2), wizardWeeks);
+        p.hybrid.weeksOverride = wizardWeeks;
+      }
+    }
     setWizardOpen(false);
     setPendingAutoFill(autoFill);
     setEditing(p);

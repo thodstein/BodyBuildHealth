@@ -373,6 +373,60 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </div>
         );
       })()}
+      {/* ⚡ Пустые тренировки — 1-клик заполнение качественными упражнениями */}
+      {(() => {
+        const hasEmpty = body.weeks.some(w => w.sessions.some(s => (s.blocks ?? []).length === 0));
+        if (!hasEmpty) return null;
+        const fillEmpty = () => {
+          const prof = loadTrainingProfile();
+          const updated = body.weeks.map(w => ({
+            ...w,
+            sessions: w.sessions.map(s => {
+              if ((s.blocks ?? []).length > 0) return s;
+              const focusMuscles = (s.focus || '').toLowerCase().split(/[,/+&]/).map(x => x.trim()).filter(Boolean);
+              // маппим фокус-строку к ключам GROUP_RU
+              const focusToKey = (txt: string): string | null => {
+                const t = txt.toLowerCase();
+                if (t.includes('грудь') || t === 'chest') return 'chest';
+                if (t.includes('спин') || t === 'back') return 'back';
+                if (t.includes('ног') || t === 'legs' || t === 'quads' || t.includes('бедр')) return 'legs';
+                if (t.includes('плеч') || t === 'shoulders') return 'shoulders';
+                if (t.includes('рук') || t === 'arms' || t.includes('биц') || t.includes('триц')) return 'arms';
+                if (t.includes('кор') || t === 'core') return 'core';
+                return null;
+              };
+              let targetMuscles = focusMuscles.map(focusToKey).filter(Boolean) as string[];
+              if (targetMuscles.length === 0) {
+                const n = (s.name || '').toLowerCase();
+                if (n.includes('грудь')) targetMuscles = ['chest','triceps'];
+                else if (n.includes('спин')) targetMuscles = ['back','biceps'];
+                else if (n.includes('ног')) targetMuscles = ['legs','shoulders'];
+                else if (n.includes('плеч')) targetMuscles = ['shoulders','arms'];
+                else if (n.includes('рук')) targetMuscles = ['arms','shoulders'];
+                else targetMuscles = ['chest','back'];
+              }
+              const newBlocks = targetMuscles.slice(0, 2).map(m => {
+                const exs = suggestExercisesForGroup(m, prof.level || level, 1, prof.equipment ?? [], prof.weakPoints ?? [], (prof.injuries ?? []).filter(i=>i.exclude).map(i=>i.muscle), prof.avoidAxialLoad ?? false, prof.favoriteExercises ?? [], prof.excludedExercises ?? []);
+                const ex = exs[0];
+                if (!ex) return null;
+                const tmpl = muscleAwareSets(m, prof.level || level);
+                const wgt = (prof.workMax ?? {})[m] ?? (prof.workMax ?? {})[m.toLowerCase()] ?? 40;
+                const sets = makeSetsFromTemplate(tmpl as any, wgt);
+                return { id: newId('blk'), type: (ex.type === 'compound' ? 'compound' : 'accessory') as const, exerciseName: ex.name, muscle: m, role: (ex.type === 'compound' ? 'primary' : 'accessory') as const, sets: sets.length ? sets : [{ reps: 10, rir: 2 }] };
+              }).filter(Boolean) as UserBlock[];
+              return newBlocks.length ? { ...s, blocks: newBlocks } : s;
+            }),
+          }));
+          setWeeks(updated);
+        };
+        return (
+          <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#00e68a' }}>⚡ Пустые тренировки — 1 клик до качества</span>
+            <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Добавит по 2 базовых упражнения в каждый пустой день (по фокусу, с учётом уровня/оборудования/весов)</span>
+            <button style={{ ...BTN, padding: '6px 14px', fontSize: 11, minHeight: 36, marginLeft: 'auto' }} onClick={fillEmpty}>⚡ Заполнить пустые</button>
+          </div>
+        );
+      })()}
       {body.weeks.map((w, wi) => (
         <div className={`editor-week-card${expandedWeekIdx === wi ? ' is-open' : ''}`}
           key={wi}
@@ -685,13 +739,18 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; onCh
     }
   }, [quickGroup]);
   const addQuickBlock = (ex: { name: string; group?: string; type?: string }) => {
+    const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', workMax: {} } as any; } })();
+    const muscle = ex.group || quickGroup || '';
+    const tmpl = muscleAwareSets(muscle, prof.level || 'intermediate');
+    const w = (prof.workMax ?? {})[muscle] ?? (prof.workMax ?? {})[muscle.toLowerCase()] ?? 40;
+    const sets = makeSetsFromTemplate(tmpl as any, w);
     onChange([...blocks, {
       id: newId('blk'),
       type: ex.type === 'compound' ? 'compound' : 'accessory',
       exerciseName: ex.name,
-      muscle: ex.group || quickGroup || '',
+      muscle,
       role: ex.type === 'compound' ? 'primary' : 'accessory',
-      sets: [{ reps: 10, rir: 2 }],
+      sets: sets.length ? sets : [{ reps: 10, rir: 2 }],
     }]);
   };
   // F2.2: clipboard для копирования блоков между сессиями/неделями.
