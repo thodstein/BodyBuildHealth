@@ -37,12 +37,14 @@ export const FOCUS_RIR_TABLE: Record<BBTrainingFocus, FocusRirConfig> = {
   endurance:   { base: 3, driftPer2Weeks: 0, pumpRir: 5 },
 };
 
+/** @deprecated не используется — reps берутся из PHASE_CONFIGS (periodization), tempo из bb-tempo-rest; оставлено для совместимости */
 export const FOCUS_REPS_TABLE: Record<BBTrainingFocus, FocusRepsConfig> = {
   strength:    { heavy: [1, 5], pump: [8, 12],   light: [6, 10] },
   hypertrophy: { heavy: [5, 10], pump: [12, 20], light: [8, 15] },
   endurance:   { heavy: [8, 12], pump: [15, 30], light: [10, 20] },
 };
 
+/** @deprecated дублирует bb-tempo-rest.ts phaseTempo; каноника — bb-tempo-rest */
 export const PHASE_TEMPO: Record<string, { notation: string; eccentric: number }> = {
   accumulation:     { notation: '3-1-1-0', eccentric: 3 },
   intensification:  { notation: '2-1-1-0', eccentric: 2 },
@@ -50,6 +52,7 @@ export const PHASE_TEMPO: Record<string, { notation: string; eccentric: number }
   deload:           { notation: '4-2-2-0', eccentric: 4 },
 };
 
+/** @deprecated не используется */
 export const LEVEL_REP_MOD: Record<string, number> = {
   beginner: 0,
   intermediate: 1,

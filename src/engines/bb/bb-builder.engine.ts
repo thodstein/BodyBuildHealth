@@ -1947,10 +1947,10 @@ function buildSession(
     const n = (pl.exDatas[0]?.name || '').toLowerCase();
     const totalSets = pl.sets || 0;
     if (/жим|bench|press|dip|отжим.*брус|жим.*узк|close.?grip/i.test(n) && !/ног|leg|сгибан|curl/i.test(n)) {
-      indirectTriceps += totalSets * 0.5;
+      indirectTriceps += totalSets * 0.45;
     }
     if (/подтяг|pull.?up|chin|тяга|row|пуллдаун|верхн.*блок|lat.?pull/i.test(n) && !/лиц|face/i.test(n)) {
-      indirectBiceps += totalSets * 0.5;
+      indirectBiceps += totalSets * 0.4;
     }
   }
   // Базовый резерв для рук снижается пропорционально косвенной нагрузке.

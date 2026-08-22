@@ -228,7 +228,7 @@ export function generateActionableRecommendations(
     switch (issue.code) {
       case 'target_volume_deficit': {
         // "muscle: effective volume X ниже MEV Y" → "Добавьте N сетов на muscle"
-        const match = issue.message.match(/(\w+):.*volume\s+([\d.]+).*MEV\s+(\d+)/);
+        const match = issue.message.match(/([\w_]+):.*volume\s+([\d.]+).*MEV\s+(\d+)/);
         if (match) {
           const muscle = match[1];
           const current = parseFloat(match[2]);
@@ -243,7 +243,7 @@ export function generateActionableRecommendations(
         break;
       }
       case 'effective_mrv_overflow': {
-        const match = issue.message.match(/(\w+):.*effective\s+([\d.]+).*MRV\s+(\d+)/);
+        const match = issue.message.match(/([\w_]+):.*effective\s+([\d.]+).*MRV\s+(\d+)/);
         if (match) {
           const muscle = match[1];
           const current = parseFloat(match[2]);

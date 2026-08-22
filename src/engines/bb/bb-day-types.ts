@@ -30,10 +30,9 @@ export interface BBDay {
 
 /** Per-group блокировка: группа всегда только тяж (никогда чистый памп).
  *  forearms/traps — нет метаболического стимула, всегда тяж.
- *  НОГИ всегда тяжёлые (модель пользователя): главная мышца ножного дня
- *  (quads/hamstrings/glutes) не уходит в чистый памп — вторая мышца ног получает
- *  памп-нагрузку (8-10), а главная всегда тяж. */
-export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['forearms', 'traps', 'quads', 'hamstrings', 'glutes']);
+ *  Ноги (quads/hamstrings/glutes) теперь МОГУТ быть памп-днём для метаболического
+ *  стресса (P0-4 audit 2026-07) — в объёмном режиме вторая мышца ног получает памп. */
+export const FORCE_HEAVY_GROUPS: ReadonlySet<string> = new Set(['forearms', 'traps']);
 
 /** FIX-8: Единый источник sessionTag→мышцы для bb-builder + bb-selector.
  *  Ранее дублировался в двух файлах (bb-selector без LegsBiceps). */
@@ -45,7 +44,7 @@ export const TAG_MUSCLES: Record<string, string[]> = {
   // остаточным одним упражнением между грудью и руками.
   Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
   Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
-  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'arms'],
+  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'biceps', 'triceps'],
   Chest: ['chest', 'delt_front', 'triceps'],
   Back: ['back', 'biceps', 'delt_rear', 'traps'],
   Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],

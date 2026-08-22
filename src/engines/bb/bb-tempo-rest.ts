@@ -44,7 +44,8 @@ const EXERCISE_TEMPO_OVERRIDES: Record<string, string> = {
   // Растянутые — длинный эксцентрик, пауза в растянутой позиции
   'румынская': '3-1-1-0',
   'rdl': '3-1-1-0',
-  'наклон': '3-1-1-0',
+  'наклонной': '3-1-1-0',
+  'наклонный жим': '3-1-1-0',
   'incline': '3-1-1-0',
   'сисси': '4-1-1-0',
   'sissy': '4-1-1-0',
@@ -67,7 +68,9 @@ const EXERCISE_TEMPO_OVERRIDES: Record<string, string> = {
 /** Найти per-exercise tempo override по имени упражнения. */
 export function exerciseTempoOverride(name: string): string | undefined {
   const n = (name || '').toLowerCase();
-  for (const key of Object.keys(EXERCISE_TEMPO_OVERRIDES)) {
+  // Более специфичные ключи первыми (длиннее → приоритет), чтобы «жим штанги» не перекрывал «жим штанги на наклонной»
+  const keys = Object.keys(EXERCISE_TEMPO_OVERRIDES).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
     if (n.includes(key)) return EXERCISE_TEMPO_OVERRIDES[key];
   }
   return undefined;
@@ -76,8 +79,14 @@ export function exerciseTempoOverride(name: string): string | undefined {
 /** Темп под характер + опционально phase (ACSM 2023: eccentric 2-4с) + интенс-технику. */
 export function tempoFor(character: DayCharacter, technique?: string, phase?: string, exerciseName?: string): TempoSpec {
   const base = { ...TEMPO_BY_CHARACTER[character] };
-  // FIX-B2: per-exercise override имеет приоритет над phase (проф-тренер > шаблон)
-  if (exerciseName) {
+  // Deload фаза доминирует над per-exercise override (восстановление важнее специфики)
+  if (phase === 'deload' && exerciseName) {
+    const override = exerciseTempoOverride(exerciseName);
+    // для deload всё равно используем фазовый темп 4-2-2-0, но сохраняем логику tut
+    if (override) {
+      // пропускаем override, переходим к фазе
+    }
+  } else if (exerciseName) {
     const override = exerciseTempoOverride(exerciseName);
     if (override) {
       const parts = override.split('-').map(Number);
@@ -87,23 +96,29 @@ export function tempoFor(character: DayCharacter, technique?: string, phase?: st
         base.concentric = parts[2];
         base.notation = override;
         base.tutPerRep = base.eccentric + base.pause + base.concentric + parts[3];
-        return base;
+        // если фаза deload —Override игнорируется, перезапишется ниже
+        if (phase !== 'deload') return base;
       }
     }
   }
   // Phase-based eccentric emphasis (ACSM 2023: accumulation 3с, peaking 2с, deload 4с)
   if (phase) {
-    const phaseTempo: Record<string, { notation: string; eccentric: number }> = {
-      accumulation:    { notation: '3-1-1-0', eccentric: 3 },
-      intensification: { notation: '2-1-1-0', eccentric: 2 },
-      peaking:         { notation: '2-0-1-0', eccentric: 2 },
-      deload:          { notation: '4-2-2-0', eccentric: 4 },
+    const phaseTempo: Record<string, string> = {
+      accumulation: '3-1-1-0',
+      intensification: '2-1-1-0',
+      peaking: '2-0-1-0',
+      deload: '4-2-2-0',
     };
     const pt = phaseTempo[phase];
     if (pt) {
-      base.eccentric = pt.eccentric;
-      base.notation = pt.notation;
-      base.tutPerRep = base.eccentric + base.pause + base.concentric;
+      const parts = pt.split('-').map(Number);
+      if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+        base.eccentric = parts[0];
+        base.pause = parts[1];
+        base.concentric = parts[2];
+        base.notation = pt;
+        base.tutPerRep = parts[0] + parts[1] + parts[2] + parts[3];
+      }
     }
   }
   if (technique === 'slow_eccentric' || technique === 'negatives') {
