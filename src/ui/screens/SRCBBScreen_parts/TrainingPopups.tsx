@@ -406,4 +406,80 @@ export const PopupExerciseList: React.FC<{
   </>;
 };
 
+/**
+ * PopupMultiSelect — мульти-выбор с галочками (автор/тип/уровень) в попапе.
+ * По умолчанию выбрано «всё» (пустой список selected = все). Кнопка «Все/Сброс».
+ */
+export const PopupMultiSelect: React.FC<{
+  label: string;
+  options: { id: string; label: string; count?: number }[];
+  selected: string[];                 // [] = все
+  hint?: string;
+  onChange: (sel: string[]) => void;
+}> = ({ label, options, selected, hint, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const allSelected = selected.length === 0 || selected.length === options.length;
+  const display = allSelected
+    ? 'Все'
+    : selected.length === 1
+      ? options.find(o => o.id === selected[0])?.label ?? 'Все'
+      : `Выбрано: ${selected.length}`;
+  const toggle = (id: string) => {
+    if (selected.includes(id)) {
+      const next = selected.filter(x => x !== id);
+      onChange(next.length === 0 ? [] : next);
+    } else {
+      onChange([...selected, id]);
+    }
+  };
+  const setAll = (v: boolean) => onChange(v ? [] : options.map(o => o.id));
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={cardBtnStyle(!allSelected)}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+        <div style={{ fontSize: 12, color: !allSelected ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
+      </button>
+      {open && (
+        <PortalOverlay onClose={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={sheet(420)}>
+            <div style={topBar} />
+            <div style={sheetBody}>
+              <div style={titleStyle}>{label}</div>
+              {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <button onClick={() => setAll(true)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: '1px solid rgba(0,230,138,0.3)', background: allSelected ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', color: ACCENT }}>✓ Все</button>
+                <button onClick={() => setAll(false)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.6)' }}>Сброс</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {options.map(o => {
+                  const isSel = selected.includes(o.id);
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => toggle(o.id)}
+                      style={{ display: 'block', width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
+                        background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        color: isSel ? ACCENT : 'rgba(255,255,255,0.85)' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{o.label}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {o.count != null && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{o.count}</span>}
+                          {isSel && <span style={{ width: 16, height: 16, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: ACCENT, color: '#000', fontSize: 9, fontWeight: 800 }}>✓</span>}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>Готово</button>
+            </div>
+          </div>
+        </PortalOverlay>
+      )}
+    </>
+  );
+};
+
 export default { PopupNumber, PopupSelect, PopupText, ExpandableCard, MetricCard, SaveButton, CalcSection, PopupToggle, CalcResult };

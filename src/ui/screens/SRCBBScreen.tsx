@@ -39,7 +39,7 @@ import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
 import { VisualTab } from './TrainingScreen_parts/VisualTab';
 import { ProMetricsPanel } from './SRCBBScreen_parts/ProMetricsPanel';
-import { PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
+import { PopupNumber, PopupSelect, PopupMultiSelect, ExpandableCard, MetricCard, SaveButton } from './SRCBBScreen_parts/TrainingPopups';
 import { lmsPlanToSessions, bbPlanToSessions, autoregPlan as autoregPlanBridge, progressFromSessions, planVsFact } from '../../engines/training-integration.engine';
 import type { BridgeSession, ReadinessInput, ProgressSnapshot } from '../../engines/training-integration.engine';
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
@@ -347,6 +347,45 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
   // ПЛ-авто работает ТОЛЬКО с силовыми циклами (бодибилдинг-циклы имеют свой экран track='bb')
   const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
+  // ── Фильтры каталога: автор / тип(период) / уровень. [] = все (по умолчанию) ──
+  const [filterAuthors, setFilterAuthors] = useState<string[]>([]);
+  const [filterTypes, setFilterTypes] = useState<string[]>([]);
+  const [filterLevels, setFilterLevels] = useState<string[]>([]);
+  const authorOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of plCycles) {
+      const tags = c.meta.tags ?? ['lms'];
+      const key = tags.find(t => t !== 'bodybuilding' && t !== 'hypertrophy') ?? 'lms';
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    const AUTHOR_LABELS: Record<string, string> = { lms: 'LMS', surovetsky: 'Суровецкий', sheiko: 'Шейко', solovyov: 'Соловьёв', muravyov: 'Муравьёв', coan: 'Коан', butenko: 'Бутенко', hatfield: 'Хэтфилд', mccullough: 'МакКаллоу', petrushin: 'Петрушин', verkhoshansky: 'Верхошанский', washington: 'Washington', muravjev: 'Муравьёв' };
+    return [...map.entries()].sort((a, b) => (AUTHOR_LABELS[a[0]] ?? a[0]).localeCompare(AUTHOR_LABELS[b[0]] ?? b[0], 'ru')).map(([id, count]) => ({ id, label: AUTHOR_LABELS[id] ?? id, count }));
+  }, [plCycles]);
+  const typeOptions = useMemo(() => {
+    const order: string[] = ['strength', 'endurance', 'peak', 'mass', 'mixed'];
+    const counts = new Map<string, number>();
+    for (const c of plCycles) counts.set(c.meta.period, (counts.get(c.meta.period) ?? 0) + 1);
+    return [...counts.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(id => ({ id, label: periodLabelRu(id), count: counts.get(id) }));
+  }, [plCycles]);
+  const levelOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of plCycles) counts.set(c.meta.level, (counts.get(c.meta.level) ?? 0) + 1);
+    return [...counts.keys()].sort().map(id => ({ id, label: id, count: counts.get(id) }));
+  }, [plCycles]);
+  const filteredPlCycles = useMemo(() => {
+    return plCycles.filter(c => {
+      if (filterAuthors.length > 0) {
+        const tags = c.meta.tags ?? ['lms'];
+        const author = tags.find(t => t !== 'bodybuilding' && t !== 'hypertrophy') ?? 'lms';
+        if (!filterAuthors.includes(author)) return false;
+      }
+      if (filterTypes.length > 0 && !filterTypes.includes(c.meta.period)) return false;
+      if (filterLevels.length > 0 && !filterLevels.includes(c.meta.level)) return false;
+      return true;
+    });
+  }, [plCycles, filterAuthors, filterTypes, filterLevels]);
+  const hasActiveFilters = filterAuthors.length > 0 || filterTypes.length > 0 || filterLevels.length > 0;
+  const resetAllFilters = () => { setFilterAuthors([]); setFilterTypes([]); setFilterLevels([]); };
   const buildSrc = (cycleId = selectedCycleId, weeks = cycleWeeks) => {
     const tpl = getCycleById(cycleId);
     if (!tpl) {
@@ -1493,8 +1532,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {plSeasonMode !== 'season' && best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           {plSeasonMode !== 'season' && (
             <>
-              <div style={H}>📂 Каталог силовых циклов ({plCycles.length})</div>
-              <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={plCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
+              <div style={H}>📂 Каталог силовых циклов ({filteredPlCycles.length})</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6, marginBottom: 6 }}>
+                <PopupMultiSelect label="👤 Автор" options={authorOptions} selected={filterAuthors} onChange={setFilterAuthors} hint="Фильтр по автору цикла (LMS, Суровецкий, Шейко и др.)" />
+                <PopupMultiSelect label="🎯 Тип" options={typeOptions} selected={filterTypes} onChange={setFilterTypes} hint="Тип/период цикла: сила, выносливость, выход на пик, масса, смешанный" />
+                <PopupMultiSelect label="📶 Уровень" options={levelOptions} selected={filterLevels} onChange={setFilterLevels} hint="Уровень спортсмена (новичок, II-КМС, КМС-МС и т.д.)" />
+              </div>
+              {hasActiveFilters && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                  <span>Фильтр активен · найдено {filteredPlCycles.length}</span>
+                  <button onClick={resetAllFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>↺ Сбросить фильтры</button>
+                </div>
+              )}
+              <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={filteredPlCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
               {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
             </>
           )}
