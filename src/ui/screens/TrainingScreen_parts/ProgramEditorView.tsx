@@ -1456,9 +1456,13 @@ return (
         <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>🎛 Основное</span>
         <span style={{ fontSize: 10, color: DIM }}>Название, цель, уровень и формат недели</span>
       </div>
-      {/* Meta */}
+      {/* Meta — с inline-валидацией для качественного итога */}
       <div className="constructor-surface editor-meta-card" style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-         <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы" />
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+           <input aria-label="Название программы" style={IN} value={program.meta.title} onChange={e => updateMeta({ title: e.target.value })} placeholder="Название программы (≥3 символов)" />
+           {!(program.meta.title && program.meta.title.trim().length >= 3) && <span style={{ fontSize: 10, color: '#ef4444' }}>⚠ Укажите название — без него Итог не будет качественным</span>}
+           {program.meta.title && program.meta.title.trim().length >= 3 && program.meta.title.trim().length < 12 && <span style={{ fontSize: 10, color: '#f59e0b' }}>💡 Более описательное название поможет в списке (напр. «Масса 4д × 8 нед»)</span>}
+         </div>
         <div style={{ display: 'flex', gap: 6 }}>
            <EditorPopupSelect
             value={program.meta.goal}
@@ -1504,6 +1508,7 @@ return (
                   }
                   onChangeWithUndo(newProgram);
                 }} />
+            <span style={{ fontSize: 9, color: program.meta.daysPerWeek < 2 || program.meta.daysPerWeek > 6 ? '#f59e0b' : DIM }}>{program.meta.daysPerWeek < 3 ? '💡 3д — минимум для прогрессии' : program.meta.daysPerWeek > 5 && program.meta.level !== 'advanced' && program.meta.level !== 'enhanced' ? '⚠ 6д — только для продвинутых' : '✓ ' + program.meta.daysPerWeek + 'д — оптимально'}</span>
            </label>
            <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
             Недель
@@ -1535,12 +1540,17 @@ return (
                   }
                   onChangeWithUndo(newProgram);
                 }} />
-           </label>
-        </div>
+            </label>
+         </div>
        </div>
-       {/* Подсказка по цели/уровню — что влияет на качество */}
-       <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa', display: 'flex', flexDirection: 'column', gap: 4 }}>
-         <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>💡 Цель и уровень — как влияет на цикл</div>
+       <div style={{ fontSize: 10, color: DIM, display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+        <span style={{ color: program.meta.daysPerWeek <3 || program.meta.daysPerWeek >6 ? '#f59e0b' : DIM }}>{program.meta.daysPerWeek <3 ? '💡 3д — минимум' : program.meta.daysPerWeek >5 && program.meta.level!=='advanced' && program.meta.level!=='enhanced' ? '⚠ 6д — для продвинутых' : '✓ ' + program.meta.daysPerWeek + 'д/нед — ок'}</span>
+        <span>·</span>
+        <span style={{ color: program.meta.weeks <3 || program.meta.weeks>12 ? '#f59e0b' : DIM }}>{program.meta.weeks <4 ? '💡 4 нед — минимум' : program.meta.weeks >12 ? '⚠ ' + program.meta.weeks + ' нед — длинный' : '✓ ' + program.meta.weeks + ' нед — ок'}</span>
+        {program.meta.weeks >=6 && !program.bb?.weeks.some(w=> w.deload) && <span style={{ color: '#f59e0b' }}>· добавьте делод</span>}
+      </div>
+      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>💡 Цель и уровень — как влияет на цикл</div>
          <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.5 }}>
            {program.meta.goal === 'hypertrophy' && 'Масса: объём 65–85% MEV→MAV, RIR 2–3 → 1, делод каждую 4 нед.'}
            {program.meta.goal === 'powerlifting' && 'Сила: интенсивность 75–90% 1RM, RIR 3→1, пик + делод перед тестом.'}
@@ -1585,6 +1595,13 @@ return (
         <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📚 Шаблоны циклов</span>
         <span style={{ fontSize: 10, color: DIM }}>1 клик — сплит ББ или цикл ПЛ из библиотеки</span>
       </div>
+      {!isPro && (
+        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>👤 Профиль для качества</span>
+          <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Веса, оборудование и травмы влияют на подбор упражнений — заполните в «Профессиональном» режиме → Профиль</span>
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(167,139,250,0.3)', color: '#a78bfa' }} onClick={() => onMode('pro')}>🎓 В Pro → Профиль</button>
+        </div>
+      )}
       <CycleTemplatesPanel program={program} onChange={onChange as any} showToast={showToast} />
       </>
       )}
