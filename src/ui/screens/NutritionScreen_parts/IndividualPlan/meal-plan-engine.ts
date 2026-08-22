@@ -565,6 +565,13 @@ function breakfastProteinFallback(pool: ReturnType<typeof buildFoodPools>): Food
   const any = [...pool.proteinSolid, ...pool.proteinLean];
   return any.filter(f => BREAKFAST_PROTEIN_IDS.some(k => f.id.includes(k) || (f.name || '').toLowerCase().includes(k)));
 }
+// П.1 (Aug 22 2026): является ли белок «завтрашним» (яйца/творог/йогурт/сыворотка/казеин/тофу).
+// Используется для фильтрации ИЗБРАННЫХ белков на завтраке, чтобы любимый говяжий фарш/рыба
+// не попадали в завтрак (только на обед/ужин).
+function isBreakfastProtein(f: FoodItem): boolean {
+  const id = (f.id || '').toLowerCase(); const name = (f.name || '').toLowerCase();
+  return BREAKFAST_PROTEIN_IDS.some(k => id.includes(k) || name.includes(k));
+}
 // ─── E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи) ──
 const SNACK_CARB_KEYWORDS = ['хлопья','овсян','рисов','манк','мюсли','гречк','сухар','рисовый крем','хлеб','рис '];
 const SNACK_FRUIT_KEYWORDS = ['изюм','кураг','черносл','финик','сухофрук','ягод','банан','инжир','черника','малин'];
@@ -925,12 +932,21 @@ function buildWholeMeal(
   const preferredRot = preferredIds && preferredIds.size > 0 ? _allProteinPool.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
   // D-28+ fix (жалоба «завтрак = овсянка и говяжий фарш»): завтрак НИКОГДА не получает
   // дневную мясную ротацию напрямую — вместо неё «завтрашний» белок (яйца/творог/сыворотка).
+  // ВАЖНО: фильтр применяется и к ИЗБРАННЫМ (preferred) — если пользователь отметил говядину
+  // любимым белком, на ЗАВТРАК она всё равно не попадёт (только на обед/ужин). Было: любимый
+  // фарш попадал в завтрак через preferredRot, обходя ротационный фильтр.
   const _breakfastFallbackProtein = breakfast ? breakfastProteinFallback(pool) : [];
-  const proteinPool = preferredRot.length > 0
-    ? preferredRot
+  // На завтраке избранные белки фильтруются до «завтрашних» (яйца/творог/сыворотка), и даже
+  // если избранных «завтрашних» нет — завтрак получит яйца/творог/сыворотку, а НЕ любимый
+  // говяжий фарш. Любимое мясо остаётся для обеда/ужина (ветка preferredRot ниже).
+  const _preferredForThis = (breakfast ? preferredRot.filter(f => isBreakfastProtein(f)) : preferredRot);
+  const proteinPool = _preferredForThis.length > 0
+    ? _preferredForThis
     : snack && pool.fastProtein.length > 0 ? [...pool.fastProtein, ...rotPoolFinal]
     : breakfast && _breakfastProtein && _breakfastProtein.length > 0 ? _breakfastProtein
     : breakfast && _breakfastFallbackProtein.length > 0 ? _breakfastFallbackProtein
+    : breakfast && preferredRot.length > 0 ? preferredRot
+    : preferredRot.length > 0 ? preferredRot
     : rotPoolFinal.length > 0 ? rotPoolFinal
     : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
     : (remF < 12 && pool.proteinLean.length > 0) ? pool.proteinLean
@@ -2329,6 +2345,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // D-28+ fix (жалоба «500 г клюквы»): фрукт — это порция-«добавка», а не углеводный
         // носитель; коррекция макросов не должна раздувать его выше реалистичных 150 г.
         if (item.role === 'fruit') upCap = FRUIT_PORTION_CAP_G;
+        // D-28+ fix: цельный белок (курица/рыба/творог) тоже не раздувается коррекцией за 300 г
+        // на приём — иначе прецизионная подгонка давала «лосось 316 г».
+        if (item.role === 'protein') upCap = Math.min(upCap, 300);
         const newAmount = Math.max(suppMin, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
         item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
@@ -2430,6 +2449,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     // D-28+ fix (жалоба «500 г клюквы»): fruit-порции не раздуваются точной подгонкой.
     if (!suppMax && best.item.role === 'fruit') maxAmount = Math.min(maxAmount, FRUIT_PORTION_CAP_G);
+    // D-28+ fix: цельный белок не раздувается за 300 г на приём (иначе «лосось 316 г»).
+    if (!suppMax && best.item.role === 'protein') maxAmount = Math.min(maxAmount, 300);
     let newAmount = best.item.amount + deltaGrams;
     newAmount = Math.max(minAmount, Math.min(maxAmount, Math.round(newAmount)));
     // Реальная дельта после округления и капов

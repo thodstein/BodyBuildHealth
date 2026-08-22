@@ -60,6 +60,20 @@ describe('D1: завтрак не получает мясную ротацию (
     const hasMeat = breakfast.items.some(it => BREAKFAST_FORBIDDEN.some(k => it.id.includes(k)));
     expect(hasMeat).toBe(false);
   });
+
+  it('ИЗБРАННЫЙ говяжий фарш не попадает в завтрак (только на обед/ужин)', () => {
+    // Реальный сценарий жалобы: пользователь отметил говядину/фарш любимым белком → раньше
+    // завтрак получал «говяжий фарш» через preferredRot (обходя ротационный фильтр).
+    const plan = buildDayPlan(base({ mealsCount: 5, preferredIds: new Set(['beef_minced', 'beef_lean']) }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    const hasMeat = breakfast.items.some(it => BREAKFAST_FORBIDDEN.some(k => it.id.includes(k)));
+    expect(hasMeat).toBe(false);
+    // говядина всё же присутствует в дне (на обеде/ужине) — пользовательский выбор уважается
+    const dayHasBeef = plan.meals.some(m => m.items.some(it => it.id.includes('beef')));
+    expect(dayHasBeef).toBe(true);
+    // ни один белок не раздут за 300 г на приём (коррекция не даёт «лосось 316 г»)
+    plan.meals.forEach(m => m.items.filter(i => i.role === 'protein').forEach(it => expect(it.amount).toBeLessThanOrEqual(300)));
+  });
 });
 
 describe('D2: E5-добивка фруктом ограничена и предпочитает карб-плотные фрукты (жалоба «500 г клюквы»)', () => {

@@ -716,31 +716,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
   const effectiveF = Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult);
-  // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом.
-  // Цель углеводов — диетологическая (г/кг / остаток после Б/Ж), а не абстрактный ×множитель.
-  // При инсулине база уже инсулин-дозозависима (computePlannerTargets поднимает carbs под дозу,
-  // а движок раздаёт ~10 г/1 ЕД на приёмы вокруг укола). Потолок 8 г/кг защищает от кумулятивного
-  // стэка nutrLevel × cycling × surplus (жалоба «120 кг на курсе → 900 г углеводов»).
-  // Для base/medium (mult ≤1.2) и ручного режима поведение НЕ меняем; enhanced/max срезают раздув.
+  // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
+  // ДИЕТОЛОГИЧЕСКИМ потолком. Цель углеводов — г/кг (межсезонье 4-6 г/кг), а не абстрактный
+  // ×множитель (жалобы «120 кг на курсе → 900/814 г углеводов»). При инсулине потолок НЕ ниже
+  // инсулин-флора (~10 г/1 ЕД, до 8 г/кг) — иначе высокие дозы не были бы обеспечены углеводами.
+  // ВАЖНО: потолок применяется ко ВСЕМ уровням (не только enhanced/max) — иначе на base/medium
+  // дисплей по-прежнему показывал бы абсурдные 800+ г.
+  const _hasInsulinC = (injections || []).some((i: any) => String(i?.type || '').toLowerCase().includes('инсулин'));
+  const _insulinCarbFloorC = _hasInsulinC
+    ? Math.round((injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0) * 10)
+    : 0;
   const effectiveC = (() => {
     if (kbjuMode === 'manual' && manualC !== null) return manualC;
     if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
       return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
     }
     const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-    if (_nutrMult <= 1.201) return rawC; // base/medium: без изменений
-    const kcalTarget = Math.round((kbjuMode === 'profile' ? profileTargets.kcal : calcTargets.kcal) * _nutrMult);
-    const byRemainder = Math.max(0, Math.round((kcalTarget - effectiveP * 4 - effectiveF * 9) / 4));
-    return Math.max(50, Math.min(byRemainder, Math.round(weight * 8))); // потолок 8 г/кг
+    // потолок: 5 г/кг, но не ниже инсулин-флора (без инсулина floor=0 → чистые 5 г/кг)
+    const floor = _insulinCarbFloorC;
+    const cap = Math.max(Math.round(weight * 5), floor, 50);
+    return Math.max(floor, Math.min(Math.max(rawC, 50), cap));
   })();
-  // Kcal согласуем с фактическими макросами (Atwater) ТОЛЬКО когда углеводы были урезаны
-  // (enhanced/max) — чтобы не оставалось «дыры» под коррекцию жирами. Для base/medium
-  // сохраняем прежнее значение точь-в-точь (никаких регрессий у существующих планов).
+  // Kcal согласуем с фактическими макросами (Atwater) ВСЕГДА (для auto): display == генерация,
+  // чтобы не было «разбега» между целью углеводов и собранным планом. Усиление уровня (nutrMult)
+  // поднимает Б/Ж, а углеводы — в пределах диетологического потолка; kcal = сумма макросов.
   const effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
     ? manualKcal
-    : (_nutrMult <= 1.201)
-      ? Math.round((kbjuMode === 'profile' ? profileTargets.kcal : calcTargets.kcal) * _nutrMult)
-      : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+    : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
