@@ -55,18 +55,26 @@ async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
 }
 
 async function prepareImageForServer(file: File): Promise<Blob> {
-  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
+  if (typeof document === 'undefined') return file;
+  const maxSide = 1600;
+  const maxPixels = 2_200_000;
+
+  const encodeCanvas = async (canvas: HTMLCanvasElement): Promise<Blob | null> => (
+    new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78))
+  );
+
   try {
     // Decode with a resize hint first. Mobile WebViews may otherwise decode a
     // 12-48 MP camera photo at full size and get killed before the OCR request
     // is sent. The pixel cap below protects browsers that ignore the hint.
-    const maxSide = 1600;
-    const maxPixels = 2_200_000;
-    const bitmap = await createImageBitmap(file, {
-      resizeWidth: maxSide,
-      resizeHeight: maxSide,
-      resizeQuality: 'high',
-    });
+    const bitmap = typeof createImageBitmap === 'function'
+      ? await createImageBitmap(file, {
+        resizeWidth: maxSide,
+        resizeHeight: maxSide,
+        resizeQuality: 'high',
+      })
+      : null;
+    if (!bitmap) throw new Error('createImageBitmap unavailable');
     const scale = Math.min(
       1,
       maxSide / Math.max(bitmap.width, bitmap.height),
@@ -82,12 +90,39 @@ async function prepareImageForServer(file: File): Promise<Blob> {
     }
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
-    const compressed = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78));
+    const compressed = await encodeCanvas(canvas);
     // Keep the JSON/base64 request below Vercel's body limit. A 12 MB binary
     // becomes roughly 16 MB after base64 encoding plus JSON overhead.
     return compressed && (compressed.size < file.size || file.size > 9 * 1024 * 1024) ? compressed : file;
   } catch {
-    return file;
+    // Older Telegram WebViews may not implement createImageBitmap. Decode via
+    // an HTMLImageElement instead of falling back to the full camera file.
+    try {
+      if (typeof Image === 'undefined' || typeof URL?.createObjectURL !== 'function') return file;
+      const url = URL.createObjectURL(file);
+      try {
+        const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const element = new Image();
+          const timer = setTimeout(() => reject(new Error('image decode timeout')), 15_000);
+          element.onload = () => { clearTimeout(timer); resolve(element); };
+          element.onerror = () => { clearTimeout(timer); reject(new Error('image decode failed')); };
+          element.src = url;
+        });
+        const scale = Math.min(1, maxSide / Math.max(image.width, image.height), Math.sqrt(maxPixels / Math.max(1, image.width * image.height)));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext('2d');
+        if (!context) return file;
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const compressed = await encodeCanvas(canvas);
+        return compressed && compressed.size < file.size ? compressed : file;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      return file;
+    }
   }
 }
 
@@ -341,6 +376,9 @@ async function serverOcrScannedPdf(file: File): Promise<string> {
 
 async function serverOcrImage(file: File): Promise<string> {
   const upload = await prepareImageForServer(file);
+  if (upload.size > 10 * 1024 * 1024) {
+    throw new Error('Фото слишком большое для мобильного OCR. Уменьшите изображение или сделайте скриншот экрана.');
+  }
   const bytes = new Uint8Array(await readFileAsArrayBuffer(upload));
   let binary = '';
   const chunk = 0x8000;
@@ -351,7 +389,10 @@ async function serverOcrImage(file: File): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), 90_000);
   let response: Response;
   try {
-    response = await fetch('./api/ocr-image', {
+    const endpoint = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
+      ? `${window.location.origin}/api/ocr-image`
+      : './api/ocr-image';
+    response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
