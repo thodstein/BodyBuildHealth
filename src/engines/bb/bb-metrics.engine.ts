@@ -43,7 +43,12 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   // fix H: метрики считаем по ПИКОВОЙ неделе (макс объёма), а не по первой (где RIR ещё высокий)
   const weekIdx = plan.weeks.reduce((best, w, i) => {
     const exs = w.sessions.flatMap(s => s.exercises);
-    const ts = exs.reduce((s, e) => s + e.sets, 0);
+    // effectiveSets более точен для пика (pump неделя может иметь больше сетов но меньше effective)
+    const ts = exs.reduce((s, e) => {
+      // fallback к total если effective не посчитан
+      const eff = (e as any).effectiveSets ?? e.sets;
+      return s + (Number.isFinite(eff) ? eff : e.sets);
+    }, 0);
     return ts > best.ts ? { ts, i } : best;
   }, { ts: -1, i: 0 }).i;
   const sessions = (weekIdx >= 0 ? plan.weeks[weekIdx] : plan.weeks[0])?.sessions || [];
@@ -55,9 +60,11 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
       if (ex.character === 'тяж') a.тяж += ex.sets;
       else if (ex.character === 'памп') a.памп += ex.sets;
       else a.лёг += ex.sets;
-      // P1-3: hard-сеты (RIR<1 = до отказа)
-      if (ex.rir < 1) a.hard += ex.sets;
-      a.rirSum += ex.rir * ex.sets; a.rirN += ex.sets;
+      // P1-3: hard-сеты (RIR<1 = до отказа) — NaN защита
+      if (Number.isFinite(ex.rir) && ex.rir < 1) a.hard += ex.sets;
+      if (Number.isFinite(ex.rir) && Number.isFinite(ex.sets)) {
+        a.rirSum += ex.rir * ex.sets; a.rirN += ex.sets;
+      }
     }
   }
   const effectiveByMuscle = aggregateBBVolume(sessions);

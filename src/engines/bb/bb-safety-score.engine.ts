@@ -68,10 +68,14 @@ export function calculatePlanSafetyScore(
   }
   issues.push(...stressAnalysis.issues.slice(0, 5));
 
-  // 2. ACWR Compliance
-  const acwr = options.acwrRatio || 1.0;
+  // 2. ACWR Compliance — если ACWR не передан, считаем осторожность (не маскируем 1.0)
+  const hasAcwr = Number.isFinite(options.acwrRatio);
+  const acwr = hasAcwr ? (options.acwrRatio as number) : 1.0;
   let acwrScore = SCORE_WEIGHTS.acwrCompliance;
-  if (acwr > 1.5) {
+  if (!hasAcwr) {
+    acwrScore = Math.round(SCORE_WEIGHTS.acwrCompliance * 0.75);
+    issues.push('ACWR не рассчитан — нет данных sRPE, осторожность.');
+  } else if (acwr > 1.5) {
     acwrScore = 0;
     issues.push(`ACWR=${acwr.toFixed(2)} — опасная зона (>1.5).`);
     recommendations.push('Принудительная разгрузка: снизить объём на 30-40%.');
@@ -109,26 +113,20 @@ export function calculatePlanSafetyScore(
     issues.push(`${injuryCount} активных травм — план адаптирован.`);
   }
 
-  // 5. Volume Compliance (MRV)
+  // 5. Volume Compliance (MRV) — приоритет mrvByMuscle (enhanced скорректированный), fallback landmarks
   let volumeViolations = 0;
   for (const w of plan.weeks) {
     if (w.phase === 'deload') continue;
     const muscleSets: Record<string, number> = {};
     for (const s of w.sessions) {
       for (const ex of s.exercises) {
-        // Разминочные упражнения (warmupActivator) не входят в рабочий объём.
         if ((ex as any).warmupActivator) continue;
         muscleSets[ex.muscle] = (muscleSets[ex.muscle] || 0) + ex.sets;
       }
     }
-    // Проверяем превышение MRV (если есть volumeLandmarks)
-    if (plan.volumeLandmarks) {
-      for (const [muscle, sets] of Object.entries(muscleSets)) {
-        const lm = plan.volumeLandmarks.find(l => l.group === muscle);
-        if (lm && sets > lm.mrv * 1.1) {
-          volumeViolations++;
-        }
-      }
+    for (const [muscle, sets] of Object.entries(muscleSets)) {
+      const cap = (plan as any).mrvByMuscle?.[muscle] ?? plan.volumeLandmarks?.find(l => l.group === muscle)?.mrv;
+      if (cap && sets > cap * 1.1) volumeViolations++;
     }
   }
   let volumeScore = SCORE_WEIGHTS.volumeCompliance;

@@ -35,7 +35,7 @@ function musclePriority(muscle: string): number {
 /* ───────────────────────── Классификаторы по имени ───────────────────────── */
 
 /** Базовое (compound) упражнение по имени или роли. */
-const ISOLATION_RE = /мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём гантелей|подъем гантелей|бицепс|трицепс|молотк|сведен/i;
+const ISOLATION_RE = /мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём гантелей|подъем гантелей|бицепс|трицепс|молотк|сведен|отведение|приведение|cable.*lateral/i;
 /** True for isolation movements by name (french press, curl, lateral/front raise, shrug, pushdown,
  *  fly, calf raise, crunch, etc.) — used to keep heavy/primary isolations out of the compound tier. */
 export function isIsolationByName(name: string): boolean {
@@ -80,8 +80,10 @@ function stretchRank(name: string): number {
 /* ───────────────────────── Нагрузка (вес/RIR) ───────────────────────── */
 // Тяжелее (больше вес / меньше RIR) — раньше среди однотипных compounds.
 function loadRank(ex: BBExercise): number {
-  const w = ex.workSets?.[0]?.weight ?? 0;
-  const rir = ex.rir ?? 2;
+  const rawW = ex.workSets?.[0]?.weight ?? 0;
+  const w = Number.isFinite(rawW) ? rawW : 0;
+  const rawRir = ex.rir ?? 2;
+  const rir = Number.isFinite(rawRir) ? rawRir : 2;
   return -w + rir * 10; // больше вес → меньше ранг (раньше); меньше RIR → раньше
 }
 
