@@ -185,6 +185,13 @@ const DAY_TEMPLATES: Array<{
   },
 ];
 
+/** ПЛ-шаблоны дней: быстрый старт для своего цикла (3 базовых движения) — Qualität через 1 клик. */
+const PL_DAY_TEMPLATES: Array<{ label: string; icon: string; name: string; lift: PLExercise['lift']; muscle: string; exercises: Array<{ name: string; lift: PLExercise['lift']; sets: PLSet[] }> }> = [
+  { label: 'Присед-день', icon: '🦵', name: 'Присед', lift: 'squat', muscle: 'legs', exercises: [{ name: 'Присед', lift: 'squat', sets: [{ pct: 0.75, reps: 5, sets: 3, rir: 2 }] }, { name: 'Фронтальный присед', lift: 'squat', sets: [{ pct: 0.65, reps: 6, sets: 3, rir: 2 }] }, { name: 'Румынская тяга', lift: 'accessory', sets: [{ pct: 0.6, reps: 8, sets: 3, rir: 2 }] }] },
+  { label: 'Жим-день', icon: '💪', name: 'Жим', lift: 'bench', muscle: 'chest', exercises: [{ name: 'Жим лёжа', lift: 'bench', sets: [{ pct: 0.75, reps: 5, sets: 3, rir: 2 }] }, { name: 'Жим узким хватом', lift: 'bench', sets: [{ pct: 0.68, reps: 6, sets: 3, rir: 2 }] }, { name: 'Тяга штанги в наклоне', lift: 'accessory', sets: [{ pct: 0.65, reps: 8, sets: 3, rir: 2 }] }] },
+  { label: 'Тяга-день', icon: '🏋️', name: 'Тяга', lift: 'dead', muscle: 'back', exercises: [{ name: 'Становая тяга', lift: 'dead', sets: [{ pct: 0.75, reps: 3, sets: 3, rir: 2 }] }, { name: 'Тяга штанги в наклоне', lift: 'accessory', sets: [{ pct: 0.65, reps: 8, sets: 3, rir: 2 }] }, { name: 'Подтягивания', lift: 'accessory', sets: [{ pct: 0.6, reps: 6, sets: 3, rir: 2 }] }] },
+];
+
 export function isUserBlockClipboardShape(value: unknown): value is UserBlock {
   if (!value || typeof value !== 'object') return false;
   const block = value as Partial<UserBlock>;
@@ -1569,6 +1576,50 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             </label>
           ))}
         </div>
+      </div>
+
+      {/* ПЛ — быстрые шаблоны дней + 1-клик заполнение пустых */}
+      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>⚡ Быстрый старт ПЛ — шаблоны дней</div>
+        <div style={{ fontSize: 10, color: DIM }}>Добавьте день из шаблона в первую неделю (или заполните пустые дни 1 кликом).</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {PL_DAY_TEMPLATES.map(t => (
+            <button key={t.label} onClick={() => {
+              const w0 = (bodyRef.current.customWeeks?.[0]) ?? null;
+              if (!w0) return;
+              const newDay = { name: t.name, dayOfWeek: firstFreeTrainingDay(w0.days as any), exercises: t.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) };
+              const weeks = (bodyRef.current.customWeeks ?? []).map((w, wi) => wi === 0 ? { ...w, days: [...w.days, newDay as any] } : w);
+              set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
+            }} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.25)', color: '#a78bfa' }}>{t.icon} {t.label}</button>
+          ))}
+        </div>
+        {(() => {
+          const hasEmpty = (body.customWeeks ?? []).some(w => w.days.some(d => (d.exercises ?? []).length === 0));
+          if (!hasEmpty) return null;
+          const fillEmptyPL = () => {
+            const weeks = (bodyRef.current.customWeeks ?? []).map(w => ({
+              ...w,
+              days: w.days.map(d => {
+                if ((d.exercises ?? []).length > 0) return d;
+                const name = (d.name || '').toLowerCase();
+                let tpl = PL_DAY_TEMPLATES[0];
+                if (name.includes('жим')) tpl = PL_DAY_TEMPLATES[1];
+                else if (name.includes('тяг')) tpl = PL_DAY_TEMPLATES[2];
+                else if (d.dayOfWeek === 1) tpl = PL_DAY_TEMPLATES[1];
+                else if ((d.dayOfWeek ?? 0) >= 2) tpl = PL_DAY_TEMPLATES[2];
+                return { ...d, exercises: tpl.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) };
+              }),
+            }));
+            set({ customWeeks: weeks });
+          };
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', background: 'rgba(167,139,250,0.06)', borderRadius: 8, padding: '6px 8px', border: '1px dashed rgba(167,139,250,0.3)' }}>
+              <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700 }}>⚡ Пустые дни — 1 клик</span>
+              <span style={{ fontSize: 10, color: DIM, flex: '1 1 180px' }}>Заполнит каждый пустой день базовым шаблоном (Присед/Жим/Тяга)</span>
+              <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff' }} onClick={fillEmptyPL}>⚡ Заполнить пустые</button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Слабые точки ПЛ — диагностика по движениям */}

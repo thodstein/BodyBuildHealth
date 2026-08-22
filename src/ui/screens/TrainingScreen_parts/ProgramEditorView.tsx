@@ -49,6 +49,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, cloneFromLibrary, createBlank, createFromBuild, deleteRevision } from '../../../engines/user-program/program-store';
 import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
+import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex, moveWeekScheduleDay, resetScheduleToRecommended, sessionUsesRecommendedDay } from './program-editor-logic';
 import { BulkApplyCard } from './BulkApplyCard';
 import { useEditorToast } from './EditorToast';
@@ -1389,6 +1390,29 @@ return (
             );
           } catch { return null; }
         })()}
+        {/* Подсказка несовпадения meta.daysPerWeek vs неделя */}
+        {(() => {
+          const actual = program.bb?.weeks[0]?.sessions.length ?? 0;
+          const expected = program.meta.daysPerWeek;
+          if (!actual || actual === expected) return null;
+          return (
+            <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #f59e0b', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚠ Дней {expected} ↔ в неделе {actual}</span>
+              <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Нажмите чтобы выровнять недели под настройку (лишние дни с контентом спросят подтверждение)</span>
+              <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={async () => {
+                const w = program.bb!.weeks;
+                const willDelete = expected < actual && w.some(week => week.sessions.slice(expected).some(s=> (s.blocks??[]).some(b=> b.exerciseName && b.exerciseName.trim())));
+                if (willDelete) {
+                  const ok = await confirm({ title: `Выровнять до ${expected}д/нед?`, message: `Лишние дни с упражнениями будут удалены во всех неделях.`, confirmLabel: 'Выровнять', danger: true });
+                  if (!ok) return;
+                }
+                const updated = w.map(week => ({ ...week, sessions: resizeTrainingSessions(week.sessions, expected, week.deload) }));
+                update({ bb: { ...program.bb!, weeks: updated as any }});
+                showToast('✓ Выровнено: ' + expected + 'д/нед');
+              }}>↔ Выровнять</button>
+            </div>
+          );
+        })()}
         </>
       )}
       {estep === 'weeks' && dir === 'pl' && program.pl && (
@@ -1608,8 +1632,24 @@ return (
         <>
            <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ в активной разработке. Редактируйте ПЛ и ББ части независимо.</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ — редактируйте ПЛ и ББ части независимо. Баланс дней: {program.hybrid.plRef?.sessionIndices?.length ?? 2} ПЛ + {Math.max(1, program.meta.daysPerWeek - (program.hybrid.plRef?.sessionIndices?.length ?? 2))} ББ = {program.meta.daysPerWeek}д/нед × {program.meta.weeks} нед.</div>
           </div>
+          {(program.hybrid.bbWeeks?.length ?? 0) === 0 && (
+            <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>⚡ Пустая ББ-часть — 1 клик</span>
+              <span style={{ fontSize: 10, color: DIM, flex: '1 1 200px' }}>Добавит ББ-недели по сплиту (с учётом дней/нед и уровня)</span>
+              <button style={{ ...BTN, padding: '6px 12px', fontSize: 11, minHeight: 32 }} onClick={() => {
+                const bbDays = Math.max(1, (program.meta.daysPerWeek ?? 4) - (program.hybrid!.plRef?.sessionIndices?.length ?? 2));
+                const weeks = Math.max(1, program.meta.weeks ?? 4);
+                const pattern = SPLIT_PATTERNS.find(pp => pp.sessionsPerRotation === bbDays && pp.schedule.some(d => d.kind === 'тренировка')) ?? [...SPLIT_PATTERNS].sort((a,b)=>Math.abs(a.sessionsPerRotation-bbDays)-Math.abs(b.sessionsPerRotation-bbDays))[0] ?? SPLIT_PATTERNS[0];
+                if (!pattern) { showToast('⚠ Сплит не найден'); return; }
+                const sessions = pattern.schedule.filter(d=>d.kind==='тренировка').map((d,si)=>({ id: newId('ses'), name: 'День '+(si+1), dayOfWeek: si as any, focus: (d as any).sessionTag ?? '', blocks: [] as any }));
+                const bbWeeks = Array.from({ length: weeks }, (_,wi)=>({ week: wi+1, phase: 'accumulation' as const, deload: false, sessions: sessions.map(s=>({ ...s, id: newId('ses') })) }));
+                update({ hybrid: { ...program.hybrid!, bbWeeks } });
+                showToast('⚡ ББ-часть создана: ' + weeks + ' нед × ' + bbDays + 'д — заполните упражнения ниже');
+              }}>⚡ Заполнить ББ-часть</button>
+            </div>
+          )}
           <HybridPlanPanel program={program} onChange={(hybrid) => update({ hybrid })} onSave={onSave} />
         </>
       )}

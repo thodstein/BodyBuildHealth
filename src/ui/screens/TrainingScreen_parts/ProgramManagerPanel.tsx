@@ -216,6 +216,10 @@ export const ProgramManagerPanel: React.FC = () => {
   const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
     try { return localStorage.getItem('he_manual_onboarding_done') !== '1'; } catch { return true; }
   });
+  const [quickTplCollapsed, setQuickTplCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_manual_quick_collapsed') === '1'; } catch { return false; }
+  });
+  useEffect(() => { try { localStorage.setItem('he_manual_quick_collapsed', quickTplCollapsed ? '1' : '0'); } catch {} }, [quickTplCollapsed]);
 
   // Последовательные шаги конструктора. Создание/открытие программы
   // автоматически переводит на шаг «Редактор», сохранение на «Итог» — обратно в выбор.
@@ -877,6 +881,36 @@ export const ProgramManagerPanel: React.FC = () => {
 
       {/* Выбор режима: «Стандартный» / «Профессиональный» */}
       <ManualModeToggle mode={manualMode} onMode={setManualMode} />
+
+      {/* 🚀 Быстрый старт — всегда видим и в непустом списке, свёртываемый (1 клик до качества) */}
+      <div style={{ ...CARD, padding: quickTplCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #00e68a' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', flex: 1 }}>🚀 Быстрый старт — 1 клик до качественной программы</span>
+          <span style={{ fontSize: 10, color: DIM, display: quickTplCollapsed ? 'none' : 'inline' }}>{QUICK_TEMPLATES.length} шаблонов</span>
+          <button onClick={() => setQuickTplCollapsed(v => !v)} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{quickTplCollapsed ? 'Показать' : 'Скрыть'}</button>
+        </div>
+        {!quickTplCollapsed && (() => {
+          const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', daysPerWeek: 4 } as any; } })();
+          const isRecommended = (tpl: typeof QUICK_TEMPLATES[0]) => tpl.days === prof.daysPerWeek && tpl.level === prof.level;
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6, marginTop: 8 }}>
+              {QUICK_TEMPLATES.map(tpl => {
+                const rec = isRecommended(tpl);
+                return (
+                  <button key={tpl.id} className="editor-chip" onClick={() => applyQuickTemplate(tpl)} style={{ padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', background: rec ? tpl.color + '18' : tpl.color + '08', border: rec ? '2px solid ' + tpl.color : '1px solid ' + tpl.color + '25', color: DIM_STRONG, display: 'flex', flexDirection: 'column', gap: 3, minHeight: 70, boxShadow: rec ? '0 0 0 1px ' + tpl.color + '30' : 'none', position: 'relative' }}>
+                    {rec && <span style={{ position: 'absolute', top: 6, right: 6, fontSize: 9, fontWeight: 800, color: tpl.color, background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: 6 }}>★ Рекомендуем</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 16 }}>{tpl.icon}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: tpl.color }}>{tpl.title}</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: DIM }}>{tpl.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
 
       {/* Actions — P2.9: иерархия кнопок (Создать / Загрузить) */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
