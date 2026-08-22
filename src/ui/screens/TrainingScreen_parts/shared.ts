@@ -44,7 +44,7 @@ export type TrainingTab =
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
-  | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'volume_hub'
+  | 'strength_analysis' | 'load_management' | 'diagnostics' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'quality_joint_hub' | 'volume_hub'
   | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'bb_foundation' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health';
 export type TrainingPage = 'hero' | 'tabs';
 
@@ -100,7 +100,8 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   diagnostics: '🔬 Диагностика',
   periodization_hub: '🔄 Периодизация (legacy → тейпер-хаб)',
   periodization_taper_hub: '🔄 Периодизация + Тейпер',
-  quality_diagnostics: '🎯 Качество+Диагностика',
+  quality_diagnostics: '🎯 Качество+Диагностика (→ хаб)',
+  quality_joint_hub: '🎯 Качество + Суставы — единый хаб',
   volume_hub: '📐 Объём-хаб',
   training_mix_hub: '🧪 Тренировочные миксы (→ микс-хаб)',
   mix_presets: '🧪 Пресеты здоровья (→ микс-хаб)',
@@ -112,7 +113,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   rir_forecast_hub: '🎯 RIR + Прогноз — единый хаб',
   tools_hub: '🛠 Инструменты — единый хаб',
   taper_planner: '📉 Планировщик тейпера (→ тейпер-хаб)',
-  joint_health: '🦴 Суставы + AI',
+  joint_health: '🦴 Суставы + AI (→ хаб)',
 
 };
 
