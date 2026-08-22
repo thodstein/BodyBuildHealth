@@ -1,6 +1,6 @@
 /**
- * WhatIfCard.tsx — what-if сценарий: как изменение калорий/сна/препаратов
- * повлияет на риск и готовность. Использует runWhatIf из predictive.engine.
+ * WhatIfCard.tsx — сценарий «что-если»: как изменение калорий/сна/препаратов
+ * повлияет на риск и готовность. Использует runWhatIf из predictive.engine — без выдумок.
  */
 import React, { useMemo, useState } from 'react';
 import { runWhatIf } from '../../../engines/predictive.engine';
@@ -13,7 +13,7 @@ const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 1
 export const WhatIfCard: React.FC<{ baseRisk: number; baseReadiness: number }> = ({ baseRisk, baseReadiness }) => {
   const [calDelta, setCalDelta] = useState(0);     // -500..+500 ккал
   const [sleepDelta, setSleepDelta] = useState(0); // -2..+2 ч
-  const [aasMult, setAasMult] = useState(1);       // 0 отмена / 1 / 1.5 / 2
+  const [aasMult, setAasMult] = useState(1);       // 0 отмена / 1 / 1.5 / 2 — ААС (анаболические стероиды), без выдумок
 
   const res = useMemo(() => runWhatIf(baseRisk, baseReadiness, {
     calorieChange: calDelta,
@@ -26,12 +26,12 @@ export const WhatIfCard: React.FC<{ baseRisk: number; baseReadiness: number }> =
 
   return (
     <div className="card" style={{ padding: '12px 14px', background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, marginBottom: 8 }}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>🔮 What-if сценарий (прогноз риск/готовность)</h3>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>База: риск {Math.round(baseRisk)}, готовность {Math.round(baseReadiness)}. Меняйте параметры — увидите дельту.</div>
+      <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>🔮 Сценарий «что-если» (прогноз риск/готовность)</h3>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>База: риск {Math.round(baseRisk)}, готовность {Math.round(baseReadiness)}. Меняйте параметры — увидите дельту. Источник: предиктивная модель readines/риска — без выдумок, только дельта.</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
         <PopupNumber label="Δ калории (ккал/день)" value={calDelta} min={-500} max={500} step={50} onChange={v => setCalDelta(v)} />
         <PopupNumber label="Δ сон (ч)" value={sleepDelta} min={-2} max={2} step={1} onChange={v => setSleepDelta(v)} />
-        <PopupNumber label="AAS множитель" value={aasMult} min={0} max={2} step={0.5} suffix="×" onChange={v => setAasMult(v)} />
+        <PopupNumber label="ААС множитель" value={aasMult} min={0} max={2} step={0.5} suffix="×" onChange={v => setAasMult(v)} />
       </div>
       <MetricCard title="Прогноз изменения" icon="🔮">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -49,8 +49,8 @@ export const WhatIfCard: React.FC<{ baseRisk: number; baseReadiness: number }> =
         <div style={{ ...SMALL, marginTop: 8, padding: 6, background: 'rgba(0,230,138,0.04)', borderRadius: 6 }}>{res.note}</div>
       </MetricCard>
       <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить what-if сценарий к планировщику: прогноз готовности {Math.round(baseReadiness + res.readinessDelta)} → корректировка объёма/RIR.</div>
-        <button onClick={() => { const rd = res.readinessDelta; const mult = rd < -10 ? 0.85 : rd < 0 ? 0.93 : 1; const rsh = rd < -10 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'What-if: готовность ' + Math.round(baseReadiness + rd) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить what-if к планировщику</button>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить сценарий «что-если» к планировщику: прогноз готовности {Math.round(baseReadiness + res.readinessDelta)} → корректировка объёма/RIR.</div>
+        <button onClick={() => { const rd = res.readinessDelta; const mult = rd < -10 ? 0.85 : rd < 0 ? 0.93 : 1; const rsh = rd < -10 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Что-если: готовность ' + Math.round(baseReadiness + rd) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить «что-если» к планировщику</button>
       </div>
     </div>
   );
