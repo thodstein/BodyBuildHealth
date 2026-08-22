@@ -188,8 +188,9 @@ const DiaryCard: React.FC<{
       }}
       aria-label={`Открыть дневник «${meta.title}»`}
       style={{
-        background: stale ? `${staleColor}14` : 'rgba(28,28,32,0.75)',
+        background: stale ? `linear-gradient(135deg, ${staleColor}14, transparent)` : 'rgba(28,28,32,0.85)',
         border: `1px solid ${stale ? `${staleColor}77` : `${meta.color}44`}`,
+        borderLeft: `3px solid ${stale ? staleColor : meta.color}`,
         borderRadius: 14,
         padding: '14px 12px',
         display: 'flex',
@@ -197,8 +198,10 @@ const DiaryCard: React.FC<{
         gap: 8,
         cursor: 'pointer',
         minHeight: 110,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-        transition: 'transform 0.15s, box-shadow 0.15s, background 0.15s',
+        boxShadow: stale ? `0 4px 14px ${staleColor}22, 0 2px 8px rgba(0,0,0,0.3)` : '0 4px 14px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        transition: 'transform 0.18s cubic-bezier(0.32,0.72,0.28,1), box-shadow 0.18s, background 0.18s',
         position: 'relative',
         overflow: 'hidden',
       }}
@@ -1500,25 +1503,52 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
             color={colors.orange}
             defaultOpen
           >
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Поиск дневника…"
-              style={{
-                width: '100%',
-                background: 'rgba(0,0,0,0.3)',
-                border: `1px solid ${colors.border}`,
-                borderRadius: 8,
-                padding: '8px 10px',
-                color: colors.text,
-                fontSize: 12,
-                outline: 'none',
-                marginBottom: 8,
-                boxSizing: 'border-box',
-              }}
-              aria-label="Поиск дневника"
-            />
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="🔍 Поиск дневника…"
+                style={{
+                  width: '100%',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 8,
+                  padding: '8px 30px 8px 10px',
+                  color: colors.text,
+                  fontSize: 12,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                aria-label="Поиск дневника"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Очистить поиск"
+                  style={{
+                    position: 'absolute',
+                    right: 6,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 6,
+                    color: colors.textMuted,
+                    cursor: 'pointer',
+                    width: 22,
+                    height: 22,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <div
               role="list"
               aria-label="Встроенные дневники"

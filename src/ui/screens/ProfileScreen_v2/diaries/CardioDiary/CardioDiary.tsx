@@ -257,6 +257,8 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         onClose={onClose}
         onAdd={add}
         addLabel="+ Записать сессию"
+        onToday={() => { setDate(todayIso()); setEditingId(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+        todayLabel="⚡ Сегодня"
         exportActions={[
           { label: '📥 CSV-файл', onClick: exportCsv },
           { label: '🖨 Печать / PDF', onClick: printPdf },
@@ -413,7 +415,12 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           <button key={r} style={range === r ? chipActive(ACCENT) : chip(ACCENT)} onClick={() => { setRange(r); setPage(1); }}>{r === 'all' ? 'Всё' : `${r}д`}</button>
         ))}
         <div style={{ flex: 1 }} />
-        <input style={{ ...inputStyle, width: 180 }} placeholder="🔍 Поиск" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <input style={{ ...inputStyle, width: 180, paddingRight: query ? 30 : undefined }} placeholder="🔍 Поиск" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
+          {query && (
+            <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+          )}
+        </div>
       </div>
       <div style={{ ...glassCard, padding: 14 }}>
         <div style={sectionTitle}>📓 Журнал ({filteredLog.length}/{log.length})</div>

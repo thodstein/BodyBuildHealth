@@ -450,7 +450,7 @@ const StatCard: React.FC<{ icon: string; label: string; value: string; color: st
   color,
   hint,
 }) => (
-  <div style={{ ...glassCard, padding: 12, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+  <div style={{ ...glassCard, padding: 12, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, boxShadow: `0 2px 10px ${color}14, 0 1px 4px rgba(0,0,0,0.2)`, borderLeft: `2px solid ${color}55` }}>
     <div style={{ fontSize: 16 }}>{icon}</div>
     <small style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
       {label}
@@ -796,15 +796,40 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <input
-            style={{ ...inputStyle, width: 200, minHeight: 38 }}
-            placeholder="🔍 Поиск"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-          />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              style={{ ...inputStyle, width: 200, minHeight: 38, paddingRight: query ? 30 : undefined }}
+              placeholder="🔍 Поиск"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(1);
+              }}
+            />
+            {query && (
+              <button
+                onClick={() => { setQuery(''); setPage(1); }}
+                aria-label="Очистить поиск"
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 6,
+                  color: colors.textMuted,
+                  cursor: 'pointer',
+                  width: 22,
+                  height: 22,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 12,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
           <button style={chip} onClick={() => changeSort('date')}>
             ↕ Дата
           </button>
