@@ -19,6 +19,7 @@ import {
   type WeeklyHistogramGoal,
 } from './diary-helpers';
 import { buildDiariesExportHtml } from './diary-pdf-export';
+import { DiaryCard } from './diary-ui';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
 import { BPDiary } from './diaries/BPDiary/BPDiary';
 import { WeightDiary } from './diaries/WeightDiary/WeightDiary';
@@ -170,212 +171,7 @@ function latestDiaryDate(arr: { date: string; timestamp?: number }[]): string {
     .sort((a, b) => (b.timestamp ?? new Date(b.date).getTime()) - (a.timestamp ?? new Date(a.date).getTime()))[0]?.date || '';
 }
 
-/* ── Модалки добавления записей ── */
-const DiaryCard: React.FC<{
-  diaryKey: DiaryKey;
-  count: number;
-  last: string;
-  daysSinceLast: number | null;
-  loggedToday: boolean;
-  onAdd: () => void;
-  onOpen: () => void;
-  extra?: string;
-  history?: { date: string }[];
-}> = ({ diaryKey, count, last, daysSinceLast, loggedToday, onAdd, onOpen, extra, history }) => {
-  const meta = DIARY_META[diaryKey];
-  const stale = daysSinceLast !== null && daysSinceLast >= 3 && !loggedToday;
-  const staleColor =
-    daysSinceLast !== null && daysSinceLast >= 14
-      ? '#ef4444'
-      : daysSinceLast !== null && daysSinceLast >= 7
-        ? '#f97316'
-        : daysSinceLast !== null && daysSinceLast >= 3
-          ? '#f59e0b'
-          : meta.color;
-  return (
-    <div
-      onClick={onOpen}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-      aria-label={`Открыть дневник «${meta.title}»`}
-      style={{
-        background: stale ? `linear-gradient(135deg, ${staleColor}14, transparent)` : 'rgba(28,28,32,0.85)',
-        border: `1px solid ${stale ? `${staleColor}77` : `${meta.color}44`}`,
-        borderLeft: `3px solid ${stale ? staleColor : meta.color}`,
-        borderRadius: 14,
-        padding: '14px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        cursor: 'pointer',
-        minHeight: 110,
-        boxShadow: stale ? `0 4px 14px ${staleColor}22, 0 2px 8px rgba(0,0,0,0.3)` : '0 4px 14px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.25)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        transition: 'transform 0.18s cubic-bezier(0.32,0.72,0.28,1), box-shadow 0.18s, background 0.18s',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,0,0,0.4)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: `${meta.color}28`,
-            border: `1px solid ${meta.color}55`,
-            fontSize: 20,
-            lineHeight: 1,
-            flexShrink: 0,
-          }}
-        >
-          {meta.icon}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: colors.text,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {meta.title}
-          </div>
-          <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 1 }}>{meta.unit || '—'}</div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 800,
-              color: meta.color,
-              background: `${meta.color}22`,
-              padding: '2px 7px',
-              borderRadius: 5,
-              border: `1px solid ${meta.color}33`,
-            }}
-          >
-            {count}
-          </span>
-          {loggedToday && (
-            <span
-              style={{
-                fontSize: 8,
-                fontWeight: 700,
-                padding: '1px 5px',
-                borderRadius: 4,
-                background: 'rgba(34,197,94,0.18)',
-                color: '#22c55e',
-                border: '1px solid rgba(34,197,94,0.3)',
-              }}
-            >
-              ✓ сегодня
-            </span>
-          )}
-        </div>
-      </div>
-      <div style={{ fontSize: 10, color: colors.textMuted, minHeight: 14, lineHeight: 1.3 }}>
-        {last ? (
-          <>
-            📅 {last}
-            {meta.unit ? ' ' + meta.unit : ''}
-            {daysSinceLast !== null && daysSinceLast > 0 && (
-              <span style={{ marginLeft: 6, fontWeight: 700, color: staleColor }}>
-                ·{' '}
-                {daysSinceLast === 1
-                  ? 'вчера'
-                  : daysSinceLast < 5
-                    ? `${daysSinceLast} дн. назад`
-                    : `${daysSinceLast} дней назад`}
-              </span>
-            )}
-          </>
-        ) : (
-          'Нет записей'
-        )}
-      </div>
-      {history && (
-        <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>
-          {(() => {
-            const set = new Set(history.map(h => h.date));
-            const today = new Date(); today.setHours(0,0,0,0);
-            return Array.from({ length: 7 }, (_, idx) => {
-              const d = new Date(today); d.setDate(today.getDate() - (6 - idx));
-              const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-              const has = set.has(iso);
-              return <div key={iso} title={iso + (has ? ' ✓' : ' —')} style={{ flex: 1, height: 6, borderRadius: 3, background: has ? meta.color : 'rgba(255,255,255,0.08)', opacity: has ? 0.9 : 0.35, transition: 'background 0.2s' }} />;
-            });
-          })()}
-        </div>
-      )}
-      {extra && (
-        <div style={{ fontSize: 9.5, color: meta.color, lineHeight: 1.35, marginTop: -4 }}>{extra}</div>
-      )}
-      <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }} onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onAdd}
-          aria-label={`Добавить запись в дневник ${meta.title}`}
-          style={{
-            flex: 1,
-            minHeight: 30,
-            padding: '6px 8px',
-            borderRadius: 7,
-            fontSize: 11,
-            fontWeight: 700,
-            background: `${meta.color}26`,
-            color: meta.color,
-            border: `1px solid ${meta.color}55`,
-            cursor: 'pointer',
-          }}
-        >
-          + Добавить
-        </button>
-        <button
-          onClick={onOpen}
-          aria-label={`Открыть дневник ${meta.title}`}
-          style={{
-            flex: 1,
-            minHeight: 30,
-            padding: '6px 8px',
-            borderRadius: 7,
-            fontSize: 11,
-            fontWeight: 700,
-            background: 'transparent',
-            color: colors.text,
-            border: `1px solid ${colors.border}`,
-            cursor: 'pointer',
-          }}
-        >
-          📋 Открыть
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ── Быстрые ссылки на дневники в других блоках ── */
+let undoTimer: ReturnType<typeof setTimeout> | null = null;
 
 interface QuickLink {
   icon: string;
@@ -1655,11 +1451,65 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
 
           <AccordionSection
             title="📓 Встроенные дневники"
-            subtitle="5 дневников: сон, давление, вес и замеры, инъекции, здоровье. Клик — раскрыть содержимое"
+            subtitle="6 дневников: сон, давление, вес и замеры, инъекции, здоровье, кардио"
             icon="📓"
-            color={colors.orange}
+            color={colors.purple}
             defaultOpen
           >
+            {/* Sticky quick-jump navigation */}
+            <div
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                display: 'flex',
+                gap: 4,
+                flexWrap: 'wrap',
+                padding: '8px 4px 4px',
+                margin: '-12px -16px 8px',
+                background: 'linear-gradient(180deg, rgba(28,28,32,0.95), rgba(28,28,32,0.7) 80%, transparent)',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '0 0 12px 12px',
+                backdropFilter: 'blur(8px)',
+              }}
+              role="navigation"
+              aria-label="Быстрая навигация по дневникам"
+            >
+              {builtInDiaries.map((d) => (
+                <button
+                  key={d.key}
+                  type="button"
+                  onClick={() => {
+                    const target = document.querySelector(`[data-diary-key="${d.key}"]`);
+                    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  aria-label={`Перейти к дневнику ${DIARY_META[d.key].title}`}
+                  style={{
+                    flex: '1 1 auto',
+                    minWidth: 72,
+                    maxWidth: 100,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: colors.text,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${DIARY_META[d.key].color}44`,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <span style={{ fontSize: 12 }}>{DIARY_META[d.key].icon}</span>
+                  <span>{DIARY_META[d.key].title}</span>
+                </button>
+              ))}
+            </div>
             <div style={{ position: 'relative', marginBottom: 8 }}>
               <input
                 type="text"
