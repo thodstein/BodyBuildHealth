@@ -1,6 +1,5 @@
 import type { BBPlan } from './bb-builder.engine';
 import type { BBBalanceReport } from './bb-balance.engine';
-import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 
 export interface BBPlanReport {
   pattern: string;
@@ -58,8 +57,6 @@ export function buildBBPlanReport(plan: BBPlan): BBPlanReport {
   };
 }
 
-export { BB_MRV_TOLERANCE };
-
 /** RU-подписи мышц (компактно). */
 const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепсы', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечья', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
 
@@ -115,19 +112,16 @@ export function buildBBPlanReportText(plan: BBPlan): string {
       if (patterns) lines.push(`    паттерн: ${patterns}`);
       const byEx = Object.entries((m as any).byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
       if (byEx) lines.push(`    упражнения: ${byEx}`);
-      // Подгруппы для ВСЕХ мышц (этап 21): не только спина — грудь/плечи/ноги/руки с пояснениями
+      // Спина — развернуто: ширина (широчайшие) vs толщина (ромб/трапеции) — паттерны и упражнения
       const sg = (m as any).subGroups as Record<string, any> | undefined;
       if (sg && Object.keys(sg).length) {
+        const subRu: Record<string, string> = { back_width: 'широчайшая (ширина)', back_thickness: 'толщина (ромб/середина)', upper_back: 'верх спины', rear_delts: 'задняя дельта', traps: 'трапеции', erectors: 'разгибатели', other: 'прочее' };
         for (const [subId, sub] of Object.entries(sg)) {
-          const expl = (sub as any).explanation as { labelRu?: string; patternRu?: string; why?: string; how?: string } | undefined;
-          const label = expl?.labelRu || subId;
-          lines.push(`    └ ${label}: ${sub.workingSets} сетов`);
+          lines.push(`    └ ${subRu[subId] || subId}: ${sub.workingSets} сетов`);
           const subPat = Object.entries(sub.byPattern || {}).map(([p, v]) => `${p} ${v}`).join(', ');
-          if (subPat) lines.push(`       паттерн: ${subPat}${expl?.patternRu ? ` (${expl.patternRu})` : ''}`);
+          if (subPat) lines.push(`       паттерн: ${subPat}`);
           const subEx = Object.entries(sub.byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
           if (subEx) lines.push(`       упражнения: ${subEx}`);
-          if (expl?.why) lines.push(`       чем хорошо: ${expl.why}`);
-          if (expl?.how) lines.push(`       как работает: ${expl.how}`);
         }
       }
     }

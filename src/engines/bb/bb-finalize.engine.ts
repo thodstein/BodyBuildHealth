@@ -11,7 +11,6 @@ import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { analyzeBBBalance } from './bb-balance.engine';
-import { buildBBExpandedSummary } from './bb-summary.engine';
 import { applyTaperToFinalWeeks } from './bb-autocoach.engine';
 import { analyzePlanStress } from './bb-injury-prevention.engine';
 import { annotateBackExercise, backQualityIssues, verticalPullProfile, classifyLegExercise, annotateArmExercise, armQualityIssues, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
@@ -2769,9 +2768,6 @@ for (const week of next.weeks) {
     }
   }
   syncBBPlanSetShape(next);
-  // Консолидация (этап 21): expandedSummary — единый источник, пересчитываем ПОСЛЕ weeklyVolume/валидации,
-  // чтобы weeklyVolume ↔ expandedSummary не расходились (пик vs total).
-  (next as any).expandedSummary = buildBBExpandedSummary(next as any);
   next.balanceReport = analyzeBBBalance(next);
   next.report = buildBBPlanReport(next);
   return next;
