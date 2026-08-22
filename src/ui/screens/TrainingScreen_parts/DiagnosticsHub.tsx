@@ -23,10 +23,10 @@ const DIM = 'rgba(255,255,255,0.5)';
 type DiagnosticsHubMode = 'master' | 'movement' | 'limiter' | 'joint' | 'jsi' | 'sticking' | 'rir' | 'mesocorr';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
-  { m: 'master', label: 'Жим — единый инструмент', icon: '🏋️' },
+  { m: 'master', label: 'Мастер жима лёжа', icon: '🏋️' },
   { m: 'movement', label: 'Мёртвые → Слабые → Бар', icon: '🎯' },
   { m: 'limiter', label: 'Лимитирующие', icon: '🧩' },
-  { m: 'joint', label: 'Суставы (поясница+)', icon: '🦴' },
+  { m: 'joint', label: 'Суставы + AI-ортопед', icon: '🦴' },
   { m: 'jsi', label: 'AI-ортопед JSI', icon: '🧬' },
   { m: 'sticking', label: 'Срывы', icon: '🔬' },
   { m: 'rir', label: 'RIR', icon: '🎯' },
@@ -82,7 +82,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        <b style={{ color: ACCENT }}>Новое: «Жим — единый инструмент» + «Суставно-связочный (поясница+)»</b> — один экран на всё (слабые → мёртвые → bar-path → геометрия → VBT, и суставы L4-S1/плечо/колено). Старые калькуляторы помечены @deprecated — прячем через 1 релиз, пока доступны как эксперт.
+        <b style={{ color: ACCENT }}>Новое: Мастер жима лёжа + Суставы с AI-ортопедом внутри</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. Старые помечены @deprecated.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -101,6 +101,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
 
       {mode === 'master' && <LiftMasterCard sessions={sessions} />}
       {mode === 'joint' && <JointMasterCard />}
+      {mode === 'jsi' && <JointJsiCalculatorCard />}
       {mode === 'movement' && <PlDeadpointsBarPathCard sessions={sessions as any} />}
       {mode === 'limiter' && <LimiterCalculatorCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}

@@ -10,6 +10,11 @@ import { CalcSection, PopupToggle, ExpandableCard, MetricCard } from '../SRCBBSc
 const ACCENT = '#00e68a';
 
 export const RIRCalibrationCard: React.FC = () => {
+  const [mode, setMode] = useState<'diary'|'manual'>('diary');
+  const [manualEx, setManualEx] = useState('Жим лёжа');
+  const [manualWeight, setManualWeight] = useState('100');
+  const [manualReps, setManualReps] = useState('5');
+  const [manualRpe, setManualRpe] = useState('8');
   const [refresh, setRefresh] = useState(0);
   const [reprocessing, setReprocessing] = useState(false);
   const [applyOn, setApplyOn] = useState(false);
@@ -42,15 +47,40 @@ export const RIRCalibrationCard: React.FC = () => {
 
   if (!stats || stats.totalSets === 0) {
     return (
-      <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc="Нет данных. Заполняйте RPE в каждой тренировке">
+      <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc="Нет данных. Заполняйте RPE или введите вручную">
+        <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+          <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
+          <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='diary'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='diary'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='diary'?'var(--accent)':'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника</button>
+        </div>
+        {mode==='manual' ? (
+          <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Введите подход вручную — bias посчитается сразу (без дневника).</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <label style={{fontSize:10,color:'var(--text-dim)'}}>Упр <input value={manualEx} onChange={e=>setManualEx(e.target.value)} style={{width:110,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+              <label style={{fontSize:10,color:'var(--text-dim)'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:56,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+              <label style={{fontSize:10,color:'var(--text-dim)'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:36,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+              <label style={{fontSize:10,color:'var(--text-dim)'}}>RPE <input value={manualRpe} onChange={e=>setManualRpe(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+            </div>
+            {(()=>{
+              const rpe = parseFloat(manualRpe)||0, weight=parseFloat(manualWeight)||0, reps=parseInt(manualReps)||0;
+              const bias = 2 - (10 - rpe); // план 2 vs факт 10-rpe
+              if (!weight||!reps||!rpe) return null;
+              return <div style={{ marginTop:6, padding:6, borderRadius:6, background: Math.abs(bias)>1?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:'1px solid '+(Math.abs(bias)>1?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)') }}>
+                <div style={{fontSize:10,fontWeight:700,color: Math.abs(bias)>1?'#f87171':'#4ade80'}}>Bias: {bias>0?`+${bias.toFixed(1)}`:`${bias.toFixed(1)}`} — {bias>0.5?'тяжелее чем думаете': bias<-0.5?'легче чем думаете':'точно'}</div>
+                <div style={{fontSize:9,color:'var(--text-dim)',marginTop:2}}>{manualEx} {weight}×{reps} @ RPE {rpe} → RIR {10-rpe}</div>
+              </div>;
+            })()}
+          </div>
+        ) : (
         <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4, padding: 8 }}>
           Нет данных для калибровки. Заполняйте RPE в каждой тренировке — чем больше данных, тем точнее корректировка RIR.
         </div>
+        )}
         <button onClick={reprocessAll} disabled={reprocessing} style={{
-          width: '100%', padding: '10px', borderRadius: 8, cursor: reprocessing ? 'wait' : 'pointer',
+          width: '100%', marginTop:8, padding: '10px', borderRadius: 8, cursor: reprocessing ? 'wait' : 'pointer',
           border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', fontSize: 11, fontWeight: 700,
         }}>
-          {reprocessing ? '⏳ Обработка...' : '🔄 Переобработать из истории'}
+          {reprocessing ? '⏳ Обработка...' : '🔄 Переобработать из истории (дневник)'}
         </button>
       </CalcSection>
     );
@@ -61,6 +91,29 @@ export const RIRCalibrationCard: React.FC = () => {
 
   return (
     <CalcSection icon="🎯" title="RIR-калибровка" accent={ACCENT} desc={`${stats.totalSets} записанных подходов`}>
+      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+        <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
+        <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='diary'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='diary'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='diary'?'var(--accent)':'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника</button>
+      </div>
+      {mode==='manual' && (
+        <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
+          <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Ручной тест: введите подход и сразу видите bias.</div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>Упр <input value={manualEx} onChange={e=>setManualEx(e.target.value)} style={{width:110,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:56,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:36,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>RPE <input value={manualRpe} onChange={e=>setManualRpe(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+          </div>
+          {(()=>{
+            const rpe = parseFloat(manualRpe)||0, weight=parseFloat(manualWeight)||0, reps=parseInt(manualReps)||0;
+            const bias = 2 - (10 - rpe);
+            if (!weight||!reps||!rpe) return null;
+            return <div style={{ marginTop:6, padding:6, borderRadius:6, background: Math.abs(bias)>1?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:'1px solid '+(Math.abs(bias)>1?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)') }}>
+              <div style={{fontSize:10,fontWeight:700,color: Math.abs(bias)>1?'#f87171':'#4ade80'}}>Bias: {bias>0?`+${bias.toFixed(1)}`:`${bias.toFixed(1)}`} — {bias>0.5?'тяжелее': bias<-0.5?'легче':'точно'}</div>
+            </div>;
+          })()}
+        </div>
+      )}
       <div style={{ padding: '0 4px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
           <MetricCard title="Общий bias" accent="#60a5fa">

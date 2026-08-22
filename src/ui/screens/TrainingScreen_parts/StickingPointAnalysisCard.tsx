@@ -132,21 +132,43 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
+  const [mode, setMode] = useState<'diary'|'manual'>('diary');
+  const [manualLift, setManualLift] = useState<Lift>('bench');
+  const [manualWeight, setManualWeight] = useState('100');
+  const [manualReps, setManualReps] = useState('3');
+  const [manualRir, setManualRir] = useState('1');
   const [selectedLift, setSelectedLift] = useState<Lift>('bench');
 
   const analysis = useMemo(() => {
+    if (mode==='manual') return [];
     if (!sessions.length) return [];
     const lifts: Lift[] = ['bench', 'squat', 'deadlift', 'ohp', 'row', 'pulldown', 'incline_press', 'sumo', 'biceps'];
     return lifts.map(l => detectFailures(sessions, l, LIFT_ALIASES[l])).filter(Boolean) as LiftFailureData[];
-  }, [sessions]);
+  }, [sessions, mode]);
 
-  if (!analysis.length) return (
+  const manualData = useMemo(()=>{
+    if (mode!=='manual') return null;
+    const reps = parseInt(manualReps)||0;
+    const weight = parseFloat(manualWeight)||0;
+    const rir = parseInt(manualRir)||0;
+    if (reps<=0 || weight<=0) return null;
+    const phase = phaseForReps(reps, manualLift);
+    const diagnosis = phase ? diagnoseLift(manualLift, phase) : null;
+    const e1rm = epley1RM(weight, reps);
+    return { lift: manualLift, reps, weight, rir, phase, diagnosis, e1rm };
+  }, [mode, manualLift, manualWeight, manualReps, manualRir]);
+
+  if (mode==='diary' && !analysis.length) return (
     <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
+      <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+        <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
+        <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.12)', color:'var(--accent)', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника ✓</button>
+      </div>
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
         🔬 Анализ мёртвых точек (sticking points)
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-        Нет данных по приседу, жиму лёжа, становой тяге и другим движениям. Чтобы рассчитать срывы, выполните эти упражнения через «▶ Проведение тренировки» — тяжёлые подходы (RPE≥8 по данным RIR) будут отмечены автоматически.
+        Нет данных по приседу, жиму лёжа, становой тяге и другим движениям. Чтобы рассчитать срывы, выполните эти упражнения через «▶ Проведение тренировки» — тяжёлые подходы (RPE≥8 по данным RIR) будут отмечены автоматически. Или переключитесь в «Вручную».
       </div>
     </div>
   );
@@ -155,10 +177,36 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
 
   return (
     <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-        🔬 Анализ мёртвых точек (sticking points)
+      <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+        <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
+        <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='diary'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='diary'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='diary'?'var(--accent)':'var(--text-dim)', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника</button>
       </div>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+      {mode==='manual' ? (
+        <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>✍️ Ручной ввод — без дневника</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
+            {(['bench','squat','deadlift','ohp','row'] as Lift[]).map(l=> <button key={l} onClick={()=>setManualLift(l)} style={{ padding:'4px 8px', borderRadius:6, border: manualLift===l?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: manualLift===l?'rgba(0,230,138,0.12)':'transparent', color: manualLift===l?'var(--accent)':'var(--text-dim)', fontSize:10 }}>{l}</button>)}
+          </div>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:60,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:40,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>RIR <input value={manualRir} onChange={e=>setManualRir(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
+          </div>
+          {manualData && (
+            <div style={{ marginTop:6, padding:6, borderRadius:6, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)' }}>
+              <div style={{fontSize:10,fontWeight:700,color:'var(--accent)'}}>Фаза: {manualData.phase ? (PHASE_LABELS[manualData.phase]||manualData.phase) : 'неопределена (≥6 повт)'} · e1RM ~{Math.round(manualData.e1rm)}кг</div>
+              {manualData.diagnosis && <>
+                <div style={{fontSize:10,color:'var(--text-dim)',marginTop:2}}>{manualData.diagnosis.biomechanicalReason}</div>
+                <div style={{fontSize:10,marginTop:2}}><span style={{color:'#22c55e'}}>Коррекции:</span> {manualData.diagnosis.corrections.slice(0,3).join(' · ')}</div>
+              </>}
+            </div>
+          )}
+        </div>
+      ) : null}
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+        🔬 Анализ мёртвых точек (sticking points) — {mode==='manual'?'вручную':'из дневника'}
+      </div>
+      {mode==='diary' && <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
         {analysis.map(a => (
           <button key={a.lift} onClick={() => setSelectedLift(a.lift)} style={{
             flex: 1, padding: '4px 6px', borderRadius: 6, border: a.lift === selectedLift ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
@@ -168,7 +216,7 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
             {a.label} {a.failureRate > 0 && <span style={{ color: a.failureRate > 20 ? '#ef4444' : '#f59e0b' }}>({a.failureRate}% срывов)</span>}
           </button>
         ))}
-      </div>
+      </div>}
       {active && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10 }}>

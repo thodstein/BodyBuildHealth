@@ -16,6 +16,7 @@ import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { VideoCaptureCard } from './VideoCaptureCard';
 import { distributeWeeklyLoad } from '../../../engines/orthopedic-load-engines';
 import { applyToPlanner } from './planner-bridge';
+import { JointJsiCalculatorCard } from './JointJsiCalculatorCard';
 
 const CARD: React.CSSProperties = { padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px solid rgba(255,255,255,0.08)', marginTop:8 };
 const DIM='rgba(255,255,255,0.55)', ACCENT='#f43f5e';
@@ -147,11 +148,12 @@ export const JointMasterCard: React.FC = () => {
         <VideoCaptureCard lift={lift as Lift} />
       </div>
 
-      {/* 0 JSI калькулятор — главный вход */}
-      <div style={{ marginTop:8 }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e', marginBottom:4 }}>0 · AI-ортопед JSI — быстрый расчёт по цифрам</div>
-        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Перейдите в <b style={{color:'#fff'}}>Диагностика → Суставно-связочный → JSI-калькулятор</b> (новый инструмент ниже) для ввода веса/темпа/геометрии и получения тепловой карты + тюнинга + нутрицевтиков. Здесь — сводка по суставу, там — цифры.</div>
+      {/* 0 JSI — встроен сразу */}
+      <div style={{ marginTop:12, padding:8, borderRadius:10, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e' }}>0 · AI-ортопед JSI — встроен (ввод → карта)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Тот же калькулятор что и в отдельной вкладке, теперь сразу в суставах — не нужно переключаться.</div>
       </div>
+      <JointJsiCalculatorCard />
 
       {/* план чистки */}
       <div style={{ marginTop:8, padding:9, borderRadius:8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)', color:'#fbbf24', fontSize:10, lineHeight:1.45 }}>
