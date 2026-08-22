@@ -120,6 +120,8 @@ export const PlNormsCalcTab: React.FC = () => {
   }, [fed, sex, table]);
 
   const progress = useMemo(() => displayResult ? progressToNextRank(displayResult, displayTotal) : 0, [displayResult, displayTotal]);
+  const eligibleSet = useMemo(() => new Set(eligibleRanksForAge(ageGroup)), [ageGroup]);
+  const ageNoteForDisplay = useMemo(() => displayResult ? ageEligibilityNote(ageGroup, displayResult.achievedRank) : null, [ageGroup, displayResult]);
   const liftsRs = useMemo(() => [
     { key: 'squat' as const, value: squat, rs: liftRelativeStrength(squat, bw) },
     { key: 'bench' as const, value: bench, rs: liftRelativeStrength(bench, bw) },
@@ -238,28 +240,35 @@ export const PlNormsCalcTab: React.FC = () => {
               {displayResult.allRanks.map(r => {
                 const isAchieved = r.achieved;
                 const isNext = r.key === displayResult.nextRank;
+                const isEligible = eligibleSet.has(r.key);
                 return (
                   <div key={r.key} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     padding: '10px 12px', borderRadius: 10,
-                    background: isAchieved ? 'rgba(0,230,138,0.08)' : isNext ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
-                    border: '1px solid ' + (isAchieved ? 'rgba(0,230,138,0.25)' : isNext ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.05)'),
-                    boxShadow: isNext ? '0 0 0 1px rgba(245,158,11,0.12) inset' : 'none'
+                    background: !isEligible ? 'rgba(255,255,255,0.015)' : isAchieved ? 'rgba(0,230,138,0.08)' : isNext ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
+                    border: '1px solid ' + (!isEligible ? 'rgba(255,255,255,0.03)' : isAchieved ? 'rgba(0,230,138,0.25)' : isNext ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.05)'),
+                    boxShadow: isNext && isEligible ? '0 0 0 1px rgba(245,158,11,0.12) inset' : 'none',
+                    opacity: !isEligible ? 0.45 : 1,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 6, height: 28, borderRadius: 6, background: rankColor[r.label] || '#555', opacity: isAchieved ? 1 : 0.6 }} />
+                      <span style={{ width: 6, height: 28, borderRadius: 6, background: rankColor[r.label] || '#555', opacity: isEligible ? (isAchieved ? 1 : 0.6) : 0.2 }} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: isAchieved ? ACCENT : isNext ? '#f59e0b' : 'var(--text-dim)' }}>{isAchieved ? '✓ ' : ''}{r.label} {isNext ? '← цель' : ''}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{RANK_DESCRIPTIONS[r.key]}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.35)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : 'var(--text-dim)' }}>{isAchieved ? '✓ ' : ''}{r.label} {isNext && isEligible ? '← цель' : ''} {!isEligible ? '⛔' : ''}</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{RANK_DESCRIPTIONS[r.key]} {!isEligible ? '— недоступен для выбранного возраста' : ''}</div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: isAchieved ? ACCENT : isNext ? '#f59e0b' : '#fff' }}>{r.threshold} кг</div>
-                      <div style={{ fontSize: 10, color: isAchieved ? '#22c55e' : isNext ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}>{isAchieved ? `выполнен (+${(displayTotal - r.threshold).toFixed(1)} кг)` : `нужно +${(r.threshold - displayTotal).toFixed(1)} кг`}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.35)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : '#fff' }}>{r.threshold} кг</div>
+                      <div style={{ fontSize: 10, color: !isEligible ? 'rgba(255,255,255,0.25)' : isAchieved ? '#22c55e' : isNext ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}>{!isEligible ? 'недоступен' : isAchieved ? `выполнен (+${(displayTotal - r.threshold).toFixed(1)} кг)` : `нужно +${(r.threshold - displayTotal).toFixed(1)} кг`}</div>
                     </div>
                   </div>
                 );
               })}
+              {ageNoteForDisplay && (
+                <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', fontSize: 11, color: '#f87171', lineHeight: 1.4 }}>
+                  ⚠️ {ageNoteForDisplay}
+                </div>
+              )}
             </div>
             <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', fontSize: 11, color: DIM, lineHeight: 1.45 }}>
               <b style={{ color: '#fff' }}>Как читать график порогов:</b> каждая строка — один разряд и килограммы, которые нужно показать в этой категории. Зелёные — уже выполнены, янтарная — ближайшая цель. Пороги нелинейны: от КМС до МС обычно +70-90 кг, от МС до МСМК +80-120 кг. Если в категории 43 кг у женщин нет МС/МСМК (прочерк) — значит, разряд не присваивается в этой категории (слишком лёгкий вес).
