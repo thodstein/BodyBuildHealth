@@ -432,7 +432,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                 const tmpl = muscleAwareSets(m, prof.level || level);
                 const wgt = (prof.workMax ?? {})[m] ?? (prof.workMax ?? {})[m.toLowerCase()] ?? 40;
                 const sets = makeSetsFromTemplate(tmpl as any, wgt);
-                return { id: newId('blk'), type: (ex.type === 'compound' ? 'compound' : 'accessory') as const, exerciseName: ex.name, muscle: m, role: (ex.type === 'compound' ? 'primary' : 'accessory') as const, sets: sets.length ? sets : [{ reps: 10, rir: 2 }] };
+                return { id: newId('blk'), type: (ex.type === 'compound' ? 'compound' : 'accessory') as 'compound' | 'accessory', exerciseName: ex.name, muscle: m, role: (ex.type === 'compound' ? 'primary' : 'accessory') as 'primary' | 'accessory', sets: sets.length ? sets : [{ reps: 10, rir: 2 }] };
               }).filter(Boolean) as UserBlock[];
               return newBlocks.length ? { ...s, blocks: newBlocks } : s;
             }),

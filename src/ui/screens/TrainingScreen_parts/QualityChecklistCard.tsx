@@ -74,7 +74,7 @@ export const QualityChecklistCard: React.FC<Props> = ({ program, onChange, showT
                 const exs = suggestExercisesForGroup(m, program.meta.level, 1, (prof.equipment ?? []) as any, [], [], (prof as any).avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as any, (prof.excludedExercises ?? []) as any);
                 const wgt = (prof.workMax ?? {} as any)[m] ?? 40;
                 const sets = makeSetsFromTemplate(muscleAwareSets(m, program.meta.level) as any, wgt);
-                return { id: newId('blk'), type: (exs[0]?.type === 'compound' ? 'compound' : 'accessory') as const, exerciseName: exs[0]?.name ?? '', muscle: m, role: (exs[0]?.type === 'compound' ? 'primary' : 'accessory') as const, sets: sets.length ? sets : [{ reps: 10, rir: 2 } as any] };
+                return { id: newId('blk'), type: (exs[0]?.type === 'compound' ? 'compound' : 'accessory') as 'compound' | 'accessory', exerciseName: exs[0]?.name ?? '', muscle: m, role: (exs[0]?.type === 'compound' ? 'primary' : 'accessory') as 'primary' | 'accessory', sets: sets.length ? sets : [{ reps: 10, rir: 2 } as any] };
               });
               return { ...s, blocks };
             }),

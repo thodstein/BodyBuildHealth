@@ -353,7 +353,7 @@ export const ProgramManagerPanel: React.FC = () => {
         const dayNames = ['Присед','Жим','Тяга','Подсобка','Подсобка 2','Подсобка 3','Подсобка 4'];
         p.pl.customWeeks = Array.from({ length: wizardWeeks }, (_, wi) => ({
           week: wi + 1,
-          phase: (wi % 4 === 3 ? 'deload' : 'accumulation') as const,
+          phase: (wi % 4 === 3 ? 'deload' : 'accumulation') as 'deload' | 'accumulation',
           deload: wi % 4 === 3,
           days: Array.from({ length: wizardDays }, (_, di) => ({
             name: dayNames[di % dayNames.length] + (wizardDays > 3 && di >= 3 ? ` ${di+1}` : ''),
