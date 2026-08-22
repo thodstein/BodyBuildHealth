@@ -62,6 +62,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const [editItem, setEditItem] = useState<{ meal: string; idx: number; item: any } | null>(null);
   const [editQty, setEditQty] = useState(100);
   const [copySource, setCopySource] = useState<string | null>(null);
+  const [copiedDay, setCopiedDay] = useState<string | null>(null);
+  const [dayPresets, setDayPresets] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_day_presets') || '[]'); } catch { return []; } });
   const [toast, setToast] = useState<string | null>(null);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [customMeals, setCustomMeals] = useState<string[]>(() => { try { const value = JSON.parse(localStorage.getItem('he_custom_meals') || '[]'); return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []; } catch { return []; } });
@@ -455,6 +457,39 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showToast('✅ Пресет сохранён');
   }, [mealPresets, safeSet, showToast]);
 
+  const copyDay = useCallback(() => {
+    if (!diaryData[selectedDate]?.meals) { showToast('❌ День пуст'); return; }
+    setCopiedDay(selectedDate);
+    showToast(`📋 День ${selectedDate} скопирован — выберите дату и Вставить`);
+  }, [diaryData, selectedDate, showToast]);
+  const pasteDay = useCallback((targetDate: string) => {
+    if (!copiedDay || !diaryData[copiedDay]) return;
+    const data = { ...diaryData };
+    data[targetDate] = { meals: JSON.parse(JSON.stringify(diaryData[copiedDay].meals)) };
+    saveDiary(data);
+    showToast(`✅ День ${copiedDay} → ${targetDate}`);
+  }, [copiedDay, diaryData, saveDiary, showToast]);
+  const saveDayPreset = useCallback(() => {
+    const day = diaryData[selectedDate];
+    if (!day?.meals || Object.keys(day.meals).length===0) { showToast('❌ День пуст'); return; }
+    const name = prompt('Название шаблона дня:', `Шаблон ${selectedDate}`);
+    if (!name?.trim()) return;
+    const upd = [...dayPresets, { name: name.trim(), meals: JSON.parse(JSON.stringify(day.meals)) }];
+    setDayPresets(upd);
+    safeSet('he_day_presets', upd);
+    showToast('💾 Шаблон дня сохранён');
+  }, [diaryData, selectedDate, dayPresets, safeSet, showToast]);
+  const loadDayPreset = useCallback((preset: any) => {
+    const data = { ...diaryData };
+    if (!data[selectedDate]) data[selectedDate] = { meals: {} };
+    for (const [meal, items] of Object.entries(preset.meals as Record<string, any[]>)) {
+      if (!data[selectedDate].meals[meal]) data[selectedDate].meals[meal] = [];
+      (data[selectedDate].meals[meal] as any).push(...JSON.parse(JSON.stringify(items)));
+    }
+    saveDiary(data);
+    showToast(`✅ Шаблон "${preset.name}" добавлен`);
+  }, [diaryData, selectedDate, saveDiary, showToast]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toast && (
@@ -617,6 +652,18 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           )}
 
           {Object.keys(dayMicros).length > 0 && <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', marginBottom: 6 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}><div style={{ fontSize: 10, fontWeight: 700, color: '#86efac' }}>🧪 Микронутриенты за день</div><button onClick={() => { const txt = Object.entries(dayMicros).filter(([k]) => microLabels[k]).map(([k, v]) => { const info = microLabels[k]; return `${info.name}: ${Math.round(v * 10) / 10} ${info.unit} (${Math.round(v / info.target * 100)}%)`; }).join('\n'); try { void navigator.clipboard?.writeText(`Микро ${selectedDate}\n${txt}`); showToast('📋 Микро скопированы'); } catch { showToast('❌ Не удалось скопировать'); } }} aria-label="Копировать микронутриенты" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 9, fontWeight: 600, cursor: 'pointer', minHeight: 28 }}>📋</button></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>{Object.entries(dayMicros).filter(([key]) => microLabels[key]).map(([key, value]) => { const info = microLabels[key]; const pct = Math.round(value / info.target * 100); return <div key={key} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.04)' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8 }}><span style={{ color: 'rgba(255,255,255,0.75)' }}>{info.name}</span><span style={{ color: pct >= 80 ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(value * 10) / 10} {info.unit}</span></div><div style={{ marginTop: 3, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}><div style={{ height: '100%', width: `${Math.min(100, pct)}%`, borderRadius: 2, background: pct >= 80 ? '#22c55e' : '#f59e0b' }} /></div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{pct}% от ориентира</div></div>; })}</div></div>}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            <button onClick={copyDay} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:10, fontWeight:600, cursor:'pointer' }}>📋 Копировать день</button>
+            {copiedDay && <button onClick={() => pasteDay(selectedDate)} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(139,92,246,0.2)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:10, fontWeight:600, cursor:'pointer' }}>📋 Вставить {copiedDay} → сегодня</button>}
+            <button onClick={saveDayPreset} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(245,158,11,0.2)', background:'rgba(245,158,11,0.06)', color:'#f59e0b', fontSize:10, fontWeight:600, cursor:'pointer' }}>💾 Шаблон дня</button>
+          </div>
+          {dayPresets.length>0 && (
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+              {dayPresets.slice(0,6).map((p:any,i:number)=>(
+                <button key={i} onClick={()=>loadDayPreset(p)} style={{ padding:'6px 10px', borderRadius:10, fontSize:10, cursor:'pointer', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.15)', color:'#f59e0b' }}>📦 {p.name}</button>
+              ))}
+            </div>
+          )}
           <DayMealsList
             dayMeals={dayMeals}
             onEditItem={openEdit} onDeleteItem={deleteItem}
