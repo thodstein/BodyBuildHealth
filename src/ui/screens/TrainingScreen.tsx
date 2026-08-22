@@ -672,11 +672,12 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_joint_hub','periodization_taper_hub','exercise_lab','volume_hub','tools_hub','rir_forecast_hub','mix_hub']);
+        const CALC_TABS = new Set(['strength_analysis','load_safety','joints_ortho','quality_joint_hub','periodization_taper_hub','exercise_lab','volume_hub','tools_hub','rir_forecast_hub','mix_hub']);
         // алиасы депрекейтнутых дублей → единые хабы (аналоги VolumeHub, без дублей формул)
         const effectiveTab = tab === 'load_management' ? 'load_safety' as const
           : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_joint_hub' as const
-          : tab === 'quality_diagnostics' || tab === 'joint_health' ? 'quality_joint_hub' as const
+          : tab === 'quality_diagnostics' ? 'quality_joint_hub' as const
+          : tab === 'joint_health' ? 'joints_ortho' as const
           : tab === 'volume' || tab === 'tonnage' || tab === 'calc_plates' || tab === 'calc_mrv' ? 'volume_hub' as const
           : tab === 'periodization_hub' || tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' || tab === 'split_gen' ? 'periodization_taper_hub' as const
           : tab === 'training_mix_hub' || tab === 'mix_presets' ? 'mix_hub' as const
@@ -692,7 +693,8 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
             {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'relstr' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
             {effectiveTab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
-            {effectiveTab === 'quality_joint_hub' && <InfoErrorBoundary label="Качество + Суставы — единый хаб"><QualityJointHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} onBuildPlan={() => goPlannerManual()} initialMode={tab === 'joint_health' ? 'joints' : 'quality'} /></InfoErrorBoundary>}
+            {effectiveTab === 'joints_ortho' && <InfoErrorBoundary label="Суставы и ортопедия — единый инструмент"><JointMasterCard /></InfoErrorBoundary>}
+            {effectiveTab === 'quality_joint_hub' && <InfoErrorBoundary label="Качество + Диагностика"><QualityJointHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
             {effectiveTab === 'periodization_taper_hub' && <InfoErrorBoundary label="Периодизация и тапер"><PeriodizationHub initialMode={tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'taper' : tab === 'split_gen' ? 'splits' : 'designer'} /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
             {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub initialMode={tab === 'tonnage' ? 'tonnage' : tab === 'calc_plates' ? 'plates' : 'volume'} /></InfoErrorBoundary>}

@@ -57,9 +57,9 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '⚡',
     color: '#3b82f6',
     subtitle: 'Персональный пульс-контроль: показатели, качество плана, инструменты сборки, периодизация',
-    // хабы единые (аналог VolumeHub): periodization_taper_hub (2→1), mix_hub (2→1), rir_forecast_hub (2→1), tools_hub (3→1), quality_joint_hub (2→1)
+    // хабы единые (аналог VolumeHub): periodization_taper_hub, mix_hub, rir_forecast_hub, quality_joint_hub, joints_ortho (один инструмент суставов)
     tabs: [
-      'strength_analysis', 'quality_joint_hub', 'periodization_taper_hub',
+      'strength_analysis', 'quality_joint_hub', 'joints_ortho', 'periodization_taper_hub',
       'exercise_lab', 'load_safety', 'volume_hub', 'tools_hub',
       'rir_forecast_hub', 'mix_hub',
     ],

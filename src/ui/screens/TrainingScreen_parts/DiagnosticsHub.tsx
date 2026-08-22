@@ -12,18 +12,16 @@ import type { TrainingProfile } from './training-profile';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { LiftMasterCard } from './LiftMasterCard';
-import { JointMasterCard } from './JointMasterCard';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-// Дедуп: единый инструмент покрывает старые movement/limiter/jsi — они скрыты, остались как алиасы для совместимости
-type DiagnosticsHubMode = 'master' | 'joint' | 'sticking' | 'rir' | 'mesocorr';
+// Дедуп: единый инструмент покрывает старые movement/limiter — они скрыты, остались как алиасы для совместимости. Суставы/ортопедия — в отдельной вкладке «Суставы и ортопедия» (joints_ortho).
+type DiagnosticsHubMode = 'master' | 'sticking' | 'rir' | 'mesocorr';
 type LegacyMode = 'movement' | 'limiter' | 'jsi';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
   { m: 'master', label: 'Мастер движения', icon: '🏋️' },
-  { m: 'joint', label: 'Суставы + ортопедия', icon: '🦴' },
   { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
   { m: 'rir', label: 'RIR', icon: '🎯' },
   { m: 'mesocorr', label: 'Мезо', icon: '🔧' },
@@ -45,8 +43,8 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
   mesoWeeks, missedSessions, currentVolume, currentRir,
 }) => {
   const [modeRaw, setModeRaw] = useState<DiagnosticsHubMode | LegacyMode>('master');
-  // алиас старых режимов на единый инструмент
-  const mode: DiagnosticsHubMode = modeRaw === 'movement' || modeRaw === 'limiter' ? 'master' : modeRaw === 'jsi' ? 'joint' : modeRaw as DiagnosticsHubMode;
+  // алиас старых режимов на единый инструмент (jsi → Мастер движения; суставы — в отдельной вкладке joints_ortho)
+  const mode: DiagnosticsHubMode = modeRaw === 'movement' || modeRaw === 'limiter' || modeRaw === 'jsi' ? 'master' : modeRaw as DiagnosticsHubMode;
   const setMode = (m: DiagnosticsHubMode | LegacyMode) => setModeRaw(m);
 
   const acwrData = useMemo(() => {
@@ -81,7 +79,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        <b style={{ color: ACCENT }}>Новое: Мастер движения (9 лифтов) + Суставы с ортопедией внутри</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. «Срывы» — авто-анализ дневника (RPE≥8), не ручной ввод. Старые помечены @deprecated.
+        <b style={{ color: ACCENT }}>Новое: Мастер движения (9 лифтов)</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. «Срывы» — авто-анализ дневника (RPE≥8), не ручной ввод. Суставы/ортопедия — в отдельной вкладке <b style={{ color: '#f43f5e' }}>«Суставы и ортопедия»</b> (единый инструмент). Старые помечены @deprecated.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -109,7 +107,6 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
           </div>
         </>
       )}
-      {mode === 'joint' && <JointMasterCard />}
       {mode === 'sticking' && <StickingPointAnalysisCard sessions={sessions} />}
       {mode === 'rir' && <RIRCalibrationCard />}
       {mode === 'mesocorr' && (
