@@ -59,6 +59,7 @@ import { useConfirmDialog } from './ConfirmDialog';
 import { ProgramTimeline } from './ProgramTimeline';
 import { RirWaveChart, QualityScorePanel, PlanStatsPanel } from './ProgramEditorPanels2';
 import type { ManualMode } from './ProgramManagerPanel';
+import { CycleTemplatesPanel } from './CycleTemplatesPanel';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
@@ -1552,6 +1553,12 @@ return (
         />
         </>
       )}
+      {/* 📚 Шаблоны циклов — используем существующие SPLIT/LMS + периодизацию */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>📚 Шаблоны циклов</span>
+        <span style={{ fontSize: 10, color: DIM }}>1 клик — сплит ББ или цикл ПЛ из библиотеки</span>
+      </div>
+      <CycleTemplatesPanel program={program} onChange={onChange as any} showToast={showToast} />
       </>
       )}
 
