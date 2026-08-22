@@ -122,7 +122,7 @@ async function getCached(barcode: string): Promise<OFFProduct | null> {
   return null;
 }
 
-async function saveToCache(product: OFFProduct): Promise<void> {
+export async function saveToCache(product: OFFProduct): Promise<void> {
   try {
     await db.put(CACHE_STORE, product);
   } catch {}
@@ -136,9 +136,13 @@ async function saveToCache(product: OFFProduct): Promise<void> {
   } catch {}
 }
 
+function sanitizeBarcode(raw: string): string { return (raw || '').replace(/\D/g, '').trim(); }
+
 async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct | null> {
+  const bc = sanitizeBarcode(barcode);
+  if (!bc) return null;
   try {
-    const res = await fetch(`${apiUrl}/product/${barcode}.json`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${apiUrl}/product/${bc}.json`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
     if (!res.ok) return null;
     const data = await res.json();
     if (data.status !== 1 || !data.product) return null;
@@ -148,13 +152,23 @@ async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct
   }
 }
 
+// Экспортируем для ручного оффлайн-создания (штрихкод не найден → создать свою еду)
+export async function cacheCustomProduct(p: OFFProduct): Promise<void> {
+  const prod = { ...p, cachedAt: Date.now() } as OFFProduct;
+  await saveToCache(prod);
+}
+
 export async function searchByBarcode(barcode: string): Promise<OFFProduct | null> {
-  const cached = await getCached(barcode);
+  const bc = sanitizeBarcode(barcode);
+  if (!bc) return null;
+  const cached = await getCached(bc);
   if (cached) return cached;
 
-  const apis = [OFF_API_RU, OFF_API_WORLD, OFF_API_US];
+  // РФ-приоритет: 460-469 — российские штрихкоды → RU первым, иначе тот же порядок (RU уже первый)
+  const isRuBarcode = /^46\d{11}$/.test(bc) || /^46\d{7}$/.test(bc);
+  const apis = isRuBarcode ? [OFF_API_RU, OFF_API_WORLD, OFF_API_US] : [OFF_API_RU, OFF_API_WORLD, OFF_API_US];
   for (const api of apis) {
-    const product = await fetchFromApi(api, barcode);
+    const product = await fetchFromApi(api, bc);
     if (product) {
       await saveToCache(product);
       return product;
@@ -168,14 +182,16 @@ export async function searchByBarcodeBatch(barcodes: string[]): Promise<(OFFProd
 }
 
 export async function searchByName(query: string, pageSize = 20): Promise<OFFProduct[]> {
-  const cached = await searchCacheByName(query);
+  const q = (query || '').trim();
+  if (!q) return [];
+  const cached = await searchCacheByName(q);
   if (cached.length > 0) return cached;
 
   const apis = [OFF_API_RU, OFF_API_WORLD];
   for (const api of apis) {
     try {
-      const encoded = encodeURIComponent(query);
-      const res = await fetch(`${api}/search?search_terms=${encoded}&page_size=${pageSize}&json=1`, { signal: AbortSignal.timeout(5000) });
+      const encoded = encodeURIComponent(q);
+      const res = await fetch(`${api}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
       if (!res.ok) continue;
       const data = await res.json();
       if (!data.products) continue;

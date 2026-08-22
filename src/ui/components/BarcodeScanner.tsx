@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
-import { searchByBarcode, searchByName, type OFFProduct } from '../../engines/openfoodfacts.engine';
+import { searchByBarcode, searchByName, saveToCache, type OFFProduct } from '../../engines/openfoodfacts.engine';
 
 interface Props {
   onProductFound: (product: OFFProduct) => void;
@@ -21,8 +21,11 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   const scannedRef = useRef(false);
 
   const handleBarcodeLookup = useCallback(async (code?: string) => {
-    const bc = code || barcode.trim();
+    const raw = code || barcode.trim();
+    const bc = raw.replace(/\D/g, '');
     if (!bc) return;
+    if (bc.length < 8) { setError('Штрихкод слишком короткий. EAN-13 — 13 цифр.'); return; }
+    setBarcode(bc);
     setLoading(true);
     setError('');
     try {
@@ -30,10 +33,13 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
       if (product) {
         onProductFound(product);
       } else {
-        setError('Продукт не найден. Проверьте штрихкод или введите название вручную.');
+        const isRu = /^46/.test(bc);
+        setError(isRu
+          ? `Продукт 46… (РФ) не найден в ru.openfoodfacts.org. Попробуйте Поиск по названию или создайте свою еду — сохранится оффлайн.`
+          : 'Продукт не найден в OFF (ru/world/us). Проверьте штрихкод или введите название вручную / создайте свою еду.');
       }
     } catch {
-      setError('Ошибка сети. Проверьте подключение к интернету.');
+      setError('Ошибка сети. OFF недоступен — создайте свою еду оффлайн, она сохранится в кэш и найдётся при след. сканировании.');
     } finally {
       setLoading(false);
     }
@@ -134,7 +140,8 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
       {mode === 'manual' && (
         <div>
           <label style={{ color: 'var(--text-light)', fontSize: 12, marginBottom: 4, display: 'block' }}>Штрихкод (EAN-13)</label>
-          <input value={barcode} onChange={e => setBarcode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795" style={inputStyle} autoFocus />
+          <input value={barcode} onChange={e => setBarcode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795 (РФ 460…)" style={inputStyle} autoFocus />
+          {barcode.replace(/\D/g,'').startsWith('46') && <div style={{ fontSize:10, color:'#00e68a', marginTop:4 }}>🇷🇺 Российский штрихкод 460… — ищем в RU-базе первым</div>}
           <button onClick={() => handleBarcodeLookup()} disabled={loading || !barcode.trim()} style={{ ...btnStyle, width: '100%', marginTop: 10, opacity: loading || !barcode.trim() ? 0.5 : 1 }}>
             {loading ? 'Поиск...' : 'Найти по штрихкоду'}
           </button>
@@ -179,15 +186,17 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         <div style={{ marginTop:10, padding:10, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}>
           <div style={{ color: '#ef4444', fontSize: 12, marginBottom:8 }}>{error}</div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-            <button onClick={() => {
+            <button onClick={async () => {
               const name = prompt('Название продукта с этикетки:');
               if (!name) return;
               const kcal = Number(prompt('Ккал на 100г:', '100') || 100);
               const p = Number(prompt('Белки г/100г:', '5') || 0);
               const f = Number(prompt('Жиры г/100г:', '5') || 0);
               const c = Number(prompt('Углеводы г/100г:', '10') || 0);
-              const bc = barcode || 'custom_' + Date.now();
-              onProductFound({ id: bc, barcode: bc, name, kcal: isNaN(kcal)?100:kcal, protein: isNaN(p)?0:p, fat: isNaN(f)?0:f, carbs: isNaN(c)?0:c, fiber:0, servingSize:'100 г', cachedAt: Date.now() } as any);
+              const bc = (barcode || 'custom_' + Date.now()).replace(/\D/g,'') || 'custom_' + Date.now();
+              const prod: OFFProduct = { id: bc, barcode: bc, name, kcal: isNaN(kcal)?100:kcal, protein: isNaN(p)?0:p, fat: isNaN(f)?0:f, carbs: isNaN(c)?0:c, fiber:0, servingSize:'100 г', cachedAt: Date.now() } as any;
+              try { await saveToCache(prod); } catch {}
+              onProductFound(prod);
             }} style={{ ...btnStyle, background:'#00e68a', color:'#000', fontSize:12 }}>➕ Создать свою еду (оффлайн)</button>
             <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', alignSelf:'center' }}>Без сети — сохранится в кэш</span>
           </div>
