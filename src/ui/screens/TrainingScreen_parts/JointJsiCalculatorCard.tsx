@@ -1,5 +1,5 @@
 /**
- * JointJsiCalculatorCard.tsx — AI-ортопед: ввод → JSI → тепловая карта + тюнинг + нутрицевтики.
+ * JointJsiCalculatorCard.tsx — ортопедический калькулятор: ввод → JSI → тепловая карта + тюнинг + нутрицевтики.
  *
  * Telegram Mini App — все инпуты по клику, тепловая карта SVG-силуэт.
  * Читает профиль (personal/pharma/health) для автоподстановки антропометрии/ААС/боли.
@@ -142,7 +142,7 @@ export const JointJsiCalculatorCard: React.FC = () => {
 
   return (
     <div style={{ padding:12, color:'#fff' }}>
-      <div style={{ fontSize:15, fontWeight:800, color:'#f43f5e' }}>🦴 AI-ортопед — JSI калькулятор (проф)</div>
+      <div style={{ fontSize:15, fontWeight:800, color:'#f43f5e' }}>🦴 Ортопедический калькулятор — индекс суставного стресса (JSI)</div>
       <div style={{ fontSize:10, color:DIM, marginTop:3, lineHeight:1.45 }}>
         Вес×Объём×Темп×Анатомия×Фарма×Боль → персональный износ по суставу. Зелёный→Жёлтый→Красный→Critical. Внутри Telegram Mini App — все 9 ортопедических калькуляторов в одном JSI.
       </div>

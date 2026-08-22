@@ -35,9 +35,9 @@ export const JointMasterCard: React.FC = () => {
 
   return (
     <div style={{ padding:12, color:'#fff' }}>
-      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🦴 Суставно-связочный мастер — {JOINT_MAP[joint].label}</div>
+      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🦴 Ортопедия и суставы — единый инструмент</div>
       <div style={{ fontSize:10, color:DIM, marginTop:3, lineHeight:1.45 }}>
-        Один экран на сустав — все 9 калькуляторов: нагрузка (jointStress) → анамнез → геометрия → недельный план → прехаб → мониторинг (FMS) → замены. Старые калькуляторы остаются как эксперт, но прячем — см. план чистки внизу.
+        Один экран на сустав — ВСЕ калькуляторы: JSI (тепловая карта износа) → анатомия риска → нагрузка (jointStress) → геометрия → недельный план → прехаб/мобильность → мониторинг (FMS) → замены + видео-гид. Все 9 ортопедических калькуляторов проекта в одном инструменте, без вкладок.
       </div>
 
       {/* выбор сустава */}
@@ -150,15 +150,10 @@ export const JointMasterCard: React.FC = () => {
 
       {/* 0 JSI — встроен сразу */}
       <div style={{ marginTop:12, padding:8, borderRadius:10, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e' }}>0 · AI-ортопед JSI — встроен (ввод → карта)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Тот же калькулятор что и в отдельной вкладке, теперь сразу в суставах — не нужно переключаться.</div>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e' }}>0 · JSI — тепловая карта износа сустава (ввод → карта)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Вес×объём×темп×геометрия×фарма×боль → персональный индекс по каждому суставу + тюнинг + нутрицевтики. Часть единого инструмента, переключение не нужно.</div>
       </div>
       <JointJsiCalculatorCard />
-
-      {/* план чистки */}
-      <div style={{ marginTop:8, padding:9, borderRadius:8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)', color:'#fbbf24', fontSize:10, lineHeight:1.45 }}>
-        <b>План чистки старых калькуляторов:</b> если мастер покрывает — прячем вкладки `Orthopedic / Mobility Assessment / Mobility Protocol / Warmup Joints` (оставляем движки, помечаем `@deprecated`, удаляем через 1 релиз после проверки). Сейчас они доступны как эксперт, но основной путь — этот мастер + JSI-калькулятор.
-      </div>
     </div>
   );
 };

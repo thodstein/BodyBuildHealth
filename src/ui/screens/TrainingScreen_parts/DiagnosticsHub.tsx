@@ -23,7 +23,7 @@ type LegacyMode = 'movement' | 'limiter' | 'jsi';
 
 const MODE_DEFS: Array<{ m: DiagnosticsHubMode; label: string; icon: string }> = [
   { m: 'master', label: 'Мастер движения', icon: '🏋️' },
-  { m: 'joint', label: 'Суставы + AI-ортопед', icon: '🦴' },
+  { m: 'joint', label: 'Суставы + ортопедия', icon: '🦴' },
   { m: 'sticking', label: 'Срывы (дневник)', icon: '🔬' },
   { m: 'rir', label: 'RIR', icon: '🎯' },
   { m: 'mesocorr', label: 'Мезо', icon: '🔧' },
@@ -81,7 +81,7 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🔬 Диагностика</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 12 }}>
-        <b style={{ color: ACCENT }}>Новое: Мастер движения (9 лифтов) + Суставы с AI-ортопедом внутри</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. «Срывы» — авто-анализ дневника (RPE≥8), не ручной ввод. Старые помечены @deprecated.
+        <b style={{ color: ACCENT }}>Новое: Мастер движения (9 лифтов) + Суставы с ортопедией внутри</b> — вес×объём×темп×анатомия×фарма×боль → тепловая карта + deadly combos + тюнинг + нутрицевтики. «Срывы» — авто-анализ дневника (RPE≥8), не ручной ввод. Старые помечены @deprecated.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>

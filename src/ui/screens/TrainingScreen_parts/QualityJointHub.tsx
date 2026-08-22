@@ -11,7 +11,7 @@ type QualityJointMode = 'quality' | 'joints';
 
 const MODE_DEFS: Array<{ m: QualityJointMode; label: string; icon: string; desc: string }> = [
   { m: 'quality', label: 'Качество + Диагностика', icon: '🎯', desc: 'Оценка 0-100, MEV/MAV/MRV, мастер движения (9 лифтов)/срывы (дневник)' },
-  { m: 'joints', label: 'Суставы + AI', icon: '🦴', desc: 'JSI теплокарта, 8 блоков, FMS, прехаб — тот же движок что и в Безопасность→Суставы' },
+  { m: 'joints', label: 'Суставы + ортопедия', icon: '🦴', desc: 'JSI теплокарта, 8 блоков, FMS, прехаб — тот же движок что и в Безопасность→Суставы' },
 ];
 
 export const QualityJointHub: React.FC<QualityDiagnosticsHubProps & { initialMode?: QualityJointMode }> = ({ initialMode, ...props }) => {
@@ -21,7 +21,7 @@ export const QualityJointHub: React.FC<QualityDiagnosticsHubProps & { initialMod
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🎯 Качество и суставы — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: <b style={{ color: '#fff' }}>качество и диагностика</b> (0-100, объём, мастер движения 9 лифтов/срывы дневник) + <b style={{ color: '#fff' }}>суставы + AI</b> (JSI, 8 блоков, FMS) — в одном месте. Суставы — тот же движок <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 3 }}>joint-load-master + joint-jsi</code> что и в «Безопасность→Суставы» (без второго расчёта). Ранее разнесены в `quality_diagnostics` и `joint_health` с дублем теплокарты — теперь единый хаб.
+        Без дублей: <b style={{ color: '#fff' }}>качество и диагностика</b> (0-100, объём, мастер движения 9 лифтов/срывы дневник) + <b style={{ color: '#fff' }}>суставы + ортопедия</b> (JSI, 8 блоков, FMS) — в одном месте. Суставы — тот же движок <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 3 }}>joint-load-master + joint-jsi</code> что и в «Безопасность→Суставы» (без второго расчёта). Ранее разнесены в `quality_diagnostics` и `joint_health` с дублем теплокарты — теперь единый хаб.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
         <b style={{ color: '#fff' }}>Как читать:</b> «Качество» — оценка плана 0-100 и диагностика объёма/техники. «Суставы» — 8 блоков на сустав (анатомия→нагрузка→геометрия→прехаб→FMS→замены). Все графики с пояснениями внутри. Источники: объём — Israetel MEV/MAV/MRV, Helms 2019; диагностика — lift-assistance, joint-load-master (Baechle & Earle 2008), FMS Cook 2010, JSI — без выдумок.

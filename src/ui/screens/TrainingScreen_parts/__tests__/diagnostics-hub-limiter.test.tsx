@@ -21,7 +21,7 @@ describe('DiagnosticsHub: единый инструмент (дедуп)', () =>
   it('есть чипы единых мастеров (дедуп старых movement/limiter/jsi)', () => {
     const html = renderToStaticMarkup(<DiagnosticsHub {...props} />);
     expect(html).toContain('Мастер движения');
-    expect(html).toContain('Суставы + AI-ортопед');
+    expect(html).toContain('Суставы + ортопедия');
     expect(html).toContain('Срывы (дневник)');
     expect(html).not.toContain('Лимитирующие факторы движения');
     expect(html).not.toContain('Мёртвые → Слабые → Бар');

@@ -72,6 +72,7 @@ export const MixPresetsCard: React.FC = () => {
     background: active ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
     border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
     color: active ? ACCENT : 'rgba(255,255,255,0.7)', transition: 'all 0.15s', textAlign: 'center' as const,
+    whiteSpace: 'nowrap' as const, overflow: 'hidden' as const, textOverflow: 'ellipsis' as const,
   });
 
   const onPush = () => {
@@ -81,14 +82,14 @@ export const MixPresetsCard: React.FC = () => {
   };
 
   const Item: React.FC<{ r: MixRenderItem }> = ({ r }) => (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <div>
-        <div style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{r.name}</div>
-        <div style={{ fontSize: 10, color: DIM }}>{r.note}</div>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div style={{ fontSize: 11, color: '#fff', fontWeight: 700, wordBreak: 'break-word' }}>{r.name}</div>
+        <div style={{ fontSize: 10, color: DIM, wordBreak: 'break-word' }}>{r.note}</div>
       </div>
-      <div style={{ textAlign: 'right' }}>
+      <div style={{ flex: '0 0 auto', textAlign: 'right', whiteSpace: 'nowrap' }}>
         <div style={{ fontSize: 11, color: ACCENT, fontWeight: 700 }}>{r.dose}{r.unit}</div>
-        <div style={{ fontSize: 10, color: DIM }}>{r.mg >= 1000 ? (r.mg / 1000).toFixed(1) + 'г' : r.mg + 'мг'}</div>
+        <div style={{ fontSize: 10, color: DIM, whiteSpace: 'nowrap' }}>{r.mg >= 1000 ? (r.mg / 1000).toFixed(1) + 'г' : r.mg + 'мг'}</div>
       </div>
     </div>
   );
@@ -102,7 +103,7 @@ export const MixPresetsCard: React.FC = () => {
 
       <div style={CARD}>
         <div style={H}>🎯 Цель пресета</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 6, marginBottom: 8 }}>
           {tpls.map(t => {
             const label = t.name.replace(/^[^\s]+\s/, ''); // убрать эмодзи-префикс
             return <div key={t.id} onClick={() => setGoal(t.id)} style={chip(goal === t.id)}>{label}</div>;

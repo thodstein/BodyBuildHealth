@@ -428,9 +428,9 @@ export const TrainingMixTab: React.FC = () => {
           <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text)' }}>📋 Состав стека</h4>
           {stack.filter(sItem => sItem.mg > 0).map((sItem, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 3 }}>
-              <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{sItem.name}</span>
-              <span style={{ fontSize: 12, color: ACCENT, fontWeight: 700 }}>{sItem.dose} {sItem.unit}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{sItem.note}</span>
+              <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)', wordBreak: 'break-word' }}>{sItem.name}</span>
+              <span style={{ flex: '0 0 auto', fontSize: 12, color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>{sItem.dose} {sItem.unit}</span>
+              <span style={{ flex: '0 0 auto', fontSize: 12, color: 'var(--text-dim)', wordBreak: 'break-word' }}>{sItem.note}</span>
             </div>
           ))}
         </div>

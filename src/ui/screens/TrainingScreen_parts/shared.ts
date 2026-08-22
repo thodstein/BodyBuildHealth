@@ -113,7 +113,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   rir_forecast_hub: '🎯 RIR + Прогноз — единый хаб',
   tools_hub: '🛠 Инструменты — единый хаб',
   taper_planner: '📉 Планировщик тейпера (→ тейпер-хаб)',
-  joint_health: '🦴 Суставы + AI (→ хаб)',
+  joint_health: '🦴 Суставы + ортопедия (→ хаб)',
 
 };
 

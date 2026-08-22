@@ -4,15 +4,13 @@ import React from 'react';
 import { JointMasterCard } from '../JointMasterCard';
 
 describe('JointMasterCard', () => {
-  it('рендерит поясницу как дефолт и 7 зон', () => {
+  it('есть единый ортопедический инструмент с JSI и зонами', () => {
     const html = renderToStaticMarkup(<JointMasterCard />);
+    expect(html).toContain('Ортопедия и суставы');
+    expect(html).toContain('JSI');
     expect(html).toContain('Поясница');
     expect(html).toContain('Плечо');
     expect(html).toContain('Колено');
     expect(html).toContain('Тазобедренный');
-  });
-  it('есть план чистки старых калькуляторов', () => {
-    const html = renderToStaticMarkup(<JointMasterCard />);
-    expect(html).toContain('План чистки');
   });
 });
