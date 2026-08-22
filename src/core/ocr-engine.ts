@@ -391,37 +391,42 @@ async function serverOcrImage(file: File): Promise<string> {
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
-  let response: Response;
-  try {
-    // Reuse the server OCR route already used successfully for scanned lab
-    // PDFs. Its Vercel bundle has the proven Node/Tesseract setup; passing an
-    // image kind avoids the separate image function that can be unavailable
-    // in Telegram deployments.
-    const endpoint = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
-      ? `${window.location.origin}/api/ocr-scanned-pdf`
-      : './api/ocr-scanned-pdf';
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: btoa(binary),
-        filename: file.name || 'nutrition-screenshot',
-        mimeType: file.type || 'application/octet-stream',
-        kind: 'image',
-      }),
-      signal: controller.signal,
-    });
-  } catch (error: any) {
-    if (error?.name === 'AbortError') throw new Error('Серверный OCR превысил лимит 90 секунд. Попробуйте более компактный скриншот.');
-    throw error;
-  } finally {
-    clearTimeout(timeout);
+  const origin = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
+    ? window.location.origin
+    : '';
+  const endpoints = [
+    origin ? `${origin}/api/ocr-scanned-pdf` : './api/ocr-scanned-pdf',
+    origin ? `${origin}/api/ocr-image` : './api/ocr-image',
+  ];
+  const errors: string[] = [];
+
+  for (const endpoint of endpoints) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35_000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: btoa(binary),
+          filename: file.name || 'nutrition-screenshot',
+          mimeType: file.type || 'application/octet-stream',
+          kind: 'image',
+          mode: 'fatsecret',
+        }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok && payload.ok && typeof payload.text === 'string') return payload.text;
+      errors.push(`${endpoint}: ${payload.error || `HTTP ${response.status}`}`);
+    } catch (error: any) {
+      errors.push(`${endpoint}: ${error?.name === 'AbortError' ? 'таймаут 35 секунд' : error?.message || String(error)}`);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.ok) throw new Error(payload.error || `Server OCR HTTP ${response.status}`);
-  return typeof payload.text === 'string' ? payload.text : '';
+
+  throw new Error(`Серверный OCR недоступен. ${errors.join(' · ')}`);
 }
 
 /**
