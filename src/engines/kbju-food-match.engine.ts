@@ -221,18 +221,19 @@ export function scoreFoodsForKBJU(
  */
 export function parseServingSizeGrams(servingSize?: string): number {
   if (!servingSize) return 100;
-  // Priority: match "(N г)" or "(N мл)" in parentheses (most specific)
-  const mParen = servingSize.match(/\((\d+)\s*(?:г|g|мл|ml)\)/i);
-  if (mParen) { const v = parseInt(mParen[1], 10); if (v > 0) return v; }
+  // P0-fix: parseFloat вместо parseInt — иначе «12.5 г» → 12, «0.5 г креатин» → 100 (fallback), теряли точность и портили замены
+  // Priority: match "(N г)" or "(N мл)" in parentheses (most specific) — поддерживает дроби и запятую
+  const mParen = servingSize.match(/\((\d+(?:[.,]\d+)?)\s*(?:г|g|мл|ml)\)/i);
+  if (mParen) { const v = parseFloat(mParen[1].replace(',', '.')); if (v > 0) return Math.round(v); }
   // Direct "N г" / "N g" / "N мл" / "N ml"
-  const mDirect = servingSize.match(/(\d+)\s*(?:г|g|мл|ml)/i);
-  if (mDirect) { const v = parseInt(mDirect[1], 10); if (v > 0) return v; }
+  const mDirect = servingSize.match(/(\d+(?:[.,]\d+)?)\s*(?:г|g|мл|ml)/i);
+  if (mDirect) { const v = parseFloat(mDirect[1].replace(',', '.')); if (v > 0) return Math.round(v); }
   // Fallback: first number, but only if it seems like grams (not "2 шт" = 2 pieces)
-  const n = servingSize.match(/(\d+)/);
+  const n = servingSize.match(/(\d+(?:[.,]\d+)?)/);
   if (n) {
-    const v = parseInt(n[1], 10);
+    const v = parseFloat(n[1].replace(',', '.'));
     if (v === 0) return 100; // "0 г" → use default
-    if (v >= 10) return v;   // likely grams
+    if (v >= 10) return Math.round(v);   // likely grams
     // Small numbers (< 10) could be pieces ("2 шт") → use default
     return 100;
   }

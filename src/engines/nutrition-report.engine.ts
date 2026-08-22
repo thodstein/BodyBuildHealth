@@ -62,6 +62,7 @@ const MICRO_LABELS: Record<string, string> = {
 };
 
 import { FOOD_DB } from '../core/nutrition-database';
+import { getMicro } from '../core/nutrition-micros';
 
 // Sodium estimation by food category (mg per 100g typical)
 const NA_BY_CATEGORY: Record<string, number> = {
@@ -104,22 +105,42 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   };
 
   // ─── 3. Micros from all food items ───
+  // P0-fix: используем getMicro чтобы тянуть K/Na/Se/Zn и т.д. из electrolytes_100g/trace_elements_100g/vitamins_100g,
+  // а не только из food.micros (там для 30+ продуктов данные лежат в alt-полях). Раньше микро-дефициты и PRAL были занижены.
   const microTotals: Record<string, number> = {};
   const microFoods: Record<string, Set<string>> = {};
   allItems.forEach(item => {
     const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name);
-    if (food?.micros) {
-      const ratio = item.amount / 100;
-      Object.entries(food.micros).forEach(([k, v]) => {
-        if (typeof v === 'number') {
-          microTotals[k] = (microTotals[k] || 0) + v * ratio;
-          if (!microFoods[k]) microFoods[k] = new Set();
-          microFoods[k].add(food.name);
-        }
-      });
+    if (!food) return;
+    const ratio = item.amount / 100;
+    for (const tgtKey of Object.keys(MICRO_TARGETS)) {
+      // Fiber/Cholesterol имеют особые источники (food.fiber, micros.Cholesterol) — отдельно
+      if (tgtKey === 'Fiber') {
+        const v = food.fiber || 0;
+        if (v > 0) { microTotals[tgtKey] = (microTotals[tgtKey] || 0) + v * ratio; if (!microFoods[tgtKey]) microFoods[tgtKey] = new Set(); microFoods[tgtKey].add(food.name); }
+        continue;
+      }
+      if (tgtKey === 'Cholesterol') {
+        const v = getMicro(food, 'Cholesterol');
+        if (v > 0) { microTotals[tgtKey] = (microTotals[tgtKey] || 0) + v * ratio; if (!microFoods[tgtKey]) microFoods[tgtKey] = new Set(); microFoods[tgtKey].add(food.name); }
+        continue;
+      }
+      const v = getMicro(food, tgtKey);
+      if (v > 0) {
+        microTotals[tgtKey] = (microTotals[tgtKey] || 0) + v * ratio;
+        if (!microFoods[tgtKey]) microFoods[tgtKey] = new Set();
+        microFoods[tgtKey].add(food.name);
+      }
+    }
+    // Также собираем P для PRAL (не в MICRO_TARGETS, но нужен для кислотной нагрузки)
+    const pVal = getMicro(food, 'P') || (food.micros?.P as number) || 0;
+    // fallback: если getMicro не знает P, пробуем напрямую micros.P
+    if (pVal > 0) {
+      // храним отдельно для PRAL, но также через microTotals['P'] чтобы не терять
+      microTotals['P'] = (microTotals['P'] || 0) + pVal * ratio;
     }
   });
-  // NOTE: Omega3 is already collected via Object.entries(food.micros) above — no duplicate block needed
+  // NOTE: Omega3 is already collected via getMicro loop above — no duplicate block needed
 
   const micros: Record<string, { actual: number; target: number; pct: number; status: 'ok' | 'low' | 'critical'; foods: string[] }> = {};
   const microDeficiencies: string[] = [];
@@ -247,22 +268,18 @@ export function generateNutritionReport(input: NutritionReportInput): NutritionR
   };
 
   // ─── 10. Sodium/Potassium ratio ───
+  // P0-fix: используем getMicro чтобы Na/K тянулись из electrolytes_100g, иначе для 30+ продуктов (творог, яйца и т.д.) Na/K=0 → искажённый Na/K и PRAL
   let estimatedNaMg = 0;
   let kMg = 0;
   allItems.forEach(item => {
     const food = FOOD_DB.find(f => f.id === item.id || f.name === item.name);
+    if (!food) return;
     const ratio = item.amount / 100;
-    // Na from micros if available, otherwise estimate by category
-    if (food?.micros?.Na !== undefined) {
-      estimatedNaMg += (food.micros.Na as number) * ratio;
-    } else {
-      const catNa = NA_BY_CATEGORY[food?.category || 'other'] || 100;
-      estimatedNaMg += catNa * ratio;
-    }
-    // K from micros
-    if (food?.micros?.K !== undefined) {
-      kMg += (food.micros.K as number) * ratio;
-    }
+    const na = getMicro(food, 'Na');
+    if (na > 0) estimatedNaMg += na * ratio;
+    else { const catNa = NA_BY_CATEGORY[food?.category || 'other'] || 100; estimatedNaMg += catNa * ratio; }
+    const k = getMicro(food, 'K');
+    if (k > 0) kMg += k * ratio;
   });
   const naKRatio = kMg > 0 ? estimatedNaMg / kMg : 3;
   const targetNaKRatio = 0.75; // ideal Na/K < 1

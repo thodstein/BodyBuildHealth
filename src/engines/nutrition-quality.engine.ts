@@ -52,10 +52,11 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
       const _amtNum = typeof _rawAmt === 'string' ? (parseFloat(_rawAmt) || 100) : (_rawAmt as number);
       const factor = _amtNum / 100;
       totalFiber += (food.fiber || 0) * factor;
-      if (food.micros) {
-        for (const [key, val] of Object.entries(food.micros)) {
-          if (typeof val === 'number') microTotals[key] = (microTotals[key] || 0) + val * factor;
-        }
+      // P0-fix: используем getMicro для всех нутриентов — иначе K/Na/Mg/Zn из electrolytes/trace терялись
+      // (раньше читали только food.micros). Это занижало microDensity и ломало PRAL/Na-K в отчётах.
+      for (const tgtKey of Object.keys(MICRO_TARGETS)) {
+        const v = getMicro(food, tgtKey);
+        if (v > 0) microTotals[tgtKey] = (microTotals[tgtKey] || 0) + v * factor;
       }
       // Bug 6: only fast_food is 'processed'; sports supplements (whey/casein/creatine) are NOT junk.
       if (food.category === 'fast_food') {
@@ -63,14 +64,16 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
       } else {
         wholeFoodKcal += item.kcal;
       }
-      // Bug 2: real saturated fat (not Cholesterol); omega-3 from getMicro.
-      totalSatFat += getMicro(food, 'SatFat');
-      totalOmega3 += getMicro(food, 'Omega3');
+      // P0-fix: масштабируем жиры порцией + без фейкового деления на 1000 (getMicro уже в граммах)
+      totalSatFat += getMicro(food, 'SatFat') * factor;
+      totalOmega3 += getMicro(food, 'Omega3') * factor;
     }
   }
 
   // Breakdown scoring
-  const microDensity = Math.min(30, Math.round((Object.keys(microTotals).length / Object.keys(MICRO_TARGETS).length) * 30));
+  // P0-fix: считаем покрытие именно по TARGET-микронутриентам, а не по любым ключам micros (Cholesterol/OleicAcid раздували счёт)
+  const coveredTargets = Object.keys(MICRO_TARGETS).filter(k => (microTotals[k] || 0) > 0).length;
+  const microDensity = Math.min(30, Math.round((coveredTargets / Object.keys(MICRO_TARGETS).length) * 30));
 
   const pPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0;
   const fPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0;
@@ -82,7 +85,8 @@ export function calcMealQuality(items: MealItem[]): QualityScore {
   macroBalance = Math.max(0, macroBalance);
 
   const fiber = Math.min(15, Math.round((totalFiber / 30) * 15));
-  const totalSatFatG = totalSatFat / 1000;
+  // P0-fix: totalSatFat уже в граммах (getMicro*Factor), деление на 1000 было ошибкой единиц (всегда ~0) → fatQuality всегда 15
+  const totalSatFatG = totalSatFat;
   const fatQuality = totalOmega3 > 1 ? 15 : totalOmega3 > 0.5 ? 10 : Math.min(15, Math.round((1 - totalSatFatG / Math.max(1, totalF)) * 15));
   const wholeFoodPct = totalKcal > 0 ? wholeFoodKcal / totalKcal : 0.5;
   const wholeFoods = Math.min(20, Math.round(wholeFoodPct * 20));

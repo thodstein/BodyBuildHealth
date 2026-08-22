@@ -186,7 +186,7 @@ export interface PlanCtx {
   saveUndo: () => void;
   quickAddMealIdx: number | null; setQuickAddMealIdx: (v: number | null) => void;
   quickAddSearch: string; setQuickAddSearch: (v: string) => void;
-  moveFoodItem: (a: number, b: number, c: number) => void;
+  moveFoodItem: (a: number, b: number, c: number, dayIdx?: number) => void;
   findSimilarFoods: (item: any, count?: number) => any[];
   replaceFoodItem: (a: number, b: number, c: number, d: any) => void;
   updateItemAmount: (a: number, b: number, c: number, d: number) => void;
@@ -1129,17 +1129,94 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
   };
 
-  const moveFoodItem = (fromMealIdx: number, toMealIdx: number, itemIdx: number) => {
-    setDayPlan((prev: any) => {
-      if (!prev) return prev;
-      const meals = prev.meals.map((m: any) => ({ ...m, items: [...m.items], totals: { ...m.totals } }));
-      const item = meals[fromMealIdx].items.splice(itemIdx, 1)[0];
-      if (!item) return prev;
-      meals[toMealIdx].items.push(item);
-      meals.forEach((m: any, i: number) => { meals[i] = { ...m, totals: { kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0), p: m.items.reduce((s: number, it: any) => s + it.p, 0), f: m.items.reduce((s: number, it: any) => s + it.f, 0), c: m.items.reduce((s: number, it: any) => s + it.c, 0), fiber: m.items.reduce((s: number, it: any) => s + (it.fiber || 0), 0) } }; });
-      const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) };
-      return { ...prev, meals, totals };
-    });
+  // P0-fix: drag&drop в 3/7-дневном виде раньше всегда правил dayPlan (день 0) вместо видимого дня.
+  // Теперь moveFoodItem принимает dayIdx (0=dayPlan, 1..3=threeDayPlan, 7..=weekPlan) и мутирует правильный план.
+  const moveFoodItem = (fromMealIdx: number, toMealIdx: number, itemIdx: number, dayIdx: number = 0) => {
+    const resolved = _resolvePlanDay(dayIdx);
+    if (!resolved || resolved.plan === 'day') {
+      setDayPlan((prev: any) => {
+        if (!prev) return prev;
+        const meals = prev.meals.map((m: any) => ({ ...m, items: [...m.items], totals: { ...m.totals } }));
+        const item = meals[fromMealIdx]?.items.splice(itemIdx, 1)[0];
+        if (!item) return prev;
+        if (!meals[toMealIdx]) return prev;
+        meals[toMealIdx].items.push(item);
+        meals.forEach((m: any, i: number) => { meals[i] = { ...m, totals: { kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0), p: m.items.reduce((s: number, it: any) => s + it.p, 0), f: m.items.reduce((s: number, it: any) => s + it.f, 0), c: m.items.reduce((s: number, it: any) => s + it.c, 0), fiber: m.items.reduce((s: number, it: any) => s + (it.fiber || 0), 0) } }; });
+        const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) };
+        return { ...prev, meals, totals };
+      });
+      if (weekEditDay !== null && weekPlan?.days?.[weekEditDay] && dayIdx === 0) {
+        // синхронизируем обратно в недельный план при редактировании его дня
+        const prev = weekPlan.days[weekEditDay];
+        if (prev?.meals?.[fromMealIdx]?.items?.[itemIdx]) {
+          const itm = prev.meals[fromMealIdx].items[itemIdx];
+          if (itm) {
+            updateMultiDayPlan(weekPlan, weekEditDay, toMealIdx, items => [...items, itm]);
+            updateMultiDayPlan(weekPlan, weekEditDay, fromMealIdx, items => items.filter((_: any, i: number) => i !== itemIdx));
+          }
+        }
+      }
+    } else if (resolved.plan === 'three') {
+      const day = threeDayPlan?.days?.[resolved.day];
+      if (!day) { setDraggedItem(null); setDropTarget(null); return; }
+      saveUndo();
+      const fromItems = [...(day.meals[fromMealIdx]?.items || [])];
+      const itm = fromItems.splice(itemIdx, 1)[0];
+      if (!itm) { setDraggedItem(null); setDropTarget(null); return; }
+      // собираем обновлённые meals для этого дня
+      const mealsCopy = day.meals.map((m: any, idx: number) => {
+        if (idx === fromMealIdx) return { ...m, items: fromItems, totals: calcItemTotals(fromItems) };
+        if (idx === toMealIdx) { const toItems = [...m.items, itm]; return { ...m, items: toItems, totals: calcItemTotals(toItems) }; }
+        return m;
+      });
+      // если from и to одинаковые — уже обработали splice, просто обновляем один meal (выше) — но to==from уже пуш+сплайс в одном — поправим:
+      // при совпадении from==to нам уже не нужно второй пуш; mealsCopy выше сделала дубль — исправим
+      let finalMeals: any[];
+      if (fromMealIdx === toMealIdx) {
+        const items = [...(day.meals[fromMealIdx].items || [])];
+        const moved = items.splice(itemIdx, 1)[0];
+        if (moved) items.splice(toMealIdx, 0, moved); // для внутри одного приёма — просто перестановка внутри, но UI пока просто возвращает без перемещения внутри приёма
+        finalMeals = day.meals.map((m: any, idx: number) => idx === fromMealIdx ? { ...m, items, totals: calcItemTotals(items) } : m);
+      } else {
+        finalMeals = mealsCopy;
+      }
+      const totals = calcMealTotals(finalMeals);
+      updateMultiDayPlan(threeDayPlan, resolved.day, 0, () => finalMeals[0].items); // placeholder to trigger setter via direct
+      // напрямую ставим threeDayPlan
+      setThreeDayPlan((prev: any) => {
+        if (!prev?.days?.[resolved.day]) return prev;
+        const days = [...prev.days];
+        days[resolved.day] = { ...days[resolved.day], meals: finalMeals, totals };
+        const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+        return { ...prev, days, totals: allTotals };
+      });
+    } else if (resolved.plan === 'week') {
+      const day = weekPlan?.days?.[resolved.day];
+      if (!day) { setDraggedItem(null); setDropTarget(null); return; }
+      saveUndo();
+      const fromItemsOrig = [...(day.meals[fromMealIdx]?.items || [])];
+      const itm = fromItemsOrig.splice(itemIdx, 1)[0];
+      if (!itm) { setDraggedItem(null); setDropTarget(null); return; }
+      const finalMeals = day.meals.map((m: any, idx: number) => {
+        if (fromMealIdx === toMealIdx && idx === fromMealIdx) {
+          const items = [...(day.meals[idx].items || [])];
+          const moved2 = items.splice(itemIdx, 1)[0];
+          if (moved2) items.push(moved2);
+          return { ...m, items, totals: calcItemTotals(items) };
+        }
+        if (idx === fromMealIdx) return { ...m, items: fromItemsOrig, totals: calcItemTotals(fromItemsOrig) };
+        if (idx === toMealIdx) { const toItems = [...m.items, itm]; return { ...m, items: toItems, totals: calcItemTotals(toItems) }; }
+        return m;
+      });
+      const totals = calcMealTotals(finalMeals);
+      setWeekPlan((prev: any) => {
+        if (!prev?.days?.[resolved.day]) return prev;
+        const days = [...prev.days];
+        days[resolved.day] = { ...days[resolved.day], meals: finalMeals, totals };
+        const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+        return { ...prev, days, totals: allTotals };
+      });
+    }
     setDraggedItem(null); setDropTarget(null);
   };
 
