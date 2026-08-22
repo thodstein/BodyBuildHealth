@@ -84,6 +84,9 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8, fontSize: 10, color: DIM, lineHeight: 1.45 }}>
+        <b style={{ color: '#fff' }}>Как читать Шаг 4:</b> Выберите 2 упражнения — слева/справа: тех.счёт (круг), сеты×репы, RIR/отдых, ЦНС, суставы, безопасность 0-100. Середина — различия типов/суставов/ЦНС. Внизу — детальный разбор техники каждого + итоговая рекомендация по цели (гипертрофия → stretch-mediated, сила → база, иначе → безопасность).
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
         <PopupSelect label="Упражнение A" value={id1} options={allExs.map(e => ({ id: e.id, label: e.name, desc: `${GROUP_RU[e.group] || e.group} · ${TYPE_RU[e.type] || e.type}` }))} hint="Первое" onChange={v => setId1(v)} />
         <PopupSelect label="Упражнение B" value={id2} options={allExs.map(e => ({ id: e.id, label: e.name, desc: `${GROUP_RU[e.group] || e.group} · ${TYPE_RU[e.type] || e.type}` }))} hint="Второе" onChange={v => setId2(v)} />

@@ -164,6 +164,9 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
+      <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8, fontSize: 10, color: DIM, lineHeight: 1.45 }}>
+        <b style={{ color: '#fff' }}>Как читать графики Шага 2:</b> Подрегионы — части мышцы (верх/середина/низ груди и т.д.), число — сколько упражнений покрывает. Тех.счёт 0-100: суставы+сложность+ЦНС+стабильность+мобильность. Круг — визуализация счёта. Фильтры «Щадящий» — скрывают высокую суставную нагрузку. ⭐ — избранное сохраняется в <code>he_elab_fav</code>.
+      </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
         <button onClick={() => setViewMode('subregion')} style={filterBtn(viewMode === 'subregion')}>📐 По подрегионам</button>
         <button onClick={() => setViewMode('list')} style={filterBtn(viewMode === 'list')}>📋 Списком</button>
