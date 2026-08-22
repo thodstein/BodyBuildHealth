@@ -46,6 +46,7 @@ import {
   type DiaryEntryLike,
   type SortState,
 } from '../../diary-helpers';
+import { DiaryHeader } from '../DiaryHeader';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const KEY = 'he_sleep_diary';
@@ -756,120 +757,27 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
         }
       `}</style>
 
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 2,
-          padding: '10px 14px',
-          display: 'flex',
-          gap: 8,
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          background: 'rgba(24,24,27,0.92)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
-          borderBottom: `1px solid ${colors.border}`,
+      <DiaryHeader
+        accent={ACCENT}
+        title="💤 Сон"
+        count={rows.length}
+        onClose={onClose}
+        onAdd={() => openSleepForm(blankEntry(), false)}
+        onToday={() => {
+          const today = todayIso();
+          const existing = rows.find((r) => r.date === today);
+          openSleepForm(existing ? { ...existing } : blankEntry(), !!existing);
         }}
-      >
-        <button style={btnGhost} onClick={onClose} aria-label="Назад к дневникам">
-          ← Дневники
-        </button>
-        <b style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-          💤 Сон
-          <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>{rows.length} записей</span>
-        </b>
-        <div style={{ flex: 1 }} />
-        <button style={btnPrimary} onClick={() => openSleepForm(blankEntry(), false)}>
-          + Записать
-        </button>
-        <button
-          style={btnBase}
-          onClick={() => {
-            const today = todayIso();
-            const existing = rows.find((r) => r.date === today);
-            openSleepForm(existing ? { ...existing } : blankEntry(), !!existing);
-          }}
-        >
-          ⚡ Сегодня
-        </button>
-        {undo && (
-          <button
-            style={{ ...btnBase, borderColor: ACCENT_BORDER, color: ACCENT }}
-            onClick={() => {
-              commit(undo, false);
-              setUndo(null);
-            }}
-          >
-            ↩ Undo
-          </button>
-        )}
-        <div style={{ position: 'relative', marginLeft: 'auto' }}>
-          <button style={btnBase} onClick={() => setExportOpen((v) => !v)} aria-expanded={exportOpen} aria-haspopup="menu">
-            ••• Ещё
-          </button>
-          {exportOpen && (
-            <>
-              <div style={{ position: 'fixed', inset: 0, zIndex: 4 }} onClick={() => setExportOpen(false)} />
-              <div
-                role="menu"
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: 'calc(100% + 8px)',
-                  zIndex: 5,
-                  minWidth: 200,
-                  maxWidth: 'calc(100vw - 20px)',
-                  maxHeight: 'min(60vh, 420px)',
-                  overflowY: 'auto',
-                  padding: 6,
-                  borderRadius: 12,
-                  background: 'rgba(28,28,34,0.98)',
-                  border: `1px solid ${ACCENT_BORDER}`,
-                  boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
-                  display: 'grid',
-                  gap: 2,
-                }}
-              >
-                <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSubtle, textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 10px 2px' }}>
-                  Экспорт
-                </div>
-                <button style={menuItem} role="menuitem" onClick={() => { setExportOpen(false); exportCsv(); }}>
-                  📥 CSV-файл
-                </button>
-                <button style={menuItem} role="menuitem" onClick={() => { setExportOpen(false); print(); }}>
-                  🖨 Печать / PDF
-                </button>
-                <button
-                  style={menuItem}
-                  role="menuitem"
-                  onClick={() => { setExportOpen(false); if (svgRef.current) exportSvgAsFile(svgRef.current, `sleep-${todayIso()}.svg`); }}
-                >
-                  📈 График SVG
-                </button>
-                <button
-                  style={menuItem}
-                  role="menuitem"
-                  onClick={() => { setExportOpen(false); if (svgRef.current) exportSvgAsPng(svgRef.current, `sleep-${todayIso()}.png`); }}
-                >
-                  🖼 График PNG
-                </button>
-                <div style={{ height: 1, background: colors.border, margin: '4px 0' }} />
-                <button
-                  style={{ ...menuItem, color: '#f87171' }}
-                  role="menuitem"
-                  onClick={() => {
-                    setExportOpen(false);
-                    if (window.confirm('Очистить дневник сна? Это действие нельзя отменить.')) commit([]);
-                  }}
-                >
-                  🗑 Очистить дневник
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </header>
+        undoActive={!!undo}
+        onUndo={() => { if (!undo) return; commit(undo, false); setUndo(null); }}
+        exportActions={[
+          { label: '📥 CSV-файл', onClick: exportCsv },
+          { label: '🖨 Печать / PDF', onClick: print },
+          { label: '📈 График SVG', onClick: () => { if (svgRef.current) exportSvgAsFile(svgRef.current, `sleep-${todayIso()}.svg`); } },
+          { label: '🖼 График PNG', onClick: () => { if (svgRef.current) exportSvgAsPng(svgRef.current, `sleep-${todayIso()}.png`); } },
+          { label: '🗑 Очистить дневник', onClick: () => { if (window.confirm('Очистить дневник сна? Это действие нельзя отменить.')) commit([]); }, danger: true },
+        ]}
+      />
 
       <main style={{ padding: '16px 16px 72px', maxWidth: 1100, margin: 'auto' }}>
         {form && <SleepForm value={form} onCancel={() => setForm(null)} onSave={add} targetHours={goals.targetHours} />}
@@ -1125,6 +1033,13 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
                       const next = { ...goals, [key]: Number(e.target.value) };
                       setGoals(next);
                       safeSet(GOALS_KEY, next, 'Не удалось сохранить цели (хранилище переполнено)');
+                      // Синхронизация с хабом he_diary_goals (sleepHours) — двусторонняя связь без дубля
+                      if (key === 'targetHours') {
+                        try {
+                          const hubRaw = JSON.parse(localStorage.getItem('he_diary_goals') || '{}');
+                          localStorage.setItem('he_diary_goals', JSON.stringify({ ...hubRaw, sleepHours: Number(e.target.value) }));
+                        } catch {}
+                      }
                     }}
                   />
                 </label>

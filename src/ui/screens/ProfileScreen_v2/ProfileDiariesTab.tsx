@@ -750,6 +750,13 @@ export const ProfileDiariesTab: React.FC<{
     try {
       localStorage.setItem(GOALS_KEY, JSON.stringify(next));
     } catch {}
+    // Двусторонняя синхронизация sleepHours ↔ he_sleep_goals.targetHours
+    try {
+      const sleepRaw = JSON.parse(localStorage.getItem('he_sleep_goals') || '{}');
+      if (Number.isFinite(next.sleepHours) && next.sleepHours > 0 && sleepRaw.targetHours !== next.sleepHours) {
+        localStorage.setItem('he_sleep_goals', JSON.stringify({ ...sleepRaw, targetHours: next.sleepHours }));
+      }
+    } catch {}
   };
 
   const refresh = () => {

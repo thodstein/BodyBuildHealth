@@ -17,6 +17,7 @@ import {
 } from '../../../../../engines/lms/cardio-diary.engine';
 import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../../../engines/profile-store';
+import { buildWeeklyHistogram, escapeHtml } from '../../diary-helpers';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const ACCENT = '#4ade80';
@@ -133,6 +134,8 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     try { return cardioHrCompliance(activeCycle, log, { days: 28 }); } catch { return null; }
   }, [activeCycle, log]);
 
+  const weeklyHistogram = useMemo(() => buildWeeklyHistogram(log.map(e => ({ date: e.date, value: e.durationMin }))), [log]);
+
   const add = () => {
     const w = validateCardioLogFields({ rpe, hr, km, minutes });
     if (Object.keys(w).length) {
@@ -196,15 +199,12 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
     URL.revokeObjectURL(a.href);
   };
 
-  const escHtml = (v: unknown) =>
-    String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
-
   const printPdf = () => {
     const w = window.open('', '_blank');
     if (!w) return;
     const typeLabel = (id: CardioType) => TYPES.find(t => t.id === id)?.label ?? id;
     const rows = log.map(e =>
-      `<tr><td>${escHtml(e.date)}</td><td>${escHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
+      `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
       `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
       `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td><td>${legDayDates.has(e.date) ? '🦵' : ''}</td></tr>`,
     ).join('');
@@ -311,6 +311,21 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           <div style={{ fontSize: 12, color: colors.textMuted }}>{totalMinutes} мин</div>
         </div>
       </div>
+
+      {weeklyHistogram.length > 0 && (
+        <div style={{ ...glassCard, padding: 12, marginBottom: 12 }}>
+          <div style={{ ...labelStyle, marginBottom: 6 }}>📊 Недельная гистограмма (мин/нед)</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {weeklyHistogram.slice(-8).map(w => (
+              <div key={w.weekStart} style={{ flex: '1 1 80px', textAlign: 'center', padding: '6px 4px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 10, color: colors.textMuted }}>{w.weekStart.slice(5)}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{w.mean.toFixed(0)}</div>
+                <div style={{ fontSize: 10, color: colors.textMuted }}>{w.count} сесс</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Форма записи */}
       <div style={{ ...glassCard, padding: 14, marginBottom: 14 }}>
