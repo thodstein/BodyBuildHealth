@@ -57,6 +57,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
       tools: [
         { icon: '🎯', label: 'Качество+Диагностика', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер жима/суставы/срывы', tab: 'quality_diagnostics' as any },
+        { icon: '🦴', label: 'Суставы + AI', desc: 'JSI теплокарта, deadly combos, тюнинг, нутрицевтики', tab: 'joint_health' as any },
       ],
     },
     {

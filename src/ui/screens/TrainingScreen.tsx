@@ -38,6 +38,7 @@ import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
 import { BBFoundationCard } from './TrainingScreen_parts/BBFoundationCard';
 import { QualityDiagnosticsHub } from './TrainingScreen_parts/QualityDiagnosticsHub';
 import { VolumeHub } from './TrainingScreen_parts/VolumeHub';
+import { JointMasterCard } from './TrainingScreen_parts/JointMasterCard';
 
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { StrengthAnalysisHub } from './TrainingScreen_parts/StrengthAnalysisHub';
@@ -676,7 +677,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','taper_planner']);
+        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','taper_planner','joint_health']);
         // алиасы депрекейтнутых дублей → единые хабы
         const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const : tab === 'calc_taper' ? 'taper_planner' as const : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
@@ -697,6 +698,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'rir_calibration' && <InfoErrorBoundary label="RIR калибратор"><RIRCalibrationCard /></InfoErrorBoundary>}
             {effectiveTab === 'readiness_forecast' && <InfoErrorBoundary label="Прогноз готовности"><ReadinessForecastCard /></InfoErrorBoundary>}
             {effectiveTab === 'taper_planner' && <InfoErrorBoundary label="Планировщик тейпера"><TaperPlannerTab /></InfoErrorBoundary>}
+            {effectiveTab === 'joint_health' && <InfoErrorBoundary label="Суставы + AI"><JointMasterCard /></InfoErrorBoundary>}
             {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
             {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}
           </>);

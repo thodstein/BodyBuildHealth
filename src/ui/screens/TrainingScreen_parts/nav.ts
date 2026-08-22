@@ -60,7 +60,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     tabs: [
       'strength_analysis', 'load_management', 'quality_diagnostics', 'periodization_hub',
       'exercise_lab', 'load_safety', 'volume_hub', 'pri_reppat',
-      'calc_plates', 'rir_calibration', 'readiness_forecast', 'taper_planner',
+      'calc_plates', 'rir_calibration', 'readiness_forecast', 'taper_planner', 'joint_health',
       'training_mix_hub', 'mix_presets', 'bb_foundation',
     ],
   },
