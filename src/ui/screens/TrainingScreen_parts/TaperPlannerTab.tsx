@@ -163,12 +163,16 @@ export const TaperPlannerTab: React.FC = () => {
     }
   }, [plCycles, adjustedTaperWeeks, baseTaperWeeks, taperAgeGroup]);
 
-  // ── Расчёты PL ──
+  // ── Расчёты PL — эффективная усталость с учётом возраста (adjustedTaperWeeks → реальный план)
+  const effectiveFatigue = useMemo(() => {
+    if (adjustedTaperWeeks !== baseTaperWeeks) return adjustedTaperWeeks === 1 ? 30 : adjustedTaperWeeks === 2 ? 50 : 75;
+    return fatigue * 10;
+  }, [adjustedTaperWeeks, baseTaperWeeks, fatigue]);
   const plan: TaperPlan | null = useMemo(() => {
     if (kind !== 'pl' || squat1RM <= 0 || bench1RM <= 0 || deadlift1RM <= 0) return null;
-    try { return taperPlan(meetDate, { squat: squat1RM, bench: bench1RM, deadlift: deadlift1RM }, fatigue * 10, strategy); }
+    try { return taperPlan(meetDate, { squat: squat1RM, bench: bench1RM, deadlift: deadlift1RM }, effectiveFatigue, strategy); }
     catch { return null; }
-  }, [kind, meetDate, squat1RM, bench1RM, deadlift1RM, fatigue, strategy]);
+  }, [kind, meetDate, squat1RM, bench1RM, deadlift1RM, effectiveFatigue, strategy]);
 
   const daysUntil = useMemo(() => {
     const d = new Date(meetDate).getTime() - Date.now();
@@ -267,7 +271,7 @@ export const TaperPlannerTab: React.FC = () => {
             <PopupSelect label="ПЛ-цикл (LMS)" value={selectedPlCycle} options={[{ id: '', label: '— без привязки к циклу —', desc: 'Ручной ввод 1RM' }, ...plCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} (${c.meta.level}, ${c.meta.weeks} нед)`, desc: `${c.meta.direction}` }))]} onChange={handlePlCycleChange} />
             {selectedPlCycleData && (
               <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', fontSize: 10, color: DIM }}>
-                <b style={{ color: ACCENT }}>{selectedPlCycleData.meta.title}</b> · {selectedPlCycleData.meta.direction} · {selectedPlCycleData.meta.weeks} нед · {selectedPlCycleData.meta.level} · {selectedPlCycleData.meta.weeks} нед цикл → тейпер {taperWeeksForFatigue(fatigue * 10)} нед (по усталости) рекомендован.
+                <b style={{ color: ACCENT }}>{selectedPlCycleData.meta.title}</b> · {selectedPlCycleData.meta.direction} · {selectedPlCycleData.meta.weeks} нед · {selectedPlCycleData.meta.level} · {selectedPlCycleData.meta.weeks} нед цикл → тейпер {adjustedTaperWeeks} нед (база {baseTaperWeeks} + возраст {AGE_GROUPS.find(a=>a.id===taperAgeGroup)?.label.split(' ')[0]}) {ageTaperNote ? '· ' + ageTaperNote.split('—')[0] : ''}.
                 <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
                   <button onClick={applyProfilePMs} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.3)', color: ACCENT }}>📥 Подставить ПМ из профиля (LMS → taper)</button>
                 </div>
@@ -365,10 +369,13 @@ export const TaperPlannerTab: React.FC = () => {
           </div>
         )}
 
-        {/* Кривая taper */}
+        {/* Кривая taper — теперь с учётом возраста (effectiveFatigue → adjustedTaperWeeks) */}
         {plan && (
           <div style={CARD}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📊 Кривая taper (объём / интенсивность / RIR)</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📊 Кривая taper (объём / интенсивность / RIR) {adjustedTaperWeeks !== baseTaperWeeks ? <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 400 }}>· {adjustedTaperWeeks} нед с возр. (база {baseTaperWeeks})</span> : null}</div>
+            {ageTaperNote && adjustedTaperWeeks !== baseTaperWeeks && (
+              <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10, color: '#f59e0b' }}>{ageTaperNote} — план построен с эффективной усталостью {effectiveFatigue}.</div>
+            )}
             {plan.taperCurve.map(tw => (
               <div key={tw.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
                 <span style={{ color: ACCENT, fontWeight: 700 }}>Нед {tw.week}</span>
