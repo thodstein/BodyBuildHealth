@@ -3,11 +3,21 @@
  * карточка «Весовая категория» показывает блок НАБОРА до категории,
  * когда текущий вес ниже верхней границы (bw=80 → категория 83).
  */
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { TaperPlannerTab } from '../TaperPlannerTab';
 
+function seedProfile(weight = 80) {
+  try {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { personal: { weight, age: 25, height: 180, sex: 'male' }, training: { pmSquat: 180, pmBench: 120, pmDeadlift: 220 } } }));
+    localStorage.setItem('he_training_profile', JSON.stringify({ pmSquat: 180, pmBench: 120, pmDead: 220 }));
+  } catch {}
+}
+
 describe('TaperPlannerTab — весовая категория (набор веса)', () => {
+  beforeEach(() => { localStorage.clear(); seedProfile(80); });
+  afterEach(() => { cleanup(); localStorage.clear(); });
+
   it('рендерит калькулятор и карточку категории', () => {
     render(<TaperPlannerTab />);
     expect(screen.getByText(/Тапер-планер/)).toBeTruthy();
@@ -29,6 +39,9 @@ describe('TaperPlannerTab — весовая категория (набор ве
 });
 
 describe('TaperPlannerTab — прикиды по умолчанию («Сбалансированная»)', () => {
+  beforeEach(() => { localStorage.clear(); seedProfile(80); });
+  afterEach(() => { cleanup(); localStorage.clear(); });
+
   it('карточка прикидов рендерится с дефолтной сбалансированной стратегией', () => {
     render(<TaperPlannerTab />);
     expect(screen.getByText(/🏆 Прикиды \(Сбалансированная\)/)).toBeTruthy();

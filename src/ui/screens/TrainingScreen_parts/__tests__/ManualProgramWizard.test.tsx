@@ -38,7 +38,7 @@ describe('ManualProgramWizard smoke render', () => {
   it('renders the embedded wizard variant', () => {
     const html = renderWizard(true);
     expect(html).toContain('Визард создания программы — шаг 4 из 4');
-    expect(html).toContain('Программа будет пустой');
+    expect(html).toContain('Пустой каркас');
   });
 
   it('renders nothing when closed', () => {
