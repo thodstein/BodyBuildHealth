@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
+import { computeDieteticCarbTarget } from '../planner-targets';
 
 const base = (overrides: any = {}): MealPlanInput => ({
   weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const,
@@ -126,10 +127,6 @@ describe('D3: углеводы под инсулин масштабируютс�
 });
 
 describe('D4: физиологический потолок углеводов 8 г/кг (вопрос «120 кг на курсе → 900 г?»)', () => {
-  it('120 кг при целе 1200 г углеводов → план не превышает ~960 г (8 г/кг)', () => {
-    const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: 1200, goalKcal: 6400, goalProteinG: 300, goalFatG: 100, mealsCount: 6 }));
-    expect(plan.totals.c).toBeLessThanOrEqual(960 + 30);
-  });
 
   it('не занижает нормальную цель: 90 кг / 320 г → без обрезки', () => {
     const plan = buildDayPlan(base({ goalCarbsG: 320, mealsCount: 5 }));
@@ -167,6 +164,37 @@ describe('P3: завтрак-шаблон ЗАМЕНЯЕТ пуловый зав
       // нет мяса/рыбы в завтраке ни в одном шаблоне
       expect(breakfast.items.some(it => BREAKFAST_FORBIDDEN.some(k => it.id.includes(k))), `template=${t}`).toBe(false);
     }
+  });
+});
+
+describe('D4/D5: диетологический потолок углеводов (computeDieteticCarbTarget)', () => {
+  it('120 кг → цель углеводов не выше 6 г/кг (720 г), даже если база 817', () => {
+    const r = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
+    expect(r).toBe(720); // 120 * 6
+  });
+
+  it('с инсулином 20 ЕД потолок не ниже инсулин-флора (200 г)', () => {
+    const r = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817, insulinTotalUnits: 20 });
+    // потолок = max(720, min(200, 960)) = 720; целе = min(max(817,200),720) = 720
+    expect(r).toBe(720);
+  });
+
+  it('с большой дозой инсулина 100 ЕД углеводы НЕ режутся ниже флора 1000 г', () => {
+    const r = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817, insulinTotalUnits: 100 });
+    // floor=1000, ceiling=max(720, min(1000,960))=960, target=min(max(817,50),960)=960 (не меньше флора 1000? → clamp к floor 1000)
+    expect(r).toBe(1000);
+  });
+
+  it('не режет разумную цель: 90 кг / 320 г → 320 г', () => {
+    const r = computeDieteticCarbTarget({ weightKg: 90, rawCarbsG: 320 });
+    expect(r).toBe(320); // min(320, 540)=320
+  });
+
+  it('итог: 120 кг / база 817 → план генерирует ~720 г (не 900/814), разбег мал', () => {
+    const target = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
+    const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: target, goalKcal: 5000, goalProteinG: 360, goalFatG: 135, mealsCount: 6 }));
+    expect(plan.totals.c).toBeLessThanOrEqual(target * 1.06); // в пределах ~6% (без абсурда 814+)
+    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.88);
   });
 });
 

@@ -13,7 +13,7 @@ import { updateSection } from "../../../../core/profile-manager";
 import { getWeightLog, saveWeightLog } from "../../../../engines/profile-store";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { computePlannerTargets } from "./planner-targets";
+import { computePlannerTargets, computeDieteticCarbTarget } from "./planner-targets";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
@@ -717,25 +717,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
   const effectiveF = Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult);
   // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
-  // ДИЕТОЛОГИЧЕСКИМ потолком. Цель углеводов — г/кг (межсезонье 4-6 г/кг), а не абстрактный
-  // ×множитель (жалобы «120 кг на курсе → 900/814 г углеводов»). При инсулине потолок НЕ ниже
-  // инсулин-флора (~10 г/1 ЕД, до 8 г/кг) — иначе высокие дозы не были бы обеспечены углеводами.
-  // ВАЖНО: потолок применяется ко ВСЕМ уровням (не только enhanced/max) — иначе на base/medium
-  // дисплей по-прежнему показывал бы абсурдные 800+ г.
-  const _hasInsulinC = (injections || []).some((i: any) => String(i?.type || '').toLowerCase().includes('инсулин'));
-  const _insulinCarbFloorC = _hasInsulinC
-    ? Math.round((injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0) * 10)
-    : 0;
+  // ДИЕТОЛОГИЧЕСКИМ потолком (computeDieteticCarbTarget). Цель углеводов — г/кг (межсезонье
+  // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).
+  // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, до 8 г/кг). Применяется ко ВСЕМ
+  // уровням (не только enhanced/max) — иначе на base/medium дисплей по-прежнему показывал бы 800+.
+  const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
   const effectiveC = (() => {
     if (kbjuMode === 'manual' && manualC !== null) return manualC;
     if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
       return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
     }
     const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-    // потолок: 5 г/кг, но не ниже инсулин-флора (без инсулина floor=0 → чистые 5 г/кг)
-    const floor = _insulinCarbFloorC;
-    const cap = Math.max(Math.round(weight * 5), floor, 50);
-    return Math.max(floor, Math.min(Math.max(rawC, 50), cap));
+    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits });
   })();
   // Kcal согласуем с фактическими макросами (Atwater) ВСЕГДА (для auto): display == генерация,
   // чтобы не было «разбега» между целью углеводов и собранным планом. Усиление уровня (nutrMult)
